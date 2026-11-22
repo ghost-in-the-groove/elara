@@ -28,7 +28,10 @@ target_compile_definitions(elara_audio_juce PRIVATE
   JUCE_STANDALONE_APPLICATION=1
   JUCE_USE_CURL=0
   JUCE_WEB_BROWSER=0
-  JUCE_MODAL_LOOPS_PERMITTED=0)
+  JUCE_MODAL_LOOPS_PERMITTED=0
+  # Debug builds would otherwise print "JUCE vX.Y.Z" to stderr at start-up on
+  # macOS and Linux, polluting elara-cli output.
+  JUCE_DISABLE_JUCE_VERSION_PRINTING=1)
 target_compile_options(elara_audio_juce PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 # Strict warnings for our file only; JUCE's module sources compile in this target too.
 elara_source_warnings(backend_juce/src/system_audio.cpp)
