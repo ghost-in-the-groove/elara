@@ -1,0 +1,21 @@
+# Build trees and caches (see CMakePresets.json: everything lands in build/)
+/build/
+/out/
+CMakeUserPresets.json
+compile_commands.json
+.cache/
+
+# IDEs
+.vs/
+.idea/
+*.user
+*.suo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

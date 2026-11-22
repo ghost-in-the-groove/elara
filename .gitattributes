@@ -1,0 +1,22 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Music, audio and sound-bank fixtures are binary
+*.gp   binary
+*.gpx  binary
+*.gp3  binary
+*.gp4  binary
+*.gp5  binary
+*.mid  binary
+*.midi binary
+*.mxl  binary
+*.sf2  binary
+*.sf3  binary
+*.wav  binary
+*.flac binary
+*.ogg  binary
+*.png  binary
+*.otf  binary
+*.ttf  binary
