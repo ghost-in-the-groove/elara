@@ -13,7 +13,7 @@ one pull request, with a test that proves it. Tick the box in the same PR.
 - [x] Qt Quick window with a test-tone button through JUCE; `--smoke-test`
 - [x] CI workflow for Windows, macOS and Linux
 - [x] First green build on Windows (MSVC 19.44, Qt 6.12.1, JUCE 9.0.6)
-- [ ] First green CI run on GitHub (needs the repository to be pushed)
+- [x] First green CI run on GitHub (Windows, macOS, Linux)
 
 ## Milestone 1 - Musical model (`elara_core`)
 

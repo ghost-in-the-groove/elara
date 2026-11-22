@@ -131,6 +131,10 @@ def extract(archive: Path, outdir: Path, version: str, arch: str) -> None:
         extract_raw(archive, staged)
         if (staged / version).is_dir():
             source, target = staged / version, outdir / version
+        elif archive.name.startswith("icu-"):
+            # The Linux ICU archive holds bare libicu*.so files, while Qt's tools
+            # look for them through RPATH $ORIGIN/../lib.
+            source, target = staged, outdir / version / arch / "lib"
         else:
             source, target = staged, outdir / version / arch
         target.mkdir(parents=True, exist_ok=True)
