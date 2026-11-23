@@ -18,8 +18,8 @@ namespace elara::core {
 
 /// Where a note is played on a fretted instrument. `fret` is relative to the capo.
 struct FretPosition {
-    int string = 1;
-    int fret = 0;
+    std::int8_t string = 1;
+    std::int8_t fret = 0;
     friend constexpr bool operator==(const FretPosition&, const FretPosition&) noexcept = default;
 };
 

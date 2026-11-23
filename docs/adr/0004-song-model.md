@@ -31,7 +31,9 @@ notation needs spelled pitches (F# is not Gb).
 
 **Pitch of a note.** A `Note` stores its *sounding* (concert) `Pitch`, spelled,
 plus an optional `FretPosition` on fretted staves. When both are present the
-position must sound the pitch under the staff's tuning and capo. Written pitch
+position must sound the pitch under the staff's tuning and capo. The pitch is the
+one played at that position; note effects (harmonics, bends, slides) change what
+is heard from there and are applied by playback, not stored in the pitch. Written pitch
 (guitar notation is an octave above the sound, a B-flat clarinet a tone above)
 comes from `Instrument::writtenOffset` at display time. Percussion notes store
 the General MIDI percussion key as the pitch's MIDI number; where they sit on the

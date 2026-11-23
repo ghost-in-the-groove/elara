@@ -53,6 +53,8 @@ TEST_CASE("Tuplet defaults to none and rejects non-positive counts", "[core][dur
     CHECK(Tuplet(3, 2).normal() == 2);
     CHECK_THROWS_AS(Tuplet(0, 2), std::invalid_argument);
     CHECK_THROWS_AS(Tuplet(3, -1), std::invalid_argument);
+    CHECK_NOTHROW(Tuplet(Tuplet::kMaxCount, Tuplet::kMaxCount - 1));
+    CHECK_THROWS_AS(Tuplet(Tuplet::kMaxCount + 1, 2), std::invalid_argument);
 }
 
 TEST_CASE("Duration rejects an unsupported number of dots", "[core][duration]") {

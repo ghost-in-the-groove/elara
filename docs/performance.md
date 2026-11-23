@@ -38,3 +38,8 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | insert a measure at the start of that song | 0.29 ms | all 20 staves shift |
 | 2026-11-23 | sum every voice length of that song | 1.6 ms | about 19 ns per beat |
 | 2026-11-23 | seconds at the end of that song (tempo map walk) | 11.6 µs | O(measures); playback will precompute a timeline |
+| 2026-11-23 | build the 20-track song, notes with effects attached | 16.8 ms | `Note` grew from 16 to 80 bytes |
+| 2026-11-23 | build the 20-track song | 13.2 ms | harmonic fret in tenths (int16), `FretPosition` and tuplet counts in one byte each, fields ordered by size: `Note` 48 bytes, `Beat` 64 |
+| 2026-11-23 | copy the 20-track song | 10.7 ms | was 14.8 ms with 80-byte notes; the rest is copying each note's (usually empty) bend curve |
+
+`python scripts/elara.py bench -- "[memory]"` prints the size of the model types.

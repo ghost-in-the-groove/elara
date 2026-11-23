@@ -25,7 +25,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |
 | grupo irregular / tresillo | tuplet / triplet | `Tuplet` | |
-| ligadura de prolongación | tie | `Tie` | Same pitch |
+| ligadura de prolongación | tie | `tiedFromPrevious` | Same pitch, no new attack |
 | ligadura de expresión | slur | `Slur` | |
 | plica | stem | `Stem` | |
 | barra (de corcheas) | beam | `Beam` | |
@@ -38,12 +38,12 @@ base speaks one vocabulary. American terms follow MusicXML.
 | traste | fret | `fret` | Relative to the capo |
 | posición (cuerda/traste) | fret position | `FretPosition` | |
 | cejilla | capo | `capo` | |
-| bend | bend | `Bend` | Curve of (time, pitch) points |
-| ligado ascendente / descendente | hammer-on / pull-off | `Legato` | |
-| deslizamiento | slide | `Slide` | |
-| palm mute | palm mute | `PalmMute` | |
+| bend | bend | `BendCurve` | Points of (percent of the note, cents) |
+| ligado ascendente / descendente | hammer-on / pull-off | `legatoFromPrevious` | Up = hammer-on, down = pull-off |
+| deslizamiento | slide | `SlideIn`, `SlideOut` | |
+| palm mute | palm mute | `palmMute` | |
 | nota muerta | dead note | `deadNote` | |
-| armónico natural / artificial | natural / artificial harmonic | `Harmonic` | |
+| armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | vibrato | vibrato | `Vibrato` | |
 | dinámica | dynamic | `Dynamic` | pp ... ff |
 | repetición / casilla | repeat / volta | `Repeat`, `Volta` | |
