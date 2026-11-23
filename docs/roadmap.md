@@ -81,6 +81,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
+  - [x] Dynamics at the caret, holding until the next change; new notes take
+        the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
