@@ -6,6 +6,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/native_format.hpp>
@@ -383,6 +384,43 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
             }
         }
         doc.execute(makeTranspose(song, what));
+    } else if (verb ==
+               "tuning") { // tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]
+        Retuning what{.track = step.index(1)};
+        std::string notes;
+        std::optional<int> capo;
+        for (std::size_t i = 2; step.has(i); ++i) {
+            const std::string_view word = step.word(i);
+            if (word == "capo") {
+                capo = step.number<int>(++i);
+            } else if (word == "staff") {
+                what.staff = step.index(++i);
+            } else if (word == "frets") {
+                what.keep = Retune::Frets;
+            } else {
+                notes += notes.empty() ? "" : " ";
+                notes += word;
+            }
+        }
+        const Staff& staff = song.track(what.track).staff(what.staff);
+        if (!notes.empty()) {
+            auto tuning = Tuning::preset(notes);
+            if (!tuning) {
+                tuning = Tuning::parse(notes);
+            }
+            if (!tuning) {
+                throw StepSyntaxError(std::format("not a tuning: {}", notes));
+            }
+            what.tuning = *tuning;
+        } else if (staff.tuning()) {
+            what.tuning = *staff.tuning(); // only the capo changes
+        } else {
+            throw std::invalid_argument("the staff has no strings");
+        }
+        what.capo = capo.value_or(staff.capo());
+        if (auto change = makeRetune(song, what)) {
+            doc.execute(std::move(change));
+        }
     } else {
         throw StepSyntaxError(std::format("unknown step: {}", verb));
     }
