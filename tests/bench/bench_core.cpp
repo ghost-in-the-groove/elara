@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Micro-benchmarks for elara_core hot paths. Run optimised builds only:
 //   python scripts/elara.py bench
+#include <elara/core/commands.hpp>
+#include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/song.hpp>
@@ -13,6 +15,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdio>
+#include <memory>
 #include <vector>
 
 using elara::core::Duration;
@@ -133,6 +136,32 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
 
     BENCHMARK("validate the large song (fills, frets, ties)") {
         return elara::core::validate(song).size();
+    };
+}
+
+TEST_CASE("edit benchmarks", "[benchmark][core][document]") {
+    using namespace elara::core;
+    Document doc(largeSong());
+    const Measure edited = doc.song().track(7).staff(0).measure(250);
+
+    // Each run applies an edit and undoes it, so the document is the same after
+    // every run and the history stays empty.
+    BENCHMARK("edit one measure and undo (large song)") {
+        doc.execute(std::make_unique<ReplaceMeasure>(7, 0, 250, edited));
+        doc.undo();
+        return doc.undoCount();
+    };
+
+    BENCHMARK("remove 100 measures from every track and undo (large song)") {
+        doc.execute(std::make_unique<RemoveMeasures>(200, 100));
+        doc.undo();
+        return doc.song().measureCount();
+    };
+
+    BENCHMARK("remove a track and undo (large song)") {
+        doc.execute(std::make_unique<RemoveTrack>(0));
+        doc.undo();
+        return doc.song().trackCount();
     };
 }
 

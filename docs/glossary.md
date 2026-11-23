@@ -23,6 +23,10 @@ base speaks one vocabulary. American terms follow MusicXML.
 | silencio | rest | `Beat::isRest()` | A beat without notes; an empty voice is a measure rest |
 | compás incompleto / sobrecargado | incomplete / overfull voice | `VoiceFill` | Shorter / longer than its time signature |
 | incidencia | issue | `Issue`, `IssueKind` | Inconsistency found by `validate()` |
+| documento | document | `Document` | A song being edited: song + undo/redo history + save point |
+| orden / acción de edición | command | `Command` | One reversible edit (`apply`/`revert`), ADR-0005 |
+| deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
+| punto de guardado | save point | `markSaved()`, `isModified()` | |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |

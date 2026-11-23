@@ -34,6 +34,7 @@ int usageError(std::string_view message);
 // Each group registers its subcommands; a subcommand's callback runs it and stores
 // the exit code in the context.
 void addAudioCommands(CLI::App& app, Context& context);
+void addEditCommands(CLI::App& app, Context& context);
 void addTheoryCommands(CLI::App& app, Context& context);
 
 } // namespace elara::cli

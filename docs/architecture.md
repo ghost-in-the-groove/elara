@@ -37,7 +37,8 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 
 - **One model, many views.** Tablature, staff, piano roll and timeline read the
   same `elara_core` objects (`Song > Track > Staff > Measure > Voice > Beat >
-  Note`, ADR-0004). Edits are commands so undo/redo is uniform.
+  Note`, ADR-0004). A live song is a `Document`: every edit is a reversible
+  command, so undo/redo is uniform (ADR-0005).
 - **Notation is a pure function.** `elara_notation` turns the model into a
   display list (glyphs, lines, positions) without Qt. The app renders that list
   with the Qt scene graph; tests snapshot it as SVG/JSON. Re-layout is
