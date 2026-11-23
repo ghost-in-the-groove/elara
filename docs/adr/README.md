@@ -26,6 +26,7 @@ one that replaces them.
 | [0018](0018-built-in-synthesizer.md) | The built-in synthesizer and offline rendering | Accepted |
 | [0019](0019-real-time-playback.md) | Real-time playback | Accepted |
 | [0020](0020-track-mix.md) | The track mix | Accepted |
+| [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
 
 ## Template
