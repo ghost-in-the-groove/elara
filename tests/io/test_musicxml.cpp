@@ -243,6 +243,45 @@ TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silent
     CHECK(hasWarning(result, "Piano", "grace note"));
 }
 
+// <midi-instrument> holds a part's playback volume, as a percentage, and its pan
+// in degrees: -90 hard left, 90 hard right, beyond that behind the listener.
+// The first instrument of a part sets the track's mix.
+TEST_CASE("MusicXML: a part's MIDI volume and pan set its track's mix", "[musicxml]") {
+    const auto part = [](int number) {
+        return std::format(R"(<part id="P{}"><measure number="1"><attributes>)"
+                           R"(<divisions>1</divisions><time><beats>4</beats>)"
+                           R"(<beat-type>4</beat-type></time></attributes>)"
+                           R"(<note><rest measure="yes"/><duration>4</duration></note>)"
+                           R"(</measure></part>)",
+                           number);
+    };
+    const std::string xml =
+        std::string(R"(<score-partwise version="4.0"><part-list>)"
+                    R"(<score-part id="P1"><part-name>Left</part-name>)"
+                    R"(<midi-instrument id="P1-I1"><midi-program>1</midi-program>)"
+                    R"(<volume>100</volume><pan>-90</pan></midi-instrument></score-part>)"
+                    R"(<score-part id="P2"><part-name>Behind</part-name>)"
+                    R"(<midi-instrument id="P2-I1"><volume>62.5</volume><pan>135</pan>)"
+                    R"(</midi-instrument><midi-instrument id="P2-I2"><volume>10</volume>)"
+                    R"(<pan>-45</pan></midi-instrument></score-part>)"
+                    R"(<score-part id="P3"><part-name>Odd</part-name>)"
+                    R"(<midi-instrument id="P3-I1"><volume>loud</volume><pan>-200</pan>)"
+                    R"(</midi-instrument></score-part>)"
+                    R"(<score-part id="P4"><part-name>Default</part-name></score-part>)"
+                    R"(</part-list>)") +
+        part(1) + part(2) + part(3) + part(4) + "</score-partwise>";
+    const ImportResult result = parse(xml);
+    CHECK(result.warnings.empty());
+    const core::Song& song = result.song;
+    REQUIRE(song.trackCount() == 4);
+    CHECK(song.track(0).mix() == core::TrackMix{.volume = 1.0, .pan = -1.0});
+    // 135 degrees is behind the right shoulder: as far right as 45 in front.
+    CHECK(song.track(1).mix() == core::TrackMix{.volume = 0.625, .pan = 0.5});
+    // A volume that is not a number keeps the default; -200 is out of range.
+    CHECK(song.track(2).mix() == core::TrackMix{});
+    CHECK(song.track(3).mix() == core::TrackMix{});
+}
+
 TEST_CASE("MusicXML: drum notes use the General MIDI keys of their instruments", "[musicxml]") {
     const core::Song song = load("drums.musicxml").song;
     REQUIRE(song.trackCount() == 1);

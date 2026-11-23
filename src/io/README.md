@@ -17,6 +17,10 @@ that uses the model's names and text forms (`"8."`, `"F#3"`, `"6/8"`) and omits
 defaults. Unzip a song to read or diff it. Any model change needs a matching
 change here and in the round-trip test (`tests/io/test_native_format.cpp`).
 
+Every importer reads each track's starting volume, pan and, where the format
+has them, mute and solo into its `TrackMix`; MIDI and MusicXML export write the
+volume and pan back (ADR-0020).
+
 Importers are implemented from public documentation only (CONTRIBUTING.md,
 golden rule 6) and tested against the self-made corpus in `tests/corpus/`
 (`SOURCES.md` lists every file).

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/song.hpp>
 
+#include <algorithm>
 #include <iterator>
 #include <stdexcept>
 #include <utility>
@@ -105,6 +106,26 @@ Track Song::takeTrack(std::size_t index) {
     Track taken = std::move(checkedAt(tracks_, index, "Song: no such track"));
     tracks_.erase(tracks_.begin() + static_cast<std::ptrdiff_t>(index));
     return taken;
+}
+
+void Track::setMix(const TrackMix& mix) {
+    // Written so that NaN fails too.
+    if (!(mix.volume >= 0.0 && mix.volume <= 1.0)) {
+        throw std::invalid_argument("Track: volume must be from 0 to 1");
+    }
+    if (!(mix.pan >= -1.0 && mix.pan <= 1.0)) {
+        throw std::invalid_argument("Track: pan must be from -1 to 1");
+    }
+    mix_ = mix;
+}
+
+bool Song::audible(std::size_t index) const {
+    const TrackMix& mix = track(index).mix();
+    if (mix.mute) {
+        return false;
+    }
+    return mix.solo ||
+           std::ranges::none_of(tracks_, [](const Track& other) { return other.mix().solo; });
 }
 
 Track& Song::track(std::size_t index) {

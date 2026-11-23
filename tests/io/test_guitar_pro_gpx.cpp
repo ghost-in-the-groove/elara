@@ -156,6 +156,9 @@ TEST_CASE("Guitar Pro 6: a compressed file keeps its tracks, tunings and drums",
     const core::Song& song = result.song;
     CHECK(result.warnings ==
           std::vector<std::string>{"Drums: drum notes without a MIDI key dropped (measure 2)"});
+    REQUIRE(song.trackCount() == 2);
+    CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.7, .pan = -0.5});
+    CHECK(song.track(1).mix() == core::TrackMix{.volume = 0.795, .pan = 0.0, .mute = true});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Duet");
     CHECK(song.startTempo() == core::Tempo(132));

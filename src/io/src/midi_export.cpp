@@ -332,6 +332,20 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
         }
         const int program = std::clamp(instrument.midiProgram, 0, 127);
         out.events.push_back(channel(0, detail::kProgramChange, channelNumber, program));
+        // The mix as channel volume and pan; players assume the default ones.
+        const core::TrackMix& mix = track.mix();
+        if (mix.volume != core::TrackMix::kDefaultVolume) {
+            out.events.push_back(channel(0, detail::kController, channelNumber, 7,
+                                         static_cast<int>(std::lround(mix.volume * 127.0))));
+        }
+        if (mix.pan != 0.0) {
+            out.events.push_back(channel(
+                0, detail::kController, channelNumber, 10,
+                std::clamp(static_cast<int>(std::lround(64.0 + (mix.pan * 63.0))), 0, 127)));
+        }
+        if (mix.mute || mix.solo) {
+            trackWarnings[t].add(track.name(), "mute and solo dropped");
+        }
         if (const core::InstrumentKind back = detail::kindForProgram(program, percussion);
             back != instrument.kind) {
             trackWarnings[t].add(track.name(),

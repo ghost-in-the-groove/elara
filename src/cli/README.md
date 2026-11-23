@@ -96,7 +96,8 @@ elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "tim
 
 Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
-`key <m> <key>`, `tempo <bpm>`, `title <text>`,
+`key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
+pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
 step the song rejects (missing track, nothing to undo) with 1.

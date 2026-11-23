@@ -53,6 +53,8 @@ core::Song richSong() {
     song.addTrack(preset("piano"));
     song.addTrack(preset("drum-kit"));
     song.appendMeasures(5);
+    song.track(0).setMix(TrackMix{.volume = 0.65, .pan = -0.5, .mute = false, .solo = true});
+    song.track(3).setMix(TrackMix{.volume = 1.0, .pan = 0.0, .mute = true, .solo = false});
 
     song.measureHeader(1).timeSignature = TimeSignature(6, 8);
     song.measureHeader(1).keySignature = KeySignature(-3, KeyMode::Minor);
@@ -157,6 +159,16 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2]})") != std::string::npos);
     CHECK(json.find(R"({"alternateEndings":[3]})") != std::string::npos);
     CHECK(json.find(R"("repeatStart":false)") == std::string::npos);
+    CHECK(json.find(R"("mix":{"volume":0.65,"pan":-0.5,"solo":true})") != std::string::npos);
+    CHECK(json.find(R"("mix":{"volume":1,"mute":true})") != std::string::npos);
+    CHECK(json.find(R"("mute":false)") == std::string::npos);
+    // The bass and the piano keep the default mix: no "mix" at all.
+    std::size_t mixes = 0;
+    for (auto at = json.find(R"("mix":)"); at != std::string::npos;
+         at = json.find(R"("mix":)", at + 1)) {
+        ++mixes;
+    }
+    CHECK(mixes == 2);
 }
 
 TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
@@ -184,6 +196,14 @@ TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     REQUIRE(at != std::string::npos);
     json.replace(at, 12, R"("pitch":"H5")");
     CHECK(error(json).starts_with("tracks[2].staves[0].measures[2][0][0].notes[0].pitch:"));
+
+    // A volume past full.
+    CHECK(error(R"({"format":"elara","formatVersion":1,"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"mix":{"volume":1.5},"staves":[{"clef":"treble"}]}]})")
+              .starts_with("tracks[0].mix.volume:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"mix":{"pan":"left"},"staves":[{"clef":"treble"}]}]})")
+              .starts_with("tracks[0].mix.pan:"));
 
     // More measures in a staff than in the song.
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",

@@ -58,6 +58,20 @@ private:
 };
 
 /// One instrument with one or more staves.
+/// How a track sits in the mix (ADR-0020): what the mixer shows and playback
+/// follows. A fader position, not a gain: playback turns it into one.
+struct TrackMix {
+    /// General MIDI's default channel volume (100 of 127), rounded.
+    static constexpr double kDefaultVolume = 0.8;
+
+    double volume = kDefaultVolume; ///< from 0 (silent) to 1
+    double pan = 0.0;               ///< from -1 (left) through 0 (centre) to 1 (right)
+    bool mute = false;
+    bool solo = false;
+
+    friend bool operator==(const TrackMix&, const TrackMix&) = default;
+};
+
 class Track {
 public:
     /// Throws std::invalid_argument when `staves` is empty.
@@ -70,6 +84,11 @@ public:
     void setName(std::string name) { name_ = std::move(name); }
 
     [[nodiscard]] const Instrument& instrument() const noexcept { return instrument_; }
+
+    [[nodiscard]] const TrackMix& mix() const noexcept { return mix_; }
+    /// Throws std::invalid_argument when the volume is outside [0, 1] or the pan
+    /// outside [-1, 1] (or either is not a number).
+    void setMix(const TrackMix& mix);
 
     [[nodiscard]] std::size_t staffCount() const noexcept { return staves_.size(); }
 
@@ -85,6 +104,7 @@ private:
     std::string name_;
     Instrument instrument_;
     std::vector<Staff> staves_;
+    TrackMix mix_;
 };
 
 /// Song-wide information about one measure, shared by every staff. Tempo changes
@@ -165,6 +185,10 @@ public:
     void removeTrack(std::size_t index) { (void)takeTrack(index); }
     [[nodiscard]] Track& track(std::size_t index);
     [[nodiscard]] const Track& track(std::size_t index) const;
+
+    /// True when track `index` sounds: it is not muted and, when any track is
+    /// soloed, it is one of them. Throws std::out_of_range for a missing track.
+    [[nodiscard]] bool audible(std::size_t index) const;
 
     /// Inserts `count` empty measures before measure `at` (at == measureCount()
     /// appends) in every staff. Their headers continue the measure before them

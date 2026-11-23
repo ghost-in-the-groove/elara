@@ -2,6 +2,7 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
+  "Clarinet: volume and pan changes dropped",
   "Clarinet: lyrics dropped",
   "gradual tempo changes written as sudden ones",
   "Clarinet: short voices filled with rests (measure 2)"
@@ -41,6 +42,10 @@
      "kind": "fretted",
      "midiProgram": 33,
      "writtenOffset": 12
+    },
+    "mix": {
+     "volume": 0.7,
+     "pan": -0.4
     },
     "staves": [
      {
@@ -104,6 +109,9 @@
     "instrument": {
      "name": "Grand Piano",
      "kind": "keyboard"
+    },
+    "mix": {
+     "volume": 0.795
     },
     "staves": [
      {
@@ -241,6 +249,9 @@
     "instrument": {
      "name": "Drums",
      "kind": "percussion"
+    },
+    "mix": {
+     "volume": 0.9
     },
     "staves": [
      {
@@ -417,6 +428,10 @@
      "kind": "pitched",
      "midiProgram": 71,
      "writtenOffset": 2
+    },
+    "mix": {
+     "volume": 0.6,
+     "pan": 0.5
     },
     "staves": [
      {
