@@ -58,8 +58,11 @@ constexpr double kTieGap = 0.12;    // between a tie end and its notehead
 constexpr double kTieRise = 0.1;    // tie height per staff space of length
 constexpr double kTieMinHeight = 0.35;
 constexpr double kTieMaxHeight = 0.8;
-constexpr double kArticulationGap = 0.3; // between a notehead and its articulation
-constexpr double kRunEndGap = 0.3;       // a technique run ends before the next column
+constexpr double kArticulationGap = 0.3;  // between a notehead and its articulation
+constexpr double kRunEndGap = 0.3;        // a technique run ends before the next column
+constexpr double kTupletGap = 0.4;        // between a tuplet number or bracket and the notes
+constexpr double kTupletHook = 0.6;       // the ends of a tuplet bracket, towards the notes
+constexpr double kTupletNumberGap = 0.25; // either side of the number in its bracket
 
 // ---- Staff positions ----------------------------------------------------------
 
@@ -248,6 +251,25 @@ struct Chord {
     double x = 0.0;
     double stemX = 0.0; // centre of the stem
     double stemStart = 0.0;
+    double inkTop = 0.0; // noteheads, accidentals, stem and flag, or the rest
+    double inkBottom = 0.0;
+};
+
+// Consecutive chords of one voice under one tuplet number.
+struct TupletGroup {
+    std::size_t first = 0;
+    std::size_t last = 0;
+    core::Tuplet tuplet;
+};
+
+// The outer edge of a beam group's primary beam: y = edge + slope * (x - x0).
+struct BeamLine {
+    double edge = 0.0;
+    double slope = 0.0;
+    double x0 = 0.0;
+    bool up = true;
+
+    [[nodiscard]] double at(double x) const { return edge + slope * (x - x0); }
 };
 
 struct Column {
@@ -409,8 +431,12 @@ private:
             }
             incoming_.fill(false);
         }
+        beamLines_.clear();
         for (const std::vector<std::size_t>& group : beamGroups_) {
-            beam(group);
+            beamLines_.push_back(beam(group));
+        }
+        for (const TupletGroup& group : tuplets_) {
+            tuplet(group);
         }
         centreMeasureRests(start, barline);
         if (techniques_) {
@@ -436,6 +462,7 @@ private:
         chords_.clear();
         columns_.clear();
         beamGroups_.clear();
+        tuplets_.clear();
         const core::Measure& measure = staff_.measure(m);
         const TimeSignature time = song_.measureHeader(m).timeSignature;
         const Fraction length = time.measureLength();
@@ -474,6 +501,7 @@ private:
                 chords_.push_back(std::move(chord));
             }
             groupBeams(voiceStart, time);
+            groupTuplets(voiceStart);
         }
         accidentals(m);
         voiceDirections();
@@ -569,6 +597,48 @@ private:
             group.push_back(c);
         }
         flush();
+    }
+
+    // Groups the tuplets of one voice: consecutive chords with the same ratio,
+    // a group closing once its written length is `actual` times a note value no
+    // shorter than any of its chords (three eighths, or a quarter and an eighth,
+    // under a 3).
+    void groupTuplets(std::size_t from) {
+        std::optional<TupletGroup> open;
+        Fraction written;
+        Fraction shortest;
+        const auto close = [&] {
+            if (open) {
+                tuplets_.push_back(*open);
+                open.reset();
+            }
+        };
+        for (std::size_t c = from; c < chords_.size(); ++c) {
+            const Chord& chord = chords_[c];
+            const core::Tuplet tuplet = chord.duration.tuplet();
+            if (open && open->tuplet != tuplet) {
+                close();
+            }
+            if (tuplet.isNone() || chord.measureRest) {
+                close();
+                continue;
+            }
+            const NoteValue value = chord.duration.value();
+            if (!open) {
+                open = TupletGroup{.first = c, .last = c, .tuplet = tuplet};
+                written = Fraction();
+                shortest = core::noteValueLength(value);
+            }
+            open->last = c;
+            written += core::Duration(value, chord.duration.dots()).length();
+            shortest = std::min(shortest, core::noteValueLength(value));
+            const Fraction unit = written / Fraction(tuplet.actual());
+            const std::int64_t den = unit.denominator();
+            if (unit.numerator() == 1 && (den & (den - 1)) == 0 && unit >= shortest) {
+                close();
+            }
+        }
+        close();
     }
 
     // Marks the accidentals the key signature and earlier notes of the measure
@@ -793,14 +863,24 @@ private:
             const Glyph rest = restFor(chord.duration.value());
             const double y = restY(chord, rest);
             glyph(rest, x - metrics(rest).box.southWest.x, y, Role::Rest);
+            chord.inkTop = y - metrics(rest).box.northEast.y;
+            chord.inkBottom = y - metrics(rest).box.southWest.y;
             dots(x + chord.headRight, {y - 0.5}, chord.duration.dots());
             return;
         }
         std::vector<double> dotYs;
+        chord.inkTop = std::numeric_limits<double>::max();
+        chord.inkBottom = std::numeric_limits<double>::lowest();
+        const auto ink = [&chord](const BoundingBox& box, double y) {
+            chord.inkTop = std::min(chord.inkTop, y - box.northEast.y);
+            chord.inkBottom = std::max(chord.inkBottom, y - box.southWest.y);
+        };
         for (const Head& head : chord.heads) {
             glyph(head.glyph, x + head.dx, yOf(head.step), Role::Notehead);
+            ink(metrics(head.glyph).box, yOf(head.step));
             if (head.accidental) {
                 glyph(*head.accidental, x + head.accidentalX, yOf(head.step), Role::Accidental);
+                ink(metrics(*head.accidental).box, yOf(head.step));
             }
             const bool onLine = head.step % 2 == 0;
             const bool lower = voiceCount_ > 1 && !voiceUp_[chord.voice];
@@ -827,6 +907,8 @@ private:
                                ? std::min(yOf(chord.heads.front().step) - length, kMiddleLine)
                                : std::max(yOf(chord.heads.back().step) + length, kMiddleLine);
         line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
+        chord.inkTop = std::min(chord.inkTop, tip);
+        chord.inkBottom = std::max(chord.inkBottom, tip);
         if (beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
             const Point attach = metrics(flag)
@@ -877,7 +959,7 @@ private:
     // half the interval between its outer notes (one staff space at most, flat
     // when an inner note reaches beyond both), and lies far enough from every
     // notehead.
-    void beam(const std::vector<std::size_t>& group) {
+    BeamLine beam(const std::vector<std::size_t>& group) {
         const bool up = chords_[group.front()].stemUp;
         const double stemWidth = defaults_.stemThickness;
         const double thickness = defaults_.beamThickness;
@@ -920,13 +1002,16 @@ private:
         } else if (!up && nearest < kMiddleLine) {
             edge += kMiddleLine - nearest;
         }
+        const BeamLine beamLine{.edge = edge, .slope = slope, .x0 = first.stemX, .up = up};
         const auto edgeAt = [&](double x) {
-            return edge + slope * (x - first.stemX);
+            return beamLine.at(x);
         };
         for (const std::size_t c : group) {
-            const Chord& chord = chords_[c];
-            line({chord.stemX, chord.stemStart}, {chord.stemX, edgeAt(chord.stemX)}, stemWidth,
-                 Role::Stem);
+            Chord& chord = chords_[c];
+            const double tip = edgeAt(chord.stemX);
+            line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
+            chord.inkTop = std::min(chord.inkTop, tip);
+            chord.inkBottom = std::max(chord.inkBottom, tip);
         }
         const double step = thickness + defaults_.beamSpacing;
         for (int level = 1; level <= levels; ++level) {
@@ -960,6 +1045,77 @@ private:
                 i = j + 1;
             }
         }
+        return beamLine;
+    }
+
+    // ---- Tuplets ----
+
+    // The number of a tuplet on the stem side: alone beyond the beam when one
+    // beam carries the whole group and only tuplets, else in the gap of a
+    // bracket beyond the notes from the first notehead to the last.
+    void tuplet(const TupletGroup& group) {
+        const Chord& first = chords_[group.first];
+        const Chord& last = chords_[group.last];
+        const int beamGroup = first.beamGroup;
+        bool beamed = beamGroup >= 0;
+        for (std::size_t c = group.first; beamed && c <= group.last; ++c) {
+            beamed = chords_[c].beamGroup == beamGroup;
+        }
+        if (beamed) {
+            beamed = std::ranges::none_of(
+                beamGroups_[static_cast<std::size_t>(beamGroup)],
+                [this](std::size_t c) { return chords_[c].duration.tuplet().isNone(); });
+        }
+        const std::string digits = std::to_string(group.tuplet.actual());
+        double width = 0.0;
+        double top = std::numeric_limits<double>::lowest(); // SMuFL y, up
+        double bottom = std::numeric_limits<double>::max();
+        for (const char digit : digits) {
+            const BoundingBox& box = metrics(offsetGlyph(Glyph::Tuplet0, digit - '0')).box;
+            width += box.width();
+            top = std::max(top, box.northEast.y);
+            bottom = std::min(bottom, box.southWest.y);
+        }
+        // Draws the digits centred on x with their baseline at `origin`.
+        const auto number = [&](double x, double origin) {
+            double from = x - width / 2;
+            for (const char digit : digits) {
+                from =
+                    glyphFrom(offsetGlyph(Glyph::Tuplet0, digit - '0'), from, origin, Role::Tuplet);
+            }
+        };
+        if (beamed) {
+            const BeamLine& beam = beamLines_[static_cast<std::size_t>(beamGroup)];
+            const double x = (first.stemX + last.stemX) / 2;
+            const double edge = beam.at(x);
+            number(x, beam.up ? edge - kTupletGap + bottom : edge + kTupletGap + top);
+            return;
+        }
+        bool up = voiceCount_ > 1 ? voiceUp_[first.voice] : true;
+        for (std::size_t c = group.first; c <= group.last; ++c) {
+            if (!chords_[c].rest) {
+                up = chords_[c].stemUp;
+                break;
+            }
+        }
+        double closest =
+            up ? std::numeric_limits<double>::max() : std::numeric_limits<double>::lowest();
+        for (std::size_t c = group.first; c <= group.last; ++c) {
+            closest =
+                up ? std::min(closest, chords_[c].inkTop) : std::max(closest, chords_[c].inkBottom);
+        }
+        const double reach = kTupletGap + std::max(kTupletHook, (top - bottom) / 2);
+        const double y = up ? closest - reach : closest + reach;
+        const double left = first.x + first.headLeft;
+        const double right = last.x + last.headRight;
+        const double middle = (left + right) / 2;
+        const double hook = y + (up ? kTupletHook : -kTupletHook);
+        const double thickness = defaults_.tupletBracketThickness;
+        line({left, hook}, {left, y}, thickness, Role::Tuplet);
+        line({left, y}, {middle - width / 2 - kTupletNumberGap, y}, thickness, Role::Tuplet);
+        line({middle + width / 2 + kTupletNumberGap, y}, {right, y}, thickness, Role::Tuplet);
+        line({right, y}, {right, hook}, thickness, Role::Tuplet);
+        number(middle, y + (top + bottom) / 2);
     }
 
     // ---- Ties, articulations and techniques ----
@@ -1131,6 +1287,8 @@ private:
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
     std::vector<std::vector<std::size_t>> beamGroups_;
+    std::vector<BeamLine> beamLines_; // of the beam groups, as drawn
+    std::vector<TupletGroup> tuplets_;
 };
 
 double StandardWriter::header(std::size_t first) {
