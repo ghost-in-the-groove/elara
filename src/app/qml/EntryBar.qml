@@ -181,7 +181,7 @@ Rectangle {
             contentItem: MusicSymbol {
                 // The tuplet's number in the music font's tuplet digits.
                 symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
-                size: 22
+                size: 30
                 color: tuplet.on ? "white" : root.ink
             }
 
