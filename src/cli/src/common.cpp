@@ -57,8 +57,15 @@ std::string jsonEscape(std::string_view text) {
 }
 
 std::string jsonNumber(double value) {
-    const double rounded = std::round(value * 10'000.0) / 10'000.0;
-    return std::format("{}", rounded == 0.0 ? 0.0 : rounded);
+    // Fixed-point, not the shortest form, which writes 0.0003 as "3e-04".
+    std::string text = std::format("{:.4f}", value);
+    if (text.find('.') != std::string::npos) {
+        text.erase(text.find_last_not_of('0') + 1);
+        if (text.back() == '.') {
+            text.pop_back();
+        }
+    }
+    return text == "-0" ? "0" : text;
 }
 
 std::filesystem::path executableDirectory() {
@@ -114,6 +121,13 @@ std::expected<core::Song, std::string> openSong(const std::filesystem::path& pat
         return std::unexpected(opened.error().message);
     }
     return std::move(opened->song);
+}
+
+std::optional<core::Tuning> tuningFromOption(std::string_view text) {
+    if (auto preset = core::Tuning::preset(text)) {
+        return preset;
+    }
+    return core::Tuning::parse(text);
 }
 
 int fail(std::string_view message) {

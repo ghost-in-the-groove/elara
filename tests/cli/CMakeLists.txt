@@ -25,6 +25,45 @@ add_test(NAME cli.rejects_bad_arguments
   COMMAND elara-cli render-tone --out "${_tone_wav}" --frequency 5)
 set_tests_properties(cli.rejects_bad_arguments PROPERTIES WILL_FAIL TRUE)
 
+# The tuner hears the test tone: 440 Hz is A4, and 31.8 cents sharp of an A4 at 432 Hz.
+add_test(NAME cli.tune_tone COMMAND elara-cli --json tune "${_tone_wav}")
+set_tests_properties(cli.tune_tone PROPERTIES
+  FIXTURES_REQUIRED tone_wav
+  PASS_REGULAR_EXPRESSION "\"sampleRate\":48000,\"windows\":13,\"pitched\":13,\"a4\":440,\"frequency\":(439\\.99[0-9]*|440(\\.00[0-9]*)?),\"note\":\"A4\",\"cents\":-?0(\\.0[0-9]*)?,\"clarity\":(0\\.99[0-9]*|1)}")
+
+add_test(NAME cli.tune_reference COMMAND elara-cli tune "${_tone_wav}" --a4 432)
+set_tests_properties(cli.tune_reference PROPERTIES
+  FIXTURES_REQUIRED tone_wav
+  PASS_REGULAR_EXPRESSION "^A4 \\+31\\.8 cents \\(440\\.00 Hz, clarity [0-9.]+, 13 of 13 windows\\)")
+
+set(_low_a_wav "${CMAKE_CURRENT_BINARY_DIR}/low_a.wav")
+add_test(NAME cli.tune_render_low_a
+  COMMAND elara-cli render-tone --out "${_low_a_wav}" --frequency 110 --seconds 0.5)
+set_tests_properties(cli.tune_render_low_a PROPERTIES FIXTURES_SETUP low_a_wav)
+
+add_test(NAME cli.tune_string COMMAND elara-cli --json tune "${_low_a_wav}" --tuning guitar)
+set_tests_properties(cli.tune_string PROPERTIES
+  FIXTURES_REQUIRED low_a_wav
+  PASS_REGULAR_EXPRESSION "\"note\":\"A2\",\"cents\":-?0(\\.0[0-9]*)?,\"clarity\":[0-9.]+,\"tuning\":\"[^\"]+\",\"string\":5,\"stringPitch\":\"A2\",\"stringCents\":-?0(\\.0[0-9]*)?}")
+
+add_test(NAME cli.tune_string_text COMMAND elara-cli tune "${_low_a_wav}" --tuning "D2 A2 D3 G3 B3 E4")
+set_tests_properties(cli.tune_string_text PROPERTIES
+  FIXTURES_REQUIRED low_a_wav
+  PASS_REGULAR_EXPRESSION "\nstring 5 \\(A2\\) \\+0\\.0 cents")
+
+add_test(NAME cli.tune_rejects_missing_file
+  COMMAND elara-cli tune "${CMAKE_CURRENT_BINARY_DIR}/missing.wav")
+set_tests_properties(cli.tune_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.tune_rejects_other_files COMMAND elara-cli tune "${ELARA_CORPUS}/gp/band.gp")
+set_tests_properties(cli.tune_rejects_other_files PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.tune_rejects_unknown_tuning
+  COMMAND elara-cli tune "${_tone_wav}" --tuning banjo-9)
+set_tests_properties(cli.tune_rejects_unknown_tuning PROPERTIES
+  FIXTURES_REQUIRED tone_wav
+  WILL_FAIL TRUE)
+
 add_test(NAME cli.pitch_from_text COMMAND elara-cli --json pitch "F#3")
 set_tests_properties(cli.pitch_from_text PROPERTIES
   PASS_REGULAR_EXPRESSION "\"pitch\":\"F#3\",\"step\":\"F\",\"alter\":1,\"octave\":3,\"midi\":54,")
@@ -147,6 +186,26 @@ set_tests_properties(cli.edit_sets_track_mix PROPERTIES
 add_test(NAME cli.edit_rejects_mix_out_of_range
   COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
 set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
+
+# Keyboard entry at a caret (ADR-0021).
+add_test(NAME cli.edit_types_frets_at_the_caret
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "caret 0 0 0 6"
+    "duration 8" "fret 3" right up "fret 2" right "duration 4" "fret 0")
+set_tests_properties(cli.edit_types_frets_at_the_caret PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":3,\"notes\":3}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":2,\"string\":5,\"freeSlot\":false},\"input\":\"4\",\"undo\":{\"count\":5,\"next\":\"Enter note\"}")
+
+add_test(NAME cli.edit_deletes_at_the_caret
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
+    "fret 0" "duration 2" delete delete)
+set_tests_properties(cli.edit_deletes_at_the_caret PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":0,\"notes\":0}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":1,\"freeSlot\":true},\"input\":\"2\",\"undo\":{\"count\":6,\"next\":\"Delete\"}")
+
+add_test(NAME cli.edit_rejects_caret_outside_song
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
+set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.edit_rejects_fret_without_track COMMAND elara-cli edit "fret 3")
+set_tests_properties(cli.edit_rejects_fret_without_track PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "explode 2")
 set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)

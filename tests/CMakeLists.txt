@@ -30,6 +30,7 @@ elara_add_unit_tests(core
     core/test_timeline.cpp
     core/test_document.cpp
     core/test_effects.cpp
+    core/test_entry.cpp
     core/test_validation.cpp
     core/test_performance.cpp
     core/test_transpose.cpp
@@ -39,7 +40,7 @@ target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PR
 elara_add_unit_tests(audio
   SOURCES audio/test_offline_renderer.cpp audio/test_player.cpp audio/test_sequence.cpp
           audio/test_synth.cpp audio/test_tone_generator.cpp
-          audio/test_wav_writer.cpp
+          audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
   LIBRARIES elara::audio)
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives

@@ -75,7 +75,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 6 - Practice tools
 
 - [ ] Metronome with count-in, A-B loop, speed 25-200 %
-- [ ] Tuner (microphone input, pitch detection)
+- [ ] Tuner: pitch detection and `elara-cli tune` done (ADR-0028); microphone input and the app panel to do
 
 ## Milestone 7 - Distribution
 

@@ -5,6 +5,7 @@ add_library(elara_core STATIC
   src/document.cpp
   src/duration.cpp
   src/effects.cpp
+  src/entry.cpp
   src/fraction.cpp
   src/fret_placement.cpp
   src/instrument.cpp

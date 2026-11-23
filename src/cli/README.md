@@ -8,6 +8,7 @@ elara-cli [--json] version
 elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [--sample-rate 48000]
 elara-cli [--json] devices
 elara-cli [--json] tone [--frequency 440] [--seconds 1]
+elara-cli [--json] tune <FILE.wav> [--a4 440] [--tuning guitar]   # the tuner's reading of a recording
 elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
 elara-cli [--json] fret --string N --fret N [--tuning guitar] [--capo 0] [--flats]
 elara-cli [--json] positions <PITCH> [--tuning guitar] [--capo 0] [--max-fret 30]
@@ -34,6 +35,13 @@ spelling, MIDI number and equal-tempered frequency. `--tuning` takes a preset
 name from `tunings` or open strings from the lowest tab line, e.g.
 `"D2 A2 D3 G3 B3 E4"`. Durations are written as in `rests`: `4` quarter, `8.`
 dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
+
+`tune` reads a WAV file (PCM or float, channels mixed to mono), detects the
+pitch in windows half a window apart (ADR-0028) and reports the median of the
+windows that have a clear one: `{"file", "sampleRate", "windows", "pitched",
+"a4", "frequency", "note", "cents", "clarity"}`, and with `--tuning` also
+`"tuning", "string", "stringPitch", "stringCents"` for the nearest open string.
+It fails when no window has a clear pitch.
 
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
@@ -109,6 +117,15 @@ interval leads to: C# up a semitone in C major is D. Key signatures move when
 every pitched track does; drums never move. A fretted note keeps its string when
 its new fret is on the neck, else takes the nearest free string; a note no
 string can play rejects the step.
+
+Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
+`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
+string (adding a beat of the input duration on the free slot after the last
+beat of a short measure), `duration <d>` sets the input duration and the
+caret beat's, `delete` removes the note on the caret's string (or the rest),
+`delete-beat` the whole beat, and `insert-rest` adds a rest before it. The
+output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

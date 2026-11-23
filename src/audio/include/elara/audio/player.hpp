@@ -45,6 +45,12 @@ public:
     /// Holds the position; sounding notes are released and ring out.
     void pause() noexcept;
 
+    /// Takes every track's mix (ADR-0020) from `song`, the song last loaded
+    /// with its mix since changed, without loading it again: the audio thread
+    /// moves to the new levels over its next block. Does nothing when `song`
+    /// does not have the loaded song's number of tracks.
+    void updateMix(const core::Song& song) noexcept;
+
     /// Moves to `seconds` (clamped to the song), silencing what sounds.
     /// Notes that started earlier are not struck again.
     void seek(double seconds) noexcept;
@@ -75,6 +81,7 @@ private:
     std::size_t maxBlockFrames_;
     double duration_ = 0.0; // control thread
 
+    Loaded* latest_ = nullptr;              // control thread: the song last loaded
     std::atomic<Loaded*> pending_{nullptr}; // control -> audio
     std::atomic<Loaded*> retired_{nullptr}; // audio -> control, for tidy()
     std::atomic<bool> playing_{false};
