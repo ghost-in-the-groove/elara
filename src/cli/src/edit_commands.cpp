@@ -4,6 +4,7 @@
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/native_format.hpp>
 
@@ -74,7 +75,10 @@ public:
 
     template <typename T>
     [[nodiscard]] T number(std::size_t i) const {
-        const std::string_view text = word(i);
+        std::string_view text = word(i);
+        if (text.size() > 1 && text.front() == '+') {
+            text.remove_prefix(1); // "+2" as well as "2"
+        }
         T value{};
         const auto* end = text.data() + text.size();
         const auto [ptr, error] = std::from_chars(text.data(), end, value);
@@ -212,6 +216,26 @@ void runStep(Document& doc, const Step& step) {
                 throw std::runtime_error("the voice cannot be completed with rests");
             }
         }));
+    } else if (verb == "transpose") { // transpose <semitones> [measures <m> <n>] [tracks <t>...]
+        Transposition what{.semitones = step.number<int>(1)};
+        for (std::size_t i = 2; step.has(i);) {
+            if (step.word(i) == "measures") {
+                what.first = step.index(i + 1);
+                what.count = step.index(i + 2);
+                i += 3;
+            } else if (step.word(i) == "tracks") {
+                for (++i; step.has(i) && step.word(i) != "measures"; ++i) {
+                    what.tracks.push_back(step.index(i));
+                }
+                if (what.tracks.empty()) {
+                    throw StepSyntaxError("transpose: tracks needs at least one track");
+                }
+            } else {
+                throw StepSyntaxError(
+                    std::format("transpose: expected measures or tracks: {}", step.word(i)));
+            }
+        }
+        doc.execute(makeTranspose(song, what));
     } else {
         throw StepSyntaxError(std::format("unknown step: {}", verb));
     }
@@ -298,7 +322,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
-        "undo, redo, save");
+        "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

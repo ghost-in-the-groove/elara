@@ -11,6 +11,7 @@ add_library(elara_core STATIC
   src/pitch.cpp
   src/signature.cpp
   src/song.cpp
+  src/transpose.cpp
   src/tuning.cpp
   src/validation.cpp
   src/version.cpp)

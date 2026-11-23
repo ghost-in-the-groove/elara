@@ -59,6 +59,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | altura | pitch | `Pitch` | step + alter + octave |
 | nombre de nota | step | `Step` | C D E F G A B |
 | enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
+| intervalo | interval | `Interval` | Diatonic steps and semitones: a major second is {1, 2} |
+| transposición | transposition | `Transposition`, `makeTranspose()` | Moving notes by an interval; keys follow when every pitched track moves (ADR-0026) |
 | afinación | tuning | `Tuning` | |
 | cuerda | string | `string` (index) | 1 = highest |
 | traste | fret | `fret` | Relative to the capo |
