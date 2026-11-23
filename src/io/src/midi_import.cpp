@@ -636,7 +636,9 @@ public:
             }
             ++withPoints;
             exactGrid[c] = exactFor(c);
-            exact += exactGrid[c] ? 1 : 0;
+            if (exactGrid[c]) {
+                ++exact;
+            }
         }
         const bool quantized = withPoints == 0 || exact * 10 >= withPoints * 9;
         for (std::size_t c = 0; c < points_.size(); ++c) {
