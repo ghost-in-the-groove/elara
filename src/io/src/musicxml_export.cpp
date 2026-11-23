@@ -897,7 +897,9 @@ private:
         std::size_t voices = 0;
         for (const Voice& voice : measure.voices) {
             Fraction onset;
-            voices += voice.isEmpty() ? 0 : 1;
+            if (!voice.isEmpty()) {
+                ++voices;
+            }
             for (const Beat& beat : voice.beats) {
                 for (const Note& note : beat.notes) {
                     onsets.push_back(Onset{.onset = onset, .dynamic = note.effects.dynamic});
