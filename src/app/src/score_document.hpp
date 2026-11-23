@@ -25,6 +25,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace elara::audio {
@@ -165,7 +166,9 @@ public:
     [[nodiscard]] int keyFifths() const;
     [[nodiscard]] bool keyMinor() const;
     /// One map per track: name, instrument, detail (strings and tuning, or the
-    /// kind of instrument) and symbol (a clef of the music font).
+    /// kind of instrument), symbol (a clef of the music font) and its mix:
+    /// volume (0 to 1), pan (-1 to 1), mute, solo, and audible when it sounds
+    /// (ADR-0039).
     [[nodiscard]] QVariantList tracks() const;
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
@@ -195,6 +198,14 @@ public:
     Q_INVOKABLE void addTrack(const QString& presetId);
     /// Removes a track; the last track of a song cannot be removed.
     Q_INVOKABLE void removeTrack(int index);
+    /// Sets a track's mix as one undo step ("Change mix"); playback carries on
+    /// with it (ADR-0039).
+    Q_INVOKABLE void setTrackMix(int track, double volume, double pan, bool mute, bool solo);
+    /// Lets playback hear a track's volume and pan while a fader moves, without
+    /// changing the song: setTrackMix() keeps it when the fader is let go.
+    Q_INVOKABLE void previewTrackMix(int track, double volume, double pan);
+    /// The mixes previewTrackMix() last made, one per track.
+    [[nodiscard]] std::span<const core::TrackMix> previewMixes() const { return previewMixes_; }
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
     /// Saves the song as a .elara file (the extension is added when missing).
@@ -257,6 +268,8 @@ signals:
     void inputChanged();
     /// An edit or a save that failed, with the reason to show.
     void editFailed(const QString& message);
+    /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
+    void mixPreviewed();
 
 private:
     bool execute(std::unique_ptr<core::Command> command);
@@ -283,6 +296,7 @@ private:
     QString errorMessage_;
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
+    std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show

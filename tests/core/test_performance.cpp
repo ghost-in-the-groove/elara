@@ -79,10 +79,16 @@ TEST_CASE("Sounding notes start where their beat starts and last their written l
          .length = Fraction(1, 12),
          .key = 50,
          .velocity = 80,
-         .measure = 1,
-         .beat = 1},
+         .beat = 1,
+         .measure = 1},
     };
     CHECK(soundingNotes(song) == expected);
+}
+
+TEST_CASE("A sounding note stays small", "[core][performance]") {
+    // The sequencer streams hundreds of thousands of these: the address of
+    // the written note must not make them larger.
+    STATIC_CHECK(sizeof(SoundingNote) == 80);
 }
 
 TEST_CASE("Tied notes sound as one note, across measures and only on the same pitch",
@@ -108,14 +114,14 @@ TEST_CASE("Tied notes sound as one note, across measures and only on the same pi
          .length = Fraction(1, 4),
          .key = 65,
          .velocity = 80,
-         .measure = 1,
-         .note = 1},
+         .note = 1,
+         .measure = 1},
         {.start = Fraction(7, 4),
          .length = Fraction(1, 4),
          .key = 60,
          .velocity = 80,
-         .measure = 1,
-         .beat = 3},
+         .beat = 3,
+         .measure = 1},
     };
     CHECK(soundingNotes(song) == expected);
 }

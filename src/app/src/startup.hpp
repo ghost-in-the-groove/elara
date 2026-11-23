@@ -13,7 +13,12 @@
 
 #include <deque>
 #include <functional>
+#include <memory>
 #include <optional>
+
+namespace elara::audio {
+class Sequence;
+} // namespace elara::audio
 
 namespace elara::app {
 
@@ -46,6 +51,7 @@ private:
     void queueSteps();
     void queueEdits();
     void queueEntry();
+    void queueMix();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     [[nodiscard]] bool checking() const;
@@ -66,9 +72,11 @@ private:
     bool queued_ = false;
     qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
-    QString editProblem_;         ///< the first edit check that failed
-    QString failure_;             ///< set by a step that went wrong
-    bool entering_ = false;       ///< whether the shown track takes frets
+    /// What playback played before the mix changed.
+    std::shared_ptr<const audio::Sequence> sequenceBefore_;
+    QString editProblem_;   ///< the first edit check that failed
+    QString failure_;       ///< set by a step that went wrong
+    bool entering_ = false; ///< whether the shown track takes frets
 };
 
 } // namespace elara::app

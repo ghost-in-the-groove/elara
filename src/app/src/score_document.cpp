@@ -545,9 +545,15 @@ QVariantList ScoreDocument::tracks() const {
     const QStringList names = trackNames();
     for (std::size_t t = 0; t < song_->trackCount(); ++t) {
         const core::Track& track = song_->track(t);
+        const core::TrackMix& mix = track.mix();
         list.append(QVariantMap{{QStringLiteral("name"), names[static_cast<qsizetype>(t)]},
                                 {QStringLiteral("detail"), trackDetail(track)},
-                                {QStringLiteral("symbol"), trackSymbol(track)}});
+                                {QStringLiteral("symbol"), trackSymbol(track)},
+                                {QStringLiteral("volume"), mix.volume},
+                                {QStringLiteral("pan"), mix.pan},
+                                {QStringLiteral("mute"), mix.mute},
+                                {QStringLiteral("solo"), mix.solo},
+                                {QStringLiteral("audible"), song_->audible(t)}});
     }
     return list;
 }
@@ -748,7 +754,12 @@ bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {
 void ScoreDocument::edited() {
     ++edits_;
     song_ = std::make_shared<const core::Song>(document_->song());
-    sequence_ = std::make_shared<const audio::Sequence>(*song_); // playback hears the edit
+    // Playback hears the edit. A sequence that plays as before (the mix or the
+    // song's info changed) stays the one playback has, so it carries on.
+    auto sequence = std::make_shared<const audio::Sequence>(*song_);
+    if (!sequence_ || *sequence != *sequence_) {
+        sequence_ = std::move(sequence);
+    }
     const auto tracks = static_cast<int>(song_->trackCount());
     if (track_ >= tracks) {
         track_ = std::max(0, tracks - 1);
@@ -758,6 +769,38 @@ void ScoreDocument::edited() {
     emit songChanged();
     emit historyChanged();
     relayout();
+}
+
+void ScoreDocument::setTrackMix(int track, double volume, double pan, bool mute, bool solo) {
+    if (!document_ || track < 0 ||
+        static_cast<std::size_t>(track) >= document_->song().trackCount() ||
+        !std::isfinite(volume) || !std::isfinite(pan)) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(track);
+    const core::TrackMix mix{.volume = std::clamp(volume, 0.0, 1.0),
+                             .pan = std::clamp(pan, -1.0, 1.0),
+                             .mute = mute,
+                             .solo = solo};
+    if (mix == document_->song().track(index).mix()) {
+        return;
+    }
+    execute(std::make_unique<core::SetTrackMix>(index, mix));
+}
+
+void ScoreDocument::previewTrackMix(int track, double volume, double pan) {
+    if (!song_ || track < 0 || static_cast<std::size_t>(track) >= song_->trackCount() ||
+        !std::isfinite(volume) || !std::isfinite(pan)) {
+        return;
+    }
+    previewMixes_.clear();
+    for (std::size_t t = 0; t < song_->trackCount(); ++t) {
+        previewMixes_.push_back(song_->track(t).mix());
+    }
+    core::TrackMix& mix = previewMixes_[static_cast<std::size_t>(track)];
+    mix.volume = std::clamp(volume, 0.0, 1.0);
+    mix.pan = std::clamp(pan, -1.0, 1.0);
+    emit mixPreviewed();
 }
 
 void ScoreDocument::fail(const QString& message) {
