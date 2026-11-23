@@ -235,3 +235,175 @@ TEST_CASE("Entry: a whole beat goes, and a rest is inserted before the caret", "
     CHECK(run(doc, insertRest(doc.song(), at(0, 2), kQuarter)) == at(0, 2));
     CHECK(firstVoice(doc.song(), 0).beats.size() == 3);
 }
+
+// ---- Note names ---------------------------------------------------------------------
+
+namespace {
+
+/// A flute in 4/4 over two empty measures.
+Song fluteSong() {
+    Song song;
+    song.appendMeasures(2);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("flute")));
+    return song;
+}
+
+} // namespace
+
+TEST_CASE("Entry: a note name on the free slot adds the nearest such note", "[core][entry]") {
+    Document doc(fluteSong());
+    Entry entry = enterPitch(doc.song(), at(0, 0), Step::C, kQuarter);
+    REQUIRE(entry.command != nullptr);
+    CHECK(entry.command->name() == "Enter note");
+    CHECK(run(doc, std::move(entry)) == at(0, 0));
+    // Nothing before it: the C nearest the middle line of the treble staff (B4).
+    const Voice& voice = firstVoice(doc.song(), 0);
+    REQUIRE(voice.beats.size() == 1);
+    CHECK(voice.beats[0] ==
+          Beat{.duration = kQuarter, .notes = {Note{.pitch = Pitch(Step::C, 0, 5)}}});
+}
+
+TEST_CASE("Entry: each note name follows the previous note, across measures", "[core][entry]") {
+    Document doc(fluteSong());
+    Caret caret = at(0, 0);
+    const auto type = [&](Step step) {
+        caret = run(doc, enterPitch(doc.song(), caret, step, kQuarter));
+        const Beat& beat = firstVoice(doc.song(), caret.measure).beats[caret.beat];
+        caret = moveCaret(doc.song(), caret, CaretMove::NextBeat);
+        return beat.notes.at(0).pitch;
+    };
+    CHECK(type(Step::C) == Pitch(Step::C, 0, 5));
+    CHECK(type(Step::E) == Pitch(Step::E, 0, 5)); // a third up, not a sixth down
+    CHECK(type(Step::A) == Pitch(Step::A, 0, 5)); // a fourth up, not a fifth down
+    CHECK(type(Step::G) == Pitch(Step::G, 0, 5)); // a step down, not a sixth up
+    // The next measure looks back at the last note of this one.
+    REQUIRE(caret == at(1, 0));
+    CHECK(type(Step::B) == Pitch(Step::B, 0, 5));
+    // A rest in between is skipped.
+    REQUIRE(run(doc, insertRest(doc.song(), caret, kQuarter)) == at(1, 1));
+    caret = at(1, 2);
+    CHECK(type(Step::G) == Pitch(Step::G, 0, 5));
+}
+
+TEST_CASE("Entry: a note name takes the key's accidental and keeps a rest's duration",
+          "[core][entry]") {
+    Song song = fluteSong();
+    song.measureHeader(0).keySignature = KeySignature(2, KeyMode::Major); // D major
+    song.track(0).staff(0).measure(0).voices[0].beats = {Beat{.duration = kHalf}};
+    Document doc(std::move(song));
+    REQUIRE(run(doc, enterPitch(doc.song(), at(0, 0), Step::F, kQuarter)) == at(0, 0));
+    const Beat& beat = firstVoice(doc.song(), 0).beats[0];
+    CHECK(beat.duration == kHalf);
+    // Three steps below the middle line (B4), not four above.
+    CHECK(beat.notes == std::vector<Note>{Note{.pitch = Pitch(Step::F, 1, 4)}});
+    // The same name again changes nothing; another replaces the note.
+    CHECK(enterPitch(doc.song(), at(0, 0), Step::F, kQuarter).command == nullptr);
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    CHECK(firstVoice(doc.song(), 0).beats[0].notes ==
+          std::vector<Note>{Note{.pitch = Pitch(Step::C, 1, 5)}});
+}
+
+TEST_CASE("Entry: a transposing instrument takes note names as it is written", "[core][entry]") {
+    Song song;
+    song.appendMeasures(1);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("trumpet")));
+    song.measureHeader(0).keySignature = KeySignature(-1, KeyMode::Major); // F, written in G
+    Document doc(std::move(song));
+    // A written B (on the middle line) sounds A; a written F sharp sounds E.
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::B, kQuarter));
+    run(doc, enterPitch(doc.song(), at(0, 1), Step::F, kQuarter));
+    const Voice& voice = firstVoice(doc.song(), 0);
+    REQUIRE(voice.beats.size() == 2);
+    CHECK(voice.beats[0].notes.at(0).pitch == Pitch(Step::A, 0, 4));
+    CHECK(voice.beats[1].notes.at(0).pitch == Pitch(Step::E, 0, 4));
+}
+
+TEST_CASE("Entry: on tablature a note name goes on the caret's string or the nearest one",
+          "[core][entry]") {
+    Document doc(guitarSong());
+    // The last note before measure 2 is E4 (written E5): A is a fourth up, A4.
+    Entry onCaret = enterPitch(doc.song(), at(2, 0, 3), Step::A, kQuarter);
+    CHECK(onCaret.caret == at(2, 0, 3));
+    run(doc, std::move(onCaret));
+    CHECK(firstVoice(doc.song(), 2).beats[0].notes ==
+          std::vector<Note>{doc.song().track(0).staff(0).frettedNote(3, 14)});
+    // After B2 the A is A2, which the first string cannot reach: the fifth can.
+    CHECK(run(doc, enterPitch(doc.song(), at(0, 2, 1), Step::A, kQuarter)) == at(0, 2, 5));
+    CHECK(firstVoice(doc.song(), 0).beats[2].notes ==
+          std::vector<Note>{doc.song().track(0).staff(0).frettedNote(5, 0)});
+}
+
+TEST_CASE("Entry: a note name added to a chord goes above its highest note", "[core][entry]") {
+    Document doc(fluteSong());
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::E, kQuarter, PitchMode::AddToChord));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter, PitchMode::AddToChord));
+    CHECK(firstVoice(doc.song(), 0).beats[0].notes ==
+          std::vector<Note>{Note{.pitch = Pitch(Step::C, 0, 6)},
+                            Note{.pitch = Pitch(Step::E, 0, 5)},
+                            Note{.pitch = Pitch(Step::C, 0, 5)}});
+    // On the free slot a chord note starts a beat.
+    run(doc, enterPitch(doc.song(), at(0, 1), Step::G, kQuarter, PitchMode::AddToChord));
+    CHECK(firstVoice(doc.song(), 0).beats[1].notes.size() == 1);
+
+    // On tablature it takes the nearest string without a note: G4 over E4.
+    Document guitar(guitarSong());
+    CHECK(run(guitar, enterPitch(guitar.song(), at(1, 0, 1), Step::G, kQuarter,
+                                 PitchMode::AddToChord)) == at(1, 0, 2));
+    const Staff& staff = guitar.song().track(0).staff(0);
+    CHECK(firstVoice(guitar.song(), 1).beats[0].notes ==
+          std::vector<Note>{staff.frettedNote(1, 0), staff.frettedNote(2, 8)});
+}
+
+TEST_CASE("Entry: note names need a pitched staff and the MIDI range", "[core][entry]") {
+    Song song = fluteSong();
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    CHECK_THROWS_AS(enterPitch(song, Caret{.track = 1}, Step::C, kQuarter), std::logic_error);
+    // Up and up in a chord until the notes leave MIDI 127.
+    Document doc(std::move(song));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    const auto addC = [&] {
+        doc.execute(
+            enterPitch(doc.song(), at(0, 0), Step::C, kQuarter, PitchMode::AddToChord).command);
+    };
+    addC(); // C6
+    addC(); // C7
+    addC(); // C8
+    addC(); // C9 (MIDI 120)
+    CHECK_THROWS_AS(addC(), std::out_of_range);
+}
+
+TEST_CASE("Entry: a pitch moves by semitones, a fretted note along its string", "[core][entry]") {
+    Document doc(fluteSong());
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::E, kQuarter, PitchMode::AddToChord));
+    Entry up = shiftPitch(doc.song(), at(0, 0), 2);
+    REQUIRE(up.command != nullptr);
+    CHECK(up.command->name() == "Change pitch");
+    run(doc, std::move(up));
+    CHECK(firstVoice(doc.song(), 0).beats[0].notes ==
+          std::vector<Note>{Note{.pitch = Pitch(Step::F, 1, 5)},
+                            Note{.pitch = Pitch(Step::D, 0, 5)}});
+    run(doc, shiftPitch(doc.song(), at(0, 0), -12));
+    CHECK(firstVoice(doc.song(), 0).beats[0].notes.at(1).pitch == Pitch(Step::D, 0, 4));
+    CHECK_THROWS_AS(shiftPitch(doc.song(), at(0, 0), 100), std::out_of_range);
+    CHECK(shiftPitch(doc.song(), at(0, 1), 1).command == nullptr); // the free slot
+
+    Song song = guitarSong();
+    song.track(0).staff(0).measure(1).voices[0].beats[0].notes[0].effects.letRing = true;
+    Document guitar(std::move(song));
+    run(guitar, shiftPitch(guitar.song(), at(1, 0, 1), 3));
+    Note expected = guitar.song().track(0).staff(0).frettedNote(1, 3);
+    expected.effects.letRing = true;
+    CHECK(firstVoice(guitar.song(), 1).beats[0].notes == std::vector<Note>{expected});
+    CHECK(shiftPitch(guitar.song(), at(1, 0, 2), 1).command == nullptr); // no note on string 2
+    CHECK_THROWS_AS(shiftPitch(guitar.song(), at(1, 0, 1), -4), std::out_of_range);
+}
+
+TEST_CASE("Entry: delete on a staff without strings leaves a rest", "[core][entry]") {
+    Document doc(fluteSong());
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kHalf));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::E, kQuarter, PitchMode::AddToChord));
+    run(doc, deleteAtCaret(doc.song(), at(0, 0)));
+    CHECK(firstVoice(doc.song(), 0).beats == std::vector<Beat>{Beat{.duration = kHalf}});
+}

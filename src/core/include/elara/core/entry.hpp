@@ -3,6 +3,7 @@
 
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
+#include <elara/core/pitch.hpp>
 #include <elara/core/song.hpp>
 
 #include <cstddef>
@@ -66,13 +67,43 @@ struct Entry {
 /// a fret off the neck.
 [[nodiscard]] Entry enterFret(const Song& song, const Caret& caret, int fret, Duration duration);
 
+/// What a note name does to the caret's beat.
+enum class PitchMode : std::uint8_t {
+    Replace,    ///< the note becomes the beat's only note
+    AddToChord, ///< the note joins the beat's notes, above the highest
+};
+
+/// Typing a note name (ADR-0034): the note on `step`, as the staff writes it,
+/// with the accidental of the measure's key (the written key on a transposing
+/// instrument). `Replace` picks the octave nearest the highest note of the
+/// previous beat with notes in the voice (or the staff's middle line when there
+/// is none): at most three steps away, as on the staff. It replaces the notes
+/// of the caret's beat (a rest becomes a note of the same duration); on the free
+/// slot it adds a beat of `duration`. `AddToChord` puts the note above the
+/// highest note of the beat, within an octave (on a rest or the free slot it
+/// works as `Replace`). On a fretted staff the note goes on the caret's string
+/// when that string reaches it, otherwise on the nearest string that does (in a
+/// chord, one without a note), and the caret follows it. Throws
+/// std::logic_error on a percussion staff and std::out_of_range when the note
+/// leaves MIDI 0..127 or no string can play it.
+[[nodiscard]] Entry enterPitch(const Song& song, const Caret& caret, Step step, Duration duration,
+                               PitchMode mode = PitchMode::Replace);
+
+/// Moves the caret's note by `semitones`, spelled in the measure's key and
+/// keeping its effects. On a fretted staff that is the note on the caret's
+/// string, which keeps its string; elsewhere every note of the beat. Nothing
+/// changes on a rest, the free slot or a string without a note. Throws
+/// std::out_of_range when a note would leave MIDI 0..127 or the neck.
+[[nodiscard]] Entry shiftPitch(const Song& song, const Caret& caret, int semitones);
+
 /// The caret's beat gets `duration`; nothing changes on the free slot.
 [[nodiscard]] Entry setBeatDuration(const Song& song, const Caret& caret, Duration duration);
 
-/// Delete: removes the note on the caret's string, leaving a rest when it was
-/// the last one. On a rest it removes the beat, and the caret stays at its index
-/// (now the next beat or the free slot). Nothing changes on the free slot or on
-/// a string without a note.
+/// Delete: removes the note on the caret's string (on a percussion staff, the
+/// lane's kit piece; on another staff without a tuning, every note of the beat),
+/// leaving a rest when it was the last one. On a rest it
+/// removes the beat, and the caret stays at its index (now the next beat or the
+/// free slot). Nothing changes on the free slot or on a string without a note.
 [[nodiscard]] Entry deleteAtCaret(const Song& song, const Caret& caret);
 
 /// Removes the caret's beat with all its notes; the caret stays at its index.
