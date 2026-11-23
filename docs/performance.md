@@ -67,6 +67,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | same | 125 ms | each staff read on its own thread, warnings merged in reading order (ADR-0010): the same song, warnings and errors on any number of threads. One thread: 211 ms; most of what is left is the XML parse. Parsing without end-of-line and attribute normalisation gained nothing |
 | 2026-11-23 | import 2 of those tracks from a `.gpx` container written as literal bytes only (4.4 MB) | 55 ms | the same GPIF alone: 17 ms, so unpacking took 38 ms, reading the stream bit by bit |
 | 2026-11-23 | same | 28 ms | bits taken from a 64-bit buffer with a shift and a mask; back references copied as a block |
+| 2026-11-23 | same | 28 to 31 ms (38 to 46 ms before, same machine and run) | reading the part configuration had unpacked the container a second time; it is now unpacked once for both files. The GPIF alone: 17 ms |
 | 2026-11-23 | load the Bravura SMuFL metadata | 10.5 ms | yyjson parse of a 1.2 MB file; done once per run |
 | 2026-11-23 | lay out one 500-measure staff of the large song (4000 two-note chords, 2000 beams) | 3.5 ms | first version, one thread: about 0.9 µs per chord; 12k glyphs, 15.5k lines |
 | 2026-11-23 | lay out 8 measures of that staff (a screenful) | 54 µs | relayout after an edit costs far less than a frame |
