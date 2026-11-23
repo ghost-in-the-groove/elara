@@ -151,7 +151,10 @@ whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
 caret's string is a drum lane, from the crash at the top to the hi-hat pedal
 (ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
 that General MIDI key's lane (moving the caret to it), and `delete` removes the
-lane's piece only. The output includes `"caret"` and `"input"`.
+lane's piece only. `effect <name>` toggles a note effect on the caret's notes
+(ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
+`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`. The
+output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
