@@ -286,6 +286,13 @@ add_test(NAME cli.export_rejects_guitar_pro
 set_tests_properties(cli.export_rejects_guitar_pro PROPERTIES
   FIXTURES_REQUIRED cli_imported WILL_FAIL TRUE)
 
+# Paths are UTF-8 on every platform (on Windows through the elara-cli manifest).
+set(_unicode_score "${CMAKE_CURRENT_BINARY_DIR}/canción-曲.musicxml")
+file(COPY_FILE "${ELARA_CORPUS}/musicxml/melody.musicxml" "${_unicode_score}" ONLY_IF_DIFFERENT)
+add_test(NAME cli.import_unicode_path COMMAND elara-cli --json import "${_unicode_score}")
+set_tests_properties(cli.import_unicode_path PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"file\":\"[^\"]*canción-曲\\.musicxml\",\"format\":\"musicxml\"")
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot

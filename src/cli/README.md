@@ -34,7 +34,7 @@ dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
 where `song` is the file's complete `song.json`: the model snapshot later tests
 compare against. `import --json` prints `{"file", "format", "out", "warnings",
-"song", "durationSeconds", "issues"}`, with `format` `musicxml` or `midi`:
+"song", "durationSeconds", "issues"}`, with `format` `musicxml`, `midi` or `guitarpro`:
 `warnings` lists what the file had that the model cannot hold yet (ADR-0007,
 ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes
 MusicXML (compressed for `.mxl`) or MIDI and prints `{"file", "out", "format",
@@ -61,6 +61,9 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 - `--json` prints exactly one JSON object on stdout; human text otherwise.
 - Exit code 0 on success (and `--help`), 1 on a runtime error, 2 on bad arguments.
 - Errors go to stderr as `error: <message>`.
+- Arguments, file paths and output are UTF-8 on every platform. On Windows an
+  application manifest (`elara-cli.manifest`) makes UTF-8 the process code page,
+  so paths such as `canción-曲.gp` reach the commands intact.
 - New features add a subcommand here *and* a CTest in `tests/cli/`.
 - Subcommands are grouped in `src/*_commands.cpp` (audio, theory); each registers
   itself with a callback that stores its exit code in the shared `Context`.
