@@ -4,6 +4,7 @@
 #pragma once
 
 #include <elara/core/document.hpp>
+#include <elara/core/tuning.hpp>
 
 #include <cstddef>
 #include <memory>
@@ -146,6 +147,25 @@ private:
 
     std::size_t track_;
     TrackMix mix_;
+};
+
+/// Gives a staff another tuning and capo, its notes staying where they are
+/// (makeRetune moves them with it, ADR-0046).
+class SetStaffTuning final : public Command {
+public:
+    SetStaffTuning(std::size_t track, std::size_t staff, std::optional<Tuning> tuning, int capo)
+        : track_(track), staff_(staff), tuning_(std::move(tuning)), capo_(capo) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Change tuning"; }
+
+private:
+    void swapWith(Song& song);
+
+    std::size_t track_;
+    std::size_t staff_;
+    std::optional<Tuning> tuning_;
+    int capo_;
 };
 
 /// Several commands as one undo step, applied in order and reverted in reverse.

@@ -78,6 +78,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
+- [ ] Tuning and capo changes, keeping the pitches or the frets
+  - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
+  - [ ] Tuning presets and capo in the song panel
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
