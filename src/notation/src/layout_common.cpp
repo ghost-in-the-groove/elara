@@ -54,8 +54,8 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
     };
     for (const GlyphItem& item : list.glyphs) {
         const BoundingBox& box = font.metrics(item.glyph).box;
-        cover(item.origin.y - box.northEast.y);
-        cover(item.origin.y - box.southWest.y);
+        cover(item.origin.y - box.northEast.y * item.scale);
+        cover(item.origin.y - box.southWest.y * item.scale);
     }
     for (const LineItem& item : list.lines) {
         cover(item.from.y);

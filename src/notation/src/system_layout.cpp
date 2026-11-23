@@ -5,13 +5,16 @@
 #include <elara/core/parallel.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/song.hpp>
+#include <elara/core/tempo.hpp>
 #include <elara/notation/staff_layout.hpp>
 
 #include "layout_common.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <memory>
 #include <span>
@@ -41,6 +44,13 @@ constexpr double kVoltaLabelInset = 0.4;    // between its start hook and its nu
 constexpr double kVoltaSize = 1.4;          // font size of its numbers and of repeat counts
 constexpr double kVoltaTextGap = 0.3;       // between the bracket and its numbers
 constexpr double kVoltaInkGap = 0.5;        // at least between its numbers and the staff's ink
+constexpr double kTempoLowest = -1.5;       // the baseline of a tempo mark at least this high
+constexpr double kTempoInkGap = 0.6;        // at least between a tempo mark and the ink below
+constexpr double kTempoSize = 1.4;          // font size of its text
+constexpr double kTempoNoteScale = 0.65;    // of its note, from the staff's size
+constexpr double kTempoNoteLift = 0.35;     // the note's head above the text's baseline
+constexpr double kTempoDotGap = 0.15;       // between the note and its dot
+constexpr double kTempoTextGap = 0.3;       // between the note (or dot) and "= 120"
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -239,6 +249,118 @@ void markRepeats(DisplayList& system, const core::Song& song, std::span<const Me
         text("x" + std::to_string(header.repeatTimes), x, TextAlign::Right, Role::Repeat, m);
     }
     system.top = std::min(system.top, y - thickness / 2);
+}
+
+// The metronome note of a beat unit.
+Glyph tempoNote(core::NoteValue value) {
+    switch (value) {
+    case core::NoteValue::DoubleWhole:
+    case core::NoteValue::Whole:
+        return Glyph::MetNoteWhole;
+    case core::NoteValue::Half:
+        return Glyph::MetNoteHalfUp;
+    case core::NoteValue::Quarter:
+        return Glyph::MetNoteQuarterUp;
+    case core::NoteValue::Eighth:
+        return Glyph::MetNote8thUp;
+    case core::NoteValue::Sixteenth:
+        return Glyph::MetNote16thUp;
+    default:
+        return Glyph::MetNote32ndUp;
+    }
+}
+
+// "120", "92.5": beats per minute to a tenth.
+std::string bpmText(double bpm) {
+    const double tenths = std::round(bpm * 10.0);
+    if (std::fmod(tenths, 10.0) == 0.0) {
+        return std::format("{}", static_cast<long long>(tenths / 10.0));
+    }
+    return std::format("{:.1f}", tenths / 10.0);
+}
+
+// Tempo marks ("quarter = 120") above everything over the first staff of
+// `system`: the tempo the song starts with, and every change to another tempo
+// over the column where it happens (ADR-0042).
+void markTempo(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
+               const EngravingFont& font) {
+    struct Mark {
+        std::size_t measure = 0;
+        double x = 0.0;
+        core::Tempo tempo;
+    };
+    std::vector<Mark> marks;
+    // The tempo in force before each measure, carried along the system's
+    // consecutive measures: looking it up from the start of the song for each
+    // made long lines quadratic.
+    core::Tempo current = song.startTempo();
+    std::size_t next = 0; // the measure `current` is in force before
+    for (const MeasureBox& box : measures) {
+        const std::size_t m = box.index;
+        const core::MeasureHeader& header = song.measureHeader(m);
+        const core::Fraction length = header.timeSignature.measureLength();
+        const auto xAt = [&box, &length](const core::Fraction& offset) {
+            const double at = (offset / length).toDouble();
+            const auto onset = std::ranges::find_if(
+                box.onsets, [at](const MeasureOnset& o) { return std::abs(o.at - at) < kEpsilon; });
+            return onset != box.onsets.end() ? onset->x : box.x + at * box.width;
+        };
+        if (m != next) {
+            current =
+                m == 0
+                    ? song.startTempo()
+                    : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        }
+        next = m + 1;
+        const bool changedAtStart =
+            !header.tempoChanges.empty() && header.tempoChanges.front().offset == core::Fraction();
+        if (m == 0 && !changedAtStart) {
+            marks.push_back(Mark{.measure = m, .x = xAt({}), .tempo = current});
+        }
+        for (const core::TempoChange& change : header.tempoChanges) {
+            if (change.tempo != current || (m == 0 && change.offset == core::Fraction())) {
+                marks.push_back(Mark{.measure = m, .x = xAt(change.offset), .tempo = change.tempo});
+            }
+            current = change.tempo;
+        }
+    }
+    if (marks.empty()) {
+        return;
+    }
+    // One baseline for the system, above the ink of everything over the staff.
+    const double baseline =
+        std::min(kTempoLowest, system.top - kTempoInkGap - kTextDescent * kTempoSize);
+    double highest = baseline - kTextAscent * kTempoSize;
+    for (const Mark& mark : marks) {
+        const Glyph note = tempoNote(mark.tempo.beatUnit().value());
+        const BoundingBox& box = font.metrics(note).box;
+        const double y = baseline - kTempoNoteLift;
+        const auto place = [&](Glyph which, double x) {
+            system.glyphs.push_back(GlyphItem{.glyph = which,
+                                              .origin = {x, y},
+                                              .role = Role::Tempo,
+                                              .measure = mark.measure,
+                                              .scale = kTempoNoteScale});
+        };
+        place(note, mark.x - box.southWest.x * kTempoNoteScale);
+        highest = std::min(highest, y - box.northEast.y * kTempoNoteScale);
+        double x = mark.x + box.width() * kTempoNoteScale;
+        for (int d = 0; d < mark.tempo.beatUnit().dots(); ++d) {
+            const BoundingBox& dot = font.metrics(Glyph::MetAugmentationDot).box;
+            x += kTempoDotGap;
+            place(Glyph::MetAugmentationDot, x - dot.southWest.x * kTempoNoteScale);
+            x += dot.width() * kTempoNoteScale;
+        }
+        TextItem text;
+        text.text = "= " + bpmText(mark.tempo.bpm());
+        text.origin = {x + kTempoTextGap, baseline};
+        text.size = kTempoSize;
+        text.align = TextAlign::Left;
+        text.role = Role::Tempo;
+        text.measure = mark.measure;
+        system.texts.push_back(std::move(text));
+    }
+    system.top = std::min(system.top, highest);
 }
 
 // Measures [first, last) with one set of writers.
@@ -443,6 +565,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         append(system, std::move(staff));
     }
     markRepeats(system, song, measures, barlineEnds, font);
+    markTempo(system, song, measures, font);
     const double height = previousY + previousHeight;
     if (writers.size() > 1) {
         // The line joining the staves at the start of the system.
