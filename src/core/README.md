@@ -17,6 +17,16 @@ DAW timeline all read and edit (see `docs/architecture.md`).
 Positions are measured in whole notes from a reference point (the start of the
 song or of a measure) and are plain `Fraction`s.
 
+## Pitch
+
+| Header | What it gives you |
+|---|---|
+| `pitch.hpp` | `Step`, `Pitch` (step + alter + octave, scientific notation: C4 = MIDI 60), `midiNumber()`, `fromMidi()` with a `SpellingPreference`, text round trip (`toString()`/`parse()`, e.g. "F#3", "Bb2") and equal-tempered `frequency()`. |
+
+A `Pitch` keeps its spelling: B#3, C4 and Dbb4 are different pitches that sound
+the same (`isEnharmonicWith`). Spelling from context (key signature) comes with
+`KeySignature`.
+
 All of these are small `constexpr` value types without allocation; keep them
 that way, the sequencer and layout engine run them in hot loops
 (`python scripts/elara.py bench`).

@@ -26,6 +26,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | barra (de corcheas) | beam | `Beam` | |
 | alteración | accidental | `Accidental` | |
 | altura | pitch | `Pitch` | step + alter + octave |
+| nombre de nota | step | `Step` | C D E F G A B |
+| enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
 | afinación | tuning | `Tuning` | |
 | cuerda | string | `string` (index) | 1 = highest |
 | traste | fret | `fret` | |

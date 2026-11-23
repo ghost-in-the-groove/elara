@@ -8,7 +8,11 @@ elara-cli [--json] version
 elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [--sample-rate 48000]
 elara-cli [--json] devices
 elara-cli [--json] tone [--frequency 440] [--seconds 1]
+elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
 ```
+
+`pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
+spelling, MIDI number and equal-tempered frequency.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

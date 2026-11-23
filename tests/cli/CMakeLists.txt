@@ -24,3 +24,21 @@ set_tests_properties(cli.render_tone_file PROPERTIES FIXTURES_REQUIRED tone_wav)
 add_test(NAME cli.rejects_bad_arguments
   COMMAND elara-cli render-tone --out "${_tone_wav}" --frequency 5)
 set_tests_properties(cli.rejects_bad_arguments PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.pitch_from_text COMMAND elara-cli --json pitch "F#3")
+set_tests_properties(cli.pitch_from_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"pitch\":\"F#3\",\"step\":\"F\",\"alter\":1,\"octave\":3,\"midi\":54,")
+
+add_test(NAME cli.pitch_from_midi_with_flats COMMAND elara-cli --json pitch 61 --flats)
+set_tests_properties(cli.pitch_from_midi_with_flats PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"pitch\":\"Db4\",\"step\":\"D\",\"alter\":-1,\"octave\":4,\"midi\":61,")
+
+add_test(NAME cli.pitch_frequency COMMAND elara-cli --json pitch A4 --a4 432)
+set_tests_properties(cli.pitch_frequency PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"midi\":69,\"frequency\":432\\.0000}")
+
+add_test(NAME cli.pitch_rejects_bad_text COMMAND elara-cli pitch H4)
+set_tests_properties(cli.pitch_rejects_bad_text PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.pitch_rejects_midi_out_of_range COMMAND elara-cli pitch 128)
+set_tests_properties(cli.pitch_rejects_midi_out_of_range PROPERTIES WILL_FAIL TRUE)

@@ -4,14 +4,18 @@
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
 #include <elara/audio/wav_writer.hpp>
+#include <elara/core/pitch.hpp>
 #include <elara/core/version.hpp>
 
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
 #include <format>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -78,6 +82,52 @@ int runVersion(bool json) {
                   << '\n';
     } else {
         std::cout << "elara " << elara::core::version() << '\n';
+    }
+    return kExitOk;
+}
+
+struct PitchOptions {
+    std::string input; // pitch text ("F#3") or MIDI number ("61")
+    bool flats = false;
+    double a4Hz = 440.0;
+};
+
+int usageError(std::string_view message) {
+    std::cerr << "error: " << message << '\n';
+    return kExitUsage;
+}
+
+int runPitch(bool json, const PitchOptions& options) {
+    using elara::core::Pitch;
+    const bool isNumber =
+        !options.input.empty() &&
+        std::ranges::all_of(options.input, [](unsigned char c) { return std::isdigit(c) != 0; });
+    std::optional<Pitch> pitch;
+    if (isNumber) {
+        const int midi = options.input.size() > 3 ? 128 : std::stoi(options.input);
+        if (midi > 127) {
+            return usageError(std::format("MIDI number out of range 0..127: {}", options.input));
+        }
+        pitch = Pitch::fromMidi(midi, options.flats ? elara::core::SpellingPreference::Flats
+                                                    : elara::core::SpellingPreference::Sharps);
+    } else {
+        pitch = Pitch::parse(options.input);
+        if (!pitch) {
+            return usageError(
+                std::format("not a pitch (expected e.g. C4, F#3, Bb2): {}", options.input));
+        }
+    }
+    const std::string text = pitch->toString();
+    const double frequency = pitch->frequency(options.a4Hz);
+    if (json) {
+        std::cout
+            << std::format(
+                   R"({{"pitch":"{}","step":"{}","alter":{},"octave":{},"midi":{},"frequency":{:.4f}}})",
+                   jsonEscape(text), text.front(), pitch->alter(), pitch->octave(),
+                   pitch->midiNumber(), frequency)
+            << '\n';
+    } else {
+        std::cout << std::format("{}  MIDI {}  {:.4f} Hz\n", text, pitch->midiNumber(), frequency);
     }
     return kExitOk;
 }
@@ -181,6 +231,15 @@ int main(int argc, char** argv) {
     auto* tone = app.add_subcommand("tone", "Play a sine test tone on the default output device");
     addToneOptions(*tone, playOptions);
 
+    PitchOptions pitchOptions;
+    auto* pitch = app.add_subcommand("pitch", "Show a pitch: spelling, MIDI number and frequency");
+    pitch->add_option("pitch", pitchOptions.input, "Pitch such as C4, F#3, Bb2, or a MIDI number")
+        ->required();
+    pitch->add_flag("--flats", pitchOptions.flats, "Spell MIDI numbers with flats, not sharps");
+    pitch->add_option("--a4", pitchOptions.a4Hz, "Reference frequency of A4 in Hz")
+        ->check(CLI::Range(400.0, 480.0))
+        ->capture_default_str();
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& error) {
@@ -200,6 +259,9 @@ int main(int argc, char** argv) {
         }
         if (*tone) {
             return runTone(json, playOptions);
+        }
+        if (*pitch) {
+            return runPitch(json, pitchOptions);
         }
     } catch (const std::exception& error) {
         return fail(error.what());
