@@ -92,6 +92,8 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | sounding notes of the 20-track song | 10.7 ms | 16 ms before: each voice read on its own thread and the lists merged pairwise instead of one stable sort of every note. The sequencer starts from them: 26 ms, repeated 40 ms (2.8x and 3.3x the first version) |
 | 2026-11-23 | one second of 32 voices of the built-in synthesizer at 48 kHz: plucked strings, piano partials, sawtooths, drums | 5.2, 8.5, 6.0, 5.1 ms | first version (ADR-0018): 3.4 to 5.5 ns per voice and frame, so 20 tracks of 32 voices take under a fifth of one core. Keeping the four partials in local arrays so that they could be one vector operation made the piano slower (11.6 ms) and was dropped |
 | 2026-11-23 | render the first 10 s of the large song (20 guitar tracks) offline | 26.4 ms | tracks on every core, mixed in track order (ADR-0018): 380 times faster than real time. One thread: 113 ms |
+| 2026-11-23 | detect the pitch of one tuner window (48 kHz, 30 to 1600 Hz, 3201 samples) of a guitar's low E | 1.61 ms | first version (ADR-0028): the YIN difference function at every lag up to 1601, one multiply-add per sample and lag |
+| 2026-11-23 | the same; a high E; a window of noise | 0.39 ms, 0.10 ms, 1.07 ms | lags past the first dip under the threshold are no longer computed (YIN never looks at them), and each difference is four independent sums. Noise has no dip, so every lag is still computed: the worst case, 3 % of one core for a window every 33 ms |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
