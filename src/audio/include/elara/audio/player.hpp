@@ -81,7 +81,7 @@ private:
     std::size_t maxBlockFrames_;
     double duration_ = 0.0; // control thread
 
-    Loaded* latest_ = nullptr; // control thread: the song last loaded
+    Loaded* latest_ = nullptr;              // control thread: the song last loaded
     std::atomic<Loaded*> pending_{nullptr}; // control -> audio
     std::atomic<Loaded*> retired_{nullptr}; // audio -> control, for tidy()
     std::atomic<bool> playing_{false};

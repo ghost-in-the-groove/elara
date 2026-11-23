@@ -134,8 +134,10 @@ TEST_CASE("OfflineRenderer: the track mix sets each track's level and place",
 
     s.track(0).setMix(TrackMix{.pan = 0.5});
     const auto [softLeft, loudRight] = channels(render(s));
-    CHECK_THAT(peakLevel(softLeft), WithinRel(peak * std::sqrt(2.0f) * std::cos(0.375f * 3.14159265f), 1e-4f));
-    CHECK_THAT(peakLevel(loudRight), WithinRel(peak * std::sqrt(2.0f) * std::sin(0.375f * 3.14159265f), 1e-4f));
+    CHECK_THAT(peakLevel(softLeft),
+               WithinRel(peak * std::sqrt(2.0f) * std::cos(0.375f * 3.14159265f), 1e-4f));
+    CHECK_THAT(peakLevel(loudRight),
+               WithinRel(peak * std::sqrt(2.0f) * std::sin(0.375f * 3.14159265f), 1e-4f));
 
     s.track(0).setMix(TrackMix{.volume = 0.4});
     CHECK_THAT(peakLevel(render(s)), WithinRel(peak / 4.0f, 1e-5f));
