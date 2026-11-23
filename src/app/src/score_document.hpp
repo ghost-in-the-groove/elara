@@ -54,7 +54,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString artist READ artist NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
-    Q_PROPERTY(double duration READ duration NOTIFY songChanged)
+    Q_PROPERTY(double duration READ duration NOTIFY sequenceChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
@@ -156,10 +156,13 @@ public:
     /// plays; negative away from every measure.
     Q_INVOKABLE double secondsAt(int page, double x, double y) const;
 
-    /// The song and the sequence it plays as, built when it is opened; null
-    /// before.
+    /// The song and the sequence it plays as; null before a song is open.
+    /// After an edit the sequence follows when the edit's layout is done: it
+    /// is built on the same worker thread, so typing never waits for it.
     [[nodiscard]] std::shared_ptr<const core::Song> song() const { return song_; }
     [[nodiscard]] std::shared_ptr<const audio::Sequence> sequence() const { return sequence_; }
+    /// The song sequence() was built from: what playback loads with it.
+    [[nodiscard]] std::shared_ptr<const core::Song> sequenceSong() const { return sequenceSong_; }
 
     // ---- Editing ------------------------------------------------------------
 
@@ -298,6 +301,9 @@ signals:
     void statusChanged();
     void busyChanged();
     void songChanged();
+    /// The sequence playback plays changed: a song was opened, or an edit
+    /// sounds different and its layout is done.
+    void sequenceChanged();
     void trackChanged();
     void viewChanged();
     void layoutChanged();
@@ -334,6 +340,7 @@ private:
     QString errorMessage_;
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
+    std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
