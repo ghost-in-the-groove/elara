@@ -16,22 +16,8 @@ Pane {
 
     signal closeRequested
 
-    // Key signatures from seven flats to seven sharps, by their tonic.
-    readonly property list<string> majorTonics: ["C♭", "G♭", "D♭", "A♭", "E♭", "B♭", "F", "C",
-        "G", "D", "A", "E", "B", "F♯", "C♯"]
-    readonly property list<string> minorTonics: ["A♭", "E♭", "B♭", "F", "C", "G", "D", "A",
-        "E", "B", "F♯", "C♯", "G♯", "D♯", "A♯"]
-    readonly property list<int> denominators: [1, 2, 4, 8, 16, 32]
     readonly property color cardColor: dark ? "#24242c" : "#ffffff"
     readonly property color lineColor: dark ? "#34343e" : "#dfe2e8"
-
-    function keyLabel(index: int, minor: bool): string {
-        const tonic = minor ? minorTonics[index] : majorTonics[index];
-        const fifths = index - 7;
-        if (fifths === 0)
-            return tonic;
-        return tonic + "  ·  " + Math.abs(fifths) + (fifths > 0 ? "♯" : "♭");
-    }
 
     padding: 0
     background: Rectangle {
@@ -41,6 +27,26 @@ Pane {
             width: 1
             height: parent.height
             color: root.lineColor
+        }
+    }
+
+    /// The track whose tuning shows under its row, -1 for none.
+    property int tuningTrack: -1
+
+    /// Shows the tuning of `track` under its row.
+    function openTuning(track: int) {
+        tuningTrack = track;
+    }
+
+    /// Scrolls the panel so that all of `item` shows.
+    function reveal(item: Item) {
+        const flick = scroll.contentItem;
+        const top = item.mapToItem(flick.contentItem, 0, 0).y;
+        const bottom = top + item.height + 12;
+        if (bottom > flick.contentY + flick.height) {
+            flick.contentY = Math.min(top - 12, bottom - flick.height);
+        } else if (top < flick.contentY) {
+            flick.contentY = Math.max(0, top - 12);
         }
     }
 
@@ -220,67 +226,15 @@ Pane {
                     text: qsTr("Measures")
                 }
 
-                RowLayout {
+                SignatureFields {
                     Layout.fillWidth: true
-
-                    FieldLabel {
-                        text: qsTr("Time signature")
-                    }
-
-                    // Beats per measure, 1 to 32.
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: 32
-                        displayText: String(currentIndex + 1)
-                        delegate: ItemDelegate {
-                            required property int index
-
-                            width: ListView.view.width
-                            text: String(index + 1)
-                        }
-                        currentIndex: root.document.timeNumerator - 1
-                        onActivated: index => root.document.setTimeSignature(
-                                         index + 1, root.document.timeDenominator)
-                    }
-
-                    Label {
-                        text: "/"
-                        font.pixelSize: 18
-                        opacity: 0.6
-                    }
-
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: root.denominators
-                        currentIndex: root.denominators.indexOf(root.document.timeDenominator)
-                        onActivated: index => root.document.setTimeSignature(
-                                         root.document.timeNumerator, root.denominators[index])
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    FieldLabel {
-                        text: qsTr("Key signature")
-                    }
-
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: root.majorTonics.map((tonic, index) => root.keyLabel(index,
-                                                                                    root.document.keyMinor))
-                        currentIndex: root.document.keyFifths + 7
-                        onActivated: index => root.document.setKeySignature(index - 7,
-                                                                            root.document.keyMinor)
-                    }
-                }
-
-                SegmentedControl {
-                    Layout.alignment: Qt.AlignRight
-                    labels: [qsTr("Major"), qsTr("Minor")]
-                    currentIndex: root.document.keyMinor ? 1 : 0
-                    onActivated: index => root.document.setKeySignature(root.document.keyFifths,
-                                                                        index === 1)
+                    numerator: root.document.timeNumerator
+                    denominator: root.document.timeDenominator
+                    fifths: root.document.keyFifths
+                    minor: root.document.keyMinor
+                    onTimeChosen: (numerator, denominator) => root.document.setTimeSignature(
+                                      numerator, denominator)
+                    onKeyChosen: (fifths, minor) => root.document.setKeySignature(fifths, minor)
                 }
 
                 Label {
@@ -323,10 +277,26 @@ Pane {
                         required property int index
                         required property var modelData
                         readonly property bool shown: root.document.track === index
+                        readonly property bool tuningOpen: root.tuningTrack === index
+                                                           && modelData.fretted === true
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 94
+                        Layout.preferredHeight: 94 + (tuningOpen ? tuning.implicitHeight + 14 : 0)
                         radius: 12
+                        clip: true
+                        // The tuning stays in sight as it opens.
+                        onHeightChanged: {
+                            if (tuningOpen) {
+                                root.reveal(row);
+                            }
+                        }
+
+                        Behavior on Layout.preferredHeight {
+                            NumberAnimation {
+                                duration: 200
+                                easing.type: Easing.OutCubic
+                            }
+                        }
                         color: shown ? Qt.alpha(Material.accent, root.dark ? 0.22 : 0.12)
                                      : hover.hovered ? Qt.alpha(Material.foreground, 0.06)
                                                      : "transparent"
@@ -399,6 +369,22 @@ Pane {
                                 }
                             }
 
+                            // Strings and a capo bar: the tuning under the row.
+                            IconButton {
+                                visible: row.modelData.fretted === true
+                                opacity: hover.hovered || row.shown || row.tuningOpen ? 1.0 : 0.0
+                                checked: row.tuningOpen
+                                iconPath: "M7 4 L7 20 M12 4 L12 20 M17 4 L17 20 M4.5 9 L19.5 9"
+                                tip: qsTr("Tuning and capo")
+                                onClicked: root.tuningTrack = row.tuningOpen ? -1 : row.index
+
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 120
+                                    }
+                                }
+                            }
+
                             IconButton {
                                 visible: root.document.tracks.length > 1
                                 opacity: hover.hovered || row.shown ? 1.0 : 0.0
@@ -418,6 +404,8 @@ Pane {
                         // pan. Playback hears a fader while it moves; letting go
                         // keeps it as one undo step.
                         RowLayout {
+                            id: mixRow
+
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: header.bottom
@@ -468,6 +456,28 @@ Pane {
                                 onMoved: root.document.previewTrackMix(row.index, volume.value, value)
                                 onReleased: root.document.setTrackMix(row.index, volume.value, value,
                                                                       row.modelData.mute, row.modelData.solo)
+                            }
+                        }
+
+                        TuningFields {
+                            id: tuning
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: mixRow.bottom
+                            anchors.topMargin: 8
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 10
+                            visible: row.tuningOpen || row.height > 95
+                            opacity: row.tuningOpen ? 1.0 : 0.0
+                            document: root.document
+                            track: row.index
+                            info: row.modelData
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 160
+                                }
                             }
                         }
                     }

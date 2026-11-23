@@ -207,6 +207,34 @@ TEST_CASE("Guitar Pro 6: plain and literal-only containers hold the same score",
     checkBass(packLiterals(plain));
 }
 
+TEST_CASE("Guitar Pro 6: the container's part configuration says which tracks keep a tuning",
+          "[io][guitarpro]") {
+    // The bass score as a flute's: Guitar Pro gives it a tuning all the same.
+    std::string flute = bassScore();
+    const std::string bass = "<Program>33</Program>";
+    flute.replace(flute.find(bass), bass.size(), "<Program>73</Program>");
+    // One score view of one track, shown as standard notation (1) or as
+    // tablature (2); then the view on screen.
+    const auto parts = [](char shown) {
+        return std::string{0, 0, 0, 1, 0, 0, 0, 0, 1, shown} + std::string(4, '\0');
+    };
+    const auto open = [&flute](const std::vector<std::pair<std::string, std::string>>& extra,
+                               bool packed) {
+        std::vector<std::pair<std::string, std::string>> files{{"score.gpif", flute}};
+        files.insert(files.end(), extra.begin(), extra.end());
+        const std::vector<std::uint8_t> plain = fileSystem(files);
+        const auto imported = importGuitarPro(packed ? packLiterals(plain) : plain);
+        REQUIRE(imported.has_value());
+        return imported->song.track(0).staff(0).isFretted();
+    };
+    for (const bool packed : {false, true}) {
+        CAPTURE(packed);
+        CHECK_FALSE(open({{"PartConfiguration", parts(1)}}, packed));
+        CHECK(open({{"PartConfiguration", parts(2)}}, packed));
+        CHECK(open({}, packed));
+    }
+}
+
 TEST_CASE("Guitar Pro 6: damaged containers are errors with a reason", "[io][guitarpro]") {
     CHECK(error(bytesOf("BCFZab")) == "Guitar Pro: damaged Guitar Pro 6 file: it ends early");
 

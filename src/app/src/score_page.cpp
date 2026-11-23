@@ -24,6 +24,7 @@ constexpr double kMaxSide = 8192.0;
 constexpr double kMaxPixels = 32.0 * 1024 * 1024;
 
 std::atomic<int> paints{0};
+std::atomic<int> kept{0};
 
 } // namespace
 
@@ -36,6 +37,10 @@ ScorePage::ScorePage(QQuickItem* parent) : QQuickItem(parent) {
 
 int ScorePage::paintCount() {
     return paints.load();
+}
+
+int ScorePage::keptCount() {
+    return kept.load();
 }
 
 void ScorePage::setDocument(ScoreDocument* document) {
@@ -101,6 +106,16 @@ void ScorePage::repaint() {
     const double side = std::max(page->width, page->bottom - page->top) * scale * ratio;
     const double pixels = page->width * (page->bottom - page->top) * scale * scale * ratio * ratio;
     scale *= std::min({1.0, kMaxSide / side, std::sqrt(kMaxPixels / pixels)});
+    // The texture already shows this page at this size: an edit elsewhere in
+    // the song costs a comparison here, not a paint.
+    if (shown_ && scale == shownScale_ && ratio == shownRatio_ && *page == *shown_) {
+        shown_ = std::move(page); // lets the previous layout go
+        ++kept;
+        return;
+    }
+    shown_ = page;
+    shownScale_ = scale;
+    shownRatio_ = ratio;
     const std::uint64_t ticket = ++ticket_;
     QtConcurrent::run([page = std::move(page), scale, ratio] {
         return ScoreDocument::painter().render(*page, scale, ratio);
