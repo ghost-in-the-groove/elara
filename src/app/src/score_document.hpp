@@ -72,6 +72,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY songChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY songChanged)
     Q_PROPERTY(QVariantList instrumentPresets READ instrumentPresets CONSTANT)
+    Q_PROPERTY(QVariantList tuningPresets READ tuningPresets CONSTANT)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(QString undoName READ undoName NOTIFY historyChanged)
@@ -85,6 +86,12 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
+    // The caret's measure.
+    Q_PROPERTY(int caretMeasure READ caretMeasure NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeNumerator READ caretTimeNumerator NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeDenominator READ caretTimeDenominator NOTIFY caretChanged)
+    Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
+    Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -169,10 +176,16 @@ public:
     /// kind of instrument), symbol (a clef of the music font) and its mix:
     /// volume (0 to 1), pan (-1 to 1), mute, solo, and audible when it sounds
     /// (ADR-0039).
+    /// The tracks: name, detail, symbol, mix ("volume", "pan", "mute", "solo",
+    /// "audible") and tuning ("fretted", "tuning", "tuningPreset", "capo", as
+    /// trackTuning() names them "fretted", "notes", "preset" and "capo").
     [[nodiscard]] QVariantList tracks() const;
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
     [[nodiscard]] static QVariantList instrumentPresets();
+    /// The tuning presets (ADR-0046): id, name and notes, the open strings
+    /// from the lowest ("E2 A2 D3 G3 B3 E4").
+    [[nodiscard]] static QVariantList tuningPresets();
     [[nodiscard]] bool canUndo() const { return document_ && document_->canUndo(); }
     [[nodiscard]] bool canRedo() const { return document_ && document_->canRedo(); }
     /// What undo() or redo() would change, e.g. "Add track"; empty when nothing.
@@ -192,6 +205,9 @@ public:
     /// Change the signature from the first measure until its next change.
     Q_INVOKABLE void setTimeSignature(int numerator, int denominator);
     Q_INVOKABLE void setKeySignature(int fifths, bool minor);
+    /// Change the signature from `measure` (0-based) until its next change.
+    Q_INVOKABLE void setTimeSignatureFrom(int measure, int numerator, int denominator);
+    Q_INVOKABLE void setKeySignatureFrom(int measure, int fifths, bool minor);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -204,6 +220,16 @@ public:
     /// Lets playback hear a track's volume and pan while a fader moves, without
     /// changing the song: setTrackMix() keeps it when the fader is let go.
     Q_INVOKABLE void previewTrackMix(int track, double volume, double pan);
+    /// The tuning of a track's first staff: "fretted" (false without strings),
+    /// "notes" (its open strings from the lowest), "preset" (the id of the
+    /// preset it matches, else empty) and "capo".
+    Q_INVOKABLE [[nodiscard]] QVariantMap trackTuning(int track) const;
+    /// Retunes a track's first staff (ADR-0046) to `tuning`, a preset id or open
+    /// strings from the lowest ("D2 A2 D3 G3 B3 E4"), with a capo at `capo`,
+    /// keeping its pitches or, with `keepFrets`, its frets: one undo step,
+    /// "Change tuning". A tuning that cannot play every note is refused through
+    /// editFailed().
+    Q_INVOKABLE void setTrackTuning(int track, const QString& tuning, int capo, bool keepFrets);
     /// The mixes previewTrackMix() last made, one per track.
     [[nodiscard]] std::span<const core::TrackMix> previewMixes() const { return previewMixes_; }
     Q_INVOKABLE void undo();
@@ -249,6 +275,18 @@ public:
     Q_INVOKABLE void deleteAtCaret();
     Q_INVOKABLE void deleteBeat();
     Q_INVOKABLE void insertRest();
+
+    /// The caret's measure, 0-based, and its signatures.
+    [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
+    [[nodiscard]] int caretTimeNumerator() const;
+    [[nodiscard]] int caretTimeDenominator() const;
+    [[nodiscard]] int caretKeyFifths() const;
+    [[nodiscard]] bool caretKeyMinor() const;
+    /// Inserts an empty measure before the caret's measure, or after it, with
+    /// the signatures of the measure before it; the caret goes to it.
+    Q_INVOKABLE void insertMeasure(bool after);
+    /// Removes the caret's measure; the last measure of a song stays.
+    Q_INVOKABLE void removeMeasure();
 
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;

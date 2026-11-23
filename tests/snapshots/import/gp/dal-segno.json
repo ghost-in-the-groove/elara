@@ -1,0 +1,163 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Navigation",
+   "subtitle": "Guitar Pro 5",
+   "artist": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {
+    "segno": true
+   },
+   {
+    "toCoda": true
+   },
+   {
+    "jump": "dal-segno",
+    "jumpThen": "al-coda"
+   },
+   {
+    "coda": true
+   },
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Guitar",
+    "instrument": {
+     "name": "Electric Guitar (clean)",
+     "kind": "fretted",
+     "midiProgram": 27,
+     "writtenOffset": 12
+    },
+    "mix": {
+     "volume": 0.8125
+    },
+    "staves": [
+     {
+      "clef": "treble-8vb",
+      "tuning": "E2 A2 D3 G3 B3 E4",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "E4",
+            "string": 1,
+            "fret": 0,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F4",
+            "string": 1,
+            "fret": 1,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G4",
+            "string": 1,
+            "fret": 3,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "A4",
+            "string": 1,
+            "fret": 5,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "B4",
+            "string": 1,
+            "fret": 7,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C5",
+            "string": 1,
+            "fret": 8,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 12.0,
+ "issues": []
+}

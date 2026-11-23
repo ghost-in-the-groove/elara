@@ -67,6 +67,16 @@ core::Song richSong() {
     song.measureHeader(2).repeatTimes = 3;
     song.measureHeader(2).alternateEndings = 0b011;
     song.measureHeader(3).alternateEndings = 0b100;
+    // Every sign on measure 0, what closes measure 1 on measure 1 (ADR-0049).
+    song.measureHeader(0).segno = true;
+    song.measureHeader(0).segnoSegno = true;
+    song.measureHeader(0).coda = true;
+    song.measureHeader(0).doubleCoda = true;
+    song.measureHeader(1).fine = true;
+    song.measureHeader(1).toCoda = true;
+    song.measureHeader(1).toDoubleCoda = true;
+    song.measureHeader(1).jump = JumpTo::SegnoSegno;
+    song.measureHeader(1).jumpThen = JumpThen::DoubleCoda;
 
     // Guitar, measure 0: every note effect, a chord, a tuplet and a second voice.
     Staff& lead = song.track(0).staff(0);
@@ -159,6 +169,13 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2]})") != std::string::npos);
     CHECK(json.find(R"({"alternateEndings":[3]})") != std::string::npos);
     CHECK(json.find(R"("repeatStart":false)") == std::string::npos);
+    CHECK(json.find(R"("segno":true,"segnoSegno":true,"coda":true,"doubleCoda":true})") !=
+          std::string::npos);
+    CHECK(
+        json.find(
+            R"("repeatStart":true,"fine":true,"toCoda":true,"toDoubleCoda":true,"jump":"dal-segno-segno","jumpThen":"al-double-coda"})") !=
+        std::string::npos);
+    CHECK(json.find(R"("segno":false)") == std::string::npos);
     CHECK(json.find(R"("mix":{"volume":0.65,"pan":-0.5,"solo":true})") != std::string::npos);
     CHECK(json.find(R"("mix":{"volume":1,"mute":true})") != std::string::npos);
     CHECK(json.find(R"("mute":false)") == std::string::npos);

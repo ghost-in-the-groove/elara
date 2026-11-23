@@ -136,12 +136,19 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption songPaneOption(
         QStringLiteral("song-pane"),
         QCoreApplication::translate("main", "Open the song and tracks panel at start."));
+    const QCommandLineOption measureOption(
+        QStringLiteral("measure"),
+        QCoreApplication::translate("main", "Open the caret's measure at start."));
+    const QCommandLineOption tuningOption(
+        QStringLiteral("tuning"),
+        QCoreApplication::translate("main",
+                                    "Open the first track's tuning in the song panel at start."));
     const QCommandLineOption languageOption(
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
         QStringLiteral("language"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       songPaneOption, languageOption});
+                       songPaneOption, measureOption, tuningOption, languageOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -210,7 +217,9 @@ int main(int argc, char* argv[]) {
 
     engine.setInitialProperties({{QStringLiteral("initialFile"), options.file},
                                  {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
-                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)}});
+                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
+                                 {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
+                                 {QStringLiteral("showTuning"), parser.isSet(tuningOption)}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()

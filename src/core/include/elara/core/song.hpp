@@ -116,9 +116,25 @@ private:
     TrackMix mix_;
 };
 
-/// Song-wide information about one measure, shared by every staff. Tempo changes
-/// and repeats live here so they move with their measure (ADR-0016). Markers
-/// and jumps (segno, coda, da capo) come later.
+/// Where a jump sends the music back to (ADR-0049).
+enum class JumpTo : std::uint8_t {
+    None,
+    Start,      ///< da capo (D.C.): the first measure
+    Segno,      ///< dal segno (D.S.): the nearest segno before the jump
+    SegnoSegno, ///< dal segno segno (D.S.S.): the nearest segno segno before it
+};
+
+/// Where the music ends, or leaves for a coda, once a jump was taken.
+enum class JumpThen : std::uint8_t {
+    End,        ///< plays on to the end of the song
+    Fine,       ///< al Fine: ends with the first measure marked fine
+    Coda,       ///< al Coda: leaves the measure marked to coda for the coda sign
+    DoubleCoda, ///< al Double Coda: the same with the double coda signs
+};
+
+/// Song-wide information about one measure, shared by every staff. Tempo changes,
+/// repeats (ADR-0016), signs and jumps (ADR-0049) live here so they move with
+/// their measure.
 struct MeasureHeader {
     /// Alternate endings name times through a repeat from 1 to this.
     static constexpr int kMaxEnding = 8;
@@ -134,6 +150,18 @@ struct MeasureHeader {
     /// The measure belongs to the alternate endings of these times through the
     /// repeat: bit n - 1 for the n-th time. 0 for a measure played every time.
     std::uint8_t alternateEndings = 0;
+
+    // Signs that open the measure: where jumps go.
+    bool segno = false;
+    bool segnoSegno = false;
+    bool coda = false;
+    bool doubleCoda = false;
+    // What closes the measure, after its repeat (if any) is done.
+    bool fine = false;         ///< after a jump al Fine, the music ends here
+    bool toCoda = false;       ///< after a jump al Coda, the music leaves here for the coda
+    bool toDoubleCoda = false; ///< after a jump al Double Coda, for the double coda
+    JumpTo jump = JumpTo::None;
+    JumpThen jumpThen = JumpThen::End;
 
     /// True when an end repeat barline closes the measure.
     [[nodiscard]] bool repeatEnd() const noexcept { return repeatTimes >= 2; }
@@ -223,7 +251,14 @@ public:
     /// section as many times as it says, and each time through only the
     /// alternate endings of that time. An end repeat without a start repeat
     /// goes back to the start of the song, or to the start of the section after
-    /// the previous repeat. Never longer than 256 times the measures.
+    /// the previous repeat.
+    ///
+    /// A jump (ADR-0049) is taken once, when its measure is done: back to the
+    /// start or to the nearest sign of its kind before it (none: it is not
+    /// taken). From then on repeats are not taken, a run of alternate endings
+    /// plays only its last ending, and the music ends at the first fine (al
+    /// Fine) or leaves the first measure marked to coda for the first coda sign
+    /// after it (al Coda). Never longer than 256 times the measures.
     [[nodiscard]] std::vector<std::size_t> playOrder() const;
 
     /// Tempo in force at the start of the song.

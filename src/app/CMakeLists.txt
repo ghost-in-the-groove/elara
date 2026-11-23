@@ -31,6 +31,8 @@ qt_add_qml_module(elara
     qml/Main.qml
     qml/ScoreView.qml
     qml/EntryBar.qml
+    qml/MeasurePopup.qml
+    qml/SignatureFields.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml
@@ -38,6 +40,7 @@ qt_add_qml_module(elara
     qml/MusicSymbol.qml
     qml/TunerPane.qml
     qml/SongPane.qml
+    qml/TuningFields.qml
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp
