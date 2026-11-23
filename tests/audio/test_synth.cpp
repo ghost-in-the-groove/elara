@@ -17,6 +17,8 @@ using elara::audio::Synth;
 using elara::audio::Timbre;
 using elara::audio::timbreFor;
 using elara::audio::timbreName;
+using elara::audio::Touch;
+using elara::audio::touchName;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 
@@ -73,6 +75,36 @@ double pitchOf(std::span<const float> x) {
         }
     }
     return 0.0;
+}
+
+double rms(std::span<const float> x) {
+    double sum = 0.0;
+    for (const float v : x) {
+        sum += static_cast<double>(v) * static_cast<double>(v);
+    }
+    return x.empty() ? 0.0 : std::sqrt(sum / static_cast<double>(x.size()));
+}
+
+// How much `x` changes from one frame to the next for its level: higher for
+// brighter sounds.
+double brightness(std::span<const float> x) {
+    double change = 0.0;
+    double level = 0.0;
+    for (std::size_t i = 1; i < x.size(); ++i) {
+        change += std::abs(static_cast<double>(x[i]) - static_cast<double>(x[i - 1]));
+        level += std::abs(static_cast<double>(x[i]));
+    }
+    return level > 0.0 ? change / level : 0.0;
+}
+
+std::vector<float> strike(Timbre timbre, int key, Touch touch, double seconds = 1.5) {
+    Synth synth(timbre, kRate);
+    synth.noteOn(key, 100, touch);
+    return render(synth, seconds);
+}
+
+std::span<const float> between(const std::vector<float>& x, double from, double to) {
+    return std::span<const float>(x).subspan(frames(from), frames(to) - frames(from));
 }
 
 Instrument program(int midiProgram) {
@@ -266,4 +298,65 @@ TEST_CASE("Synth: rendering adds to what is already in the buffer", "[audio][syn
     for (std::size_t i = 0; i < out.size(); ++i) {
         CHECK(out[i] == 0.5f + alone[i]);
     }
+}
+
+// Touches (ADR-0022): plucked strings play each one differently.
+TEST_CASE("Synth: a palm-muted string dies away sooner than an open one", "[audio][synth][touch]") {
+    const Timbre timbre = GENERATE(Timbre::Guitar, Timbre::Overdrive, Timbre::Bass);
+    CAPTURE(timbreName(timbre));
+    const int key = timbre == Timbre::Bass ? 40 : 52;
+    const std::vector<float> open = strike(timbre, key, Touch::Normal);
+    const std::vector<float> muted = strike(timbre, key, Touch::PalmMute);
+    CHECK(rms(between(muted, 0.0, 0.02)) > 0.3 * rms(between(open, 0.0, 0.02)));
+    CHECK(rms(between(muted, 0.5, 0.7)) < 0.1 * rms(between(open, 0.5, 0.7)));
+}
+
+TEST_CASE("Synth: a palm-muted string sounds darker", "[audio][synth][touch]") {
+    const Timbre timbre = GENERATE(Timbre::Guitar, Timbre::Bass);
+    CAPTURE(timbreName(timbre));
+    const std::vector<float> open = strike(timbre, 52, Touch::Normal, 0.1);
+    const std::vector<float> muted = strike(timbre, 52, Touch::PalmMute, 0.1);
+    CHECK(brightness(between(muted, 0.0, 0.05)) < brightness(between(open, 0.0, 0.05)));
+}
+
+TEST_CASE("Synth: a dead note is a click that is over at once", "[audio][synth][touch]") {
+    Synth dead(Timbre::Guitar, kRate);
+    dead.noteOn(52, 100, Touch::Dead);
+    Synth open(Timbre::Guitar, kRate);
+    open.noteOn(52, 100);
+    const std::vector<float> click = render(dead, 0.3);
+    const std::vector<float> ringing = render(open, 0.3);
+    CHECK(rms(between(click, 0.0, 0.01)) > 0.0);
+    CHECK(rms(between(click, 0.15, 0.3)) < 0.01 * rms(between(ringing, 0.15, 0.3)));
+    CHECK(dead.activeVoices() == 0);
+    CHECK(open.activeVoices() == 1);
+}
+
+TEST_CASE("Synth: a harmonic rings pure and long at the pitch of its key",
+          "[audio][synth][touch]") {
+    const std::vector<float> open = strike(Timbre::Guitar, 64, Touch::Normal);
+    const std::vector<float> harmonic = strike(Timbre::Guitar, 64, Touch::Harmonic);
+    const double expected = keyFrequency(64);
+    CHECK(std::abs(pitchOf(between(harmonic, 0.1, 0.3)) - expected) < 0.01 * expected);
+    CHECK(brightness(between(harmonic, 0.0, 0.2)) < 0.5 * brightness(between(open, 0.0, 0.2)));
+    const auto decay = [](const std::vector<float>& x) {
+        return rms(between(x, 1.0, 1.2)) / rms(between(x, 0.1, 0.3));
+    };
+    CHECK(decay(harmonic) > decay(open));
+}
+
+TEST_CASE("Synth: timbres that are not plucked play every touch alike", "[audio][synth][touch]") {
+    const Timbre timbre = GENERATE(Timbre::Piano, Timbre::Mallet, Timbre::Organ, Timbre::Bowed,
+                                   Timbre::Wind, Timbre::Drums);
+    const Touch touch = GENERATE(Touch::PalmMute, Touch::Dead, Touch::Harmonic);
+    CAPTURE(timbreName(timbre), touchName(touch));
+    const int key = timbre == Timbre::Drums ? 38 : 60;
+    CHECK(strike(timbre, key, touch, 0.3) == strike(timbre, key, Touch::Normal, 0.3));
+}
+
+TEST_CASE("Synth: touches have the names the command line prints", "[audio][synth][touch]") {
+    CHECK(touchName(Touch::Normal) == "normal");
+    CHECK(touchName(Touch::PalmMute) == "palm-mute");
+    CHECK(touchName(Touch::Dead) == "dead");
+    CHECK(touchName(Touch::Harmonic) == "harmonic");
 }

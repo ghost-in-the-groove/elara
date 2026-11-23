@@ -30,6 +30,7 @@ struct OfflineRenderer::TrackPlayer {
             if (log) {
                 dispatched.push_back({.frame = event.frame,
                                       .kind = event.kind,
+                                      .touch = event.touch,
                                       .track = track,
                                       .key = event.key,
                                       .velocity = event.velocity});
