@@ -56,7 +56,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 4 - Playback  -> usable as a player
 
-- [ ] Sequencer: model -> timed events, tempo map, repeats
+- [x] Sequencer: model -> timed events, tempo map, repeats (ADR-0017)
 - [ ] FluidSynth integration, MuseScore General SF3
 - [ ] sfizz integration and guitar SFZ library selection
 - [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)

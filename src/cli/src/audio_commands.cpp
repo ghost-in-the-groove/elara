@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: render-tone, devices, tone.
+// Audio subcommands: sequence, render-tone, devices, tone.
+#include <elara/audio/sequence.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
 #include <elara/audio/wav_writer.hpp>
@@ -8,11 +9,13 @@
 #include <CLI/CLI.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 
 namespace elara::cli {
@@ -109,9 +112,97 @@ int runTone(bool json, const ToneOptions& tone) {
     return finished ? kExitOk : fail("tone did not finish; the audio callback may not be running");
 }
 
+struct SequenceOptions {
+    std::string file;
+    bool notes = false;
+    bool events = false;
+};
+
+std::string_view kindName(audio::EventKind kind) {
+    return kind == audio::EventKind::NoteOn ? "on" : "off";
+}
+
+std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions& options) {
+    std::string json = std::format(R"({{"file":"{}","duration":{},"measures":[)",
+                                   jsonEscape(options.file), jsonNumber(sequence.duration()));
+    for (std::size_t k = 0; k < sequence.measures().size(); ++k) {
+        const audio::PlayedMeasure& measure = sequence.measures()[k];
+        json += std::format(R"({}{{"measure":{},"start":{},"end":{}}})", k == 0 ? "" : ",",
+                            measure.measure, jsonNumber(measure.start), jsonNumber(measure.end));
+    }
+    json += std::format(R"(],"noteCount":{},"eventCount":{})", sequence.notes().size(),
+                        sequence.events().size());
+    if (options.notes) {
+        json += R"(,"notes":[)";
+        for (std::size_t i = 0; i < sequence.notes().size(); ++i) {
+            const audio::PlayedNote& note = sequence.notes()[i];
+            json += std::format(
+                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}}})",
+                i == 0 ? "" : ",", note.track, note.staff, note.voice, note.pass,
+                jsonNumber(note.start), jsonNumber(note.end), note.key, note.velocity);
+        }
+        json += ']';
+    }
+    if (options.events) {
+        json += R"(,"events":[)";
+        for (std::size_t i = 0; i < sequence.events().size(); ++i) {
+            const audio::NoteEvent& event = sequence.events()[i];
+            json += std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},"velocity":{}}})",
+                                i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
+                                event.track, event.key, event.velocity);
+        }
+        json += ']';
+    }
+    return json + '}';
+}
+
+int runSequence(bool json, const SequenceOptions& options) {
+    const auto song = openSong(options.file);
+    if (!song) {
+        return fail(song.error());
+    }
+    const audio::Sequence sequence(*song);
+    if (json) {
+        std::cout << sequenceJson(sequence, options) << '\n';
+        return kExitOk;
+    }
+    std::string order;
+    for (const audio::PlayedMeasure& measure : sequence.measures()) {
+        order += std::format(" {}", measure.measure + 1);
+    }
+    std::cout << std::format("played measures:{}\n{} measures, {} notes, {} events in {:.3f} s\n",
+                             order, sequence.measures().size(), sequence.notes().size(),
+                             sequence.events().size(), sequence.duration());
+    if (options.notes) {
+        for (const audio::PlayedNote& note : sequence.notes()) {
+            std::cout << std::format(
+                "{:9.3f} {:9.3f}  track {} staff {} voice {}  key {:3} velocity {:3}\n", note.start,
+                note.end, note.track, note.staff, note.voice, note.key, note.velocity);
+        }
+    }
+    if (options.events) {
+        for (const audio::NoteEvent& event : sequence.events()) {
+            std::cout << std::format("{:9.3f} {:3}  track {}  key {:3} velocity {:3}\n", event.time,
+                                     kindName(event.kind), event.track, event.key, event.velocity);
+        }
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addAudioCommands(CLI::App& app, Context& context) {
+    auto sequenced = std::make_shared<SequenceOptions>();
+    auto* sequence = app.add_subcommand(
+        "sequence", "Play a song through the sequencer without sound: the measures in play order "
+                    "(repeats unrolled), its notes and note events, in seconds");
+    sequence->add_option("file", sequenced->file, "A .elara file or any file import reads")
+        ->required();
+    sequence->add_flag("--notes", sequenced->notes, "List the notes as played");
+    sequence->add_flag("--events", sequenced->events, "List the note events for a synthesizer");
+    sequence->callback(
+        [&context, sequenced] { context.exitCode = runSequence(context.json, *sequenced); });
+
     auto render = std::make_shared<RenderOptions>();
     auto* renderTone =
         app.add_subcommand("render-tone", "Render a sine test tone to a 16-bit PCM WAV file");

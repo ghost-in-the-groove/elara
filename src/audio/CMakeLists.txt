@@ -1,10 +1,12 @@
-# elara_audio: real-time-safe DSP and audio file helpers. Pure C++23.
+# elara_audio: the sequencer, real-time-safe DSP and audio file helpers. Pure C++23.
 add_library(elara_audio STATIC
+  src/sequence.cpp
   src/tone_generator.cpp
   src/wav_writer.cpp)
 add_library(elara::audio ALIAS elara_audio)
 
 target_include_directories(elara_audio PUBLIC include)
+target_link_libraries(elara_audio PUBLIC elara::core)
 elara_target_warnings(elara_audio)
 
 # elara_audio_juce: the only target that sees JUCE (ADR-0002). Its public
