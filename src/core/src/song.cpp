@@ -120,12 +120,8 @@ void Track::setMix(const TrackMix& mix) {
 }
 
 bool Song::audible(std::size_t index) const {
-    const TrackMix& mix = track(index).mix();
-    if (mix.mute) {
-        return false;
-    }
-    return mix.solo ||
-           std::ranges::none_of(tracks_, [](const Track& other) { return other.mix().solo; });
+    return track(index).mix().audible(
+        std::ranges::any_of(tracks_, [](const Track& other) { return other.mix().solo; }));
 }
 
 Track& Song::track(std::size_t index) {

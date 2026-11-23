@@ -69,16 +69,15 @@ struct TrackLevel {
 /// the headroom, so turning it on leaves the song as loud.
 inline constexpr TrackLevel kMetronomeLevel{.left = 1.25f, .right = 1.25f};
 
-/// The level of track `t` from its mix (ADR-0020), times `headroom`: the fader
+/// The level of a track with `mix` (ADR-0020), times `headroom`: the fader
 /// as a gain of (volume / 0.8)^2, unity at the default position; a
 /// constant-power pan, unity in the centre and sqrt(2) on the side it goes to;
-/// silence when mute or solo keeps the track quiet.
-[[nodiscard]] inline TrackLevel levelOf(const core::Song& song, std::size_t t,
+/// silence when mute or solo keeps the track quiet (not `audible`).
+[[nodiscard]] inline TrackLevel levelOf(const core::TrackMix& mix, bool audible,
                                         float headroom) noexcept {
-    if (!song.audible(t)) {
+    if (!audible) {
         return {.left = 0.0f, .right = 0.0f};
     }
-    const core::TrackMix& mix = song.track(t).mix();
     const double fader = mix.volume / core::TrackMix::kDefaultVolume;
     const double gain = fader * fader * static_cast<double>(headroom) * std::numbers::sqrt2;
     // The same expression for both sides, so the centre is exactly even; a
@@ -90,6 +89,12 @@ inline constexpr TrackLevel kMetronomeLevel{.left = 1.25f, .right = 1.25f};
     const double angle = (mix.pan + 1.0) * std::numbers::pi / 4.0;
     return {.left = static_cast<float>(gain * side(angle)),
             .right = static_cast<float>(gain * side((std::numbers::pi / 2.0) - angle))};
+}
+
+/// The level of track `t` of `song`, as above.
+[[nodiscard]] inline TrackLevel levelOf(const core::Song& song, std::size_t t,
+                                        float headroom) noexcept {
+    return levelOf(song.track(t).mix(), song.audible(t), headroom);
 }
 
 /// Adds `track` at its level to `left` and `right`. The level moves in a

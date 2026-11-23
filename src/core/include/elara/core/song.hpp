@@ -69,6 +69,10 @@ struct TrackMix {
     bool mute = false;
     bool solo = false;
 
+    /// Whether a track with this mix sounds when `anySolo` tracks of its song
+    /// are soloed: it is not muted and, when any is soloed, it is one of them.
+    [[nodiscard]] bool audible(bool anySolo) const noexcept { return !mute && (solo || !anySolo); }
+
     friend bool operator==(const TrackMix&, const TrackMix&) = default;
 };
 

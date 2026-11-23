@@ -11,7 +11,8 @@
 
 namespace elara::core {
 class Song;
-}
+struct TrackMix;
+} // namespace elara::core
 
 namespace elara::audio {
 
@@ -50,6 +51,9 @@ public:
     /// moves to the new levels over its next block. Does nothing when `song`
     /// does not have the loaded song's number of tracks.
     void updateMix(const core::Song& song) noexcept;
+    /// The same from the tracks' mixes alone, in track order: what a mixer
+    /// passes while a fader moves, without copying the song for every step.
+    void updateMix(std::span<const core::TrackMix> mixes) noexcept;
 
     /// Moves to `seconds` (clamped to the song), silencing what sounds.
     /// Notes that started earlier are not struck again.

@@ -203,6 +203,45 @@ TEST_CASE("Player: a mix change takes over within a block, without reloading",
     CHECK(peakLevel(quiet) == 0.0f);
 }
 
+// While a fader moves, the mixer passes the mixes alone, so the song is not
+// copied for every step of the drag.
+TEST_CASE("Player: a mix change from the mixes alone sounds as one from the song",
+          "[audio][player][mix]") {
+    const Song s = song(2, 60);
+    Song soloed = s;
+    soloed.track(0).setMix(TrackMix{.volume = 0.5, .pan = 0.5});
+    soloed.track(1).setMix(TrackMix{.solo = true});
+    const std::vector<TrackMix> mixes{soloed.track(0).mix(), soloed.track(1).mix()};
+
+    Player fromSong(kRate);
+    fromSong.load(s, Sequence(s));
+    fromSong.play();
+    fromSong.updateMix(soloed);
+    Player fromMixes(kRate);
+    fromMixes.load(s, Sequence(s));
+    fromMixes.play();
+    fromMixes.updateMix(mixes);
+    const auto [left, right] = playStereo(fromSong, 0.5);
+    const auto [mixesLeft, mixesRight] = playStereo(fromMixes, 0.5);
+    CHECK(peakLevel(left) > 0.0f);
+    CHECK(left == mixesLeft);
+    CHECK(right == mixesRight);
+
+    // The solo on the second track keeps the first one quiet.
+    const std::vector<TrackMix> onlyFirst{TrackMix{}, TrackMix{.mute = true}};
+    fromMixes.updateMix(onlyFirst);
+    const std::vector<TrackMix> soloFirst{TrackMix{.solo = true}, TrackMix{}};
+    fromSong.updateMix(soloFirst);
+    (void)playStereo(fromSong, 480 * kFrame);
+    (void)playStereo(fromMixes, 480 * kFrame);
+    CHECK(playStereo(fromSong, 0.3).first == playStereo(fromMixes, 0.3).first);
+
+    // Mixes for another number of tracks are not the loaded song's: ignored.
+    const std::vector<TrackMix> three(3, TrackMix{.mute = true});
+    fromMixes.updateMix(three);
+    CHECK(peakLevel(playStereo(fromMixes, 0.3).first) > 0.0f);
+}
+
 TEST_CASE("Player: a pause holds the position and lets the notes ring out", "[audio][player]") {
     const Song s = song(2, 60);
     Player player(kRate);

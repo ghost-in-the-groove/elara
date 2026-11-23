@@ -127,6 +127,10 @@ public:
     [[nodiscard]] std::optional<double> secondsAt(std::size_t measure,
                                                   double fraction) const noexcept;
 
+    /// Equal when they play the same: a song whose mix or title changed plays
+    /// as before, so playback can carry on (ADR-0039).
+    friend bool operator==(const Sequence&, const Sequence&) = default;
+
 private:
     std::vector<PlayedMeasure> measures_;
     std::vector<PlayedNote> notes_;
