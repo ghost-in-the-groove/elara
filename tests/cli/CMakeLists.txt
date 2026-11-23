@@ -208,6 +208,32 @@ add_test(NAME cli.edit_deletes_at_the_caret
 set_tests_properties(cli.edit_deletes_at_the_caret PROPERTIES
   PASS_REGULAR_EXPRESSION "\"beats\":0,\"notes\":0}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":1,\"freeSlot\":true},\"input\":\"2\",\"undo\":{\"count\":6,\"next\":\"Delete\"}")
 
+# Note names (ADR-0034): each in the octave nearest the previous note, a chord
+# note above the highest, then a semitone down; on tablature the caret moves to
+# the string that reaches the note.
+set(ELARA_CLI_NAMES "${CMAKE_CURRENT_BINARY_DIR}/cli-note-names.elara")
+add_test(NAME cli.edit_types_note_names
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_NAMES}" "add-track flute" "append-measures 1"
+    "caret 0 0 0" "pitch C" right "pitch E" "pitch G add" right "pitch A" "shift -1")
+set_tests_properties(cli.edit_types_note_names PROPERTIES
+  FIXTURES_SETUP cli_note_names
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":2,\"string\":1,\"freeSlot\":false},\"input\":\"4\",\"undo\":{\"count\":7,\"next\":\"Change pitch\"}")
+add_test(NAME cli.dump_note_names COMMAND elara-cli --json dump "${ELARA_CLI_NAMES}")
+set_tests_properties(cli.dump_note_names PROPERTIES
+  FIXTURES_REQUIRED cli_note_names
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G5\"},{\"pitch\":\"E5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G#5\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_note_name_on_tablature
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
+    "pitch A")
+set_tests_properties(cli.edit_note_name_on_tablature PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":3,\"freeSlot\":false}")
+add_test(NAME cli.edit_rejects_note_name_on_drums
+  COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "pitch C")
+add_test(NAME cli.edit_rejects_unknown_note_name
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch H")
+set_tests_properties(cli.edit_rejects_note_name_on_drums cli.edit_rejects_unknown_note_name
+  PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
