@@ -24,7 +24,9 @@ function(_elara_warning_flags out_var)
         # GCC finds these only when optimising (never in the dev preset), from
         # an analysis that also flags paths inside libstdc++ and loops it
         # cannot prove run: shown, but not fatal to a release build.
-        list(APPEND flags -Wno-error=null-dereference)
+        list(APPEND flags -Wno-error=null-dereference -Wno-error=array-bounds
+          -Wno-error=stringop-overflow -Wno-error=stringop-overread
+          -Wno-error=maybe-uninitialized)
       endif()
     endif()
   endif()
