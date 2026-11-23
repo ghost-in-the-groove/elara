@@ -23,3 +23,9 @@ if(WIN32)
   # UTF-8 arguments and paths (see the manifest).
   target_sources(elara-cli PRIVATE elara-cli.manifest)
 endif()
+
+install(TARGETS elara-cli RUNTIME DESTINATION "${ELARA_INSTALL_TOOLS_DIR}")
+if(WIN32)
+  # The DLLs of the libraries it links (vcpkg builds them as DLLs on Windows).
+  install(FILES $<TARGET_RUNTIME_DLLS:elara-cli> DESTINATION "${ELARA_INSTALL_TOOLS_DIR}")
+endif()
