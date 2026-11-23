@@ -105,4 +105,25 @@ if(TARGET elara)
   set_tests_properties(app.smoke_open_views PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 4 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+
+  # The UI in Spanish: the catalog compiled into the executable loads and the
+  # window loads with it. Every string has a translation in every language.
+  add_test(NAME app.smoke_spanish COMMAND elara --smoke-test --language es)
+  add_test(NAME app.language_unknown COMMAND elara --smoke-test --language xx)
+  set_tests_properties(app.smoke_spanish app.language_unknown PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60)
+  set_tests_properties(app.smoke_spanish PROPERTIES
+    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+smoke-test: ok")
+  set_tests_properties(app.language_unknown PROPERTIES
+    PASS_REGULAR_EXPRESSION "no translation for language \"xx\"")
+  add_test(NAME app.translations_complete
+    COMMAND ${CMAKE_COMMAND}
+      -DLUPDATE=$<TARGET_FILE:Qt6::lupdate>
+      -DLCONVERT=$<TARGET_FILE:Qt6::lconvert>
+      -DAPP_DIR=${PROJECT_SOURCE_DIR}/src/app
+      -DSOURCE_LANGUAGE=en
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/translations
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/app/check_translations.cmake)
 endif()
