@@ -13,6 +13,15 @@ elara_source_warnings(src/score_painter.cpp)
 qt_add_executable(elara WIN32 MACOSX_BUNDLE
   src/main.cpp)
 
+# macOS asks the user before an app may listen to the microphone (the tuner,
+# ADR-0029), and quits an app whose Info.plist does not say why it wants to.
+set_target_properties(elara PROPERTIES
+  MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.ghost-in-the-groove.elara"
+  MACOSX_BUNDLE_BUNDLE_NAME "Elara"
+  MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+  MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
+
 qt_add_qml_module(elara
   URI Elara.App
   VERSION 1.0
@@ -24,6 +33,7 @@ qt_add_qml_module(elara
     qml/IconButton.qml
         qml/Icon.qml
     qml/MusicSymbol.qml
+    qml/TunerPane.qml
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp
@@ -32,7 +42,9 @@ qt_add_qml_module(elara
     src/score_page.hpp
     src/score_page.cpp
     src/startup.hpp
-    src/startup.cpp)
+    src/startup.cpp
+    src/tuner_controller.hpp
+    src/tuner_controller.cpp)
 
 # The fonts scores are painted with, and the controls style, built into the
 # executable so that it finds them wherever it is installed.
@@ -64,4 +76,4 @@ target_link_libraries(elara PRIVATE
 
 # Strict warnings for our sources only, not for moc/qmlcache output.
 elara_source_warnings(src/main.cpp src/audio_controller.cpp src/score_document.cpp
-  src/score_page.cpp src/startup.cpp)
+  src/score_page.cpp src/startup.cpp src/tuner_controller.cpp)
