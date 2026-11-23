@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone, tune.
+// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone, tune, listen.
+#include <elara/audio/microphone_input.hpp>
 #include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/pitch_detector.hpp>
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
+#include <elara/audio/tuner.hpp>
 #include <elara/audio/wav_reader.hpp>
 #include <elara/audio/wav_writer.hpp>
 
@@ -75,24 +77,34 @@ int runRenderTone(bool json, const RenderOptions& options) {
     return kExitOk;
 }
 
+// One JSON array of devices, or one line per device.
+template <typename Device>
+std::string devicesText(const std::vector<Device>& devices, bool json) {
+    std::string text;
+    for (const auto& device : devices) {
+        if (json) {
+            text += std::format(R"({}{{"type":"{}","name":"{}","default":{}}})",
+                                text.empty() ? "" : ",", jsonEscape(device.type),
+                                jsonEscape(device.name), device.isDefault ? "true" : "false");
+        } else {
+            text += std::format("  {} {} / {}\n", device.isDefault ? '*' : ' ', device.type,
+                                device.name);
+        }
+    }
+    return text;
+}
+
 int runDevices(bool json) {
-    const auto devices = audio::listOutputDevices();
+    const auto outputs = audio::listOutputDevices();
+    const auto inputs = audio::listInputDevices();
     if (json) {
-        std::string body;
-        for (const auto& device : devices) {
-            if (!body.empty()) {
-                body += ',';
-            }
-            body +=
-                std::format(R"({{"type":"{}","name":"{}","default":{}}})", jsonEscape(device.type),
-                            jsonEscape(device.name), device.isDefault ? "true" : "false");
-        }
-        std::cout << R"({"outputs":[)" << body << "]}\n";
+        std::cout << std::format(R"({{"outputs":[{}],"inputs":[{}]}})", devicesText(outputs, true),
+                                 devicesText(inputs, true))
+                  << '\n';
     } else {
-        for (const auto& device : devices) {
-            std::cout << std::format("{} {} / {}\n", device.isDefault ? '*' : ' ', device.type,
-                                     device.name);
-        }
+        std::cout << "outputs:\n"
+                  << devicesText(outputs, false) << "inputs:\n"
+                  << devicesText(inputs, false);
     }
     return kExitOk;
 }
@@ -380,13 +392,19 @@ std::string signedCents(double cents) {
 
 // The tuner's reading of a recording: the median pitch of the windows, half a
 // window apart, where the detector hears one clearly.
+// The tuner's --tuning: none when empty. False for text that names no tuning.
+bool tunerTuning(const std::string& text, std::optional<core::Tuning>& tuning) {
+    if (text.empty()) {
+        return true;
+    }
+    tuning = tuningFromOption(text);
+    return tuning.has_value();
+}
+
 int runTune(bool json, const TuneOptions& options) {
     std::optional<core::Tuning> tuning;
-    if (!options.tuning.empty()) {
-        tuning = tuningFromOption(options.tuning);
-        if (!tuning) {
-            return usageError(std::format("unknown tuning: {}", options.tuning));
-        }
+    if (!tunerTuning(options.tuning, tuning)) {
+        return usageError(std::format("unknown tuning: {}", options.tuning));
     }
     const auto wav = audio::readWav(options.file);
     if (!wav) {
@@ -452,6 +470,96 @@ int runTune(bool json, const TuneOptions& options) {
     return kExitOk;
 }
 
+struct ListenOptions {
+    double seconds = 5.0;
+    double a4Hz = 440.0;
+    std::string tuning;
+};
+
+// One reading of `listen`: what the tuner shows from `time` seconds on.
+std::string listenJson(double time, const std::optional<audio::TunerReading>& reading,
+                       const std::optional<core::Tuning>& tuning) {
+    if (!reading) {
+        return std::format(R"({{"time":{},"note":null}})", jsonNumber(time));
+    }
+    std::string out = std::format(R"({{"time":{},"note":"{}","cents":{},"frequency":{})",
+                                  jsonNumber(time), reading->note.toString(),
+                                  jsonNumber(reading->cents), jsonNumber(reading->frequency));
+    if (tuning) {
+        out += std::format(R"(,"string":{},"stringCents":{})", reading->string,
+                           jsonNumber(reading->stringCents));
+    }
+    return out + '}';
+}
+
+// Listens to the default input for a while and reports each change of the
+// tuner's reading as it happens.
+int runListen(bool json, const ListenOptions& options) {
+    std::optional<core::Tuning> tuning;
+    if (!tunerTuning(options.tuning, tuning)) {
+        return usageError(std::format("unknown tuning: {}", options.tuning));
+    }
+    audio::MicrophoneInput input;
+    if (auto opened = input.open(); !opened) {
+        return fail(opened.error());
+    }
+    if (input.sampleRate() <= 2.0 * audio::PitchDetector::kMaxFrequency) {
+        return fail(
+            std::format("a sample rate of {} Hz is too low for the tuner", input.sampleRate()));
+    }
+    audio::Tuner tuner(input.sampleRate(), {.a4 = options.a4Hz, .tuning = tuning});
+    if (!json) {
+        std::cout << std::format("listening on {} for {} s\n", input.deviceDescription(),
+                                 options.seconds);
+    }
+    using namespace std::chrono_literals;
+    const auto start = std::chrono::steady_clock::now();
+    std::vector<float> block(8192);
+    std::string readings;
+    float peak = 0.0f;
+    for (;;) {
+        std::this_thread::sleep_for(20ms);
+        const double time =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        for (std::size_t got = input.read(block); got > 0; got = input.read(block)) {
+            if (!tuner.push(std::span(block).first(got))) {
+                continue;
+            }
+            const auto& reading = tuner.reading();
+            if (json) {
+                readings += (readings.empty() ? "" : ",") + listenJson(time, reading, tuning);
+            } else if (!reading) {
+                std::cout << std::format("{:7.2f} s  -\n", time) << std::flush;
+            } else {
+                std::cout << std::format("{:7.2f} s  {} {} cents ({:.2f} Hz){}\n", time,
+                                         reading->note.toString(), signedCents(reading->cents),
+                                         reading->frequency,
+                                         tuning
+                                             ? std::format(", string {} {} cents", reading->string,
+                                                           signedCents(reading->stringCents))
+                                             : std::string())
+                          << std::flush;
+            }
+        }
+        peak = std::max(peak, input.takePeak());
+        if (time >= options.seconds) {
+            break;
+        }
+    }
+    if (json) {
+        std::cout
+            << std::format(
+                   R"({{"device":"{}","sampleRate":{},"seconds":{},"peak":{},"dropped":{},"readings":[{}]}})",
+                   jsonEscape(input.deviceDescription()), jsonNumber(input.sampleRate()),
+                   jsonNumber(options.seconds), jsonNumber(static_cast<double>(peak)),
+                   input.dropped(), readings)
+            << '\n';
+    } else {
+        std::cout << std::format("peak level {:.3f}\n", peak);
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addAudioCommands(CLI::App& app, Context& context) {
@@ -508,7 +616,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
     renderTone->callback(
         [&context, render] { context.exitCode = runRenderTone(context.json, *render); });
 
-    app.add_subcommand("devices", "List audio output devices")->callback([&context] {
+    app.add_subcommand("devices", "List audio output and input devices")->callback([&context] {
         context.exitCode = runDevices(context.json);
     });
 
@@ -529,6 +637,21 @@ void addAudioCommands(CLI::App& app, Context& context) {
                      "Name the nearest open string of a preset (\"guitar\", \"bass-5\") or of "
                      "open strings (\"D2 A2 D3 G3 B3 E4\")");
     tune->callback([&context, tuned] { context.exitCode = runTune(context.json, *tuned); });
+
+    auto listening = std::make_shared<ListenOptions>();
+    auto* listen = app.add_subcommand(
+        "listen", "Tune from the default audio input: print each change of the tuner's reading "
+                  "(note, cents, and with --tuning the nearest open string) while listening");
+    listen->add_option("--seconds", listening->seconds, "How long to listen")
+        ->check(CLI::Range(0.1, 3600.0))
+        ->capture_default_str();
+    listen->add_option("--a4", listening->a4Hz, "Reference frequency of A4 in Hz")
+        ->check(CLI::Range(400.0, 480.0))
+        ->capture_default_str();
+    listen->add_option("--tuning", listening->tuning,
+                       "Name the nearest open string of a preset or of open strings");
+    listen->callback(
+        [&context, listening] { context.exitCode = runListen(context.json, *listening); });
 }
 
 } // namespace elara::cli

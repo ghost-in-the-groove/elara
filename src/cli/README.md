@@ -6,9 +6,10 @@ look at a score, so every capability must be observable from here:
 ```text
 elara-cli [--json] version
 elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [--sample-rate 48000]
-elara-cli [--json] devices
+elara-cli [--json] devices                         # outputs and inputs
 elara-cli [--json] tone [--frequency 440] [--seconds 1]
 elara-cli [--json] tune <FILE.wav> [--a4 440] [--tuning guitar]   # the tuner's reading of a recording
+elara-cli [--json] listen [--seconds 5] [--a4 440] [--tuning guitar] # tune from the default input
 elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
 elara-cli [--json] fret --string N --fret N [--tuning guitar] [--capo 0] [--flats]
 elara-cli [--json] positions <PITCH> [--tuning guitar] [--capo 0] [--max-fret 30]
@@ -41,7 +42,12 @@ pitch in windows half a window apart (ADR-0028) and reports the median of the
 windows that have a clear one: `{"file", "sampleRate", "windows", "pitched",
 "a4", "frequency", "note", "cents", "clarity"}`, and with `--tuning` also
 `"tuning", "string", "stringPitch", "stringCents"` for the nearest open string.
-It fails when no window has a clear pitch.
+It fails when no window has a clear pitch. `listen` opens the default audio
+input (ADR-0029) and prints each change of the tuner's reading as it happens;
+with `--json`, at the end: `{"device", "sampleRate", "seconds", "peak",
+"dropped", "readings"}`, each reading `{"time", "note", "cents",
+"frequency"}` (plus `"string", "stringCents"` with `--tuning`) or `{"time",
+"note": null}` when the note stops. `devices` lists `"outputs"` and `"inputs"`.
 
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
