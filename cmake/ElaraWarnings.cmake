@@ -8,7 +8,8 @@
 
 function(_elara_warning_flags out_var)
   if(MSVC)
-    set(flags /W4 /permissive- /w14265 /w14296 /w14826 /w14905 /w14906 /w14928)
+    # /w15038: members initialized out of order, which GCC and Clang report too.
+    set(flags /W4 /permissive- /w14265 /w14296 /w14826 /w14905 /w14906 /w14928 /w15038)
     if(ELARA_WARNINGS_AS_ERRORS)
       list(APPEND flags /WX)
     endif()

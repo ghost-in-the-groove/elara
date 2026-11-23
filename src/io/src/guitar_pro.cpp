@@ -895,10 +895,10 @@ private:
 class GpifReader {
 public:
     GpifReader(pugi::xml_node root, std::vector<std::uint8_t> parts, Warnings& warnings)
-        : root_(root), parts_(std::move(parts)), bars_(root.child("Bars"), "Bar"),
-          voices_(root.child("Voices"), "Voice"), beats_(root.child("Beats"), "Beat"),
-          notes_(root.child("Notes"), "Note"), rhythms_(root.child("Rhythms"), "Rhythm"),
-          warnings_(warnings) {}
+        : root_(root), bars_(root.child("Bars"), "Bar"), voices_(root.child("Voices"), "Voice"),
+          beats_(root.child("Beats"), "Beat"), notes_(root.child("Notes"), "Note"),
+          rhythms_(root.child("Rhythms"), "Rhythm"), warnings_(warnings), parts_(std::move(parts)) {
+    }
 
     Song read(unsigned threads) {
         Song song;
