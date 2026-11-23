@@ -12,7 +12,8 @@
     python scripts/elara.py tidy [FILES...]      clang-tidy (default: changed .cpp files)
     python scripts/elara.py cli -- ARGS...       run the built elara-cli
     python scripts/elara.py app [-- ARGS...]     run the built desktop app
-    python scripts/elara.py ci                   what CI runs (fresh configure)
+    python scripts/elara.py translations         refresh the UI translation files (lupdate)
+    python scripts/elara.py ci                  what CI runs (fresh configure)
 
 On Windows the MSVC developer environment is loaded automatically (vswhere +
 vcvarsall.bat), and VCPKG_ROOT / QT_ROOT_DIR are read from the user
@@ -463,6 +464,14 @@ def cmd_app(args: argparse.Namespace) -> int:
                           check=False).returncode
 
 
+def cmd_translations(args: argparse.Namespace) -> int:
+    """Refreshes the app's .ts files from its sources (lupdate). Translate the
+    new or changed strings in Qt Linguist, or by hand, afterwards."""
+    if (code := ensure_configured(args.preset)) != 0:
+        return code
+    return run(["cmake", "--build", "--preset", args.preset, "--target", "update_translations"])
+
+
 def _gate(steps: list[tuple[str, callable]]) -> int:
     results = []
     for name, step in steps:
@@ -524,6 +533,7 @@ def main() -> int:
     add("tidy", cmd_tidy, "clang-tidy changed or given files").add_argument("files", nargs="*")
     add("cli", cmd_cli, "run elara-cli").add_argument("args", nargs=argparse.REMAINDER)
     add("app", cmd_app, "run the desktop app").add_argument("args", nargs=argparse.REMAINDER)
+    add("translations", cmd_translations, "refresh the UI translation files from the sources")
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)
