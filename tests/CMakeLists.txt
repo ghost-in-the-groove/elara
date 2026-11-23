@@ -29,6 +29,7 @@ elara_add_unit_tests(core
     core/test_timeline.cpp
     core/test_document.cpp
     core/test_effects.cpp
+    core/test_entry.cpp
     core/test_validation.cpp
     core/test_performance.cpp
   LIBRARIES elara::core)

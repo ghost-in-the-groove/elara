@@ -39,9 +39,23 @@ ADR-0005). `setMix` rejects values outside the ranges.
 **A fader position, not a gain.** The volume is where the fader stands, as in
 the formats, which all store a position rather than decibels. The default 0.8
 is close to the General MIDI default channel volume (100 of 127), so imported
-songs keep their balance. The mixer turns positions into gains: the plan is a
-gain of (volume / 0.8)², which is unity at the default and about +4 dB at the
-top, and a constant-power pan that is unity in the centre.
+songs keep their balance.
+
+**Playback.** The offline renderer and the player turn each track's mix into a
+left and a right gain:
+
+- the fader is a gain of (volume / 0.8)², unity at the default position and
+  about +4 dB at the top;
+- the pan keeps the power constant, unity in the centre and +3 dB on the side
+  it goes to;
+- a track that mute or solo keeps quiet gets no gain.
+
+These gains multiply the headroom every track already had (1/√n for n tracks
+with notes), which does not depend on the mix, so muting one track leaves the
+others as loud. The player takes a new mix while it plays
+(`Player::updateMix()`) without loading the song again. The levels are atomics
+the audio thread reads at the start of each block, and it moves to them in a
+straight line over that block, so a fader never clicks.
 
 **Imports.**
 
