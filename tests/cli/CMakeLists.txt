@@ -215,11 +215,36 @@ set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TR
 add_test(NAME cli.edit_rejects_fret_without_track COMMAND elara-cli edit "fret 3")
 set_tests_properties(cli.edit_rejects_fret_without_track PROPERTIES WILL_FAIL TRUE)
 
-add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "transpose 2")
+add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "explode 2")
 set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME cli.edit_rejects_undo_without_history COMMAND elara-cli edit undo)
 set_tests_properties(cli.edit_rejects_undo_without_history PROPERTIES WILL_FAIL TRUE)
+
+# Transposition (ADR-0026): the open high E down a semitone is D#4 on the B
+# string, and the keys follow to B major.
+set(ELARA_CLI_TRANSPOSED "${CMAKE_CURRENT_BINARY_DIR}/cli-transposed.elara")
+add_test(NAME cli.edit_transpose
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_TRANSPOSED}" "add-track electric-guitar"
+    "add-track flute" "add-track drum-kit" "append-measures 2" "note 0 0 1 0 1" "transpose -1")
+set_tests_properties(cli.edit_transpose PROPERTIES
+  FIXTURES_SETUP cli_transposed
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"B major\"},{\"time\":\"4/4\",\"key\":\"B major\"}\\].*\"undo\":{\"count\":6,\"next\":\"Transpose\"}")
+add_test(NAME cli.dump_transposed COMMAND elara-cli --json dump "${ELARA_CLI_TRANSPOSED}")
+set_tests_properties(cli.dump_transposed PROPERTIES
+  FIXTURES_REQUIRED cli_transposed
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"D#4\",\"string\":2,\"fret\":4}\\]")
+add_test(NAME cli.edit_transpose_measures_and_tracks
+  COMMAND elara-cli --json edit "add-track electric-guitar" "add-track flute" "append-measures 3"
+    "transpose +2 measures 1 1 tracks 0")
+set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\].*\"undo\":{\"count\":4,\"next\":\"Transpose\"}")
+add_test(NAME cli.edit_rejects_unplayable_transpose
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
+set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_malformed_transpose
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "transpose 2 bars 1")
+set_tests_properties(cli.edit_rejects_malformed_transpose PROPERTIES WILL_FAIL TRUE)
 
 # Song files: create, edit, dump (ADR-0006). The cases share files through fixtures.
 set(ELARA_CLI_SONG "${CMAKE_CURRENT_BINARY_DIR}/cli-song.elara")

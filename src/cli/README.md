@@ -102,8 +102,17 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
-`fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
-step the song rejects (missing track, nothing to undo) with 1.
+`fill <track> <m>`, `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
+`undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
+(missing track, nothing to undo) with 1.
+
+`transpose` moves pitched notes up (or down, when negative) by that many
+semitones, over every measure or `n` measures from `m`, of every track or the
+listed ones (ADR-0026). Notes keep the degree of their spelling in the key the
+interval leads to: C# up a semitone in C major is D. Key signatures move when
+every pitched track does; drums never move. A fretted note keeps its string when
+its new fret is on the neck, else takes the nearest free string; a note no
+string can play rejects the step.
 
 Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
 `caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
