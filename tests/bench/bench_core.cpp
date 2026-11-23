@@ -39,7 +39,7 @@ std::vector<Duration> sampleDurations(std::size_t count) {
 
 } // namespace
 
-TEST_CASE("core benchmarks", "[!benchmark][core]") {
+TEST_CASE("core benchmarks", "[benchmark][core]") {
     const auto durations = sampleDurations(10'000);
 
     BENCHMARK("sum 10k mixed durations (one long voice)") {
