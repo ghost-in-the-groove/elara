@@ -193,8 +193,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
 }
 
 // `clipboard` holds what the last copy step copied.
-void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard,
-             EntryState& entry) {
+void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, EntryState& entry) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
