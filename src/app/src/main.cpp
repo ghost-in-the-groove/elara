@@ -78,7 +78,9 @@ int main(int argc, char* argv[]) {
         QStringLiteral("seek"),
         QCoreApplication::translate("main", "Move the playback cursor to this many seconds."),
         QStringLiteral("seconds"));
-    parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot});
+    const QCommandLineOption tunerOption(
+        QStringLiteral("tuner"), QCoreApplication::translate("main", "Open the tuner at start."));
+    parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -141,7 +143,8 @@ int main(int argc, char* argv[]) {
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
 
-    engine.setInitialProperties({{QStringLiteral("initialFile"), options.file}});
+    engine.setInitialProperties({{QStringLiteral("initialFile"), options.file},
+                                 {QStringLiteral("showTuner"), parser.isSet(tunerOption)}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()

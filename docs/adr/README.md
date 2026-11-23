@@ -29,6 +29,7 @@ one that replaces them.
 | [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0026](0026-transposition.md) | Transposition | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
+| [0029](0029-microphone-input.md) | Microphone input for the tuner | Accepted |
 
 ## Template
 

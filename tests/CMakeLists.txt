@@ -40,6 +40,7 @@ elara_add_unit_tests(audio
   SOURCES audio/test_offline_renderer.cpp audio/test_player.cpp audio/test_sequence.cpp
           audio/test_synth.cpp audio/test_tone_generator.cpp
           audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
+          audio/test_tuner.cpp
   LIBRARIES elara::audio)
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
@@ -89,7 +90,11 @@ if(TARGET elara)
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   add_test(NAME app.smoke_open_missing
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/missing.gp")
+  # The tuner opened at start. Without an audio input (as in CI) it says so
+  # instead of listening; either way its QML must load without warnings.
+  add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
+    app.smoke_tuner
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
