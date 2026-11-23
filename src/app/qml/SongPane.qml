@@ -16,22 +16,8 @@ Pane {
 
     signal closeRequested
 
-    // Key signatures from seven flats to seven sharps, by their tonic.
-    readonly property list<string> majorTonics: ["C♭", "G♭", "D♭", "A♭", "E♭", "B♭", "F", "C",
-        "G", "D", "A", "E", "B", "F♯", "C♯"]
-    readonly property list<string> minorTonics: ["A♭", "E♭", "B♭", "F", "C", "G", "D", "A",
-        "E", "B", "F♯", "C♯", "G♯", "D♯", "A♯"]
-    readonly property list<int> denominators: [1, 2, 4, 8, 16, 32]
     readonly property color cardColor: dark ? "#24242c" : "#ffffff"
     readonly property color lineColor: dark ? "#34343e" : "#dfe2e8"
-
-    function keyLabel(index: int, minor: bool): string {
-        const tonic = minor ? minorTonics[index] : majorTonics[index];
-        const fifths = index - 7;
-        if (fifths === 0)
-            return tonic;
-        return tonic + "  ·  " + Math.abs(fifths) + (fifths > 0 ? "♯" : "♭");
-    }
 
     padding: 0
     background: Rectangle {
@@ -220,67 +206,15 @@ Pane {
                     text: qsTr("Measures")
                 }
 
-                RowLayout {
+                SignatureFields {
                     Layout.fillWidth: true
-
-                    FieldLabel {
-                        text: qsTr("Time signature")
-                    }
-
-                    // Beats per measure, 1 to 32.
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: 32
-                        displayText: String(currentIndex + 1)
-                        delegate: ItemDelegate {
-                            required property int index
-
-                            width: ListView.view.width
-                            text: String(index + 1)
-                        }
-                        currentIndex: root.document.timeNumerator - 1
-                        onActivated: index => root.document.setTimeSignature(
-                                         index + 1, root.document.timeDenominator)
-                    }
-
-                    Label {
-                        text: "/"
-                        font.pixelSize: 18
-                        opacity: 0.6
-                    }
-
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: root.denominators
-                        currentIndex: root.denominators.indexOf(root.document.timeDenominator)
-                        onActivated: index => root.document.setTimeSignature(
-                                         root.document.timeNumerator, root.denominators[index])
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    FieldLabel {
-                        text: qsTr("Key signature")
-                    }
-
-                    ComboBox {
-                        Layout.fillWidth: true
-                        model: root.majorTonics.map((tonic, index) => root.keyLabel(index,
-                                                                                    root.document.keyMinor))
-                        currentIndex: root.document.keyFifths + 7
-                        onActivated: index => root.document.setKeySignature(index - 7,
-                                                                            root.document.keyMinor)
-                    }
-                }
-
-                SegmentedControl {
-                    Layout.alignment: Qt.AlignRight
-                    labels: [qsTr("Major"), qsTr("Minor")]
-                    currentIndex: root.document.keyMinor ? 1 : 0
-                    onActivated: index => root.document.setKeySignature(root.document.keyFifths,
-                                                                        index === 1)
+                    numerator: root.document.timeNumerator
+                    denominator: root.document.timeDenominator
+                    fifths: root.document.keyFifths
+                    minor: root.document.keyMinor
+                    onTimeChosen: (numerator, denominator) => root.document.setTimeSignature(
+                                      numerator, denominator)
+                    onKeyChosen: (fifths, minor) => root.document.setKeySignature(fifths, minor)
                 }
 
                 Label {

@@ -12,6 +12,9 @@ Rectangle {
     required property ScoreDocument document
     property bool dark: false
 
+    /// The measure button: the caret's measure, its signatures and length.
+    signal measureRequested
+
     // Note values from the music font's metronome marks, longest first.
     readonly property var values: [
         { value: 1, symbol: "\uECA2", tip: qsTr("Whole note") },
@@ -169,6 +172,16 @@ Rectangle {
 
             contentItem: Icon {
                 path: "M5 7 L19 7 M10 7 L10 4.5 L14 4.5 L14 7 M7 7 L8 20 L16 20 L17 7"
+                color: root.ink
+            }
+        }
+
+        Tool {
+            tip: qsTr("Measure: signatures, insert, delete (Ctrl+M)")
+            onClicked: root.measureRequested()
+
+            contentItem: Icon {
+                path: "M4 7 L4 17 M20 7 L20 17 M4 9 L20 9 M4 12 L20 12 M4 15 L20 15 M12 7 L12 17"
                 color: root.ink
             }
         }
