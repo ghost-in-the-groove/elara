@@ -150,11 +150,13 @@ private:
     struct TempoPoint {
         double time = 0.0;
         double perWhole = 0.0;
+        friend bool operator==(const TempoPoint&, const TempoPoint&) = default;
     };
     // The beats of a played measure: `count` of `length` whole notes.
     struct Pulse {
         double length = 0.0;
         int count = 0;
+        friend bool operator==(const Pulse&, const Pulse&) = default;
     };
 
     std::vector<PlayedMeasure> measures_;
