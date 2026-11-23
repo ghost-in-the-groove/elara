@@ -155,12 +155,14 @@ void Startup::queueEdits() {
     steps_.emplace_back([this, check] {
         check(score_->trackNames().size() == tracksBefore_ + 1, "the track was not added");
         check(score_->track() == tracksBefore_, "the new track is not shown");
+        durationBefore_ = score_->duration();
         score_->setTimeSignature(5, 8);
         return true;
     });
     steps_.emplace_back([this, check] {
         check(score_->timeNumerator() == 5 && score_->timeDenominator() == 8,
               "the time signature did not change");
+        check(score_->duration() != durationBefore_, "playback did not follow the edit");
         score_->undo();
         return true;
     });

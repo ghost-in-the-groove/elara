@@ -203,9 +203,9 @@ private:
     QUrl source_;
     Status status_ = Status::Empty;
     QString errorMessage_;
-    std::shared_ptr<const core::Song> song_; ///< what the pages show
+    std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
-    std::optional<core::Document> document_; ///< the song being edited
+    std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     int track_ = 0;
     View view_ = View::Both;

@@ -465,8 +465,8 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     }
     if (layout.song != song_) {
         song_ = layout.song;
-        sequence_ = layout.sequence ? layout.sequence
-                                    : std::make_shared<const audio::Sequence>(*song_);
+        sequence_ =
+            layout.sequence ? layout.sequence : std::make_shared<const audio::Sequence>(*song_);
         if (!layout.source.isEmpty() && layout.source != source_) {
             source_ = layout.source;
             emit sourceChanged();
