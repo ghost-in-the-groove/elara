@@ -4,6 +4,8 @@
 #include <elara/io/musicxml.hpp>
 
 #include "archive.hpp"
+#include "musicxml_shared.hpp"
+#include "warnings.hpp"
 #include <pugixml.hpp>
 
 #include <algorithm>
@@ -30,14 +32,11 @@ namespace {
 
 using namespace core;
 using namespace std::string_view_literals;
+using detail::kTypeNames;
+using detail::transposedFifths;
+using detail::Warnings;
 
 // ---- Small helpers ------------------------------------------------------------
-
-/// MusicXML <type> values the model has, index = NoteValue.
-constexpr std::array<std::string_view, 9> kTypeNames{"breve", "whole", "half", "quarter", "eighth",
-                                                     "16th",  "32nd",  "64th", "128th"};
-
-constexpr std::array<int, 7> kStepSemitones{0, 2, 4, 5, 7, 9, 11};
 
 std::string_view trim(std::string_view text) {
     const auto first = text.find_first_not_of(" \t\r\n");
@@ -101,7 +100,7 @@ std::optional<Step> stepOf(std::string_view text) {
 }
 
 int midiOf(Step step, int alter, int octave) {
-    return (octave + 1) * 12 + kStepSemitones[static_cast<std::size_t>(step)] + alter;
+    return detail::midiOf(static_cast<int>(step), alter, octave);
 }
 
 std::optional<NoteValue> noteValueOf(std::string_view type) {
@@ -209,18 +208,6 @@ std::optional<double> leadingNumber(std::string_view text) {
     return std::strtod(number.c_str(), nullptr);
 }
 
-/// Steps a key moves when the music is transposed by `semitones`, in -7..7.
-int transposedFifths(int fifths, int semitones) {
-    int result = fifths + ((semitones * 7) % 12 + 12) % 12;
-    while (result > KeySignature::kMaxFifths) {
-        result -= 12;
-    }
-    while (result < -KeySignature::kMaxFifths) {
-        result += 12;
-    }
-    return result;
-}
-
 /// The note sounded at `midi`, keeping the source spelling when only the
 /// octave differs.
 Pitch respell(const Pitch& source, int midi, const KeySignature& key) {
@@ -262,60 +249,13 @@ void mergeEffects(NoteEffects& into, const NoteEffects& from) {
     }
 }
 
-// ---- Warnings -----------------------------------------------------------------
-
-/// Dropped features, one line per (part, feature) with where it first happened.
-class Warnings {
-public:
-    /// `who` is a part name, empty for the whole score; `measure` is 0-based.
-    void add(std::string_view who, std::string_view what, std::size_t measure) {
-        for (Entry& entry : entries_) {
-            if (entry.who == who && entry.what == what) {
-                ++entry.count;
-                return;
-            }
-        }
-        entries_.push_back(Entry{std::string(who), std::string(what), measure, 1});
-    }
-
-    /// Adds `other`'s entries after these (parts are merged in score order).
-    void append(const Warnings& other) {
-        for (const Entry& entry : other.entries_) {
-            entries_.push_back(entry);
-        }
-    }
-
-    [[nodiscard]] std::vector<std::string> lines() const {
-        std::vector<std::string> result;
-        result.reserve(entries_.size());
-        for (const Entry& entry : entries_) {
-            const std::string where =
-                entry.count == 1
-                    ? std::format("measure {}", entry.measure + 1)
-                    : std::format("{} times, first in measure {}", entry.count, entry.measure + 1);
-            result.push_back(entry.who.empty()
-                                 ? std::format("{} ({})", entry.what, where)
-                                 : std::format("{}: {} ({})", entry.who, entry.what, where));
-        }
-        return result;
-    }
-
-private:
-    struct Entry {
-        std::string who;
-        std::string what;
-        std::size_t measure = 0;
-        std::size_t count = 0;
-    };
-    std::vector<Entry> entries_;
-};
-
 // ---- Part list and part layout ------------------------------------------------
 
 struct PartInfo {
     std::string id{};
     std::string name{};
-    int midiProgram = 0;                                 // 0-based
+    std::string instrumentName{}; // the first <score-instrument>; drum names on percussion
+    int midiProgram = 0;          // 0-based
     std::vector<std::pair<std::string, int>> drumKeys{}; // instrument id -> GM key
 };
 
@@ -328,6 +268,7 @@ std::vector<PartInfo> readPartList(pugi::xml_node score) {
         if (info.name.empty()) {
             info.name = textOf(part.child("part-abbreviation"));
         }
+        info.instrumentName = textOf(part.child("score-instrument").child("instrument-name"));
         bool programSet = false;
         for (pugi::xml_node midi : part.children("midi-instrument")) {
             const int program = midi.child("midi-program").text().as_int(0);
@@ -579,7 +520,10 @@ PartLayout layoutPart(pugi::xml_node part, const PartInfo& info, Warnings& warni
     } else if (layout.staves.size() >= 2) {
         kind = InstrumentKind::Keyboard;
     }
-    layout.instrument = Instrument{.name = info.name,
+    // A pitched part's <score-instrument> names its instrument; a drum part's
+    // name its drums.
+    const bool named = !percussion && !info.instrumentName.empty();
+    layout.instrument = Instrument{.name = named ? info.instrumentName : info.name,
                                    .kind = kind,
                                    .midiProgram = percussion ? 0 : info.midiProgram,
                                    .writtenOffset = writtenOffset};
@@ -929,7 +873,8 @@ private:
             return;
         }
         header.keySignature =
-            KeySignature(transposedFifths(written, layout_.transposition.chromatic),
+            KeySignature(transposedFifths(written, layout_.transposition.chromatic,
+                                          layout_.transposition.diatonic),
                          mode == "minor" ? KeyMode::Minor : KeyMode::Major);
     }
 
@@ -1289,6 +1234,14 @@ private:
                 }
             } else if (name == "strong-accent") {
                 fx.accent = Accent::Marcato;
+            } else if (name == "scoop") {
+                fx.slideIn = SlideIn::FromBelow;
+            } else if (name == "plop") {
+                fx.slideIn = SlideIn::FromAbove;
+            } else if (name == "doit") {
+                fx.slideOut = SlideOut::Upwards;
+            } else if (name == "falloff") {
+                fx.slideOut = SlideOut::Downwards;
             } else {
                 warn("articulations other than staccato and accents dropped", index);
             }
@@ -1310,7 +1263,8 @@ private:
                 }
             } else if (name == "wavy-line") {
                 if (isType(mark, "start")) {
-                    fx.vibrato = Vibrato::Slight;
+                    const bool wide = mark.attribute("smufl").value() == detail::kWideVibratoGlyph;
+                    fx.vibrato = wide ? Vibrato::Wide : Vibrato::Slight;
                 }
             } else if (name != "accidental-mark") {
                 warn("ornaments dropped", index);
@@ -1620,6 +1574,19 @@ SongInfo readInfo(pugi::xml_node score) {
             info.music = textOf(creator);
         } else if ((type == "lyricist" || type == "poet") && info.words.empty()) {
             info.words = textOf(creator);
+        } else if (type == "artist" && info.artist.empty()) {
+            info.artist = textOf(creator);
+        } else if (type == "transcriber" && info.transcriber.empty()) {
+            info.transcriber = textOf(creator);
+        }
+    }
+    for (pugi::xml_node field :
+         identification.child("miscellaneous").children("miscellaneous-field")) {
+        const std::string_view name = field.attribute("name").value();
+        if (name == "album") {
+            info.album = textOf(field);
+        } else if (name == "notes") {
+            info.notes = textOf(field);
         }
     }
     info.copyright = textOf(identification.child("rights"));

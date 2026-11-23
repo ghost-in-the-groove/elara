@@ -55,9 +55,19 @@ dependencies. Compressed `.mxl` files are zip archives read with miniz
   measure) gets leading rests so its notes end the measure; both are reported.
 - Guitar notations: `string`/`fret`, `hammer-on`/`pull-off` (stop) as legato,
   `bend` (with `release`, `pre-bend`), `harmonic`, `slide`/`glissando`, ties,
-  `staccato`, `accent`, `strong-accent`, `x` noteheads as dead notes, and
-  `dynamics` as the dynamic of the following notes. Percussion uses
-  `midi-unpitched` from the part's instruments.
+  `staccato`, `accent`, `strong-accent`, `scoop`/`plop` (slide in from below or
+  above), `doit`/`falloff` (slide off upwards or downwards), `wavy-line` (wide
+  vibrato with the SMuFL glyph `guitarWideVibratoStroke`), `x` noteheads as
+  dead notes, and `dynamics` as the dynamic of the following notes. Percussion
+  uses `midi-unpitched` from the part's instruments.
+- A pitched part's first `score-instrument` names the instrument; the part
+  name is the track name.
+- Keys are moved by the whole transposition interval (`diatonic` steps and
+  `chromatic` semitones), so a written E-flat major for an alto saxophone is
+  concert G-flat major, not F-sharp major.
+- Song info: `work-title`, `movement-title`, `creator` (`composer`,
+  `lyricist`, `artist`, `transcriber`), `rights`, `miscellaneous-field`
+  (`album`, `notes`) and, for what those leave empty, `credit`s.
 
 **Warnings, not failures.** What the model cannot hold yet (grace notes,
 lyrics, repeats, chord symbols, text, more than four voices...) is dropped and
@@ -80,6 +90,7 @@ under 1 MiB use one thread; `MusicXmlOptions::threads` overrides it.
 - Exporters disagree on details (voice numbering, tablature staves, where
   dynamics sit); the self-made corpus (`tests/corpus/musicxml/`) pins the cases
   we handle, and new real-world quirks get a corpus file each.
-- MusicXML export (the reverse mapping) reuses these decisions.
+- MusicXML export (ADR-0008) is the reverse mapping, and round-trip tests
+  keep both directions in step.
 - `elara-cli import <file> --json` prints the song, the warnings and the
   validation issues, and `--out` saves it as `.elara`.

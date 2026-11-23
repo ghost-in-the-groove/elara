@@ -218,3 +218,38 @@ set_tests_properties(cli.import_rejects_unknown_types PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.import_rejects_missing_file
   COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/no-such-score.musicxml")
 set_tests_properties(cli.import_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+# Export (ADR-0007): the imported guitar song goes back to MusicXML and in again.
+set(ELARA_CLI_EXPORTED "${CMAKE_CURRENT_BINARY_DIR}/cli-exported.musicxml")
+
+add_test(NAME cli.export_musicxml
+  COMMAND elara-cli --json export "${ELARA_CLI_IMPORTED}" "${ELARA_CLI_EXPORTED}" --force)
+set_tests_properties(cli.export_musicxml PROPERTIES
+  FIXTURES_REQUIRED cli_imported
+  FIXTURES_SETUP cli_exported
+  PASS_REGULAR_EXPRESSION "\"format\":\"musicxml\",\"compressed\":false,\"bytes\":[1-9][0-9]*,\"warnings\":\\[\\]}")
+
+add_test(NAME cli.import_reads_exported_musicxml
+  COMMAND elara-cli --json import "${ELARA_CLI_EXPORTED}")
+set_tests_properties(cli.import_reads_exported_musicxml PROPERTIES
+  FIXTURES_REQUIRED cli_exported
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],.*\"clef\":\"treble-8vb\",\"tuning\":\"D2 A2 D3 G3 B3 E4\",\"capo\":2")
+
+add_test(NAME cli.export_mxl
+  COMMAND elara-cli --json export "${ELARA_CLI_IMPORTED}"
+    "${CMAKE_CURRENT_BINARY_DIR}/cli-exported.mxl" --force)
+set_tests_properties(cli.export_mxl PROPERTIES
+  FIXTURES_REQUIRED cli_imported
+  PASS_REGULAR_EXPRESSION "\"compressed\":true")
+
+add_test(NAME cli.export_refuses_to_replace
+  COMMAND elara-cli export "${ELARA_CLI_IMPORTED}" "${ELARA_CLI_EXPORTED}")
+set_tests_properties(cli.export_refuses_to_replace PROPERTIES
+  FIXTURES_REQUIRED cli_exported
+  WILL_FAIL TRUE)
+
+add_test(NAME cli.export_rejects_unknown_types
+  COMMAND elara-cli export "${ELARA_CLI_IMPORTED}" "${CMAKE_CURRENT_BINARY_DIR}/song.txt")
+set_tests_properties(cli.export_rejects_unknown_types PROPERTIES
+  FIXTURES_REQUIRED cli_imported
+  WILL_FAIL TRUE)

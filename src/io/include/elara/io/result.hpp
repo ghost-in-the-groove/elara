@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Results shared by every reader in elara_io.
+// Results shared by the readers and writers in elara_io.
 #pragma once
 
 #include <elara/core/song.hpp>
@@ -19,6 +19,15 @@ struct FormatError {
 struct ImportResult {
     core::Song song{};
     /// One line per dropped feature, e.g. "Piano: grace notes dropped (measure 2)".
+    std::vector<std::string> warnings{};
+};
+
+/// A file written from a song in a foreign format, with what that format could
+/// not hold.
+struct ExportResult {
+    /// The file's content (text or binary).
+    std::string data{};
+    /// One line per changed or dropped feature, e.g. "Guitar: let ring dropped (measure 3)".
     std::vector<std::string> warnings{};
 };
 

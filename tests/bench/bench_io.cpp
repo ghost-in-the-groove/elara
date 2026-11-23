@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Benchmarks for elara_io: the native format and MusicXML import.
+// Benchmarks for elara_io: the native format and MusicXML import and export.
 #include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
 
@@ -98,5 +98,29 @@ TEST_CASE("MusicXML import benchmarks", "[benchmark][io]") {
 
     BENCHMARK("import the large song from MusicXML") {
         return elara::io::importMusicXml(xml)->song.measureCount();
+    };
+}
+
+TEST_CASE("MusicXML export benchmarks", "[benchmark][io]") {
+    const elara::core::Song song = elara::bench::largeSong();
+    const elara::io::ExportResult exported = elara::io::exportMusicXml(song);
+    REQUIRE(exported.warnings.empty());
+    const auto back = elara::io::importMusicXml(exported.data);
+    REQUIRE(back.has_value());
+    REQUIRE(back->warnings.empty());
+    REQUIRE(back->song == song);
+    const elara::io::ExportResult compressed =
+        elara::io::exportMusicXml(song, {.compressed = true});
+    std::printf("large song exported: MusicXML %zu bytes, .mxl %zu bytes\n", exported.data.size(),
+                compressed.data.size());
+
+    BENCHMARK("export the large song as MusicXML") {
+        return elara::io::exportMusicXml(song).data.size();
+    };
+    BENCHMARK("export the large song as MusicXML on one thread") {
+        return elara::io::exportMusicXml(song, {.threads = 1}).data.size();
+    };
+    BENCHMARK("export the large song as .mxl (MusicXML + deflate)") {
+        return elara::io::exportMusicXml(song, {.compressed = true}).data.size();
     };
 }

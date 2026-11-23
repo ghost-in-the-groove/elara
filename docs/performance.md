@@ -52,7 +52,11 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | import the 20-track song from MusicXML (33 MB, string and fret on every note) | 265 ms | first version; pugixml alone parses the text in about 100 ms |
 | 2026-11-23 | same | 238 ms | each `<note>`'s children found in one pass instead of a dozen `child()` scans; per-measure buffers reused; beats and chords reserved once |
 | 2026-11-23 | same | 118 ms | parts after the first read on all cores (ADR-0007); what is left is mostly the XML parse. The result equals the song built in memory and does not depend on the number of threads |
+| 2026-11-23 | export the 20-track song as MusicXML (124 MB of indented text: standard and TAB staff for every guitar) | 155 ms | one thread; imports back to the same song |
+| 2026-11-23 | same | 88 ms | one part per thread into separate buffers, joined in score order (ADR-0008); same text on any number of threads |
+| 2026-11-23 | export it as `.mxl` | 669 ms, 1.09 MB | deflate of the indented text dominates |
+| 2026-11-23 | same | 391 ms, 566 KB | archives get compact XML (no indentation), which halves what deflate reads; deflate level 1 was only 40 ms faster but gave 5.5 MB |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
-`-- "[io]"` prints the size of the large song as JSON, as a `.elara` file and
-as MusicXML.
+`-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as
+MusicXML and as `.mxl`.

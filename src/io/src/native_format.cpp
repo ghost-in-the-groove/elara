@@ -3,7 +3,6 @@
 #include <elara/io/native_format.hpp>
 
 #include "archive.hpp"
-#include <miniz.h>
 #include <yyjson.h>
 
 #include <algorithm>
@@ -12,12 +11,10 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <system_error>
 #include <utility>
 
 namespace elara::io {
@@ -876,28 +873,10 @@ std::expected<Song, FormatError> songFromJson(std::string_view json) {
 
 std::vector<std::uint8_t> encodeNative(const Song& song) {
     const std::string json = songToJson(song);
-    mz_zip_archive zip{};
-    if (mz_zip_writer_init_heap(&zip, 0, json.size() / 4 + 4096) == 0) {
-        throw std::runtime_error("cannot create the zip archive");
-    }
-    void* buffer = nullptr;
-    std::size_t size = 0;
-    const bool written = mz_zip_writer_add_mem(&zip, "mimetype", kNativeMimeType.data(),
-                                               kNativeMimeType.size(), MZ_NO_COMPRESSION) != 0 &&
-                         mz_zip_writer_add_mem(&zip, "song.json", json.data(), json.size(),
-                                               static_cast<mz_uint>(MZ_DEFAULT_LEVEL)) != 0 &&
-                         mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size) != 0;
-    std::vector<std::uint8_t> bytes;
-    if (written) {
-        const auto* begin = static_cast<const std::uint8_t*>(buffer);
-        bytes.assign(begin, begin + size);
-    }
-    mz_free(buffer);
-    mz_zip_writer_end(&zip);
-    if (!written) {
-        throw std::runtime_error("cannot write the zip archive");
-    }
-    return bytes;
+    const std::array entries{
+        detail::ZipEntry{.name = "mimetype", .content = kNativeMimeType, .level = 0},
+        detail::ZipEntry{.name = "song.json", .content = json}};
+    return detail::writeZip(entries);
 }
 
 std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
@@ -923,30 +902,8 @@ std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> byte
 
 void saveNative(const Song& song, const std::filesystem::path& path) {
     const std::vector<std::uint8_t> bytes = encodeNative(song);
-    std::filesystem::path temporary = path;
-    temporary += ".saving";
-    {
-        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            throw std::runtime_error(std::format("cannot write {}", detail::displayPath(path)));
-        }
-        out.write(reinterpret_cast<const char*>(bytes.data()),
-                  static_cast<std::streamsize>(bytes.size()));
-        out.close();
-        if (!out) {
-            std::error_code ignored;
-            std::filesystem::remove(temporary, ignored);
-            throw std::runtime_error(std::format("cannot write {}", detail::displayPath(path)));
-        }
-    }
-    std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error) {
-        std::error_code ignored;
-        std::filesystem::remove(temporary, ignored);
-        throw std::runtime_error(
-            std::format("cannot replace {}: {}", detail::displayPath(path), error.message()));
-    }
+    detail::writeFileAtomically(
+        path, std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()));
 }
 
 std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {

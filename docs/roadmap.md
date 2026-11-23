@@ -36,7 +36,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Self-made test corpus with `SOURCES.md`
 - [ ] Guitar Pro 3/4/5 (binary), GPX (6), GP (7-8) importers
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
-- [ ] MusicXML export
+- [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [ ] MIDI import/export
 - [ ] `elara-cli import <file> --json` snapshot tests per corpus file
 
