@@ -30,6 +30,14 @@ Staff::Staff(Clef clef, std::optional<Tuning> tuning, int capo)
     }
 }
 
+void Staff::setTuning(std::optional<Tuning> tuning, int capo) {
+    if (capo < 0 || capo > Tuning::kMaxFret) {
+        throw std::invalid_argument("Staff: capo outside the neck");
+    }
+    tuning_ = std::move(tuning);
+    capo_ = capo;
+}
+
 Measure& Staff::measure(std::size_t index) {
     return checkedAt(measures_, index, "Staff: no such measure");
 }
@@ -120,12 +128,8 @@ void Track::setMix(const TrackMix& mix) {
 }
 
 bool Song::audible(std::size_t index) const {
-    const TrackMix& mix = track(index).mix();
-    if (mix.mute) {
-        return false;
-    }
-    return mix.solo ||
-           std::ranges::none_of(tracks_, [](const Track& other) { return other.mix().solo; });
+    return track(index).mix().audible(
+        std::ranges::any_of(tracks_, [](const Track& other) { return other.mix().solo; }));
 }
 
 Track& Song::track(std::size_t index) {

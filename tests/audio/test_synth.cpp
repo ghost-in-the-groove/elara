@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The built-in synthesizer (ADR-0018).
+#include <elara/audio/sequence.hpp>
 #include <elara/audio/synth.hpp>
 #include <elara/audio/tone_generator.hpp>
 #include <elara/core/instrument.hpp>
@@ -203,6 +204,24 @@ TEST_CASE("Synth: drums ring out without a release; a closed hi-hat chokes an op
     drums.noteOn(46, 100); // left alone, an open hi-hat still sounds after 0.25 s
     static_cast<void>(render(drums, 0.25));
     CHECK(drums.activeVoices() == 1);
+}
+
+TEST_CASE("Synth: the metronome's wood blocks click at two pitches, the accent higher",
+          "[audio][synth][practice]") {
+    Synth drums(Timbre::Drums, kRate);
+    const auto click = [&](int key) {
+        drums.reset();
+        drums.noteOn(key, 100);
+        return render(drums, 0.06);
+    };
+    const double high =
+        elara::audio::test::pitchOf(click(elara::audio::kMetronomeAccentKey), kRate);
+    const double low = elara::audio::test::pitchOf(click(elara::audio::kMetronomeKey), kRate);
+    CHECK(low > 600.0);
+    CHECK(high > 1.4 * low); // a fifth apart
+    CHECK(high < 1.6 * low);
+    static_cast<void>(render(drums, 0.3)); // a click, not a note
+    CHECK(drums.activeVoices() == 0);
 }
 
 TEST_CASE("Synth: every drum key sounds and ends", "[audio][synth]") {

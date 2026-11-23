@@ -34,7 +34,9 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     document_ = document;
     if (document_) {
         connect(document_, &elara::app::ScoreDocument::songChanged, this,
-                &AudioController::loadSong);
+                &AudioController::songEdited);
+        connect(document_, &elara::app::ScoreDocument::mixPreviewed, this,
+                &AudioController::previewMix);
     }
     loadSong();
     emit documentChanged();
@@ -56,13 +58,34 @@ bool AudioController::openDevice() {
     return true;
 }
 
+// The song changed. When it plays as before (the document kept its
+// sequence: the mix or the song's info changed), playback carries on with the
+// new mix (ADR-0039); otherwise the song is loaded again.
+void AudioController::songEdited() {
+    if (player_ && document_ && document_->song() && document_->sequence() &&
+        document_->sequence() == loaded_) {
+        player_->updateMix(*document_->song());
+        return;
+    }
+    loadSong();
+}
+
+// A fader moves: playback hears it at once.
+void AudioController::previewMix() {
+    if (player_ && document_) {
+        player_->updateMix(document_->previewMixes());
+    }
+}
+
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
+    loaded_.reset();
     if (player_) {
         player_->pause();
         player_->seek(0.0);
         if (document_ && document_->song() && document_->sequence()) {
             player_->load(*document_->song(), *document_->sequence());
+            loaded_ = document_->sequence();
         }
     }
     pollTransport();
@@ -82,6 +105,7 @@ void AudioController::togglePlayback() {
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
         player_->load(*document_->song(), *document_->sequence());
+        loaded_ = document_->sequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
     }

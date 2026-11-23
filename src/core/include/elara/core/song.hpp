@@ -33,6 +33,11 @@ public:
     [[nodiscard]] bool isFretted() const noexcept { return tuning_.has_value(); }
     [[nodiscard]] int capo() const noexcept { return capo_; }
 
+    /// Gives the staff another tuning (none: no strings) and capo. Its notes keep
+    /// their positions; makeRetune moves them with it. Throws
+    /// std::invalid_argument for a capo outside 0..Tuning::kMaxFret.
+    void setTuning(std::optional<Tuning> tuning, int capo = 0);
+
     [[nodiscard]] std::size_t measureCount() const noexcept { return measures_.size(); }
 
     /// Throws std::out_of_range for a missing measure.
@@ -68,6 +73,10 @@ struct TrackMix {
     double pan = 0.0;               ///< from -1 (left) through 0 (centre) to 1 (right)
     bool mute = false;
     bool solo = false;
+
+    /// Whether a track with this mix sounds when `anySolo` tracks of its song
+    /// are soloed: it is not muted and, when any is soloed, it is one of them.
+    [[nodiscard]] bool audible(bool anySolo) const noexcept { return !mute && (solo || !anySolo); }
 
     friend bool operator==(const TrackMix&, const TrackMix&) = default;
 };

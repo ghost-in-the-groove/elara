@@ -148,6 +148,9 @@ void shift(DisplayList& list, double dx, double dy) {
             onset.x += dx;
         }
     }
+    for (ColumnBox& column : list.columns) {
+        column.x += dx;
+    }
     list.top += dy;
     list.bottom += dy;
 }
@@ -164,6 +167,7 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.systems, from.systems);
     move(to.staves, from.staves);
     move(to.measures, from.measures);
+    move(to.columns, from.columns);
     move(to.glyphs, from.glyphs);
     move(to.lines, from.lines);
     move(to.beams, from.beams);
@@ -648,8 +652,7 @@ void StaffWriter::tupletBracket(const TupletNumber& number, double left, double 
 
 std::vector<std::vector<std::size_t>> beamGroups(std::span<const RhythmItem> items,
                                                  const core::TimeSignature& time) {
-    const bool compound =
-        time.numerator() > 3 && time.numerator() % 3 == 0 && time.denominator() >= 8;
+    const bool compound = time.isCompound() && time.denominator() >= 8;
     const core::Fraction window(compound ? 3 : 1, time.denominator());
     std::vector<std::vector<std::size_t>> groups;
     std::vector<std::size_t> group;

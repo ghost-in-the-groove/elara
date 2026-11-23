@@ -38,7 +38,9 @@ using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Tempo;
 using elara::core::TempoChange;
+using elara::core::TimeSignature;
 using elara::core::Track;
+using elara::core::TrackMix;
 using elara::core::Tuning;
 using elara::core::Vibrato;
 
@@ -178,6 +180,21 @@ TEST_CASE("Sequence: measures and notes in seconds from the tempo", "[audio][seq
     CHECK(notes[3].key == 72);
     CHECK(notes[3].pass == 1);
     CHECK_THAT(notes[3].end, WithinAbs(4.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: the same when only the mix or the title changes", "[audio][sequence]") {
+    Song song = pianoSong(2);
+    voice(song, 0) = {beat(NoteValue::Whole, {note(60)})};
+    const Sequence before(song);
+
+    Song mixed = song;
+    mixed.track(0).setMix(TrackMix{.volume = 0.3, .pan = -1.0, .mute = true});
+    mixed.info().title = "Another title";
+    CHECK(Sequence(mixed) == before);
+
+    Song edited = song;
+    voice(edited, 1) = {beat(NoteValue::Whole, {note(62)})};
+    CHECK_FALSE(Sequence(edited) == before);
 }
 
 TEST_CASE("Sequence: repeats play their measures again", "[audio][sequence]") {
@@ -584,4 +601,126 @@ TEST_CASE("Sequence: vibrato swings the pitch either side of the note",
     REQUIRE(wide.size() >= 8);
     CHECK(std::vector<int>(slight.begin(), slight.begin() + 4) == std::vector<int>{20, 0, -20, 0});
     CHECK(std::vector<int>(wide.begin(), wide.begin() + 4) == std::vector<int>{50, 0, -50, 0});
+}
+
+namespace {
+
+// A click of the metronome: when it is struck and on which block.
+struct Click {
+    double time = 0.0;
+    int key = 0;
+    friend bool operator==(const Click& a, const Click& b) {
+        return std::abs(a.time - b.time) < 1e-6 && a.key == b.key;
+    }
+};
+
+std::vector<Click> clicksOf(const Sequence& sequence) {
+    std::vector<Click> result;
+    for (const NoteEvent& event : sequence.events()) {
+        if (event.track == sequence.metronomeTrack() && event.kind == EventKind::NoteOn) {
+            result.push_back({.time = event.time, .key = event.key});
+        }
+    }
+    return result;
+}
+
+constexpr int kHigh = elara::audio::kMetronomeAccentKey;
+constexpr int kLow = elara::audio::kMetronomeKey;
+
+} // namespace
+
+TEST_CASE("Sequence: a slower or faster speed scales every tempo", "[audio][sequence][practice]") {
+    Song song = pianoSong(2);
+    voice(song, 0) = {beat(NoteValue::Half, {note(60)}), beat(NoteValue::Half, {note(62)})};
+    voice(song, 1) = {beat(NoteValue::Whole, {note(64)})};
+    const Sequence half(song, {.speed = 0.5});
+
+    CHECK(half.speed() == 0.5);
+    CHECK_THAT(half.measures()[1].start, WithinAbs(4.0, kEpsilon));
+    CHECK_THAT(half.duration(), WithinAbs(8.0, kEpsilon));
+    CHECK(eventsOf(half) == std::vector<Event>{on(0.0, 60), off(2.0, 60), on(2.0, 62), off(4.0, 62),
+                                               on(4.0, 64), off(8.0, 64)});
+    CHECK_THAT(Sequence(song, {.speed = 2.0}).duration(), WithinAbs(2.0, kEpsilon));
+    CHECK(Sequence(song).speed() == 1.0);
+
+    SECTION("from a quarter of the tempo to twice it") {
+        CHECK(Sequence(song, {.speed = 0.1}).speed() == elara::audio::kMinSpeed);
+        CHECK_THAT(Sequence(song, {.speed = 0.1}).duration(), WithinAbs(16.0, kEpsilon));
+        CHECK(Sequence(song, {.speed = 5.0}).speed() == elara::audio::kMaxSpeed);
+        CHECK(Sequence(song, {.speed = std::nan("")}).speed() == 1.0);
+    }
+    SECTION("effects timed in seconds keep their pace") {
+        // A vibrato cycle lasts 1 / 5.5 s at any speed.
+        Song guitar = guitarSong(1);
+        Note shaking = fretted(guitar, 3, 2);
+        shaking.effects.vibrato = Vibrato::Wide;
+        voice(guitar, 0) = {beat(NoteValue::Whole, {shaking})};
+        const Sequence slow(guitar, {.speed = 0.5});
+        const auto first = std::ranges::find(slow.events(), EventKind::Pitch, &NoteEvent::kind);
+        REQUIRE(first != slow.events().end());
+        CHECK_THAT(first->glide, WithinAbs(1.0 / 22.0, 1e-6));
+        CHECK(first->cents == 50);
+    }
+}
+
+TEST_CASE("Sequence: the metronome clicks every beat, higher on the first of a measure",
+          "[audio][sequence][practice]") {
+    // 4/4, then 3/4, at quarter = 120.
+    Song song = pianoSong(2);
+    song.measureHeader(1).timeSignature = TimeSignature(3, 4);
+    voice(song, 0) = {beat(NoteValue::Whole, {note(60)})};
+    const Sequence plain(song);
+    const Sequence clicking(song, {.metronome = true});
+
+    CHECK(clicking.metronomeTrack() == 1);
+    CHECK(clicksOf(plain).empty());
+    CHECK(clicksOf(clicking) == std::vector<Click>{{0.0, kHigh},
+                                                   {0.5, kLow},
+                                                   {1.0, kLow},
+                                                   {1.5, kLow},
+                                                   {2.0, kHigh},
+                                                   {2.5, kLow},
+                                                   {3.0, kLow}});
+    CHECK_THAT(clicking.duration(), WithinAbs(3.5, kEpsilon));
+    // The song plays as before, and every click is released before the next.
+    CHECK(clicking.notes() == plain.notes());
+    std::vector<NoteEvent> songEvents;
+    std::vector<Click> releases;
+    for (const NoteEvent& event : clicking.events()) {
+        if (event.track != clicking.metronomeTrack()) {
+            songEvents.push_back(event);
+        } else if (event.kind == EventKind::NoteOff) {
+            releases.push_back({.time = event.time, .key = event.key});
+        }
+    }
+    CHECK(songEvents == plain.events());
+    REQUIRE(releases.size() == 7);
+    CHECK(releases[0].key == kHigh);
+    CHECK(releases[0].time > 0.0);
+    CHECK(releases[0].time <= 0.5);
+    CHECK(releases[6].time > 3.0);
+
+    SECTION("a compound meter clicks its dotted beats") {
+        Song compound = pianoSong(1);
+        compound.measureHeader(0).timeSignature = TimeSignature(6, 8);
+        CHECK(clicksOf(Sequence(compound, {.metronome = true})) ==
+              std::vector<Click>{{0.0, kHigh}, {0.75, kLow}});
+    }
+    SECTION("clicks follow tempo changes inside a measure") {
+        Song changing = pianoSong(1);
+        changing.measureHeader(0).tempoChanges.push_back(
+            TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(60.0)});
+        CHECK(clicksOf(Sequence(changing, {.metronome = true})) ==
+              std::vector<Click>{{0.0, kHigh}, {0.5, kLow}, {1.0, kLow}, {2.0, kLow}});
+    }
+    SECTION("every played measure clicks, at the speed asked for") {
+        Song repeated = pianoSong(1);
+        repeated.measureHeader(0).repeatStart = true;
+        repeated.measureHeader(0).repeatTimes = 2;
+        const std::vector<Click> clicks =
+            clicksOf(Sequence(repeated, {.speed = 0.5, .metronome = true}));
+        REQUIRE(clicks.size() == 8);
+        CHECK(clicks[1] == Click{1.0, kLow});
+        CHECK(clicks[4] == Click{4.0, kHigh});
+    }
 }

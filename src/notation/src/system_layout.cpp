@@ -290,6 +290,11 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         core::Tempo tempo;
     };
     std::vector<Mark> marks;
+    // The tempo in force before each measure, carried along the system's
+    // consecutive measures: looking it up from the start of the song for each
+    // made long lines quadratic.
+    core::Tempo current = song.startTempo();
+    std::size_t next = 0; // the measure `current` is in force before
     for (const MeasureBox& box : measures) {
         const std::size_t m = box.index;
         const core::MeasureHeader& header = song.measureHeader(m);
@@ -300,9 +305,13 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
                 box.onsets, [at](const MeasureOnset& o) { return std::abs(o.at - at) < kEpsilon; });
             return onset != box.onsets.end() ? onset->x : box.x + at * box.width;
         };
-        core::Tempo current =
-            m == 0 ? song.startTempo()
-                   : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        if (m != next) {
+            current =
+                m == 0
+                    ? song.startTempo()
+                    : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        }
+        next = m + 1;
         const bool changedAtStart =
             !header.tempoChanges.empty() && header.tempoChanges.front().offset == core::Fraction();
         if (m == 0 && !changedAtStart) {
@@ -461,6 +470,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
     const std::vector<std::unique_ptr<StaffWriter>> writers = makeWriters(song, staves, font);
     std::vector<MeasureBox> measures;
     measures.reserve(last - first);
+    std::vector<ColumnBox> columnBoxes;
     double x = 0.0;
     for (const auto& writer : writers) {
         x = std::max(x, writer->header(first));
@@ -511,6 +521,8 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         for (const ColumnPosition& position : positions) {
             box.onsets.push_back(
                 MeasureOnset{.at = (position.start / length).toDouble(), .x = position.x});
+            columnBoxes.push_back(
+                ColumnBox{.measure = m, .start = position.start, .x = position.x});
         }
         measures.push_back(std::move(box));
         const bool songEnd = m + 1 == song.measureCount();
@@ -580,6 +592,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         measure.height = height;
     }
     system.measures = std::move(measures);
+    system.columns = std::move(columnBoxes);
     const double indent = options.named ? nameIndent(song, staves) : 0.0;
     if (indent > 0.0) {
         shift(system, indent, 0.0);
