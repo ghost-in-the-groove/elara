@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Internal helpers shared by the readers: zip archives and whole-file reads.
+// Internal helpers shared by the readers and writers: zip archives and files.
 #pragma once
 
 #include <elara/io/result.hpp>
@@ -13,6 +13,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace elara::io::detail {
@@ -47,6 +48,22 @@ private:
     mz_zip_archive zip_{};
     bool ok_ = false;
 };
+
+/// One file of an archive being written.
+struct ZipEntry {
+    std::string_view name{};
+    std::string_view content{};
+    /// Deflate level: 0 stores the entry, 1 is the fastest, 6 the default.
+    int level = 6;
+};
+
+/// A zip archive holding `entries`, in that order. Throws std::runtime_error.
+[[nodiscard]] std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
+
+/// Writes `content` to a temporary file next to `path`, then renames it over
+/// `path`, so a failure never leaves a half-written file. Throws
+/// std::runtime_error with the path.
+void writeFileAtomically(const std::filesystem::path& path, std::string_view content);
 
 /// The whole file. Errors: "cannot open the file", "cannot read the file".
 [[nodiscard]] std::expected<std::vector<std::uint8_t>, FormatError>

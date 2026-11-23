@@ -20,6 +20,7 @@ elara-cli [--json] new <FILE> [--title T] [--track PRESET]... [--measures 4] [--
                        [--key "C major"] [--tempo 120] [--force]
 elara-cli [--json] dump <FILE>                    # with --json: the whole model
 elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl
+elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 ```
 
@@ -35,6 +36,9 @@ where `song` is the file's complete `song.json`: the model snapshot later tests
 compare against. `import --json` prints `{"file", "format", "out", "warnings",
 "song", "durationSeconds", "issues"}`: `warnings` lists what the file had that
 the model cannot hold yet (ADR-0007); `--out` also saves the song as `.elara`.
+`export --json` writes MusicXML (compressed for `.mxl`) and prints `{"file",
+"out", "format", "compressed", "bytes", "warnings"}`, where `warnings` lists
+what MusicXML could not hold (ADR-0008).
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

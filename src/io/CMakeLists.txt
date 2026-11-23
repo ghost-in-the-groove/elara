@@ -1,5 +1,5 @@
 # elara_io: file formats. The native .elara format (ADR-0006) and MusicXML import
-# (ADR-0007); Guitar Pro and MIDI later. No Qt, no JUCE (see README.md).
+# and export (ADR-0007, ADR-0008); Guitar Pro and MIDI later. No Qt, no JUCE (see README.md).
 find_package(miniz CONFIG REQUIRED)
 find_package(pugixml CONFIG REQUIRED)
 find_package(Threads REQUIRED)
@@ -8,6 +8,7 @@ find_package(yyjson CONFIG REQUIRED)
 add_library(elara_io STATIC
   src/archive.cpp
   src/musicxml.cpp
+  src/musicxml_export.cpp
   src/native_format.cpp)
 add_library(elara::io ALIAS elara_io)
 

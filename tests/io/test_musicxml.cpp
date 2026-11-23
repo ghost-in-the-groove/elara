@@ -489,3 +489,21 @@ TEST_CASE("MusicXML: unreadable documents are errors with a reason", "[musicxml]
     REQUIRE_FALSE(missing.has_value());
     CHECK(missing.error().message == "cannot open the file");
 }
+
+TEST_CASE("MusicXML: transposed keys move by the whole interval, so flat keys stay flat",
+          "[musicxml]") {
+    // Alto saxophone (sounds a major sixth lower) written in E-flat major: the
+    // concert key is G-flat major, not its enharmonic F-sharp major.
+    const ImportResult result = parse(
+        R"(<score-partwise version="4.0"><part-list><score-part id="P1">)"
+        R"(<part-name>Alto Saxophone</part-name></score-part></part-list><part id="P1">)"
+        R"(<measure number="1"><attributes><divisions>1</divisions><key><fifths>-3</fifths>)"
+        R"(</key><time><beats>4</beats><beat-type>4</beat-type></time><transpose>)"
+        R"(<diatonic>-5</diatonic><chromatic>-9</chromatic></transpose></attributes>)"
+        R"(<note><pitch><step>E</step><alter>-1</alter><octave>5</octave></pitch>)"
+        R"(<duration>4</duration><type>whole</type></note></measure></part></score-partwise>)");
+    CHECK(result.song.measureHeader(0).keySignature ==
+          core::KeySignature(-6, core::KeyMode::Major));
+    CHECK(result.song.track(0).instrument().writtenOffset == 9);
+    CHECK(noteOf(result.song, 0, 0).pitch == core::Pitch(core::Step::G, -1, 4));
+}

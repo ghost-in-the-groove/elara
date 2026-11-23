@@ -4,6 +4,8 @@
 #include <format>
 #include <fstream>
 #include <ios>
+#include <stdexcept>
+#include <system_error>
 
 namespace elara::io::detail {
 
@@ -53,6 +55,64 @@ std::vector<std::string> ZipReader::names() {
         }
     }
     return result;
+}
+
+std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries) {
+    std::size_t total = 0;
+    for (const ZipEntry& entry : entries) {
+        total += entry.content.size();
+    }
+    mz_zip_archive zip{};
+    if (mz_zip_writer_init_heap(&zip, 0, total / 4 + 4096) == 0) {
+        throw std::runtime_error("cannot create the zip archive");
+    }
+    bool written = true;
+    for (const ZipEntry& entry : entries) {
+        const std::string name(entry.name);
+        const auto level = static_cast<mz_uint>(entry.level);
+        written = written && mz_zip_writer_add_mem(&zip, name.c_str(), entry.content.data(),
+                                                   entry.content.size(), level) != 0;
+    }
+    void* buffer = nullptr;
+    std::size_t size = 0;
+    written = written && mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size) != 0;
+    std::vector<std::uint8_t> bytes;
+    if (written) {
+        const auto* begin = static_cast<const std::uint8_t*>(buffer);
+        bytes.assign(begin, begin + size);
+    }
+    mz_free(buffer);
+    mz_zip_writer_end(&zip);
+    if (!written) {
+        throw std::runtime_error("cannot write the zip archive");
+    }
+    return bytes;
+}
+
+void writeFileAtomically(const std::filesystem::path& path, std::string_view content) {
+    std::filesystem::path temporary = path;
+    temporary += ".saving";
+    {
+        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
+        }
+        out.write(content.data(), static_cast<std::streamsize>(content.size()));
+        out.close();
+        if (!out) {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
+        }
+    }
+    std::error_code error;
+    std::filesystem::rename(temporary, path, error);
+    if (error) {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        throw std::runtime_error(
+            std::format("cannot replace {}: {}", displayPath(path), error.message()));
+    }
 }
 
 std::expected<std::vector<std::uint8_t>, FormatError> readFile(const std::filesystem::path& path) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// File subcommands: new (create a .elara song), dump (print one) and import
-// (read a foreign format, optionally saving it as .elara).
+// File subcommands: new (create a .elara song), dump (print one), import (read a
+// foreign format, optionally saving it as .elara) and export (write one).
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/musicxml.hpp>
@@ -18,6 +18,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace elara::cli {
@@ -110,10 +111,22 @@ std::string lowercase(std::string text) {
     return text;
 }
 
+bool isMusicXmlPath(const std::filesystem::path& path) {
+    const std::string extension = lowercase(displayPath(path.extension()));
+    return extension == ".musicxml" || extension == ".xml" || extension == ".mxl";
+}
+
+std::string warningsJson(const std::vector<std::string>& warnings) {
+    std::string json = "[";
+    for (const std::string& warning : warnings) {
+        json += std::format("{}\"{}\"", json.size() > 1 ? "," : "", jsonEscape(warning));
+    }
+    return json + ']';
+}
+
 int runImport(bool json, const ImportOptions& options) {
     const std::filesystem::path path(options.file);
-    const std::string extension = lowercase(displayPath(path.extension()));
-    if (extension != ".musicxml" && extension != ".xml" && extension != ".mxl") {
+    if (!isMusicXmlPath(path)) {
         return usageError(std::format(
             "cannot import {}: supported files are .musicxml, .xml and .mxl", options.file));
     }
@@ -133,12 +146,7 @@ int runImport(bool json, const ImportOptions& options) {
         }
     }
     if (json) {
-        std::string warnings = "[";
-        for (const std::string& warning : imported->warnings) {
-            warnings +=
-                std::format("{}\"{}\"", warnings.size() > 1 ? "," : "", jsonEscape(warning));
-        }
-        warnings += ']';
+        const std::string warnings = warningsJson(imported->warnings);
         const std::string out =
             options.out.empty() ? "null" : std::format("\"{}\"", jsonEscape(options.out));
         std::cout << std::format(R"({{"file":"{}","format":"musicxml","out":{},"warnings":{},)"
@@ -154,6 +162,50 @@ int runImport(bool json, const ImportOptions& options) {
         }
         if (!options.out.empty()) {
             std::cout << std::format("saved {}\n", options.out);
+        }
+    }
+    return kExitOk;
+}
+
+struct ExportOptions {
+    std::string file;
+    std::string out;
+    bool force = false;
+};
+
+int runExport(bool json, const ExportOptions& options) {
+    const std::filesystem::path out(options.out);
+    if (!isMusicXmlPath(out)) {
+        return usageError(std::format(
+            "cannot export to {}: supported files are .musicxml, .xml and .mxl", options.out));
+    }
+    const auto song = io::loadNative(options.file);
+    if (!song) {
+        return fail(std::format("{}: {}", options.file, song.error().message));
+    }
+    if (!options.force && std::filesystem::exists(out)) {
+        return fail(std::format("{} already exists (use --force to replace it)", options.out));
+    }
+    std::vector<std::string> warnings;
+    try {
+        warnings = io::exportMusicXmlFile(*song, out);
+    } catch (const std::exception& error) {
+        return fail(error.what());
+    }
+    const bool compressed = lowercase(displayPath(out.extension())) == ".mxl";
+    std::error_code ignored;
+    const auto bytes = std::filesystem::file_size(out, ignored);
+    if (json) {
+        std::cout << std::format(R"({{"file":"{}","out":"{}","format":"musicxml",)"
+                                 R"("compressed":{},"bytes":{},"warnings":{}}})",
+                                 jsonEscape(options.file), jsonEscape(options.out), compressed,
+                                 bytes, warningsJson(warnings))
+                  << '\n';
+    } else {
+        std::cout << std::format("exported {} to {} ({}, {} bytes)\n", options.file, options.out,
+                                 compressed ? "compressed MusicXML" : "MusicXML", bytes);
+        for (const std::string& warning : warnings) {
+            std::cout << "warning: " << warning << '\n';
         }
     }
     return kExitOk;
@@ -197,6 +249,16 @@ void addFileCommands(CLI::App& app, Context& context) {
     importCommand->add_flag("--force", imported->force, "Replace the --out file if it exists");
     importCommand->callback(
         [&context, imported] { context.exitCode = runImport(context.json, *imported); });
+
+    auto exported = std::make_shared<ExportOptions>();
+    auto* exportCommand = app.add_subcommand(
+        "export", "Write a .elara song as MusicXML (.musicxml, .xml, or compressed .mxl): with "
+                  "--json, what MusicXML could not hold (warnings)");
+    exportCommand->add_option("file", exported->file, "A .elara file")->required();
+    exportCommand->add_option("out", exported->out, "File to write")->required();
+    exportCommand->add_flag("--force", exported->force, "Replace the file if it exists");
+    exportCommand->callback(
+        [&context, exported] { context.exitCode = runExport(context.json, *exported); });
 }
 
 } // namespace elara::cli
