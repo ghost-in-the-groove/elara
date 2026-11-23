@@ -19,7 +19,7 @@ one pull request, with a test that proves it. Tick the box in the same PR.
 
 Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
-- [ ] Rational durations (`Fraction`) and time positions; tuplet arithmetic
+- [x] Rational durations (`Fraction`) and time positions; tuplet arithmetic
 - [ ] Pitch and spelling (step, alter, octave), MIDI number conversion
 - [ ] Tuning and fret/string <-> pitch mapping, capo
 - [ ] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy

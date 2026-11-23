@@ -4,8 +4,9 @@
 
     python scripts/elara.py doctor               check the toolchain
     python scripts/elara.py build [--preset P]   configure if needed, then build
-    python scripts/elara.py test  [--preset P] [-R REGEX]
+    python scripts/elara.py test  [--preset P] [-R REGEX] [--no-build]
     python scripts/elara.py check                fast gate: format check, guard, build, tests
+    python scripts/elara.py bench [-- ARGS]      benchmarks in the release preset
     python scripts/elara.py format [--check]     clang-format every C++ source
     python scripts/elara.py guard                module-boundary check
     python scripts/elara.py tidy [FILES...]      clang-tidy (default: changed .cpp files)
@@ -274,6 +275,9 @@ def cmd_build(args: argparse.Namespace) -> int:
 
 
 def cmd_test(args: argparse.Namespace) -> int:
+    # Build first so a test run never exercises stale binaries.
+    if not getattr(args, "no_build", False) and (code := cmd_build(args)) != 0:
+        return code
     cmd = ["ctest", "--preset", args.preset]
     if getattr(args, "regex", None):
         cmd += ["-R", args.regex]
@@ -330,6 +334,18 @@ def cmd_cli(args: argparse.Namespace) -> int:
                           env=build_env(), check=False).returncode
 
 
+def cmd_bench(args: argparse.Namespace) -> int:
+    """Build and run the micro-benchmarks in the optimised release preset."""
+    preset = "release"
+    if not (build_dir(preset) / "CMakeCache.txt").exists() and (code := configure(preset)) != 0:
+        return code
+    if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara_benchmarks"])) != 0:
+        return code
+    exe = build_dir(preset) / "bin" / f"elara_benchmarks{EXE}"
+    return subprocess.run([str(exe), *_strip_dashes(args.args)], cwd=ROOT,
+                          env=build_env(), check=False).returncode
+
+
 def cmd_app(args: argparse.Namespace) -> int:
     bin_dir = build_dir(args.preset) / "bin"
     exe = (bin_dir / "elara.app" / "Contents" / "MacOS" / "elara") if IS_MAC else bin_dir / f"elara{EXE}"
@@ -361,7 +377,7 @@ def _gate(steps: list[tuple[str, callable]]) -> int:
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    ns = argparse.Namespace(check=True, preset=args.preset, regex=None)
+    ns = argparse.Namespace(check=True, preset=args.preset, regex=None, no_build=True)
     return _gate([
         ("format", lambda: cmd_format(ns)),
         ("guard", lambda: cmd_guard(ns)),
@@ -371,7 +387,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_ci(args: argparse.Namespace) -> int:
-    ns = argparse.Namespace(check=True, preset=args.preset, regex=None)
+    ns = argparse.Namespace(check=True, preset=args.preset, regex=None, no_build=True)
     return _gate([
         ("format", lambda: cmd_format(ns)),
         ("guard", lambda: cmd_guard(ns)),
@@ -395,7 +411,9 @@ def main() -> int:
 
     add("doctor", cmd_doctor, "check the toolchain", preset=False)
     add("build", cmd_build, "configure if needed, then build")
-    add("test", cmd_test, "run CTest").add_argument("-R", dest="regex", help="test name regex")
+    test = add("test", cmd_test, "build, then run CTest")
+    test.add_argument("-R", dest="regex", help="test name regex")
+    test.add_argument("--no-build", action="store_true", help="run the existing binaries")
     add("check", cmd_check, "fast gate: format check, guard, build, tests")
     add("format", cmd_format, "clang-format C++ sources", preset=False).add_argument(
         "--check", action="store_true", help="only report differences")
@@ -404,6 +422,8 @@ def main() -> int:
     add("cli", cmd_cli, "run elara-cli").add_argument("args", nargs=argparse.REMAINDER)
     add("app", cmd_app, "run the desktop app").add_argument("args", nargs=argparse.REMAINDER)
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
+    add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
+        "args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
     return args.func(args)

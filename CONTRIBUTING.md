@@ -18,7 +18,8 @@ Always go through the task runner (use `py` instead of `python` on Windows):
 | `python scripts/elara.py doctor` | Check the toolchain; run first if anything fails to configure |
 | `python scripts/elara.py check` | **The gate.** Format check, architecture guard, build, all tests |
 | `python scripts/elara.py build` | Configure (first time) and build the `dev` preset |
-| `python scripts/elara.py test -R audio` | Run tests whose name matches a regex |
+| `python scripts/elara.py test -R audio` | Build, then run tests whose name matches a regex |
+| `python scripts/elara.py bench` | Build and run the benchmarks in the optimised `release` preset |
 | `python scripts/elara.py format` | Apply clang-format 23 |
 | `python scripts/elara.py cli -- --json version` | Run the headless CLI |
 | `python scripts/elara.py app` | Launch the desktop app |

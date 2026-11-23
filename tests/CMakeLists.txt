@@ -17,7 +17,10 @@ function(elara_add_unit_tests module)
 endfunction()
 
 elara_add_unit_tests(core
-  SOURCES core/test_version.cpp
+  SOURCES
+    core/test_version.cpp
+    core/test_fraction.cpp
+    core/test_duration.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
@@ -26,6 +29,12 @@ elara_add_unit_tests(audio
   LIBRARIES elara::audio)
 
 add_subdirectory(cli)
+
+# Benchmarks: built on demand (`python scripts/elara.py bench`, release preset),
+# never part of CTest or the gate.
+add_executable(elara_benchmarks EXCLUDE_FROM_ALL bench/bench_core.cpp)
+target_link_libraries(elara_benchmarks PRIVATE elara::core Catch2::Catch2WithMain)
+elara_target_warnings(elara_benchmarks)
 
 if(TARGET elara)
   add_test(NAME app.smoke COMMAND elara --smoke-test)

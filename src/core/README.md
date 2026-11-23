@@ -5,9 +5,21 @@ DAW timeline all read and edit (see `docs/architecture.md`).
 
 - **May depend on:** the C++ standard library only.
 - **Must not include:** Qt (`<Q...>`), JUCE (`<juce_...>`), or any other Elara module.
-- **Status:** milestone 0 only provides `elara::core::version()`. The model
-  (song, tracks, measures, voices, beats, notes, tunings, articulations,
-  undo/redo) arrives in milestone 1 - see `docs/roadmap.md`.
+- **Status:** milestone 1 in progress (see `docs/roadmap.md`).
+
+## Time
+
+| Header | What it gives you |
+|---|---|
+| `fraction.hpp` | `Fraction`: exact, always-normalised rational. Every duration and time position is a `Fraction` of a whole note, so tuplets never drift. |
+| `duration.hpp` | `NoteValue`, `Tuplet`, `Duration` (value + dots + tuplet) and its sounding `length()`. |
+
+Positions are measured in whole notes from a reference point (the start of the
+song or of a measure) and are plain `Fraction`s.
+
+All of these are small `constexpr` value types without allocation; keep them
+that way, the sequencer and layout engine run them in hot loops
+(`python scripts/elara.py bench`).
 
 Public headers live in `include/elara/core/`, sources in `src/`, tests in
 `tests/core/`.

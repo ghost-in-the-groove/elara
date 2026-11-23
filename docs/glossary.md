@@ -16,7 +16,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | tiempo / pulso (posición) | beat | `Beat` | Group of notes starting together |
 | nota | note | `Note` | |
 | silencio | rest | `Rest` | |
-| figura / duración | duration, note value | `Duration` | Rational (`Fraction`) |
+| figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
+| posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |
 | grupo irregular / tresillo | tuplet / triplet | `Tuplet` | |
 | ligadura de prolongación | tie | `Tie` | Same pitch |
