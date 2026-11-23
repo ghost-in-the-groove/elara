@@ -8,6 +8,7 @@
 #include "playback.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <memory>
 #include <utility>
@@ -23,12 +24,29 @@ struct Player::Loaded {
         std::vector<detail::FrameEvent> events{};
         std::size_t next = 0;
         std::vector<float> buffer{};
+        detail::TrackLevel applied{}; // audio thread: the level last mixed at
     };
 
+    explicit Loaded(std::size_t trackCount) : levels(2 * trackCount) {}
+
     std::vector<Track> tracks{};
-    std::vector<float> mix{};
+    std::vector<float> left{};
+    std::vector<float> right{};
     std::int64_t endFrame = 0;
-    float gain = 1.0f;
+    float headroom = 1.0f;
+    // Each track's left and right level: written by the control thread
+    // (updateMix), read by the audio thread at the start of each block.
+    std::vector<std::atomic<float>> levels;
+
+    void setLevel(std::size_t t, detail::TrackLevel level) noexcept {
+        levels[2 * t].store(level.left, std::memory_order_relaxed);
+        levels[(2 * t) + 1].store(level.right, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] detail::TrackLevel level(std::size_t t) const noexcept {
+        return {.left = levels[2 * t].load(std::memory_order_relaxed),
+                .right = levels[(2 * t) + 1].load(std::memory_order_relaxed)};
+    }
 
     // Points every track at the first event at or after `frame`.
     void seat(std::int64_t frame) noexcept {
@@ -48,23 +66,38 @@ Player::~Player() {
 }
 
 void Player::load(const core::Song& song, const Sequence& sequence) {
-    auto loaded = std::make_unique<Loaded>();
     const std::size_t tracks = song.trackCount();
+    auto loaded = std::make_unique<Loaded>(tracks);
     auto events = detail::eventsByTrack(sequence, tracks, sampleRate_);
-    loaded->gain = detail::trackGain(events);
+    loaded->headroom = detail::headroom(events);
     loaded->endFrame = std::llround(sequence.duration() * sampleRate_);
-    loaded->mix.assign(maxBlockFrames_, 0.0f);
+    loaded->left.assign(maxBlockFrames_, 0.0f);
+    loaded->right.assign(maxBlockFrames_, 0.0f);
     loaded->tracks.reserve(tracks);
     for (std::size_t t = 0; t < tracks; ++t) {
+        const detail::TrackLevel level = detail::levelOf(song, t, loaded->headroom);
+        loaded->setLevel(t, level);
         loaded->tracks.push_back(
             {.synth = Synth(timbreFor(song.track(t).instrument()), sampleRate_),
              .events = std::move(events[t]),
-             .buffer = std::vector<float>(maxBlockFrames_, 0.0f)});
+             .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+             .applied = level});
     }
     duration_ = sequence.duration();
     tidy();
-    // A song the audio thread has not taken yet is replaced.
+    latest_ = loaded.get();
+    // A song the audio thread has not taken yet is replaced. The release
+    // publishes the levels stored above with the song.
     delete pending_.exchange(loaded.release(), std::memory_order_acq_rel);
+}
+
+void Player::updateMix(const core::Song& song) noexcept {
+    if (latest_ == nullptr || song.trackCount() != latest_->tracks.size()) {
+        return;
+    }
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        latest_->setLevel(t, detail::levelOf(song, t, latest_->headroom));
+    }
 }
 
 void Player::play() noexcept {
@@ -141,9 +174,12 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
     }
     const std::size_t n = left.size();
     const bool playing = wasPlaying_;
-    std::span<float> mix(current_->mix.data(), n);
-    std::ranges::fill(mix, 0.0f);
-    for (Loaded::Track& track : current_->tracks) {
+    const std::span<float> mixLeft(current_->left.data(), n);
+    const std::span<float> mixRight(current_->right.data(), n);
+    std::ranges::fill(mixLeft, 0.0f);
+    std::ranges::fill(mixRight, 0.0f);
+    for (std::size_t t = 0; t < current_->tracks.size(); ++t) {
+        Loaded::Track& track = current_->tracks[t];
         const std::span<float> out(track.buffer.data(), n);
         std::ranges::fill(out, 0.0f);
         if (playing) {
@@ -152,14 +188,13 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
         } else {
             track.synth.render(out); // released notes ringing out
         }
-        for (std::size_t i = 0; i < n; ++i) {
-            mix[i] += out[i];
-        }
+        const detail::TrackLevel target = current_->level(t);
+        detail::mixInto(out, track.applied, target, mixLeft, mixRight);
+        track.applied = target;
     }
     for (std::size_t i = 0; i < n; ++i) {
-        const float sample = detail::limit(mix[i] * current_->gain);
-        left[i] = sample;
-        right[i] = sample;
+        left[i] = detail::limit(mixLeft[i]);
+        right[i] = detail::limit(mixRight[i]);
     }
     if (playing) {
         frame_ += static_cast<std::int64_t>(n);

@@ -35,6 +35,7 @@ struct LoggedEvent {
 
 /// Plays a sequence through one built-in Synth per track into interleaved
 /// stereo, call by call, so a whole song never has to be in memory at once.
+/// Each track sits in the stereo mix as the song's track mix says (ADR-0020).
 ///
 /// An event at t seconds is dispatched at frame round(t x rate). Tracks render
 /// on separate threads and are mixed in track order, so the output does not
@@ -78,7 +79,7 @@ private:
     RenderOptions options_;
     std::int64_t frames_ = 0;
     std::int64_t position_ = 0;
-    float trackGain_ = 1.0f;
+    std::vector<float> levels_; // each track's left and right level (ADR-0020)
     std::vector<Timbre> timbres_;
     std::vector<TrackPlayer> players_;
     std::vector<float> mix_;

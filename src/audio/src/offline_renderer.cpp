@@ -45,7 +45,13 @@ OfflineRenderer::OfflineRenderer(const core::Song& song, const Sequence& sequenc
     frames_ = std::llround((sequence.duration() + std::max(0.0, options_.tail)) * rate);
     const std::size_t tracks = song.trackCount();
     auto events = detail::eventsByTrack(sequence, tracks, rate);
-    trackGain_ = detail::trackGain(events);
+    const float headroom = detail::headroom(events);
+    levels_.reserve(2 * tracks);
+    for (std::size_t t = 0; t < tracks; ++t) {
+        const detail::TrackLevel level = detail::levelOf(song, t, headroom);
+        levels_.push_back(level.left);
+        levels_.push_back(level.right);
+    }
     timbres_.reserve(tracks);
     players_.reserve(tracks);
     for (std::size_t t = 0; t < tracks; ++t) {
@@ -72,16 +78,16 @@ std::size_t OfflineRenderer::render(std::span<float> out) {
     });
 
     // Mix in track order, so the sums do not depend on the threads.
-    mix_.assign(count, 0.0f);
-    for (const TrackPlayer& player : players_) {
-        for (std::size_t i = 0; i < count; ++i) {
-            mix_[i] += player.buffer[i];
-        }
+    mix_.assign(2 * count, 0.0f);
+    const std::span<float> left(mix_.data(), count);
+    const std::span<float> right(mix_.data() + count, count);
+    for (std::size_t t = 0; t < players_.size(); ++t) {
+        const detail::TrackLevel level{.left = levels_[2 * t], .right = levels_[(2 * t) + 1]};
+        detail::mixInto(players_[t].buffer, level, level, left, right);
     }
     for (std::size_t i = 0; i < count; ++i) {
-        const float sample = detail::limit(mix_[i] * trackGain_);
-        out[2 * i] = sample;
-        out[2 * i + 1] = sample;
+        out[2 * i] = detail::limit(left[i]);
+        out[(2 * i) + 1] = detail::limit(right[i]);
     }
 
     if (options_.logEvents) {
