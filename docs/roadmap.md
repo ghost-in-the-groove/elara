@@ -52,6 +52,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [ ] Incremental relayout (only the systems an edit touches)
+  - [x] Pages an edit leaves as they were keep their textures instead of being
+        painted again
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
