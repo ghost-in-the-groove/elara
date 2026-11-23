@@ -16,7 +16,8 @@ add_library(elara_io STATIC
   src/midi_export.cpp
   src/midi_import.cpp
   src/smf.cpp
-  src/native_format.cpp)
+  src/native_format.cpp
+  src/open.cpp)
 add_library(elara::io ALIAS elara_io)
 
 target_include_directories(elara_io PUBLIC include)

@@ -81,6 +81,13 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | lay out notation and tablature of the 500-measure staff on A4 pages (125 systems, 21 pages) | 3.4 to 3.6 ms | first version (ADR-0014): every measure measured, line breaks by dynamic programming, systems justified and laid out on every core. One thread: 9.4 ms, so measuring costs about as much as the layout itself |
 | 2026-11-23 | lay out all 20 staves of the large song on A4 pages | 21 ms | one thread: 132 ms (the 20 staves on one line: 84 to 90 ms); 6x faster on every core, the same pages on any number of threads |
 | 2026-11-23 | lay out one 500-measure staff, notation and tablature, 8 measures of each | 3.8 ms, 1.3 ms, 5.8 ms, 74 µs, 83 µs | the same layout with springs (ADR-0014); within run-to-run noise of the rows above |
+| 2026-11-23 | paint an A4 page of notation and tablature (588 glyphs, 840 lines, 391 texts) at 100 % (6.6 px per staff space) | 28 ms | first version (ADR-0015): all glyphs in one path, all letters in one path |
+| 2026-11-23 | the same | 5.4 ms | each glyph filled on its own, outlines made once per glyph and size: Qt's rasteriser fills many small paths much faster than one large one (glyphs alone: 22 ms to 2.8 ms) |
+| 2026-11-23 | the same on a high-density screen (2 device pixels per pixel), and at 200 % | 8.5 ms, 19 ms | 70 ms and 131 ms before; pages are painted on worker threads, so this is latency, not stutter |
+| 2026-11-23 | paint an A4 page of the 20-staff score (1960 glyphs, 2781 lines, 1282 texts), high density | 11.5 ms | 132 ms before |
+
+The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
+`bench` builds and runs them after the others when the app is built.
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as

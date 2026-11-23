@@ -470,3 +470,35 @@ TEST_CASE("Tablature layout: rejects what it cannot show", "[notation][tab]") {
     const StaffSelection missing{.track = 7};
     CHECK_THROWS_AS(layoutSystem(song, std::span(&missing, 1), bravura()), std::out_of_range);
 }
+
+TEST_CASE("Tablature layout: whole tracks as notation, tablature or both", "[notation][tab]") {
+    using elara::notation::selectTracks;
+    using elara::notation::TrackView;
+    Song song = guitar({{play(1, 0)}});
+    song.addTrack(
+        Track("Piano", Instrument{.name = "Piano"}, {Staff(Clef::Treble), Staff(Clef::Bass)}));
+    const std::array<std::size_t, 2> both{0, 1};
+
+    const auto standard = selectTracks(song, both, TrackView::Standard);
+    CHECK(standard == std::vector<StaffSelection>{{.track = 0, .staff = 0},
+                                                  {.track = 1, .staff = 0},
+                                                  {.track = 1, .staff = 1}});
+    // Staves without a tuning stay in standard notation.
+    const auto tablature = selectTracks(song, both, TrackView::Tablature);
+    CHECK(tablature ==
+          std::vector<StaffSelection>{{.track = 0, .staff = 0, .view = StaffView::Tablature},
+                                      {.track = 1, .staff = 0},
+                                      {.track = 1, .staff = 1}});
+    const auto all = selectTracks(song, both, TrackView::Both);
+    CHECK(all == std::vector<StaffSelection>{{.track = 0, .staff = 0},
+                                             {.track = 0, .staff = 0, .view = StaffView::Tablature},
+                                             {.track = 1, .staff = 0},
+                                             {.track = 1, .staff = 1}});
+    CHECK_NOTHROW(layoutSystem(song, all, bravura()));
+
+    CHECK(elara::notation::hasTablature(song, both));
+    const std::array<std::size_t, 1> piano{1};
+    CHECK_FALSE(elara::notation::hasTablature(song, piano));
+    const std::array<std::size_t, 1> missing{2};
+    CHECK_THROWS_AS(selectTracks(song, missing, TrackView::Both), std::out_of_range);
+}

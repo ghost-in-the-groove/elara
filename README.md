@@ -3,8 +3,9 @@
 A free and open-source guitar tablature editor, score editor and (later) music
 studio for Windows, macOS and Linux.
 
-> **Status:** milestone 0 - project skeleton. Nothing musical works yet.
-> See [docs/roadmap.md](docs/roadmap.md).
+> **Status:** alpha, milestone 3. Elara opens Guitar Pro, MusicXML, MIDI and its
+> own files and shows them as notation, tablature or both, page by page; playback
+> and editing come next. See [docs/roadmap.md](docs/roadmap.md).
 
 ## Highlights (planned for 1.0)
 
@@ -22,7 +23,7 @@ Qt 6.12, vcpkg, Python 3.11+. Full setup: [docs/development.md](docs/development
 ```sh
 python scripts/elara.py doctor   # checks the toolchain
 python scripts/elara.py check    # builds and runs every test
-python scripts/elara.py app      # launches the app
+python scripts/elara.py app      # launches the app (or: app -- song.gp)
 ```
 
 ## Contributing

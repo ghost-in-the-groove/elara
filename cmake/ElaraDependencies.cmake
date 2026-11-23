@@ -56,6 +56,39 @@ foreach(_entry IN ITEMS
   file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
 endforeach()
 
+# Arimo (sans-serif text font, SIL OFL 1.1, ADR-0015): metric-compatible with
+# Arial and Helvetica, the widths layout assumes for text. Two files of a pinned
+# commit of the Google Fonts repository and their licence, each checked against
+# its SHA-256, copied to bin/fonts/ under plain names.
+set(_arimo_commit 903d46673260c1f4c7f7ef67f5190fb03eab5042)
+set(_arimo_url "https://raw.githubusercontent.com/google/fonts/${_arimo_commit}/ofl/arimo")
+set(_arimo_cache "${ELARA_DOWNLOAD_CACHE}/arimo-${_arimo_commit}")
+foreach(_entry IN ITEMS
+    "Arimo%5Bwght%5D.ttf|Arimo.ttf|e43898b143ec826ac8cb4034816458a7047fbe0836558de2a1f8c6223ae3e0ca"
+    "Arimo-Italic%5Bwght%5D.ttf|Arimo-Italic.ttf|a80fc54fd0233c1dfe298577c4d00f5ae81d5bb83510975e473c47e699b7f4ed"
+    "OFL.txt|Arimo-OFL.txt|11cce536cd2f3864d767003af5dcd739e2e15818cf2279b6175edeadd3960992")
+  string(REPLACE "|" ";" _parts "${_entry}")
+  list(GET _parts 0 _path)
+  list(GET _parts 1 _name)
+  list(GET _parts 2 _hash)
+  set(_cached "${_arimo_cache}/${_name}")
+  set(_have "")
+  if(EXISTS "${_cached}")
+    file(SHA256 "${_cached}" _have)
+  endif()
+  if(NOT _have STREQUAL _hash)
+    message(STATUS "Downloading Arimo: ${_name}")
+    file(DOWNLOAD "${_arimo_url}/${_path}" "${_cached}"
+      EXPECTED_HASH SHA256=${_hash} TLS_VERIFY ON STATUS _status)
+    list(GET _status 0 _code)
+    if(NOT _code EQUAL 0)
+      list(GET _status 1 _reason)
+      message(FATAL_ERROR "Could not download Arimo's ${_name}: ${_reason}")
+    endif()
+  endif()
+  file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
+endforeach()
+
 find_package(CLI11 CONFIG REQUIRED)
 
 if(ELARA_BUILD_TESTS)
@@ -63,5 +96,5 @@ if(ELARA_BUILD_TESTS)
 endif()
 
 if(ELARA_BUILD_APP)
-  find_package(Qt6 6.12 REQUIRED COMPONENTS Quick QuickControls2)
+  find_package(Qt6 6.12 REQUIRED COMPONENTS Concurrent Quick QuickControls2)
 endif()

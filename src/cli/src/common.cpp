@@ -13,10 +13,7 @@
 #include <mach-o/dyld.h>
 #endif
 
-#include <elara/io/guitar_pro.hpp>
-#include <elara/io/midi.hpp>
-#include <elara/io/musicxml.hpp>
-#include <elara/io/native_format.hpp>
+#include <elara/io/open.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -112,30 +109,11 @@ std::filesystem::path defaultFontMetadata() {
 }
 
 std::expected<core::Song, std::string> openSong(const std::filesystem::path& path) {
-    std::string extension = utf8(path.extension());
-    std::ranges::transform(extension, extension.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (extension == ".elara") {
-        auto song = io::loadNative(path);
-        if (!song) {
-            return std::unexpected(song.error().message);
-        }
-        return std::move(*song);
+    auto opened = io::openFile(path);
+    if (!opened) {
+        return std::unexpected(opened.error().message);
     }
-    std::expected<io::ImportResult, io::FormatError> imported =
-        std::unexpected(io::FormatError{.message = "unsupported file type"});
-    if (extension == ".musicxml" || extension == ".xml" || extension == ".mxl") {
-        imported = io::importMusicXmlFile(path);
-    } else if (extension == ".mid" || extension == ".midi" || extension == ".smf") {
-        imported = io::importMidiFile(path);
-    } else if (extension == ".gp" || extension == ".gpx" || extension == ".gp5" ||
-               extension == ".gp4" || extension == ".gp3") {
-        imported = io::importGuitarProFile(path);
-    }
-    if (!imported) {
-        return std::unexpected(imported.error().message);
-    }
-    return std::move(imported->song);
+    return std::move(opened->song);
 }
 
 int fail(std::string_view message) {
