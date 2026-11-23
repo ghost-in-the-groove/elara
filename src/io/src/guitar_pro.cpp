@@ -7,6 +7,8 @@
 #include <elara/io/guitar_pro.hpp>
 
 #include "archive.hpp"
+#include "general_midi.hpp"
+#include "gpx_container.hpp"
 #include "guitar_pro_binary.hpp"
 #include "midi_shared.hpp"
 #include "warnings.hpp"
@@ -20,6 +22,7 @@
 #include <fstream>
 #include <iterator>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -166,7 +169,10 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
     if (layout.name.empty()) {
         layout.name = setName.empty() ? std::format("Track {}", index + 1) : setName;
     }
-    layout.percussion = textOf(set.child("Type")) == std::string_view("drumKit");
+    // Guitar Pro 6 has no instrument set: its General MIDI table says drums.
+    layout.percussion =
+        textOf(set.child("Type")) == std::string_view("drumKit") ||
+        track.child("GeneralMidi").attribute("table").value() == std::string_view("Percussion");
 
     // Drum notes name an articulation of the kit, counted across its elements.
     for (const pugi::xml_node element : set.child("Elements").children("Element")) {
@@ -185,9 +191,6 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
     }
     program = std::clamp(program, 0, 127);
 
-    const int chromatic = intOf(track.child("Transpose").child("Chromatic"), 0);
-    const int octave = intOf(track.child("Transpose").child("Octave"), 0);
-
     std::vector<pugi::xml_node> staffNodes;
     for (const pugi::xml_node staff : track.child("Staves").children("Staff")) {
         staffNodes.push_back(staff);
@@ -195,25 +198,40 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
     if (staffNodes.empty()) {
         staffNodes.emplace_back(); // no <Staves>: one plain staff
     }
+    // Guitar Pro 6 keeps the tuning and capo on the track, not the staff.
+    const auto ownerOf = [&](std::size_t s) {
+        return property(staffNodes[s], "Tuning") || staffNodes.size() > 1 ? staffNodes[s] : track;
+    };
+
+    const int chromatic = intOf(track.child("Transpose").child("Chromatic"), 0);
+    int octave = intOf(track.child("Transpose").child("Octave"), 0);
+    // Guitar Pro 6 writes no transposition: guitars and basses sound an octave
+    // below their notes, as in every other version.
+    if (!track.child("Transpose") && !layout.percussion &&
+        std::ranges::any_of(std::views::iota(std::size_t{0}, staffNodes.size()),
+                            [&](std::size_t s) { return tuningOf(ownerOf(s)).has_value(); })) {
+        octave = -1;
+    }
+
     bool fretted = false;
     for (std::size_t s = 0; s < staffNodes.size(); ++s) {
         const std::string_view clefName = s < clefs.size() ? clefs[s] : std::string_view("G2");
         const Clef clef = layout.percussion ? Clef::Percussion : clefFor(clefName, octave);
-        const auto pitches = layout.percussion ? std::nullopt : tuningOf(staffNodes[s]);
+        const pugi::xml_node owner = ownerOf(s);
+        const auto pitches = layout.percussion ? std::nullopt : tuningOf(owner);
         if (!pitches) {
             layout.staves.emplace_back(clef);
             layout.lowToHigh.emplace_back();
             continue;
         }
         fretted = true;
-        const auto preference = property(staffNodes[s], "TuningFlat")
-                                    ? core::SpellingPreference::Flats
-                                    : core::SpellingPreference::Sharps;
+        const auto preference = property(owner, "TuningFlat") ? core::SpellingPreference::Flats
+                                                              : core::SpellingPreference::Sharps;
         std::vector<Pitch> strings; // string 1 (highest) first
         for (auto it = pitches->rbegin(); it != pitches->rend(); ++it) {
             strings.push_back(Pitch::fromMidi(*it, preference));
         }
-        int capo = intOf(property(staffNodes[s], "CapoFret").child("Fret"), 0);
+        int capo = intOf(property(owner, "CapoFret").child("Fret"), 0);
         if (capo < 0 || capo > Tuning::kMaxFret) {
             warnings.add(layout.name, "capo outside the neck dropped");
             capo = 0;
@@ -231,8 +249,13 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
                detail::kindForProgram(program, false) == InstrumentKind::Keyboard) {
         kind = InstrumentKind::Keyboard;
     }
+    // Without an instrument set (Guitar Pro 6) the General MIDI program names it.
+    std::string instrumentName = setName;
+    if (instrumentName.empty() && track.child("GeneralMidi")) {
+        instrumentName = layout.percussion ? "Drums" : std::string(detail::programName(program));
+    }
     layout.instrument = Instrument{
-        .name = setName.empty() ? layout.name : setName,
+        .name = instrumentName.empty() ? layout.name : instrumentName,
         .kind = kind,
         .midiProgram = layout.percussion ? 0 : program,
         .writtenOffset = layout.percussion ? 0 : -(chromatic + 12 * octave),
@@ -788,7 +811,12 @@ private:
                     drum = layout.drumKeys[static_cast<std::size_t>(*articulation)];
                 }
             }
-            note.pitch = Pitch::fromMidi(std::clamp(drum.value_or(38), 0, 127));
+            if (!drum || *drum < 0 || *drum > 127) {
+                // Guitar Pro 6 names drums by kit element instead (not read yet).
+                warnings_.add(who, "drum notes without a MIDI key dropped", m);
+                return std::nullopt;
+            }
+            note.pitch = Pitch::fromMidi(*drum);
         } else {
             const std::vector<int>& strings = layout.lowToHigh[staffIndex];
             // Strings count from 0, the lowest; frets from the capo.
@@ -983,8 +1011,17 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
         return importGpif(*score);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
-        return std::unexpected(
-            FormatError{"Guitar Pro: Guitar Pro 6 files (.gpx) are not supported yet"});
+        std::optional<std::string> score;
+        try {
+            score = detail::gpxEntry(bytes, "score.gpif");
+        } catch (const FormatError& error) {
+            return std::unexpected(error);
+        }
+        if (!score) {
+            return std::unexpected(FormatError{
+                "Guitar Pro: no score.gpif in the container (not a Guitar Pro 6 file)"});
+        }
+        return importGpif(*score);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {
         try {

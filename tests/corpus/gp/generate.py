@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: CC0-1.0
-"""Writes the Guitar Pro 7-8 files (.gp) of the test corpus, the same on every run.
+"""Writes the Guitar Pro 6-8 files (.gpx, .gp) of the test corpus, the same on every run.
 
     python tests/corpus/gp/generate.py
 
-A .gp file is a zip archive whose Content/score.gpif holds the score as XML.
+A .gp file is a zip archive whose Content/score.gpif holds the score as XML; a
+.gpx file keeps an older form of the same XML in a compressed file system.
 Every element here is written out by hand, following the structure of files
-saved by Guitar Pro 8; nothing is copied from Guitar Pro or its files.
+saved by Guitar Pro; nothing is copied from Guitar Pro or its files.
 """
 
 from __future__ import annotations
@@ -112,7 +113,11 @@ class Track:
                 f"</Sound></Sounds>{lyrics}<Staves>{''.join(staves)}</Staves></Track>")
 
 
-def score(*, info, tempos, tracks, master_bars) -> str:
+GP8_HEADER = ("<GPVersion>8.0.2</GPVersion><GPRevision>13002</GPRevision>"
+              "<Encoding><EncodingDescription>GP8</EncodingDescription></Encoding>")
+
+
+def score(*, info, tempos, tracks, master_bars, header=GP8_HEADER) -> str:
     """master_bars: dicts with time, key (fifths, mode), extra XML and one bar per
     staff of every track: (clef, [voice beats...])."""
     rhythms: dict = {}
@@ -178,9 +183,7 @@ def score(*, info, tempos, tracks, master_bars) -> str:
         f"<Position>{position}</Position><Visible>true</Visible><Value>{value}</Value>"
         f"</Automation>" for bar, position, value, linear in tempos)
     track_ids = " ".join(str(i) for i in range(len(tracks)))
-    return ('<?xml version="1.0" encoding="utf-8"?>\n<GPIF>'
-            "<GPVersion>8.0.2</GPVersion><GPRevision>13002</GPRevision>"
-            "<Encoding><EncodingDescription>GP8</EncodingDescription></Encoding>"
+    return ('<?xml version="1.0" encoding="utf-8"?>\n<GPIF>' + header +
             f"<Score>{info_xml}<MultiVoice>0</MultiVoice></Score>"
             f"<MasterTrack><Tracks>{track_ids}</Tracks><Automations>{tempo_xml}</Automations>"
             "</MasterTrack>"
@@ -311,15 +314,182 @@ def band() -> str:
         master_bars=bars)
 
 
+# ---- duet.gpx (Guitar Pro 6) -----------------------------------------------------
+
+SECTOR = 0x1000
+
+
+class Gp6Track:
+    """A Guitar Pro 6 track: no instrument set and no staves; the General MIDI
+    table says whether it is a drum kit, and the tuning and capo sit on the track."""
+
+    def __init__(self, name, *, program, channel, percussion=False, tuning=None, capo=0,
+                 flat=False):
+        self.name, self.program, self.channel = name, program, channel
+        self.percussion, self.tuning, self.capo, self.flat = percussion, tuning, capo, flat
+
+    def xml(self, track_id: int) -> str:
+        table = "Percussion" if self.percussion else "Instrument"
+        props = []
+        if self.tuning:
+            props.append(prop("CapoFret", f"<Fret>{self.capo}</Fret>"))
+            props.append(prop("FretCount", "<Number>21</Number>"))
+            props.append(prop("Tuning", "<Pitches>" + " ".join(map(str, self.tuning))
+                              + "</Pitches>"))
+            if self.flat:
+                props.append(prop("TuningFlat"))
+        properties = "<Properties>" + "".join(props) + "</Properties>" if props else ""
+        return (f'<Track id="{track_id}"><Name>{cdata(self.name)}</Name>'
+                f"<ShortName>{cdata(self.name[:5])}</ShortName><Color>80 160 220</Color>"
+                f'<GeneralMidi table="{table}"><Program>{self.program}</Program><Port>0</Port>'
+                f"<PrimaryChannel>{self.channel}</PrimaryChannel>"
+                f"<SecondaryChannel>{self.channel}</SecondaryChannel>"
+                "<ForeOneChannelPerString>false</ForeOneChannelPerString></GeneralMidi>"
+                f"<PlaybackState>Default</PlaybackState>{properties}</Track>")
+
+
+class BitWriter:
+    """Bits from the most significant down, byte after byte."""
+
+    def __init__(self) -> None:
+        self.data = bytearray()
+        self.used = 8
+
+    def bit(self, value: int) -> None:
+        if self.used == 8:
+            self.data.append(0)
+            self.used = 0
+        if value:
+            self.data[-1] |= 0x80 >> self.used
+        self.used += 1
+
+    def bits(self, value: int, count: int) -> None:  # the most significant bit first
+        for i in reversed(range(count)):
+            self.bit((value >> i) & 1)
+
+    def bits_reversed(self, value: int, count: int) -> None:  # the least significant first
+        for i in range(count):
+            self.bit((value >> i) & 1)
+
+
+def bcfs(files: list[tuple[str, bytes]]) -> bytes:
+    """A Guitar Pro 6 file system: 4096-byte sectors, the first one unused. Each
+    file is an entry sector (type 2, the name, the size, the sectors that hold
+    it) followed by its data sectors."""
+    sectors = [bytes(SECTOR)]
+    for name, data in files:
+        count = max(1, -(-len(data) // SECTOR))
+        entry = bytearray(SECTOR)
+        entry[0:4] = (2).to_bytes(4, "little")
+        encoded = name.encode("ascii")
+        entry[0x04:0x04 + len(encoded)] = encoded
+        entry[0x8C:0x90] = len(data).to_bytes(4, "little")
+        first = len(sectors) + 1
+        for i in range(count):
+            entry[0x94 + 4 * i:0x98 + 4 * i] = (first + i).to_bytes(4, "little")
+        sectors.append(bytes(entry))
+        for i in range(count):
+            chunk = data[i * SECTOR:(i + 1) * SECTOR]
+            sectors.append(chunk + bytes(SECTOR - len(chunk)))
+    return b"BCFS" + b"".join(sectors)
+
+
+def bcfz(data: bytes) -> bytes:
+    """Compresses `data` into the chunks Guitar Pro 6 unpacks: a 0 bit and up to
+    three literal bytes, or a 1 bit, a word size and an offset and length of that
+    many bits that copy earlier bytes (never more than the offset)."""
+    window = (1 << 12) - 1
+    out = BitWriter()
+    starts: dict[bytes, list[int]] = {}
+    literals = bytearray()
+
+    def flush() -> None:
+        for at in range(0, len(literals), 3):
+            chunk = literals[at:at + 3]
+            out.bit(0)
+            out.bits_reversed(len(chunk), 2)
+            for byte in chunk:
+                out.bits(byte, 8)
+        literals.clear()
+
+    i = 0
+    while i < len(data):
+        best_length = best_offset = 0
+        key = data[i:i + 3]
+        for start in reversed(starts.get(key, [])[-32:]):
+            offset = i - start
+            if offset > window:
+                break
+            limit = min(offset, window, len(data) - i)
+            length = 0
+            while length < limit and data[start + length] == data[i + length]:
+                length += 1
+            if length > best_length:
+                best_length, best_offset = length, offset
+        starts.setdefault(key, []).append(i)
+        if best_length >= 4:
+            flush()
+            word = max(best_offset.bit_length(), best_length.bit_length())
+            out.bit(1)
+            out.bits(word, 4)
+            out.bits_reversed(best_offset, word)
+            out.bits_reversed(best_length, word)
+            i += best_length
+        else:
+            literals.append(data[i])
+            i += 1
+    flush()
+    return b"BCFZ" + len(data).to_bytes(4, "little") + bytes(out.data)
+
+
+EB_STANDARD = [39, 44, 49, 54, 58, 63]  # lowest string first
+DUET_CAPO = 2
+
+
+def duet() -> bytes:
+    guitar = Gp6Track("Rhythm Guitar", program=25, channel=0, tuning=EB_STANDARD,
+                      capo=DUET_CAPO, flat=True)
+    drums = Gp6Track("Drums", program=0, channel=9, percussion=True)
+
+    def note(string, fret, **kwargs):
+        return Note(string=string, fret=fret, midi=EB_STANDARD[string] + DUET_CAPO + fret,
+                    **kwargs)
+
+    kick, snare, hat, crash = (Note(midi=key) for key in (36, 38, 42, 49))
+    element_only = Note(props=[prop("Element", "<Element>1</Element>"),
+                               prop("Variation", "<Variation>0</Variation>")])
+    bar1 = [[Beat("Quarter", [note(0, 0), note(1, 2), note(2, 2)]),
+             Beat("Quarter", [note(3, 0)]),
+             Beat("Half", [note(4, 1, elements=["<LetRing />"])])]]
+    bar2 = [[Beat("Whole", [note(5, 0)])]]
+    kit1 = [[Beat("Quarter", [kick, hat]), Beat("Quarter", [hat]),
+             Beat("Quarter", [snare, hat]), Beat("Quarter", [hat])]]
+    kit2 = [[Beat("Half", [crash, kick]), Beat("Half", [element_only])]]
+    gpif = score(
+        info={"Title": "Corpus Duet", "Artist": "Ghost in the Groove", "Copyright": "CC0 1.0"},
+        tempos=[(0, 0, "132", False)],
+        tracks=[guitar, drums],
+        master_bars=[
+            {"time": "4/4", "key": (-3, "Major"), "bars": [("G2", bar1), ("Neutral", kit1)]},
+            {"time": "4/4", "key": (-3, "Major"), "bars": [("G2", bar2), ("Neutral", kit2)]},
+        ],
+        header="<GPRevision>0</GPRevision>")
+    misc = b'<?xml version="1.0" encoding="utf-8"?>\n<Misc></Misc>\n'
+    parts = bytes([0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0])  # neutral part settings
+    return bcfz(bcfs([("misc.xml", misc), ("score.gpif", gpif.encode("utf-8")),
+                      ("PartConfiguration", parts)]))
+
+
 FILES = {
-    "guitar-techniques.gp": guitar_techniques,
-    "band.gp": band,
+    "guitar-techniques.gp": lambda: gp_file(guitar_techniques()),
+    "band.gp": lambda: gp_file(band()),
+    "duet.gpx": duet,
 }
 
 
 def main() -> None:
     for name, make in FILES.items():
-        (HERE / name).write_bytes(gp_file(make()))
+        (HERE / name).write_bytes(make())
         print(f"wrote {name}")
 
 
