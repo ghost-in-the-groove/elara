@@ -44,8 +44,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
 
-- [ ] SMuFL metadata loading (Bravura), glyph metrics
-- [ ] Horizontal spacing, beaming, stems, accidentals for one staff
+- [x] SMuFL metadata loading (Bravura), glyph metrics
+- [x] Horizontal spacing, beaming, stems, accidentals for one staff
 - [ ] Tablature staff layout with effects notation
 - [ ] Systems and pages, incremental relayout
 - [ ] `elara-cli render --svg` snapshot tests

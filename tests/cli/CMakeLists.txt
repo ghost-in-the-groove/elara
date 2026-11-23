@@ -293,6 +293,47 @@ add_test(NAME cli.import_unicode_path COMMAND elara-cli --json import "${_unicod
 set_tests_properties(cli.import_unicode_path PROPERTIES
   PASS_REGULAR_EXPRESSION "\"file\":\"[^\"]*canción-曲\\.musicxml\",\"format\":\"musicxml\"")
 
+# Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
+add_test(NAME cli.font COMMAND elara-cli --json font)
+set_tests_properties(cli.font PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":85,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+
+add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
+set_tests_properties(cli.font_glyph PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"glyph\":\"noteheadBlack\",\"codepoint\":\"U\\+E0A4\",\"bbox\":{\"sw\":\\[0,-0\\.5\\],\"ne\":\\[1\\.18,0\\.5\\]},\"advanceWidth\":1\\.18,\"anchors\":{\"stemUpSE\":\\[1\\.18,0\\.168\\],\"stemDownNW\":\\[0,-0\\.168\\]")
+
+add_test(NAME cli.font_rejects_unknown_glyph COMMAND elara-cli font --glyph noSuchGlyph)
+set_tests_properties(cli.font_rejects_unknown_glyph PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.font_rejects_missing_metadata
+  COMMAND elara-cli font --metadata "${CMAKE_CURRENT_BINARY_DIR}/no-such-metadata.json")
+set_tests_properties(cli.font_rejects_missing_metadata PROPERTIES WILL_FAIL TRUE)
+
+# Notation layout (ADR-0012): one staff as a display list, or as SVG.
+add_test(NAME cli.render COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml")
+set_tests_properties(cli.render PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"track\":0,\"staff\":0,\"first\":0,\"count\":4,\"svg\":null,.*\"counts\":\\{\"staffLine\":5,\"ledgerLine\":1,\"barline\":5,\"clef\":1,\"keySignature\":1,\"timeSignature\":4,\"notehead\":10,\"accidental\":2,")
+
+add_test(NAME cli.render_drums COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/drums.musicxml")
+set_tests_properties(cli.render_drums PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"notehead\":5,\"accidental\":0,.*\"glyph\":\"unpitchedPercussionClef1\",\"role\":\"clef\"")
+
+add_test(NAME cli.render_svg
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --first 2 --count 1
+          --svg "${CMAKE_CURRENT_BINARY_DIR}/melody-measure-3.svg")
+set_tests_properties(cli.render_svg PROPERTIES
+  PASS_REGULAR_EXPRESSION "measures 2 to 2 of 4.*saved .*melody-measure-3\\.svg"
+  FIXTURES_SETUP cli_rendered)
+add_test(NAME cli.render_svg_content
+  COMMAND "${CMAKE_COMMAND}" -E cat "${CMAKE_CURRENT_BINARY_DIR}/melody-measure-3.svg")
+set_tests_properties(cli.render_svg_content PROPERTIES
+  PASS_REGULAR_EXPRESSION "@font-face\\{font-family:\"Bravura\";src:url\\(\"[^\"]*fonts/Bravura\\.otf\".*<text class=\"keySignature\""
+  FIXTURES_REQUIRED cli_rendered)
+
+add_test(NAME cli.render_rejects_missing_track
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --track 3)
+set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot

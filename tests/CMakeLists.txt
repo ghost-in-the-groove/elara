@@ -1,6 +1,6 @@
 # Tests. One Catch2 executable per module plus end-to-end CTest cases that drive
 # elara-cli and the app headlessly (ADR-0003). Test names are prefixed with the
-# module ("core.", "io.", "audio.", "cli.", "app.") so `ctest -R <module>` selects them.
+# module ("core.", "io.", "notation.", "audio.", "cli.", "app.") so `ctest -R <module>` selects them.
 
 include(Catch)
 
@@ -45,12 +45,20 @@ elara_add_unit_tests(io
   LIBRARIES elara::io miniz::miniz)
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
+elara_add_unit_tests(notation
+  SOURCES notation/test_smufl.cpp notation/test_staff_layout.cpp
+  LIBRARIES elara::notation)
+target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
+
 add_subdirectory(cli)
 
 # Benchmarks: built on demand (`python scripts/elara.py bench`, release preset),
 # never part of CTest or the gate.
-add_executable(elara_benchmarks EXCLUDE_FROM_ALL bench/bench_core.cpp bench/bench_io.cpp)
-target_link_libraries(elara_benchmarks PRIVATE elara::core elara::io Catch2::Catch2WithMain)
+add_executable(elara_benchmarks EXCLUDE_FROM_ALL bench/bench_core.cpp bench/bench_io.cpp
+  bench/bench_notation.cpp)
+target_link_libraries(elara_benchmarks PRIVATE elara::core elara::io elara::notation
+  Catch2::Catch2WithMain)
+target_compile_definitions(elara_benchmarks PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 elara_target_warnings(elara_benchmarks)
 
 if(TARGET elara)

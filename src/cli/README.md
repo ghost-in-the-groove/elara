@@ -22,6 +22,8 @@ elara-cli [--json] dump <FILE>                    # with --json: the whole model
 elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gpx, .gp5, .gp4, .gp3
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
+elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
+elara-cli [--json] render <FILE> [--track 0] [--staff 0] [--first 0] [--count N] [--svg OUT]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -40,6 +42,20 @@ ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes
 MusicXML (compressed for `.mxl`) or MIDI and prints `{"file", "out", "format",
 "compressed", "bytes", "warnings"}`, where `warnings` lists what the format
 could not hold (ADR-0008, ADR-0009).
+
+`font` shows what the notation engine reads from the SMuFL font (ADR-0011),
+by default `fonts/Bravura.json` next to `elara-cli`: `--json` prints `{"name",
+"version", "metadata", "glyphs", "described", "missing", "defaults"}`, and
+with `--glyph noteheadBlack` one glyph's `{"glyph", "codepoint", "bbox",
+"advanceWidth", "anchors"}` in staff spaces, y up.
+
+`render` lays out one staff of a `.elara` file or of any file `import` reads,
+as the notation engine does (ADR-0012), from measure `--first` (0-based) for
+`--count` measures. `--json` prints `{"file", "track", "staff", "first",
+"count", "svg", "width", "top", "bottom", "counts", "measures", "glyphs",
+"lines", "beams"}`: lengths in staff spaces, y down from the top staff line,
+`counts` per role (noteheads, stems, accidentals...). `--svg OUT` also writes
+the staff as SVG, loading the music font from `fonts/` next to `elara-cli`.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
