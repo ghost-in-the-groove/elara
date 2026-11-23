@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Render subcommand: one staff in standard notation, tablature or both, as the
-// notation engine lays it out (ADR-0012), printed as a display list or written
-// as SVG.
+// Render subcommand: staves in standard notation, tablature or both, as the
+// notation engine lays them out on one line (ADR-0012) or on pages (ADR-0014),
+// printed as display lists or written as SVG.
 #include <elara/notation/display_list.hpp>
+#include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
@@ -11,7 +12,9 @@
 #include <CLI/CLI.hpp>
 
 #include <array>
+#include <charconv>
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -35,9 +38,17 @@ struct RenderOptions {
     std::string file;
     std::size_t track = 0;
     std::size_t staff = 0;
+    std::vector<std::string> tracks; // "all" or indices: every staff of these tracks
     std::size_t first = 0;
     std::size_t count = notation::kAllMeasures;
     std::string view = "standard";
+    std::string layout = "line";
+    std::string paper = "a4";
+    double staffSpace = 1.75; // mm
+    double margin = 15.0;     // mm
+    double width = 0.0;       // staff spaces, for the scroll layout; 0: the paper's
+    std::size_t measuresPerSystem = 0;
+    bool noCredits = false;
     std::string svg;
     std::string metadata;
 };
@@ -87,19 +98,29 @@ std::string displayListJson(const notation::DisplayList& list) {
         json += std::format(R"({}"{}":{})", r == 0 ? "" : ",", roleName(static_cast<Role>(r)),
                             counts[r]);
     }
-    json += R"(},"staves":[)";
+    json += R"(},"systems":[)";
+    for (std::size_t i = 0; i < list.systems.size(); ++i) {
+        const auto& box = list.systems[i];
+        json += std::format(
+            R"({}{{"firstMeasure":{},"measureCount":{},"x":{},"y":{},"width":{},"height":{},"top":{},"bottom":{}}})",
+            i == 0 ? "" : ",", box.firstMeasure, box.measureCount, jsonNumber(box.x),
+            jsonNumber(box.y), jsonNumber(box.width), jsonNumber(box.height), jsonNumber(box.top),
+            jsonNumber(box.bottom));
+    }
+    json += R"(],"staves":[)";
     for (std::size_t i = 0; i < list.staves.size(); ++i) {
         const auto& box = list.staves[i];
-        json +=
-            std::format(R"({}{{"track":{},"staff":{},"view":"{}","y":{},"height":{},"lines":{}}})",
-                        i == 0 ? "" : ",", box.track, box.staff, viewName(box.view),
-                        jsonNumber(box.y), jsonNumber(box.height), box.lines);
+        json += std::format(
+            R"({}{{"track":{},"staff":{},"view":"{}","x":{},"y":{},"width":{},"height":{},"lines":{}}})",
+            i == 0 ? "" : ",", box.track, box.staff, viewName(box.view), jsonNumber(box.x),
+            jsonNumber(box.y), jsonNumber(box.width), jsonNumber(box.height), box.lines);
     }
     json += R"(],"measures":[)";
     for (std::size_t i = 0; i < list.measures.size(); ++i) {
         const auto& box = list.measures[i];
-        json += std::format(R"({}{{"index":{},"x":{},"width":{}}})", i == 0 ? "" : ",", box.index,
-                            jsonNumber(box.x), jsonNumber(box.width));
+        json += std::format(R"({}{{"index":{},"x":{},"width":{},"y":{},"height":{}}})",
+                            i == 0 ? "" : ",", box.index, jsonNumber(box.x), jsonNumber(box.width),
+                            jsonNumber(box.y), jsonNumber(box.height));
     }
     json += R"(],"glyphs":[)";
     for (std::size_t i = 0; i < list.glyphs.size(); ++i) {
@@ -168,19 +189,114 @@ std::string fontUrl(const std::filesystem::path& font, const std::filesystem::pa
     return utf8(relative.generic_u8string());
 }
 
+// "score.svg" for page 2 of several: "score-2.svg".
+std::filesystem::path pagePath(const std::filesystem::path& svg, std::size_t page,
+                               std::size_t pages) {
+    if (pages <= 1 && page == 0) {
+        return svg;
+    }
+    std::filesystem::path path = svg;
+    path.replace_filename(utf8(svg.stem().generic_u8string()) + "-" + std::to_string(page + 1) +
+                          utf8(svg.extension().generic_u8string()));
+    return path;
+}
+
+// The staves to lay out, or a usage error.
+std::expected<std::vector<notation::StaffSelection>, std::string>
+selectStaves(const core::Song& song, const RenderOptions& options) {
+    const bool standard = options.view != "tab";
+    const bool tablature = options.view != "standard";
+    std::vector<notation::StaffSelection> selection;
+    if (options.tracks.empty()) {
+        if (options.track >= song.trackCount()) {
+            return std::unexpected(
+                std::format("no track {}: the song has {}", options.track, song.trackCount()));
+        }
+        const std::size_t staves = song.track(options.track).staffCount();
+        if (options.staff >= staves) {
+            return std::unexpected(
+                std::format("no staff {}: track {} has {}", options.staff, options.track, staves));
+        }
+        if (tablature && !song.track(options.track).staff(options.staff).isFretted()) {
+            return std::unexpected(std::format("staff {} of track {} has no tuning: no tablature",
+                                               options.staff, options.track));
+        }
+        if (standard) {
+            selection.push_back({.track = options.track,
+                                 .staff = options.staff,
+                                 .view = notation::StaffView::Standard});
+        }
+        if (tablature) {
+            selection.push_back({.track = options.track,
+                                 .staff = options.staff,
+                                 .view = notation::StaffView::Tablature});
+        }
+        return selection;
+    }
+    // Whole tracks: tablature where the staff has a tuning, notation otherwise.
+    std::vector<std::size_t> tracks;
+    for (const std::string& text : options.tracks) {
+        if (text == "all") {
+            for (std::size_t t = 0; t < song.trackCount(); ++t) {
+                tracks.push_back(t);
+            }
+            continue;
+        }
+        std::size_t index = 0;
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), index);
+        if (error != std::errc{} || end != text.data() + text.size()) {
+            return std::unexpected(std::format("--tracks: not a track index: {}", text));
+        }
+        if (index >= song.trackCount()) {
+            return std::unexpected(
+                std::format("no track {}: the song has {}", index, song.trackCount()));
+        }
+        tracks.push_back(index);
+    }
+    for (const std::size_t t : tracks) {
+        for (std::size_t s = 0; s < song.track(t).staffCount(); ++s) {
+            const bool fretted = song.track(t).staff(s).isFretted();
+            if (standard || !fretted) {
+                selection.push_back(
+                    {.track = t, .staff = s, .view = notation::StaffView::Standard});
+            }
+            if (tablature && fretted) {
+                selection.push_back(
+                    {.track = t, .staff = s, .view = notation::StaffView::Tablature});
+            }
+        }
+    }
+    return selection;
+}
+
+notation::PageLayoutOptions pageLayoutOptions(const RenderOptions& options) {
+    notation::PageLayoutOptions page =
+        notation::pageOptions(options.paper == "letter" ? notation::kLetter : notation::kA4,
+                              options.staffSpace, options.margin);
+    page.firstMeasure = options.first;
+    page.measureCount = options.count;
+    page.measuresPerSystem = options.measuresPerSystem;
+    page.credits = !options.noCredits;
+    if (options.layout == "scroll") {
+        page.height = 0.0;
+        if (options.width > 0.0) {
+            page.width = options.width;
+        }
+    }
+    return page;
+}
+
 int runRender(bool json, const RenderOptions& options) {
     const auto song = openSong(options.file);
     if (!song) {
         return fail(std::format("{}: {}", options.file, song.error()));
     }
-    if (options.track >= song->trackCount()) {
-        return usageError(
-            std::format("no track {}: the song has {}", options.track, song->trackCount()));
+    const auto selection = selectStaves(*song, options);
+    if (!selection) {
+        return usageError(selection.error());
     }
-    const std::size_t staves = song->track(options.track).staffCount();
-    if (options.staff >= staves) {
-        return usageError(
-            std::format("no staff {}: track {} has {}", options.staff, options.track, staves));
+    if (selection->empty()) {
+        return usageError("no staves to render");
     }
     if (options.first >= song->measureCount()) {
         return usageError(
@@ -188,63 +304,128 @@ int runRender(bool json, const RenderOptions& options) {
     }
     const std::filesystem::path metadata =
         options.metadata.empty() ? defaultFontMetadata() : std::filesystem::path(options.metadata);
-    const bool tablature = options.view != "standard";
-    if (tablature && !song->track(options.track).staff(options.staff).isFretted()) {
-        return usageError(std::format("staff {} of track {} has no tuning: no tablature",
-                                      options.staff, options.track));
-    }
     const auto font = notation::EngravingFont::fromMetadataFile(metadata);
     if (!font) {
         return fail(font.error().message);
     }
-    std::vector<notation::StaffSelection> selection;
-    if (options.view != "tab") {
-        selection.push_back({.track = options.track,
-                             .staff = options.staff,
-                             .view = notation::StaffView::Standard});
+    const bool paged = options.layout != "line";
+    std::vector<notation::DisplayList> pages;
+    if (paged) {
+        const notation::PageLayoutOptions page = pageLayoutOptions(options);
+        if (page.width <= 2 * page.margin) {
+            return usageError("the margins leave no room on the page");
+        }
+        pages = notation::layoutPages(*song, *selection, *font, page);
+    } else {
+        pages.push_back(
+            notation::layoutSystem(*song, *selection, *font,
+                                   {.firstMeasure = options.first, .measureCount = options.count}));
     }
-    if (tablature) {
-        selection.push_back({.track = options.track,
-                             .staff = options.staff,
-                             .view = notation::StaffView::Tablature});
-    }
-    const notation::DisplayList list = notation::layoutSystem(
-        *song, selection, *font, {.firstMeasure = options.first, .measureCount = options.count});
+    std::vector<std::string> written;
     if (!options.svg.empty()) {
-        const std::filesystem::path out(options.svg);
         std::filesystem::path otf = metadata;
         otf.replace_extension(".otf");
-        std::ofstream file(out, std::ios::binary);
-        file << notation::toSvg(list, {.fontFamily = font->name(), .fontUrl = fontUrl(otf, out)});
-        if (!file) {
-            return fail(std::format("cannot write {}", options.svg));
+        for (std::size_t p = 0; p < pages.size(); ++p) {
+            const std::filesystem::path out = options.layout == "page"
+                                                  ? pagePath(options.svg, p, pages.size())
+                                                  : std::filesystem::path(options.svg);
+            notation::SvgOptions svg;
+            svg.fontFamily = font->name();
+            svg.fontUrl = fontUrl(otf, out);
+            if (paged) {
+                svg.margin = 0.0; // the page has its own
+            }
+            std::ofstream file(out, std::ios::binary);
+            file << notation::toSvg(pages[p], svg);
+            if (!file) {
+                return fail(std::format("cannot write {}", utf8(out.generic_u8string())));
+            }
+            written.push_back(utf8(out.generic_u8string()));
         }
     }
-    const std::size_t shown = list.measures.size();
+    std::size_t shown = 0;
+    std::size_t systems = 0;
+    for (const notation::DisplayList& page : pages) {
+        shown += page.measures.size();
+        systems += page.systems.size();
+    }
+    std::string staves;
+    if (options.tracks.empty()) {
+        staves = std::format(R"("track":{},"staff":{})", options.track, options.staff);
+    } else {
+        staves = R"("tracks":[)";
+        std::size_t previous = notation::kAllMeasures;
+        bool firstTrack = true;
+        for (const notation::StaffSelection& each : *selection) {
+            if (each.track != previous) {
+                staves += std::format("{}{}", firstTrack ? "" : ",", each.track);
+                previous = each.track;
+                firstTrack = false;
+            }
+        }
+        staves += ']';
+    }
     if (json) {
-        const std::string svg =
-            options.svg.empty() ? "null" : std::format("\"{}\"", jsonEscape(options.svg));
+        std::string svg = "null";
+        if (!written.empty()) {
+            if (options.layout == "page") {
+                svg = "[";
+                for (std::size_t i = 0; i < written.size(); ++i) {
+                    svg += std::format(R"({}"{}")", i == 0 ? "" : ",", jsonEscape(written[i]));
+                }
+                svg += ']';
+            } else {
+                svg = std::format("\"{}\"", jsonEscape(options.svg));
+            }
+        }
+        std::string body;
+        if (paged) {
+            body = R"("pages":[)";
+            for (std::size_t p = 0; p < pages.size(); ++p) {
+                body += std::format("{}{{{}}}", p == 0 ? "" : ",", displayListJson(pages[p]));
+            }
+            body += ']';
+        } else {
+            body = displayListJson(pages.front());
+        }
         std::cout
             << std::format(
-                   R"({{"file":"{}","track":{},"staff":{},"first":{},"count":{},"svg":{},"view":"{}",{}}})",
-                   jsonEscape(options.file), options.track, options.staff, options.first, shown,
-                   svg, options.view, displayListJson(list))
+                   R"({{"file":"{}",{},"first":{},"count":{},"svg":{},"view":"{}","layout":"{}",{}}})",
+                   jsonEscape(options.file), staves, options.first, shown, svg, options.view,
+                   options.layout, body)
             << '\n';
         return kExitOk;
     }
-    std::cout << std::format("{}: track {}, staff {} ({}), measures {} to {} of {}: {} x {} "
-                             "staff spaces\n",
-                             options.file, options.track, options.staff, options.view,
-                             options.first, options.first + shown - 1, song->measureCount(),
-                             jsonNumber(list.width), jsonNumber(list.bottom - list.top));
-    const auto counts = countRoles(list);
+    const std::string what = options.tracks.empty()
+                                 ? std::format("track {}, staff {}", options.track, options.staff)
+                                 : std::format("{} staves", selection->size());
+    if (paged) {
+        std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} {} on {} {}\n",
+                                 options.file, what, options.view, options.first,
+                                 options.first + shown - 1, song->measureCount(), systems,
+                                 systems == 1 ? "system" : "systems", pages.size(),
+                                 pages.size() == 1 ? "page" : "pages");
+    } else {
+        const notation::DisplayList& list = pages.front();
+        std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} x {} staff spaces\n",
+                                 options.file, what, options.view, options.first,
+                                 options.first + shown - 1, song->measureCount(),
+                                 jsonNumber(list.width), jsonNumber(list.bottom - list.top));
+    }
+    std::array<std::size_t, kRoleCount> counts{};
+    for (const notation::DisplayList& page : pages) {
+        const auto pageCounts = countRoles(page);
+        for (std::size_t r = 0; r < kRoleCount; ++r) {
+            counts[r] += pageCounts[r];
+        }
+    }
     for (std::size_t r = 0; r < kRoleCount; ++r) {
         if (counts[r] > 0) {
             std::cout << std::format("  {} {}\n", roleName(static_cast<Role>(r)), counts[r]);
         }
     }
-    if (!options.svg.empty()) {
-        std::cout << std::format("saved {}\n", options.svg);
+    for (const std::string& file : written) {
+        std::cout << std::format("saved {}\n", file);
     }
     return kExitOk;
 }
@@ -254,13 +435,20 @@ int runRender(bool json, const RenderOptions& options) {
 void addRenderCommands(CLI::App& app, Context& context) {
     auto options = std::make_shared<RenderOptions>();
     auto* render = app.add_subcommand(
-        "render", "Lay out one staff of a song in standard notation, tablature or both: print "
-                  "the display list (glyphs, lines, beams, text and curves in staff spaces) or "
-                  "write it as SVG");
+        "render", "Lay out staves of a song in standard notation, tablature or both, on one line "
+                  "or on pages: print the display list (glyphs, lines, beams, text and curves in "
+                  "staff spaces) or write it as SVG");
     render->add_option("file", options->file, "A .elara file or any file import reads")->required();
-    render->add_option("--track", options->track, "Track index (0 = first)")->capture_default_str();
-    render->add_option("--staff", options->staff, "Staff index in the track")
-        ->capture_default_str();
+    auto* track = render->add_option("--track", options->track, "Track index (0 = first)")
+                      ->capture_default_str();
+    auto* staff = render->add_option("--staff", options->staff, "Staff index in the track")
+                      ->capture_default_str();
+    render
+        ->add_option("--tracks", options->tracks,
+                     "Whole tracks instead of one staff: indices (0,2) or all")
+        ->delimiter(',')
+        ->excludes(track)
+        ->excludes(staff);
     render->add_option("--first", options->first, "First measure index")->capture_default_str();
     render->add_option("--count", options->count, "Number of measures (default: to the end)");
     render
@@ -268,7 +456,32 @@ void addRenderCommands(CLI::App& app, Context& context) {
                      "standard, tab (tablature of a fretted staff) or both, notation above tab")
         ->check(CLI::IsMember({"standard", "tab", "both"}))
         ->capture_default_str();
-    render->add_option("--svg", options->svg, "Also write the staff as an SVG file");
+    render
+        ->add_option("--layout", options->layout,
+                     "line (one line, natural spacing), page (systems on pages) or scroll (systems "
+                     "on one endless page)")
+        ->check(CLI::IsMember({"line", "page", "scroll"}))
+        ->capture_default_str();
+    render->add_option("--paper", options->paper, "Page size: a4 or letter")
+        ->check(CLI::IsMember({"a4", "letter"}))
+        ->capture_default_str();
+    render->add_option("--staff-space", options->staffSpace, "Staff space in mm")
+        ->check(CLI::Range(0.5, 10.0))
+        ->capture_default_str();
+    render->add_option("--margin", options->margin, "Page margins in mm")
+        ->check(CLI::Range(0.0, 100.0))
+        ->capture_default_str();
+    render
+        ->add_option("--width", options->width,
+                     "Width of the scroll layout in staff spaces (default: the paper's)")
+        ->check(CLI::PositiveNumber);
+    render->add_option("--measures-per-system", options->measuresPerSystem,
+                       "Measures in every system (default: as many as space evenly)");
+    render->add_flag("--no-credits", options->noCredits,
+                     "Leave out the title, credits and page numbers");
+    render->add_option("--svg", options->svg,
+                       "Also write SVG; with --layout page and several pages, one file per page "
+                       "(name-1.svg, ...)");
     render->add_option("--metadata", options->metadata,
                        "SMuFL metadata file (default: fonts/Bravura.json next to elara-cli)");
     render->callback([&context, options] { context.exitCode = runRender(context.json, *options); });

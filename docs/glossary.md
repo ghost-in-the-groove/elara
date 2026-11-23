@@ -11,7 +11,12 @@ base speaks one vocabulary. American terms follow MusicXML.
 | instrumento | instrument | `Instrument`, `InstrumentPreset` | Kind, GM program, written offset |
 | pentagrama | staff | `Staff` | Plural `staves` |
 | tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004); `StaffView::Tablature` in layout |
-| sistema | system | `layoutSystem()` | Staves laid out together, notes that start together aligned (ADR-0013) |
+| sistema | system | `layoutSystem()`, `SystemBox` | Staves laid out together, notes that start together aligned (ADR-0013); a line of a page (ADR-0014) |
+| página | page | `layoutPages()`, `PageLayoutOptions` | Systems stacked between margins, with the title on the first (ADR-0014) |
+| salto de línea | line break | `LineBreaker` | Where one system ends and the next starts, chosen to space the systems evenly (ADR-0014) |
+| justificar | justify | stretch | Stretch or tighten a system's spacing so that it fills the width (ADR-0014) |
+| muelle | spring | `Spring` | The space after a column of notes: an ideal length and the least its ink needs (ADR-0014) |
+| créditos | credits | `Role::Credit` | Title, subtitle, artist, words and music by, copyright and page numbers |
 | lista de visualización | display list | `DisplayList` | What layout produces: glyphs, lines, beams, text and curves in staff spaces (ADR-0012) |
 | carril de técnicas | technique lane | `Lane` | Band above a staff for palm mute, let ring, vibrato... (ADR-0013) |
 | clave | clef | `Clef` | |

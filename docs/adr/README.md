@@ -19,6 +19,7 @@ one that replaces them.
 | [0011](0011-notation-engine.md) | Notation engine | Accepted |
 | [0012](0012-staff-layout.md) | Staff layout and the display list | Accepted |
 | [0013](0013-tablature-and-systems.md) | Tablature layout and staves aligned in systems | Accepted |
+| [0014](0014-line-breaking-and-pages.md) | Line breaking, justification and pages | Accepted |
 
 ## Template
 

@@ -9,6 +9,7 @@
 #include <elara/core/signature.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/smufl.hpp>
+#include <elara/notation/staff_layout.hpp>
 
 #include <algorithm>
 #include <array>
@@ -35,6 +36,11 @@ inline constexpr double kMinNoteGap = 0.4;   // between the ink of neighbouring 
 inline constexpr double kEndGap = 1.0;       // after the last note, before the barline
 inline constexpr double kQuarterSpace = 3.0; // ideal distance after a quarter note
 inline constexpr double kEpsilon = 1e-9;
+
+// Text extents as layout assumes them: ascenders (and parentheses) reach
+// 0.75 em above the baseline, descenders 0.21 em below.
+inline constexpr double kTextAscent = 0.75;
+inline constexpr double kTextDescent = 0.21;
 
 /// Ideal distance after a note that lasts `length` whole notes: each doubling of
 /// the length multiplies the space by the square root of two.
@@ -81,10 +87,10 @@ struct Extents {
 /// `staffHeight` high.
 void measureExtents(DisplayList& list, const EngravingFont& font, double staffHeight);
 
-/// Moves every item of `list` down by `dy`.
-void shift(DisplayList& list, double dy);
+/// Moves every item and box of `list` right by `dx` and down by `dy`.
+void shift(DisplayList& list, double dx, double dy);
 
-/// Appends the items of `from` to `to`.
+/// Appends the items and boxes of `from` to `to`.
 void append(DisplayList& to, DisplayList&& from);
 
 // ---- Technique lanes ----------------------------------------------------------------
@@ -202,12 +208,18 @@ public:
     /// returns its right.
     double barline(std::size_t m, double x, bool songEnd);
 
-    /// Staff lines over `width`, the marks still open, the ink extents.
+    /// Staff lines over `width`, the marks still open, the ink extents. Ends the
+    /// line: the writer can start another with header().
     DisplayList finish(double width);
 
+    /// Forgets what was drawn, keeping the buffers: measuring calls header(),
+    /// changes(), collect() and barline() for their widths only.
+    void clearItems();
+
 protected:
-    /// Draws what waits for the end of the line (technique lanes, open runs).
-    virtual void close() {}
+    /// Draws what waits for the end of the line ending at `width` (technique
+    /// lanes, ties into the next line).
+    virtual void close(double /*width*/) {}
 
     // Inline: layout draws tens of thousands of glyphs and lines.
     void glyph(Glyph which, double x, double y, Role role) {
@@ -271,5 +283,83 @@ private:
 [[nodiscard]] std::unique_ptr<StaffWriter> makeTabWriter(const core::Song& song, std::size_t track,
                                                          std::size_t staff,
                                                          const EngravingFont& font, bool rests);
+
+// ---- Lines of music --------------------------------------------------------------------
+
+/// The writers of the selected staves, top to bottom. Throws
+/// std::invalid_argument for no staves or tablature of a staff without tuning,
+/// std::out_of_range for a missing track or staff.
+[[nodiscard]] std::vector<std::unique_ptr<StaffWriter>>
+makeWriters(const core::Song& song, std::span<const StaffSelection> staves,
+            const EngravingFont& font);
+
+/// Systems tighten their spacing at most this share of the ideal spaces.
+inline constexpr double kMaxShrink = 0.2;
+
+/// A space between columns: `ideal` for the rhythm, at least `ink` for the
+/// notes on either side.
+struct Spring {
+    double ideal = 0.0;
+    double ink = 0.0;
+};
+
+/// The spring's length at `stretch`: from 0 (natural: the ideal space unless
+/// the ink needs more) up, ideal spaces grow by `stretch` of themselves; down
+/// to -kMaxShrink they shrink, never below the ink.
+[[nodiscard]] inline double springLength(const Spring& spring, double stretch) {
+    return stretch >= 0.0 ? std::max(spring.ideal, spring.ink) + stretch * spring.ideal
+                          : std::max(spring.ideal * (1.0 + stretch), spring.ink);
+}
+
+/// How wide a measure is at any stretch, and what goes before and after it.
+struct MeasureWidth {
+    double header = 0.0;         // clef and signatures, when a system starts with it
+    double changes = 0.0;        // signature changes after the barline before it, otherwise
+    double lead = 0.0;           // after the gap at its start, before the first column
+    double tail = 0.0;           // after the last spring, before the barline
+    std::vector<Spring> springs; // after each column, the last one up to the barline
+    double barline = 0.0;        // the barline closing it
+
+    /// From the end of the gap at its start to its barline.
+    [[nodiscard]] double width(double stretch) const {
+        double total = lead + tail;
+        for (const Spring& spring : springs) {
+            total += springLength(spring, stretch);
+        }
+        return total;
+    }
+
+    /// The sum of its ideal spaces: how much it grows per unit of stretch.
+    [[nodiscard]] double ideal() const {
+        double total = 0.0;
+        for (const Spring& spring : springs) {
+            total += spring.ideal;
+        }
+        return total;
+    }
+};
+
+/// The widths of measures [first, last) of the selected staves, on up to
+/// `threads` threads.
+[[nodiscard]] std::vector<MeasureWidth> measureWidths(const core::Song& song,
+                                                      std::span<const StaffSelection> staves,
+                                                      const EngravingFont& font, std::size_t first,
+                                                      std::size_t last, unsigned threads);
+
+/// How a system is drawn besides its measures.
+struct LineOptions {
+    double stretch = 0.0;  ///< 0: natural spacing
+    bool numbered = false; ///< the number of its first measure above it
+    bool named = false;    ///< track names left of the staves (see nameIndent())
+};
+
+/// Room for the names of the tracks left of the first system's staves: 0 for
+/// staves of a single track.
+[[nodiscard]] double nameIndent(const core::Song& song, std::span<const StaffSelection> staves);
+
+/// Lays out measures [first, last) of the selected staves as one system.
+[[nodiscard]] DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> staves,
+                                     const EngravingFont& font, std::size_t first, std::size_t last,
+                                     const LineOptions& options);
 
 } // namespace elara::notation::detail

@@ -231,10 +231,16 @@ TEST_CASE("Tablature layout: notation and tablature line up", "[notation][tab]")
     // Shared barlines, measures and a rest only in the notation.
     std::vector<double> notationBars;
     std::vector<double> tabBars;
+    std::size_t joins = 0;
     for (const LineItem& line : byRole(list.lines, Role::Barline)) {
+        if (line.from.y < tabY - kEpsilon && line.to.y > tabY + kEpsilon) {
+            ++joins; // the line joining the staves at the start of the system
+            continue;
+        }
         (line.from.y < tabY - kEpsilon ? notationBars : tabBars).push_back(line.from.x);
     }
     CHECK(notationBars == tabBars);
+    CHECK(joins == 1);
     CHECK(list.measures.size() == 2);
     for (const GlyphItem& item : byRole(list.glyphs, Role::Rest)) {
         CHECK(item.origin.y < tabY);

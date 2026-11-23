@@ -338,12 +338,12 @@ set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_tab
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view tab)
 set_tests_properties(cli.render_tab PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,.*\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"y\":0,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
+  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,.*\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
 
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2},\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"y\":0,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"y\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -359,6 +359,37 @@ set_tests_properties(cli.render_tab_svg_content PROPERTIES FIXTURES_REQUIRED cli
 add_test(NAME cli.render_rejects_tab_without_tuning
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --view tab)
 set_tests_properties(cli.render_rejects_tab_without_tuning PROPERTIES WILL_FAIL TRUE)
+
+# Systems on pages (ADR-0014): page size from the paper and the staff space,
+# whole tracks, one SVG per page.
+add_test(NAME cli.render_page
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
+          --layout page --paper letter --staff-space 2)
+set_tests_properties(cli.render_page PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"view\":\"both\",\"layout\":\"page\",\"pages\":\\[{\"width\":107\\.95,\"top\":0,\"bottom\":139\\.7,.*\"credit\":[1-9].*\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":7\\.5,")
+
+add_test(NAME cli.render_scroll
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout scroll
+          --width 40 --no-credits)
+set_tests_properties(cli.render_scroll PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"scroll\",\"pages\":\\[{\"width\":40,\"top\":0,.*\"measureNumber\":[1-9][0-9]*,\"credit\":0,.*\"systems\":\\[{\"firstMeasure\":0,.*{\"firstMeasure\":[1-9]")
+
+add_test(NAME cli.render_tracks_pages
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks all --layout page
+          --staff-space 6 --svg "${CMAKE_CURRENT_BINARY_DIR}/band-pages.svg")
+set_tests_properties(cli.render_tracks_pages PROPERTIES FIXTURES_SETUP cli_rendered_pages
+  PASS_REGULAR_EXPRESSION "5 staves \\(standard\\), measures 0 to 1 of 2: 2 systems on 2 pages.*trackName 4.*saved .*band-pages-1\\.svg.*saved .*band-pages-2\\.svg")
+add_test(NAME cli.render_tracks_pages_content
+  COMMAND ${CMAKE_COMMAND} -E cat "${CMAKE_CURRENT_BINARY_DIR}/band-pages-1.svg")
+set_tests_properties(cli.render_tracks_pages_content PROPERTIES FIXTURES_REQUIRED cli_rendered_pages
+  PASS_REGULAR_EXPRESSION "viewBox=\"0 0 35 49\\.5\".*<text class=\"t credit\"[^>]*>Corpus Band</text>.*<text class=\"t trackName\"")
+
+add_test(NAME cli.render_rejects_tracks_with_track
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks 0 --track 1)
+set_tests_properties(cli.render_rejects_tracks_with_track PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.render_rejects_bad_tracks
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks 9)
+set_tests_properties(cli.render_rejects_bad_tracks PROPERTIES WILL_FAIL TRUE)
 
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an

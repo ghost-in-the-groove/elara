@@ -56,6 +56,12 @@ sixth string of a guitar sounds F#2.
 | `performance.hpp` | `soundingNotes(song)`: every note as it sounds (start and length in whole notes from the start of the song, ties joined, velocity from the dynamic), ordered by time; what MIDI export writes and playback will build on (ADR-0009). |
 | `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()` and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
 
+## Utilities
+
+| Header | What it gives you |
+|---|---|
+| `parallel.hpp` | `forEachIndex()`: independent jobs on several threads (or the calling one), exceptions rethrown in order; `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export and notation layout. |
+
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
 staves at once, and `addTrack` gives a new track as many measures as the song.
 Each `MeasureHeader` holds the time signature, the concert key and the tempo

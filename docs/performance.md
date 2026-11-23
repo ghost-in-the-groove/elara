@@ -78,6 +78,9 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | lay out its notation and tablature together | 5.2 ms | the two staves cost about what they cost apart: the shared spacing pass is cheap |
 | 2026-11-23 | lay out 8 measures of notation and tablature | 81 µs | |
 | 2026-11-23 | write notation and tablature of the staff as SVG (46k elements) | 43 ms | text and knockout rectangles for every fret number |
+| 2026-11-23 | lay out notation and tablature of the 500-measure staff on A4 pages (125 systems, 21 pages) | 3.4 to 3.6 ms | first version (ADR-0014): every measure measured, line breaks by dynamic programming, systems justified and laid out on every core. One thread: 9.4 ms, so measuring costs about as much as the layout itself |
+| 2026-11-23 | lay out all 20 staves of the large song on A4 pages | 21 ms | one thread: 132 ms (the 20 staves on one line: 84 to 90 ms); 6x faster on every core, the same pages on any number of threads |
+| 2026-11-23 | lay out one 500-measure staff, notation and tablature, 8 measures of each | 3.8 ms, 1.3 ms, 5.8 ms, 74 µs, 83 µs | the same layout with springs (ADR-0014); within run-to-run noise of the rows above |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as

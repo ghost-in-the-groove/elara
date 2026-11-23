@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Benchmarks for elara_notation: laying out staves and writing them as SVG.
+#include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
@@ -14,8 +15,10 @@
 #include <filesystem>
 #include <span>
 #include <utility>
+#include <vector>
 
 using elara::notation::EngravingFont;
+using elara::notation::layoutPages;
 using elara::notation::layoutStaff;
 using elara::notation::layoutSystem;
 using elara::notation::StaffSelection;
@@ -81,5 +84,33 @@ TEST_CASE("Notation benchmarks", "[!benchmark][notation]") {
     };
     BENCHMARK("write notation and tablature of the staff as SVG") {
         return elara::notation::toSvg(system);
+    };
+
+    // Pages (ADR-0014): line breaking and justification on top of the layout.
+    elara::notation::PageLayoutOptions pages;
+    const auto paged = layoutPages(song, both, font, pages);
+    std::size_t systems = 0;
+    for (const auto& page : paged) {
+        systems += page.systems.size();
+    }
+    std::printf("notation and tablature on A4: %zu systems on %zu pages\n", systems, paged.size());
+    BENCHMARK("lay out notation and tablature of one track on A4 pages") {
+        return layoutPages(song, both, font, pages);
+    };
+    pages.threads = 1;
+    BENCHMARK("the same on one thread") {
+        return layoutPages(song, both, font, pages);
+    };
+    std::vector<StaffSelection> score;
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        score.push_back({.track = t});
+    }
+    pages.threads = 0;
+    BENCHMARK("lay out all 20 staves of the large song on A4 pages") {
+        return layoutPages(song, score, font, pages);
+    };
+    pages.threads = 1;
+    BENCHMARK("the same on one thread ") {
+        return layoutPages(song, score, font, pages);
     };
 }

@@ -24,11 +24,6 @@ constexpr double kRunLineGap = 0.25;   // between the text and its line
 constexpr double kVibratoLift = 0.25;  // vibrato strokes above the bottom of their lane
 constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3};
 
-// Text extents as layout assumes them: ascenders (and parentheses) reach
-// 0.75 em above the baseline, descenders 0.21 em below.
-constexpr double kAscent = 0.75;
-constexpr double kDescent = 0.21;
-
 } // namespace
 
 double idealSpace(const core::Fraction& length) {
@@ -70,8 +65,8 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
         cover(item.right.y + item.thickness / 2);
     }
     for (const TextItem& item : list.texts) {
-        cover(item.origin.y - kAscent * item.size);
-        cover(item.origin.y + kDescent * item.size);
+        cover(item.origin.y - kTextAscent * item.size);
+        cover(item.origin.y + kTextDescent * item.size);
     }
     for (const CurveItem& item : list.curves) {
         // A Bézier curve stays inside the hull of its control points.
@@ -93,37 +88,52 @@ void measureExtents(DisplayList& list, const EngravingFont& font, double staffHe
     list.bottom = extents.bottom;
 }
 
-void shift(DisplayList& list, double dy) {
-    if (dy == 0.0) {
+void shift(DisplayList& list, double dx, double dy) {
+    if (dx == 0.0 && dy == 0.0) {
         return;
     }
+    const auto move = [dx, dy](Point& point) {
+        point.x += dx;
+        point.y += dy;
+    };
     for (GlyphItem& item : list.glyphs) {
-        item.origin.y += dy;
+        move(item.origin);
     }
     for (LineItem& item : list.lines) {
-        item.from.y += dy;
-        item.to.y += dy;
+        move(item.from);
+        move(item.to);
     }
     for (BeamItem& item : list.beams) {
-        item.left.y += dy;
-        item.right.y += dy;
+        move(item.left);
+        move(item.right);
     }
     for (TextItem& item : list.texts) {
-        item.origin.y += dy;
+        move(item.origin);
     }
     for (CurveItem& item : list.curves) {
-        item.from.y += dy;
-        item.control1.y += dy;
-        item.control2.y += dy;
-        item.to.y += dy;
+        move(item.from);
+        move(item.control1);
+        move(item.control2);
+        move(item.to);
     }
     for (PolygonItem& item : list.polygons) {
         for (Point& point : item.points) {
-            point.y += dy;
+            move(point);
         }
     }
+    for (SystemBox& system : list.systems) {
+        system.x += dx;
+        system.y += dy;
+        system.top += dy;
+        system.bottom += dy;
+    }
     for (StaffBox& staff : list.staves) {
+        staff.x += dx;
         staff.y += dy;
+    }
+    for (MeasureBox& measure : list.measures) {
+        measure.x += dx;
+        measure.y += dy;
     }
     list.top += dy;
     list.bottom += dy;
@@ -138,7 +148,9 @@ void append(DisplayList& to, DisplayList&& from) {
         into.insert(into.end(), std::make_move_iterator(items.begin()),
                     std::make_move_iterator(items.end()));
     };
+    move(to.systems, from.systems);
     move(to.staves, from.staves);
+    move(to.measures, from.measures);
     move(to.glyphs, from.glyphs);
     move(to.lines, from.lines);
     move(to.beams, from.beams);
@@ -320,7 +332,7 @@ void TechniqueLanes::place(DisplayList& list, double top) {
             continue;
         }
         bottom_[lane] = base;
-        shift(items_[lane], base);
+        shift(items_[lane], 0.0, base);
         append(list, std::move(items_[lane]));
         items_[lane] = DisplayList{};
         base -= kLaneHeight[lane];
@@ -348,7 +360,7 @@ double StaffWriter::barline(std::size_t m, double x, bool songEnd) {
 
 DisplayList StaffWriter::finish(double width) {
     list_.width = width;
-    close();
+    close(width);
     std::vector<LineItem> staff;
     const double spacing = lines_ > 1 ? height_ / static_cast<double>(lines_ - 1) : 0.0;
     for (std::size_t i = 0; i < lines_; ++i) {
@@ -362,7 +374,16 @@ DisplayList StaffWriter::finish(double width) {
     }
     list_.lines.insert(list_.lines.begin(), staff.begin(), staff.end());
     measureExtents(list_, font_, height_);
-    return std::move(list_);
+    return std::exchange(list_, DisplayList{});
+}
+
+void StaffWriter::clearItems() {
+    list_.glyphs.clear();
+    list_.lines.clear();
+    list_.beams.clear();
+    list_.texts.clear();
+    list_.curves.clear();
+    list_.polygons.clear();
 }
 
 void StaffWriter::glyphCentred(Glyph which, double x, double y, Role role) {

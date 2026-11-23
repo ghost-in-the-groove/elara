@@ -71,7 +71,7 @@ the staccato dot in a space when inside the staff.
 - The engraving constants live in `layout_common.hpp` (spacing),
   `standard_staff.cpp` and `tab_staff.cpp`.
 - A system of several tracks, line breaks and pages build on the same writers
-  (milestone 3, "Systems and pages").
+  (ADR-0014).
 - Not covered yet: rhythm stems under tablature shown on its own, slurs in
   standard notation, bends in standard notation, tremolo picking, whammy bar,
   tapping and slap marks, fingering, chord diagrams.
