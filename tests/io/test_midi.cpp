@@ -655,6 +655,29 @@ TEST_CASE("MIDI import puts held notes in their own voice", "[io][midi]") {
     CHECK(imported->warnings.empty());
 }
 
+TEST_CASE("MIDI import keeps no measure for a release just after the last barline", "[io][midi]") {
+    // At 96 ticks per quarter: a whole note released 5 ticks late (the track
+    // ends there too), as played music often is.
+    const std::vector<Event> late{program(0, 0, 0), on(0, 0, 60), off(389, 0, 60)};
+    const auto played = importMidi(bytesOf(smf(0, 96, {late})));
+    REQUIRE(played.has_value());
+    CHECK(played->song.measureCount() == 1);
+    CHECK(durationsOf(played->song.track(0).staff(0).measure(0).voices[0]) ==
+          std::vector<Duration>{Duration(NoteValue::Whole)});
+
+    // A note that starts after the barline, or a release a sixteenth or more
+    // late, still gets its measure.
+    const std::vector<Event> startsLate{program(0, 0, 0), on(0, 0, 60), off(384, 0, 60),
+                                        on(386, 0, 62), off(389, 0, 62)};
+    const auto second = importMidi(bytesOf(smf(0, 96, {startsLate})));
+    REQUIRE(second.has_value());
+    CHECK(second->song.measureCount() == 2);
+    const std::vector<Event> heldOver{program(0, 0, 0), on(0, 0, 60), off(408, 0, 60)};
+    const auto held = importMidi(bytesOf(smf(0, 96, {heldOver})));
+    REQUIRE(held.has_value());
+    CHECK(held->song.measureCount() == 2);
+}
+
 TEST_CASE("MIDI import splits a format 0 file by channel and names tracks by program",
           "[io][midi]") {
     const std::vector<Event> events{metaText(0, 0x03, "Demo"),

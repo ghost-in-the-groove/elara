@@ -1,0 +1,76 @@
+{
+ "format": "musicxml",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Drums"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Drumset",
+    "instrument": {
+     "name": "Drumset",
+     "kind": "percussion"
+    },
+    "staves": [
+     {
+      "clef": "percussion",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D2"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2"
+           },
+           {
+            "pitch": "D2"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D2"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 2.0,
+ "issues": []
+}

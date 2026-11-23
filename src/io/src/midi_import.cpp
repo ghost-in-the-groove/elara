@@ -198,7 +198,8 @@ struct Gathered {
     std::vector<Timed<KeySignature>> keys{};
     std::vector<Timed<long long>> tempos{}; // microseconds per quarter note
     std::vector<Source> sources{};
-    std::int64_t end = 0; // last tick of any track
+    std::int64_t end = 0;       // last tick of any track
+    std::int64_t lastStart = 0; // where the last note starts
 };
 
 std::string_view programName(int program) {
@@ -359,6 +360,7 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
         });
         for (const RawNote& note : source.notes) {
             out.end = std::max(out.end, note.end);
+            out.lastStart = std::max(out.lastStart, note.start);
         }
     }
     const auto byTick = [](const auto& a, const auto& b) {
@@ -446,6 +448,17 @@ std::vector<MeasureInfo> layMeasures(const Gathered& in, int division, Warnings&
         measures.push_back(MeasureInfo{.start = position, .time = meter});
         position += length;
         applyTimesUpTo(position);
+    }
+    // Played music often releases its last notes, and ends its tracks, just after
+    // the last barline: a final measure that would hold only that (less than a
+    // sixteenth note, no note starting in it) is not kept. An end exactly on a
+    // barline, as written files have, always is.
+    if (measures.size() > 1) {
+        const MeasureInfo& last = measures.back();
+        if (songEnd - last.start < Fraction(1, 16) && songEnd < last.end() &&
+            at(in.lastStart) < last.start) {
+            measures.pop_back();
+        }
     }
 
     // Keys at measure starts; tempo changes inside measures.

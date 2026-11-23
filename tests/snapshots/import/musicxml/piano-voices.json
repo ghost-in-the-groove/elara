@@ -1,0 +1,134 @@
+{
+ "format": "musicxml",
+ "out": null,
+ "warnings": [
+  "Piano: chord symbols dropped (measure 1)",
+  "Piano: repeats dropped (measure 2)",
+  "Piano: text directions dropped (measure 2)",
+  "Piano: lyrics dropped (measure 2)",
+  "Piano: grace notes dropped (measure 2)"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Piano"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {
+    "keySignature": "F major"
+   },
+   {
+    "timeSignature": "6/8",
+    "keySignature": "F major",
+    "tempoChanges": [
+     {
+      "bpm": 80
+     }
+    ]
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C5"
+           },
+           {
+            "pitch": "E5"
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "F5"
+           }
+          ]
+         }
+        ],
+        [
+         {
+          "duration": "2"
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         },
+         {
+          "duration": "4."
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F3"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2.",
+          "notes": [
+           {
+            "pitch": "F3"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 4.25,
+ "issues": []
+}
