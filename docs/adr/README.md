@@ -11,6 +11,7 @@ one that replaces them.
 | [0003](0003-headless-verification.md) | Headless verification | Accepted |
 | [0004](0004-song-model.md) | Song model | Accepted |
 | [0005](0005-undo-with-reversible-commands.md) | Undo with reversible commands | Accepted |
+| [0006](0006-native-file-format.md) | Native file format | Accepted |
 
 ## Template
 

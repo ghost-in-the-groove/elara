@@ -27,6 +27,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | orden / acción de edición | command | `Command` | One reversible edit (`apply`/`revert`), ADR-0005 |
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
+| archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |
