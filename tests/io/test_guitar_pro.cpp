@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,6 +78,37 @@ std::string guitarScore(int capo, const std::string& beats, const std::string& n
            R"(<Property name="String"><String>0</String></Property></Properties></Note>)"
            "</Notes><Rhythms>" +
            rhythms + "</Rhythms></GPIF>";
+}
+
+// A one-track score as Guitar Pro writes it for any instrument: the staff has a
+// tuning (a guitar's when the instrument has no strings) and the note a string,
+// a fret and its MIDI pitch (E5: the highest string at fret 12).
+std::string trackScore(int program) {
+    return R"(<GPIF><Score /><MasterTrack><Tracks>0</Tracks></MasterTrack><Tracks>)"
+           R"(<Track id="0"><Name><![CDATA[T]]></Name><Sounds><Sound><MIDI><Program>)" +
+           std::to_string(program) +
+           R"(</Program></MIDI></Sound></Sounds><Staves><Staff><Properties>)"
+           R"(<Property name="Tuning"><Pitches>40 45 50 55 59 64</Pitches></Property>)"
+           R"(</Properties></Staff></Staves></Track></Tracks><MasterBars><MasterBar>)"
+           R"(<Time>4/4</Time><Bars>0</Bars></MasterBar></MasterBars><Bars><Bar id="0">)"
+           R"(<Clef>G2</Clef><Voices>0 -1 -1 -1</Voices></Bar></Bars><Voices><Voice id="0">)"
+           R"(<Beats>0</Beats></Voice></Voices><Beats><Beat id="0"><Rhythm ref="0"/>)"
+           R"(<Notes>0</Notes></Beat></Beats><Notes><Note id="0"><Properties>)"
+           R"(<Property name="String"><String>5</String></Property>)"
+           R"(<Property name="Fret"><Fret>12</Fret></Property>)"
+           R"(<Property name="Midi"><Number>76</Number></Property></Properties></Note></Notes>)"
+           R"(<Rhythms><Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm></Rhythms></GPIF>)";
+}
+
+// Guitar Pro's PartConfiguration for a full score whose tracks show `flags`
+// (1 standard notation, 2 tablature): the number of score views, then for each
+// view a byte, its number of tracks and a byte per track; numbers are big-endian.
+std::string partConfiguration(std::initializer_list<std::uint8_t> flags) {
+    std::string bytes{0, 0, 0, 1, 0, 0, 0, 0, static_cast<char>(flags.size())};
+    for (const std::uint8_t flag : flags) {
+        bytes.push_back(static_cast<char>(flag));
+    }
+    return bytes + std::string(4, '\0'); // the score view on screen
 }
 
 } // namespace
@@ -175,8 +207,11 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
           core::FretPosition{.string = 4, .fret = 1});
 
     const core::Track& piano = song.track(1);
+    // Guitar Pro's default tunings on the piano and the clarinet are not theirs.
     CHECK(piano.instrument().kind == core::InstrumentKind::Keyboard);
     REQUIRE(piano.staffCount() == 2);
+    CHECK_FALSE(piano.staff(0).isFretted());
+    CHECK_FALSE(piano.staff(1).isFretted());
     CHECK(piano.staff(1).clef() == core::Clef::Bass);
     const core::Measure& right = piano.staff(0).measure(0);
     CHECK(right.voices[0].beats[0].notes.size() == 3);
@@ -196,10 +231,55 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     // A B-flat clarinet: notes given only by their concert pitch, spelled as written.
     const core::Track& clarinet = song.track(3);
     CHECK(clarinet.instrument().writtenOffset == 2);
+    CHECK(clarinet.instrument().kind == core::InstrumentKind::Pitched);
+    CHECK_FALSE(clarinet.staff(0).isFretted());
     const auto& horn = clarinet.staff(0).measure(0).voices[0].beats;
     CHECK(horn[0].notes[0].pitch == core::Pitch(core::Step::B, -1, 4));
     CHECK(horn[2].notes[0].pitch == core::Pitch(core::Step::E, -1, 5));
     CHECK(clarinet.staff(0).measure(1).voices[0].beats.back().isRest());
+}
+
+TEST_CASE("Guitar Pro: a tuning that is never shown is dropped unless the instrument is fretted",
+          "[io][guitarpro]") {
+    // Guitar Pro gives every track a tuning, a flute's too. Its part
+    // configuration says which tracks the full score shows as tablature.
+    const auto open = [](int program, const std::string& parts) {
+        std::vector<std::pair<std::string, std::string>> entries{
+            {"Content/score.gpif", trackScore(program)}};
+        if (!parts.empty()) {
+            entries.emplace_back("Content/PartConfiguration", parts);
+        }
+        const auto imported = importGuitarPro(zipOf(entries));
+        REQUIRE(imported.has_value());
+        CHECK(imported->warnings.empty());
+        return imported->song.track(0);
+    };
+    constexpr int kFlute = 73;
+    constexpr int kGuitar = 27;
+
+    // A flute shown as notation only: the tuning is not its own.
+    const core::Track flute = open(kFlute, partConfiguration({1}));
+    CHECK(flute.instrument().kind == core::InstrumentKind::Pitched);
+    CHECK_FALSE(flute.staff(0).isFretted());
+    CHECK(flute.staff(0).clef() == core::Clef::Treble);
+    const core::Note& note = flute.staff(0).measure(0).voices[0].beats[0].notes[0];
+    CHECK(note.pitch.midiNumber() == 76);
+    CHECK_FALSE(note.position.has_value());
+
+    // A guitar shown as notation only keeps its strings and frets.
+    const core::Track guitar = open(kGuitar, partConfiguration({1}));
+    CHECK(guitar.instrument().kind == core::InstrumentKind::Fretted);
+    REQUIRE(guitar.staff(0).isFretted());
+    CHECK(guitar.staff(0).measure(0).voices[0].beats[0].notes[0].position ==
+          core::FretPosition{.string = 1, .fret = 12});
+
+    // Shown as tablature, without a part configuration, or with one that does
+    // not fit the score, the tuning stays.
+    CHECK(open(kFlute, partConfiguration({3})).staff(0).isFretted());
+    CHECK(open(kFlute, partConfiguration({2})).staff(0).isFretted());
+    CHECK(open(kFlute, "").staff(0).isFretted());
+    CHECK(open(kFlute, partConfiguration({1, 1})).staff(0).isFretted());
+    CHECK(open(kFlute, std::string("\0\0\0\1\0\0\0", 7)).staff(0).isFretted());
 }
 
 TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {

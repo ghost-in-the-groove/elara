@@ -45,6 +45,17 @@ notes, dynamic) and notes refer to each other by id. The mapping:
 - Staves: tuning (`Pitches`, lowest string first) and capo. Strings count from
   0 at the lowest string; frets count from the capo. A note's `Midi` number,
   when present, wins over a fret position that disagrees with it.
+- Guitar Pro gives every staff a tuning, a flute's or a piano's too (a
+  guitar's by default), and string and fret numbers to every note. What it
+  shows is in `Content/PartConfiguration`, beside the score: the number of
+  score views, then for each view a byte (multi-measure rests), its number of
+  tracks and a byte of flags per track (1 standard notation, 2 tablature, 4
+  slashes, 8 numbered notation), numbers big-endian, the full score first. A
+  track the full score shows without tablature keeps its tuning only when its
+  program is a guitar or a bass; otherwise it is not fretted and its notes
+  keep their pitch. Without that file, or when it does not fit the score (it
+  only says how tracks are shown, so a damaged one is ignored), every tuning is
+  kept.
 - Pitches: the `Midi` number, else string and fret, else the concert pitch
   (whose octaves count from MIDI 0, so middle C is C5). Spelling: the concert
   pitch's when it matches, else the key's. Drum notes use their `Midi` number
@@ -101,8 +112,8 @@ before the end, never more than `offset`. The result is `BCFS`, a file system
 of 4096-byte sectors: sector 0 is unused, and a sector starting with the
 number 2 is a file entry with the name at byte 4, the size at byte 0x8C and the
 list of the sectors that hold the file at byte 0x94, ended by 0. The next entry
-follows the file's last sector. The score is the entry `score.gpif`; the other
-entries (page layout, part settings) are skipped. An uncompressed `BCFS` file
+follows the file's last sector. The score is the entry `score.gpif`, read with
+`PartConfiguration` as above; the other entries (page layout) are skipped. An uncompressed `BCFS` file
 is read the same way. Unpacking stops at 64 MB, and references before the
 start or sectors past the end make the file damaged.
 

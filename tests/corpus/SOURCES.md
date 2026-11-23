@@ -28,7 +28,7 @@ element written by hand following the structure of files saved by Guitar Pro
 | File | Exercises |
 |---|---|
 | `guitar-techniques.gp` | Electric guitar in drop D with a capo; palm mute, hammer-on in a triplet, bend with vibrato, natural harmonic with let ring, tie, dead note with an accent, shift slide, staccato, pick stroke, dynamics; a tempo change in the middle of a bar; 4/4 then 3/4; a repeat and a grace note (reported) |
-| `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported) |
+| `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported); the piano and the clarinet carry the default tunings Guitar Pro gives every staff, and its part configuration shows them without tablature |
 | `duet.gpx` | Guitar Pro 6: a container with three files, compressed with literals and back references; steel-string guitar in E-flat tuning (spelled with flats) with a capo, both on the track; a drum kit from the General MIDI table whose notes give their MIDI keys; E-flat major; a tempo without a beat unit; let ring; a drum note that names only a kit element (reported) |
 
 ## Guitar Pro 3-5 (`gp/`)
