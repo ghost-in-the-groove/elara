@@ -43,6 +43,7 @@ private:
     void tick();
     void queueSteps();
     void queueEdits();
+    void queueEntry();
     void finish(bool ok, const QString& detail);
     [[nodiscard]] bool checking() const;
 
@@ -62,6 +63,7 @@ private:
     bool queued_ = false;
     qsizetype tracksBefore_ = 0; ///< tracks when the smoke test's edits start
     QString editProblem_;        ///< the first edit check that failed
+    bool entering_ = false;      ///< whether the shown track takes frets
 };
 
 } // namespace elara::app

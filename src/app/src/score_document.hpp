@@ -4,11 +4,15 @@
 #pragma once
 
 #include <elara/core/document.hpp>
+#include <elara/core/duration.hpp>
+#include <elara/core/entry.hpp>
 #include <elara/core/song.hpp>
 #include <elara/notation/display_list.hpp>
 
 #include "score_painter.hpp"
+#include <QElapsedTimer>
 #include <QObject>
+#include <QRectF>
 #include <QSizeF>
 #include <QString>
 #include <QStringList>
@@ -17,6 +21,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -66,6 +71,13 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString redoName READ redoName NOTIFY historyChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
     Q_PROPERTY(bool savesInPlace READ savesInPlace NOTIFY sourceChanged)
+    // Keyboard entry (ADR-0021).
+    Q_PROPERTY(int caretPage READ caretPage NOTIFY caretChanged)
+    Q_PROPERTY(QRectF caretRect READ caretRect NOTIFY caretChanged)
+    Q_PROPERTY(QString caretStatus READ caretStatus NOTIFY caretChanged)
+    Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
+    Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
+    Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -73,6 +85,19 @@ public:
     /// How the shown tracks are drawn (notation::TrackView).
     enum class View : quint8 { Standard, Tablature, Both };
     Q_ENUM(View)
+    /// The caret's moves (core::CaretMove): the arrow keys.
+    enum class CaretMove : quint8 {
+        NextBeat,
+        PreviousBeat,
+        NextMeasure,
+        PreviousMeasure,
+        StringUp,
+        StringDown
+    };
+    Q_ENUM(CaretMove)
+
+    /// How long after a digit a second one makes a two-digit fret.
+    static constexpr int kTwoDigitMilliseconds = 700;
 
     /// `track` for every track of the song at once.
     static constexpr int kAllTracks = -1;
@@ -154,6 +179,44 @@ public:
     /// Returns false, and reports why through editFailed(), when it cannot.
     Q_INVOKABLE bool save(const QUrl& file);
 
+    // ---- Keyboard entry -----------------------------------------------------
+
+    /// The page showing the caret, or -1 when no page shows it (its track is
+    /// hidden, or there is no song).
+    [[nodiscard]] int caretPage() const { return caretPage_; }
+    /// The caret on its page, in staff spaces from the page's top-left corner.
+    [[nodiscard]] QRectF caretRect() const { return caretRect_; }
+    /// Where the caret is, for a status line: "Measure 3 · Beat 2 · String 4 ·
+    /// Fret 5".
+    [[nodiscard]] QString caretStatus() const;
+    /// Whether the caret's staff has strings, so that digits type frets.
+    [[nodiscard]] bool caretFretted() const;
+    /// The duration typing uses: 1 a whole note, 2 a half note... 64.
+    [[nodiscard]] int inputValue() const;
+    [[nodiscard]] bool inputDotted() const { return input_.dots() > 0; }
+    /// The caret in the song being edited.
+    [[nodiscard]] core::Caret caret() const { return caret_; }
+    /// The fret of the note on the caret's string at its beat, if there is one.
+    [[nodiscard]] std::optional<int> fretAtCaret() const;
+
+    Q_INVOKABLE void moveCaret(CaretMove move);
+    /// Puts the caret where a click at (x, y) on page `index` points, in staff
+    /// spaces from the page's top-left corner. Returns whether it moved there.
+    Q_INVOKABLE bool placeCaret(int index, double x, double y);
+    /// Types a digit: a fret on the caret's string. A second digit within
+    /// kTwoDigitMilliseconds on the same caret makes a two-digit fret, as one
+    /// undo step.
+    Q_INVOKABLE void typeDigit(int digit);
+    /// The input duration (1, 2, 4... 64), also given to the caret's beat.
+    Q_INVOKABLE void setInputValue(int value);
+    Q_INVOKABLE void toggleDot();
+    /// The next longer or shorter note value, as setInputValue().
+    Q_INVOKABLE void longerDuration();
+    Q_INVOKABLE void shorterDuration();
+    Q_INVOKABLE void deleteAtCaret();
+    Q_INVOKABLE void deleteBeat();
+    Q_INVOKABLE void insertRest();
+
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;
     /// The painter of every page.
@@ -168,11 +231,26 @@ signals:
     void viewChanged();
     void layoutChanged();
     void historyChanged();
+    void caretChanged();
+    void inputChanged();
     /// An edit or a save that failed, with the reason to show.
     void editFailed(const QString& message);
 
 private:
-    void execute(std::unique_ptr<core::Command> command);
+    bool execute(std::unique_ptr<core::Command> command);
+    /// Executes an entry's command, if any, and moves the caret. Returns
+    /// whether a command ran.
+    bool enter(core::Entry entry);
+    /// Makes an entry from the song being edited and enters it, reporting
+    /// what it throws through editFailed().
+    void runEntry(const std::function<core::Entry(const core::Song&)>& make);
+    /// The input duration takes the caret beat's, when it has one typing can use.
+    void followBeat();
+    void setInput(core::Duration duration);
+    /// Clamps the caret to the song being edited.
+    void clampCaret();
+    /// Finds the caret on the pages shown.
+    void placeCaretBox();
     void edited();
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
@@ -184,6 +262,17 @@ private:
     std::shared_ptr<const core::Song> song_; ///< what the pages show
     std::optional<core::Document> document_; ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
+    std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
+    core::Caret caret_;
+    core::Duration input_;
+    int caretPage_ = -1;
+    QRectF caretRect_;
+    int pendingDigit_ = -1;       ///< a digit just typed, waiting for a second
+    core::Caret digitCaret_;      ///< where it was typed
+    std::uint64_t digitEdit_ = 0; ///< edits_ after it
+    bool digitChanged_ = false;   ///< whether it changed the song (and can be undone)
+    QElapsedTimer digitClock_;
+    std::uint64_t edits_ = 0; ///< edits, undos and redos so far
     int track_ = 0;
     View view_ = View::Both;
     bool hasTablature_ = false;

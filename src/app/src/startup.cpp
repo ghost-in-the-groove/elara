@@ -4,6 +4,7 @@
 #include "score_page.hpp"
 #include <QCoreApplication>
 #include <QImage>
+#include <QPointF>
 
 #include <array>
 #include <cstdio>
@@ -65,6 +66,7 @@ void Startup::queueSteps() {
                 return true;
             });
             queueEdits();
+            queueEntry();
         }
         return;
     }
@@ -93,6 +95,7 @@ void Startup::queueSteps() {
             return true;
         });
         queueEdits();
+        queueEntry();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -162,6 +165,84 @@ void Startup::queueEdits() {
         }
         score_->setTrack(0);
         return true;
+    });
+}
+
+// Keyboard entry on the first fretted track shown: a click on the caret keeps
+// it, two digits make one fret as one undo step, a duration, a rest inserted
+// and deleted; then everything is undone and the song must end as it started.
+void Startup::queueEntry() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("entry check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        entering_ = score_->caretFretted() && score_->caretPage() >= 0;
+        if (!entering_) {
+            return false;
+        }
+        const core::Caret before = score_->caret();
+        const QPointF centre = score_->caretRect().center();
+        check(score_->placeCaret(score_->caretPage(), centre.x(), centre.y()) &&
+                  score_->caret() == before,
+              "a click on the caret moved it");
+        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        score_->typeDigit(1);
+        score_->typeDigit(2);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(score_->fretAtCaret() == 12, "two digits did not type fret 12");
+        check(score_->caretPage() >= 0, "the caret went away after typing");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(!score_->modified(), "a two-digit fret is not one undo step");
+        score_->redo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(score_->fretAtCaret() == 12, "redo did not bring the fret back");
+        score_->setInputValue(8);
+        check(score_->inputValue() == 8, "the input duration did not change");
+        score_->insertRest();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(!score_->fretAtCaret().has_value(), "the caret is not on the inserted rest");
+        score_->deleteAtCaret();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(score_->fretAtCaret() == 12, "deleting the rest did not bring the note back");
+        for (int i = 0; i < 8 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!entering_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the entry did not restore the song");
+        return false;
     });
 }
 

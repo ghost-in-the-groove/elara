@@ -81,11 +81,13 @@ measures each system holds. `--json` prints `{"file", "track", "staff",
 "first", "count", "svg", "view", "layout", ...}` (`"tracks"` instead of
 `"track"` and `"staff"` with `--tracks`) followed, for a line, by the display
 list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
-"glyphs", "lines", "beams", "texts", "curves", "polygons"` and, for pages, by
+"columns", "glyphs", "lines", "beams", "texts", "curves", "polygons"` and, for pages, by
 `"pages"`: one display list per page. Lengths are in staff spaces, y down from
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
-credits...). `--svg OUT` also writes SVG, loading the music font from `fonts/`
+credits...); `columns` say where the notes starting at each time of a measure
+are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
+beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
 several.
 

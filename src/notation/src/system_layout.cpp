@@ -348,6 +348,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
     const std::vector<std::unique_ptr<StaffWriter>> writers = makeWriters(song, staves, font);
     std::vector<MeasureBox> measures;
     measures.reserve(last - first);
+    std::vector<ColumnBox> columnBoxes;
     double x = 0.0;
     for (const auto& writer : writers) {
         x = std::max(x, writer->header(first));
@@ -393,6 +394,10 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
             writer->draw(positions, start, barline);
         }
         measures.push_back(MeasureBox{.index = m, .x = start, .width = barline - start});
+        for (const ColumnPosition& position : positions) {
+            columnBoxes.push_back(
+                ColumnBox{.measure = m, .start = position.start, .x = position.x});
+        }
         const bool songEnd = m + 1 == song.measureCount();
         double after = barline;
         for (const auto& writer : writers) {
@@ -459,6 +464,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         measure.height = height;
     }
     system.measures = std::move(measures);
+    system.columns = std::move(columnBoxes);
     const double indent = options.named ? nameIndent(song, staves) : 0.0;
     if (indent > 0.0) {
         shift(system, indent, 0.0);

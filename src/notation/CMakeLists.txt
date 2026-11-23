@@ -5,6 +5,7 @@ find_package(yyjson CONFIG REQUIRED)
 find_package(Threads REQUIRED) # systems are laid out on several threads
 
 add_library(elara_notation STATIC
+  src/caret.cpp
   src/display_list.cpp
   src/drum_map.cpp
   src/layout_common.cpp

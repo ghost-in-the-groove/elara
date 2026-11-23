@@ -68,6 +68,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+  - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
+        undo step), note values and dots, rests, delete, clicks that place the
+        caret (ADR-0032)
 - [ ] Copy/paste, insert/delete measures, transposition
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,

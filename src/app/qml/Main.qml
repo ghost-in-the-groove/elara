@@ -417,6 +417,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: songPane.left
             document: score
+            dark: window.dark
             opacity: window.hasScore ? 1.0 : 0.0
             visible: opacity > 0
 

@@ -397,6 +397,12 @@ add_test(NAME cli.render COMMAND elara-cli --json render "${ELARA_CORPUS}/musicx
 set_tests_properties(cli.render PROPERTIES
   PASS_REGULAR_EXPRESSION "\"track\":0,\"staff\":0,\"first\":0,\"count\":4,\"svg\":null,.*\"counts\":\\{\"staffLine\":5,\"ledgerLine\":1,\"barline\":5,\"clef\":1,\"keySignature\":1,\"timeSignature\":4,\"notehead\":10,\"accidental\":2,")
 
+# Where the notes of each measure start, as an editor finds its beats.
+add_test(NAME cli.render_columns
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --count 1)
+set_tests_properties(cli.render_columns PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"columns\":\\[\\{\"measure\":0,\"start\":\"0\",\"x\":[0-9.]+\\},\\{\"measure\":0,\"start\":\"1/4\",")
+
 add_test(NAME cli.render_drums COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/drums.musicxml")
 set_tests_properties(cli.render_drums PROPERTIES
   PASS_REGULAR_EXPRESSION "\"notehead\":5,\"accidental\":0,.*\"glyph\":\"unpitchedPercussionClef1\",\"role\":\"clef\"")
