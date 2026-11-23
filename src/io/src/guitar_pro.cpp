@@ -21,7 +21,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
-#include <fstream>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -1421,13 +1420,11 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
 
 std::expected<ImportResult, FormatError> importGuitarProFile(const std::filesystem::path& path,
                                                              const GuitarProOptions& options) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
+    const auto bytes = detail::readFile(path);
+    if (!bytes) {
         return std::unexpected(FormatError{std::format("cannot open {}", path.string())});
     }
-    const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
-                                          std::istreambuf_iterator<char>()};
-    return importGuitarPro(bytes, options);
+    return importGuitarPro(*bytes, options);
 }
 
 } // namespace elara::io

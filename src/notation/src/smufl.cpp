@@ -7,7 +7,6 @@
 
 #include <format>
 #include <fstream>
-#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -247,11 +246,19 @@ std::expected<EngravingFont, FontError> EngravingFont::fromMetadata(std::string_
 
 std::expected<EngravingFont, FontError>
 EngravingFont::fromMetadataFile(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
+    // One sized read: istreambuf_iterator costs a call per byte, and GCC's
+    // optimiser reports a null dereference inside it.
+    std::ifstream in(path, std::ios::binary | std::ios::ate);
+    const std::streamoff size = in ? static_cast<std::streamoff>(in.tellg()) : -1;
+    if (size < 0) {
+        return std::unexpected(error(std::format("cannot read {}", path.string())));
+    }
+    std::string text(static_cast<std::size_t>(size), '\0');
+    in.seekg(0);
+    in.read(text.data(), static_cast<std::streamsize>(text.size()));
     if (!in) {
         return std::unexpected(error(std::format("cannot read {}", path.string())));
     }
-    const std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
     return fromMetadata(text);
 }
 
