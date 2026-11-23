@@ -113,9 +113,8 @@ std::filesystem::path defaultFontMetadata() {
 
 std::expected<core::Song, std::string> openSong(const std::filesystem::path& path) {
     std::string extension = utf8(path.extension());
-    std::ranges::transform(extension, extension.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::ranges::transform(extension, extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (extension == ".elara") {
         auto song = io::loadNative(path);
         if (!song) {

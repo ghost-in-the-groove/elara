@@ -29,7 +29,9 @@ struct FontOptions {
     std::string glyph;
 };
 
-std::string number(double value) { return jsonNumber(value); }
+std::string number(double value) {
+    return jsonNumber(value);
+}
 
 std::string point(const notation::Point& p) {
     return std::format("[{},{}]", number(p.x), number(p.y));
@@ -131,9 +133,8 @@ int printFont(bool json, const EngravingFont& font, const std::filesystem::path&
 }
 
 int runFont(bool json, const FontOptions& options) {
-    const std::filesystem::path path = options.metadata.empty()
-                                           ? defaultFontMetadata()
-                                           : std::filesystem::path(options.metadata);
+    const std::filesystem::path path =
+        options.metadata.empty() ? defaultFontMetadata() : std::filesystem::path(options.metadata);
     const auto font = EngravingFont::fromMetadataFile(path);
     if (!font) {
         return fail(font.error().message);

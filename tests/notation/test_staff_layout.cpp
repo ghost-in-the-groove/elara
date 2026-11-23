@@ -374,8 +374,9 @@ TEST_CASE("Staff layout: time signatures", "[notation][layout]") {
           std::vector<std::pair<Glyph, double>>{{Glyph::TimeSig3, 1.0}, {Glyph::TimeSig4, 3.0}});
     const auto twelveEight = digits(TimeSignature(12, 8));
     REQUIRE(twelveEight.size() == 3);
-    CHECK(twelveEight == std::vector<std::pair<Glyph, double>>{
-                             {Glyph::TimeSig1, 1.0}, {Glyph::TimeSig2, 1.0}, {Glyph::TimeSig8, 3.0}});
+    CHECK(twelveEight == std::vector<std::pair<Glyph, double>>{{Glyph::TimeSig1, 1.0},
+                                                               {Glyph::TimeSig2, 1.0},
+                                                               {Glyph::TimeSig8, 3.0}});
 
     SECTION("a change is written where it happens, not repeated") {
         Song song = songOf({{{}}, {{}}, {{}}});
@@ -643,10 +644,10 @@ TEST_CASE("Staff layout: drums follow the drum map", "[notation][layout]") {
 
     SECTION("hands point up and feet down, whatever voice holds them") {
         // Bass drum in the first voice, hi-hat in the second.
-        const DisplayList voices = layout(songOf(
-            {{{drum({36}, NoteValue::Half), drum({36}, NoteValue::Half)},
-              {drum({42}), drum({42}), drum({42}), drum({42})}}},
-            kit));
+        const DisplayList voices =
+            layout(songOf({{{drum({36}, NoteValue::Half), drum({36}, NoteValue::Half)},
+                            {drum({42}), drum({42}), drum({42}), drum({42})}}},
+                          kit));
         for (const LineItem& stem : lines(voices, Role::Stem)) {
             const double top = std::min(stem.from.y, stem.to.y);
             const double bottom = std::max(stem.from.y, stem.to.y);

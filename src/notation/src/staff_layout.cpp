@@ -18,6 +18,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace elara::notation {
@@ -544,7 +545,11 @@ private:
             voiceCount_ += voice.isEmpty() ? 0 : 1;
         }
         if (voiceCount_ == 0) {
-            chords_.push_back(Chord{.length = length, .rest = true, .measureRest = true});
+            Chord rest;
+            rest.length = length;
+            rest.rest = true;
+            rest.measureRest = true;
+            chords_.push_back(std::move(rest));
             return;
         }
         for (std::size_t v = 0; v < measure.voices.size(); ++v) {
@@ -552,11 +557,12 @@ private:
             Fraction at;
             const std::size_t voiceStart = chords_.size();
             for (const Beat& beat : beats) {
-                Chord chord{.voice = v,
-                            .start = at,
-                            .length = beat.duration.length(),
-                            .duration = beat.duration,
-                            .rest = beat.isRest()};
+                Chord chord;
+                chord.voice = v;
+                chord.start = at;
+                chord.length = beat.duration.length();
+                chord.duration = beat.duration;
+                chord.rest = beat.isRest();
                 chord.measureRest = chord.rest && beats.size() == 1 && chord.length >= length;
                 for (const core::Note& note : beat.notes) {
                     chord.heads.push_back(headOf(note, beat.duration.value()));
@@ -595,9 +601,11 @@ private:
         std::ranges::stable_sort(order, {}, [this](std::size_t c) { return chords_[c].start; });
         for (const std::size_t c : order) {
             if (columns_.empty() || columns_.back().start != chords_[c].start) {
-                columns_.push_back(Column{.start = chords_[c].start,
-                                          .left = std::numeric_limits<double>::max(),
-                                          .right = std::numeric_limits<double>::lowest()});
+                Column column;
+                column.start = chords_[c].start;
+                column.left = std::numeric_limits<double>::max();
+                column.right = std::numeric_limits<double>::lowest();
+                columns_.push_back(std::move(column));
             }
             Column& column = columns_.back();
             column.chords.push_back(c);
@@ -607,7 +615,8 @@ private:
     }
 
     [[nodiscard]] Head headOf(const core::Note& note, NoteValue value) const {
-        Head head{.tied = note.effects.tiedFromPrevious};
+        Head head;
+        head.tied = note.effects.tiedFromPrevious;
         if (percussion_) {
             const detail::DrumNote drum = detail::drumNote(note.pitch.midiNumber());
             head.step = drum.step;

@@ -17,6 +17,7 @@ one that replaces them.
 | [0009](0009-midi-import-and-export.md) | MIDI import and export | Accepted |
 | [0010](0010-guitar-pro-import.md) | Guitar Pro import | Accepted |
 | [0011](0011-notation-engine.md) | Notation engine | Accepted |
+| [0012](0012-staff-layout.md) | Staff layout and the display list | Accepted |
 
 ## Template
 
