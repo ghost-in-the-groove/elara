@@ -612,6 +612,10 @@
         <translation>Cambiar la mezcla</translation>
     </message>
     <message>
+        <source>Change navigation marks</source>
+        <translation>Cambiar señales y saltos</translation>
+    </message>
+    <message>
         <source>Change time signature</source>
         <translation>Cambiar el compás</translation>
     </message>

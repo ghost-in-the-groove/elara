@@ -27,7 +27,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
-  - [ ] Drawn in the score
+  - [x] Drawn in the score
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill

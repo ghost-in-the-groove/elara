@@ -217,6 +217,8 @@ constexpr std::array kEditNames{
     Translation{"Edit song info", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Edit song info")},
     Translation{"Change tempo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tempo")},
     Translation{"Change mix", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change mix")},
+    Translation{"Change navigation marks",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
     Translation{"Change key signature",
