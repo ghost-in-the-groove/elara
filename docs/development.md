@@ -61,7 +61,7 @@ their SHA-1 and extracts them to `<outdir>/<version>/<kit>`. CI uses it too.
 |---|---|
 | `build/dev/` | Debug build (`dev` preset), `bin/` holds every executable |
 | `build/release/` | RelWithDebInfo build |
-| `build/_downloads/` | Cached third-party archives (JUCE) shared by build trees |
+| `build/_downloads/` | Cached third-party downloads (JUCE, the Bravura and Arimo fonts) shared by build trees |
 
 The first configure downloads JUCE (~25 MB), builds JUCE's helper tool and
 builds the vcpkg packages; later builds are incremental.
