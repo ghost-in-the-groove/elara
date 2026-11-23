@@ -123,6 +123,15 @@ void SetTrackMix::swapWith(Song& song) {
     mix_ = previous;
 }
 
+void SetStaffTuning::swapWith(Song& song) {
+    Staff& staff = song.track(track_).staff(staff_);
+    std::optional<Tuning> previous = staff.tuning();
+    const int previousCapo = staff.capo();
+    staff.setTuning(std::move(tuning_), capo_);
+    tuning_ = std::move(previous);
+    capo_ = previousCapo;
+}
+
 // ---- Groups ------------------------------------------------------------------
 
 CommandGroup::CommandGroup(std::string name, std::vector<std::unique_ptr<Command>> commands)

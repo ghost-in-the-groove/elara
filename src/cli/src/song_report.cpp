@@ -33,10 +33,13 @@ std::string tracksJson(const core::Song& song) {
             }
         }
         const core::TrackMix& mix = track.mix();
+        const core::Staff& first = track.staff(0);
         out += std::format(
-            R"({}{{"name":"{}","mix":{{"volume":{},"pan":{},"mute":{},"solo":{}}},"staves":{},"beats":{},"notes":{}}})",
+            R"({}{{"name":"{}","mix":{{"volume":{},"pan":{},"mute":{},"solo":{}}},"tuning":{},"capo":{},"staves":{},"beats":{},"notes":{}}})",
             t == 0 ? "" : ",", jsonEscape(track.name()), jsonNumber(mix.volume),
-            jsonNumber(mix.pan), mix.mute, mix.solo, track.staffCount(), beats, notes);
+            jsonNumber(mix.pan), mix.mute, mix.solo,
+            first.tuning() ? std::format("\"{}\"", first.tuning()->toString()) : "null",
+            first.capo(), track.staffCount(), beats, notes);
     }
     return out + "]";
 }

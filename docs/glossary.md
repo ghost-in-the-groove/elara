@@ -65,6 +65,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | portapapeles | clipboard | `MeasureClip`, `copyMeasures()`, `makePaste()` | Copied measures of some tracks, pasted over measures or into new ones (ADR-0027) |
 | transposición | transposition | `Transposition`, `makeTranspose()` | Moving notes by an interval; keys follow when every pitched track moves (ADR-0026) |
 | afinación | tuning | `Tuning` | |
+| reafinar | retune | `Retuning`, `makeRetune()` | A new tuning or capo for a fretted staff, keeping the pitches or the frets (ADR-0046) |
 | cuerda | string | `string` (index) | 1 = highest |
 | traste | fret | `fret` | Relative to the capo |
 | posición (cuerda/traste) | fret position | `FretPosition` | |
@@ -79,7 +80,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
-| dinámica | dynamic | `Dynamic` | pp ... ff |
+| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()` | ppp ... fff; set at the caret, it holds until the next change (ADR-0047) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
 | metrónomo | metronome | `SequenceOptions::metronome` | A click on every beat, a high wood block on the first; events on `Sequence::metronomeTrack()` (ADR-0024) |
