@@ -26,6 +26,12 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
 
+// Pages brought up to date so far: painted, or kept because a relayout left
+// them as they were.
+int pagesUpdated() {
+    return ScorePage::paintCount() + ScorePage::keptCount();
+}
+
 } // namespace
 
 void reportSmokeTest(bool ok, const QString& detail) {
@@ -50,7 +56,7 @@ void Startup::start() {
     clock_.start();
     // The window opens the file itself; wait for its first layout and paint.
     waiting_ = !options_.file.isEmpty();
-    paintsBefore_ = ScorePage::paintCount();
+    paintsBefore_ = pagesUpdated();
     timer_.start();
 }
 
@@ -443,7 +449,7 @@ void Startup::tick() {
     if (waiting_) {
         const bool settled = score_ != nullptr && laidOut_ && !score_->busy() &&
                              score_->status() == ScoreDocument::Status::Ready &&
-                             (score_->pageCount() == 0 || ScorePage::paintCount() > paintsBefore_);
+                             (score_->pageCount() == 0 || pagesUpdated() > paintsBefore_);
         if (!settled) {
             if (clock_.elapsed() - stepStarted_ > kStepTimeoutMilliseconds) {
                 finish(false, QStringLiteral("timed out"));
@@ -460,7 +466,7 @@ void Startup::tick() {
         const auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
-        paintsBefore_ = ScorePage::paintCount();
+        paintsBefore_ = pagesUpdated();
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
@@ -491,6 +497,7 @@ void Startup::tick() {
     }
     QString detail;
     if (score_ != nullptr && score_->pageCount() > 0) {
+        std::printf("pages kept: %d\n", ScorePage::keptCount());
         detail = QStringLiteral("%1 pages, %2 painted, %3 layouts")
                      .arg(score_->pageCount())
                      .arg(ScorePage::paintCount())

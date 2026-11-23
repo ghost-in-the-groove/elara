@@ -26,7 +26,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Time and key signatures, tempo map
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
-  - [ ] Read and written by the Guitar Pro and MusicXML importers and exporters
+  - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
   - [ ] Drawn in the score
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
@@ -57,6 +57,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [ ] Incremental relayout (only the systems an edit touches)
+  - [x] Pages an edit leaves as they were keep their textures instead of being
+        painted again
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,

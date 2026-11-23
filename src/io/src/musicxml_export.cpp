@@ -672,6 +672,7 @@ private:
         tempoMarks_.clear();
         if (index_ == 0) {
             collectTempoMarks(m);
+            writeSigns(xml, m);
         }
         for (int s = 0; s < xmlStaves_; ++s) {
             tabPass_ = s >= staffCount_;
@@ -699,6 +700,9 @@ private:
         }
         tabPass_ = false;
         cursor_ = Fraction(0);
+        if (index_ == 0) {
+            writeJumps(xml, m);
+        }
         writeRightBarline(xml, m);
         xml.close("measure");
     }
@@ -910,6 +914,73 @@ private:
     }
 
     // ---- Directions -----------------------------------------------------------------
+
+    // The signs and jumps (ADR-0049), in the first part: a glyph or a text for
+    // the reader and a <sound> attribute for playback, which names the second
+    // segno and coda "segno-segno" and "double-coda".
+    static void writeNavigation(XmlWriter& xml, std::string_view glyph, std::string_view words,
+                                std::string_view attribute, std::string_view value) {
+        xml.start("direction");
+        xml.attribute("placement", "above");
+        xml.endOpen();
+        xml.open("direction-type");
+        if (glyph.empty()) {
+            xml.text("words", words);
+        } else {
+            xml.empty(glyph);
+        }
+        xml.close("direction-type");
+        xml.start("sound");
+        xml.attribute(attribute, value);
+        xml.endEmpty();
+        xml.close("direction");
+    }
+
+    // The signs open the measure.
+    void writeSigns(XmlWriter& xml, std::size_t m) const {
+        const MeasureHeader& header = song_.measureHeader(m);
+        if (header.segno) {
+            writeNavigation(xml, "segno", {}, "segno", "segno");
+        }
+        if (header.segnoSegno) {
+            writeNavigation(xml, "segno", {}, "segno", "segno-segno");
+        }
+        if (header.coda) {
+            writeNavigation(xml, "coda", {}, "coda", "coda");
+        }
+        if (header.doubleCoda) {
+            writeNavigation(xml, "coda", {}, "coda", "double-coda");
+        }
+    }
+
+    // Fine, To Coda and the jump close it.
+    void writeJumps(XmlWriter& xml, std::size_t m) const {
+        const MeasureHeader& header = song_.measureHeader(m);
+        if (header.fine) {
+            writeNavigation(xml, {}, "Fine", "fine", "yes");
+        }
+        if (header.toCoda) {
+            writeNavigation(xml, {}, "To Coda", "tocoda", "coda");
+        }
+        if (header.toDoubleCoda) {
+            writeNavigation(xml, {}, "To Double Coda", "tocoda", "double-coda");
+        }
+        if (header.jump == JumpTo::None) {
+            return;
+        }
+        constexpr std::array<std::string_view, 4> kTexts{"", "D.C.", "D.S.", "D.S.S."};
+        constexpr std::array<std::string_view, 4> kEndings{"", " al Fine", " al Coda",
+                                                           " al Double Coda"};
+        const std::string words =
+            std::string(kTexts.at(static_cast<std::size_t>(header.jump))) +
+            std::string(kEndings.at(static_cast<std::size_t>(header.jumpThen)));
+        if (header.jump == JumpTo::Start) {
+            writeNavigation(xml, {}, words, "dacapo", "yes");
+        } else {
+            writeNavigation(xml, {}, words, "dalsegno",
+                            header.jump == JumpTo::Segno ? "segno" : "segno-segno");
+        }
+    }
 
     void collectTempoMarks(std::size_t m) {
         const MeasureHeader& header = song_.measureHeader(m);
