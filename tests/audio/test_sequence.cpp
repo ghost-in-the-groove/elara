@@ -39,6 +39,7 @@ using elara::core::Staff;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::Track;
+using elara::core::TrackMix;
 using elara::core::Tuning;
 using elara::core::Vibrato;
 
@@ -178,6 +179,21 @@ TEST_CASE("Sequence: measures and notes in seconds from the tempo", "[audio][seq
     CHECK(notes[3].key == 72);
     CHECK(notes[3].pass == 1);
     CHECK_THAT(notes[3].end, WithinAbs(4.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: the same when only the mix or the title changes", "[audio][sequence]") {
+    Song song = pianoSong(2);
+    voice(song, 0) = {beat(NoteValue::Whole, {note(60)})};
+    const Sequence before(song);
+
+    Song mixed = song;
+    mixed.track(0).setMix(TrackMix{.volume = 0.3, .pan = -1.0, .mute = true});
+    mixed.info().title = "Another title";
+    CHECK(Sequence(mixed) == before);
+
+    Song edited = song;
+    voice(edited, 1) = {beat(NoteValue::Whole, {note(62)})};
+    CHECK_FALSE(Sequence(edited) == before);
 }
 
 TEST_CASE("Sequence: repeats play their measures again", "[audio][sequence]") {

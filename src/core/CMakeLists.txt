@@ -12,6 +12,7 @@ add_library(elara_core STATIC
   src/measure.cpp
   src/performance.cpp
   src/pitch.cpp
+  src/retune.cpp
   src/signature.cpp
   src/song.cpp
   src/transpose.cpp
