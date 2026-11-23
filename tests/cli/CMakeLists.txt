@@ -98,3 +98,22 @@ set_tests_properties(cli.meter_compound_time PROPERTIES
 
 add_test(NAME cli.meter_rejects_bad_meter COMMAND elara-cli meter 5/3)
 set_tests_properties(cli.meter_rejects_bad_meter PROPERTIES WILL_FAIL TRUE)
+
+# Rests that complete a measure.
+add_test(NAME cli.rests_compound_meter COMMAND elara-cli --json rests 6/8 8)
+set_tests_properties(cli.rests_compound_meter PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"written\":\\[\"8\"\\],\"fill\":\"incomplete\",\"rests\":\\[\"8\",\"8\",\"4\\.\"\\]")
+
+add_test(NAME cli.rests_after_triplet COMMAND elara-cli --json rests 4/4 "8*3:2")
+set_tests_properties(cli.rests_after_triplet PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"rests\":\\[\"8\\*3:2\",\"8\\*3:2\",\"4\",\"2\"\\]")
+
+add_test(NAME cli.rests_complete_measure COMMAND elara-cli --json rests 3/4 2.)
+set_tests_properties(cli.rests_complete_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"fill\":\"complete\",\"rests\":\\[\\]")
+
+add_test(NAME cli.rests_rejects_overfull COMMAND elara-cli rests 4/4 1 4)
+set_tests_properties(cli.rests_rejects_overfull PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.rests_rejects_bad_duration COMMAND elara-cli rests 4/4 3)
+set_tests_properties(cli.rests_rejects_bad_duration PROPERTIES WILL_FAIL TRUE)

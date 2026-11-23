@@ -20,7 +20,9 @@ base speaks one vocabulary. American terms follow MusicXML.
 | voz | voice | `Voice` | Up to 4 per staff |
 | tiempo / pulso (posición) | beat | `Beat` | Group of notes starting together |
 | nota | note | `Note` | |
-| silencio | rest | `Rest` | |
+| silencio | rest | `Beat::isRest()` | A beat without notes; an empty voice is a measure rest |
+| compás incompleto / sobrecargado | incomplete / overfull voice | `VoiceFill` | Shorter / longer than its time signature |
+| incidencia | issue | `Issue`, `IssueKind` | Inconsistency found by `validate()` |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |

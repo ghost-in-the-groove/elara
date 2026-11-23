@@ -41,5 +41,6 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | build the 20-track song, notes with effects attached | 16.8 ms | `Note` grew from 16 to 80 bytes |
 | 2026-11-23 | build the 20-track song | 13.2 ms | harmonic fret in tenths (int16), `FretPosition` and tuplet counts in one byte each, fields ordered by size: `Note` 48 bytes, `Beat` 64 |
 | 2026-11-23 | copy the 20-track song | 10.7 ms | was 14.8 ms with 80-byte notes; the rest is copying each note's (usually empty) bend curve |
+| 2026-11-23 | validate the 20-track song (fills, frets, ties) | 3.0 ms | about 19 ns per note, half of it summing voice lengths; well under a 60 Hz frame, so the editor can validate the whole song after every edit without caching or threads |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types.

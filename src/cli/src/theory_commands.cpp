@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Music-theory subcommands: pitch, fret, positions, tunings, key, spell, meter.
+// Music-theory subcommands: pitch, fret, positions, tunings, key, spell, meter, rests.
 #include <elara/core/duration.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/tempo.hpp>
 #include <elara/core/tuning.hpp>
+#include <elara/core/validation.hpp>
 
 #include "common.hpp"
 #include <CLI/CLI.hpp>
@@ -19,6 +20,7 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 namespace elara::cli {
 
@@ -307,6 +309,79 @@ int runMeter(bool json, const MeterOptions& options) {
     return kExitOk;
 }
 
+// ---- rests ----------------------------------------------------------------------
+
+struct RestsOptions {
+    std::string time;
+    std::vector<std::string> durations;
+};
+
+std::string_view fillName(core::VoiceFill fill) {
+    switch (fill) {
+    case core::VoiceFill::Empty:
+        return "empty";
+    case core::VoiceFill::Incomplete:
+        return "incomplete";
+    case core::VoiceFill::Complete:
+        return "complete";
+    case core::VoiceFill::Overfull:
+        return "overfull";
+    }
+    return "unknown";
+}
+
+std::string jsonStrings(const std::vector<std::string>& items) {
+    std::string out = "[";
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        out += std::format("{}\"{}\"", i == 0 ? "" : ",", jsonEscape(items[i]));
+    }
+    return out + "]";
+}
+
+int runRests(bool json, const RestsOptions& options) {
+    const auto time = core::TimeSignature::parse(options.time);
+    if (!time) {
+        return usageError(
+            std::format("not a time signature (expected e.g. 4/4, 6/8): {}", options.time));
+    }
+    core::Voice voice;
+    for (const auto& text : options.durations) {
+        const auto duration = core::Duration::parse(text);
+        if (!duration) {
+            return usageError(
+                std::format("not a duration (expected e.g. 4, 8., 16*3:2): {}", text));
+        }
+        voice.beats.push_back(core::Beat{.duration = *duration, .notes = {core::Note{}}});
+    }
+    const core::VoiceFill fill = core::voiceFill(voice, *time);
+    const std::size_t written = voice.beats.size();
+    if (!core::fillWithRests(voice, *time)) {
+        return fail(
+            fill == core::VoiceFill::Overfull
+                ? std::format("the durations are longer than a {} measure", time->toString())
+                : std::string("the rest of the beat cannot be written with rests"));
+    }
+    std::vector<std::string> rests;
+    for (std::size_t i = written; i < voice.beats.size(); ++i) {
+        rests.push_back(voice.beats[i].duration.toString());
+    }
+    if (json) {
+        std::cout << std::format(R"({{"time":"{}","written":{},"fill":"{}","rests":{}}})",
+                                 time->toString(), jsonStrings(options.durations), fillName(fill),
+                                 jsonStrings(rests))
+                  << '\n';
+    } else if (rests.empty()) {
+        std::cout << std::format("{}: {}, no rests needed\n", time->toString(), fillName(fill));
+    } else {
+        std::string list;
+        for (const auto& rest : rests) {
+            list += (list.empty() ? "" : " ") + rest;
+        }
+        std::cout << std::format("{}: add rests {}\n", time->toString(), list);
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addTheoryCommands(CLI::App& app, Context& context) {
@@ -379,6 +454,17 @@ void addTheoryCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     meterCommand->callback(
         [&context, meter] { context.exitCode = runMeter(context.json, *meter); });
+
+    auto rests = std::make_shared<RestsOptions>();
+    auto* restsCommand =
+        app.add_subcommand("rests", "Show the rests that complete a measure after some durations");
+    restsCommand->add_option("time", rests->time, "Time signature such as 4/4 or 6/8")->required();
+    restsCommand
+        ->add_option("durations", rests->durations,
+                     "Written durations in order: 4 = quarter, 8. = dotted eighth, 8*3:2 = triplet")
+        ->required();
+    restsCommand->callback(
+        [&context, rests] { context.exitCode = runRests(context.json, *rests); });
 }
 
 } // namespace elara::cli

@@ -26,7 +26,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Time and key signatures, tempo map
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
-- [ ] Measure validation (voice fills its measure), rests auto-fill
+- [x] Measure validation (voice fills its measure), rests auto-fill
 - [ ] Command pattern with undo/redo
 - [ ] Native format v1 (zip container + JSON), round-trip tests
 - [ ] `elara-cli new`, `elara-cli dump --json` (model snapshot used by later tests)
