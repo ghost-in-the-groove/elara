@@ -112,7 +112,7 @@ void Player::updateMix(const core::Song& song) noexcept {
 }
 
 void Player::updateMix(std::span<const core::TrackMix> mixes) noexcept {
-    if (latest_ == nullptr || mixes.size() != latest_->tracks.size()) {
+    if (latest_ == nullptr || mixes.size() != latest_->songTracks) {
         return;
     }
     const bool anySolo =

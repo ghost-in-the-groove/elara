@@ -373,4 +373,14 @@ TEST_CASE("Player: plays the metronome, which the track mix leaves alone",
     const std::vector<float> clicks = play(player, 1.5);
     CHECK(peakLevel(between(clicks, 0.4, 0.49)) == 0.0f);
     CHECK(peakLevel(between(clicks, 1.0, 1.05)) > 0.01f); // the third beat's click
+
+    // The same from the mixes alone, as a moving fader gives them.
+    const std::vector<TrackMix> mutedMixes(s.trackCount(), TrackMix{.mute = true});
+    player.load(s, sequence);
+    player.updateMix(mutedMixes);
+    player.seek(0.0);
+    player.play();
+    const std::vector<float> previewed = play(player, 1.5);
+    CHECK(peakLevel(between(previewed, 0.4, 0.49)) == 0.0f);
+    CHECK(peakLevel(between(previewed, 1.0, 1.05)) > 0.01f);
 }
