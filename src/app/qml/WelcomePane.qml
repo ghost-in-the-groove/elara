@@ -9,6 +9,7 @@ Item {
     id: root
 
     signal openRequested
+    signal newRequested
 
     ColumnLayout {
         id: column
@@ -67,13 +68,24 @@ Item {
             opacity: 0.7
         }
 
-        Button {
+        RowLayout {
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: 24
-            text: qsTr("Open a score…")
-            highlighted: true
-            font.pixelSize: 15
-            onClicked: root.openRequested()
+            spacing: 12
+
+            Button {
+                text: qsTr("Open a score…")
+                highlighted: true
+                font.pixelSize: 15
+                onClicked: root.openRequested()
+            }
+
+            Button {
+                text: qsTr("New song")
+                flat: true
+                font.pixelSize: 15
+                onClicked: root.newRequested()
+            }
         }
 
         Label {

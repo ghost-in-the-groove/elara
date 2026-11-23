@@ -171,6 +171,13 @@ add_test(NAME cli.edit_undo_and_redo_history
 set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
   PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
 
+# A signature change runs until the next change, as in the app.
+add_test(NAME cli.edit_signature_runs_to_next_change
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8"
+    "time 1 3/4" "key 0 D major")
+set_tests_properties(cli.edit_signature_runs_to_next_change PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"D major\"},{\"time\":\"3/4\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"}\\].*\"undo\":{\"count\":5,")
+
 add_test(NAME cli.edit_reports_incomplete_measure
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 3 4")
 set_tests_properties(cli.edit_reports_incomplete_measure PROPERTIES
@@ -252,6 +259,27 @@ add_test(NAME cli.edit_rejects_drum_on_guitar
 add_test(NAME cli.edit_rejects_drum_without_lane
   COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
 set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
+  PROPERTIES WILL_FAIL TRUE)
+
+# Note effects (ADR-0037): palm mute and let ring on fret 5, let ring off again;
+# a tie on fret 7 after it takes fret 5; a natural harmonic on fret 12.
+set(ELARA_CLI_EFFECTS "${CMAKE_CURRENT_BINARY_DIR}/cli-effects.elara")
+add_test(NAME cli.edit_toggles_effects
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_EFFECTS}" "add-track electric-guitar" "append-measures 1"
+    "caret 0 0 0 3" "fret 5" "effect palm-mute" "effect let-ring" "effect let-ring"
+    right "fret 7" "effect tie" right "fret 12" "effect harmonic")
+set_tests_properties(cli.edit_toggles_effects PROPERTIES
+  FIXTURES_SETUP cli_effects
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":10,\"next\":\"Change effect\"}")
+add_test(NAME cli.dump_effects COMMAND elara-cli --json dump "${ELARA_CLI_EFFECTS}")
+set_tests_properties(cli.dump_effects PROPERTIES
+  FIXTURES_REQUIRED cli_effects
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"C4\",\"string\":3,\"fret\":5,\"effects\":{\"palmMute\":true}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C4\",\"string\":3,\"fret\":5,\"effects\":{\"tiedFromPrevious\":true}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G4\",\"string\":3,\"fret\":12,\"effects\":{\"harmonic\":{\"kind\":\"natural\"")
+add_test(NAME cli.edit_rejects_unknown_effect
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect wah")
+add_test(NAME cli.edit_rejects_tie_without_note
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect tie")
+set_tests_properties(cli.edit_rejects_unknown_effect cli.edit_rejects_tie_without_note
   PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME cli.edit_rejects_caret_outside_song

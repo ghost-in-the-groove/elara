@@ -13,10 +13,11 @@ Qt Quick / QML user interface.
 | File | What it does |
 |---|---|
 | `src/score_painter.hpp` | `ScorePainter`: paints a display list with QPainter (glyph outlines of the bundled fonts, shapes), the same on every platform and thread. `ScoreFonts` loads Bravura and Arimo. Built as the `elara_app_view` library so that tests link it. |
-| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. |
+| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. Edits the song through `core::Document` (new song, song info, tempo, signatures, length, tracks; undo, redo) and saves it as `.elara` (ADR-0031). |
 | `src/score_page.hpp` | `ScorePage` (QML): one page as a texture, painted on a worker thread at its size in device pixels and painted again when zooming settles. |
 | `src/startup.hpp` | What the app does after its window loads: `--track`, `--view`, `--seek`, `--smoke-test`, `--screenshot` (`--tuner` is a property of the window). |
-| `qml/Main.qml` | The window: toolbar (open, view, track, zoom), welcome pane, pages, transport, drag and drop, errors, status bar. |
+| `qml/Main.qml` | The window: toolbar (new, open, save, undo, redo, view, track, zoom), welcome pane, pages, transport, drag and drop, errors, status bar; asks to save unsaved changes before they would be lost. |
+| `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. |
 | `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. |
 
 ## The tuner (ADR-0029)
@@ -63,7 +64,7 @@ the way down.
 
 ```
 elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
-      [--tuner] [--language en|es] [--smoke-test] [--screenshot OUT.png]
+      [--tuner] [--song-pane] [--language en|es] [--smoke-test] [--screenshot OUT.png]
 ```
 
 - `FILE` opens a score at start; `--track` (from 1) and `--view` show that track
@@ -78,6 +79,10 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
 - `--screenshot OUT.png` saves the window once it is shown and quits.
 - `--tuner` opens the tuner at start (`app.smoke_tuner` checks it loads cleanly;
   without an audio input it says so instead of listening).
+- `--song-pane` opens the song panel at start (`app.smoke_song_pane`).
+- After the views, `--smoke-test` edits the song, or a new one when no file is
+  given: it adds a track, changes the time signature, undoes both, redoes and
+  undoes again, and fails unless the song ends as it began.
 - `--language es` shows the UI in Spanish (`en` in English) instead of the
   system's language. With `--smoke-test` or `--screenshot` the app first prints
   `ui language: es`, which `app.smoke_spanish` checks; `app.language_unknown`

@@ -32,6 +32,7 @@ elara_add_unit_tests(core
     core/test_effects.cpp
     core/test_entry.cpp
     core/test_drum_entry.cpp
+    core/test_entry_effects.cpp
     core/test_validation.cpp
     core/test_performance.cpp
     core/test_transpose.cpp
@@ -85,6 +86,8 @@ if(TARGET elara)
 
   # The window without a screen: it loads cleanly and, given a file, lays it
   # out, paints its first page and shows it in every view and with all tracks.
+  # Then it edits the song (a new one without a file): adds a track, changes
+  # the time signature, undoes, redoes, and checks the song ends as it began.
   add_test(NAME app.smoke COMMAND elara --smoke-test)
   add_test(NAME app.smoke_open_tracks
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
@@ -95,16 +98,21 @@ if(TARGET elara)
   # The tuner opened at start. Without an audio input (as in CI) it says so
   # instead of listening; either way its QML must load without warnings.
   add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
+  # The song panel open while the song is edited.
+  add_test(NAME app.smoke_song_pane
+    COMMAND elara --smoke-test --song-pane "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner
+    app.smoke_tuner app.smoke_song_pane
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
-  set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 6 layouts\\)")
+  set_tests_properties(app.smoke PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 7 layouts\\)")
+  set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 13 layouts\\)")
   set_tests_properties(app.smoke_open_views PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 4 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 10 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # The UI in Spanish: the catalog compiled into the executable loads and the
