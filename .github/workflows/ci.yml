@@ -22,7 +22,7 @@ jobs:
       matrix:
         include:
           - { name: windows, os: windows-2022 }
-          - { name: macos, os: macos-15 }
+          - { name: macos, os: macos-15-intel }
           - { name: linux, os: ubuntu-24.04 }
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +69,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json') }}
 
       - name: Check, build and test
         run: python scripts/elara.py ci
