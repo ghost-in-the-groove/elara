@@ -59,7 +59,18 @@ bool Startup::checking() const {
 
 void Startup::queueSteps() {
     using View = ScoreDocument::View;
-    if (score_ == nullptr || options_.file.isEmpty()) {
+    if (score_ == nullptr) {
+        return;
+    }
+    if (options_.file.isEmpty()) {
+        // Without a file the smoke test edits a new song.
+        if (options_.smokeTest) {
+            steps_.emplace_back([this] {
+                score_->newSong(QStringLiteral("electric-guitar"));
+                return true;
+            });
+            queueEdits();
+        }
         return;
     }
     if (options_.smokeTest) {
@@ -86,6 +97,7 @@ void Startup::queueSteps() {
             score_->setTrack(0);
             return true;
         });
+        queueEdits();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -124,6 +136,61 @@ void Startup::queueSteps() {
     if (options_.seek) {
         seekTo(*options_.seek);
     }
+}
+
+// Edits, undone and redone: a track added and shown, the time signature
+// changed, both undone, the track redone and undone again. Each step is laid
+// out and painted; the song must end as it started.
+void Startup::queueEdits() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("edit check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        tracksBefore_ = score_->trackNames().size();
+        score_->addTrack(QStringLiteral("electric-bass"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->trackNames().size() == tracksBefore_ + 1, "the track was not added");
+        check(score_->track() == tracksBefore_, "the new track is not shown");
+        durationBefore_ = score_->duration();
+        score_->setTimeSignature(5, 8);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->timeNumerator() == 5 && score_->timeDenominator() == 8,
+              "the time signature did not change");
+        check(score_->duration() != durationBefore_, "playback did not follow the edit");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->trackNames().size() == tracksBefore_, "undo left the track");
+        check(score_->timeNumerator() != 5 && !score_->canUndo() && score_->canRedo(),
+              "undo did not restore the song");
+        score_->redo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->trackNames().size() == tracksBefore_ + 1, "redo did not add the track");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->trackNames().size() == tracksBefore_ && !score_->modified(),
+              "the song did not end as it started");
+        if (score_->track() == 0) {
+            return false;
+        }
+        score_->setTrack(0);
+        return true;
+    });
 }
 
 void Startup::tick() {
@@ -176,6 +243,10 @@ void Startup::tick() {
         if (clock_.elapsed() - settledAt_ < kSettleMilliseconds) {
             return;
         }
+    }
+    if (!editProblem_.isEmpty()) {
+        finish(false, editProblem_);
+        return;
     }
     QString detail;
     if (score_ != nullptr && score_->pageCount() > 0) {

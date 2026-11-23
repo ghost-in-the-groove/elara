@@ -144,7 +144,7 @@ void playTrack(Synth& synth, std::span<const FrameEvent> events, std::size_t& ne
             synth.noteOff(event.key);
             break;
         case EventKind::Pitch:
-            synth.glide(event.key, event.cents, event.glide);
+            synth.glide(event.key, event.cents, static_cast<double>(event.glide));
             break;
         }
         dispatched(event);

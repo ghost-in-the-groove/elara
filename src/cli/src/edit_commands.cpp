@@ -153,6 +153,22 @@ struct EntryState {
     core::Duration input{core::NoteValue::Quarter};
 };
 
+// The names `effect <name>` takes (ADR-0037).
+constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectNames{{
+    {"tie", core::NoteEffect::Tie},
+    {"legato", core::NoteEffect::Legato},
+    {"slide", core::NoteEffect::Slide},
+    {"bend", core::NoteEffect::Bend},
+    {"vibrato", core::NoteEffect::Vibrato},
+    {"palm-mute", core::NoteEffect::PalmMute},
+    {"dead-note", core::NoteEffect::DeadNote},
+    {"let-ring", core::NoteEffect::LetRing},
+    {"harmonic", core::NoteEffect::Harmonic},
+    {"ghost", core::NoteEffect::Ghost},
+    {"accent", core::NoteEffect::Accent},
+    {"staccato", core::NoteEffect::Staccato},
+}};
+
 /// Runs a keyboard entry step; false when `step` is not one.
 bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     using namespace core;
@@ -213,6 +229,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             entry.caret.string = static_cast<int>(found - pieces.begin()) + 1;
         }
         edit = toggleDrum(song, entry.caret, entry.input);
+    } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kEffectNames, [name](const auto& effect) { return effect.first == name; });
+        if (found == kEffectNames.end()) {
+            throw StepSyntaxError(std::format("not an effect: {}", name));
+        }
+        edit = toggleEffect(song, entry.caret, found->second);
     } else {
         return false;
     }
@@ -256,22 +280,25 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         const std::size_t count = step.has(2) ? step.index(2) : 1;
         doc.execute(std::make_unique<RemoveMeasures>(step.index(1), count));
     } else if (verb == "time" || verb == "key") {
+        // From the measure until the next change of that signature.
         const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
+        std::unique_ptr<Command> change;
         if (verb == "time") {
             const auto time = TimeSignature::parse(step.word(2));
             if (!time) {
                 throw StepSyntaxError(std::format("not a time signature: {}", step.word(2)));
             }
-            header.timeSignature = *time;
+            change = changeTimeSignature(song, measure, *time);
         } else {
             const auto key = KeySignature::parse(step.rest(2));
             if (!key) {
                 throw StepSyntaxError(std::format("not a key: {}", step.rest(2)));
             }
-            header.keySignature = *key;
+            change = changeKeySignature(song, measure, *key);
         }
-        doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        if (change) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
         core::TrackMix mix{.volume = step.decimal(2), .pan = step.decimal(3)};
         for (std::size_t i = 4; step.has(i); ++i) {
@@ -475,7 +502,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", undo, redo, save");
+        "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

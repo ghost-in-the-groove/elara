@@ -14,15 +14,20 @@ ApplicationWindow {
     property url initialFile
     /// Open the tuner at start (from the command line).
     property bool showTuner: false
+    /// The song panel at the right of the score.
+    property bool showSongPane: false
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
+    /// What to do once unsaved changes are saved or discarded.
+    property var pendingAction: null
+    property bool closing: false
 
     width: 1280
     height: 860
     minimumWidth: 760
     minimumHeight: 480
     visible: true
-    title: hasScore ? qsTr("%1 — Elara").arg(score.title) : "Elara"
+    title: hasScore ? qsTr("%1 — Elara").arg((score.modified ? "• " : "") + score.title) : "Elara"
     color: dark ? "#17171c" : "#e9ebf0"
 
     Component.onCompleted: {
@@ -32,11 +37,59 @@ ApplicationWindow {
             tunerPane.open();
     }
 
+    onClosing: close => {
+        if (score.modified && !closing) {
+            close.accepted = false;
+            whenSaved(() => {
+                window.closing = true;
+                window.close();
+            });
+        }
+    }
+
     function toggleTuner() {
         if (tunerPane.visible)
             tunerPane.close();
         else
             tunerPane.open();
+    }
+
+    /// Runs `action` at once, or after asking whether to save the changes.
+    function whenSaved(action) {
+        if (!score.modified) {
+            action();
+            return;
+        }
+        pendingAction = action;
+        unsavedDialog.open();
+    }
+
+    function runPendingAction() {
+        const action = pendingAction;
+        pendingAction = null;
+        if (action)
+            action();
+    }
+
+    function openScore() {
+        whenSaved(() => openDialog.open());
+    }
+
+    function newSong() {
+        whenSaved(() => {
+            score.newSong("electric-guitar");
+            window.showSongPane = true;
+        });
+    }
+
+    /// Saves to the song's own file, or asks where when it has none.
+    function save() {
+        if (score.savesInPlace) {
+            if (score.save(score.source))
+                runPendingAction();
+        } else {
+            saveDialog.open();
+        }
     }
 
     ScoreDocument {
@@ -51,6 +104,7 @@ ApplicationWindow {
             if (status === ScoreDocument.Error)
                 toast.show(errorMessage);
         }
+        onEditFailed: message => toast.show(message)
     }
 
     AudioController {
@@ -76,6 +130,43 @@ ApplicationWindow {
         title: qsTr("Open a score")
         nameFilters: score.nameFilters
         onAccepted: score.open(selectedFile)
+    }
+
+    FileDialog {
+        id: saveDialog
+
+        title: qsTr("Save the song")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("Elara (*.elara)")]
+        defaultSuffix: "elara"
+        onAccepted: {
+            if (score.save(selectedFile))
+                window.runPendingAction();
+        }
+        onRejected: window.pendingAction = null
+    }
+
+    Dialog {
+        id: unsavedDialog
+
+        anchors.centerIn: parent
+        // A fixed width: three buttons and a label would size each other.
+        width: Math.min(460, window.width - 48)
+        modal: true
+        title: qsTr("Save the changes?")
+        standardButtons: Dialog.Save | Dialog.Discard | Dialog.Cancel
+        onAccepted: window.save()
+        onDiscarded: {
+            close();
+            window.runPendingAction();
+        }
+        onRejected: window.pendingAction = null
+
+        Label {
+            width: unsavedDialog.availableWidth
+            text: qsTr("“%1” has changes that are not saved.").arg(score.title)
+            wrapMode: Text.Wrap
+        }
     }
 
     Dialog {
@@ -129,9 +220,41 @@ ApplicationWindow {
             }
 
             IconButton {
+                // A sheet with a plus.
+                iconPath: "M6 3 L14 3 L19 8 L19 21 L6 21 Z M14 3 L14 8 L19 8 M12.5 11 L12.5 17 M9.5 14 L15.5 14"
+                tip: qsTr("New song (Ctrl+N)")
+                onClicked: window.newSong()
+            }
+
+            IconButton {
                 iconPath: "M3 7 L3 18 Q3 19 4 19 L20 19 Q21 19 21 18 L21 9 Q21 8 20 8 L11.5 8 L9.5 6 L4 6 Q3 6 3 7 Z"
                 tip: qsTr("Open a score (Ctrl+O)")
-                onClicked: openDialog.open()
+                onClicked: window.openScore()
+            }
+
+            IconButton {
+                visible: window.hasScore
+                enabled: score.modified || !score.savesInPlace
+                // A floppy disk.
+                iconPath: "M5 4 L16 4 L20 8 L20 20 L4 20 L4 5 Q4 4 5 4 Z M8 4 L8 9 L15 9 L15 4 M8 20 L8 14 L16 14 L16 20"
+                tip: qsTr("Save (Ctrl+S)")
+                onClicked: window.save()
+            }
+
+            IconButton {
+                visible: window.hasScore
+                enabled: score.canUndo
+                iconPath: "M9 14 L4 9 L9 4 M4 9 L14 9 Q20 9 20 15 Q20 20 14 20 L10 20"
+                tip: score.canUndo ? qsTr("Undo %1 (Ctrl+Z)").arg(score.undoName) : qsTr("Undo (Ctrl+Z)")
+                onClicked: score.undo()
+            }
+
+            IconButton {
+                visible: window.hasScore
+                enabled: score.canRedo
+                iconPath: "M15 14 L20 9 L15 4 M20 9 L10 9 Q4 9 4 15 Q4 20 10 20 L14 20"
+                tip: score.canRedo ? qsTr("Redo %1 (Ctrl+Y)").arg(score.redoName) : qsTr("Redo (Ctrl+Y)")
+                onClicked: score.redo()
             }
 
             ToolSeparator {
@@ -152,7 +275,7 @@ ApplicationWindow {
 
                 Label {
                     Layout.fillWidth: true
-                    text: score.title
+                    text: score.title + (score.modified ? "  •" : "")
                     font.pixelSize: 15
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -238,6 +361,16 @@ ApplicationWindow {
             }
 
             IconButton {
+                visible: window.hasScore
+                // Three sliders.
+                iconPath: "M4 7 L20 7 M4 12 L20 12 M4 17 L20 17 M9 5 L9 9 M15 10 L15 14 M7 15 L7 19"
+                tip: qsTr("Song and tracks (Ctrl+I)")
+                checkable: true
+                checked: window.showSongPane
+                onClicked: window.showSongPane = !window.showSongPane
+            }
+
+            IconButton {
                 // A tuning fork.
                 iconPath: "M9 3 L9 10 Q9 14 12 14 Q15 14 15 10 L15 3 M12 14 L12 21"
                 tip: qsTr("Tuner (Ctrl+Shift+T)")
@@ -279,7 +412,8 @@ ApplicationWindow {
             anchors.fill: parent
             opacity: window.hasScore ? 0.0 : 1.0
             visible: opacity > 0
-            onOpenRequested: openDialog.open()
+            onOpenRequested: window.openScore()
+            onNewRequested: window.newSong()
 
             Behavior on opacity {
                 NumberAnimation {
@@ -292,7 +426,10 @@ ApplicationWindow {
         ScoreView {
             id: scoreView
 
-            anchors.fill: parent
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: songPane.left
             document: score
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
@@ -304,6 +441,30 @@ ApplicationWindow {
             Behavior on opacity {
                 NumberAnimation {
                     duration: 260
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        // Slides in from the right; the score makes room for it.
+        SongPane {
+            id: songPane
+
+            readonly property bool shown: window.showSongPane && window.hasScore
+
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            width: shown ? 340 : 0
+            visible: width > 0
+            clip: true
+            document: score
+            dark: window.dark
+            onCloseRequested: window.showSongPane = false
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: 220
                     easing.type: Easing.OutCubic
                 }
             }
@@ -324,8 +485,10 @@ ApplicationWindow {
             anchors.fill: parent
             onEntered: drag => drag.accepted = drag.hasUrls
             onDropped: drop => {
-                if (drop.hasUrls)
-                    score.open(drop.urls[0]);
+                if (drop.hasUrls) {
+                    const file = drop.urls[0];
+                    window.whenSaved(() => score.open(file));
+                }
             }
         }
 
@@ -586,7 +749,36 @@ ApplicationWindow {
 
     Shortcut {
         sequences: [StandardKey.Open]
-        onActivated: openDialog.open()
+        onActivated: window.openScore()
+    }
+    Shortcut {
+        sequences: [StandardKey.New]
+        onActivated: window.newSong()
+    }
+    Shortcut {
+        sequences: [StandardKey.Save]
+        enabled: window.hasScore
+        onActivated: window.save()
+    }
+    Shortcut {
+        sequences: [StandardKey.SaveAs]
+        enabled: window.hasScore
+        onActivated: saveDialog.open()
+    }
+    Shortcut {
+        sequences: [StandardKey.Undo]
+        enabled: score.canUndo
+        onActivated: score.undo()
+    }
+    Shortcut {
+        sequences: [StandardKey.Redo, "Ctrl+Y"]
+        enabled: score.canRedo
+        onActivated: score.redo()
+    }
+    Shortcut {
+        sequence: "Ctrl+I"
+        enabled: window.hasScore
+        onActivated: window.showSongPane = !window.showSongPane
     }
     Shortcut {
         sequence: "Ctrl+Shift+T"

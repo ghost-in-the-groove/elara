@@ -121,7 +121,9 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `paste <m> [track <t>] [insert]`,
 `transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
 `save`. A malformed step exits with 2, a step the song rejects
-(missing track, nothing to undo) with 1.
+(missing track, nothing to undo) with 1. `time` and `key` change the signature
+from measure `m` until the next change of it, as the app does; a step that
+changes nothing adds no undo step.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an
@@ -153,7 +155,10 @@ whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
 caret's string is a drum lane, from the crash at the top to the hi-hat pedal
 (ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
 that General MIDI key's lane (moving the caret to it), and `delete` removes the
-lane's piece only. The output includes `"caret"` and `"input"`.
+lane's piece only. `effect <name>` toggles a note effect on the caret's notes
+(ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
+`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`. The
+output includes `"caret"` and `"input"`.
 
 `sequence`, `render-audio` and `play` play a song for practice (ADR-0024):
 `--speed` from 25 to 200 percent of the written tempo, and `--metronome` clicks
