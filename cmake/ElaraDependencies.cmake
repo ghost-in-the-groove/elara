@@ -9,6 +9,7 @@
 # THIRD_PARTY_NOTICES.md and, if it is a design decision, in docs/adr/.
 
 include(FetchContent)
+include(${CMAKE_CURRENT_LIST_DIR}/ElaraFetchFile.cmake)
 
 set(ELARA_DOWNLOAD_CACHE "${PROJECT_SOURCE_DIR}/build/_downloads"
   CACHE PATH "Where third-party source archives are cached between build trees")
@@ -39,20 +40,8 @@ foreach(_entry IN ITEMS
   list(GET _parts 1 _hash)
   get_filename_component(_name "${_path}" NAME)
   set(_cached "${_bravura_cache}/${_name}")
-  set(_have "")
-  if(EXISTS "${_cached}")
-    file(SHA256 "${_cached}" _have)
-  endif()
-  if(NOT _have STREQUAL _hash)
-    message(STATUS "Downloading Bravura ${ELARA_BRAVURA_VERSION}: ${_name}")
-    file(DOWNLOAD "${_bravura_url}/${_path}" "${_cached}"
-      EXPECTED_HASH SHA256=${_hash} TLS_VERIFY ON STATUS _status)
-    list(GET _status 0 _code)
-    if(NOT _code EQUAL 0)
-      list(GET _status 1 _reason)
-      message(FATAL_ERROR "Could not download Bravura's ${_name}: ${_reason}")
-    endif()
-  endif()
+  elara_fetch_file("${_bravura_url}/${_path}" "${_cached}" ${_hash}
+    "Bravura ${ELARA_BRAVURA_VERSION}: ${_name}")
   file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
 endforeach()
 
@@ -72,20 +61,7 @@ foreach(_entry IN ITEMS
   list(GET _parts 1 _name)
   list(GET _parts 2 _hash)
   set(_cached "${_arimo_cache}/${_name}")
-  set(_have "")
-  if(EXISTS "${_cached}")
-    file(SHA256 "${_cached}" _have)
-  endif()
-  if(NOT _have STREQUAL _hash)
-    message(STATUS "Downloading Arimo: ${_name}")
-    file(DOWNLOAD "${_arimo_url}/${_path}" "${_cached}"
-      EXPECTED_HASH SHA256=${_hash} TLS_VERIFY ON STATUS _status)
-    list(GET _status 0 _code)
-    if(NOT _code EQUAL 0)
-      list(GET _status 1 _reason)
-      message(FATAL_ERROR "Could not download Arimo's ${_name}: ${_reason}")
-    endif()
-  endif()
+  elara_fetch_file("${_arimo_url}/${_path}" "${_cached}" ${_hash} "Arimo: ${_name}")
   file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
 endforeach()
 
