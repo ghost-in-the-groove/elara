@@ -39,9 +39,11 @@ enum class Role : std::uint8_t {
     MeasureNumber, ///< the number of the first measure of a system
     Credit,        ///< title, subtitle, artist, words, music, copyright and page numbers
     TrackName,     ///< the name of a track left of its staves in the first system
+    Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
+    Volta,         ///< the bracket and numbers of an alternate ending
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::TrackName) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Volta) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

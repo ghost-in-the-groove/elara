@@ -48,6 +48,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Horizontal spacing, beaming, stems, accidentals for one staff
 - [x] Tablature staff layout with effects notation
 - [x] Systems and pages: line breaking, justification, multi-track scores
+- [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [ ] Incremental relayout (only the systems an edit touches)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
@@ -62,6 +63,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)
 - [ ] Mixer (volume, pan, mute, solo), playback cursor in the app
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
+- [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
 
 ## Milestone 5 - Editor
 

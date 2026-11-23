@@ -32,6 +32,8 @@ inline constexpr double kClefX = 0.6;        // left edge of the clef
 inline constexpr double kHeaderGap = 0.9;    // between clef, key and time signatures
 inline constexpr double kFirstNoteGap = 1.6; // after the header, before the first note
 inline constexpr double kBarlineGap = 1.2;   // after a barline, before the first note
+inline constexpr double kRepeatGap =
+    0.9; // after a header or signature changes, before a start repeat
 inline constexpr double kMinNoteGap = 0.4;   // between the ink of neighbouring columns
 inline constexpr double kEndGap = 1.0;       // after the last note, before the barline
 inline constexpr double kQuarterSpace = 3.0; // ideal distance after a quarter note
@@ -204,9 +206,13 @@ public:
     /// measure running from `start` to its barline.
     virtual void draw(std::span<const ColumnPosition> positions, double start, double barline) = 0;
 
-    /// The barline closing measure m at `x` (thin-thick at the song's end);
-    /// returns its right.
-    double barline(std::size_t m, double x, bool songEnd);
+    /// The barline closing measure m at `x`: thin, thin-thick at the song's
+    /// end, dots and thin-thick for an end repeat. Returns its right.
+    double barline(std::size_t m, double x, bool songEnd, bool repeatEnd);
+
+    /// The start repeat of measure m, thick-thin and dots, from `x`; returns
+    /// its right.
+    double opening(std::size_t m, double x);
 
     /// Staff lines over `width`, the marks still open, the ink extents. Ends the
     /// line: the writer can start another with header().
@@ -267,6 +273,10 @@ protected:
     std::size_t measure_ = 0;
 
 private:
+    /// The two dots of a repeat barline from `x`, either side of the middle of
+    /// the staff in a space; returns their right.
+    double repeatDots(double x);
+
     double height_;
     std::size_t lines_;
 };
@@ -319,6 +329,17 @@ struct MeasureWidth {
     double tail = 0.0;           // after the last spring, before the barline
     std::vector<Spring> springs; // after each column, the last one up to the barline
     double barline = 0.0;        // the barline closing it
+    double opening = 0.0;        // its start repeat after a header or changes, gap included
+    double openingInline = 0.0;  // its start repeat over the barline before it
+
+    /// What comes before the gap at its start: the header when a system starts
+    /// with it (`first`), otherwise the signature changes; then its start repeat.
+    [[nodiscard]] double before(bool first) const {
+        if (first) {
+            return header + opening;
+        }
+        return changes > 0.0 ? changes + opening : openingInline;
+    }
 
     /// From the end of the gap at its start to its barline.
     [[nodiscard]] double width(double stretch) const {
