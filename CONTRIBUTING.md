@@ -40,7 +40,7 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
    | `src/audio` (`elara_audio`) | std, core | Qt, JUCE |
    | `src/audio/backend_juce` | std, core, audio, JUCE | Qt; JUCE in its public header |
    | `src/io` (`elara_io`) | std, core, miniz, pugixml, yyjson | Qt, JUCE |
-   | `src/notation` (future) | std, core | Qt, JUCE |
+   | `src/notation` (`elara_notation`) | std, core, yyjson | Qt, JUCE, other modules |
    | `src/cli` | all modules but app | Qt, JUCE |
    | `src/app` | Qt, all modules | JUCE |
 

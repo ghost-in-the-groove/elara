@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
     addTheoryCommands(app, context);
     addEditCommands(app, context);
     addFileCommands(app, context);
+    addFontCommands(app, context);
 
     try {
         app.parse(argc, argv);

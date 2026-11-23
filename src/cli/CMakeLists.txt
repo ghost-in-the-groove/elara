@@ -6,12 +6,14 @@ add_executable(elara-cli
   src/audio_commands.cpp
   src/edit_commands.cpp
   src/file_commands.cpp
+  src/font_commands.cpp
   src/song_report.cpp
   src/theory_commands.cpp)
 
 target_link_libraries(elara-cli PRIVATE
   elara::core
   elara::io
+  elara::notation
   elara::audio
   elara::audio_juce
   CLI11::CLI11)

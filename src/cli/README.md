@@ -22,6 +22,7 @@ elara-cli [--json] dump <FILE>                    # with --json: the whole model
 elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl, .mid, .midi, .smf, .gp
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
+elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -40,6 +41,12 @@ ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes
 MusicXML (compressed for `.mxl`) or MIDI and prints `{"file", "out", "format",
 "compressed", "bytes", "warnings"}`, where `warnings` lists what the format
 could not hold (ADR-0008, ADR-0009).
+
+`font` shows what the notation engine reads from the SMuFL font (ADR-0011),
+by default `fonts/Bravura.json` next to `elara-cli`: `--json` prints `{"name",
+"version", "metadata", "glyphs", "described", "missing", "defaults"}`, and
+with `--glyph noteheadBlack` one glyph's `{"glyph", "codepoint", "bbox",
+"advanceWidth", "anchors"}` in staff spaces, y up.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

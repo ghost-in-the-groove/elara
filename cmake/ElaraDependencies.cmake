@@ -2,6 +2,7 @@
 #
 # - vcpkg (manifest mode, vcpkg.json): CLI11, Catch2.
 # - FetchContent with a pinned, hashed archive: JUCE (audio only, ADR-0002).
+# - Pinned, hashed files: the Bravura music font and its SMuFL metadata (ADR-0011).
 # - Qt is found from QT_ROOT_DIR (CMAKE_PREFIX_PATH in CMakePresets.json).
 #
 # Adding a dependency: check its licence against AGPL-3.0 first, record it in
@@ -20,6 +21,40 @@ FetchContent_Declare(juce
   SYSTEM
   EXCLUDE_FROM_ALL)
 FetchContent_MakeAvailable(juce)
+
+# Bravura (SMuFL music font, SIL OFL 1.1, ADR-0011): three files of a tagged
+# release, each checked against its SHA-256, copied to bin/fonts/ next to the
+# executables. ELARA_FONT_DIR is where they end up.
+set(ELARA_BRAVURA_VERSION 1.482)
+set(ELARA_FONT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fonts")
+set(_bravura_url
+  "https://raw.githubusercontent.com/steinbergmedia/bravura/bravura-${ELARA_BRAVURA_VERSION}/redist")
+set(_bravura_cache "${ELARA_DOWNLOAD_CACHE}/bravura-${ELARA_BRAVURA_VERSION}")
+foreach(_entry IN ITEMS
+    "Bravura.json|489fb4d734fc0b72a3cc601b50ebdf0bf8c57802ab9893e52ce030b86bf2ce11"
+    "otf/Bravura.otf|cdf0f893ee1fdb64b7f6713d71ee0dcfc349c0ac01429a8e451b01a9e79f5f3b"
+    "OFL.txt|c24929be7028026a65ee8894da1e3c36d2a4ccce0548d9ba8ba64509f46319ee")
+  string(REPLACE "|" ";" _parts "${_entry}")
+  list(GET _parts 0 _path)
+  list(GET _parts 1 _hash)
+  get_filename_component(_name "${_path}" NAME)
+  set(_cached "${_bravura_cache}/${_name}")
+  set(_have "")
+  if(EXISTS "${_cached}")
+    file(SHA256 "${_cached}" _have)
+  endif()
+  if(NOT _have STREQUAL _hash)
+    message(STATUS "Downloading Bravura ${ELARA_BRAVURA_VERSION}: ${_name}")
+    file(DOWNLOAD "${_bravura_url}/${_path}" "${_cached}"
+      EXPECTED_HASH SHA256=${_hash} TLS_VERIFY ON STATUS _status)
+    list(GET _status 0 _code)
+    if(NOT _code EQUAL 0)
+      list(GET _status 1 _reason)
+      message(FATAL_ERROR "Could not download Bravura's ${_name}: ${_reason}")
+    endif()
+  endif()
+  file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
+endforeach()
 
 find_package(CLI11 CONFIG REQUIRED)
 

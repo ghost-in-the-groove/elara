@@ -16,6 +16,7 @@ one that replaces them.
 | [0008](0008-musicxml-export.md) | MusicXML export | Accepted |
 | [0009](0009-midi-import-and-export.md) | MIDI import and export | Accepted |
 | [0010](0010-guitar-pro-import.md) | Guitar Pro import | Accepted |
+| [0011](0011-notation-engine.md) | Notation engine | Accepted |
 
 ## Template
 

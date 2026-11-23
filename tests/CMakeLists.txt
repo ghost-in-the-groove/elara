@@ -1,6 +1,6 @@
 # Tests. One Catch2 executable per module plus end-to-end CTest cases that drive
 # elara-cli and the app headlessly (ADR-0003). Test names are prefixed with the
-# module ("core.", "io.", "audio.", "cli.", "app.") so `ctest -R <module>` selects them.
+# module ("core.", "io.", "notation.", "audio.", "cli.", "app.") so `ctest -R <module>` selects them.
 
 include(Catch)
 
@@ -43,6 +43,11 @@ elara_add_unit_tests(io
   SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp io/test_midi.cpp io/test_guitar_pro.cpp
   LIBRARIES elara::io miniz::miniz)
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
+
+elara_add_unit_tests(notation
+  SOURCES notation/test_smufl.cpp
+  LIBRARIES elara::notation)
+target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 
 add_subdirectory(cli)
 

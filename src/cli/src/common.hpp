@@ -2,6 +2,7 @@
 // Shared plumbing for elara-cli subcommands.
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 
@@ -25,6 +26,13 @@ struct Context {
 /// Escapes text for a JSON string literal (without the quotes).
 [[nodiscard]] std::string jsonEscape(std::string_view text);
 
+/// The directory holding the running executable (empty if the system will not
+/// say). Files shipped with Elara, such as fonts/, sit next to it.
+[[nodiscard]] std::filesystem::path executableDirectory();
+
+/// A path as UTF-8 text, whatever the system's code page.
+[[nodiscard]] std::string utf8(const std::filesystem::path& path);
+
 /// Prints "error: <message>" on stderr and returns kExitError (runtime failure).
 int fail(std::string_view message);
 
@@ -36,6 +44,7 @@ int usageError(std::string_view message);
 void addAudioCommands(CLI::App& app, Context& context);
 void addEditCommands(CLI::App& app, Context& context);
 void addFileCommands(CLI::App& app, Context& context);
+void addFontCommands(CLI::App& app, Context& context);
 void addTheoryCommands(CLI::App& app, Context& context);
 
 } // namespace elara::cli

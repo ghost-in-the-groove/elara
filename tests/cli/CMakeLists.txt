@@ -293,6 +293,22 @@ add_test(NAME cli.import_unicode_path COMMAND elara-cli --json import "${_unicod
 set_tests_properties(cli.import_unicode_path PROPERTIES
   PASS_REGULAR_EXPRESSION "\"file\":\"[^\"]*canción-曲\\.musicxml\",\"format\":\"musicxml\"")
 
+# Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
+add_test(NAME cli.font COMMAND elara-cli --json font)
+set_tests_properties(cli.font PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":85,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+
+add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
+set_tests_properties(cli.font_glyph PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"glyph\":\"noteheadBlack\",\"codepoint\":\"U\\+E0A4\",\"bbox\":{\"sw\":\\[0,-0\\.5\\],\"ne\":\\[1\\.18,0\\.5\\]},\"advanceWidth\":1\\.18,\"anchors\":{\"stemUpSE\":\\[1\\.18,0\\.168\\],\"stemDownNW\":\\[0,-0\\.168\\]")
+
+add_test(NAME cli.font_rejects_unknown_glyph COMMAND elara-cli font --glyph noSuchGlyph)
+set_tests_properties(cli.font_rejects_unknown_glyph PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.font_rejects_missing_metadata
+  COMMAND elara-cli font --metadata "${CMAKE_CURRENT_BINARY_DIR}/no-such-metadata.json")
+set_tests_properties(cli.font_rejects_missing_metadata PROPERTIES WILL_FAIL TRUE)
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot
