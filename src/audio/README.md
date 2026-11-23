@@ -12,7 +12,10 @@ Two targets with different rules:
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
   ring and harmonics applied (ADR-0022), and bends, slides, hammer-ons and
-  vibrato sent as pitch events (ADR-0023);
+  vibrato sent as pitch events (ADR-0023). For practice it plays at 25 % to
+  200 % of the written tempo and adds a metronome on a track after the song's
+  (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
+  wood blocks at a fixed level;
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`; plucked timbres also play each note's `Touch`:
   palm mute, dead note or harmonic, ADR-0022; `glide()` moves a sounding
@@ -55,7 +58,8 @@ reports frames and peak level; `elara-cli sequence FILE --json --events` prints
 what the sequencer would play; `elara-cli render-audio FILE --json --events
 [--out song.wav]` plays it through the built-in synthesizer and prints the
 level, each track's timbre and every event with the frame it was dispatched
-at. `elara-cli play FILE` plays it on the default device. `elara-cli tune
+at. `elara-cli play FILE` plays it on the default device. All three take
+`--speed PERCENT` and `--metronome`. `elara-cli tune
 FILE.wav --json [--tuning guitar]` reports the pitch a tuner would show for a
 recording. Tests in
 `tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the

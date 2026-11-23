@@ -41,6 +41,15 @@ public:
     }
     /// Length of the note value the denominator names (6/8 -> 1/8).
     [[nodiscard]] constexpr Fraction beatLength() const { return Fraction(1, denominator_); }
+    /// A compound meter counts its beats in threes: 6/8, 9/8, 12/16, 6/4.
+    [[nodiscard]] constexpr bool isCompound() const noexcept {
+        return numerator_ > 3 && numerator_ % 3 == 0;
+    }
+    /// Length of the beat a player counts: three of the denominator's value
+    /// in a compound meter (6/8 -> 3/8), otherwise beatLength().
+    [[nodiscard]] constexpr Fraction pulseLength() const {
+        return Fraction(isCompound() ? 3 : 1, denominator_);
+    }
 
     /// "6/8".
     [[nodiscard]] std::string toString() const;

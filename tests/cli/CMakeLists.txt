@@ -614,7 +614,7 @@ set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_tab
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view tab)
 set_tests_properties(cli.render_tab PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,.*\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
+  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,\"accidental\":0,\"dot\":1,\"stem\":11,\"flag\":1,\"beam\":1,\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
 
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
@@ -744,6 +744,25 @@ set_tests_properties(cli.render_audio_touches PROPERTIES
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# Practice playback (ADR-0024): half speed doubles every time; the metronome
+# clicks every beat of band.gp (two 4/4 measures at quarter = 90) on a fifth
+# track, a high block on each first beat.
+add_test(NAME cli.sequence_speed
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --speed 50)
+set_tests_properties(cli.sequence_speed PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"duration\":16\\.8,\"speed\":0\\.5,\"metronome\":false,\"measures\":\\[{\"measure\":0,\"start\":0,\"end\":4\\.8}")
+add_test(NAME cli.sequence_metronome
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/band.gp" --metronome --events)
+set_tests_properties(cli.sequence_metronome PROPERTIES
+  PASS_REGULAR_EXPRESSION "112 events in 5\\.333 s\nat 100 % speed, metronome on track 4\n.*\n +0\\.000 on   track 4  key  76 velocity 100\n.*\n +0\\.667 on   track 4  key  77 velocity  80\n.*\n +2\\.667 on   track 4  key  76 velocity 100\n")
+add_test(NAME cli.render_audio_metronome
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/musicxml/melody.musicxml" --tail 0
+          --metronome --speed 200)
+set_tests_properties(cli.render_audio_metronome PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"seconds\":4\\.2,.*\"eventCount\":4[0-9],\"speed\":2,\"metronome\":true}")
+add_test(NAME cli.sequence_rejects_speed
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --speed 300)
+set_tests_properties(cli.sequence_rejects_speed PROPERTIES WILL_FAIL TRUE)
 
 # The built-in synthesizer, offline (ADR-0018). melody.musicxml lasts 8.4 s;
 # with the default 2 s tail that is 10.4 s, 499200 frames at 48 kHz.

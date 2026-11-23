@@ -16,6 +16,8 @@ ApplicationWindow {
     property bool showTuner: false
     /// The song panel at the right of the score.
     property bool showSongPane: false
+    /// Open the caret's measure once the score is laid out (from the command line).
+    property bool showMeasure: false
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
     /// What to do once unsaved changes are saved or discarded.
@@ -122,6 +124,18 @@ ApplicationWindow {
         const whole = Math.max(0, Math.floor(seconds));
         const rest = whole % 60;
         return Math.floor(whole / 60) + ":" + (rest < 10 ? "0" : "") + rest;
+    }
+
+    Connections {
+        target: score
+        enabled: window.showMeasure
+
+        function onCaretChanged() {
+            if (score.caretPage >= 0) {
+                window.showMeasure = false;
+                scoreView.openMeasurePopupAtCaret();
+            }
+        }
     }
 
     FileDialog {
