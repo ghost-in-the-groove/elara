@@ -29,6 +29,18 @@ files saved by Guitar Pro 8 (ADR-0010).
 | `guitar-techniques.gp` | Electric guitar in drop D with a capo; palm mute, hammer-on in a triplet, bend with vibrato, natural harmonic with let ring, tie, dead note with an accent, shift slide, staccato, pick stroke, dynamics; a tempo change in the middle of a bar; 4/4 then 3/4; a repeat and a grace note (reported) |
 | `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported) |
 
+## Guitar Pro 3-5 (`gp/`)
+
+Written field by field by `gp/generate_binary.py` (run it to rebuild them),
+following the structure of the binary format (ADR-0010); unused fields hold
+neutral values.
+
+| File | Exercises |
+|---|---|
+| `techniques.gp5` | Guitar Pro 5.10: overdriven guitar with a capo; palm mute, hammer-on in a triplet, full bend with vibrato, natural harmonic with let ring, a tie that does not repeat its fret, dead note with a heavy accent, dynamics, a second voice, shift slide with staccato and a down pick stroke, upward strum, tremolo picking, slide out, tapped harmonic, whammy-bar dip; a tempo change in the middle of a measure; G then D major; 4/4, 3/4; a marker, a repeat, a chord diagram, a grace note and text (reported) |
+| `quartet.gp4` | Guitar Pro 4.06: bass with slap, pop, slide in and a harmonic; piano and flute programs that keep only their pitches; drums on channel 10; F major; a tempo change from a mix table, a tie, a bend, vibrato; triplet feel, lyrics, a volume change and a trill (reported) |
+| `melody.gp3` | Guitar Pro 3.00: a Windows-1252 title; nylon guitar with a per-beat natural harmonic, hammer-on, slide, tapped quintuplet, wide vibrato with let ring, whammy-bar dip and a downward strum; A minor, 4/4 then 6/8; chord diagrams in both formats and text (reported) |
+
 ## MIDI (`midi/`)
 
 Written byte for byte by `midi/generate.py` (run it to rebuild them) from the
