@@ -11,6 +11,8 @@ ApplicationWindow {
 
     /// A file to open at start (from the command line).
     property url initialFile
+    /// Open the tuner at start (from the command line).
+    property bool showTuner: false
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
 
@@ -25,6 +27,15 @@ ApplicationWindow {
     Component.onCompleted: {
         if (initialFile.toString().length > 0)
             score.open(initialFile);
+        if (showTuner)
+            tunerPane.open();
+    }
+
+    function toggleTuner() {
+        if (tunerPane.visible)
+            tunerPane.close();
+        else
+            tunerPane.open();
     }
 
     ScoreDocument {
@@ -213,6 +224,13 @@ ApplicationWindow {
             }
 
             IconButton {
+                // A tuning fork.
+                iconPath: "M9 3 L9 10 Q9 14 12 14 Q15 14 15 10 L15 3 M12 14 L12 21"
+                tip: qsTr("Tuner (Ctrl+Shift+T)")
+                onClicked: window.toggleTuner()
+            }
+
+            IconButton {
                 id: moreButton
 
                 iconPath: "M12 5.5 L12 5.6 M12 12 L12 12.1 M12 18.5 L12 18.6"
@@ -318,6 +336,14 @@ ApplicationWindow {
             }
         }
 
+        TunerPane {
+            id: tunerPane
+
+            x: parent.width - width - 16
+            y: 12
+            dark: window.dark
+        }
+
         // Errors slide up from the bottom and go away by themselves.
         Rectangle {
             id: toast
@@ -407,6 +433,10 @@ ApplicationWindow {
     Shortcut {
         sequences: [StandardKey.Open]
         onActivated: openDialog.open()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+T"
+        onActivated: window.toggleTuner()
     }
     Shortcut {
         sequences: [StandardKey.ZoomIn, "Ctrl+="]
