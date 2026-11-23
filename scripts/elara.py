@@ -12,7 +12,8 @@
     python scripts/elara.py tidy [FILES...]      clang-tidy (default: changed .cpp files)
     python scripts/elara.py cli -- ARGS...       run the built elara-cli
     python scripts/elara.py app [-- ARGS...]     run the built desktop app
-    python scripts/elara.py ci                   what CI runs (fresh configure)
+    python scripts/elara.py translations         refresh the UI translation files (lupdate)
+    python scripts/elara.py ci                  what CI runs (fresh configure)
 
 On Windows the MSVC developer environment is loaded automatically (vswhere +
 vcvarsall.bat), and VCPKG_ROOT / QT_ROOT_DIR are read from the user
@@ -23,13 +24,14 @@ Output is kept short: commands are echoed, tool output is shown as-is.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import platform
 import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -158,9 +160,82 @@ def which(tool: str) -> str | None:
     return shutil.which(tool, path=build_env().get("PATH"))
 
 
+# --------------------------------------------------------------------------- MSVC header dependencies
+#
+# Under a non-English MSVC, /showIncludes lines start with a localized prefix
+# ("Nota: inclusión del archivo:"). CMake writes that prefix into rules.ninja
+# encoded for the console code page it generates under, cl prints it in the code
+# page it compiles under, and Ninja compares bytes. When the two differ (a tree
+# generated from a cmd window and built from a UTF-8 terminal), Ninja records no
+# header dependencies, and a later header change leaves stale objects behind.
+# The runner therefore runs every tool with the console's OEM code page, and
+# regenerates a tree whose prefix was written for another one.
+
+
+def _console_code_pages() -> tuple[int, int]:
+    """(current output code page, OEM code page); the first is 0 without a console."""
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    return kernel32.GetConsoleOutputCP(), kernel32.GetOEMCP()
+
+
+@contextlib.contextmanager
+def oem_console() -> Iterator[None]:
+    """Sets the console's output code page to the OEM one while build tools run."""
+    if not IS_WINDOWS:
+        yield
+        return
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    previous, oem = _console_code_pages()
+    changed = previous not in (0, oem) and bool(kernel32.SetConsoleOutputCP(oem))
+    try:
+        yield
+    finally:
+        if changed:
+            kernel32.SetConsoleOutputCP(previous)
+
+
+def _deps_prefix_is_stale(preset: str) -> bool:
+    """True when rules.ninja holds the localized prefix encoded for a code page
+    other than the OEM one, so Ninja would not recognise what cl prints."""
+    if not IS_WINDOWS or _console_code_pages()[0] == 0:
+        return False
+    build = build_dir(preset)
+    rules = build / "CMakeFiles" / "rules.ninja"
+    written = re.search(rb"msvc_deps_prefix = ([^\r\n]*)", rules.read_bytes()) if rules.exists() else None
+    if written is None or written.group(1).isascii():
+        return False  # an English prefix reads the same in every code page
+    for compiler in build.glob("CMakeFiles/*/CMakeCXXCompiler.cmake"):
+        found = re.search(r'set\(CMAKE_CXX_CL_SHOWINCLUDES_PREFIX "([^"]*)"\)',
+                          compiler.read_text(encoding="utf-8", errors="replace"))
+        if found:
+            try:
+                expected = found.group(1).encode(f"cp{_console_code_pages()[1]}")
+            except (LookupError, UnicodeEncodeError):
+                return False
+            return written.group(1) != expected
+    return False
+
+
+def _forget_objects_without_dependencies(preset: str) -> None:
+    """Deletes the objects Ninja recorded no header dependencies for, so the next
+    build compiles them again and records them."""
+    ninja = which("ninja")
+    if not ninja:
+        return
+    build = build_dir(preset)
+    result = subprocess.run([ninja, "-C", str(build), "-t", "deps"], capture_output=True,
+                            text=True, errors="replace", env=build_env(), check=False)
+    for line in result.stdout.splitlines():
+        if line and not line[0].isspace() and ": #deps 0," in line:
+            (build / line.split(": #deps", 1)[0]).unlink(missing_ok=True)
+
+
 def run(cmd: Sequence[str], *, env: dict[str, str] | None = None, cwd: Path = ROOT) -> int:
     print("$ " + " ".join(cmd), flush=True)
-    return subprocess.run(list(cmd), env=env or build_env(), cwd=cwd, check=False).returncode
+    with oem_console():
+        return subprocess.run(list(cmd), env=env or build_env(), cwd=cwd, check=False).returncode
 
 
 def build_dir(preset: str) -> Path:
@@ -267,10 +342,22 @@ def configure(preset: str, fresh: bool = False) -> int:
     return run(cmd)
 
 
-def cmd_build(args: argparse.Namespace) -> int:
-    if not (build_dir(args.preset) / "CMakeCache.txt").exists():
-        if (code := configure(args.preset)) != 0:
+def ensure_configured(preset: str) -> int:
+    """Configures a new build tree, and regenerates one whose MSVC dependency
+    prefix was written for another console code page (see oem_console)."""
+    if not (build_dir(preset) / "CMakeCache.txt").exists():
+        return configure(preset)
+    if _deps_prefix_is_stale(preset):
+        log("regenerating: the MSVC dependency prefix was written for another console code page")
+        if (code := configure(preset)) != 0:
             return code
+        _forget_objects_without_dependencies(preset)
+    return 0
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    if (code := ensure_configured(args.preset)) != 0:
+        return code
     return run(["cmake", "--build", "--preset", args.preset])
 
 
@@ -337,7 +424,7 @@ def cmd_cli(args: argparse.Namespace) -> int:
 def cmd_bench(args: argparse.Namespace) -> int:
     """Build and run the micro-benchmarks in the optimised release preset."""
     preset = "release"
-    if not (build_dir(preset) / "CMakeCache.txt").exists() and (code := configure(preset)) != 0:
+    if (code := ensure_configured(preset)) != 0:
         return code
     if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara_benchmarks"])) != 0:
         return code
@@ -375,6 +462,14 @@ def cmd_app(args: argparse.Namespace) -> int:
         env["PATH"] = str(Path(qt) / "bin") + os.pathsep + env.get("PATH", "")
     return subprocess.run([str(exe), *_strip_dashes(args.args)], cwd=ROOT, env=env,
                           check=False).returncode
+
+
+def cmd_translations(args: argparse.Namespace) -> int:
+    """Refreshes the app's .ts files from its sources (lupdate). Translate the
+    new or changed strings in Qt Linguist, or by hand, afterwards."""
+    if (code := ensure_configured(args.preset)) != 0:
+        return code
+    return run(["cmake", "--build", "--preset", args.preset, "--target", "update_translations"])
 
 
 def _gate(steps: list[tuple[str, callable]]) -> int:
@@ -438,6 +533,7 @@ def main() -> int:
     add("tidy", cmd_tidy, "clang-tidy changed or given files").add_argument("files", nargs="*")
     add("cli", cmd_cli, "run elara-cli").add_argument("args", nargs=argparse.REMAINDER)
     add("app", cmd_app, "run the desktop app").add_argument("args", nargs=argparse.REMAINDER)
+    add("translations", cmd_translations, "refresh the UI translation files from the sources")
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Micro-benchmarks for elara_audio: the sequencer, the built-in synthesizer and
-// offline rendering. Run optimised builds only:
+// offline rendering, and the tuner's pitch detector. Run optimised builds only:
 //   python scripts/elara.py bench -- "[audio]"
 #include <elara/audio/offline_renderer.hpp>
+#include <elara/audio/pitch_detector.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/synth.hpp>
 #include <elara/core/performance.hpp>
@@ -12,7 +13,10 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <numbers>
 #include <vector>
 
 TEST_CASE("sequencer benchmarks", "[benchmark][audio]") {
@@ -81,5 +85,35 @@ TEST_CASE("offline rendering benchmarks", "[benchmark][audio]") {
     };
     BENCHMARK("render 10 s of the large song on one thread") {
         return tenSeconds(1);
+    };
+}
+
+TEST_CASE("pitch detector benchmarks", "[benchmark][audio][tuner]") {
+    // A tuner listening at 48 kHz looks at one window every half window (33 ms).
+    elara::audio::PitchDetector detector(48000.0);
+    const auto sine = [&](double frequency) {
+        std::vector<float> window(detector.frameSize());
+        for (std::size_t i = 0; i < window.size(); ++i) {
+            window[i] = static_cast<float>(0.5 * std::sin(2.0 * std::numbers::pi * frequency *
+                                                          static_cast<double>(i) / 48000.0));
+        }
+        return window;
+    };
+    const std::vector<float> lowE = sine(82.41);
+    const std::vector<float> highE = sine(329.63);
+    std::vector<float> noise(detector.frameSize());
+    std::uint32_t state = 12345;
+    for (float& sample : noise) {
+        state = (state * 1664525U) + 1013904223U;
+        sample = (static_cast<float>(state >> 8U) / 8388608.0f) - 1.0f;
+    }
+    BENCHMARK("detect a guitar's low E in one window (48 kHz, 3201 samples)") {
+        return detector.detect(lowE)->frequency;
+    };
+    BENCHMARK("detect a guitar's high E in one window") {
+        return detector.detect(highE)->frequency;
+    };
+    BENCHMARK("find no pitch in one window of noise (every lag computed)") {
+        return detector.detect(noise).has_value();
     };
 }

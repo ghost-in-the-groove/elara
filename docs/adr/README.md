@@ -26,8 +26,16 @@ one that replaces them.
 | [0018](0018-built-in-synthesizer.md) | The built-in synthesizer and offline rendering | Accepted |
 | [0019](0019-real-time-playback.md) | Real-time playback | Accepted |
 | [0020](0020-track-mix.md) | The track mix | Accepted |
+| [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
 | [0023](0023-pitch-articulations.md) | Bends, slides and legato in playback | Accepted |
+| [0026](0026-transposition.md) | Transposition | Accepted |
+| [0027](0027-copy-and-paste.md) | Copying and pasting measures | Accepted |
+| [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
+| [0029](0029-microphone-input.md) | Microphone input for the tuner | Accepted |
+| [0030](0030-translations.md) | Translations of the user interface | Accepted |
+| [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
+| [0035](0035-drum-entry.md) | Drum entry | Accepted |
 
 ## Template
 

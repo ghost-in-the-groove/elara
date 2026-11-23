@@ -95,6 +95,8 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | sequence the 20-track song, articulations applied (ADR-0022, ADR-0023) | 32.3 ms | each note's effects read from the score, and passes for let ring, legato and slides. 27.1 ms on the same machine just before. Repeated: 47 ms (41 before) |
 | 2026-11-23 | the same | 27.9 ms | the written note's beat and note kept in 32 bits, so a sounding note stays 80 bytes (sounding notes: 13.2 to 11.2 ms), and the legato and slide passes skipped when no note moves: 3 % over the sequencer without articulations. Repeated: 42 ms |
 | 2026-11-23 | the synthesizer able to glide (plucked, piano, sawtooth, drums), and the 10 s offline render | 5.2, 8.3, 6.1, 4.8 ms; 24.6 ms | a string reads its delay line from a moving position, so its length can change while it rings: no measurable cost. One thread: 111 ms |
+| 2026-11-23 | detect the pitch of one tuner window (48 kHz, 30 to 1600 Hz, 3201 samples) of a guitar's low E | 1.61 ms | first version (ADR-0028): the YIN difference function at every lag up to 1601, one multiply-add per sample and lag |
+| 2026-11-23 | the same; a high E; a window of noise | 0.39 ms, 0.10 ms, 1.07 ms | lags past the first dip under the threshold are no longer computed (YIN never looks at them), and each difference is four independent sums. Noise has no dip, so every lag is still computed: the worst case, 3 % of one core for a window every 33 ms |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.

@@ -663,4 +663,21 @@ std::size_t Sequence::eventAt(double seconds) const noexcept {
         std::ranges::lower_bound(events_, seconds, {}, &NoteEvent::time) - events_.begin());
 }
 
+std::optional<double> Sequence::secondsAt(std::size_t measure, double fraction) const noexcept {
+    const auto played = std::ranges::find(measures_, measure, &PlayedMeasure::measure);
+    if (played == measures_.end()) {
+        return std::nullopt;
+    }
+    return played->start + std::clamp(fraction, 0.0, 1.0) * (played->end - played->start);
+}
+
+std::size_t Sequence::playedMeasureAt(double seconds) const noexcept {
+    if (measures_.empty() || seconds > measures_.back().end) {
+        return measures_.size();
+    }
+    // The first measure that ends after `seconds`, or the last one.
+    const auto after = std::ranges::upper_bound(measures_, seconds, {}, &PlayedMeasure::end);
+    return std::min(static_cast<std::size_t>(after - measures_.begin()), measures_.size() - 1);
+}
+
 } // namespace elara::audio
