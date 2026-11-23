@@ -28,6 +28,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
   - [x] Drawn in the score
+  - [x] Set from the measure popup in the app
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill

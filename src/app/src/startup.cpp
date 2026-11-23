@@ -74,6 +74,7 @@ void Startup::queueSteps() {
             queueEntry();
             queueMeasures();
             queueMix();
+            queueNavigation();
         }
         return;
     }
@@ -105,6 +106,7 @@ void Startup::queueSteps() {
         queueEntry();
         queueMeasures();
         queueMix();
+        queueNavigation();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -378,6 +380,44 @@ void Startup::queueMix() {
     });
 }
 
+// Signs and jumps from the measure popup (ADR-0049): a segno on the first
+// measure, then a D.S. al Coda on it, each one undo step named for them; both
+// undone, the song must end as it started.
+void Startup::queueNavigation() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("navigation check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("segno"), true}});
+        check(score_->navigationAt(0).value(QStringLiteral("segno")).toBool(),
+              "the segno was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change navigation marks"),
+              "the marks are not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("jump"), 2}, {QStringLiteral("jumpThen"), 2}});
+        const QVariantMap marks = score_->navigationAt(0);
+        check(marks.value(QStringLiteral("jump")).toInt() == 2 &&
+                  marks.value(QStringLiteral("jumpThen")).toInt() == 2 &&
+                  marks.value(QStringLiteral("segno")).toBool(),
+              "the jump was not set beside the segno");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantMap marks = score_->navigationAt(0);
+        check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
+                  marks.value(QStringLiteral("jump")).toInt() == 0,
+              "undoing the marks did not restore the song");
+        return false;
+    });
+}
+
 void Startup::tick() {
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
@@ -401,7 +441,7 @@ void Startup::tick() {
         queueSteps();
     }
     while (!steps_.empty()) {
-        const auto step = std::move(steps_.front());
+        auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = ScorePage::paintCount();
@@ -410,6 +450,18 @@ void Startup::tick() {
             finish(false, failure_);
             return;
         }
+        if (again_) {
+            again_ = false;
+            if (againSince_ < 0) {
+                againSince_ = clock_.elapsed();
+            } else if (clock_.elapsed() - againSince_ > kStepTimeoutMilliseconds) {
+                finish(false, QStringLiteral("timed out"));
+                return;
+            }
+            steps_.push_front(std::move(step));
+            return;
+        }
+        againSince_ = -1;
         if (changed) {
             waiting_ = true;
             stepStarted_ = clock_.elapsed();
@@ -452,6 +504,14 @@ void Startup::clickCursor() {
     auto* playhead = window_->findChild<QQuickItem*>(QStringLiteral("playhead"));
     if (audio == nullptr || playhead == nullptr || !playhead->isVisible()) {
         failure_ = QStringLiteral("no playback cursor");
+        return;
+    }
+    // Nothing may cover the cursor, as the measure popup open at the caret can:
+    // it closes first, and the click waits until it is gone.
+    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
+        popup != nullptr && popup->property("visible").toBool()) {
+        QMetaObject::invokeMethod(popup, "close");
+        again_ = true;
         return;
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());

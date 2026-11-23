@@ -406,6 +406,7 @@ Item {
     MeasurePopup {
         id: measurePopup
 
+        objectName: "measurePopup"
         document: root.document
         dark: root.dark
         onClosed: root.forceActiveFocus()

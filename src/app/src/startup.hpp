@@ -53,6 +53,7 @@ private:
     void queueEntry();
     void queueMeasures();
     void queueMix();
+    void queueNavigation();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     [[nodiscard]] bool checking() const;
@@ -66,6 +67,8 @@ private:
     qint64 stepStarted_ = 0;
     std::deque<std::function<bool()>> steps_; ///< each returns whether it changed the score
     bool waiting_ = false;                    ///< for a layout and a paint
+    bool again_ = false;     ///< set by a step that must run again on the next tick
+    qint64 againSince_ = -1; ///< when that step first asked to run again
     bool laidOut_ = false;
     int paintsBefore_ = 0;
     int layouts_ = 0;

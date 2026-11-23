@@ -232,6 +232,70 @@
         <translation>Desde este compás hasta el siguiente cambio.</translation>
     </message>
     <message>
+        <source>Signs and jumps</source>
+        <translation>Señales y saltos</translation>
+    </message>
+    <message>
+        <source>Segno</source>
+        <translation>Segno</translation>
+    </message>
+    <message>
+        <source>Segno segno</source>
+        <translation>Doble segno</translation>
+    </message>
+    <message>
+        <source>Coda</source>
+        <translation>Coda</translation>
+    </message>
+    <message>
+        <source>Double coda</source>
+        <translation>Doble coda</translation>
+    </message>
+    <message>
+        <source>Fine</source>
+        <translation>Fine</translation>
+    </message>
+    <message>
+        <source>To coda</source>
+        <translation>A la coda</translation>
+    </message>
+    <message>
+        <source>To double coda</source>
+        <translation>A la doble coda</translation>
+    </message>
+    <message>
+        <source>No jump</source>
+        <translation>Sin salto</translation>
+    </message>
+    <message>
+        <source>D.C.</source>
+        <translation>D.C.</translation>
+    </message>
+    <message>
+        <source>D.S.</source>
+        <translation>D.S.</translation>
+    </message>
+    <message>
+        <source>D.S.S.</source>
+        <translation>D.S.S.</translation>
+    </message>
+    <message>
+        <source>to the end</source>
+        <translation>hasta el final</translation>
+    </message>
+    <message>
+        <source>al Fine</source>
+        <translation>al Fine</translation>
+    </message>
+    <message>
+        <source>al Coda</source>
+        <translation>al Coda</translation>
+    </message>
+    <message>
+        <source>al Double Coda</source>
+        <translation>al Doble Coda</translation>
+    </message>
+    <message>
         <source>Insert before</source>
         <translation>Insertar antes</translation>
     </message>

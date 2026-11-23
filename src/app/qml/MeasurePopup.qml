@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The caret's measure: its time and key signatures, which change from it until
-// the next change, and measures inserted before or after it, or it deleted.
+// the next change, its signs and jumps, and measures inserted before or after
+// it, or it deleted.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -15,6 +16,39 @@ Popup {
     property bool dark: false
 
     readonly property color ink: dark ? "#e8e8ee" : "#23232b"
+    readonly property var marks: document.caretNavigation
+
+    // A mark that is on or off, as a rounded chip.
+    component Chip: AbstractButton {
+        id: chip
+
+        property bool on: false
+
+        focusPolicy: Qt.NoFocus
+        implicitHeight: 30
+        implicitWidth: chipLabel.implicitWidth + 24
+        contentItem: Label {
+            id: chipLabel
+
+            text: chip.text
+            font.pixelSize: 13
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            color: chip.on ? "white" : root.ink
+        }
+        background: Rectangle {
+            radius: height / 2
+            color: chip.on ? chip.Material.accent
+                           : (chip.hovered ? Qt.alpha(root.ink, 0.08) : "transparent")
+            border.color: chip.on ? chip.Material.accent : Qt.alpha(root.ink, 0.2)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 120
+                }
+            }
+        }
+    }
 
     width: 360
     padding: 18
@@ -103,6 +137,99 @@ Popup {
             opacity: 0.5
             wrapMode: Text.Wrap
             color: root.ink
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.topMargin: 2
+            height: 1
+            color: Qt.alpha(root.ink, 0.1)
+        }
+
+        Label {
+            text: qsTr("Signs and jumps")
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+            color: root.ink
+        }
+
+        // The signs that open the measure and the marks that close it.
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Repeater {
+                model: [
+                    {
+                        key: "segno",
+                        label: qsTr("Segno")
+                    },
+                    {
+                        key: "segnoSegno",
+                        label: qsTr("Segno segno")
+                    },
+                    {
+                        key: "coda",
+                        label: qsTr("Coda")
+                    },
+                    {
+                        key: "doubleCoda",
+                        label: qsTr("Double coda")
+                    },
+                    {
+                        key: "fine",
+                        label: qsTr("Fine")
+                    },
+                    {
+                        key: "toCoda",
+                        label: qsTr("To coda")
+                    },
+                    {
+                        key: "toDoubleCoda",
+                        label: qsTr("To double coda")
+                    }
+                ]
+
+                delegate: Chip {
+                    required property var modelData
+
+                    text: modelData.label
+                    on: root.marks[modelData.key] === true
+                    onClicked: {
+                        const change = {};
+                        change[modelData.key] = !on;
+                        root.document.setNavigation(root.document.caretMeasure, change);
+                    }
+                }
+            }
+        }
+
+        // The jump at the end of the measure and what ends the music after it.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 8
+
+            ComboBox {
+                id: jumpField
+
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                model: [qsTr("No jump"), qsTr("D.C."), qsTr("D.S."), qsTr("D.S.S.")]
+                currentIndex: root.marks.jump ?? 0
+                onActivated: index => root.document.setNavigation(root.document.caretMeasure, {
+                                                                      jump: index
+                                                                  })
+            }
+            ComboBox {
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                enabled: jumpField.currentIndex > 0
+                model: [qsTr("to the end"), qsTr("al Fine"), qsTr("al Coda"), qsTr("al Double Coda")]
+                currentIndex: root.marks.jumpThen ?? 0
+                onActivated: index => root.document.setNavigation(root.document.caretMeasure, {
+                                                                      jumpThen: index
+                                                                  })
+            }
         }
 
         Rectangle {

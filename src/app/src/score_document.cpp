@@ -679,6 +679,70 @@ void ScoreDocument::setKeySignatureFrom(int measure, int fifths, bool minor) {
         core::KeySignature(fifths, minor ? core::KeyMode::Minor : core::KeyMode::Major)));
 }
 
+namespace {
+
+// The flags navigationAt() and setNavigation() name.
+struct NavigationFlag {
+    const char* key;
+    bool core::MeasureHeader::* flag;
+};
+constexpr std::array kNavigationFlags{
+    NavigationFlag{"segno", &core::MeasureHeader::segno},
+    NavigationFlag{"segnoSegno", &core::MeasureHeader::segnoSegno},
+    NavigationFlag{"coda", &core::MeasureHeader::coda},
+    NavigationFlag{"doubleCoda", &core::MeasureHeader::doubleCoda},
+    NavigationFlag{"fine", &core::MeasureHeader::fine},
+    NavigationFlag{"toCoda", &core::MeasureHeader::toCoda},
+    NavigationFlag{"toDoubleCoda", &core::MeasureHeader::toDoubleCoda},
+};
+
+} // namespace
+
+QVariantMap ScoreDocument::navigationAt(int measure) const {
+    QVariantMap marks;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return marks;
+    }
+    const core::MeasureHeader& header =
+        document_->song().measureHeader(static_cast<std::size_t>(measure));
+    for (const NavigationFlag& item : kNavigationFlags) {
+        marks.insert(QLatin1StringView(item.key), header.*item.flag);
+    }
+    marks.insert(QStringLiteral("jump"), static_cast<int>(header.jump));
+    marks.insert(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen));
+    return marks;
+}
+
+void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const auto m = static_cast<std::size_t>(measure);
+    core::MeasureHeader header = document_->song().measureHeader(m);
+    for (const NavigationFlag& item : kNavigationFlags) {
+        if (const auto found = marks.constFind(QLatin1StringView(item.key));
+            found != marks.cend()) {
+            header.*item.flag = found->toBool();
+        }
+    }
+    const auto choice = [&marks](const QString& key, int current) {
+        const int value = marks.value(key, current).toInt();
+        return value >= 0 && value <= 3 ? value : current;
+    };
+    header.jump =
+        static_cast<core::JumpTo>(choice(QStringLiteral("jump"), static_cast<int>(header.jump)));
+    header.jumpThen = static_cast<core::JumpThen>(
+        choice(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen)));
+    if (header.jump == core::JumpTo::None) {
+        header.jumpThen = core::JumpThen::End;
+    }
+    if (header != document_->song().measureHeader(m)) {
+        execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
+    }
+}
+
 int ScoreDocument::caretTimeNumerator() const {
     return document_ && caret_.measure < document_->song().measureCount()
                ? document_->song().measureHeader(caret_.measure).timeSignature.numerator()
