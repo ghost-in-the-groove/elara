@@ -29,6 +29,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT]
+                           [--cursor-at SECONDS] [--time-at PAGE X Y]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -88,6 +89,16 @@ page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
 credits...). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
 several.
+
+The playback cursor and clicks on the score (the app's transport): with
+`--cursor-at SECONDS`, `--json` adds `"cursor": {"seconds", "played",
+"measure", "page", "x", "y", "height"}` before the display lists: the measure
+played then (`played` counts repeats, `measure` is the written one) and the
+line across its system, standing on each column of notes as it starts; `null`
+after the end. `--time-at PAGE X Y` (the page from 0, x and y as the cursor
+gives them) adds `"timeAt": {"page", "x", "y", "measure", "seconds"}`: where a
+click there starts playback, on the column of notes under it the first time
+its measure plays; `measure` and `seconds` are `null` away from every measure.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
