@@ -148,6 +148,26 @@ add_test(NAME cli.edit_rejects_mix_out_of_range
   COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
 set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
 
+# Keyboard entry at a caret (ADR-0021).
+add_test(NAME cli.edit_types_frets_at_the_caret
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "caret 0 0 0 6"
+    "duration 8" "fret 3" right up "fret 2" right "duration 4" "fret 0")
+set_tests_properties(cli.edit_types_frets_at_the_caret PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":3,\"notes\":3}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":2,\"string\":5,\"freeSlot\":false},\"input\":\"4\",\"undo\":{\"count\":5,\"next\":\"Enter note\"}")
+
+add_test(NAME cli.edit_deletes_at_the_caret
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
+    "fret 0" "duration 2" delete delete)
+set_tests_properties(cli.edit_deletes_at_the_caret PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":0,\"notes\":0}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":1,\"freeSlot\":true},\"input\":\"2\",\"undo\":{\"count\":6,\"next\":\"Delete\"}")
+
+add_test(NAME cli.edit_rejects_caret_outside_song
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
+set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.edit_rejects_fret_without_track COMMAND elara-cli edit "fret 3")
+set_tests_properties(cli.edit_rejects_fret_without_track PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "explode 2")
 set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
 

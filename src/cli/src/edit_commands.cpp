@@ -3,6 +3,7 @@
 // a .elara file).
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
+#include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
@@ -12,6 +13,7 @@
 #include "song_report.hpp"
 #include <CLI/CLI.hpp>
 
+#include <array>
 #include <charconv>
 #include <cstddef>
 #include <cstdlib>
@@ -132,11 +134,71 @@ std::unique_ptr<core::Command> editMeasure(const Song& song, std::size_t track, 
     return std::make_unique<core::ReplaceMeasure>(track, 0, measure, std::move(content));
 }
 
-void runStep(Document& doc, const Step& step) {
+/// Keyboard entry across steps (ADR-0021): the caret and the input duration.
+struct EntryState {
+    core::Caret caret{};
+    core::Duration input{core::NoteValue::Quarter};
+};
+
+/// Runs a keyboard entry step; false when `step` is not one.
+bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
+    using namespace core;
+    const Song& song = doc.song();
+    const std::string_view verb = step.verb();
+    static constexpr std::array<std::pair<std::string_view, CaretMove>, 6> kMoves{{
+        {"right", CaretMove::NextBeat},
+        {"left", CaretMove::PreviousBeat},
+        {"next-measure", CaretMove::NextMeasure},
+        {"previous-measure", CaretMove::PreviousMeasure},
+        {"up", CaretMove::StringUp},
+        {"down", CaretMove::StringDown},
+    }};
+    for (const auto& [name, move] : kMoves) {
+        if (verb == name) {
+            entry.caret = moveCaret(song, entry.caret, move);
+            return true;
+        }
+    }
+    Entry edit;
+    if (verb == "caret") { // caret <track> <measure> <beat> [string]
+        const Caret wanted{.track = step.index(1),
+                           .measure = step.index(2),
+                           .beat = step.index(3),
+                           .string = step.has(4) ? step.number<int>(4) : 1};
+        if (clampCaret(song, wanted) != wanted) {
+            throw std::out_of_range("the song has no such caret position");
+        }
+        entry.caret = wanted;
+        return true;
+    } else if (verb == "fret") {
+        edit = enterFret(song, entry.caret, step.number<int>(1), entry.input);
+    } else if (verb == "duration") {
+        entry.input = step.duration(1);
+        edit = setBeatDuration(song, entry.caret, entry.input);
+    } else if (verb == "delete") {
+        edit = deleteAtCaret(song, entry.caret);
+    } else if (verb == "delete-beat") {
+        edit = deleteBeat(song, entry.caret);
+    } else if (verb == "insert-rest") {
+        edit = insertRest(song, entry.caret, entry.input);
+    } else {
+        return false;
+    }
+    if (edit.command) {
+        doc.execute(std::move(edit.command));
+    }
+    entry.caret = edit.caret;
+    return true;
+}
+
+void runStep(Document& doc, const Step& step, EntryState& entry) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
 
+    if (runEntryStep(doc, step, entry)) {
+        return;
+    }
     if (verb == "undo") {
         doc.undo();
     } else if (verb == "redo") {
@@ -245,20 +307,42 @@ std::string jsonName(std::string_view name) {
     return name.empty() ? std::string("null") : std::format("\"{}\"", jsonEscape(name));
 }
 
-void printJson(const Document& doc) {
+bool hasCaret(const Song& song) {
+    return song.trackCount() > 0 && song.measureCount() > 0;
+}
+
+std::string caretJson(const Song& song, const core::Caret& caret) {
+    if (!hasCaret(song)) {
+        return "null";
+    }
+    return std::format(
+        R"({{"track":{},"staff":{},"measure":{},"voice":{},"beat":{},"string":{},"freeSlot":{}}})",
+        caret.track, caret.staff, caret.measure, caret.voice, caret.beat, caret.string,
+        core::onFreeSlot(song, caret));
+}
+
+void printJson(const Document& doc, const EntryState& entry) {
     const Song& song = doc.song();
     std::cout
         << std::format(
-               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"modified":{}}})",
+               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"caret":{},"input":"{}","undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"modified":{}}})",
                jsonEscape(song.info().title), song.startTempo().bpm(), tracksJson(song),
                song.measureCount(), measuresJson(song), issuesJson(core::validate(song)),
-               doc.undoCount(), jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
+               caretJson(song, entry.caret), entry.input.toString(), doc.undoCount(),
+               jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
                doc.isModified())
         << '\n';
 }
 
-void printText(const Document& doc) {
+void printText(const Document& doc, const EntryState& entry) {
     printSongText(doc.song());
+    if (const core::Caret& caret = entry.caret; hasCaret(doc.song())) {
+        std::cout << std::format(
+            "caret: track {}, staff {}, measure {}, voice {}, beat {}{}, string {}; input {}\n",
+            caret.track, caret.staff, caret.measure, caret.voice, caret.beat,
+            core::onFreeSlot(doc.song(), caret) ? " (free slot)" : "", caret.string,
+            entry.input.toString());
+    }
     std::cout << std::format("undo: {} ({} step(s)), redo: {} ({} step(s)){}\n",
                              doc.canUndo() ? doc.undoName() : "-", doc.undoCount(),
                              doc.canRedo() ? doc.redoName() : "-", doc.redoCount(),
@@ -281,9 +365,14 @@ int runEdit(bool json, const EditOptions& options) {
         doc = Document(std::move(*loaded));
     }
     const auto& steps = options.steps;
+    EntryState entry;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         try {
-            runStep(doc, Step(steps[i]));
+            runStep(doc, Step(steps[i]), entry);
+            // Undo, removals and other edits can take the caret's beat away.
+            if (hasCaret(doc.song())) {
+                entry.caret = core::clampCaret(doc.song(), entry.caret);
+            }
         } catch (const StepSyntaxError& error) {
             return usageError(std::format("step {} ({}): {}", i + 1, steps[i], error.what()));
         } catch (const std::exception& error) {
@@ -299,9 +388,9 @@ int runEdit(bool json, const EditOptions& options) {
         doc.markSaved();
     }
     if (json) {
-        printJson(doc);
+        printJson(doc, entry);
     } else {
-        printText(doc);
+        printText(doc, entry);
     }
     return kExitOk;
 }
@@ -322,7 +411,10 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
-        "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", undo, redo, save");
+        "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
+        "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
+        "previous-measure, \"fret <n>\", \"duration <d>\", delete, delete-beat, "
+        "insert-rest, undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }
