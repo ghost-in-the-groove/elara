@@ -27,6 +27,7 @@ struct RenderOptions {
 struct LoggedEvent {
     std::int64_t frame = 0;
     EventKind kind = EventKind::NoteOn;
+    Touch touch = Touch::Normal;
     std::size_t track = 0;
     int key = 60;
     int velocity = 80;

@@ -121,15 +121,25 @@ struct PolygonItem {
     friend bool operator==(const PolygonItem&, const PolygonItem&) = default;
 };
 
+/// Where a column of notes (or rests) starts in a measure: `at` is the time
+/// it starts, as a fraction of the measure's length, and `x` where it stands.
+struct MeasureOnset {
+    double at = 0.0;
+    double x = 0.0;
+    friend bool operator==(const MeasureOnset&, const MeasureOnset&) = default;
+};
+
 /// Where a measure sits: from the end of the barline before it to the start
 /// of the barline after it, and from the top line of its system's first staff
-/// (`y`) down to the bottom line of the last one.
+/// (`y`) down to the bottom line of the last one. `onsets` are its columns in
+/// time order, for the playback cursor.
 struct MeasureBox {
     std::size_t index = 0;
     double x = 0.0;
     double width = 0.0;
     double y = 0.0;
     double height = 0.0;
+    std::vector<MeasureOnset> onsets{};
     friend bool operator==(const MeasureBox&, const MeasureBox&) = default;
 };
 

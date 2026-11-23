@@ -29,6 +29,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT]
+                           [--cursor-at SECONDS] [--time-at PAGE X Y]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -91,6 +92,16 @@ beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `font
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
 several.
 
+The playback cursor and clicks on the score (the app's transport): with
+`--cursor-at SECONDS`, `--json` adds `"cursor": {"seconds", "played",
+"measure", "page", "x", "y", "height"}` before the display lists: the measure
+played then (`played` counts repeats, `measure` is the written one) and the
+line across its system, standing on each column of notes as it starts; `null`
+after the end. `--time-at PAGE X Y` (the page from 0, x and y as the cursor
+gives them) adds `"timeAt": {"page", "x", "y", "measure", "seconds"}`: where a
+click there starts playback, on the column of notes under it the first time
+its measure plays; `measure` and `seconds` are `null` away from every measure.
+
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
 validation issues and the undo/redo state:
@@ -138,8 +149,11 @@ on tablature on the nearest string that reaches it, ADR-0034), `shift
 <semitones>` moves the caret's note, `duration <d>` sets the input duration and
 the caret beat's, `delete` removes the note on the caret's string (on a staff
 without strings, the beat's notes; on a rest, the rest), `delete-beat` the
-whole beat, and `insert-rest` adds a rest before it. The output includes
-`"caret"` and `"input"`.
+whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
+caret's string is a drum lane, from the crash at the top to the hi-hat pedal
+(ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
+that General MIDI key's lane (moving the caret to it), and `delete` removes the
+lane's piece only. The output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "score_document.hpp"
 
+#include <elara/audio/sequence.hpp>
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/io/native_format.hpp>
 #include <elara/io/open.hpp>
 #include <elara/notation/caret.hpp>
+#include <elara/notation/cursor.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
@@ -40,6 +42,7 @@ namespace elara::app {
 struct ScoreLayout {
     QUrl source;
     std::shared_ptr<const core::Song> song;
+    std::shared_ptr<const audio::Sequence> sequence; // only when opened
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     int track = 0;
     ScoreDocument::View view = ScoreDocument::View::Both;
@@ -160,9 +163,11 @@ ScoreLayout openAndLayOut(const QUrl& file) {
         const std::array<std::size_t, 1> first{0};
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
+        auto sequence = std::make_shared<const audio::Sequence>(*song);
         result = layOut(std::move(song), 0, view);
         result.source = file;
         result.opened = true;
+        result.sequence = std::move(sequence);
     } catch (const std::exception& error) {
         result.error = qstring(error.what());
     }
@@ -332,6 +337,43 @@ int ScoreDocument::measureCount() const {
     return song_ ? static_cast<int>(song_->measureCount()) : 0;
 }
 
+double ScoreDocument::duration() const {
+    return sequence_ ? sequence_->duration() : 0.0;
+}
+
+QVariantMap ScoreDocument::cursorAt(double seconds) const {
+    if (!sequence_ || !pages_) {
+        return {};
+    }
+    const std::size_t played = sequence_->playedMeasureAt(seconds);
+    if (played >= sequence_->measures().size()) {
+        return {};
+    }
+    const audio::PlayedMeasure& measure = sequence_->measures()[played];
+    const double length = measure.end - measure.start;
+    const auto cursor = notation::cursorAt(*pages_, measure.measure,
+                                           length > 0.0 ? (seconds - measure.start) / length : 0.0);
+    if (!cursor) {
+        return {};
+    }
+    return {{QStringLiteral("page"), static_cast<int>(cursor->page)},
+            {QStringLiteral("x"), cursor->x},
+            {QStringLiteral("y"), cursor->y},
+            {QStringLiteral("height"), cursor->height}};
+}
+
+double ScoreDocument::secondsAt(int page, double x, double y) const {
+    if (!sequence_ || !pages_ || page < 0 || static_cast<std::size_t>(page) >= pages_->size()) {
+        return -1.0;
+    }
+    const auto position =
+        notation::measurePositionAt((*pages_)[static_cast<std::size_t>(page)], x, y);
+    if (!position) {
+        return -1.0;
+    }
+    return sequence_->secondsAt(position->measure, position->fraction).value_or(-1.0);
+}
+
 void ScoreDocument::setTrack(int track) {
     if (track == track_ || !song_ || track < kAllTracks ||
         track >= static_cast<int>(song_->trackCount())) {
@@ -442,6 +484,8 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     }
     if (layout.song != song_) {
         song_ = layout.song;
+        sequence_ =
+            layout.sequence ? layout.sequence : std::make_shared<const audio::Sequence>(*song_);
         if (!layout.source.isEmpty() && layout.source != source_) {
             source_ = layout.source;
             emit sourceChanged();
@@ -554,6 +598,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     ++generation_; // a file still opening must not replace the new song
     document_.emplace(std::move(song));
     song_ = std::make_shared<const core::Song>(document_->song());
+    sequence_ = std::make_shared<const audio::Sequence>(*song_);
     source_.clear();
     track_ = 0;
     caret_ = core::Caret{};
@@ -762,6 +807,7 @@ bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {
 void ScoreDocument::edited() {
     ++edits_;
     song_ = std::make_shared<const core::Song>(document_->song());
+    sequence_ = std::make_shared<const audio::Sequence>(*song_); // playback hears the edit
     const auto tracks = static_cast<int>(song_->trackCount());
     if (track_ >= tracks) {
         track_ = std::max(0, tracks - 1);

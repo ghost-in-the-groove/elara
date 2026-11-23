@@ -430,6 +430,20 @@ Timbre timbreFor(const core::Instrument& instrument) noexcept {
     }
 }
 
+std::string_view touchName(Touch touch) noexcept {
+    switch (touch) {
+    case Touch::Normal:
+        return "normal";
+    case Touch::PalmMute:
+        return "palm-mute";
+    case Touch::Dead:
+        return "dead";
+    case Touch::Harmonic:
+        return "harmonic";
+    }
+    return "normal";
+}
+
 std::string_view timbreName(Timbre timbre) noexcept {
     switch (timbre) {
     case Timbre::Piano:
@@ -475,7 +489,7 @@ Synth::~Synth() = default;
 Synth::Synth(Synth&&) noexcept = default;
 Synth& Synth::operator=(Synth&&) noexcept = default;
 
-void Synth::noteOn(int key, int velocity) noexcept {
+void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
     key = std::clamp(key, 0, 127);
     velocity = std::clamp(velocity, 1, 127);
     const double rate = sampleRate_;
@@ -604,20 +618,44 @@ void Synth::noteOn(int key, int velocity) noexcept {
         const double fraction = std::clamp(delay - whole, 0.1, 1.1);
         voice.length = static_cast<std::uint32_t>(whole);
         voice.allpass = static_cast<float>((1.0 - fraction) / (1.0 + fraction));
-        const double t60 = bass ? std::clamp(6.0 * std::sqrt(55.0 / frequency), 1.0, 10.0)
-                                : std::clamp(4.0 * std::sqrt(110.0 / frequency), 0.6, 8.0);
+        double t60 = bass ? std::clamp(6.0 * std::sqrt(55.0 / frequency), 1.0, 10.0)
+                          : std::clamp(4.0 * std::sqrt(110.0 / frequency), 0.6, 8.0);
+        auto smoothing =
+            static_cast<float>(bass ? 0.15 + 0.3 * brightness : 0.3 + 0.6 * brightness);
+        switch (touch) {
+        case Touch::Normal:
+            break;
+        case Touch::PalmMute: // the picking hand damps the string: darker and short
+            t60 = std::min(t60, bass ? 0.5 : 0.3);
+            smoothing *= 0.5f;
+            voice.gain *= 0.85f;
+            break;
+        case Touch::Dead: // a muted string: a bright click that dies at once
+            t60 = 0.04;
+            smoothing = 0.9f;
+            voice.gain *= 0.6f;
+            break;
+        case Touch::Harmonic: // a node touched: only the partial, ringing longer
+            t60 = std::min(1.5 * t60, 10.0);
+            voice.gain *= 0.8f;
+            break;
+        }
         voice.loopGain = static_cast<float>(std::pow(10.0, -3.0 / (t60 * frequency)));
 
-        // Excitation: noise, darker for soft notes and for basses.
+        // Excitation: noise, darker for soft notes and for basses; for a
+        // harmonic one period of a sine, which the string keeps pure.
         float* line = strings_.data() + voice.line;
         std::uint32_t seed = 0x9E3779B9U ^ (static_cast<std::uint32_t>(key) * 2654435761U) ^
                              static_cast<std::uint32_t>(struck_);
-        const auto smoothing =
-            static_cast<float>(bass ? 0.15 + 0.3 * brightness : 0.3 + 0.6 * brightness);
         float state = 0.0f;
         double mean = 0.0;
         for (std::uint32_t i = 0; i < voice.length; ++i) {
-            state += smoothing * (whiteNoise(seed) - state);
+            if (touch == Touch::Harmonic) {
+                state = static_cast<float>(
+                    std::sin(kTwoPi * static_cast<double>(i) / static_cast<double>(voice.length)));
+            } else {
+                state += smoothing * (whiteNoise(seed) - state);
+            }
             line[i] = state;
             mean += static_cast<double>(state);
         }
