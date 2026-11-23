@@ -65,6 +65,25 @@ struct NoteEvent {
     friend bool operator==(const NoteEvent&, const NoteEvent&) = default;
 };
 
+/// The playback speed's range: a quarter of the written tempo to twice it.
+inline constexpr double kMinSpeed = 0.25;
+inline constexpr double kMaxSpeed = 2.0;
+
+/// The metronome's keys (General MIDI percussion): a high wood block on the
+/// first beat of a measure, a low one on the others.
+inline constexpr int kMetronomeAccentKey = 76;
+inline constexpr int kMetronomeKey = 77;
+
+/// How a song is played for practice (ADR-0024).
+struct SequenceOptions {
+    /// Times every written tempo, from kMinSpeed to kMaxSpeed (clamped; 1
+    /// when it is not a number). Effects timed in seconds, such as vibrato
+    /// and slides, keep their pace.
+    double speed = 1.0;
+    /// A click on every beat, as events on Sequence::metronomeTrack().
+    bool metronome = false;
+};
+
 /// A song as it is played: its measures in play order (repeats unrolled,
 /// core::Song::playOrder()), its notes and the note events for a
 /// synthesizer, all in seconds. Every measure plays at the tempo written in
@@ -75,7 +94,14 @@ struct NoteEvent {
 /// audio thread can read it without locks.
 class Sequence {
 public:
-    explicit Sequence(const core::Song& song);
+    explicit Sequence(const core::Song& song, SequenceOptions options = {});
+
+    /// The speed played at, as clamped from the options.
+    [[nodiscard]] double speed() const noexcept { return speed_; }
+    /// Whether the metronome's clicks are among the events.
+    [[nodiscard]] bool metronome() const noexcept { return metronome_; }
+    /// The track the metronome's events are on: one past the song's last.
+    [[nodiscard]] std::size_t metronomeTrack() const noexcept { return metronomeTrack_; }
 
     [[nodiscard]] const std::vector<PlayedMeasure>& measures() const noexcept { return measures_; }
     /// Ordered by start, then track, staff, voice and key.
@@ -110,6 +136,9 @@ private:
     std::vector<PlayedNote> notes_;
     std::vector<NoteEvent> events_;
     double duration_ = 0.0;
+    double speed_ = 1.0;
+    bool metronome_ = false;
+    std::size_t metronomeTrack_ = 0;
 };
 
 } // namespace elara::audio
