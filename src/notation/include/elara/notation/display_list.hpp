@@ -136,7 +136,7 @@ struct MeasureBox {
     double width = 0.0;
     double y = 0.0;
     double height = 0.0;
-    std::vector<MeasureOnset> onsets;
+    std::vector<MeasureOnset> onsets{};
     friend bool operator==(const MeasureBox&, const MeasureBox&) = default;
 };
 
