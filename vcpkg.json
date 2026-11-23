@@ -6,8 +6,21 @@
   "dependencies": [
     "catch2",
     "cli11",
+    "fluidsynth",
+    {
+      "name": "libsndfile",
+      "default-features": false,
+      "features": [
+        "external-libs"
+      ]
+    },
     "miniz",
     "pugixml",
     "yyjson"
-  ]
+  ],
+  "vcpkg-configuration": {
+    "overlay-ports": [
+      "cmake/vcpkg-ports"
+    ]
+  }
 }

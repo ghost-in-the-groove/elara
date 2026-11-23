@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Offline rendering with the built-in synthesizer (ADR-0018).
+// Offline rendering (ADR-0018), through a sound bank (ADR-0043).
 #include <elara/audio/offline_renderer.hpp>
+#include <elara/core/instrument.hpp>
 #include <elara/core/parallel.hpp>
 #include <elara/core/song.hpp>
 
@@ -8,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace elara::audio {
 
@@ -18,7 +20,7 @@ constexpr std::size_t kParallelFrames = 8192; // frames x tracks worth starting 
 } // namespace
 
 struct OfflineRenderer::TrackPlayer {
-    Synth synth;
+    std::unique_ptr<TrackSound> sound;
     std::vector<detail::FrameEvent> events{};
     std::size_t next = 0;
     std::vector<float> buffer{};
@@ -26,7 +28,7 @@ struct OfflineRenderer::TrackPlayer {
 
     void render(std::int64_t from, std::size_t count, std::size_t track, bool log) {
         buffer.assign(count, 0.0f);
-        detail::playTrack(synth, events, next, from, buffer, [&](const detail::FrameEvent& event) {
+        detail::playTrack(*sound, events, next, from, buffer, [&](const detail::FrameEvent& event) {
             if (log) {
                 dispatched.push_back({.frame = event.frame,
                                       .kind = event.kind,
@@ -55,19 +57,24 @@ OfflineRenderer::OfflineRenderer(const core::Song& song, const Sequence& sequenc
         levels_.push_back(level.left);
         levels_.push_back(level.right);
     }
+    const std::shared_ptr<const SoundBank> bank = options_.bank ? options_.bank : builtinBank();
     timbres_.reserve(tracks);
+    sounds_.reserve(tracks);
     players_.reserve(tracks + 1);
     for (std::size_t t = 0; t < tracks; ++t) {
-        timbres_.push_back(timbreFor(song.track(t).instrument()));
+        const core::Instrument& instrument = song.track(t).instrument();
+        timbres_.push_back(timbreFor(instrument));
+        sounds_.push_back(bank->soundName(instrument));
         players_.push_back(
-            TrackPlayer{.synth = Synth(timbres_.back(), rate), .events = std::move(events[t])});
+            TrackPlayer{.sound = bank->sound(instrument, rate), .events = std::move(events[t])});
     }
     // The metronome plays after the tracks, so its index is its track's.
     if (!events[tracks].empty()) {
         levels_.push_back(detail::kMetronomeLevel.left);
         levels_.push_back(detail::kMetronomeLevel.right);
-        players_.push_back(
-            TrackPlayer{.synth = Synth(Timbre::Drums, rate), .events = std::move(events[tracks])});
+        players_.push_back(TrackPlayer{
+            .sound = builtinBank()->sound({.kind = core::InstrumentKind::Percussion}, rate),
+            .events = std::move(events[tracks])});
     }
 }
 
