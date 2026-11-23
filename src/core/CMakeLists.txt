@@ -4,6 +4,7 @@ add_library(elara_core STATIC
   src/document.cpp
   src/duration.cpp
   src/effects.cpp
+  src/entry.cpp
   src/fraction.cpp
   src/instrument.cpp
   src/measure.cpp
@@ -11,6 +12,7 @@ add_library(elara_core STATIC
   src/pitch.cpp
   src/signature.cpp
   src/song.cpp
+  src/transpose.cpp
   src/tuning.cpp
   src/validation.cpp
   src/version.cpp)
