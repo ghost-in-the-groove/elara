@@ -74,7 +74,11 @@ int main(int argc, char* argv[]) {
         QStringLiteral("screenshot"),
         QCoreApplication::translate("main", "Save the window as an image once shown, and quit."),
         QStringLiteral("png"));
-    parser.addOptions({trackOption, viewOption, smokeTest, screenshot});
+    const QCommandLineOption seekOption(
+        QStringLiteral("seek"),
+        QCoreApplication::translate("main", "Move the playback cursor to this many seconds."),
+        QStringLiteral("seconds"));
+    parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -107,6 +111,15 @@ int main(int argc, char* argv[]) {
             std::fprintf(stderr, "elara: --view takes notation, tab or both\n");
             return EXIT_FAILURE;
         }
+    }
+    if (parser.isSet(seekOption)) {
+        bool number = false;
+        const double seconds = parser.value(seekOption).toDouble(&number);
+        if (!number || seconds < 0.0) {
+            std::fprintf(stderr, "elara: --seek takes a number of seconds\n");
+            return EXIT_FAILURE;
+        }
+        options.seek = seconds;
     }
     options.smokeTest = parser.isSet(smokeTest);
     options.screenshot = parser.value(screenshot);
@@ -141,7 +154,7 @@ int main(int argc, char* argv[]) {
         }
         return EXIT_FAILURE;
     }
-    if (checking || options.track || options.view) {
+    if (checking || options.track || options.view || options.seek) {
         auto* startup = new elara::app::Startup(window, options, qmlWarnings);
         startup->start();
     }

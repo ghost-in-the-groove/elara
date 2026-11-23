@@ -2,6 +2,8 @@
 // Render subcommand: staves in standard notation, tablature or both, as the
 // notation engine lays them out on one line (ADR-0012) or on pages (ADR-0014),
 // printed as display lists or written as SVG.
+#include <elara/audio/sequence.hpp>
+#include <elara/notation/cursor.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
@@ -20,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -51,7 +54,41 @@ struct RenderOptions {
     bool noCredits = false;
     std::string svg;
     std::string metadata;
+    double cursorAt = -1.0; // seconds; negative for no cursor
 };
+
+/// The playback cursor at `seconds`, as JSON ("null" when no page shows the
+/// measure played then), and the played measure it is in.
+struct CursorReport {
+    std::string json = "null";
+    std::string text;
+};
+
+CursorReport cursorReport(const core::Song& song, std::span<const notation::DisplayList> pages,
+                          double seconds) {
+    const audio::Sequence sequence(song);
+    const std::size_t played = sequence.playedMeasureAt(seconds);
+    if (played >= sequence.measures().size()) {
+        return {.json = "null", .text = std::format("cursor at {} s: after the end\n", seconds)};
+    }
+    const audio::PlayedMeasure& measure = sequence.measures()[played];
+    const double length = measure.end - measure.start;
+    const double fraction = length > 0.0 ? (seconds - measure.start) / length : 0.0;
+    const std::optional<notation::Cursor> cursor =
+        notation::cursorAt(pages, measure.measure, fraction);
+    if (!cursor) {
+        return {.json = "null",
+                .text = std::format("cursor at {} s: measure {} is not shown\n", seconds,
+                                    measure.measure + 1)};
+    }
+    return {.json = std::format(
+                R"({{"seconds":{},"played":{},"measure":{},"page":{},"x":{},"y":{},"height":{}}})",
+                jsonNumber(seconds), played, measure.measure, cursor->page, jsonNumber(cursor->x),
+                jsonNumber(cursor->y), jsonNumber(cursor->height)),
+            .text = std::format("cursor at {} s: measure {}, page {}, x {}, y {}\n", seconds,
+                                measure.measure + 1, cursor->page + 1, jsonNumber(cursor->x),
+                                jsonNumber(cursor->y))};
+}
 
 std::string point(const notation::Point& p) {
     return std::format("[{},{}]", jsonNumber(p.x), jsonNumber(p.y));
@@ -369,14 +406,18 @@ int runRender(bool json, const RenderOptions& options) {
             }
         }
         std::string body;
+        if (options.cursorAt >= 0.0) {
+            body =
+                std::format(R"("cursor":{},)", cursorReport(*song, pages, options.cursorAt).json);
+        }
         if (paged) {
-            body = R"("pages":[)";
+            body += R"("pages":[)";
             for (std::size_t p = 0; p < pages.size(); ++p) {
                 body += std::format("{}{{{}}}", p == 0 ? "" : ",", displayListJson(pages[p]));
             }
             body += ']';
         } else {
-            body = displayListJson(pages.front());
+            body += displayListJson(pages.front());
         }
         std::cout
             << std::format(
@@ -416,6 +457,9 @@ int runRender(bool json, const RenderOptions& options) {
     }
     for (const std::string& file : written) {
         std::cout << std::format("saved {}\n", file);
+    }
+    if (options.cursorAt >= 0.0) {
+        std::cout << cursorReport(*song, pages, options.cursorAt).text;
     }
     return kExitOk;
 }
@@ -467,6 +511,10 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->check(CLI::PositiveNumber);
     render->add_option("--measures-per-system", options->measuresPerSystem,
                        "Measures in every system (default: as many as space evenly)");
+    render
+        ->add_option("--cursor-at", options->cursorAt,
+                     "Report where the playback cursor stands this many seconds into the song")
+        ->check(CLI::NonNegativeNumber);
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");
     render->add_option("--svg", options->svg,

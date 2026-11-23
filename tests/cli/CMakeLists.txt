@@ -477,3 +477,15 @@ set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL 
 add_test(NAME cli.play_rejects_missing_file
   COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+# The playback cursor: guitar-techniques.gp plays measures 1 2 1 2 1 3, about
+# 2.5 s each, so 6 s is in the third measure played, the first one written.
+add_test(NAME cli.render_cursor_in_a_repeat
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --cursor-at 6)
+set_tests_properties(cli.render_cursor_in_a_repeat PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"cursor\":{\"seconds\":6,\"played\":2,\"measure\":0,\"page\":0,\"x\":[0-9.]+,\"y\":[0-9.]+,\"height\":4},\"pages\":\\[")
+add_test(NAME cli.render_cursor_after_the_end
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --cursor-at 99)
+set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
+  PASS_REGULAR_EXPRESSION "cursor at 99 s: after the end")

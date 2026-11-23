@@ -44,6 +44,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | evento de nota | note event | `NoteEvent`, `EventKind` | What a synthesizer is told: a key struck (`NoteOn`) or released (`NoteOff`) on a track at a time |
 | timbre | timbre | `audio::Timbre`, `timbreFor()` | The sound the built-in synthesizer gives a track, picked from its instrument (ADR-0018) |
 | reproductor / transporte | player / transport | `audio::Player`: `play()`, `pause()`, `seek()`, `position()` | Plays a song in real time; the transport is where it is and whether it moves (ADR-0019) |
+| cursor de reproducción | playback cursor | `notation::cursorAt`, `ScoreDocument::cursorAt` | The line across a system that shows what plays; it stands on each column of notes as it starts |
 | registro de eventos | event log | `LoggedEvent`, `OfflineRenderer::log()` | The note events a render dispatched, each with its sample frame; what playback tests compare |
 | cuantización / rejilla | quantization / grid | MIDI import | Placing played or exported MIDI notes on a rhythm grid chosen per beat before writing them as notes, rests, ties and tuplets (ADR-0009) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |

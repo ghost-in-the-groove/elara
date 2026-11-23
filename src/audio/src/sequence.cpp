@@ -316,4 +316,13 @@ std::size_t Sequence::eventAt(double seconds) const noexcept {
         std::ranges::lower_bound(events_, seconds, {}, &NoteEvent::time) - events_.begin());
 }
 
+std::size_t Sequence::playedMeasureAt(double seconds) const noexcept {
+    if (measures_.empty() || seconds > measures_.back().end) {
+        return measures_.size();
+    }
+    // The first measure that ends after `seconds`, or the last one.
+    const auto after = std::ranges::upper_bound(measures_, seconds, {}, &PlayedMeasure::end);
+    return std::min(static_cast<std::size_t>(after - measures_.begin()), measures_.size() - 1);
+}
+
 } // namespace elara::audio

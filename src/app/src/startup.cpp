@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "startup.hpp"
 
+#include "audio_controller.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
 #include <QImage>
@@ -82,6 +83,20 @@ void Startup::queueSteps() {
             return true;
         });
     }
+    // Moving the transport shows the cursor; it needs no relayout. The device
+    // stays closed while paused.
+    const auto seekTo = [this](double seconds) {
+        steps_.emplace_back([this, seconds] {
+            auto* audio = window_ != nullptr ? window_->findChild<AudioController*>() : nullptr;
+            if (audio != nullptr) {
+                audio->seek(seconds);
+            }
+            return false;
+        });
+    };
+    if (options_.smokeTest) {
+        seekTo(score_->duration() / 2.0);
+    }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
             const int before = score_->track();
@@ -97,6 +112,9 @@ void Startup::queueSteps() {
             score_->setView(view);
             return true;
         });
+    }
+    if (options_.seek) {
+        seekTo(*options_.seek);
     }
 }
 

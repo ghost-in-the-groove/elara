@@ -72,6 +72,11 @@ public:
     /// when there is none): where playback starting there begins.
     [[nodiscard]] std::size_t eventAt(double seconds) const noexcept;
 
+    /// The index in measures() of the measure played at `seconds`: the first
+    /// one for earlier times, the last one at its very end, and
+    /// measures().size() after that or when there is none.
+    [[nodiscard]] std::size_t playedMeasureAt(double seconds) const noexcept;
+
 private:
     std::vector<PlayedMeasure> measures_;
     std::vector<PlayedNote> notes_;

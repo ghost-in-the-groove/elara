@@ -115,6 +115,22 @@ TEST_CASE("Sequence: repeats play their measures again", "[audio][sequence]") {
     CHECK_THAT(notes[2].start, WithinAbs(4.0, kEpsilon));
 }
 
+TEST_CASE("Sequence: the played measure at a time", "[audio][sequence]") {
+    // |: 0 :| 1, two seconds each: played 0 (0-2 s), 0 (2-4 s), 1 (4-6 s).
+    Song song = pianoSong(2);
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+    const Sequence sequence(song);
+    CHECK(sequence.playedMeasureAt(-1.0) == 0);
+    CHECK(sequence.playedMeasureAt(0.0) == 0);
+    CHECK(sequence.playedMeasureAt(1.999) == 0);
+    CHECK(sequence.playedMeasureAt(2.0) == 1);
+    CHECK(sequence.playedMeasureAt(5.5) == 2);
+    CHECK(sequence.playedMeasureAt(6.0) == 2); // the end belongs to the last measure
+    CHECK(sequence.playedMeasureAt(60.0) == 3);
+    CHECK(Sequence(pianoSong(0)).playedMeasureAt(0.0) == 0);
+}
+
 TEST_CASE("Sequence: every measure keeps the tempo written there", "[audio][sequence]") {
     // |: 0 | 1 (quarter = 60) :|: back at the start, quarter = 120 again.
     Song song = pianoSong(2);
