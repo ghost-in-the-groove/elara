@@ -15,7 +15,7 @@ Real-world files used by importer, notation and playback tests (milestone 2+).
 
 ## Import snapshots
 
-Every MusicXML and MIDI file here is imported by a CTest case
+Every MusicXML, MIDI and Guitar Pro file here is imported by a CTest case
 (`cli.snapshot_<folder>_<name>`) that compares `elara-cli --json import` with
 `tests/snapshots/import/<folder>/<name>.json`. A new file gets its snapshot,
 and an intended change to the importers updates them, with

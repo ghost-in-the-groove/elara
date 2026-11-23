@@ -3,6 +3,7 @@
 // foreign format, optionally saving it as .elara) and export (write one).
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
+#include <elara/io/guitar_pro.hpp>
 #include <elara/io/midi.hpp>
 #include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
@@ -113,7 +114,7 @@ std::string lowercase(std::string text) {
     return text;
 }
 
-enum class Foreign { MusicXml, Midi };
+enum class Foreign { MusicXml, Midi, GuitarPro };
 
 // The foreign format a path names by its extension.
 std::optional<Foreign> foreignFormat(const std::filesystem::path& path) {
@@ -124,10 +125,40 @@ std::optional<Foreign> foreignFormat(const std::filesystem::path& path) {
     if (extension == ".mid" || extension == ".midi" || extension == ".smf") {
         return Foreign::Midi;
     }
+    if (extension == ".gp" || extension == ".gpx" || extension == ".gp5" || extension == ".gp4" ||
+        extension == ".gp3") {
+        return Foreign::GuitarPro;
+    }
     return std::nullopt;
 }
 
-constexpr std::string_view kForeignTypes = ".musicxml, .xml, .mxl, .mid, .midi and .smf";
+constexpr std::string_view kImportTypes = ".musicxml, .xml, .mxl, .mid, .midi, .smf and .gp";
+constexpr std::string_view kExportTypes = ".musicxml, .xml, .mxl, .mid, .midi and .smf";
+
+// How the JSON output and the text output name a format.
+std::string_view formatId(Foreign format) {
+    switch (format) {
+    case Foreign::Midi:
+        return "midi";
+    case Foreign::GuitarPro:
+        return "guitarpro";
+    case Foreign::MusicXml:
+        break;
+    }
+    return "musicxml";
+}
+
+std::string_view formatName(Foreign format) {
+    switch (format) {
+    case Foreign::Midi:
+        return "MIDI";
+    case Foreign::GuitarPro:
+        return "Guitar Pro";
+    case Foreign::MusicXml:
+        break;
+    }
+    return "MusicXML";
+}
 
 std::string warningsJson(const std::vector<std::string>& warnings) {
     std::string json = "[";
@@ -142,10 +173,11 @@ int runImport(bool json, const ImportOptions& options) {
     const auto format = foreignFormat(path);
     if (!format) {
         return usageError(
-            std::format("cannot import {}: supported files are {}", options.file, kForeignTypes));
+            std::format("cannot import {}: supported files are {}", options.file, kImportTypes));
     }
-    const bool midi = *format == Foreign::Midi;
-    const auto imported = midi ? io::importMidiFile(path) : io::importMusicXmlFile(path);
+    const auto imported = *format == Foreign::Midi        ? io::importMidiFile(path)
+                          : *format == Foreign::GuitarPro ? io::importGuitarProFile(path)
+                                                          : io::importMusicXmlFile(path);
     if (!imported) {
         return fail(std::format("{}: {}", options.file, imported.error().message));
     }
@@ -166,12 +198,12 @@ int runImport(bool json, const ImportOptions& options) {
             options.out.empty() ? "null" : std::format("\"{}\"", jsonEscape(options.out));
         std::cout << std::format(R"({{"file":"{}","format":"{}","out":{},"warnings":{},)"
                                  R"("song":{},"durationSeconds":{:.3f},"issues":{}}})",
-                                 jsonEscape(options.file), midi ? "midi" : "musicxml", out,
-                                 warnings, io::songToJson(song), song.durationSeconds(),
+                                 jsonEscape(options.file), formatId(*format), out, warnings,
+                                 io::songToJson(song), song.durationSeconds(),
                                  issuesJson(core::validate(song)))
                   << '\n';
     } else {
-        std::cout << std::format("imported {} ({})\n", options.file, midi ? "MIDI" : "MusicXML");
+        std::cout << std::format("imported {} ({})\n", options.file, formatName(*format));
         printSongText(song);
         for (const std::string& warning : imported->warnings) {
             std::cout << "warning: " << warning << '\n';
@@ -192,9 +224,9 @@ struct ExportOptions {
 int runExport(bool json, const ExportOptions& options) {
     const std::filesystem::path out(options.out);
     const auto format = foreignFormat(out);
-    if (!format) {
+    if (!format || *format == Foreign::GuitarPro) {
         return usageError(
-            std::format("cannot export to {}: supported files are {}", options.out, kForeignTypes));
+            std::format("cannot export to {}: supported files are {}", options.out, kExportTypes));
     }
     const bool midi = *format == Foreign::Midi;
     const auto song = io::loadNative(options.file);
@@ -264,8 +296,8 @@ void addFileCommands(CLI::App& app, Context& context) {
 
     auto imported = std::make_shared<ImportOptions>();
     auto* importCommand = app.add_subcommand(
-        "import", "Read a MusicXML (.musicxml, .xml, .mxl) or MIDI (.mid, .midi, .smf) file: with "
-                  "--json, the song, what was dropped (warnings) and issues");
+        "import", "Read a MusicXML (.musicxml, .xml, .mxl), MIDI (.mid, .midi, .smf) or Guitar Pro "
+                  "7-8 (.gp) file: with --json, the song, what was dropped (warnings) and issues");
     importCommand->add_option("file", imported->file, "File to import")->required();
     importCommand->add_option("--out", imported->out, "Also save the song as a .elara file");
     importCommand->add_flag("--force", imported->force, "Replace the --out file if it exists");

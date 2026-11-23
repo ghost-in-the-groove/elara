@@ -275,6 +275,17 @@ add_test(NAME cli.import_rejects_damaged_midi
   COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid")
 set_tests_properties(cli.import_rejects_damaged_midi PROPERTIES WILL_FAIL TRUE)
 
+# Guitar Pro (ADR-0010): read only.
+add_test(NAME cli.import_guitar_pro
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/gp/guitar-techniques.gp")
+set_tests_properties(cli.import_guitar_pro PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"format\":\"guitarpro\".*\"title\":\"Corpus Guitar Techniques\".*\"capo\":2")
+
+add_test(NAME cli.export_rejects_guitar_pro
+  COMMAND elara-cli export "${ELARA_CLI_IMPORTED}" "${CMAKE_CURRENT_BINARY_DIR}/out.gp")
+set_tests_properties(cli.export_rejects_guitar_pro PROPERTIES
+  FIXTURES_REQUIRED cli_imported WILL_FAIL TRUE)
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot
@@ -282,7 +293,8 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 file(GLOB _corpus_files CONFIGURE_DEPENDS
   "${ELARA_CORPUS}/musicxml/*.musicxml"
   "${ELARA_CORPUS}/musicxml/*.mxl"
-  "${ELARA_CORPUS}/midi/*.mid")
+  "${ELARA_CORPUS}/midi/*.mid"
+  "${ELARA_CORPUS}/gp/*.gp")
 foreach(_file IN LISTS _corpus_files)
   file(RELATIVE_PATH _relative "${ELARA_CORPUS}" "${_file}")
   string(REGEX REPLACE "\.[^./]+$" "" _name "${_relative}")
