@@ -35,7 +35,8 @@ elara_add_unit_tests(core
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
 elara_add_unit_tests(audio
-  SOURCES audio/test_offline_renderer.cpp audio/test_sequence.cpp audio/test_synth.cpp audio/test_tone_generator.cpp
+  SOURCES audio/test_offline_renderer.cpp audio/test_player.cpp audio/test_sequence.cpp
+          audio/test_synth.cpp audio/test_tone_generator.cpp
           audio/test_wav_writer.cpp
   LIBRARIES elara::audio)
 

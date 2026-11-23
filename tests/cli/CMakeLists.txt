@@ -481,3 +481,8 @@ set_tests_properties(cli.render_audio_band PROPERTIES
 add_test(NAME cli.render_audio_rejects_missing_file
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# Playing needs an output device, which CI does not have; a missing file fails
+# before the device is opened.
+add_test(NAME cli.play_rejects_missing_file
+  COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
+set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)

@@ -11,6 +11,8 @@
 
 namespace elara::audio {
 
+class AudioSource;
+
 struct OutputDeviceInfo {
     std::string type; // driver family, e.g. "Windows Audio", "CoreAudio", "ALSA"
     std::string name;
@@ -21,9 +23,10 @@ struct OutputDeviceInfo {
 /// Call from the main thread.
 [[nodiscard]] std::vector<OutputDeviceInfo> listOutputDevices();
 
-/// Owns the default output device and a test-tone voice.
-/// Construct, open() and destroy on the main thread; playTone()/stop()/isPlaying()
-/// are safe from any thread and never block the audio callback.
+/// Owns the default output device, a test-tone voice and the source it plays
+/// (a Player). Construct, open(), setSource() and destroy on the main thread;
+/// playTone()/stop()/isPlaying() are safe from any thread and never block the
+/// audio callback.
 class SystemAudio {
 public:
     SystemAudio();
@@ -38,6 +41,14 @@ public:
 
     /// Human-readable "<type> / <device> @ <rate> Hz, <buffer> samples"; empty if closed.
     [[nodiscard]] std::string deviceDescription() const;
+
+    /// The device's sample rate in Hz; 0 while closed.
+    [[nodiscard]] double sampleRate() const;
+
+    /// Plays `source` (nullptr for none) alongside the test tone. The audio
+    /// callback is stopped while the source changes, so once this returns the
+    /// previous source is no longer called and may be destroyed.
+    void setSource(AudioSource* source);
 
     /// Starts a sine tone with short fades; replaces any tone already playing.
     void playTone(double frequencyHz, double seconds) noexcept;
