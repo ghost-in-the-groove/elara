@@ -51,6 +51,19 @@ Every jump raises the time through, and a new section starts after the
 current measure, so the order always ends; it is also capped at 256 times the
 measures.
 
+**In the notation.** A start repeat (thick, thin, dots) follows the
+clef and signatures at the start of a system and signature changes elsewhere;
+right after a barline it takes that barline's place. An end repeat (dots,
+thin, thick) closes its measure, and back-to-back repeats share their thick
+line. The dots sit in the two spaces around the middle of the staff, or either
+side of the middle space of a staff with an odd number of spaces (six-string
+tablature). A repeat played more than twice shows its count ("x3") above its
+end. Alternate endings are brackets above the first staff of the system, all
+at one height, from the barline before them: a run of measures with the same
+endings is one bracket with the numbers ("1., 2.") after its start hook, an
+end hook where an end repeat closes it, and no start hook or numbers where it
+goes on from the system before.
+
 **In files.**
 
 - `.elara`: `repeatStart`, `repeatTimes` and `alternateEndings` as a list of
@@ -74,8 +87,8 @@ measures.
 
 ## Consequences
 
-- Imported songs keep their form; the sequencer will play them in order and
-  the notation engine can draw repeat barlines and voltas.
+- Imported songs keep their form: the score shows it, and the sequencer will
+  play them in order.
 - MIDI files have no repeats: a MIDI export of a song with repeats writes the
   measures as written until the sequencer writes them as played.
 - The Guitar Pro 3 and 4 counting is taken from how those versions describe
