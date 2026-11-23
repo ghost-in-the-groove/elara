@@ -41,6 +41,7 @@ one that replaces them.
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
 | [0042](0042-tempo-marks.md) | Tempo marks | Accepted |
+| [0044](0044-dynamics-marks.md) | Dynamics marks | Accepted |
 
 ## Template
 
