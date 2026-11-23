@@ -12,6 +12,12 @@
 #include <format>
 #include <iostream>
 
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
 namespace {
 
 int runVersion(bool json) {
@@ -28,6 +34,10 @@ int runVersion(bool json) {
 
 int main(int argc, char** argv) {
     using namespace elara::cli;
+#ifdef _WIN32
+    // Output is UTF-8 (as are arguments, through the manifest): show it so.
+    SetConsoleOutputCP(CP_UTF8);
+#endif
 
     CLI::App app{"Elara command-line tools (headless)", "elara-cli"};
     app.require_subcommand(1);

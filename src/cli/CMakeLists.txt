@@ -16,3 +16,7 @@ target_link_libraries(elara-cli PRIVATE
   elara::audio_juce
   CLI11::CLI11)
 elara_target_warnings(elara-cli)
+if(WIN32)
+  # UTF-8 arguments and paths (see the manifest).
+  target_sources(elara-cli PRIVATE elara-cli.manifest)
+endif()
