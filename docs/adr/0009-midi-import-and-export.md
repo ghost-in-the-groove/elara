@@ -83,7 +83,8 @@ applied there.
    beat is cut at the next beat; otherwise each step takes the longest value that
    fits (up to two dots), rests also aligned to their own length. Cut notes are
    tied; pitches are spelled in the key in force (`KeySignature::spell`);
-   velocities become the nearest dynamic.
+   velocities become the nearest dynamic (played velocities: a dynamic per
+   measure with accents and ghost notes, ADR-0045).
 
 **Threads.** Both directions work track by track once the shared part is done
 (the sounding notes and the division when writing; the events, measures and
