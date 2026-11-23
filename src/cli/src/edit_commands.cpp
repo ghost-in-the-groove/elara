@@ -14,6 +14,7 @@
 #include "song_report.hpp"
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstddef>
@@ -201,6 +202,17 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         edit = deleteBeat(song, entry.caret);
     } else if (verb == "insert-rest") {
         edit = insertRest(song, entry.caret, entry.input);
+    } else if (verb == "drum") { // drum [key]: the caret's lane, or that piece's
+        if (step.has(1)) {
+            const int key = step.number<int>(1);
+            const auto pieces = drumPieces();
+            const auto found = std::ranges::find(pieces, key, &DrumPiece::key);
+            if (found == pieces.end()) {
+                throw std::out_of_range(std::format("drum: no lane for key {}", key));
+            }
+            entry.caret.string = static_cast<int>(found - pieces.begin()) + 1;
+        }
+        edit = toggleDrum(song, entry.caret, entry.input);
     } else {
         return false;
     }
@@ -463,7 +475,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, undo, redo, save");
+        "insert-rest, \"drum [key]\", undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

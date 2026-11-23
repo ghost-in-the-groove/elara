@@ -12,11 +12,16 @@
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
 #include <memory>
 #include <vector>
+
+namespace elara::audio {
+class Sequence;
+}
 
 namespace elara::app {
 
@@ -37,6 +42,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString artist READ artist NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
+    Q_PROPERTY(double duration READ duration NOTIFY songChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
@@ -66,6 +72,8 @@ public:
     [[nodiscard]] QString artist() const;
     [[nodiscard]] QStringList trackNames() const;
     [[nodiscard]] int measureCount() const;
+    /// Seconds the song lasts when played, repeats included.
+    [[nodiscard]] double duration() const;
     [[nodiscard]] int track() const { return track_; }
     void setTrack(int track);
     [[nodiscard]] View view() const { return view_; }
@@ -84,6 +92,20 @@ public:
     Q_INVOKABLE void open(const QUrl& file);
     /// Lays out the score again (after a track or view change).
     Q_INVOKABLE void relayout();
+
+    /// Where the playback cursor stands `seconds` into the song: "page", and
+    /// "x", "y" and "height" in staff spaces on it; empty when no page shows
+    /// the measure played then.
+    Q_INVOKABLE QVariantMap cursorAt(double seconds) const;
+    /// When playback would start for a click at (`x`, `y`) staff spaces on
+    /// page `page`: on the column of notes there, the first time its measure
+    /// plays; negative away from every measure.
+    Q_INVOKABLE double secondsAt(int page, double x, double y) const;
+
+    /// The song and the sequence it plays as, built when it is opened; null
+    /// before.
+    [[nodiscard]] std::shared_ptr<const core::Song> song() const { return song_; }
+    [[nodiscard]] std::shared_ptr<const audio::Sequence> sequence() const { return sequence_; }
 
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;
@@ -108,6 +130,7 @@ private:
     Status status_ = Status::Empty;
     QString errorMessage_;
     std::shared_ptr<const core::Song> song_;
+    std::shared_ptr<const audio::Sequence> sequence_;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     int track_ = 0;
     View view_ = View::Both;

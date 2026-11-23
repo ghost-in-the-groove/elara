@@ -234,6 +234,26 @@ add_test(NAME cli.edit_rejects_unknown_note_name
 set_tests_properties(cli.edit_rejects_note_name_on_drums cli.edit_rejects_unknown_note_name
   PROPERTIES WILL_FAIL TRUE)
 
+# Drum entry (ADR-0035): a bass drum, a closed hi-hat and a snare on the first
+# beat, the hi-hat toggled off from its lane, then a snare on the second beat.
+set(ELARA_CLI_DRUMS "${CMAKE_CURRENT_BINARY_DIR}/cli-drums.elara")
+add_test(NAME cli.edit_types_drums
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DRUMS}" "add-track drum-kit" "append-measures 1"
+    "caret 0 0 0" "drum 36" "drum 42" "drum 38" "caret 0 0 0 2" drum right "drum 38")
+set_tests_properties(cli.edit_types_drums PROPERTIES
+  FIXTURES_SETUP cli_drums
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":1,\"string\":8,\"freeSlot\":false}")
+add_test(NAME cli.dump_drums COMMAND elara-cli --json dump "${ELARA_CLI_DRUMS}")
+set_tests_properties(cli.dump_drums PROPERTIES
+  FIXTURES_REQUIRED cli_drums
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"},{\"pitch\":\"C2\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_rejects_drum_on_guitar
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" drum)
+add_test(NAME cli.edit_rejects_drum_without_lane
+  COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
+set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
+  PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
@@ -633,3 +653,27 @@ set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL 
 add_test(NAME cli.play_rejects_missing_file
   COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+# The playback cursor: guitar-techniques.gp plays measures 1 2 1 2 1 3, about
+# 2.5 s each, so 6 s is in the third measure played, the first one written.
+add_test(NAME cli.render_cursor_in_a_repeat
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --cursor-at 6)
+set_tests_properties(cli.render_cursor_in_a_repeat PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"cursor\":{\"seconds\":6,\"played\":2,\"measure\":0,\"page\":0,\"x\":[0-9.]+,\"y\":[0-9.]+,\"height\":4},\"pages\":\\[")
+add_test(NAME cli.render_cursor_after_the_end
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --cursor-at 99)
+set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
+  PASS_REGULAR_EXPRESSION "cursor at 99 s: after the end")
+
+# A click where the cursor stood at 6 s (the second time through measure 1)
+# starts playback on the same column the first time through: at 1 s.
+add_test(NAME cli.render_time_at_a_note
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --time-at 0 27.7 28)
+set_tests_properties(cli.render_time_at_a_note PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":27.7,\"y\":28,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+add_test(NAME cli.render_time_at_nothing
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
+set_tests_properties(cli.render_time_at_nothing PROPERTIES
+  PASS_REGULAR_EXPRESSION "time at page 1, x 1, y 1: no measure there")
