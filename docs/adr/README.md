@@ -28,6 +28,7 @@ one that replaces them.
 | [0020](0020-track-mix.md) | The track mix | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
 | [0029](0029-microphone-input.md) | Microphone input for the tuner | Accepted |
+| [0030](0030-translations.md) | Translations of the user interface | Accepted |
 
 ## Template
 

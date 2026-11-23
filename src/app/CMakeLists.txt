@@ -1,6 +1,8 @@
 # elara: the Qt Quick desktop application. Qt draws, JUCE plays (ADR-0002);
 # the app talks to audio only through elara::audio_juce's plain C++ API.
-qt_standard_project_setup(REQUIRES 6.12)
+qt_standard_project_setup(REQUIRES 6.12
+  I18N_SOURCE_LANGUAGE en
+  I18N_TRANSLATED_LANGUAGES es)
 
 # Painting of display lists, in a library of its own so that tests link it
 # without the QML application.
@@ -45,6 +47,16 @@ qt_add_qml_module(elara
     src/startup.cpp
     src/tuner_controller.hpp
     src/tuner_controller.cpp)
+
+# Translations of the UI strings (qsTr/tr), compiled into the executable under
+# :/i18n. The `update_translations` target runs lupdate to refresh the .ts
+# files from the sources; each build compiles them with lrelease.
+qt_add_translations(elara
+  SOURCE_TARGETS elara
+  TS_FILE_DIR i18n
+  TS_FILE_BASE elara
+  RESOURCE_PREFIX /i18n
+  LUPDATE_OPTIONS -no-obsolete -locations none)
 
 # The fonts scores are painted with, and the controls style, built into the
 # executable so that it finds them wherever it is installed.

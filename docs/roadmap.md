@@ -70,7 +70,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
 - [ ] Copy/paste, insert/delete measures, transposition
 - [ ] Edit every element of milestone 1 from the UI
-- [ ] Spanish and English translations (Qt Linguist)
+- [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
 
