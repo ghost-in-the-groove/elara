@@ -54,6 +54,7 @@ private:
     void queueMeasures();
     void queuePitches();
     void queueMix();
+    void queueTuning();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     [[nodiscard]] bool checking() const;
@@ -76,13 +77,14 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
-    QString editProblem_;    ///< the first edit check that failed
-    QString failure_;        ///< set by a step that went wrong
-    bool entering_ = false;  ///< whether the shown track takes frets
-    int measuresBefore_ = 0; ///< measures when the measure edits start
-    int firstNumerator_ = 0; ///< the first time signature then
-    bool pitching_ = false;  ///< whether the caret takes note names
-    int typedMidi_ = -1;     ///< the note name typed, as a MIDI number
+    QVariantMap tuningBefore_; ///< the first track's tuning before it changed
+    QString editProblem_;      ///< the first edit check that failed
+    QString failure_;          ///< set by a step that went wrong
+    bool entering_ = false;    ///< whether the shown track takes frets
+    int measuresBefore_ = 0;   ///< measures when the measure edits start
+    int firstNumerator_ = 0;   ///< the first time signature then
+    bool pitching_ = false;    ///< whether the caret takes note names
+    int typedMidi_ = -1;       ///< the note name typed, as a MIDI number
 };
 
 } // namespace elara::app

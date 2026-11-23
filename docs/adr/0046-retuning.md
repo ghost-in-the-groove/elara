@@ -55,9 +55,16 @@ B3 E4`), the current tuning when only the capo changes, the current capo when
 only the tuning does. The `edit --json` output gives each track's tuning and
 capo.
 
+**In the app.** A track with strings opens its tuning under its row in the
+song panel: a preset (a tuning no preset has shows as "Custom"), its open
+strings typed from the lowest, and the capo, each change one "Change tuning"
+step. A choice beside them, keeping the sound (the default) or keeping the
+frets, says what a change keeps. A tuning that cannot play every note is
+refused with a message that names the track.
+
 ## Consequences
 
-- The song panel can offer tuning presets and a capo field over this command,
+- The song panel offers tuning presets and a capo field over this command,
   with a choice between keeping the sound and keeping the tablature.
 - Keeping the pitches can move notes to awkward positions: it keeps strings
   where it can, but does not look for the best fingering of a whole passage.
