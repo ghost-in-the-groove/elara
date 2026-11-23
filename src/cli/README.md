@@ -23,7 +23,8 @@ elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
-elara-cli [--json] render <FILE> [--track 0] [--staff 0] [--first 0] [--count N] [--svg OUT]
+elara-cli [--json] render <FILE> [--track 0] [--staff 0] [--first 0] [--count N]
+                           [--view standard|tab|both] [--svg OUT]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -50,12 +51,15 @@ with `--glyph noteheadBlack` one glyph's `{"glyph", "codepoint", "bbox",
 "advanceWidth", "anchors"}` in staff spaces, y up.
 
 `render` lays out one staff of a `.elara` file or of any file `import` reads,
-as the notation engine does (ADR-0012), from measure `--first` (0-based) for
-`--count` measures. `--json` prints `{"file", "track", "staff", "first",
-"count", "svg", "width", "top", "bottom", "counts", "measures", "glyphs",
-"lines", "beams"}`: lengths in staff spaces, y down from the top staff line,
-`counts` per role (noteheads, stems, accidentals...). `--svg OUT` also writes
-the staff as SVG, loading the music font from `fonts/` next to `elara-cli`.
+as the notation engine does (ADR-0012, ADR-0013), from measure `--first`
+(0-based) for `--count` measures: in standard notation, as tablature
+(`--view tab`, fretted staves only) or both, notation above tablature. `--json`
+prints `{"file", "track", "staff", "first", "count", "svg", "view", "width",
+"top", "bottom", "counts", "staves", "measures", "glyphs", "lines", "beams",
+"texts", "curves", "polygons"}`: lengths in staff spaces, y down from the top
+line of the first staff, `counts` per role (noteheads, fret numbers, bends...).
+`--svg OUT` also writes it as SVG, loading the music font from `fonts/` next to
+`elara-cli`.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

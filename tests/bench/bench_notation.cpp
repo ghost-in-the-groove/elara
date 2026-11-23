@@ -8,13 +8,18 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
+#include <span>
 #include <utility>
 
 using elara::notation::EngravingFont;
 using elara::notation::layoutStaff;
+using elara::notation::layoutSystem;
+using elara::notation::StaffSelection;
+using elara::notation::StaffView;
 
 namespace {
 
@@ -57,5 +62,24 @@ TEST_CASE("Notation benchmarks", "[!benchmark][notation]") {
     };
     BENCHMARK("write the 500-measure staff as SVG") {
         return elara::notation::toSvg(list);
+    };
+
+    const std::array<StaffSelection, 2> both{StaffSelection{.view = StaffView::Standard},
+                                             StaffSelection{.view = StaffView::Tablature}};
+    const auto system = layoutSystem(song, both, font);
+    std::printf("notation and tablature of one track: %zu glyphs, %zu lines, %zu texts\n",
+                system.glyphs.size(), system.lines.size(), system.texts.size());
+    BENCHMARK("lay out the tablature of one 500-measure staff") {
+        const StaffSelection tab{.view = StaffView::Tablature};
+        return layoutSystem(song, std::span(&tab, 1), font);
+    };
+    BENCHMARK("lay out notation and tablature of one 500-measure staff") {
+        return layoutSystem(song, both, font);
+    };
+    BENCHMARK("lay out notation and tablature of 8 measures") {
+        return layoutSystem(song, both, font, {.firstMeasure = 100, .measureCount = 8});
+    };
+    BENCHMARK("write notation and tablature of the staff as SVG") {
+        return elara::notation::toSvg(system);
     };
 }
