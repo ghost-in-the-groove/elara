@@ -22,12 +22,12 @@ only hold files we made (`tests/corpus/README.md`).
 
 **One entry point.** `importGuitarPro(bytes)` recognises every generation by its
 content: a zip archive (7-8), the `BCFZ`/`BCFS` container (6) or the `FICHIER
-GUITAR PRO` header (3-5). Generations not read yet fail with a message that
-names them, so users know the file is not damaged. `elara-cli import` takes
+GUITAR PRO` header (3-5); Guitar Pro 1 and 2 fail with a message that names
+them, so users know the file is not damaged. `elara-cli import` takes
 `.gp`, `.gpx`, `.gp5`, `.gp4` and `.gp3`. Guitar Pro 7-8 came first: they are what
 Guitar Pro writes today, and their XML also covers Guitar Pro 6 once its
 container is unpacked (`importGpif`). Guitar Pro 3-5 followed: most tablature
-shared online is in those versions.
+shared online is in those versions. Guitar Pro 6 came last.
 
 **Written from the files.** The reader follows the structure of files saved by
 Guitar Pro 8, examined as data. GPIF is normalised: master bars (meter, key,
@@ -92,17 +92,45 @@ takes the version (300, 400, 406, 500, 510) and skips what it does not use
   feel, lyrics, chord diagrams, text, grace notes and trills are listed in the
   warnings, as for Guitar Pro 7-8.
 
-**Corpus.** `tests/corpus/gp/generate.py` writes self-made `.gp` files and
-`generate_binary.py` self-made `.gp5`, `.gp4` and `.gp3` files from the same
-structures. The readers were also checked locally against Guitar Pro 3, 4 and
-8 files that cannot be shared (read to the last byte, with no validation
-issue); no Guitar Pro 5 file was at hand, so Guitar Pro 5 rests on the
-self-made files and on what it shares with Guitar Pro 4.
+**Guitar Pro 6.** A `.gpx` file is `BCFZ`, the unpacked size (32 bits,
+little-endian) and a bit stream read from the most significant bit of each
+byte. A 0 bit and two bits (least significant first) give 0-3 literal bytes; a
+1 bit, a four-bit word size and two numbers of that many bits (least
+significant first) copy earlier bytes: `length` of them from `offset` bytes
+before the end, never more than `offset`. The result is `BCFS`, a file system
+of 4096-byte sectors: sector 0 is unused, and a sector starting with the
+number 2 is a file entry with the name at byte 4, the size at byte 0x8C and the
+list of the sectors that hold the file at byte 0x94, ended by 0. The next entry
+follows the file's last sector. The score is the entry `score.gpif`; the other
+entries (page layout, part settings) are skipped. An uncompressed `BCFS` file
+is read the same way. Unpacking stops at 64 MB, and references before the
+start or sectors past the end make the file damaged.
+
+The GPIF of Guitar Pro 6 is an older form of the one above: a track has no
+instrument set and no staves. Its `GeneralMidi` element says whether it is a
+drum kit (`table="Percussion"`) and gives the program, which also names the
+instrument as in Guitar Pro 3-5; its tuning, capo and flat spelling are
+properties of the track itself; and since it has no transposition, guitars
+and basses get the 8vb clef and an octave of written offset, as in every
+other version. Drum notes that give a MIDI key keep it. Guitar Pro 6 also
+names drums by kit element and variation, a table this reader does not have
+yet, so such notes are dropped with a warning.
+
+**Corpus.** `tests/corpus/gp/generate.py` writes self-made `.gp` and `.gpx`
+files (with its own compressor for the container) and `generate_binary.py`
+self-made `.gp5`, `.gp4` and `.gp3` files from the same structures. The
+readers were also checked locally against Guitar Pro 3, 4 and 8 files that
+cannot be shared (read to the last byte, with no validation issue). No Guitar
+Pro 5 or 6 file was at hand: Guitar Pro 5 rests on the self-made files and on
+what it shares with Guitar Pro 4, and Guitar Pro 6 on the self-made files and
+on what its GPIF shares with Guitar Pro 7-8.
 
 ## Consequences
 
-- Guitarists can open Guitar Pro 3-5 and 7-8 files; Guitar Pro 6 follows as a
-  separate task behind the same entry point.
+- Guitarists can open the files of every Guitar Pro version from 3 to 8
+  through one entry point.
+- Guitar Pro 6 drum tracks that name their notes by kit element lose them
+  until the element table is added; the warning says so.
 - Where the meaning of a GPIF value is inferred (bend scale, tempo position,
   accent flags, slide flags), the guess is written down here and in the code;
   a file that shows otherwise becomes a corpus case and a fix.

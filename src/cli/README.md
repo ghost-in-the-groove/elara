@@ -19,7 +19,7 @@ elara-cli [--json] rests <N/D> <DURATION>...      # e.g. rests 6/8 8 -> 8 8 4.
 elara-cli [--json] new <FILE> [--title T] [--track PRESET]... [--measures 4] [--time 4/4]
                        [--key "C major"] [--tempo 120] [--force]
 elara-cli [--json] dump <FILE>                    # with --json: the whole model
-elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gp5, .gp4, .gp3
+elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gpx, .gp5, .gp4, .gp3
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 ```

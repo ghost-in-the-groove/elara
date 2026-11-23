@@ -133,7 +133,7 @@ std::optional<Foreign> foreignFormat(const std::filesystem::path& path) {
 }
 
 constexpr std::string_view kImportTypes =
-    ".musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gp5, .gp4 and .gp3";
+    ".musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gpx, .gp5, .gp4 and .gp3";
 constexpr std::string_view kExportTypes = ".musicxml, .xml, .mxl, .mid, .midi and .smf";
 
 // How the JSON output and the text output name a format.
@@ -297,10 +297,9 @@ void addFileCommands(CLI::App& app, Context& context) {
 
     auto imported = std::make_shared<ImportOptions>();
     auto* importCommand = app.add_subcommand(
-        "import",
-        "Read a MusicXML (.musicxml, .xml, .mxl), MIDI (.mid, .midi, .smf) or Guitar Pro "
-        "(.gp, .gp5, .gp4, .gp3) file: with --json, the song, what was dropped (warnings) and "
-        "issues");
+        "import", "Read a MusicXML (.musicxml, .xml, .mxl), MIDI (.mid, .midi, .smf) or Guitar Pro "
+                  "(.gp, .gpx, .gp5, .gp4, .gp3) file: with --json, the song, what was dropped "
+                  "(warnings) and issues");
     importCommand->add_option("file", imported->file, "File to import")->required();
     importCommand->add_option("--out", imported->out, "Also save the song as a .elara file");
     importCommand->add_flag("--force", imported->force, "Replace the --out file if it exists");

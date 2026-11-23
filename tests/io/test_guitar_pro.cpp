@@ -235,7 +235,7 @@ TEST_CASE("Guitar Pro: other versions and damaged files are errors with a reason
                         "FICHIER GUITAR PRO v5.00")) ==
           "Guitar Pro: damaged file: it ends early (byte 25)");
     CHECK(error(bytesOf("BCFZ....")) ==
-          "Guitar Pro: Guitar Pro 6 files (.gpx) are not supported yet");
+          "Guitar Pro: damaged Guitar Pro 6 file: it claims more than 64 MB");
     CHECK(error(bytesOf("hello")) == "Guitar Pro: not a Guitar Pro file");
     CHECK(error(zipOf({{"other.txt", "x"}})) ==
           "Guitar Pro: no Content/score.gpif in the archive (not a Guitar Pro 7 or 8 file)");

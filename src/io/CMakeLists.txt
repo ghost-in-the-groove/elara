@@ -12,6 +12,7 @@ add_library(elara_io STATIC
   src/musicxml_export.cpp
   src/guitar_pro.cpp
   src/guitar_pro_binary.cpp
+  src/gpx_container.cpp
   src/midi_export.cpp
   src/midi_import.cpp
   src/smf.cpp
