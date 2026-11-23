@@ -6,10 +6,14 @@ base speaks one vocabulary. American terms follow MusicXML.
 | Español | English | Code name | Notes |
 |---|---|---|---|
 | canción / partitura | song / score | `Song` | Whole document |
+| datos de la canción | song info | `SongInfo` | Title, artist, album... |
 | pista | track | `Track` | One instrument |
+| instrumento | instrument | `Instrument`, `InstrumentPreset` | Kind, GM program, written offset |
 | pentagrama | staff | `Staff` | Plural `staves` |
-| tablatura | tablature | `TabStaff` | |
-| compás (unidad) | measure | `Measure` | Not "bar" |
+| tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004) |
+| clave | clef | `Clef` | |
+| compás (unidad) | measure | `Measure` | Not "bar"; one staff's content |
+| cabecera de compás | measure header | `MeasureHeader` | Song-wide: signatures, repeats |
 | indicación de compás | time signature | `TimeSignature` | |
 | armadura | key signature | `KeySignature` | |
 | voz | voice | `Voice` | Up to 4 per staff |

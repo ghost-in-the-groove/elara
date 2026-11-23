@@ -3,6 +3,7 @@
 //   python scripts/elara.py bench
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
+#include <elara/core/song.hpp>
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -60,5 +61,67 @@ TEST_CASE("core benchmarks", "[benchmark][core]") {
         auto copy = lengths;
         std::sort(copy.begin(), copy.end());
         return copy.front();
+    };
+}
+
+namespace {
+
+// A large score: 20 guitar tracks x 500 measures, eight eighth notes per measure,
+// a two-note chord on every beat (80 000 beats, 160 000 notes).
+elara::core::Song largeSong() {
+    using namespace elara::core;
+    Song song;
+    const auto* preset = findInstrumentPreset("electric-guitar");
+    for (int t = 0; t < 20; ++t) {
+        song.addTrack(Track::fromPreset(*preset));
+    }
+    song.appendMeasures(500);
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        Staff& staff = song.track(t).staff(0);
+        for (std::size_t m = 0; m < song.measureCount(); ++m) {
+            auto& beats = staff.measure(m).voices[0].beats;
+            beats.reserve(8);
+            for (int b = 0; b < 8; ++b) {
+                beats.push_back(
+                    Beat{.duration = Duration(NoteValue::Eighth),
+                         .notes = {staff.frettedNote(6, b % 5), staff.frettedNote(5, b % 5)}});
+            }
+        }
+    }
+    return song;
+}
+
+} // namespace
+
+TEST_CASE("song benchmarks", "[benchmark][core][song]") {
+    BENCHMARK("build a 20-track x 500-measure song") {
+        return largeSong().measureCount();
+    };
+
+    const elara::core::Song song = largeSong();
+
+    BENCHMARK("copy the large song (snapshot)") {
+        elara::core::Song copy = song;
+        return copy.trackCount();
+    };
+
+    BENCHMARK_ADVANCED("insert a measure at the start of the large song")
+    (Catch::Benchmark::Chronometer meter) {
+        std::vector<elara::core::Song> songs(static_cast<std::size_t>(meter.runs()), song);
+        meter.measure([&](int i) {
+            songs[static_cast<std::size_t>(i)].insertMeasures(0);
+            return songs[static_cast<std::size_t>(i)].measureCount();
+        });
+    };
+
+    BENCHMARK("sum every voice length of the large song") {
+        elara::core::Fraction total;
+        for (std::size_t t = 0; t < song.trackCount(); ++t) {
+            const auto& staff = song.track(t).staff(0);
+            for (std::size_t m = 0; m < song.measureCount(); ++m) {
+                total += staff.measure(m).voices[0].length();
+            }
+        }
+        return total;
     };
 }

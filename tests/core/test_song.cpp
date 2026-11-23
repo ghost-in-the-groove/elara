@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/song.hpp>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <stdexcept>
+#include <string_view>
+
+using elara::core::Beat;
+using elara::core::Clef;
+using elara::core::Duration;
+using elara::core::findInstrumentPreset;
+using elara::core::FretPosition;
+using elara::core::InstrumentKind;
+using elara::core::instrumentPresets;
+using elara::core::Note;
+using elara::core::NoteValue;
+using elara::core::Pitch;
+using elara::core::Song;
+using elara::core::Staff;
+using elara::core::Step;
+using elara::core::Track;
+using elara::core::Tuning;
+
+namespace {
+
+Track presetTrack(std::string_view id) {
+    const auto* preset = findInstrumentPreset(id);
+    REQUIRE(preset != nullptr);
+    return Track::fromPreset(*preset);
+}
+
+} // namespace
+
+TEST_CASE("Instrument presets describe each family", "[core][song]") {
+    const Track guitar = presetTrack("electric-guitar");
+    CHECK(guitar.instrument().kind == InstrumentKind::Fretted);
+    CHECK(guitar.instrument().writtenOffset == 12); // written an octave above the sound
+    REQUIRE(guitar.staffCount() == 1);
+    CHECK(guitar.staff(0).clef() == Clef::Treble8vb);
+    CHECK(guitar.staff(0).tuning() == Tuning::standardGuitar());
+
+    const Track bass = presetTrack("electric-bass");
+    CHECK(bass.staff(0).clef() == Clef::Bass8vb);
+    CHECK(bass.staff(0).tuning() == Tuning::standardBass());
+
+    const Track drums = presetTrack("drum-kit");
+    CHECK(drums.instrument().kind == InstrumentKind::Percussion);
+    CHECK(drums.staff(0).clef() == Clef::Percussion);
+    CHECK_FALSE(drums.staff(0).isFretted());
+
+    const Track piano = presetTrack("piano");
+    CHECK(piano.instrument().kind == InstrumentKind::Keyboard);
+    REQUIRE(piano.staffCount() == 2);
+    CHECK(piano.staff(0).clef() == Clef::Treble);
+    CHECK(piano.staff(1).clef() == Clef::Bass);
+
+    CHECK(presetTrack("trumpet").instrument().writtenOffset == 2); // B-flat trumpet
+    CHECK(findInstrumentPreset("kazoo-orchestra") == nullptr);
+    for (const auto& preset : instrumentPresets()) {
+        CHECK_NOTHROW(Track::fromPreset(preset));
+    }
+}
+
+TEST_CASE("A new song is empty", "[core][song]") {
+    const Song song;
+    CHECK(song.trackCount() == 0);
+    CHECK(song.measureCount() == 0);
+    CHECK(song.info().title.empty());
+}
+
+TEST_CASE("Every staff of every track has one measure per song measure", "[core][song]") {
+    Song song;
+    song.info().title = "Etude";
+    song.addTrack(presetTrack("electric-guitar"));
+    song.appendMeasures(4);
+    CHECK(song.measureCount() == 4);
+    CHECK(song.track(0).staff(0).measureCount() == 4);
+
+    // Tracks added later catch up with the song.
+    song.addTrack(presetTrack("piano"));
+    CHECK(song.track(1).staff(0).measureCount() == 4);
+    CHECK(song.track(1).staff(1).measureCount() == 4);
+    CHECK(song.trackCount() == 2);
+    CHECK(song.info().title == "Etude");
+}
+
+TEST_CASE("Inserting and removing measures moves content in all staves", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("electric-guitar"));
+    song.addTrack(presetTrack("electric-bass"));
+    song.appendMeasures(3);
+    const Beat marker{.duration = Duration(NoteValue::Whole), .notes = {Note{.pitch = Pitch{}}}};
+    song.track(0).staff(0).measure(1).voices[0].beats.push_back(marker);
+    song.track(1).staff(0).measure(1).voices[0].beats.push_back(marker);
+
+    song.insertMeasures(1, 2); // two empty measures before the marked one
+    CHECK(song.measureCount() == 5);
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        const Staff& staff = song.track(t).staff(0);
+        CHECK(staff.measureCount() == 5);
+        CHECK(staff.measure(1).isEmpty());
+        CHECK(staff.measure(2).isEmpty());
+        CHECK_FALSE(staff.measure(3).isEmpty());
+    }
+
+    song.removeMeasures(0, 3);
+    CHECK(song.measureCount() == 2);
+    CHECK_FALSE(song.track(0).staff(0).measure(0).isEmpty());
+    CHECK_FALSE(song.track(1).staff(0).measure(0).isEmpty());
+
+    CHECK_THROWS_AS(song.insertMeasures(3), std::out_of_range);
+    CHECK_THROWS_AS(song.removeMeasures(1, 2), std::out_of_range);
+    CHECK_THROWS_AS(song.track(0).staff(0).measure(2), std::out_of_range);
+}
+
+TEST_CASE("Removing a track keeps the others", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("electric-guitar"));
+    song.addTrack(presetTrack("drum-kit"));
+    song.appendMeasures(2);
+    song.removeTrack(0);
+    REQUIRE(song.trackCount() == 1);
+    CHECK(song.track(0).instrument().kind == InstrumentKind::Percussion);
+    CHECK_THROWS_AS(song.track(1), std::out_of_range);
+    CHECK_THROWS_AS(song.removeTrack(1), std::out_of_range);
+}
+
+TEST_CASE("A track needs at least one staff", "[core][song]") {
+    const auto* preset = findInstrumentPreset("electric-guitar");
+    REQUIRE(preset != nullptr);
+    CHECK_THROWS_AS(Track("Empty", Track::fromPreset(*preset).instrument(), {}),
+                    std::invalid_argument);
+}
+
+TEST_CASE("A fretted staff turns string and fret into a note", "[core][song]") {
+    const Staff guitar(Clef::Treble8vb, Tuning::standardGuitar(), 0);
+    const Note g = guitar.frettedNote(6, 3);
+    CHECK(g.pitch == Pitch(Step::G, 0, 2));
+    CHECK(g.position == FretPosition{.string = 6, .fret = 3});
+
+    const Staff capo2(Clef::Treble8vb, Tuning::standardGuitar(), 2);
+    CHECK(capo2.capo() == 2);
+    CHECK(capo2.frettedNote(6, 0).pitch == Pitch(Step::F, 1, 2));
+    CHECK(capo2.frettedNote(6, 0, elara::core::SpellingPreference::Flats).pitch ==
+          Pitch(Step::G, -1, 2));
+
+    const Staff drums(Clef::Percussion);
+    CHECK_THROWS_AS(drums.frettedNote(1, 0), std::logic_error);
+    CHECK_THROWS_AS(Staff(Clef::Treble8vb, Tuning::standardGuitar(), -1), std::invalid_argument);
+}
