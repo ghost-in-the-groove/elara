@@ -27,6 +27,18 @@ enum class Timbre : std::uint8_t {
     Drums,     ///< percussion: one sound per General MIDI percussion key
 };
 
+/// How a note is struck (ADR-0022). Plucked timbres (guitar, overdrive,
+/// bass) play each touch differently; the others play every touch as Normal.
+enum class Touch : std::uint8_t {
+    Normal,
+    PalmMute, ///< damped by the picking hand: dark, short
+    Dead,     ///< fretting hand muting the string: a short, pitchless click
+    Harmonic, ///< only the note's partial sounds: pure and bell-like
+};
+
+/// Lower-case name ("palm-mute"), as `elara-cli` prints it.
+[[nodiscard]] std::string_view touchName(Touch touch) noexcept;
+
 /// The timbre for an instrument: drums for percussion, otherwise by the
 /// family of its General MIDI program.
 [[nodiscard]] Timbre timbreFor(const core::Instrument& instrument) noexcept;
@@ -53,9 +65,10 @@ public:
     [[nodiscard]] Timbre timbre() const noexcept { return timbre_; }
     [[nodiscard]] double sampleRate() const noexcept { return sampleRate_; }
 
-    /// Strikes a MIDI key (0-127) with a velocity (1-127). When every voice
-    /// sounds, the quietest released voice is taken, or else the oldest.
-    void noteOn(int key, int velocity) noexcept;
+    /// Strikes a MIDI key (0-127) with a velocity (1-127) and a touch. When
+    /// every voice sounds, the quietest released voice is taken, or else the
+    /// oldest.
+    void noteOn(int key, int velocity, Touch touch = Touch::Normal) noexcept;
 
     /// Releases every voice playing `key`. Drums ignore it and ring out.
     void noteOff(int key) noexcept;

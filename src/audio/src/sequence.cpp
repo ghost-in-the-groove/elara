@@ -3,6 +3,7 @@
 // order until they are turned into seconds, so notes that meet in the score
 // meet in time.
 #include <elara/audio/sequence.hpp>
+#include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/parallel.hpp>
 #include <elara/core/performance.hpp>
@@ -12,7 +13,10 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <span>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -26,6 +30,7 @@ constexpr int kKeys = 128;
 constexpr std::size_t kParallelNotes = 20'000;  // notes from which work goes on several threads
 constexpr std::size_t kParallelEvents = 40'000; // events from which merges go on several threads
 constexpr std::size_t kNotesPerBlock = 8192;    // written notes timed together on one thread
+constexpr int kDynamicStep = 16;                // velocity between two dynamics (mf 80, f 96)
 
 // The tempo of every written measure as segments: from an offset (in whole
 // notes, as a double) on, seconds pass at a rate per whole note. Exact
@@ -143,6 +148,7 @@ std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
         }
         events.push_back({.time = note.start,
                           .kind = EventKind::NoteOn,
+                          .touch = note.touch,
                           .track = track,
                           .key = note.key,
                           .velocity = note.velocity});
@@ -165,6 +171,80 @@ struct Timing {
     bool crosses = false;
     Fraction endOffset{};
 };
+
+// How a written note is played (ADR-0022).
+struct Articulation {
+    int key = 60;
+    int velocity = 80;
+    Touch touch = Touch::Normal;
+    bool staccato = false;
+    bool letRing = false;
+    int string = 0; // 0 when the note has no fret position
+};
+
+// The key a harmonic sounds: a partial of the open string (natural) or of
+// the fretted note (artificial, pinch, tapped). A semi-harmonic keeps the
+// fretted pitch, and so does a node that is not one.
+int harmonicKey(const core::Note& note, int key) {
+    const core::Harmonic& harmonic = note.effects.harmonic;
+    const std::optional<int> semitones =
+        core::naturalHarmonicSemitones(static_cast<double>(harmonic.fretTenths) / 10.0);
+    int sounding = key;
+    switch (harmonic.kind) {
+    case core::HarmonicKind::Natural:
+        if (note.position && semitones) {
+            sounding = key - note.position->fret + *semitones;
+        }
+        break;
+    case core::HarmonicKind::Artificial:
+    case core::HarmonicKind::Pinch:
+    case core::HarmonicKind::Tapped:
+        if (semitones) {
+            sounding = key + *semitones;
+        }
+        break;
+    case core::HarmonicKind::None:
+    case core::HarmonicKind::Semi:
+        break;
+    }
+    return sounding >= 0 && sounding < kKeys ? sounding : key;
+}
+
+Articulation articulationOf(const core::Song& song, const core::SoundingNote& sounding) {
+    const core::Track& track = song.track(sounding.track);
+    const core::Note& note = track.staff(sounding.staff)
+                                 .measure(sounding.measure)
+                                 .voices[sounding.voice]
+                                 .beats[sounding.beat]
+                                 .notes[sounding.note];
+    const core::NoteEffects& effects = note.effects;
+    Articulation result{.key = sounding.key,
+                        .velocity = sounding.velocity,
+                        .staccato = effects.staccato,
+                        .letRing = effects.letRing,
+                        .string = note.position ? note.position->string : 0};
+    if (effects.accent == core::Accent::Accent) {
+        result.velocity += kDynamicStep;
+    } else if (effects.accent == core::Accent::Marcato) {
+        result.velocity += 2 * kDynamicStep;
+    }
+    if (effects.ghost) {
+        result.velocity -= 2 * kDynamicStep;
+    }
+    result.velocity = std::clamp(result.velocity, 1, 127);
+    if (track.instrument().kind == core::InstrumentKind::Percussion) {
+        return result; // keys are drums: no partials, no touches
+    }
+    result.key = harmonicKey(note, sounding.key);
+    if (effects.deadNote) {
+        result.touch = Touch::Dead;
+    } else if (effects.harmonic.kind != core::HarmonicKind::None) {
+        result.touch = Touch::Harmonic;
+    } else if (effects.palmMute) {
+        result.touch = Touch::PalmMute;
+    }
+    return result;
+}
 
 } // namespace
 
@@ -196,28 +276,31 @@ Sequence::Sequence(const core::Song& song) {
         return;
     }
 
-    // Every written note timed once in its measure.
+    // Every written note articulated and timed once in its measure.
     const std::vector<core::SoundingNote> sounding = core::soundingNotes(song);
     std::vector<Timing> timings(sounding.size());
+    std::vector<Articulation> articulations(sounding.size());
     const std::size_t blocks = (sounding.size() + kNotesPerBlock - 1) / kNotesPerBlock;
-    core::forEachIndex(0, blocks, core::threadsFor(0, sounding.size(), kParallelNotes, blocks),
-                       [&](std::size_t block) {
-                           const std::size_t last =
-                               std::min(sounding.size(), (block + 1) * kNotesPerBlock);
-                           for (std::size_t i = block * kNotesPerBlock; i < last; ++i) {
-                               const core::SoundingNote& note = sounding[i];
-                               const Fraction offset = note.start - written[note.measure];
-                               const Fraction end = offset + note.length;
-                               Timing& timing = timings[i];
-                               timing.start = tempo.secondsInto(note.measure, offset.toDouble());
-                               timing.crosses = end > lengths[note.measure];
-                               if (timing.crosses) {
-                                   timing.endOffset = end;
-                               } else {
-                                   timing.end = tempo.secondsInto(note.measure, end.toDouble());
-                               }
-                           }
-                       });
+    core::forEachIndex(
+        0, blocks, core::threadsFor(0, sounding.size(), kParallelNotes, blocks),
+        [&](std::size_t block) {
+            const std::size_t last = std::min(sounding.size(), (block + 1) * kNotesPerBlock);
+            for (std::size_t i = block * kNotesPerBlock; i < last; ++i) {
+                const core::SoundingNote& note = sounding[i];
+                articulations[i] = articulationOf(song, note);
+                const Fraction offset = note.start - written[note.measure];
+                const Fraction end =
+                    offset + (articulations[i].staccato ? note.length / Fraction(2) : note.length);
+                Timing& timing = timings[i];
+                timing.start = tempo.secondsInto(note.measure, offset.toDouble());
+                timing.crosses = end > lengths[note.measure];
+                if (timing.crosses) {
+                    timing.endOffset = end;
+                } else {
+                    timing.end = tempo.secondsInto(note.measure, end.toDouble());
+                }
+            }
+        });
     // Where a note crossing out of played measure k ends: over the measures
     // played after it, the last one going on past its end.
     const auto endAfter = [&](std::size_t k, Fraction into) {
@@ -240,12 +323,16 @@ Sequence::Sequence(const core::Song& song) {
         played += firstOf[measure.measure + 1] - firstOf[measure.measure];
     }
     notes_.reserve(played);
+    std::vector<std::size_t> writtenAs; // the sounding note each played note is
+    writtenAs.reserve(played);
+    bool letRing = false;
     for (std::size_t k = 0; k < measures_.size(); ++k) {
         const std::size_t m = measures_[k].measure;
         const double base = measures_[k].start;
         for (std::size_t i = firstOf[m]; i < firstOf[m + 1]; ++i) {
             const core::SoundingNote& note = sounding[i];
             const Timing& timing = timings[i];
+            const Articulation& articulation = articulations[i];
             notes_.push_back(PlayedNote{.track = note.track,
                                         .staff = note.staff,
                                         .voice = note.voice,
@@ -253,8 +340,38 @@ Sequence::Sequence(const core::Song& song) {
                                         .start = base + timing.start,
                                         .end = timing.crosses ? endAfter(k, timing.endOffset)
                                                               : base + timing.end,
-                                        .key = note.key,
-                                        .velocity = note.velocity});
+                                        .key = articulation.key,
+                                        .velocity = articulation.velocity,
+                                        .touch = articulation.touch});
+            writtenAs.push_back(i);
+            letRing = letRing || articulation.letRing;
+        }
+    }
+
+    // Let ring: a note rings on until its string (without a fret position,
+    // its key) is struck again on its staff, or to the end; never shorter.
+    if (letRing) {
+        std::unordered_map<std::uint64_t, std::size_t> ringing;
+        for (std::size_t p = 0; p < notes_.size(); ++p) {
+            const PlayedNote& note = notes_[p];
+            const Articulation& articulation = articulations[writtenAs[p]];
+            const auto place = static_cast<std::uint64_t>(
+                articulation.string > 0 ? articulation.string : kKeys + note.key);
+            const std::uint64_t slot = (static_cast<std::uint64_t>(note.track) << 40U) |
+                                       (static_cast<std::uint64_t>(note.staff) << 16U) | place;
+            const auto found = ringing.find(slot);
+            if (found != ringing.end()) {
+                PlayedNote& rung = notes_[found->second];
+                rung.end = std::max(rung.end, note.start);
+                ringing.erase(found);
+            }
+            if (articulation.letRing) {
+                ringing.emplace(slot, p);
+            }
+        }
+        for (const auto& entry : ringing) {
+            PlayedNote& rung = notes_[entry.second];
+            rung.end = std::max(rung.end, duration_);
         }
     }
 
