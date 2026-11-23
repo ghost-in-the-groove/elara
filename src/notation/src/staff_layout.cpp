@@ -542,7 +542,9 @@ private:
         const Fraction length = time.measureLength();
         voiceCount_ = 0;
         for (const core::Voice& voice : measure.voices) {
-            voiceCount_ += voice.isEmpty() ? 0 : 1;
+            if (!voice.isEmpty()) {
+                ++voiceCount_;
+            }
         }
         if (voiceCount_ == 0) {
             Chord rest;
