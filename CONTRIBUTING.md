@@ -23,6 +23,7 @@ Always go through the task runner (use `py` instead of `python` on Windows):
 | `python scripts/elara.py format` | Apply clang-format 23 |
 | `python scripts/elara.py cli -- --json version` | Run the headless CLI |
 | `python scripts/elara.py app` | Launch the desktop app |
+| `python scripts/elara.py translations` | Refresh the UI translation files after changing UI strings |
 
 The runner loads MSVC on Windows by itself; do not hand-roll `cmake`/`vcvars` calls.
 Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
@@ -63,7 +64,8 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
 ## Conventions
 
 - Code, comments, docs and commit messages in English. UI strings are English
-  source strings wrapped in `tr()`/`qsTr()` (Spanish translation planned).
+  source strings wrapped in `tr()`/`qsTr()`, translated into Spanish in
+  `src/app/i18n/` (refresh with `elara.py translations`; ADR-0030).
 - Musical vocabulary: use the names in `docs/glossary.md` (e.g. `Measure`, not `Bar`).
 - C++23 without modules. Allowed: `std::expected`, `std::span`, `std::format`,
   designated initializers. Avoid `std::print` (not yet on the macOS toolchain).
