@@ -27,7 +27,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 |---|---|---|---|
 | `src/core` | `elara_core` | Musical model, commands with undo/redo | 1 |
 | `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-8 import (ADR-0010) | 1, 2 |
-| `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of standard notation and tablature into a display list, staves aligned in systems, SVG output (ADR-0012, ADR-0013) | 3 |
+| `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of standard notation and tablature into a display list, staves aligned in systems, line breaking and pages, SVG output (ADR-0012, ADR-0013, ADR-0014) | 3 |
 | `src/audio` | `elara_audio` | Real-time-safe DSP, sequencer, offline rendering, WAV | 0, 4 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE; synths (FluidSynth, sfizz) | 0, 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
@@ -41,8 +41,9 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
   command, so undo/redo is uniform (ADR-0005).
 - **Notation is a pure function.** `elara_notation` turns the model into a
   display list (glyphs, lines, positions) without Qt. The app renders that list
-  with the Qt scene graph; tests snapshot it as SVG/JSON. Re-layout is
-  incremental per system.
+  with the Qt scene graph; tests snapshot it as SVG/JSON. Systems are laid out
+  independently of each other (in parallel), so re-layout can be incremental
+  per system.
 - **Qt draws, JUCE plays** (ADR-0002). JUCE is used as a headless library inside
   `elara_audio_juce`; nothing else sees JUCE types.
 - **Headless first** (ADR-0003). Every feature is reachable from `elara-cli` and

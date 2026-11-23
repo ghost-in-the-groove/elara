@@ -367,7 +367,7 @@ private:
             .centre = centre, .halfWidth = half, .fret = note.fret, .slideOut = effects.slideOut};
     }
 
-    void close() override {
+    void close(double /*width*/) override {
         if (lanes_.empty()) {
             return;
         }

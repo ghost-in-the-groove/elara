@@ -23,8 +23,10 @@ elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
-elara-cli [--json] render <FILE> [--track 0] [--staff 0] [--first 0] [--count N]
-                           [--view standard|tab|both] [--svg OUT]
+elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
+                           [--count N] [--view standard|tab|both] [--layout line|page|scroll]
+                           [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
+                           [--measures-per-system N] [--no-credits] [--svg OUT]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -53,13 +55,25 @@ with `--glyph noteheadBlack` one glyph's `{"glyph", "codepoint", "bbox",
 `render` lays out one staff of a `.elara` file or of any file `import` reads,
 as the notation engine does (ADR-0012, ADR-0013), from measure `--first`
 (0-based) for `--count` measures: in standard notation, as tablature
-(`--view tab`, fretted staves only) or both, notation above tablature. `--json`
-prints `{"file", "track", "staff", "first", "count", "svg", "view", "width",
-"top", "bottom", "counts", "staves", "measures", "glyphs", "lines", "beams",
-"texts", "curves", "polygons"}`: lengths in staff spaces, y down from the top
-line of the first staff, `counts` per role (noteheads, fret numbers, bends...).
-`--svg OUT` also writes it as SVG, loading the music font from `fonts/` next to
-`elara-cli`.
+(`--view tab`, fretted staves only) or both, notation above tablature.
+`--tracks` takes whole tracks instead (every staff of each, tablature only where
+a staff has a tuning). `--layout line` (the default) puts the measures on one
+line at their natural spacing; `--layout page` breaks them into systems on
+pages of `--paper` with staff spaces `--staff-space` mm apart and `--margin` mm
+margins, with the title and credits on the first page (unless `--no-credits`);
+`--layout scroll` stacks the systems on one page as long as the music,
+`--width` staff spaces wide (ADR-0014). `--measures-per-system` fixes how many
+measures each system holds. `--json` prints `{"file", "track", "staff",
+"first", "count", "svg", "view", "layout", ...}` (`"tracks"` instead of
+`"track"` and `"staff"` with `--tracks`) followed, for a line, by the display
+list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
+"glyphs", "lines", "beams", "texts", "curves", "polygons"` and, for pages, by
+`"pages"`: one display list per page. Lengths are in staff spaces, y down from
+the top line of the first staff on a line and from the top of the page on a
+page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
+credits...). `--svg OUT` also writes SVG, loading the music font from `fonts/`
+next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
+several.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

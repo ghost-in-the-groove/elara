@@ -35,10 +35,13 @@ enum class Role : std::uint8_t {
     Bend,
     Slide,
     Vibrato,
-    Articulation, ///< staccato, accent and marcato
+    Articulation,  ///< staccato, accent and marcato
+    MeasureNumber, ///< the number of the first measure of a system
+    Credit,        ///< title, subtitle, artist, words, music, copyright and page numbers
+    TrackName,     ///< the name of a track left of its staves in the first system
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Articulation) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::TrackName) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;
@@ -116,11 +119,14 @@ struct PolygonItem {
 };
 
 /// Where a measure sits: from the end of the barline before it to the start
-/// of the barline after it.
+/// of the barline after it, and from the top line of its system's first staff
+/// (`y`) down to the bottom line of the last one.
 struct MeasureBox {
     std::size_t index = 0;
     double x = 0.0;
     double width = 0.0;
+    double y = 0.0;
+    double height = 0.0;
     friend bool operator==(const MeasureBox&, const MeasureBox&) = default;
 };
 
@@ -128,24 +134,43 @@ struct MeasureBox {
 /// a view of a fretted staff).
 enum class StaffView : std::uint8_t { Standard, Tablature };
 
-/// Where one staff of a system sits: its top line at `y`, `lines` lines over
-/// `height` staff spaces.
+/// Where one staff of a system sits: its lines run from `x` over `width`, the
+/// top one at `y`, `lines` lines over `height` staff spaces.
 struct StaffBox {
     std::size_t track = 0;
     std::size_t staff = 0;
     StaffView view = StaffView::Standard;
+    double x = 0.0;
     double y = 0.0;
+    double width = 0.0;
     double height = 4.0;
     std::size_t lines = 5;
     friend bool operator==(const StaffBox&, const StaffBox&) = default;
 };
 
+/// Where a system sits: measures [firstMeasure, firstMeasure + measureCount)
+/// from `x` over `width`, from the top line of its first staff (`y`) down
+/// `height` to the bottom line of its last; its ink from `top` to `bottom`.
+struct SystemBox {
+    std::size_t firstMeasure = 0;
+    std::size_t measureCount = 0;
+    double x = 0.0;
+    double y = 0.0;
+    double width = 0.0;
+    double height = 0.0;
+    double top = 0.0;
+    double bottom = 0.0;
+    friend bool operator==(const SystemBox&, const SystemBox&) = default;
+};
+
 /// Positioned glyphs, lines, beams, text and curves. Lengths are in staff
-/// spaces and y grows downwards: the top line of the first staff is at y = 0.
+/// spaces and y grows downwards. In a single system the top line of the first
+/// staff is at y = 0; on a page (0, 0) is the page's top-left corner.
 struct DisplayList {
-    double width = 0.0;  ///< from x = 0 to the end of the last barline
-    double top = 0.0;    ///< highest ink, negative above the first staff
-    double bottom = 4.0; ///< lowest ink
+    double width = 0.0;  ///< from x = 0 to the end of the last barline, or of the page
+    double top = 0.0;    ///< highest ink, negative above the first staff; 0 on a page
+    double bottom = 4.0; ///< lowest ink, or the bottom of the page
+    std::vector<SystemBox> systems;
     std::vector<StaffBox> staves;
     std::vector<MeasureBox> measures;
     std::vector<GlyphItem> glyphs;
@@ -154,6 +179,7 @@ struct DisplayList {
     std::vector<TextItem> texts;
     std::vector<CurveItem> curves;
     std::vector<PolygonItem> polygons;
+    friend bool operator==(const DisplayList&, const DisplayList&) = default;
 };
 
 /// The width layout assumes for `text` at `size`: the advance widths of a

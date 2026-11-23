@@ -10,10 +10,10 @@ namespace elara::notation {
 namespace {
 
 constexpr std::array<std::string_view, kRoleCount> kRoleNames{
-    "staffLine", "ledgerLine", "barline",      "clef", "keySignature", "timeSignature",
-    "notehead",  "accidental", "dot",          "stem", "flag",         "beam",
-    "rest",      "fretNumber", "tie",          "slur", "technique",    "bend",
-    "slide",     "vibrato",    "articulation",
+    "staffLine", "ledgerLine", "barline",      "clef",          "keySignature", "timeSignature",
+    "notehead",  "accidental", "dot",          "stem",          "flag",         "beam",
+    "rest",      "fretNumber", "tie",          "slur",          "technique",    "bend",
+    "slide",     "vibrato",    "articulation", "measureNumber", "credit",       "trackName",
 };
 
 // Advance widths in em of a Helvetica-like font for printable ASCII; other

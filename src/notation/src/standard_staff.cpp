@@ -275,7 +275,8 @@ public:
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override;
 
 private:
-    void close() override {
+    void close(double width) override {
+        tiesOut(width - defaults_.thinBarlineThickness - kTieGap);
         if (techniques_ && !lanes_.empty()) {
             lanes_.place(list_, inkTop());
         }
@@ -325,6 +326,9 @@ private:
             x = timeSignature(song_.measureHeader(first).timeSignature, x + kHeaderGap,
                               kMiddleLine);
         }
+        // Ties from the line before start after the header.
+        lineStart_ = x;
+        incoming_.fill(first > 0);
         return x;
     }
 
@@ -392,6 +396,7 @@ private:
         for (Chord& chord : chords_) {
             if (chord.measureRest) {
                 tieStarts_[chord.voice].clear();
+                incoming_[chord.voice] = false;
                 continue;
             }
             draw(chord);
@@ -402,6 +407,7 @@ private:
             for (auto& starts : tieStarts_) {
                 starts.clear();
             }
+            incoming_.fill(false);
         }
         for (const std::vector<std::size_t>& group : beamGroups_) {
             beam(group);
@@ -959,9 +965,11 @@ private:
     // ---- Ties, articulations and techniques ----
 
     // Ties the tied noteheads of `chord` to the same notes of the previous chord
-    // of its voice, then remembers its noteheads for the next chord.
+    // of its voice (or to the start of the line for its first chord), then
+    // remembers its noteheads for the next chord.
     void ties(const Chord& chord) {
         std::vector<TieStart>& previous = tieStarts_[chord.voice];
+        const bool incoming = std::exchange(incoming_[chord.voice], false);
         const std::size_t count = chord.heads.size();
         for (std::size_t i = 0; i < count; ++i) {
             const Head& head = chord.heads[i];
@@ -969,36 +977,73 @@ private:
                 continue;
             }
             const auto from = std::ranges::find(previous, head.step, &TieStart::step);
-            if (from == previous.end()) {
+            if (from == previous.end() && !incoming) {
                 continue;
             }
-            // The outer notes of a chord tie away from it; a single note (and the
-            // middle one) away from its stem.
-            bool above = !chord.stemUp;
-            if (2 * i + 1 != count) {
-                above = 2 * i + 1 < count;
-            }
-            const double direction = above ? -1.0 : 1.0;
-            const double y = yOf(head.step) + direction * kTieOffset;
-            const double left = from->right + kTieGap;
-            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x - kTieGap;
-            if (right - left < kEpsilon) {
-                continue;
-            }
-            const double height =
-                std::clamp((right - left) * kTieRise, kTieMinHeight, kTieMaxHeight);
-            curve({left, y}, {right, y}, direction * height, defaults_.tieMidpointThickness,
-                  defaults_.tieEndpointThickness, Role::Tie);
+            const double left = from == previous.end() ? lineStart_ : from->right;
+            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+            tie(head.step, tieAbove(chord, i), left + kTieGap, right - kTieGap);
         }
         previous.clear();
         if (chord.rest) {
             return;
         }
         const double dots = dotsWidth(chord.duration.dots());
-        for (const Head& head : chord.heads) {
+        for (std::size_t i = 0; i < count; ++i) {
+            const Head& head = chord.heads[i];
             previous.push_back(
                 TieStart{.step = head.step,
-                         .right = chord.x + head.dx + metrics(head.glyph).box.northEast.x + dots});
+                         .right = chord.x + head.dx + metrics(head.glyph).box.northEast.x + dots,
+                         .above = tieAbove(chord, i)});
+        }
+    }
+
+    // The outer notes of a chord tie away from it; a single note (and the
+    // middle one) away from its stem.
+    [[nodiscard]] static bool tieAbove(const Chord& chord, std::size_t head) {
+        const std::size_t count = chord.heads.size();
+        if (2 * head + 1 != count) {
+            return 2 * head + 1 < count;
+        }
+        return !chord.stemUp;
+    }
+
+    void tie(int step, bool above, double left, double right) {
+        if (right - left < kEpsilon) {
+            return;
+        }
+        const double direction = above ? -1.0 : 1.0;
+        const double y = yOf(step) + direction * kTieOffset;
+        const double height = std::clamp((right - left) * kTieRise, kTieMinHeight, kTieMaxHeight);
+        curve({left, y}, {right, y}, direction * height, defaults_.tieMidpointThickness,
+              defaults_.tieEndpointThickness, Role::Tie);
+    }
+
+    // At the end of a line: the first half of the ties the first notes of the
+    // next measure continue, up to `end`.
+    void tiesOut(double end) {
+        const std::size_t next = measureIndex_ + 1;
+        if (next >= song_.measureCount()) {
+            return;
+        }
+        measure_ = measureIndex_;
+        const core::Measure& measure = staff_.measure(next);
+        for (std::size_t v = 0; v < measure.voices.size(); ++v) {
+            const std::vector<TieStart>& starts = tieStarts_[v];
+            const std::vector<Beat>& beats = measure.voices[v].beats;
+            if (starts.empty() || beats.empty()) {
+                continue;
+            }
+            for (const core::Note& note : beats.front().notes) {
+                if (!note.effects.tiedFromPrevious) {
+                    continue;
+                }
+                const int step = headOf(note, beats.front().duration.value()).step;
+                const auto from = std::ranges::find(starts, step, &TieStart::step);
+                if (from != starts.end()) {
+                    tie(step, from->above, from->right + kTieGap, end);
+                }
+            }
         }
     }
 
@@ -1067,6 +1112,7 @@ private:
     struct TieStart {
         int step = 0;
         double right = 0.0; // after the notehead and its dots
+        bool above = false; // the side the tie leaves on
     };
 
     const core::Song& song_;
@@ -1079,6 +1125,8 @@ private:
     std::size_t measureIndex_ = 0;
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
+    std::array<bool, core::Measure::kMaxVoices> incoming_{}; // ties from the line before
+    double lineStart_ = 0.0;                                 // where the header ends
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
