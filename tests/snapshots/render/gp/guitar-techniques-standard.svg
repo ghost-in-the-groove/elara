@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1697.143" viewBox="0 0 120 169.714">
+<style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
+<rect x="0" y="0" width="120" height="169.714" fill="white"/>
+<g fill="black" stroke="black">
+<line class="staffLine" x1="8.571" y1="26.903" x2="58.97" y2="26.903" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="27.903" x2="58.97" y2="27.903" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="28.903" x2="58.97" y2="28.903" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="29.903" x2="58.97" y2="29.903" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="30.903" x2="58.97" y2="30.903" stroke-width="0.13"/>
+<line class="ledgerLine" x1="17.731" y1="31.903" x2="19.711" y2="31.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="17.731" y1="32.903" x2="19.711" y2="32.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="17.731" y1="33.903" x2="19.711" y2="33.903" stroke-width="0.16"/>
+<line class="stem" x1="19.251" y1="34.235" x2="19.251" y2="28.903" stroke-width="0.12"/>
+<line class="ledgerLine" x1="20.731" y1="31.903" x2="22.711" y2="31.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="23.507" y1="31.903" x2="25.487" y2="31.903" stroke-width="0.16"/>
+<line class="stem" x1="27.432" y1="29.071" x2="27.432" y2="32.403" stroke-width="0.12"/>
+<line class="ledgerLine" x1="29.972" y1="25.903" x2="31.952" y2="25.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="29.972" y1="24.903" x2="31.952" y2="24.903" stroke-width="0.16"/>
+<line class="stem" x1="30.432" y1="25.071" x2="30.432" y2="28.903" stroke-width="0.12"/>
+<line class="stem" x1="22.251" y1="32.235" x2="22.251" y2="28.153" stroke-width="0.12"/>
+<line class="stem" x1="25.027" y1="31.735" x2="25.027" y2="27.692" stroke-width="0.12"/>
+<line class="stem" x1="26.759" y1="30.735" x2="26.759" y2="27.403" stroke-width="0.12"/>
+<line class="barline" x1="33.452" y1="26.903" x2="33.452" y2="30.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="34.332" y1="25.903" x2="36.312" y2="25.903" stroke-width="0.16"/>
+<line class="stem" x1="34.792" y1="26.071" x2="34.792" y2="29.403" stroke-width="0.12"/>
+<line class="ledgerLine" x1="38.574" y1="25.903" x2="40.554" y2="25.903" stroke-width="0.16"/>
+<line class="stem" x1="39.034" y1="26.071" x2="39.034" y2="29.403" stroke-width="0.12"/>
+<line class="ledgerLine" x1="41.574" y1="31.903" x2="43.534" y2="31.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="41.574" y1="32.903" x2="43.534" y2="32.903" stroke-width="0.16"/>
+<line class="ledgerLine" x1="41.574" y1="33.903" x2="43.534" y2="33.903" stroke-width="0.16"/>
+<line class="stem" x1="43.074" y1="33.959" x2="43.074" y2="28.903" stroke-width="0.12"/>
+<line class="barline" x1="45.054" y1="26.903" x2="45.054" y2="30.903" stroke-width="0.16"/>
+<line class="stem" x1="50.234" y1="29.235" x2="50.234" y2="25.903" stroke-width="0.12"/>
+<line class="stem" x1="52.848" y1="29.071" x2="52.848" y2="32.403" stroke-width="0.12"/>
+<line class="barline" x1="57.99" y1="26.903" x2="57.99" y2="30.903" stroke-width="0.16"/>
+<line class="barline" x1="58.72" y1="26.903" x2="58.72" y2="30.903" stroke-width="0.5"/>
+<polygon class="beam" stroke="none" points="22.191,28.163 26.819,27.393 26.819,27.893 22.191,28.663"/>
+<text class="clef" x="9.171" y="29.903" stroke="none">&#xE052;</text>
+<text class="keySignature" x="12.755" y="26.903" stroke="none">&#xE262;</text>
+<text class="timeSignature" x="14.651" y="27.903" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="14.651" y="29.903" stroke="none">&#xE084;</text>
+<text class="notehead" x="18.131" y="34.403" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="21.131" y="32.403" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="23.907" y="31.903" stroke="none">&#xE0A4;</text>
+<text class="accidental" x="22.711" y="31.903" stroke="none">&#xE262;</text>
+<text class="notehead" x="25.639" y="30.903" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="27.372" y="28.903" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="30.372" y="24.903" stroke="none">&#xE0A4;</text>
+<text class="accidental" x="29.176" y="24.903" stroke="none">&#xE262;</text>
+<text class="notehead" x="34.732" y="25.903" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="38.974" y="25.903" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="41.974" y="34.403" stroke="none">&#xE0A9;</text>
+<text class="articulation" x="41.876" y="35.203" stroke="none">&#xE4A1;</text>
+<text class="timeSignature" x="46.132" y="27.903" stroke="none">&#xE083;</text>
+<text class="timeSignature" x="46.034" y="29.903" stroke="none">&#xE084;</text>
+<text class="notehead" x="49.114" y="29.403" stroke="none">&#xE0A4;</text>
+<text class="dot" x="50.594" y="29.403" stroke="none">&#xE1E7;</text>
+<text class="articulation" x="49.536" y="30.235" stroke="none">&#xE4A3;</text>
+<text class="notehead" x="52.788" y="28.903" stroke="none">&#xE0A4;</text>
+<text class="flag" x="52.788" y="32.535" stroke="none">&#xE241;</text>
+<text class="rest" x="54.906" y="28.903" stroke="none">&#xE4E5;</text>
+<text class="vibrato" x="27.658" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="28.266" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="28.874" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="technique" x="49.08" y="19.203" stroke="none">&#xE610;</text>
+<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Guitar Techniques</text>
+<text class="t credit" x="60" y="14.511" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
+<text class="t technique" x="18.421" y="21.503" style="font-size:0.95px" text-anchor="start" stroke="none">P.M.</text>
+<text class="t technique" x="30.662" y="20.353" style="font-size:0.95px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
+<text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M36.032,25.553 C36.737,25.047 38.149,25.047 38.854,25.553 C38.149,25.127 36.737,25.127 36.032,25.553Z"/>
+</g>
+</svg>
