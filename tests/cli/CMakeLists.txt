@@ -393,6 +393,38 @@ add_test(NAME cli.edit_rejects_unknown_jump
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "jump 0 da-capo al-segno")
 set_tests_properties(cli.edit_rejects_unknown_sign cli.edit_rejects_unknown_jump
   PROPERTIES WILL_FAIL TRUE)
+# Repeats and alternate endings (ADR-0016): |: 1 | 2 (1., 2.) :| 3 (3.) | 4, played
+# three times through, saved, read back and played in order.
+set(ELARA_CLI_REPEATS "${CMAKE_CURRENT_BINARY_DIR}/cli-repeats.elara")
+add_test(NAME cli.edit_repeats
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_REPEATS}" "add-track electric-guitar"
+    "append-measures 4" "repeat 0 start" "repeat 1 end 3" "ending 1 1 2" "ending 2 3")
+set_tests_properties(cli.edit_repeats PROPERTIES
+  FIXTURES_SETUP cli_repeats
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{[^}]*\"repeatStart\":true},{[^}]*\"repeatTimes\":3,\"endings\":\\[1,2\\]},{[^}]*\"endings\":\\[3\\]},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":6,\"next\":\"Change repeats\"}")
+add_test(NAME cli.dump_repeats COMMAND elara-cli --json dump "${ELARA_CLI_REPEATS}")
+set_tests_properties(cli.dump_repeats PROPERTIES
+  FIXTURES_REQUIRED cli_repeats
+  PASS_REGULAR_EXPRESSION "\"repeatTimes\":3,\"alternateEndings\":\\[1,2\\]")
+add_test(NAME cli.sequence_edited_repeats COMMAND elara-cli sequence "${ELARA_CLI_REPEATS}")
+set_tests_properties(cli.sequence_edited_repeats PROPERTIES
+  FIXTURES_REQUIRED cli_repeats
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 1 2 1 3 4\n")
+add_test(NAME cli.edit_clears_repeats
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1"
+    "repeat 0 start end 2" "ending 0 1" "repeat 0 none" "ending 0 none")
+set_tests_properties(cli.edit_clears_repeats PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":6,")
+add_test(NAME cli.edit_rejects_single_repeat
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "repeat 0 end 1")
+add_test(NAME cli.edit_rejects_unknown_repeat
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "repeat 0 twice")
+add_test(NAME cli.edit_rejects_ending_past_eight
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "ending 0 9")
+add_test(NAME cli.edit_rejects_ending_zero
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "ending 0 0")
+set_tests_properties(cli.edit_rejects_single_repeat cli.edit_rejects_unknown_repeat
+  cli.edit_rejects_ending_past_eight cli.edit_rejects_ending_zero PROPERTIES WILL_FAIL TRUE)
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste

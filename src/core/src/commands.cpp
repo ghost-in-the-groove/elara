@@ -109,13 +109,22 @@ void SetMeasureHeader::apply(Song& song) {
     marks.jump = header_.jump;
     marks.jumpThen = header_.jumpThen;
     const bool navigation = marks != target;
+    // The same with the new repeats and alternate endings (ADR-0016).
+    MeasureHeader repeats = target;
+    repeats.repeatStart = header_.repeatStart;
+    repeats.repeatTimes = header_.repeatTimes;
+    repeats.alternateEndings = header_.alternateEndings;
+    const bool repeated = repeats != target;
+    const bool marked = navigation || repeated;
     if (navigation && marks == header_) {
         name_ = "Change navigation marks";
-    } else if (!navigation && time && !key && !tempo) {
+    } else if (repeated && repeats == header_) {
+        name_ = "Change repeats";
+    } else if (!marked && time && !key && !tempo) {
         name_ = "Change time signature";
-    } else if (!navigation && key && !time && !tempo) {
+    } else if (!marked && key && !time && !tempo) {
         name_ = "Change key signature";
-    } else if (!navigation && tempo && !time && !key) {
+    } else if (!marked && tempo && !time && !key) {
         name_ = "Change tempo";
     }
     std::swap(target, header_);

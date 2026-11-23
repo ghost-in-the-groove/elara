@@ -100,6 +100,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
+  - [ ] Repeats and alternate endings at the caret's measure
+    - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
+          steps (ADR-0016)
 - [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
