@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Editing subcommands: edit (a script of undoable edits applied to a new song or
 // a .elara file).
+#include <elara/core/clipboard.hpp>
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/entry.hpp>
@@ -191,7 +192,8 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     return true;
 }
 
-void runStep(Document& doc, const Step& step, EntryState& entry) {
+// `clipboard` holds what the last copy step copied.
+void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, EntryState& entry) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
@@ -281,6 +283,31 @@ void runStep(Document& doc, const Step& step, EntryState& entry) {
                 throw std::runtime_error("the voice cannot be completed with rests");
             }
         }));
+    } else if (verb == "copy") { // copy <m> <n> [track <t> [<count>]]
+        std::size_t track = 0;
+        std::size_t tracks = 0; // every track
+        if (step.has(3)) {
+            if (step.word(3) != "track") {
+                throw StepSyntaxError(std::format("copy: expected track: {}", step.word(3)));
+            }
+            track = step.index(4);
+            tracks = step.has(5) ? step.index(5) : 1;
+        }
+        clipboard = copyMeasures(song, step.index(1), step.index(2), track, tracks);
+    } else if (verb == "paste") { // paste <m> [track <t>] [insert]
+        std::size_t track = 0;
+        PasteMode mode = PasteMode::Replace;
+        for (std::size_t i = 2; step.has(i); ++i) {
+            if (step.word(i) == "track") {
+                track = step.index(++i);
+            } else if (step.word(i) == "insert") {
+                mode = PasteMode::Insert;
+            } else {
+                throw StepSyntaxError(
+                    std::format("paste: expected track or insert: {}", step.word(i)));
+            }
+        }
+        doc.execute(makePaste(song, clipboard, step.index(1), track, mode));
     } else if (verb == "transpose") { // transpose <semitones> [measures <m> <n>] [tracks <t>...]
         Transposition what{.semitones = step.number<int>(1)};
         for (std::size_t i = 2; step.has(i);) {
@@ -368,10 +395,11 @@ int runEdit(bool json, const EditOptions& options) {
         doc = Document(std::move(*loaded));
     }
     const auto& steps = options.steps;
+    core::MeasureClip clipboard;
     EntryState entry;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         try {
-            runStep(doc, Step(steps[i]), entry);
+            runStep(doc, Step(steps[i]), clipboard, entry);
             // Undo, removals and other edits can take the caret's beat away.
             if (hasCaret(doc.song())) {
                 entry.caret = core::clampCaret(doc.song(), entry.caret);
@@ -414,6 +442,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
+        "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
         "previous-measure, \"fret <n>\", \"duration <d>\", delete, delete-beat, "
