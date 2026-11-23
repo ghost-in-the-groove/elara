@@ -272,7 +272,7 @@ public:
           percussion_(staff.clef() == Clef::Percussion ||
                       track.instrument().kind == core::InstrumentKind::Percussion),
           offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
-          lanes_(font) {}
+          lanes_(font), dynamics_(font) {}
 
     double header(std::size_t first) override;
     double changes(std::size_t m, double x) override;
@@ -285,6 +285,9 @@ private:
         tiesOut(width - defaults_.thinBarlineThickness - kTieGap);
         if (techniques_ && !lanes_.empty()) {
             lanes_.place(list_, inkTop());
+        }
+        if (!dynamics_.empty()) {
+            dynamics_.place(list_, inkBottom(), height(), width);
         }
     }
 
@@ -1170,6 +1173,22 @@ private:
         }
     }
 
+    // The dynamics of the measure's columns (ADR-0044).
+    void strikeDynamics() {
+        const double centre = widthOf(Glyph::NoteheadBlack) / 2;
+        for (const Column& column : columns_) {
+            std::optional<core::Dynamic> loudest;
+            for (const std::size_t c : column.chords) {
+                if (!chords_[c].rest) {
+                    addStruck(loudest, *chords_[c].beat);
+                }
+            }
+            if (loudest) {
+                dynamics_.strike(*loudest, column.x + centre, measure_);
+            }
+        }
+    }
+
     struct TieStart {
         int step = 0;
         double right = 0.0; // after the notehead and its dots
@@ -1183,6 +1202,7 @@ private:
     int offset_;
     bool techniques_;
     TechniqueLanes lanes_;
+    DynamicMarks dynamics_;
     std::size_t measureIndex_ = 0;
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
@@ -1198,6 +1218,7 @@ private:
 };
 
 double StandardWriter::header(std::size_t first) {
+    dynamics_.start(staff_, first);
     return headerAt(first);
 }
 
@@ -1212,6 +1233,7 @@ void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
 
 void StandardWriter::draw(std::span<const ColumnPosition> positions, double start, double barline) {
     drawMeasure(positions, start, barline);
+    strikeDynamics();
 }
 
 } // namespace

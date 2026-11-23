@@ -107,10 +107,12 @@ public:
               bool alone)
         : StaffWriter(font, kLineSpace * (staff.tuning()->stringCount() - 1),
                       static_cast<std::size_t>(staff.tuning()->stringCount())),
-          song_(song), staff_(staff), tuning_(*staff.tuning()), alone_(alone), lanes_(font) {}
+          song_(song), staff_(staff), tuning_(*staff.tuning()), alone_(alone), lanes_(font),
+          dynamics_(font) {}
 
     double header(std::size_t first) override {
         measure_ = first;
+        dynamics_.start(staff_, first);
         const Glyph clef = lineCount() >= 5 ? Glyph::TabClef6 : Glyph::TabClef4;
         const BoundingBox& box = metrics(clef).box;
         double x = glyphFrom(clef, kClefX, height() / 2 + (box.southWest.y + box.northEast.y) / 2,
@@ -222,8 +224,14 @@ public:
                 }
             }
             ColumnTechniques marks;
+            std::optional<core::Dynamic> loudest;
             for (const core::Beat* beat : column.beats) {
                 addTechniques(marks, *beat);
+                addStruck(loudest, *beat);
+            }
+            // Dynamics go under the standard notation when the system has it.
+            if (alone_ && loudest) {
+                dynamics_.strike(*loudest, centre, measure_);
             }
             for (const TabNote& note : column.notes) {
                 drawNote(note, centre);
@@ -518,15 +526,17 @@ private:
             .centre = centre, .halfWidth = half, .fret = note.fret, .slideOut = effects.slideOut};
     }
 
-    void close(double /*width*/) override {
-        if (lanes_.empty()) {
-            return;
+    void close(double width) override {
+        if (!lanes_.empty()) {
+            lanes_.place(list_, inkTop());
+            const double tip = lanes_.bottom(Lane::Bend);
+            for (const PendingBend& bend : pendingBends_) {
+                measure_ = bend.measure;
+                bendArrows(bend, tip);
+            }
         }
-        lanes_.place(list_, inkTop());
-        const double tip = lanes_.bottom(Lane::Bend);
-        for (const PendingBend& bend : pendingBends_) {
-            measure_ = bend.measure;
-            bendArrows(bend, tip);
+        if (!dynamics_.empty()) {
+            dynamics_.place(list_, inkBottom(), height(), width);
         }
     }
 
@@ -582,6 +592,7 @@ private:
     std::vector<RhythmItem> rhythm_; // the voice whose rhythm shows, in the measure read last
     std::vector<double> rhythmX_;    // the stems' x
     TechniqueLanes lanes_;
+    DynamicMarks dynamics_;
     std::size_t measureIndex_ = 0;
     std::vector<TabColumn> columns_;
     std::array<std::optional<LastNote>, core::Tuning::kMaxStrings + 1> last_{};
