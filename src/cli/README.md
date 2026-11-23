@@ -153,8 +153,10 @@ caret's string is a drum lane, from the crash at the top to the hi-hat pedal
 that General MIDI key's lane (moving the caret to it), and `delete` removes the
 lane's piece only. `effect <name>` toggles a note effect on the caret's notes
 (ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
-`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`. The
-output includes `"caret"` and `"input"`.
+`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`.
+`dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
+of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
+dynamic in force at the caret. The output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

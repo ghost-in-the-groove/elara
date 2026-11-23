@@ -169,6 +169,17 @@ constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectN
     {"staccato", core::NoteEffect::Staccato},
 }};
 
+constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
+    {"ppp", core::Dynamic::PPP},
+    {"pp", core::Dynamic::PP},
+    {"p", core::Dynamic::P},
+    {"mp", core::Dynamic::MP},
+    {"mf", core::Dynamic::MF},
+    {"f", core::Dynamic::F},
+    {"ff", core::Dynamic::FF},
+    {"fff", core::Dynamic::FFF},
+}};
+
 /// Runs a keyboard entry step; false when `step` is not one.
 bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     using namespace core;
@@ -237,6 +248,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             throw StepSyntaxError(std::format("not an effect: {}", name));
         }
         edit = toggleEffect(song, entry.caret, found->second);
+    } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kDynamicNames, [name](const auto& dynamic) { return dynamic.first == name; });
+        if (found == kDynamicNames.end()) {
+            throw StepSyntaxError(std::format("not a dynamic: {}", name));
+        }
+        edit = setDynamic(song, entry.caret, found->second);
     } else {
         return false;
     }
