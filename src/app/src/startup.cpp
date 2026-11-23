@@ -26,6 +26,12 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
 
+// Pages brought up to date so far: painted, or kept because a relayout left
+// them as they were.
+int pagesUpdated() {
+    return ScorePage::paintCount() + ScorePage::keptCount();
+}
+
 } // namespace
 
 void reportSmokeTest(bool ok, const QString& detail) {
@@ -50,7 +56,7 @@ void Startup::start() {
     clock_.start();
     // The window opens the file itself; wait for its first layout and paint.
     waiting_ = !options_.file.isEmpty();
-    paintsBefore_ = ScorePage::paintCount();
+    paintsBefore_ = pagesUpdated();
     timer_.start();
 }
 
@@ -75,6 +81,7 @@ void Startup::queueSteps() {
             queueMeasures();
             queueMix();
             queueNavigation();
+            queueTuning();
         }
         return;
     }
@@ -107,6 +114,7 @@ void Startup::queueSteps() {
         queueMeasures();
         queueMix();
         queueNavigation();
+        queueTuning();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -418,6 +426,60 @@ void Startup::queueNavigation() {
     });
 }
 
+// The first track's tuning from the song panel (ADR-0046): a capo a fret
+// higher keeping the frets, then the capo taken off keeping the sound, each
+// one undo step; both undone, the song must end as it started.
+void Startup::queueTuning() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tuning check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        tuningBefore_ = score_->trackTuning(0);
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const int capo = tuningBefore_.value(QStringLiteral("capo")).toInt() + 1;
+        score_->setTrackTuning(0, notes, capo, true);
+        const QVariantMap tuning = score_->trackTuning(0);
+        check(tuning.value(QStringLiteral("notes")).toString() == notes &&
+                  tuning.value(QStringLiteral("capo")).toInt() == capo,
+              "the capo was not moved");
+        const bool changed = score_->undoName() == ScoreDocument::tr("Change tuning");
+        check(changed, "the tuning is not one undo step");
+        return changed;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        // By its preset when it has one, else by its notes.
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const QString preset = tuningBefore_.value(QStringLiteral("preset")).toString();
+        score_->setTrackTuning(0, preset.isEmpty() ? notes : preset, 0, false);
+        const QVariantMap tuning = score_->trackTuning(0);
+        const bool changed = tuning.value(QStringLiteral("notes")).toString() == notes &&
+                             tuning.value(QStringLiteral("capo")).toInt() == 0;
+        check(changed, "the capo was not taken off");
+        if (!changed) {
+            return false;
+        }
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        check(!score_->modified() && score_->trackTuning(0) == tuningBefore_,
+              "undoing the tunings did not restore the song");
+        return false;
+    });
+}
+
 void Startup::tick() {
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
@@ -427,7 +489,7 @@ void Startup::tick() {
     if (waiting_) {
         const bool settled = score_ != nullptr && laidOut_ && !score_->busy() &&
                              score_->status() == ScoreDocument::Status::Ready &&
-                             (score_->pageCount() == 0 || ScorePage::paintCount() > paintsBefore_);
+                             (score_->pageCount() == 0 || pagesUpdated() > paintsBefore_);
         if (!settled) {
             if (clock_.elapsed() - stepStarted_ > kStepTimeoutMilliseconds) {
                 finish(false, QStringLiteral("timed out"));
@@ -444,7 +506,7 @@ void Startup::tick() {
         auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
-        paintsBefore_ = ScorePage::paintCount();
+        paintsBefore_ = pagesUpdated();
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
@@ -485,8 +547,13 @@ void Startup::tick() {
         finish(false, editProblem_);
         return;
     }
+    if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
+        finish(false, overlap);
+        return;
+    }
     QString detail;
     if (score_ != nullptr && score_->pageCount() > 0) {
+        std::printf("pages kept: %d\n", ScorePage::keptCount());
         detail = QStringLiteral("%1 pages, %2 painted, %3 layouts")
                      .arg(score_->pageCount())
                      .arg(ScorePage::paintCount())
@@ -531,6 +598,26 @@ void Startup::clickCursor() {
                        .arg(audio->position())
                        .arg(expected);
     }
+}
+
+// The bars that float over the bottom of the score, the transport and the
+// note entry bar shown with the caret, must not cover each other.
+QString Startup::overlappingBars() const {
+    auto* transport = window_->findChild<QQuickItem*>(QStringLiteral("transport"));
+    auto* entry = window_->findChild<QQuickItem*>(QStringLiteral("entryBar"));
+    if (transport == nullptr || entry == nullptr) {
+        return QStringLiteral("no transport or note entry bar");
+    }
+    if (!transport->isVisible() || !entry->isVisible()) {
+        return {};
+    }
+    const auto sceneRect = [](const QQuickItem* item) {
+        return item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
+    };
+    if (sceneRect(transport).intersects(sceneRect(entry))) {
+        return QStringLiteral("the note entry bar overlaps the transport");
+    }
+    return {};
 }
 
 void Startup::finish(bool ok, const QString& detail) {

@@ -18,8 +18,19 @@ ApplicationWindow {
     property bool showSongPane: false
     /// Open the caret's measure once the score is laid out (from the command line).
     property bool showMeasure: false
+    /// Open the first track's tuning in the song panel once there is a score
+    /// (from the command line).
+    property bool showTuning: false
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
+
+    onHasScoreChanged: {
+        if (hasScore && showTuning) {
+            showTuning = false;
+            showSongPane = true;
+            songPane.openTuning(0);
+        }
+    }
     /// What to do once unsaved changes are saved or discarded.
     property var pendingAction: null
     property bool closing: false
@@ -448,6 +459,7 @@ ApplicationWindow {
             dark: window.dark
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
+            bottomInset: window.hasScore ? transport.height + 20 : 0
             onSeekRequested: seconds => audio.seek(seconds)
             cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
@@ -547,6 +559,7 @@ ApplicationWindow {
         Rectangle {
             id: transport
 
+            objectName: "transport"
             anchors.horizontalCenter: parent.horizontalCenter
             y: window.hasScore ? parent.height - height - 20 : parent.height + 12
             width: transportRow.implicitWidth + 28
@@ -690,7 +703,8 @@ ApplicationWindow {
             property bool shown: false
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
+            y: shown ? parent.height - height - scoreView.entryBarSpace
+                       - (window.hasScore ? transport.height + 36 : 24)
                      : parent.height + 8
             width: Math.min(parent.width - 48, toastText.implicitWidth + 40)
             height: toastText.implicitHeight + 24

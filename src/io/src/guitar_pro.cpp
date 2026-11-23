@@ -1412,9 +1412,13 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
         return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
+        // Unpacked once for both files: unpacking is most of what opening a
+        // compressed container costs.
+        std::optional<detail::GpxContainer> container;
         std::optional<std::string> score;
         try {
-            score = detail::gpxEntry(bytes, "score.gpif");
+            container.emplace(bytes);
+            score = container->entry("score.gpif");
         } catch (const FormatError& error) {
             return std::unexpected(error);
         }
@@ -1423,7 +1427,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
                 "Guitar Pro: no score.gpif in the container (not a Guitar Pro 6 file)"});
         }
         const std::string parts =
-            partsOf([bytes] { return detail::gpxEntry(bytes, "PartConfiguration"); });
+            partsOf([&container] { return container->entry("PartConfiguration"); });
         return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {

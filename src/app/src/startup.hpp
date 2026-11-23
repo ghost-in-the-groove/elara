@@ -54,8 +54,10 @@ private:
     void queueMeasures();
     void queueMix();
     void queueNavigation();
+    void queueTuning();
     void finish(bool ok, const QString& detail);
     void clickCursor();
+    [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
     QPointer<QQuickWindow> window_;
@@ -78,11 +80,12 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
-    QString editProblem_;    ///< the first edit check that failed
-    QString failure_;        ///< set by a step that went wrong
-    bool entering_ = false;  ///< whether the shown track takes frets
-    int measuresBefore_ = 0; ///< measures when the measure edits start
-    int firstNumerator_ = 0; ///< the first time signature then
+    QVariantMap tuningBefore_; ///< the first track's tuning before it changed
+    QString editProblem_;      ///< the first edit check that failed
+    QString failure_;          ///< set by a step that went wrong
+    bool entering_ = false;    ///< whether the shown track takes frets
+    int measuresBefore_ = 0;   ///< measures when the measure edits start
+    int firstNumerator_ = 0;   ///< the first time signature then
 };
 
 } // namespace elara::app
