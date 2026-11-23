@@ -114,6 +114,17 @@ public:
         return text;
     }
 
+    /// A note name from C to B.
+    [[nodiscard]] core::Step noteName(std::size_t i) const {
+        static constexpr std::string_view kNames = "CDEFGAB";
+        const std::string_view text = word(i);
+        const auto found = text.size() == 1 ? kNames.find(text.front()) : std::string_view::npos;
+        if (found == std::string_view::npos) {
+            throw StepSyntaxError(std::format("{}: not a note name (C to B): {}", verb(), text));
+        }
+        return static_cast<core::Step>(found);
+    }
+
     [[nodiscard]] core::Duration duration(std::size_t i) const {
         const auto parsed = core::Duration::parse(word(i));
         if (!parsed) {
@@ -173,6 +184,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         return true;
     } else if (verb == "fret") {
         edit = enterFret(song, entry.caret, step.number<int>(1), entry.input);
+    } else if (verb == "pitch") { // pitch <C..B> [add]
+        if (step.has(2) && step.word(2) != "add") {
+            throw StepSyntaxError(std::format("pitch: expected add, got {}", step.word(2)));
+        }
+        edit = enterPitch(song, entry.caret, step.noteName(1), entry.input,
+                          step.has(2) ? PitchMode::AddToChord : PitchMode::Replace);
+    } else if (verb == "shift") { // shift <semitones>
+        edit = shiftPitch(song, entry.caret, step.number<int>(1));
     } else if (verb == "duration") {
         entry.input = step.duration(1);
         edit = setBeatDuration(song, entry.caret, entry.input);
@@ -442,7 +461,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
-        "previous-measure, \"fret <n>\", \"duration <d>\", delete, delete-beat, "
+        "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
+        "\"duration <d>\", delete, delete-beat, "
         "insert-rest, undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
