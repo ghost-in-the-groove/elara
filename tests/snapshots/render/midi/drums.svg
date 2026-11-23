@@ -82,22 +82,7 @@
 <text class="notehead" x="42.413" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="44.534" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="46.655" y="27.45" stroke="none">&#xE0A9;</text>
-<text class="dynamic" x="9.191" y="33.226" stroke="none">&#xE530;</text>
-<text class="dynamic" x="8.651" y="33.226" stroke="none">&#xE52C;</text>
-<text class="dynamic" x="9.111" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="8.651" y="33.226" stroke="none">&#xE52C;</text>
-<text class="dynamic" x="12.697" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="16.101" y="33.226" stroke="none">&#xE522;</text>
-<text class="dynamic" x="18.497" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="21.417" y="33.226" stroke="none">&#xE52C;</text>
-<text class="dynamic" x="25.657" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="28.577" y="33.226" stroke="none">&#xE52C;</text>
-<text class="dynamic" x="32.817" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="35.737" y="33.226" stroke="none">&#xE52C;</text>
-<text class="dynamic" x="39.977" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="43.381" y="33.226" stroke="none">&#xE522;</text>
-<text class="dynamic" x="45.777" y="33.226" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="48.697" y="33.226" stroke="none">&#xE52C;</text>
+<text class="dynamic" x="14.413" y="33.226" stroke="none">&#xE522;</text>
 <text class="tempo" x="15.079" y="17.2" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Drums</text>
 <text class="t tempo" x="16.243" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 120</text>
