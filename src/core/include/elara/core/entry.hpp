@@ -120,4 +120,34 @@ enum class PitchMode : std::uint8_t {
 /// std::logic_error on a staff that is not a percussion staff.
 [[nodiscard]] Entry toggleDrum(const Song& song, const Caret& caret, Duration duration);
 
+/// A note effect that typing toggles (ADR-0037), in the form it is usually
+/// written.
+enum class NoteEffect : std::uint8_t {
+    Tie,      ///< tied from the previous note
+    Legato,   ///< hammer-on or pull-off from the previous note
+    Slide,    ///< a shift slide to the next note
+    Bend,     ///< a full-step bend
+    Vibrato,  ///< slight vibrato
+    PalmMute, ///< palm mute
+    DeadNote, ///< a muted, percussive note
+    LetRing,  ///< let ring
+    Harmonic, ///< a natural harmonic at the note's fret
+    Ghost,    ///< a soft note, written in parentheses
+    Accent,   ///< an accent
+    Staccato, ///< staccato
+};
+
+/// Toggles `effect` on the notes the caret is on: the note on its string on a
+/// fretted staff, the lane's hit on a percussion staff, every note of the beat
+/// elsewhere. It goes on when any of them lacks it and off when all have it,
+/// as one undo step ("Change effect"); any slide off the note counts as a
+/// slide, any bend as a bend. A tie takes the pitch (and fret) of the note it
+/// continues, in the beat just before: on a fretted staff its note on the same
+/// string, elsewhere its note of the same pitch or its only note. Nothing
+/// changes on a rest, the free slot or a string without a note. Throws
+/// std::logic_error for a tie with nothing to continue or a harmonic on a
+/// staff without strings, and std::out_of_range for a natural harmonic at a
+/// fret without a node.
+[[nodiscard]] Entry toggleEffect(const Song& song, const Caret& caret, NoteEffect effect);
+
 } // namespace elara::core

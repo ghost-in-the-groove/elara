@@ -153,6 +153,22 @@ struct EntryState {
     core::Duration input{core::NoteValue::Quarter};
 };
 
+// The names `effect <name>` takes (ADR-0037).
+constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectNames{{
+    {"tie", core::NoteEffect::Tie},
+    {"legato", core::NoteEffect::Legato},
+    {"slide", core::NoteEffect::Slide},
+    {"bend", core::NoteEffect::Bend},
+    {"vibrato", core::NoteEffect::Vibrato},
+    {"palm-mute", core::NoteEffect::PalmMute},
+    {"dead-note", core::NoteEffect::DeadNote},
+    {"let-ring", core::NoteEffect::LetRing},
+    {"harmonic", core::NoteEffect::Harmonic},
+    {"ghost", core::NoteEffect::Ghost},
+    {"accent", core::NoteEffect::Accent},
+    {"staccato", core::NoteEffect::Staccato},
+}};
+
 /// Runs a keyboard entry step; false when `step` is not one.
 bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     using namespace core;
@@ -213,6 +229,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             entry.caret.string = static_cast<int>(found - pieces.begin()) + 1;
         }
         edit = toggleDrum(song, entry.caret, entry.input);
+    } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kEffectNames, [name](const auto& effect) { return effect.first == name; });
+        if (found == kEffectNames.end()) {
+            throw StepSyntaxError(std::format("not an effect: {}", name));
+        }
+        edit = toggleEffect(song, entry.caret, found->second);
     } else {
         return false;
     }
@@ -478,7 +502,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", undo, redo, save");
+        "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }
