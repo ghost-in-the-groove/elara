@@ -73,3 +73,11 @@ builds the vcpkg packages; later builds are incremental.
   running (often a driver installer). Let it finish or reboot, then retry.
 - **`Qt6Config.cmake` not found**: `QT_ROOT_DIR` must point at the kit folder
   (`.../6.12.1/msvc2022_64`), not at `C:\Qt`.
+- **A test crashes after a header changed (Windows)**: under a non-English
+  MSVC, Ninja records header dependencies only when the build tree was generated
+  and built from consoles with the same code page (for example not generated
+  from `cmd` and built from a UTF-8 terminal). The task runner always uses the
+  OEM code page and regenerates a tree written for another one, so go through
+  it. After calling `cmake --build` directly, list the objects without
+  dependencies with `ninja -C build/dev -t deps | findstr "#deps 0"` and delete
+  them to rebuild them.
