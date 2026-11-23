@@ -72,6 +72,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY songChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY songChanged)
     Q_PROPERTY(QVariantList instrumentPresets READ instrumentPresets CONSTANT)
+    Q_PROPERTY(QVariantList tuningPresets READ tuningPresets CONSTANT)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(QString undoName READ undoName NOTIFY historyChanged)
@@ -176,10 +177,16 @@ public:
     /// kind of instrument), symbol (a clef of the music font) and its mix:
     /// volume (0 to 1), pan (-1 to 1), mute, solo, and audible when it sounds
     /// (ADR-0039).
+    /// The tracks: name, detail, symbol, mix ("volume", "pan", "mute", "solo",
+    /// "audible") and tuning ("fretted", "tuning", "tuningPreset", "capo", as
+    /// trackTuning() names them "fretted", "notes", "preset" and "capo").
     [[nodiscard]] QVariantList tracks() const;
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
     [[nodiscard]] static QVariantList instrumentPresets();
+    /// The tuning presets (ADR-0046): id, name and notes, the open strings
+    /// from the lowest ("E2 A2 D3 G3 B3 E4").
+    [[nodiscard]] static QVariantList tuningPresets();
     [[nodiscard]] bool canUndo() const { return document_ && document_->canUndo(); }
     [[nodiscard]] bool canRedo() const { return document_ && document_->canRedo(); }
     /// What undo() or redo() would change, e.g. "Add track"; empty when nothing.
@@ -214,6 +221,16 @@ public:
     /// Lets playback hear a track's volume and pan while a fader moves, without
     /// changing the song: setTrackMix() keeps it when the fader is let go.
     Q_INVOKABLE void previewTrackMix(int track, double volume, double pan);
+    /// The tuning of a track's first staff: "fretted" (false without strings),
+    /// "notes" (its open strings from the lowest), "preset" (the id of the
+    /// preset it matches, else empty) and "capo".
+    Q_INVOKABLE [[nodiscard]] QVariantMap trackTuning(int track) const;
+    /// Retunes a track's first staff (ADR-0046) to `tuning`, a preset id or open
+    /// strings from the lowest ("D2 A2 D3 G3 B3 E4"), with a capo at `capo`,
+    /// keeping its pitches or, with `keepFrets`, its frets: one undo step,
+    /// "Change tuning". A tuning that cannot play every note is refused through
+    /// editFailed().
+    Q_INVOKABLE void setTrackTuning(int track, const QString& tuning, int capo, bool keepFrets);
     /// The mixes previewTrackMix() last made, one per track.
     [[nodiscard]] std::span<const core::TrackMix> previewMixes() const { return previewMixes_; }
     Q_INVOKABLE void undo();

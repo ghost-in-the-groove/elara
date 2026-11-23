@@ -101,9 +101,9 @@ if(TARGET elara)
   # The tuner opened at start. Without an audio input (as in CI) it says so
   # instead of listening; either way its QML must load without warnings.
   add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
-  # The song panel open while the song is edited.
+  # The song panel open, with the first track's tuning, while the song is edited.
   add_test(NAME app.smoke_song_pane
-    COMMAND elara --smoke-test --song-pane "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
+    COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
   # The measure popup open at the caret while the measures are edited.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
