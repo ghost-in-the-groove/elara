@@ -52,8 +52,8 @@ them.
 
 ## Consequences
 
-- Tablature without standard notation still shows no rhythm, so no tuplets
-  either; they come with rhythm stems under the tablature.
+- Tablature without standard notation shows them under its rhythm stems
+  (ADR-0041).
 - The number of a beamed group can sit on a staff line when the beam lies
   inside the staff, as in most engraving programs; moving it out of the staff
   is a later refinement.
