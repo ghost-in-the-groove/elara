@@ -5,9 +5,10 @@
 #include <elara/core/measure.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/signature.hpp>
-#include <elara/notation/staff_layout.hpp>
+#include <elara/core/song.hpp>
 
 #include "drum_map.hpp"
+#include "layout_common.hpp"
 
 #include <algorithm>
 #include <array>
@@ -15,13 +16,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
-#include <stdexcept>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
-namespace elara::notation {
+namespace elara::notation::detail {
 
 namespace {
 
@@ -36,14 +38,7 @@ using core::TimeSignature;
 
 // ---- Engraving constants, in staff spaces (ADR-0012) ------------------------
 
-constexpr double kClefX = 0.6;             // left edge of the clef
-constexpr double kHeaderGap = 0.9;         // between clef, key and time signatures
 constexpr double kKeyAccidentalGap = 0.12; // between the accidentals of a key signature
-constexpr double kFirstNoteGap = 1.6;      // after the header, before the first note
-constexpr double kBarlineGap = 1.2;        // after a barline, before the first note
-constexpr double kMinNoteGap = 0.4;        // between the ink of neighbouring columns
-constexpr double kEndGap = 1.0;            // after the last note, before the barline
-constexpr double kQuarterSpace = 3.0;      // ideal distance after a quarter note
 constexpr double kAccidentalGap = 0.2;     // between an accidental and its notehead
 constexpr double kAccidentalColumnGap = 0.12;
 constexpr double kDotGap = 0.3; // between a notehead and its first dot
@@ -57,7 +52,14 @@ constexpr double kVoiceRestShift = 2.0;
 constexpr double kMiddleLine = 2.0;
 constexpr int kMiddleStep = 4;
 constexpr int kAccidentalClearance = 6; // steps two accidentals in one column keep apart
-constexpr double kEpsilon = 1e-9;
+constexpr double kStaffHeight = 4.0;
+constexpr double kTieOffset = 0.35; // tie ends off the notehead's centre
+constexpr double kTieGap = 0.12;    // between a tie end and its notehead
+constexpr double kTieRise = 0.1;    // tie height per staff space of length
+constexpr double kTieMinHeight = 0.35;
+constexpr double kTieMaxHeight = 0.8;
+constexpr double kArticulationGap = 0.3; // between a notehead and its articulation
+constexpr double kRunEndGap = 0.3;       // a technique run ends before the next column
 
 // ---- Staff positions ----------------------------------------------------------
 
@@ -157,10 +159,6 @@ int keyStep(Clef clef, bool sharp, std::size_t index) {
 
 // ---- Glyph choice ---------------------------------------------------------------
 
-Glyph offsetGlyph(Glyph first, int by) {
-    return static_cast<Glyph>(static_cast<int>(first) + by);
-}
-
 int valueIndex(NoteValue value) {
     return static_cast<int>(value);
 }
@@ -217,12 +215,6 @@ double stemLengthFor(NoteValue value) {
     return kStemLength + kExtraFlagStem * std::max(0, beamCount(value) - 2);
 }
 
-// Ideal distance after a note that lasts `length` whole notes: each doubling of
-// the length multiplies the space by the square root of two.
-double idealSpace(const Fraction& length) {
-    return kQuarterSpace * std::sqrt(std::max(length.toDouble(), 1.0 / 128.0) * 4.0);
-}
-
 // ---- Measure contents -------------------------------------------------------------
 
 struct Head {
@@ -235,9 +227,11 @@ struct Head {
     std::optional<Glyph> accidental;
     double accidentalX = 0.0; // accidental origin, from the chord's x
     double dx = 0.0;          // notehead origin, from the chord's x
+    const core::Note* note = nullptr;
 };
 
 struct Chord {
+    const core::Beat* beat = nullptr;
     std::size_t voice = 0;
     Fraction start;
     Fraction length;
@@ -264,55 +258,27 @@ struct Column {
     double x = 0.0;
 };
 
-class StaffLayouter {
+class StandardWriter final : public StaffWriter {
 public:
-    StaffLayouter(const core::Song& song, const core::Track& track, const core::Staff& staff,
-                  const EngravingFont& font)
-        : song_(song), staff_(staff), font_(font), defaults_(font.defaults()), clef_(staff.clef()),
+    StandardWriter(const core::Song& song, const core::Track& track, const core::Staff& staff,
+                   const EngravingFont& font, bool techniques)
+        : StaffWriter(font, kStaffHeight, 5), song_(song), staff_(staff), clef_(staff.clef()),
           percussion_(staff.clef() == Clef::Percussion ||
                       track.instrument().kind == core::InstrumentKind::Percussion),
-          offset_(percussion_ ? 0 : track.instrument().writtenOffset) {}
+          offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
+          lanes_(font) {}
 
-    DisplayList run(std::size_t first, std::size_t count) {
-        const std::size_t last = first + std::min(count, song_.measureCount() - first);
-        double x = header(first);
-        for (std::size_t m = first; m < last; ++m) {
-            if (m > first) {
-                x = changes(m, x);
-            }
-            const double start = x;
-            const double barline = measure(m, start, m == first ? kFirstNoteGap : kBarlineGap);
-            list_.measures.push_back(MeasureBox{.index = m, .x = start, .width = barline - start});
-            x = barlines(m, barline, m + 1 == song_.measureCount());
-        }
-        list_.width = x;
-        staffLines();
-        extents();
-        return std::move(list_);
-    }
+    double header(std::size_t first) override;
+    double changes(std::size_t m, double x) override;
+    void collect(std::size_t m, std::vector<ColumnInk>& ink) override;
+    [[nodiscard]] double emptyWidth() const override { return widthOf(Glyph::RestWhole); }
+    void draw(std::span<const ColumnPosition> positions, double start, double barline) override;
 
 private:
-    // ---- Drawing helpers ----
-
-    void glyph(Glyph which, double x, double y, Role role) {
-        list_.glyphs.push_back(
-            GlyphItem{.glyph = which, .origin = {x, y}, .role = role, .measure = measure_});
-    }
-
-    void line(Point from, Point to, double thickness, Role role) {
-        list_.lines.push_back(LineItem{
-            .from = from, .to = to, .thickness = thickness, .role = role, .measure = measure_});
-    }
-
-    [[nodiscard]] const GlyphMetrics& metrics(Glyph which) const { return font_.metrics(which); }
-
-    [[nodiscard]] double widthOf(Glyph which) const { return metrics(which).box.width(); }
-
-    // Draws `which` with the left of its box at `x`; returns the right of the box.
-    double glyphFrom(Glyph which, double x, double y, Role role) {
-        const BoundingBox& box = metrics(which).box;
-        glyph(which, x - box.southWest.x, y, role);
-        return x + box.width();
+    void close() override {
+        if (techniques_ && !lanes_.empty()) {
+            lanes_.place(list_, inkTop());
+        }
     }
 
     // ---- Signatures ----
@@ -321,7 +287,7 @@ private:
         return writtenKey(song_.measureHeader(m).keySignature, offset_);
     }
 
-    double header(std::size_t first) {
+    double headerAt(std::size_t first) {
         measure_ = first;
         Glyph clefGlyph = Glyph::GClef;
         double clefY = 3.0;
@@ -356,7 +322,8 @@ private:
         x = keySignature(keyAt(first), x);
         if (first == 0 || song_.measureHeader(first - 1).timeSignature !=
                               song_.measureHeader(first).timeSignature) {
-            x = timeSignature(song_.measureHeader(first).timeSignature, x + kHeaderGap);
+            x = timeSignature(song_.measureHeader(first).timeSignature, x + kHeaderGap,
+                              kMiddleLine);
         }
         return x;
     }
@@ -381,32 +348,8 @@ private:
         return x;
     }
 
-    double timeSignature(const TimeSignature& time, double x) {
-        const auto digitsWidth = [this](const std::string& digits) {
-            double width = 0.0;
-            for (const char digit : digits) {
-                width += metrics(offsetGlyph(Glyph::TimeSig0, digit - '0')).advanceWidth;
-            }
-            return width;
-        };
-        const std::string numerator = std::to_string(time.numerator());
-        const std::string denominator = std::to_string(time.denominator());
-        const double width = std::max(digitsWidth(numerator), digitsWidth(denominator));
-        const auto draw = [&](const std::string& digits, double y) {
-            double cursor = x + (width - digitsWidth(digits)) / 2;
-            for (const char digit : digits) {
-                const Glyph which = offsetGlyph(Glyph::TimeSig0, digit - '0');
-                glyph(which, cursor, y, Role::TimeSignature);
-                cursor += metrics(which).advanceWidth;
-            }
-        };
-        draw(numerator, 1.0);
-        draw(denominator, 3.0);
-        return x + width;
-    }
-
     // Signature changes at the start of measure m, drawn after the barline.
-    double changes(std::size_t m, double x) {
+    double changesAt(std::size_t m, double x) {
         measure_ = m;
         const KeySignature before = keyAt(m - 1);
         const KeySignature now = keyAt(m);
@@ -414,111 +357,59 @@ private:
             x = now.fifths() == 0 ? keySignature(before, x, true) : keySignature(now, x);
         }
         if (song_.measureHeader(m).timeSignature != song_.measureHeader(m - 1).timeSignature) {
-            x = timeSignature(song_.measureHeader(m).timeSignature, x + kHeaderGap);
+            x = timeSignature(song_.measureHeader(m).timeSignature, x + kHeaderGap, kMiddleLine);
         }
         return x;
-    }
-
-    // ---- Barlines and staff ----
-
-    double barlines(std::size_t m, double x, bool songEnd) {
-        measure_ = m;
-        const double thin = defaults_.thinBarlineThickness;
-        line({x + thin / 2, 0.0}, {x + thin / 2, 4.0}, thin, Role::Barline);
-        x += thin;
-        if (songEnd) {
-            const double thick = defaults_.thickBarlineThickness;
-            x += defaults_.thinThickBarlineSeparation;
-            line({x + thick / 2, 0.0}, {x + thick / 2, 4.0}, thick, Role::Barline);
-            x += thick;
-        }
-        return x;
-    }
-
-    void staffLines() {
-        std::vector<LineItem> staff;
-        for (int i = 0; i < 5; ++i) {
-            const auto y = static_cast<double>(i);
-            staff.push_back(
-                LineItem{.from = {0.0, y},
-                         .to = {list_.width, y},
-                         .thickness = defaults_.staffLineThickness,
-                         .role = Role::StaffLine,
-                         .measure = list_.measures.empty() ? 0 : list_.measures[0].index});
-        }
-        list_.lines.insert(list_.lines.begin(), staff.begin(), staff.end());
-    }
-
-    void extents() {
-        double top = -defaults_.staffLineThickness / 2;
-        double bottom = 4.0 + defaults_.staffLineThickness / 2;
-        for (const GlyphItem& item : list_.glyphs) {
-            const BoundingBox& box = metrics(item.glyph).box;
-            top = std::min(top, item.origin.y - box.northEast.y);
-            bottom = std::max(bottom, item.origin.y - box.southWest.y);
-        }
-        for (const LineItem& item : list_.lines) {
-            top = std::min({top, item.from.y, item.to.y});
-            bottom = std::max({bottom, item.from.y, item.to.y});
-        }
-        for (const BeamItem& item : list_.beams) {
-            top = std::min(
-                {top, item.left.y - item.thickness / 2, item.right.y - item.thickness / 2});
-            bottom = std::max(
-                {bottom, item.left.y + item.thickness / 2, item.right.y + item.thickness / 2});
-        }
-        list_.top = top;
-        list_.bottom = bottom;
     }
 
     // ---- One measure ----
 
-    // Lays out measure m after `start`; returns where its closing barline goes.
-    double measure(std::size_t m, double start, double gap) {
-        measure_ = m;
-        collect(m);
-        const Fraction length = song_.measureHeader(m).timeSignature.measureLength();
-        if (columns_.empty()) {
-            const double restWidth = widthOf(Glyph::RestWhole);
-            const double barline = start + gap + std::max(idealSpace(length), restWidth) + kEndGap;
-            centreMeasureRests(start, barline);
-            return barline;
-        }
-        // Columns, left to right: each gets its ideal space unless the ink of
-        // its neighbour needs more.
-        double x = start + gap + std::max(0.0, -columns_.front().left);
-        for (std::size_t i = 0; i < columns_.size(); ++i) {
-            Column& column = columns_[i];
-            column.x = x;
-            if (i + 1 < columns_.size()) {
-                const Column& next = columns_[i + 1];
-                x += std::max(idealSpace(next.start - column.start),
-                              column.right + kMinNoteGap - next.left);
-            }
-        }
-        const Column& last = columns_.back();
-        Fraction lastLength;
-        for (const std::size_t c : last.chords) {
-            lastLength = std::max(lastLength, chords_[c].length);
-        }
-        const double barline =
-            last.x +
-            std::max(idealSpace(std::max(lastLength, length - last.start)), last.right + kEndGap);
+    // ---- One measure ----
+
+    // The ink of the columns read by read().
+    void columnInk(std::vector<ColumnInk>& ink) const {
+        ink.clear();
         for (const Column& column : columns_) {
+            Fraction longest;
+            for (const std::size_t c : column.chords) {
+                longest = std::max(longest, chords_[c].length);
+            }
+            ink.push_back(ColumnInk{.start = column.start,
+                                    .longest = longest,
+                                    .left = column.left,
+                                    .right = column.right});
+        }
+    }
+
+    void drawMeasure(std::span<const ColumnPosition> positions, double start, double barline) {
+        measure_ = measureIndex_;
+        for (Column& column : columns_) {
+            column.x = columnX(positions, column.start);
             for (const std::size_t c : column.chords) {
                 chords_[c].x = column.x;
             }
         }
         for (Chord& chord : chords_) {
-            if (!chord.measureRest) {
-                draw(chord);
+            if (chord.measureRest) {
+                tieStarts_[chord.voice].clear();
+                continue;
+            }
+            draw(chord);
+            ties(chord);
+            articulations(chord);
+        }
+        if (voiceCount_ == 0) {
+            for (auto& starts : tieStarts_) {
+                starts.clear();
             }
         }
         for (const std::vector<std::size_t>& group : beamGroups_) {
             beam(group);
         }
         centreMeasureRests(start, barline);
-        return barline;
+        if (techniques_) {
+            markTechniques(positions, barline);
+        }
     }
 
     void centreMeasureRests(double start, double barline) {
@@ -533,7 +424,9 @@ private:
     }
 
     // Reads measure m into chords_, columns_ and beamGroups_.
-    void collect(std::size_t m) {
+    void read(std::size_t m) {
+        measure_ = m;
+        measureIndex_ = m;
         chords_.clear();
         columns_.clear();
         beamGroups_.clear();
@@ -560,6 +453,7 @@ private:
             const std::size_t voiceStart = chords_.size();
             for (const Beat& beat : beats) {
                 Chord chord;
+                chord.beat = &beat;
                 chord.voice = v;
                 chord.start = at;
                 chord.length = beat.duration.length();
@@ -618,6 +512,7 @@ private:
 
     [[nodiscard]] Head headOf(const core::Note& note, NoteValue value) const {
         Head head;
+        head.note = &note;
         head.tied = note.effects.tiedFromPrevious;
         if (percussion_) {
             const detail::DrumNote drum = detail::drumNote(note.pitch.midiNumber());
@@ -1061,32 +956,157 @@ private:
         }
     }
 
+    // ---- Ties, articulations and techniques ----
+
+    // Ties the tied noteheads of `chord` to the same notes of the previous chord
+    // of its voice, then remembers its noteheads for the next chord.
+    void ties(const Chord& chord) {
+        std::vector<TieStart>& previous = tieStarts_[chord.voice];
+        const std::size_t count = chord.heads.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            const Head& head = chord.heads[i];
+            if (!head.tied) {
+                continue;
+            }
+            const auto from = std::ranges::find(previous, head.step, &TieStart::step);
+            if (from == previous.end()) {
+                continue;
+            }
+            // The outer notes of a chord tie away from it; a single note (and the
+            // middle one) away from its stem.
+            bool above = !chord.stemUp;
+            if (2 * i + 1 != count) {
+                above = 2 * i + 1 < count;
+            }
+            const double direction = above ? -1.0 : 1.0;
+            const double y = yOf(head.step) + direction * kTieOffset;
+            const double left = from->right + kTieGap;
+            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x - kTieGap;
+            if (right - left < kEpsilon) {
+                continue;
+            }
+            const double height =
+                std::clamp((right - left) * kTieRise, kTieMinHeight, kTieMaxHeight);
+            curve({left, y}, {right, y}, direction * height, defaults_.tieMidpointThickness,
+                  defaults_.tieEndpointThickness, Role::Tie);
+        }
+        previous.clear();
+        if (chord.rest) {
+            return;
+        }
+        const double dots = dotsWidth(chord.duration.dots());
+        for (const Head& head : chord.heads) {
+            previous.push_back(
+                TieStart{.step = head.step,
+                         .right = chord.x + head.dx + metrics(head.glyph).box.northEast.x + dots});
+        }
+    }
+
+    // Staccato and accents on the notehead side of the chord, the staccato
+    // dot in a space when inside the staff.
+    void articulations(const Chord& chord) {
+        if (chord.rest || chord.heads.empty()) {
+            return;
+        }
+        bool staccato = false;
+        core::Accent accent = core::Accent::None;
+        for (const Head& head : chord.heads) {
+            staccato = staccato || head.note->effects.staccato;
+            accent = std::max(accent, head.note->effects.accent);
+        }
+        if (!staccato && accent == core::Accent::None) {
+            return;
+        }
+        const bool above = !chord.stemUp;
+        const double direction = above ? -1.0 : 1.0;
+        const Head& outer = above ? chord.heads.front() : chord.heads.back();
+        const BoundingBox& head = metrics(outer.glyph).box;
+        const double centre = chord.x + outer.dx + (head.southWest.x + head.northEast.x) / 2;
+        double edge = yOf(outer.step) + direction * (0.5 + kArticulationGap);
+        if (staccato) {
+            int target = outer.step + (above ? -2 : 2);
+            if (target % 2 == 0 && target >= 0 && target <= 2 * kMiddleStep) {
+                target += above ? -1 : 1;
+            }
+            const Glyph dot = above ? Glyph::ArticStaccatoAbove : Glyph::ArticStaccatoBelow;
+            glyphCentred(dot, centre, yOf(target), Role::Articulation);
+            edge = yOf(target) + direction * (metrics(dot).box.height() / 2 + kArticulationGap);
+        }
+        if (accent == core::Accent::None) {
+            return;
+        }
+        const Glyph mark = accent == core::Accent::Marcato
+                               ? (above ? Glyph::ArticMarcatoAbove : Glyph::ArticMarcatoBelow)
+                               : (above ? Glyph::ArticAccentAbove : Glyph::ArticAccentBelow);
+        const BoundingBox& box = metrics(mark).box;
+        glyph(mark, centre - (box.southWest.x + box.northEast.x) / 2,
+              edge + (above ? box.southWest.y : box.northEast.y), Role::Articulation);
+    }
+
+    // Palm mutes, let ring, vibrato and pick strokes of the measure's columns.
+    void markTechniques(std::span<const ColumnPosition> positions, double barline) {
+        if (columns_.empty()) {
+            lanes_.column({}, barline, barline, measure_);
+            return;
+        }
+        const double centre = widthOf(Glyph::NoteheadBlack) / 2;
+        for (const Column& column : columns_) {
+            ColumnTechniques marks;
+            for (const std::size_t c : column.chords) {
+                if (!chords_[c].rest) {
+                    addTechniques(marks, *chords_[c].beat);
+                }
+            }
+            const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
+            lanes_.column(marks, column.x + centre, end, measure_);
+        }
+    }
+
+    struct TieStart {
+        int step = 0;
+        double right = 0.0; // after the notehead and its dots
+    };
+
     const core::Song& song_;
     const core::Staff& staff_;
-    const EngravingFont& font_;
-    const EngravingDefaults& defaults_;
     Clef clef_;
     bool percussion_;
     int offset_;
-    DisplayList list_;
-    std::size_t measure_ = 0;
+    bool techniques_;
+    TechniqueLanes lanes_;
+    std::size_t measureIndex_ = 0;
     std::size_t voiceCount_ = 0;
+    std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
     std::vector<std::vector<std::size_t>> beamGroups_;
 };
 
-} // namespace
-
-DisplayList layoutStaff(const core::Song& song, std::size_t track, std::size_t staff,
-                        const EngravingFont& font, const StaffLayoutOptions& options) {
-    const core::Track& part = song.track(track);
-    const core::Staff& lines = part.staff(staff);
-    if (options.firstMeasure >= song.measureCount()) {
-        throw std::out_of_range("layoutStaff: no measure " + std::to_string(options.firstMeasure));
-    }
-    return StaffLayouter(song, part, lines, font).run(options.firstMeasure, options.measureCount);
+double StandardWriter::header(std::size_t first) {
+    return headerAt(first);
 }
 
-} // namespace elara::notation
+double StandardWriter::changes(std::size_t m, double x) {
+    return changesAt(m, x);
+}
+
+void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
+    read(m);
+    columnInk(ink);
+}
+
+void StandardWriter::draw(std::span<const ColumnPosition> positions, double start, double barline) {
+    drawMeasure(positions, start, barline);
+}
+
+} // namespace
+
+std::unique_ptr<StaffWriter> makeStandardWriter(const core::Song& song, std::size_t track,
+                                                std::size_t staff, const EngravingFont& font,
+                                                bool techniques) {
+    const core::Track& part = song.track(track);
+    return std::make_unique<StandardWriter>(song, part, part.staff(staff), font, techniques);
+}
+
+} // namespace elara::notation::detail

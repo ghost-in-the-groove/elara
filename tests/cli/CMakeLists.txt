@@ -334,6 +334,32 @@ add_test(NAME cli.render_rejects_missing_track
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --track 3)
 set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
 
+# Tablature of a fretted staff, alone or under its standard notation.
+add_test(NAME cli.render_tab
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view tab)
+set_tests_properties(cli.render_tab PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,.*\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"y\":0,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
+
+add_test(NAME cli.render_both
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
+set_tests_properties(cli.render_both PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2},\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"y\":0,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"y\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+
+add_test(NAME cli.render_tab_svg
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
+          --svg "${CMAKE_CURRENT_BINARY_DIR}/guitar-techniques-tab.svg")
+set_tests_properties(cli.render_tab_svg PROPERTIES FIXTURES_SETUP cli_rendered_tab
+  PASS_REGULAR_EXPRESSION "\\(both\\), measures 0 to 2 of 3")
+
+add_test(NAME cli.render_tab_svg_content
+  COMMAND ${CMAKE_COMMAND} -E cat "${CMAKE_CURRENT_BINARY_DIR}/guitar-techniques-tab.svg")
+set_tests_properties(cli.render_tab_svg_content PROPERTIES FIXTURES_REQUIRED cli_rendered_tab
+  PASS_REGULAR_EXPRESSION "<rect class=\"knockout\"[^>]*fill=\"white\".*<text class=\"t fretNumber\"[^>]*text-anchor=\"middle\"[^>]*>0</text>.*<path class=\"tie\".*<polygon class=\"bend\"")
+
+add_test(NAME cli.render_rejects_tab_without_tuning
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --view tab)
+set_tests_properties(cli.render_rejects_tab_without_tuning PROPERTIES WILL_FAIL TRUE)
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot
