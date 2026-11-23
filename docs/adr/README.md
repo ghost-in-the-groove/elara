@@ -35,6 +35,7 @@ one that replaces them.
 | [0029](0029-microphone-input.md) | Microphone input for the tuner | Accepted |
 | [0030](0030-translations.md) | Translations of the user interface | Accepted |
 | [0031](0031-editing-in-the-app.md) | Editing the song in the app | Accepted |
+| [0032](0032-keyboard-entry-in-the-app.md) | Keyboard entry in the app | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
@@ -42,6 +43,7 @@ one that replaces them.
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
 | [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
+| [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
 
 ## Template
 

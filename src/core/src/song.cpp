@@ -30,6 +30,14 @@ Staff::Staff(Clef clef, std::optional<Tuning> tuning, int capo)
     }
 }
 
+void Staff::setTuning(std::optional<Tuning> tuning, int capo) {
+    if (capo < 0 || capo > Tuning::kMaxFret) {
+        throw std::invalid_argument("Staff: capo outside the neck");
+    }
+    tuning_ = std::move(tuning);
+    capo_ = capo;
+}
+
 Measure& Staff::measure(std::size_t index) {
     return checkedAt(measures_, index, "Staff: no such measure");
 }

@@ -190,6 +190,12 @@ std::string displayListJson(const notation::DisplayList& list) {
                             i == 0 ? "" : ",", box.index, jsonNumber(box.x), jsonNumber(box.width),
                             jsonNumber(box.y), jsonNumber(box.height));
     }
+    json += R"(],"columns":[)";
+    for (std::size_t i = 0; i < list.columns.size(); ++i) {
+        const auto& column = list.columns[i];
+        json += std::format(R"({}{{"measure":{},"start":"{}","x":{}}})", i == 0 ? "" : ",",
+                            column.measure, column.start.toString(), jsonNumber(column.x));
+    }
     json += R"(],"glyphs":[)";
     for (std::size_t i = 0; i < list.glyphs.size(); ++i) {
         const auto& item = list.glyphs[i];

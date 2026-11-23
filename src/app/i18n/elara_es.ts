@@ -9,6 +9,53 @@
     </message>
 </context>
 <context>
+    <name>EntryBar</name>
+    <message>
+        <source>Whole note</source>
+        <translation>Redonda</translation>
+    </message>
+    <message>
+        <source>Half note</source>
+        <translation>Blanca</translation>
+    </message>
+    <message>
+        <source>Quarter note</source>
+        <translation>Negra</translation>
+    </message>
+    <message>
+        <source>Eighth note</source>
+        <translation>Corchea</translation>
+    </message>
+    <message>
+        <source>16th note</source>
+        <translation>Semicorchea</translation>
+    </message>
+    <message>
+        <source>32nd note</source>
+        <translation>Fusa</translation>
+    </message>
+    <message>
+        <source>64th note</source>
+        <translation>Semifusa</translation>
+    </message>
+    <message>
+        <source>%1 (+ longer, - shorter)</source>
+        <translation>%1 (+ más larga, - más corta)</translation>
+    </message>
+    <message>
+        <source>Dotted (.)</source>
+        <translation>Con puntillo (.)</translation>
+    </message>
+    <message>
+        <source>Insert a rest (Insert)</source>
+        <translation>Insertar un silencio (Insert)</translation>
+    </message>
+    <message>
+        <source>Delete the note (Delete); the beat with Ctrl+Delete</source>
+        <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
+    </message>
+</context>
+<context>
     <name>Main</name>
     <message>
         <source>%1 — Elara</source>
@@ -572,6 +619,26 @@
         <source>Change key signature</source>
         <translation>Cambiar la armadura</translation>
     </message>
+    <message>
+        <source>Enter note</source>
+        <translation>Escribir nota</translation>
+    </message>
+    <message>
+        <source>Change duration</source>
+        <translation>Cambiar duración</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Borrar</translation>
+    </message>
+    <message>
+        <source>Delete beat</source>
+        <translation>Borrar tiempo</translation>
+    </message>
+    <message>
+        <source>Insert rest</source>
+        <translation>Insertar silencio</translation>
+    </message>
     <message numerus="yes">
         <source>%n strings</source>
         <translation>
@@ -637,6 +704,30 @@
     <message>
         <source>Could not save %1: %2</source>
         <translation>No se pudo guardar %1: %2</translation>
+    </message>
+    <message>
+        <source>Measure %1</source>
+        <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>New beat</source>
+        <translation>Tiempo nuevo</translation>
+    </message>
+    <message>
+        <source>Beat %1</source>
+        <translation>Tiempo %1</translation>
+    </message>
+    <message>
+        <source>String %1</source>
+        <translation>Cuerda %1</translation>
+    </message>
+    <message>
+        <source>Fret %1</source>
+        <translation>Traste %1</translation>
+    </message>
+    <message>
+        <source>Frets are typed on a track with strings.</source>
+        <translation>Los trastes se escriben en una pista con cuerdas.</translation>
     </message>
 </context>
 <context>

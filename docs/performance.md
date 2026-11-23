@@ -97,6 +97,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | the synthesizer able to glide (plucked, piano, sawtooth, drums), and the 10 s offline render | 5.2, 8.3, 6.1, 4.8 ms; 24.6 ms | a string reads its delay line from a moving position, so its length can change while it rings: no measurable cost. One thread: 111 ms |
 | 2026-11-23 | detect the pitch of one tuner window (48 kHz, 30 to 1600 Hz, 3201 samples) of a guitar's low E | 1.61 ms | first version (ADR-0028): the YIN difference function at every lag up to 1601, one multiply-add per sample and lag |
 | 2026-11-23 | the same; a high E; a window of noise | 0.39 ms, 0.10 ms, 1.07 ms | lags past the first dip under the threshold are no longer computed (YIN never looks at them), and each difference is four independent sums. Noise has no dip, so every lag is still computed: the worst case, 3 % of one core for a window every 33 ms |
+| 2026-11-23 | find the keyboard entry caret on the 21 A4 pages of one 500-measure track (last measure), and the caret a click on a page picks | 0.37 µs, 1.5 µs | first version (ADR-0032): a linear search of each page's measure boxes and columns; nothing to gain beside a 3.5 ms relayout |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
