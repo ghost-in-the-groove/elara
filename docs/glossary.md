@@ -80,10 +80,13 @@ base speaks one vocabulary. American terms follow MusicXML.
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
-| dinámica | dynamic | `Dynamic` | pp ... ff |
+| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()` | ppp ... fff; set at the caret, it holds until the next change (ADR-0047) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
-| metrónomo | metronome | `Metronome` | |
+| metrónomo | metronome | `SequenceOptions::metronome` | A click on every beat, a high wood block on the first; events on `Sequence::metronomeTrack()` (ADR-0024) |
+| pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
+| compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |
+| velocidad de reproducción | playback speed | `SequenceOptions::speed` | 0.25 to 2 times every written tempo (ADR-0024) |
 | bucle A-B | A-B loop | `LoopRange` | |
 | afinador | tuner | `Tuner`, `PitchDetector`, `tunerReading()` | YIN pitch detection; the nearest note, its cents and the nearest open string (ADR-0028); smoothed readings from the audio input (ADR-0029) |
 | banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |

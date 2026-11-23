@@ -461,6 +461,125 @@ TEST_CASE("Tablature layout: techniques go above the notation without tablature"
     CHECK(marks[0].origin.y < both.staves[1].y);
 }
 
+TEST_CASE("Tablature layout: rhythm under the tablature without notation", "[notation][tab]") {
+    constexpr double kBottomLine = 7.5;
+    const auto stemsOf = [](const DisplayList& list) {
+        auto found = byRole(list.lines, Role::Stem);
+        std::ranges::stable_sort(found, {}, [](const LineItem& line) { return line.from.x; });
+        return found;
+    };
+    const auto low = [](const LineItem& line) {
+        return std::max(line.from.y, line.to.y);
+    };
+    const auto high = [](const LineItem& line) {
+        return std::min(line.from.y, line.to.y);
+    };
+    const auto glyphTop = [](const GlyphItem& item) {
+        return item.origin.y - bravura().metrics(item.glyph).box.northEast.y;
+    };
+
+    SECTION("stems under the fret numbers, beams for eighths, a shorter stem for a half") {
+        const Song song = guitar({{play(1, 0), play(2, 1, NoteValue::Eighth),
+                                   play(3, 2, NoteValue::Eighth), play(1, 3, NoteValue::Half)}});
+        const DisplayList list = tab(song);
+        const auto stems = stemsOf(list);
+        const auto frets = texts(list, Role::FretNumber);
+        REQUIRE(stems.size() == 4);
+        REQUIRE(frets.size() == 4);
+        for (std::size_t i = 0; i < stems.size(); ++i) {
+            CHECK(stems[i].from.x == stems[i].to.x);
+            CHECK_THAT(stems[i].from.x, WithinAbs(frets[i].origin.x, kEpsilon));
+            CHECK(high(stems[i]) > kBottomLine + 0.5);
+            CHECK_THAT(low(stems[i]), WithinAbs(low(stems[0]), kEpsilon));
+        }
+        CHECK(high(stems[3]) > high(stems[0]) + 0.5);
+        CHECK_THAT(high(stems[1]), WithinAbs(high(stems[0]), kEpsilon));
+        REQUIRE(list.beams.size() == 1);
+        const auto& beam = list.beams[0];
+        CHECK(beam.left.y == beam.right.y);
+        CHECK_THAT(beam.left.y + beam.thickness / 2, WithinAbs(low(stems[1]), kEpsilon));
+        CHECK(beam.left.x <= stems[1].from.x);
+        CHECK(beam.right.x >= stems[2].from.x);
+        CHECK(byRole(list.glyphs, Role::Flag).empty());
+        CHECK(list.bottom >= low(stems[0]) - kEpsilon);
+    }
+    SECTION("flags, dots, rests and whole notes") {
+        const Song song =
+            guitar({{play(1, 0, NoteValue::Eighth), rest(NoteValue::Eighth),
+                     Beat{.duration = Duration(NoteValue::Quarter, 1), .notes = {fretted(2, 1)}},
+                     play(3, 2, NoteValue::Eighth), rest()},
+                    {play(6, 3, NoteValue::Whole)}});
+        const DisplayList list = tab(song);
+        const auto stems = stemsOf(list);
+        REQUIRE(stems.size() == 3); // no stem for rests or the whole note
+        CHECK(list.beams.empty());
+        const auto flags = byRole(list.glyphs, Role::Flag);
+        REQUIRE(flags.size() == 2);
+        CHECK(flags[0].glyph == Glyph::Flag8thDown);
+        CHECK(flags[1].glyph == Glyph::Flag8thDown);
+        const auto dots = byRole(list.glyphs, Role::Dot);
+        REQUIRE(dots.size() == 1);
+        CHECK(dots[0].origin.x > stems[1].from.x);
+        CHECK(dots[0].origin.x < stems[2].from.x);
+        CHECK(dots[0].origin.y > high(stems[1]));
+        CHECK(dots[0].origin.y < low(stems[1]));
+        CHECK(byRole(list.glyphs, Role::Rest).size() == 2);
+    }
+    SECTION("sixteenths: a second beam, a beamlet after a dotted eighth") {
+        const Song song =
+            guitar({{play(1, 0, NoteValue::Sixteenth), play(1, 1, NoteValue::Sixteenth),
+                     play(1, 2, NoteValue::Sixteenth), play(1, 3, NoteValue::Sixteenth),
+                     Beat{.duration = Duration(NoteValue::Eighth, 1), .notes = {fretted(2, 1)}},
+                     play(2, 3, NoteValue::Sixteenth), rest(NoteValue::Half)}});
+        const DisplayList list = tab(song);
+        const auto stems = stemsOf(list);
+        REQUIRE(stems.size() == 6);
+        REQUIRE(list.beams.size() == 4);
+        auto beams = list.beams;
+        std::ranges::sort(beams, {}, [](const auto& beam) { return beam.left.x + beam.left.y; });
+        // Secondary beams lie above the primary ones, towards the staff.
+        const double primary =
+            std::ranges::max(list.beams, {}, [](const auto& b) { return b.left.y; }).left.y;
+        const auto secondary = std::ranges::count_if(
+            list.beams, [&](const auto& b) { return b.left.y < primary - kEpsilon; });
+        CHECK(secondary == 2);
+        const auto shortest = std::ranges::min(
+            list.beams, {}, [](const auto& beam) { return beam.right.x - beam.left.x; });
+        CHECK(shortest.right.x - shortest.left.x < stems[5].from.x - stems[4].from.x);
+    }
+    SECTION("a triplet: its number under the beam") {
+        const elara::core::Tuplet triplet(3, 2);
+        const auto eighth = [&](int string, int fret) {
+            return Beat{.duration = Duration(NoteValue::Eighth, 0, triplet),
+                        .notes = {fretted(string, fret)}};
+        };
+        const Song song = guitar(
+            {{eighth(1, 0), eighth(2, 1), eighth(3, 2), play(1, 3, NoteValue::Half), play(1, 0)}});
+        const DisplayList list = tab(song);
+        const auto numbers = byRole(list.glyphs, Role::Tuplet);
+        REQUIRE(numbers.size() == 1);
+        CHECK(numbers[0].glyph == Glyph::Tuplet3);
+        REQUIRE(list.beams.size() == 1);
+        const double beamBottom = list.beams[0].left.y + list.beams[0].thickness / 2;
+        CHECK(glyphTop(numbers[0]) > beamBottom + 0.25);
+        CHECK(glyphTop(numbers[0]) < beamBottom + 1.0);
+        CHECK(byRole(list.lines, Role::Tuplet).empty());
+    }
+    SECTION("under standard notation the tablature has no rhythm") {
+        const Song song = guitar({{play(1, 0), play(2, 1, NoteValue::Eighth),
+                                   play(3, 2, NoteValue::Eighth), play(1, 3, NoteValue::Half)}});
+        const DisplayList list = notationAndTab(song);
+        REQUIRE(list.staves.size() == 2);
+        const double tabY = list.staves[1].y;
+        const auto stems = byRole(list.lines, Role::Stem);
+        CHECK(stems.size() == 4);
+        for (const LineItem& stem : stems) {
+            CHECK(std::max(stem.from.y, stem.to.y) < tabY);
+        }
+        CHECK(list.beams.size() == 1);
+    }
+}
+
 TEST_CASE("Tablature layout: rejects what it cannot show", "[notation][tab]") {
     Song song = guitar({{play(1, 0)}});
     song.addTrack(Track("Flute", Instrument{.name = "Flute"}, {Staff(Clef::Treble)}));

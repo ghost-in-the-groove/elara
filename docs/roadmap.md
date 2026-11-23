@@ -51,6 +51,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
+- [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [ ] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being
         painted again
@@ -83,7 +84,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
+  - [x] Dynamics at the caret, holding until the next change; new notes take
+        the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
+  - [x] Measures at the caret in the app: insert before or after, delete, time
+        and key signatures from that measure on (ADR-0033)
 - [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
   - [ ] Tuning presets and capo in the song panel

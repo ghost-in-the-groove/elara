@@ -33,6 +33,7 @@ elara_add_unit_tests(core
     core/test_entry.cpp
     core/test_drum_entry.cpp
     core/test_entry_effects.cpp
+    core/test_entry_dynamics.cpp
     core/test_validation.cpp
     core/test_performance.cpp
     core/test_retune.cpp
@@ -102,18 +103,21 @@ if(TARGET elara)
   # The song panel open while the song is edited.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --song-pane "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
+  # The measure popup open at the caret while the measures are edited.
+  add_test(NAME app.smoke_measure
+    COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner app.smoke_song_pane
+    app.smoke_tuner app.smoke_song_pane app.smoke_measure
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 15 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 21 layouts\\)")
-  set_tests_properties(app.smoke_open_views PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 25 layouts\\)")
+  set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 22 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # A song of several pages: the notes typed on the first page leave the others

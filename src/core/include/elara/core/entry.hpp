@@ -3,6 +3,7 @@
 
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
+#include <elara/core/effects.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/song.hpp>
 
@@ -63,6 +64,7 @@ struct Entry {
 /// spelled in the measure's key. On a beat it replaces the note on that string,
 /// keeping its effects, or joins the chord (a rest becomes a note of the same
 /// duration); on the free slot it adds a beat of `duration`. The caret stays.
+/// A new note takes the dynamic in force at the caret (see dynamicAt()).
 /// Throws std::logic_error on a staff without a tuning and std::out_of_range for
 /// a fret off the neck.
 [[nodiscard]] Entry enterFret(const Song& song, const Caret& caret, int fret, Duration duration);
@@ -83,7 +85,8 @@ enum class PitchMode : std::uint8_t {
 /// highest note of the beat, within an octave (on a rest or the free slot it
 /// works as `Replace`). On a fretted staff the note goes on the caret's string
 /// when that string reaches it, otherwise on the nearest string that does (in a
-/// chord, one without a note), and the caret follows it. Throws
+/// chord, one without a note), and the caret follows it. The note takes the
+/// dynamic in force at the caret (see dynamicAt()). Throws
 /// std::logic_error on a percussion staff and std::out_of_range when the note
 /// leaves MIDI 0..127 or no string can play it.
 [[nodiscard]] Entry enterPitch(const Song& song, const Caret& caret, Step step, Duration duration,
@@ -115,8 +118,9 @@ enum class PitchMode : std::uint8_t {
 
 /// Drum entry (ADR-0035): toggles the kit piece of the caret's lane on its beat.
 /// Absent, it joins the beat's hits in lane order (a rest becomes a hit of the
-/// same duration; the free slot gets a beat of `duration`); present, it goes,
-/// leaving a rest when it was the last. The caret stays. Throws
+/// same duration; the free slot gets a beat of `duration`) at the dynamic in
+/// force there (see dynamicAt()); present, it goes, leaving a rest when it was
+/// the last. The caret stays. Throws
 /// std::logic_error on a staff that is not a percussion staff.
 [[nodiscard]] Entry toggleDrum(const Song& song, const Caret& caret, Duration duration);
 
@@ -149,5 +153,22 @@ enum class NoteEffect : std::uint8_t {
 /// staff without strings, and std::out_of_range for a natural harmonic at a
 /// fret without a node.
 [[nodiscard]] Entry toggleEffect(const Song& song, const Caret& caret, NoteEffect effect);
+
+/// The dynamic in force at the caret's beat (ADR-0047): that of the notes struck
+/// at the latest start no later than the beat's, over every voice of the staff
+/// and looking back through earlier measures (the loudest when several are
+/// struck together; tied notes only sustain); mf before the first note.
+[[nodiscard]] Dynamic dynamicAt(const Song& song, const Caret& caret);
+
+/// Sets a dynamic at the caret (ADR-0047), as one undo step ("Change dynamic"):
+/// the passage from the caret's beat to the next change of dynamic takes
+/// `dynamic`. The passage starts at the first start, from the beat's on, with
+/// struck notes (on a rest or the free slot, the notes after it), over every
+/// voice of the staff; it runs while the notes struck at each start have the
+/// loudest dynamic of that first one, through later measures. Every note struck
+/// in it changes, and a tied note with the note it continues, even past its
+/// end. The caret stays. Nothing changes when the passage already has the
+/// dynamic or no note follows the caret.
+[[nodiscard]] Entry setDynamic(const Song& song, const Caret& caret, Dynamic dynamic);
 
 } // namespace elara::core
