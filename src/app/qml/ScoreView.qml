@@ -98,6 +98,28 @@ Item {
         if (y !== list.contentY || x !== list.contentX)
             scrollTo(y, x);
     }
+    /// Where the caret's bottom left is in the view.
+    function caretPoint(): point {
+        const scale = unit * shownZoom;
+        const caret = document.caretRect;
+        const page = document.caretPage;
+        const x = list.originX + (list.contentWidth - pageWidth) / 2 + caret.x * scale - list.contentX;
+        const y = list.originY + page * (pageHeight + gap) + (caret.y + caret.height) * scale
+                  - list.contentY;
+        return Qt.point(x, y);
+    }
+    /// Opens the measure popup near (x, y), inside the view.
+    function openMeasurePopup(x: real, y: real) {
+        measurePopup.x = Math.max(8, Math.min(width - measurePopup.width - 8, x));
+        measurePopup.y = Math.max(8, Math.min(height - measurePopup.implicitHeight - 8, y));
+        measurePopup.open();
+    }
+    function openMeasurePopupAtCaret() {
+        if (document.caretPage < 0)
+            return;
+        const at = caretPoint();
+        openMeasurePopup(at.x - 24, at.y + 12);
+    }
     function scrollTo(y: real, x: real) {
         scrollY.stop();
         scrollX.stop();
@@ -115,7 +137,17 @@ Item {
         const alt = (event.modifiers & Qt.AltModifier) !== 0;
         if (alt || document.pageCount === 0)
             return;
-        if (!control && event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
+        const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+        if (control && event.key === Qt.Key_M) {
+            openMeasurePopupAtCaret();
+            event.accepted = true;
+            return;
+        }
+        if (control && event.key === Qt.Key_Insert) {
+            document.insertMeasure(false);
+        } else if (control && shift && event.key === Qt.Key_Delete) {
+            document.removeMeasure();
+        } else if (!control && event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
             document.typeDigit(event.key - Qt.Key_0);
         } else if (event.key === Qt.Key_Right) {
             document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
@@ -335,6 +367,21 @@ Item {
                     }
                 }
 
+                // A right click opens the measure under it.
+                TapHandler {
+                    acceptedButtons: Qt.RightButton
+                    onTapped: eventPoint => {
+                        const scale = root.unit * root.shownZoom;
+                        root.forceActiveFocus();
+                        if (root.document.placeCaret(sheet.index, eventPoint.position.x / scale,
+                                                     eventPoint.position.y / scale)) {
+                            const at = paper.mapToItem(root, eventPoint.position.x,
+                                                       eventPoint.position.y);
+                            root.openMeasurePopup(at.x + 8, at.y + 8);
+                        }
+                    }
+                }
+
                 // A click puts the caret on the beat and string under it and
                 // moves playback to that note; a drag still scrolls. One
                 // handler for both, so neither takes the click from the other.
@@ -356,6 +403,14 @@ Item {
         }
     }
 
+    MeasurePopup {
+        id: measurePopup
+
+        document: root.document
+        dark: root.dark
+        onClosed: root.forceActiveFocus()
+    }
+
     EntryBar {
         id: entryBar
 
@@ -365,6 +420,7 @@ Item {
         y: shown ? parent.height - height - 18 : parent.height + 8
         document: root.document
         dark: root.dark
+        onMeasureRequested: root.openMeasurePopupAtCaret()
         opacity: shown ? 1.0 : 0.0
         visible: opacity > 0
 

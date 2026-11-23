@@ -54,6 +54,10 @@
         <source>Delete the note (Delete); the beat with Ctrl+Delete</source>
         <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
     </message>
+    <message>
+        <source>Measure: signatures, insert, delete (Ctrl+M)</source>
+        <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
+    </message>
 </context>
 <context>
     <name>Main</name>
@@ -214,6 +218,41 @@
     </message>
 </context>
 <context>
+    <name>MeasurePopup</name>
+    <message>
+        <source>Measure %1</source>
+        <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+    <message>
+        <source>From this measure until the next change.</source>
+        <translation>Desde este compás hasta el siguiente cambio.</translation>
+    </message>
+    <message>
+        <source>Insert before</source>
+        <translation>Insertar antes</translation>
+    </message>
+    <message>
+        <source>An empty measure before this one (Ctrl+Insert)</source>
+        <translation>Un compás vacío antes de este (Ctrl+Insert)</translation>
+    </message>
+    <message>
+        <source>Insert after</source>
+        <translation>Insertar después</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Borrar</translation>
+    </message>
+    <message>
+        <source>Delete this measure from every track (Ctrl+Shift+Delete)</source>
+        <translation>Borrar este compás de todas las pistas (Ctrl+Mayús+Supr)</translation>
+    </message>
+</context>
+<context>
     <name>QObject</name>
     <message>
         <source>The music font is missing.</source>
@@ -226,6 +265,25 @@
     <message>
         <source>The file has no music.</source>
         <translation>El archivo no contiene música.</translation>
+    </message>
+</context>
+<context>
+    <name>SignatureFields</name>
+    <message>
+        <source>Time signature</source>
+        <translation>Compás</translation>
+    </message>
+    <message>
+        <source>Key signature</source>
+        <translation>Armadura</translation>
+    </message>
+    <message>
+        <source>Major</source>
+        <translation>Mayor</translation>
+    </message>
+    <message>
+        <source>Minor</source>
+        <translation>Menor</translation>
     </message>
 </context>
 <context>
@@ -265,22 +323,6 @@
     <message>
         <source>Measures</source>
         <translation>Compases</translation>
-    </message>
-    <message>
-        <source>Time signature</source>
-        <translation>Compás</translation>
-    </message>
-    <message>
-        <source>Key signature</source>
-        <translation>Armadura</translation>
-    </message>
-    <message>
-        <source>Major</source>
-        <translation>Mayor</translation>
-    </message>
-    <message>
-        <source>Minor</source>
-        <translation>Menor</translation>
     </message>
     <message>
         <source>From the first measure until the next change.</source>
@@ -771,6 +813,10 @@
     <message>
         <source>Open the song and tracks panel at start.</source>
         <translation>Abrir el panel de canción y pistas al iniciar.</translation>
+    </message>
+    <message>
+        <source>Open the caret&apos;s measure at start.</source>
+        <translation>Abrir el compás del cursor al iniciar.</translation>
     </message>
     <message>
         <source>Show the interface in this language (en, es).</source>
