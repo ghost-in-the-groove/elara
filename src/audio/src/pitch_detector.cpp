@@ -26,17 +26,17 @@ double squaredDifference(const float* samples, std::size_t window, std::size_t l
     double s3 = 0.0;
     std::size_t j = 0;
     for (; j + 4 <= window; j += 4) {
-        const double d0 = static_cast<double>(samples[j]) - later[j];
-        const double d1 = static_cast<double>(samples[j + 1]) - later[j + 1];
-        const double d2 = static_cast<double>(samples[j + 2]) - later[j + 2];
-        const double d3 = static_cast<double>(samples[j + 3]) - later[j + 3];
+        const double d0 = static_cast<double>(samples[j]) - static_cast<double>(later[j]);
+        const double d1 = static_cast<double>(samples[j + 1]) - static_cast<double>(later[j + 1]);
+        const double d2 = static_cast<double>(samples[j + 2]) - static_cast<double>(later[j + 2]);
+        const double d3 = static_cast<double>(samples[j + 3]) - static_cast<double>(later[j + 3]);
         s0 += d0 * d0;
         s1 += d1 * d1;
         s2 += d2 * d2;
         s3 += d3 * d3;
     }
     for (; j < window; ++j) {
-        const double d = static_cast<double>(samples[j]) - later[j];
+        const double d = static_cast<double>(samples[j]) - static_cast<double>(later[j]);
         s0 += d * d;
     }
     return (s0 + s1) + (s2 + s3);
@@ -65,7 +65,8 @@ std::optional<PitchEstimate> PitchDetector::detect(std::span<const float> sample
     }
     double energy = 0.0;
     for (std::size_t j = 0; j < window_; ++j) {
-        energy += static_cast<double>(samples[j]) * samples[j];
+        const auto sample = static_cast<double>(samples[j]);
+        energy += sample * sample;
     }
     if (energy / static_cast<double>(window_) < kSilence) {
         return std::nullopt;

@@ -89,7 +89,7 @@ TEST_CASE("A WAV file written by Elara reads back", "[audio][wav]") {
     CHECK(decoded->frames() == 3);
     REQUIRE(decoded->samples.size() == samples.size());
     for (std::size_t i = 0; i < samples.size(); ++i) {
-        CHECK_THAT(decoded->samples[i], WithinAbs(samples[i], 1.0 / 32767.0));
+        CHECK_THAT(decoded->samples[i], WithinAbs(static_cast<double>(samples[i]), 1.0 / 32767.0));
     }
     CHECK(decoded->mono().size() == 3);
     CHECK_THAT(decoded->mono()[2], WithinAbs(-0.375, 1e-4)); // (-1 + 0.25) / 2
