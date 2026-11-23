@@ -557,16 +557,13 @@ void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
         }
     }
 
-    // A free voice, else the quietest released one, else the oldest.
-    Voice* chosen = nullptr;
+    // A free voice, else the quietest released one, else the oldest. There is
+    // always at least one voice (see the constructor).
+    Voice* chosen = &voices_.front();
     for (Voice& voice : voices_) {
         if (voice.stage == Stage::Off) {
             chosen = &voice;
             break;
-        }
-        if (chosen == nullptr) {
-            chosen = &voice;
-            continue;
         }
         const bool released = voice.stage == Stage::Released;
         const bool chosenReleased = chosen->stage == Stage::Released;

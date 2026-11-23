@@ -20,6 +20,12 @@ function(_elara_warning_flags out_var)
       -Wnull-dereference -Wdouble-promotion -Wimplicit-fallthrough)
     if(ELARA_WARNINGS_AS_ERRORS)
       list(APPEND flags -Werror)
+      if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        # GCC finds these only when optimising (never in the dev preset), from
+        # an analysis that also flags paths inside libstdc++ and loops it
+        # cannot prove run: shown, but not fatal to a release build.
+        list(APPEND flags -Wno-error=null-dereference)
+      endif()
     endif()
   endif()
   set(${out_var} ${flags} PARENT_SCOPE)
