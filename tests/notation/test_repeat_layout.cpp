@@ -156,7 +156,7 @@ TEST_CASE("Repeat layout: repeat barlines with dots in the middle spaces", "[not
         CHECK(dots[i].glyph == Glyph::RepeatDot);
         CHECK(dots[i].measure == 1 + i / 2);
         CHECK_THAT(left(dots[i]), WithinAbs(left(dots[i + 1]), kEpsilon));
-        const auto [high, low] = std::minmax(centreY(dots[i]), centreY(dots[i + 1]));
+        const auto [high, low] = std::minmax({centreY(dots[i]), centreY(dots[i + 1])});
         CHECK_THAT(high, WithinAbs(1.5, kEpsilon)); // the second space from the top
         CHECK_THAT(low, WithinAbs(2.5, kEpsilon));  // the third
     }
