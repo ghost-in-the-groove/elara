@@ -103,11 +103,11 @@ bool earlier(const NoteEvent& a, const NoteEvent& b) {
 // indices into `notes` in start order): a key struck while it sounds is
 // released first, unless it was struck at that very time, and released when
 // its last note ends (`ends`: a struck note's end, or that of the last note
-// joined to it). Notes that are not struck have no events. Releases at a time
-// come before attacks. Ordered as events() are.
+// joined to it; empty when no note is joined). Notes that are not struck have
+// no events. Releases at a time come before attacks. Ordered as events() are.
 std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
-                                   const std::vector<double>& ends,
-                                   std::span<const std::size_t> mine, std::size_t track) {
+                                   std::span<const double> ends, std::span<const std::size_t> mine,
+                                   std::size_t track) {
     struct Release {
         double time = 0.0;
         int key = 60;
@@ -116,7 +116,8 @@ std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
     releases.reserve(mine.size());
     for (const std::size_t i : mine) {
         if (notes[i].struck && notes[i].key >= 0 && notes[i].key < kKeys) {
-            releases.push_back({.time = ends[i], .key = notes[i].key});
+            releases.push_back(
+                {.time = ends.empty() ? notes[i].end : ends[i], .key = notes[i].key});
         }
     }
     std::ranges::sort(releases, {}, &Release::time);
@@ -337,16 +338,12 @@ int harmonicKey(const core::Note& note, int key) {
 
 Articulation articulationOf(const core::Song& song, const core::SoundingNote& sounding) {
     const core::Track& track = song.track(sounding.track);
-    const core::Note& note = track.staff(sounding.staff)
-                                 .measure(sounding.measure)
-                                 .voices[sounding.voice]
-                                 .beats[sounding.beat]
-                                 .notes[sounding.note];
-    const core::NoteEffects& effects = note.effects;
     const core::Beat& beat = track.staff(sounding.staff)
                                  .measure(sounding.measure)
                                  .voices[sounding.voice]
                                  .beats[sounding.beat];
+    const core::Note& note = beat.notes[sounding.note];
+    const core::NoteEffects& effects = note.effects;
     Articulation result{.key = sounding.key,
                         .velocity = sounding.velocity,
                         .staccato = effects.staccato,
@@ -484,9 +481,13 @@ Sequence::Sequence(const core::Song& song) {
             moves = moves || articulation.moves;
         }
     }
-    std::vector<double> writtenEnds(notes_.size());
-    for (std::size_t p = 0; p < notes_.size(); ++p) {
-        writtenEnds[p] = notes_[p].end;
+    // Each note's written end, before let ring: the span of its pitch line.
+    std::vector<double> writtenEnds;
+    if (moves) {
+        writtenEnds.reserve(notes_.size());
+        for (const PlayedNote& note : notes_) {
+            writtenEnds.push_back(note.end);
+        }
     }
 
     // Let ring: a note rings on until its string (without a fret position,
@@ -519,10 +520,15 @@ Sequence::Sequence(const core::Song& song) {
     // Hammer-ons, pull-offs and legato slides join a note to the previous
     // note on its string, which keeps sounding; shift and legato slides go
     // to the next note on the string (ADR-0023).
-    std::vector<std::size_t> head(notes_.size()); // the struck note each note sounds on
-    std::iota(head.begin(), head.end(), std::size_t{0});
-    std::vector<int> slideTo(notes_.size(), -1); // the key a slide out goes to
+    // Without moving notes none is joined, slides go nowhere and every note
+    // ends at its own end, so these stay empty.
+    std::vector<std::size_t> head; // the struck note each note sounds on
+    std::vector<int> slideTo;      // the key a slide out goes to
+    std::vector<double> ends;      // a struck note's end, or its last joined note's
     if (moves) {
+        head.resize(notes_.size());
+        std::iota(head.begin(), head.end(), std::size_t{0});
+        slideTo.assign(notes_.size(), -1);
         std::unordered_map<std::uint64_t, std::size_t> previous;
         for (std::size_t p = 0; p < notes_.size(); ++p) {
             const Articulation& articulation = articulations[writtenAs[p]];
@@ -550,11 +556,11 @@ Sequence::Sequence(const core::Song& song) {
                 notes_[p].struck = false;
             }
         }
-    }
-    std::vector<double> ends(notes_.size()); // a struck note's end, or its last joined note's
-    for (std::size_t p = 0; p < notes_.size(); ++p) {
-        ends[p] = notes_[p].end;
-        ends[head[p]] = std::max(ends[head[p]], notes_[p].end);
+        ends.resize(notes_.size());
+        for (std::size_t p = 0; p < notes_.size(); ++p) {
+            ends[p] = notes_[p].end;
+            ends[head[p]] = std::max(ends[head[p]], notes_[p].end);
+        }
     }
 
     // The notes of each track, in order (a counting sort by track).

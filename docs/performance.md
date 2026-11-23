@@ -92,6 +92,9 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | sounding notes of the 20-track song | 10.7 ms | 16 ms before: each voice read on its own thread and the lists merged pairwise instead of one stable sort of every note. The sequencer starts from them: 26 ms, repeated 40 ms (2.8x and 3.3x the first version) |
 | 2026-11-23 | one second of 32 voices of the built-in synthesizer at 48 kHz: plucked strings, piano partials, sawtooths, drums | 5.2, 8.5, 6.0, 5.1 ms | first version (ADR-0018): 3.4 to 5.5 ns per voice and frame, so 20 tracks of 32 voices take under a fifth of one core. Keeping the four partials in local arrays so that they could be one vector operation made the piano slower (11.6 ms) and was dropped |
 | 2026-11-23 | render the first 10 s of the large song (20 guitar tracks) offline | 26.4 ms | tracks on every core, mixed in track order (ADR-0018): 380 times faster than real time. One thread: 113 ms |
+| 2026-11-23 | sequence the 20-track song, articulations applied (ADR-0022, ADR-0023) | 32.3 ms | each note's effects read from the score, and passes for let ring, legato and slides. 27.1 ms on the same machine just before. Repeated: 47 ms (41 before) |
+| 2026-11-23 | the same | 27.9 ms | the written note's beat and note kept in 32 bits, so a sounding note stays 80 bytes (sounding notes: 13.2 to 11.2 ms), and the legato and slide passes skipped when no note moves: 3 % over the sequencer without articulations. Repeated: 42 ms |
+| 2026-11-23 | the synthesizer able to glide (plucked, piano, sawtooth, drums), and the 10 s offline render | 5.2, 8.3, 6.1, 4.8 ms; 24.6 ms | a string reads its delay line from a moving position, so its length can change while it rings: no measurable cost. One thread: 111 ms |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
