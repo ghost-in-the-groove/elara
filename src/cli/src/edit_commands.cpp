@@ -440,6 +440,48 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (auto change = makeRetune(song, what)) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "sign") { // sign <m> <segno|coda|fine|to-coda|...>... | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        for (const SignName& sign : kSignNames) {
+            header.*sign.flag = false;
+        }
+        if (!step.has(2)) {
+            throw StepSyntaxError("sign: expected signs or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const auto found = std::ranges::find(kSignNames, step.word(i), &SignName::name);
+                if (found == kSignNames.end()) {
+                    throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
+                }
+                header.*found->flag = true;
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "jump") { // jump <m> <da-capo|dal-segno|dal-segno-segno|none> [al-...]
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        const auto to = std::ranges::find(kJumpToNames, step.word(2));
+        if (to == kJumpToNames.end()) {
+            throw StepSyntaxError(std::format("not a jump: {}", step.word(2)));
+        }
+        header.jump = static_cast<JumpTo>(to - kJumpToNames.begin());
+        header.jumpThen = JumpThen::End;
+        if (step.has(3)) {
+            const auto then = std::ranges::find(kJumpThenNames, step.word(3));
+            if (then == kJumpThenNames.end() || header.jump == JumpTo::None || step.has(4)) {
+                throw StepSyntaxError(std::format("jump: not al-fine, al-coda or "
+                                                  "al-double-coda: {}",
+                                                  step.word(3)));
+            }
+            header.jumpThen = static_cast<JumpThen>(then - kJumpThenNames.begin());
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
     } else {
         throw StepSyntaxError(std::format("unknown step: {}", verb));
     }

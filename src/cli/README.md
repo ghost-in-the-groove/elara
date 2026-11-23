@@ -118,11 +118,18 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
 `paste <m> [track <t>] [insert]`,
 `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
-`tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`, `undo`,
-`redo`, `save`. A malformed step exits with 2, a step the song rejects
+`tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`,
+`sign <m> <segno|segno-segno|coda|double-coda|fine|to-coda|to-double-coda>...`
+or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
+[al-fine|al-coda|al-double-coda]`, `undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
+
+`sign` gives measure `m` exactly the signs and closing marks it lists (`none`
+clears them) and `jump` its jump, with what ends the music after it (ADR-0049).
+The measures of `edit` and `dump` list them as `"signs":["segno","to-coda"]`,
+`"jump":"dal-segno"` and `"jumpThen":"al-coda"`; `sequence` plays them.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an
