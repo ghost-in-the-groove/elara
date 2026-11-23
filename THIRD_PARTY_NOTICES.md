@@ -11,6 +11,8 @@ and be listed here before it is merged.
 | [Qt](https://www.qt.io) | 6.12.1 | LGPL-3.0 | User interface | Prebuilt kit (`scripts/install_qt.py`), linked dynamically |
 | [CLI11](https://github.com/CLIUtils/CLI11) | vcpkg baseline | BSD-3-Clause | `elara-cli` argument parsing | vcpkg |
 | [Catch2](https://github.com/catchorg/Catch2) | vcpkg baseline | BSL-1.0 | Tests only (not distributed) | vcpkg |
+| [yyjson](https://github.com/ibireme/yyjson) | 0.13.0 | MIT | JSON in the native format (`elara_io`) | vcpkg |
+| [miniz](https://github.com/richgel999/miniz) | 3.1.2 | MIT | Zip container of the native format (`elara_io`) | vcpkg |
 
 ## Planned (licence checked, not yet integrated)
 

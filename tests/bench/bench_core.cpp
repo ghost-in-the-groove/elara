@@ -8,6 +8,7 @@
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
 
+#include "bench_songs.hpp"
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
@@ -69,41 +70,12 @@ TEST_CASE("core benchmarks", "[benchmark][core]") {
     };
 }
 
-namespace {
-
-// A large score: 20 guitar tracks x 500 measures, eight eighth notes per measure,
-// a two-note chord on every beat (80 000 beats, 160 000 notes).
-elara::core::Song largeSong() {
-    using namespace elara::core;
-    Song song;
-    const auto* preset = findInstrumentPreset("electric-guitar");
-    for (int t = 0; t < 20; ++t) {
-        song.addTrack(Track::fromPreset(*preset));
-    }
-    song.appendMeasures(500);
-    for (std::size_t t = 0; t < song.trackCount(); ++t) {
-        Staff& staff = song.track(t).staff(0);
-        for (std::size_t m = 0; m < song.measureCount(); ++m) {
-            auto& beats = staff.measure(m).voices[0].beats;
-            beats.reserve(8);
-            for (int b = 0; b < 8; ++b) {
-                beats.push_back(
-                    Beat{.duration = Duration(NoteValue::Eighth),
-                         .notes = {staff.frettedNote(6, b % 5), staff.frettedNote(5, b % 5)}});
-            }
-        }
-    }
-    return song;
-}
-
-} // namespace
-
 TEST_CASE("song benchmarks", "[benchmark][core][song]") {
     BENCHMARK("build a 20-track x 500-measure song") {
-        return largeSong().measureCount();
+        return elara::bench::largeSong().measureCount();
     };
 
-    const elara::core::Song song = largeSong();
+    const elara::core::Song song = elara::bench::largeSong();
 
     BENCHMARK("copy the large song (snapshot)") {
         elara::core::Song copy = song;
@@ -141,7 +113,7 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
 
 TEST_CASE("edit benchmarks", "[benchmark][core][document]") {
     using namespace elara::core;
-    Document doc(largeSong());
+    Document doc(elara::bench::largeSong());
     const Measure edited = doc.song().track(7).staff(0).measure(250);
 
     // Each run applies an edit and undoes it, so the document is the same after

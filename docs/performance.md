@@ -45,5 +45,10 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | edit one measure of that song and undo | 0.60 µs | the command swaps the measure in and out (ADR-0005); most of the time is building the new measure |
 | 2026-11-23 | remove 100 measures from all 20 tracks and undo | 211 µs | 2000 measures and 100 headers moved out and back, nothing copied |
 | 2026-11-23 | remove a 500-measure track and undo | 0.31 µs | the track is moved into the command and back; a copy would take about 0.5 ms |
+| 2026-11-23 | write `song.json` of the 20-track song (7.9 MB of JSON) | 42.8 ms | yyjson document, then compact text (ADR-0006) |
+| 2026-11-23 | read that `song.json` back into a song | 35.3 ms | parsing is a small part; most is building the model and parsing pitches and durations |
+| 2026-11-23 | save the 20-track song as a `.elara` file (JSON + deflate) | 70.4 ms | 41 KB: the benchmark song repeats one pattern, real songs compress far less |
+| 2026-11-23 | open that `.elara` file | 51.3 ms | inflate + read; fast enough for open/save. If it ever shows, write tracks in parallel or emit JSON directly |
 
-`python scripts/elara.py bench -- "[memory]"` prints the size of the model types.
+`python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
+`-- "[io]"` prints the size of the large song as JSON and as a `.elara` file.

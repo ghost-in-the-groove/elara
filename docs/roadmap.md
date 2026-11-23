@@ -28,7 +28,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill
 - [x] Command pattern with undo/redo
-- [ ] Native format v1 (zip container + JSON), round-trip tests
+- [x] Native format v1 (zip container + JSON), round-trip tests
 - [ ] `elara-cli new`, `elara-cli dump --json` (model snapshot used by later tests)
 
 ## Milestone 2 - Importers (`elara_io`)

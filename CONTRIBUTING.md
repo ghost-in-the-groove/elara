@@ -39,7 +39,8 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
    | `src/core` | std | Qt, JUCE, other modules |
    | `src/audio` (`elara_audio`) | std, core | Qt, JUCE |
    | `src/audio/backend_juce` | std, core, audio, JUCE | Qt; JUCE in its public header |
-   | `src/io`, `src/notation` (future) | std, core | Qt, JUCE |
+   | `src/io` (`elara_io`) | std, core, miniz, yyjson | Qt, JUCE |
+   | `src/notation` (future) | std, core | Qt, JUCE |
    | `src/cli` | all modules but app | Qt, JUCE |
    | `src/app` | Qt, all modules | JUCE |
 
@@ -51,7 +52,7 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
    (Catch2 unit tests and/or CTest cases driving the CLI). UI changes must keep
    `app.smoke` passing (QML loads with zero warnings).
 5. **Tests first for behaviour.** Add or extend a test that fails, then make it pass.
-   Test names are prefixed by module (`core.`, `audio.`, `cli.`, `app.`).
+   Test names are prefixed by module (`core.`, `io.`, `audio.`, `cli.`, `app.`).
 6. **Licences.** Never copy code or assets from Guitar Pro, MuseScore or other
    projects unless the licence is compatible *and* recorded in
    `THIRD_PARTY_NOTICES.md`. File formats are implemented from public documentation.

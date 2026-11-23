@@ -26,6 +26,7 @@ include(ElaraDependencies)
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 add_subdirectory(src/core)
+add_subdirectory(src/io)
 add_subdirectory(src/audio)
 add_subdirectory(src/cli)
 if(ELARA_BUILD_APP)
