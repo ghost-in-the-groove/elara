@@ -50,7 +50,7 @@ target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURR
 elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp
   notation/test_page_layout.cpp
-  notation/test_tab_layout.cpp
+  notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
   LIBRARIES elara::notation)
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 

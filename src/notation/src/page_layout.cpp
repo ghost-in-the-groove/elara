@@ -47,10 +47,10 @@ struct Line {
 // The width of the system of measures [first, last) at `stretch`.
 double lineWidth(std::span<const MeasureWidth> widths, std::size_t first, std::size_t last,
                  double stretch) {
-    double width = widths[first].header + detail::kFirstNoteGap;
+    double width = widths[first].before(true) + detail::kFirstNoteGap;
     for (std::size_t m = first; m < last; ++m) {
         if (m > first) {
-            width += widths[m].changes + detail::kBarlineGap;
+            width += widths[m].before(false) + detail::kBarlineGap;
         }
         width += widths[m].width(stretch) + widths[m].barline;
     }
@@ -128,7 +128,8 @@ public:
 
 private:
     [[nodiscard]] Candidate start(std::size_t first) const {
-        const double fixed = widths_[first].header + detail::kFirstNoteGap - detail::kBarlineGap;
+        const double fixed =
+            widths_[first].before(true) + detail::kFirstNoteGap - detail::kBarlineGap;
         return Candidate{.room = first == 0 ? width_ - indent_ : width_,
                          .natural = fixed,
                          .tightest = fixed,
@@ -137,7 +138,7 @@ private:
 
     void add(Candidate& line, std::size_t first, std::size_t m) const {
         const double around =
-            (m > first ? widths_[m].changes : 0.0) + detail::kBarlineGap + widths_[m].barline;
+            (m > first ? widths_[m].before(false) : 0.0) + detail::kBarlineGap + widths_[m].barline;
         line.natural += natural_[m] + around;
         line.tightest += tightest_[m] + around;
         line.ideal += ideal_[m];

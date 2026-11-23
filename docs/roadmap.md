@@ -48,6 +48,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Horizontal spacing, beaming, stems, accidentals for one staff
 - [x] Tablature staff layout with effects notation
 - [x] Systems and pages: line breaking, justification, multi-track scores
+- [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [ ] Incremental relayout (only the systems an edit touches)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene

@@ -4,12 +4,14 @@
 #include <elara/core/fraction.hpp>
 #include <elara/core/parallel.hpp>
 #include <elara/core/signature.hpp>
+#include <elara/core/song.hpp>
 #include <elara/notation/staff_layout.hpp>
 
 #include "layout_common.hpp"
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <span>
@@ -32,6 +34,13 @@ constexpr double kMeasureNumberSize = 1.2;  // font size of a system's first mea
 constexpr double kMeasureNumberY = -2.0;    // its baseline, above the clef
 constexpr double kTrackNameSize = 1.6;      // font size of the track names of the first system
 constexpr double kTrackNameGap = 1.0;       // between a track name and its staves
+constexpr double kVoltaLowest = -3.0;       // the bracket of an alternate ending at least this high
+constexpr double kVoltaHook = 2.0;          // the length of its hooks
+constexpr double kVoltaInset = 0.2;         // between its hooks and the barlines
+constexpr double kVoltaLabelInset = 0.4;    // between its start hook and its numbers
+constexpr double kVoltaSize = 1.4;          // font size of its numbers and of repeat counts
+constexpr double kVoltaTextGap = 0.3;       // between the bracket and its numbers
+constexpr double kVoltaInkGap = 0.5;        // at least between its numbers and the staff's ink
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -127,6 +136,111 @@ void nameTracks(DisplayList& system, const core::Song& song, std::span<const Sta
     }
 }
 
+// How far a start repeat right after the barline before measure m reaches
+// back: over that barline's last line, which it replaces.
+double overlap(const core::Song& song, std::size_t m, const EngravingFont& font) {
+    return song.measureHeader(m - 1).repeatEnd() ? font.defaults().thickBarlineThickness
+                                                 : font.defaults().thinBarlineThickness;
+}
+
+// The numbers of an alternate ending: "1., 2.".
+std::string endingLabel(std::uint8_t endings) {
+    std::string label;
+    for (int time = 1; time <= core::MeasureHeader::kMaxEnding; ++time) {
+        if (((static_cast<unsigned>(endings) >> static_cast<unsigned>(time - 1)) & 1U) != 0) {
+            if (!label.empty()) {
+                label += ", ";
+            }
+            label += std::to_string(time) + ".";
+        }
+    }
+    return label;
+}
+
+// The brackets of alternate endings and the counts of repeats played more
+// than twice above the first staff of `system`, whose measures are
+// `measures`, closed by barlines ending at `barlineEnds`.
+void markRepeats(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
+                 std::span<const double> barlineEnds, const EngravingFont& font) {
+    const auto endingsOf = [&song](std::size_t m) {
+        return song.measureHeader(m).alternateEndings;
+    };
+    const bool marked = std::ranges::any_of(measures, [&song](const MeasureBox& box) {
+        const core::MeasureHeader& header = song.measureHeader(box.index);
+        return header.alternateEndings != 0 || header.repeatTimes > 2;
+    });
+    if (!marked) {
+        return;
+    }
+    // Every bracket of the system at one height, above the first staff's ink.
+    const double y =
+        std::min(kVoltaLowest, system.top - kVoltaInkGap -
+                                   (kTextAscent + kTextDescent) * kVoltaSize - kVoltaTextGap);
+    const double baseline = y + kVoltaTextGap + kTextAscent * kVoltaSize;
+    const double thickness = font.defaults().repeatEndingLineThickness;
+    const auto line = [&](Point from, Point to, std::size_t m) {
+        system.lines.push_back(LineItem{
+            .from = from, .to = to, .thickness = thickness, .role = Role::Volta, .measure = m});
+    };
+    const auto text = [&](std::string content, double x, TextAlign align, Role role,
+                          std::size_t m) {
+        TextItem item;
+        item.text = std::move(content);
+        item.origin = {x, baseline};
+        item.size = kVoltaSize;
+        item.align = align;
+        item.role = role;
+        item.measure = m;
+        system.texts.push_back(std::move(item));
+    };
+    // A run of measures with the same endings is one bracket. It has no start
+    // hook or numbers when it goes on from the system before, no end hook
+    // when it goes on into the next one or no end repeat closes it.
+    for (std::size_t i = 0; i < measures.size();) {
+        const std::size_t m = measures[i].index;
+        const std::uint8_t endings = endingsOf(m);
+        std::size_t end = i + 1;
+        while (end < measures.size() && endingsOf(measures[end].index) == endings) {
+            ++end;
+        }
+        if (endings != 0) {
+            const MeasureBox& from = measures[i];
+            const MeasureBox& to = measures[end - 1];
+            const bool continued = i == 0 && m > 0 && endingsOf(m - 1) == endings;
+            const bool goesOn = end == measures.size() && to.index + 1 < song.measureCount() &&
+                                endingsOf(to.index + 1) == endings;
+            // From the barline before it, over signature changes.
+            const double left =
+                continued ? from.x : (i > 0 ? barlineEnds[i - 1] : from.x) + kVoltaInset;
+            const double right = to.x + to.width - (goesOn ? 0.0 : kVoltaInset);
+            line({left, y}, {right, y}, m);
+            if (!continued) {
+                line({left, y}, {left, y + kVoltaHook}, m);
+                text(endingLabel(endings), left + kVoltaLabelInset, TextAlign::Left, Role::Volta,
+                     m);
+            }
+            if (!goesOn && song.measureHeader(to.index).repeatEnd()) {
+                line({right, y}, {right, y + kVoltaHook}, to.index);
+            }
+        }
+        i = end;
+    }
+    // "x3" over the end repeat, inside the end hook of an ending there.
+    for (std::size_t i = 0; i < measures.size(); ++i) {
+        const std::size_t m = measures[i].index;
+        const core::MeasureHeader& header = song.measureHeader(m);
+        if (header.repeatTimes <= 2) {
+            continue;
+        }
+        const bool hooked = header.alternateEndings != 0 &&
+                            (m + 1 == song.measureCount() || endingsOf(m + 1) != endingsOf(m));
+        const double x = hooked ? measures[i].x + measures[i].width - kVoltaInset - kVoltaLabelInset
+                                : barlineEnds[i];
+        text("x" + std::to_string(header.repeatTimes), x, TextAlign::Right, Role::Repeat, m);
+    }
+    system.top = std::min(system.top, y - thickness / 2);
+}
+
 // Measures [first, last) with one set of writers.
 void measureRange(const core::Song& song, std::span<const StaffSelection> staves,
                   const EngravingFont& font, std::size_t first, std::size_t last,
@@ -137,18 +251,28 @@ void measureRange(const core::Song& song, std::span<const StaffSelection> staves
     std::vector<ColumnInk> merged;
     for (std::size_t m = first; m < last; ++m) {
         MeasureWidth& width = widths[m - first];
+        const core::MeasureHeader& header = song.measureHeader(m);
         double emptyWidth = 0.0;
+        double opening = 0.0;
         for (std::size_t s = 0; s < writers.size(); ++s) {
             StaffWriter& writer = *writers[s];
             width.header = std::max(width.header, writer.header(m));
             if (m > 0) {
                 width.changes = std::max(width.changes, writer.changes(m, 0.0));
             }
+            if (header.repeatStart) {
+                opening = std::max(opening, writer.opening(m, 0.0));
+            }
             writer.collect(m, columns[s]);
             emptyWidth = std::max(emptyWidth, writer.emptyWidth());
             width.barline =
-                std::max(width.barline, writer.barline(m, 0.0, m + 1 == song.measureCount()));
+                std::max(width.barline,
+                         writer.barline(m, 0.0, m + 1 == song.measureCount(), header.repeatEnd()));
             writer.clearItems();
+        }
+        if (header.repeatStart) {
+            width.opening = kRepeatGap + opening;
+            width.openingInline = m > 0 ? opening - overlap(song, m, font) : width.opening;
         }
         merge(columns, all, merged);
         springsOf(merged, song.measureHeader(m).timeSignature.measureLength(), emptyWidth, width);
@@ -232,12 +356,26 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
     std::vector<ColumnInk> all;
     std::vector<ColumnInk> merged;
     std::vector<ColumnPosition> positions;
+    std::vector<double> barlineEnds;
+    barlineEnds.reserve(last - first);
     MeasureWidth width;
     for (std::size_t m = first; m < last; ++m) {
+        const core::MeasureHeader& header = song.measureHeader(m);
+        bool changed = false;
         if (m > first) {
             double after = x;
             for (const auto& writer : writers) {
                 after = std::max(after, writer->changes(m, x));
+            }
+            changed = after > x;
+            x = after;
+        }
+        if (header.repeatStart) {
+            // After the header or the changes, or in place of the barline before.
+            const double from = m == first || changed ? x + kRepeatGap : x - overlap(song, m, font);
+            double after = from;
+            for (const auto& writer : writers) {
+                after = std::max(after, writer->opening(m, from));
             }
             x = after;
         }
@@ -265,8 +403,9 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         const bool songEnd = m + 1 == song.measureCount();
         double after = barline;
         for (const auto& writer : writers) {
-            after = std::max(after, writer->barline(m, barline, songEnd));
+            after = std::max(after, writer->barline(m, barline, songEnd, header.repeatEnd()));
         }
+        barlineEnds.push_back(after);
         x = after;
     }
 
@@ -300,6 +439,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         system.bottom = staff.bottom;
         append(system, std::move(staff));
     }
+    markRepeats(system, song, measures, barlineEnds, font);
     const double height = previousY + previousHeight;
     if (writers.size() > 1) {
         // The line joining the staves at the start of the system.
