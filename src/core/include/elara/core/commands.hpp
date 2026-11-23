@@ -70,13 +70,16 @@ private:
 };
 
 /// Replaces one measure of one staff: the way notes, rests and effects change.
+/// `name` says what the edit was, e.g. "Enter note".
 class ReplaceMeasure final : public Command {
 public:
-    ReplaceMeasure(std::size_t track, std::size_t staff, std::size_t measure, Measure content)
-        : track_(track), staff_(staff), measure_(measure), content_(std::move(content)) {}
+    ReplaceMeasure(std::size_t track, std::size_t staff, std::size_t measure, Measure content,
+                   std::string name = "Edit measure")
+        : track_(track), staff_(staff), measure_(measure), content_(std::move(content)),
+          name_(std::move(name)) {}
     void apply(Song& song) override { swapWith(song); }
     void revert(Song& song) override { swapWith(song); }
-    [[nodiscard]] std::string_view name() const noexcept override { return "Edit measure"; }
+    [[nodiscard]] std::string_view name() const noexcept override { return name_; }
 
 private:
     void swapWith(Song& song);
@@ -85,6 +88,7 @@ private:
     std::size_t staff_;
     std::size_t measure_;
     Measure content_; // the new content before apply(), the old one after
+    std::string name_;
 };
 
 /// Replaces a measure header: time signature, key signature, tempo changes.

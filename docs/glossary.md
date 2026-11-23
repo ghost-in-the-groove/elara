@@ -34,6 +34,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | documento | document | `Document` | A song being edited: song + undo/redo history + save point |
 | orden / acción de edición | command | `Command` | One reversible edit (`apply`/`revert`), ADR-0005 |
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
+| cursor de edición | caret | `Caret` | Beat and string where typing enters notes; the free slot follows the last beat of a short measure (ADR-0021) |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
 | importación / aviso | import / warning | `ImportResult`, `warnings` | A foreign file read into the model; each warning is a feature it had that the model cannot hold yet (ADR-0007) |
