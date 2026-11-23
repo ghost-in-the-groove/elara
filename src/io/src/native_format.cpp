@@ -185,6 +185,19 @@ private:
             }
             add(object, "tempoChanges", changes);
         }
+        addFlag(object, "repeatStart", value.repeatStart);
+        if (value.repeatEnd()) {
+            addInt(object, "repeatTimes", value.repeatTimes);
+        }
+        if (value.alternateEndings != 0) {
+            yyjson_mut_val* endings = yyjson_mut_arr(doc_);
+            for (int time = 1; time <= MeasureHeader::kMaxEnding; ++time) {
+                if (value.playedOnTime(time)) {
+                    yyjson_mut_arr_add_int(doc_, endings, time);
+                }
+            }
+            add(object, "alternateEndings", endings);
+        }
         return object;
     }
 
@@ -658,6 +671,23 @@ private:
                 }
                 header.tempoChanges.push_back(
                     TempoChange{.offset = at, .tempo = readTempo(change)});
+            });
+        }
+        header.repeatStart = flag(object, "repeatStart");
+        header.repeatTimes =
+            static_cast<std::uint8_t>(optionalInteger(object, "repeatTimes", 2, 255).value_or(0));
+        if (yyjson_val* endings = optionalArray(object, "alternateEndings")) {
+            Scope scope(*this, "alternateEndings");
+            int last = 0;
+            forEach(endings, [&](std::size_t, yyjson_val* ending) {
+                const auto time =
+                    static_cast<int>(integerValue(ending, 1, MeasureHeader::kMaxEnding));
+                if (time <= last) {
+                    fail("alternate endings must be in ascending order");
+                }
+                last = time;
+                header.alternateEndings =
+                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             });
         }
         return header;

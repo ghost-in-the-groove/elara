@@ -86,8 +86,13 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
     const ImportResult result = load("guitar-techniques.gp");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{"repeats dropped (written once) (measure 2)",
-                                   "Lead Guitar: grace notes dropped (measure 3)"});
+          std::vector<std::string>{"Lead Guitar: grace notes dropped (measure 3)"});
+    // |: 1 |1.2. 2 :|3. 3 |, played three times
+    CHECK(song.measureHeader(0).repeatStart);
+    CHECK(song.measureHeader(1).repeatTimes == 3);
+    CHECK(song.measureHeader(1).alternateEndings == 0b011);
+    CHECK(song.measureHeader(2).alternateEndings == 0b100);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 0, 1, 0, 2});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Guitar Techniques");
     CHECK(song.info().transcriber == "Elara contributors");

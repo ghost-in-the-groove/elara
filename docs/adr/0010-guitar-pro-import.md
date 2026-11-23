@@ -56,8 +56,8 @@ notes, dynamic) and notes refer to each other by id. The mapping:
   percent of the note), harmonics, palm mutes, dead and ghost notes, let ring,
   vibrato, staccato and accents, dynamics, pick strokes, strums, tremolo
   picking, slap and pop.
-- Everything else is listed in the warnings: repeats and alternate endings,
-  sections, jumps, fermatas, triplet feel, grace notes, lyrics, chords, text,
+- Repeats and alternate endings are kept (ADR-0016).
+- Everything else is listed in the warnings: sections, jumps, fermatas, triplet feel, grace notes, lyrics, chords, text,
   hairpins, whammy bar, tapping, trills. Short voices are filled with rests.
 - Missing references (a bar, voice, beat, note or rhythm id that is not there)
   make the file damaged.
@@ -88,8 +88,8 @@ takes the version (300, 400, 406, 500, 510) and skips what it does not use
   This reading is the least certain one; a file that shows otherwise becomes a
   corpus case and a fix.
 - Tempo changes come from mix-table changes, at the offset of their beat.
-  Instrument and volume changes, repeats, alternate endings, markers, triplet
-  feel, lyrics, chord diagrams, text, grace notes and trills are listed in the
+    Repeats and alternate endings are kept (ADR-0016). Instrument and volume
+  changes, markers, triplet feel, lyrics, chord diagrams, text, grace notes and trills are listed in the
   warnings, as for Guitar Pro 7-8.
 
 **Guitar Pro 6.** A `.gpx` file is `BCFZ`, the unpacked size (32 bits,
@@ -144,5 +144,5 @@ on what its GPIF shares with Guitar Pro 7-8.
 - Where the meaning of a GPIF value is inferred (bend scale, tempo position,
   accent flags, slide flags), the guess is written down here and in the code;
   a file that shows otherwise becomes a corpus case and a fix.
-- Repeats are not in the model yet, so songs with repeats play straight
-  through until they are.
+- Repeats and alternate endings are kept since ADR-0016; jumps (segno,
+  coda) and sections are still dropped.

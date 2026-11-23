@@ -60,6 +60,11 @@ core::Song richSong() {
         TempoChange{.offset = Fraction(0), .tempo = Tempo(60, Duration(NoteValue::Quarter, 1))},
         TempoChange{.offset = Fraction(3, 8), .tempo = Tempo(90)}};
     song.measureHeader(2).keySignature = KeySignature(4, KeyMode::Major);
+    // |: 1 |1.2. 2 :|3. 3 |, played three times
+    song.measureHeader(1).repeatStart = true;
+    song.measureHeader(2).repeatTimes = 3;
+    song.measureHeader(2).alternateEndings = 0b011;
+    song.measureHeader(3).alternateEndings = 0b100;
 
     // Guitar, measure 0: every note effect, a chord, a tuplet and a second voice.
     Staff& lead = song.track(0).staff(0);
@@ -148,6 +153,10 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("slideIn":"from-below")") != std::string::npos);
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default
     CHECK(json.find(R"("tiedFromPrevious":false)") == std::string::npos);
+    CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
+    CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2]})") != std::string::npos);
+    CHECK(json.find(R"({"alternateEndings":[3]})") != std::string::npos);
+    CHECK(json.find(R"("repeatStart":false)") == std::string::npos);
 }
 
 TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
@@ -162,6 +171,12 @@ TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
           std::string::npos);
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{"timeSignature":"5/3"}]})")
               .starts_with("measures[0].timeSignature:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{},{"repeatTimes":1}]})")
+              .starts_with("measures[1].repeatTimes:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{"alternateEndings":[9]}]})")
+              .starts_with("measures[0].alternateEndings[0]:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{"alternateEndings":[2,1]}]})")
+              .starts_with("measures[0].alternateEndings[1]:"));
 
     // A pitch that does not exist, deep in a staff.
     std::string json = songToJson(richSong());

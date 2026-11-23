@@ -772,7 +772,7 @@ private:
             } else if (name == "figured-bass") {
                 warn("figured bass dropped", index);
             } else if (name == "barline") {
-                readBarline(child, index);
+                readBarline(child, index, header);
             }
         }
 
@@ -816,6 +816,12 @@ private:
                 } else {
                     changes.push_back(TempoChange{.offset = mark.onset, .tempo = mark.tempo});
                 }
+            }
+            // An alternate ending spans the measures from its start to its stop.
+            header.alternateEndings = ending_;
+            if (endingStops_) {
+                ending_ = 0;
+                endingStops_ = false;
             }
             score_.headers.push_back(std::move(header));
         }
@@ -987,19 +993,58 @@ private:
         }
     }
 
-    void readBarline(pugi::xml_node barline, std::size_t index) {
-        if (barline.child("repeat")) {
-            warn("repeats dropped", index);
-        }
-        if (const pugi::xml_node ending = barline.child("ending");
-            ending && isType(ending, "start")) {
-            warn("alternate endings dropped", index);
+    // Repeats and alternate endings belong to the measure header, which the
+    // first part writes; the other parts repeat them.
+    void readBarline(pugi::xml_node barline, std::size_t index, MeasureHeader& header) {
+        if (first_) {
+            readRepeats(barline, index, header);
         }
         if (barline.child("fermata")) {
             warn("fermatas dropped", index);
         }
         if (barline.child("segno") || barline.child("coda")) {
             warn("jumps (D.C., D.S., segno, coda, fine) dropped", index);
+        }
+    }
+
+    void readRepeats(pugi::xml_node barline, std::size_t index, MeasureHeader& header) {
+        if (const pugi::xml_node repeat = barline.child("repeat")) {
+            if (repeat.attribute("direction").value() == std::string_view("backward")) {
+                header.repeatTimes = static_cast<std::uint8_t>(
+                    std::clamp(repeat.attribute("times").as_int(2), 2, 255));
+            } else {
+                header.repeatStart = true;
+            }
+        }
+        if (const pugi::xml_node ending = barline.child("ending")) {
+            // number="1, 2": the times through the repeat that play it.
+            std::uint8_t times = 0;
+            std::string_view numbers = ending.attribute("number").value();
+            while (!numbers.empty()) {
+                const std::size_t at = numbers.find_first_of(", ");
+                const std::string_view number = numbers.substr(0, at);
+                numbers =
+                    at == std::string_view::npos ? std::string_view{} : numbers.substr(at + 1);
+                int time = 0;
+                const auto [end, error] =
+                    std::from_chars(number.data(), number.data() + number.size(), time);
+                if (number.empty()) {
+                    continue;
+                }
+                if (error != std::errc{} || end != number.data() + number.size() || time < 1 ||
+                    time > MeasureHeader::kMaxEnding) {
+                    warn("alternate endings after the eighth time dropped", index);
+                    continue;
+                }
+                times = static_cast<std::uint8_t>(times | (1U << (time - 1)));
+            }
+            if (isType(ending, "start")) {
+                ending_ = times;
+                endingStops_ = false;
+            } else {
+                ending_ = ending_ != 0 ? ending_ : times;
+                endingStops_ = true;
+            }
         }
     }
 
@@ -1534,7 +1579,9 @@ private:
     const PartInfo& info_;
     PartLayout layout_;
     bool first_;
-    ScoreState& score_; // written by the first part only
+    std::uint8_t ending_ = 0;  // the alternate ending being read, as times
+    bool endingStops_ = false; // it stops at the end of this measure
+    ScoreState& score_;        // written by the first part only
     Warnings& warnings_;
     int divisions_ = 1;
     Fraction oneDivision_{1, 4};

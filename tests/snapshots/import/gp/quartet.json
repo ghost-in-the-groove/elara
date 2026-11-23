@@ -25,7 +25,12 @@
   },
   "measures": [
    {
-    "keySignature": "F major"
+    "keySignature": "F major",
+    "repeatStart": true,
+    "repeatTimes": 2,
+    "alternateEndings": [
+     1
+    ]
    },
    {
     "keySignature": "F major",
@@ -33,6 +38,9 @@
      {
       "bpm": 120
      }
+    ],
+    "alternateEndings": [
+     2
     ]
    }
   ],

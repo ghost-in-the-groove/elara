@@ -9,6 +9,7 @@
 #include <elara/core/tuning.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -87,11 +88,33 @@ private:
 };
 
 /// Song-wide information about one measure, shared by every staff. Tempo changes
-/// live here so they move with their measure. Repeats and markers come later.
+/// and repeats live here so they move with their measure (ADR-0016). Markers
+/// and jumps (segno, coda, da capo) come later.
 struct MeasureHeader {
+    /// Alternate endings name times through a repeat from 1 to this.
+    static constexpr int kMaxEnding = 8;
+
     TimeSignature timeSignature{};
     KeySignature keySignature{};             // concert key
     std::vector<TempoChange> tempoChanges{}; // ascending offsets inside the measure
+    /// A start repeat barline opens the measure.
+    bool repeatStart = false;
+    /// 2 or more when an end repeat barline closes the measure: how many times
+    /// its section is played. 0 (or 1) for none.
+    std::uint8_t repeatTimes = 0;
+    /// The measure belongs to the alternate endings of these times through the
+    /// repeat: bit n - 1 for the n-th time. 0 for a measure played every time.
+    std::uint8_t alternateEndings = 0;
+
+    /// True when an end repeat barline closes the measure.
+    [[nodiscard]] bool repeatEnd() const noexcept { return repeatTimes >= 2; }
+    /// True when the measure is played the `time`-th time through its repeat.
+    [[nodiscard]] bool playedOnTime(int time) const noexcept {
+        return alternateEndings == 0 ||
+               (time >= 1 && time <= kMaxEnding &&
+                ((static_cast<unsigned>(alternateEndings) >> static_cast<unsigned>(time - 1)) &
+                 1U) != 0);
+    }
 
     /// The header a new measure after this one starts with: same meter and key,
     /// no events.
@@ -160,7 +183,15 @@ public:
 
     // ---- Timeline ----------------------------------------------------------
     // Positions are (measure, offset in whole notes); measure == measureCount()
-    // with offset 0 is the end of the song. Repeats are not unrolled yet.
+    // with offset 0 is the end of the song. Positions and times count measures
+    // as written; playOrder() unrolls the repeats.
+
+    /// The measures in the order they are played (ADR-0016): a repeat plays its
+    /// section as many times as it says, and each time through only the
+    /// alternate endings of that time. An end repeat without a start repeat
+    /// goes back to the start of the song, or to the start of the section after
+    /// the previous repeat. Never longer than 256 times the measures.
+    [[nodiscard]] std::vector<std::size_t> playOrder() const;
 
     /// Tempo in force at the start of the song.
     [[nodiscard]] const Tempo& startTempo() const noexcept { return startTempo_; }

@@ -515,10 +515,12 @@ def techniques_gp5() -> dict:
                  "copyright": "CC0 1.0", "tab": "Elara contributors",
                  "instructions": "Play with a pick", "notice": ["Self-made test file"]},
         "tempo": 100, "key": 1,
+                # Intro |: 2 |1. 3 :|2. 4 |: Guitar Pro 5 counts the times played and
+        # keeps the alternate endings as bits.
         "measures": [{"time": (4, 4), "marker": "Intro"},
-                     {"repeat_open": True, "repeat_close": 2},
-                     {"time": (3, 4), "key": (2, 0)},
-                     {"time": (4, 4)}],
+                     {"repeat_open": True},
+                     {"time": (3, 4), "key": (2, 0), "repeat_close": 2, "alternate": 0b01},
+                     {"time": (4, 4), "alternate": 0b10}],
         "tracks": [lead],
     }
 
@@ -567,7 +569,10 @@ def quartet_gp4() -> dict:
         "triplet_feel": True,
         "lyrics": (4, [(1, "la la la")]),
         "tempo": 90, "key": -1,
-        "measures": [{"time": (4, 4)}, {}],
+                # |:1. 1 :|2. 2 |: Guitar Pro 4 counts the times played again and names
+        # each alternate ending by its number.
+        "measures": [{"time": (4, 4), "repeat_open": True, "repeat_close": 1, "alternate": 1},
+                     {"alternate": 2}],
         "tracks": [bass, piano, drums, melody],
     }
 

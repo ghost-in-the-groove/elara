@@ -256,11 +256,15 @@ def guitar_techniques() -> str:
               "Copyright": "CC0 1.0", "Tabber": "Elara contributors"},
         tempos=[(0, 0, "100 2", False), (1, 0.5, "80 2", False)],
         tracks=[guitar],
+                # |: 1 |1.2. 2 :|3. 3 |, played three times
         master_bars=[
-            {"time": "4/4", "key": (1, "Major"), "bars": [("G2", bar1)]},
-            {"time": "4/4", "key": (1, "Major"), "bars": [("G2", bar2)],
+            {"time": "4/4", "key": (1, "Major"), "bars": [("G2", bar1)],
              "extra": '<Repeat start="true" end="false" count="0" />'},
-            {"time": "3/4", "key": (1, "Major"), "bars": [("G2", bar3)]},
+            {"time": "4/4", "key": (1, "Major"), "bars": [("G2", bar2)],
+             "extra": '<Repeat start="false" end="true" count="3" />'
+                      "<AlternateEndings>1 2</AlternateEndings>"},
+            {"time": "3/4", "key": (1, "Major"), "bars": [("G2", bar3)],
+             "extra": "<AlternateEndings>3</AlternateEndings>"},
         ])
 
 

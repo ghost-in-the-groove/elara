@@ -48,6 +48,7 @@ using core::InstrumentKind;
 using core::KeyMode;
 using core::KeySignature;
 using core::Measure;
+using core::MeasureHeader;
 using core::Note;
 using core::NoteValue;
 using core::Pitch;
@@ -140,6 +141,9 @@ Clef clefFor(std::string_view name, int octave) {
     }
     return octave == -1 ? Clef::Treble8vb : Clef::Treble;
 }
+
+// The most times a repeat can say its section is played.
+constexpr std::uint8_t kMaxRepeatTimes = 255;
 
 struct TrackLayout {
     std::string name;
@@ -987,17 +991,34 @@ private:
             }
             song.measureHeader(m).timeSignature = time;
             song.measureHeader(m).keySignature = key;
+            readRepeats(bar, song.measureHeader(m), m);
             warnMasterBar(bar, m);
         }
     }
 
+    // <Repeat start="true" end="true" count="2"/>: barlines at the start and
+    // the end of the bar, and how many times the section is played.
+    // <AlternateEndings>1 2</AlternateEndings>: the times through the repeat
+    // that play the bar.
+    void readRepeats(pugi::xml_node bar, MeasureHeader& header, std::size_t m) {
+        if (const pugi::xml_node repeat = bar.child("Repeat")) {
+            header.repeatStart = repeat.attribute("start").as_bool(false);
+            if (repeat.attribute("end").as_bool(false)) {
+                header.repeatTimes = static_cast<std::uint8_t>(std::clamp(
+                    repeat.attribute("count").as_int(2), 2, static_cast<int>(kMaxRepeatTimes)));
+            }
+        }
+        for (const int time : intsOf(textOf(bar.child("AlternateEndings")))) {
+            if (time >= 1 && time <= MeasureHeader::kMaxEnding) {
+                header.alternateEndings =
+                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
+            } else {
+                warnings_.add({}, "alternate endings after the eighth time dropped", m);
+            }
+        }
+    }
+
     void warnMasterBar(pugi::xml_node bar, std::size_t m) {
-        if (bar.child("Repeat")) {
-            warnings_.add({}, "repeats dropped (written once)", m);
-        }
-        if (bar.child("AlternateEndings")) {
-            warnings_.add({}, "alternate endings dropped", m);
-        }
         if (bar.child("Section")) {
             warnings_.add({}, "section marks dropped", m);
         }

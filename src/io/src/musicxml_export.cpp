@@ -649,6 +649,7 @@ private:
         xml.start("measure");
         xml.attribute("number", static_cast<std::int64_t>(m + 1));
         xml.endOpen();
+        writeLeftBarline(xml, m);
         writeAttributes(xml, m);
         const Fraction measureLength = song_.measureHeader(m).timeSignature.measureLength();
         tempoMarks_.clear();
@@ -681,14 +682,82 @@ private:
         }
         tabPass_ = false;
         cursor_ = Fraction(0);
-        if (m + 1 == song_.measureCount()) {
-            xml.start("barline");
-            xml.attribute("location", "right");
-            xml.endOpen();
-            xml.text("bar-style", "light-heavy");
-            xml.close("barline");
-        }
+        writeRightBarline(xml, m);
         xml.close("measure");
+    }
+
+    // "1, 2": the times through the repeat that play an alternate ending.
+    static std::string endingNumbers(std::uint8_t times) {
+        std::string numbers;
+        for (int time = 1; time <= MeasureHeader::kMaxEnding; ++time) {
+            if (((static_cast<unsigned>(times) >> static_cast<unsigned>(time - 1)) & 1U) != 0) {
+                numbers += (numbers.empty() ? "" : ", ") + std::to_string(time);
+            }
+        }
+        return numbers;
+    }
+
+    // A start repeat and the start of an alternate ending, before the notes.
+    void writeLeftBarline(XmlWriter& xml, std::size_t m) const {
+        const MeasureHeader& header = song_.measureHeader(m);
+        const bool endingStarts =
+            header.alternateEndings != 0 &&
+            (m == 0 || song_.measureHeader(m - 1).alternateEndings != header.alternateEndings);
+        if (!header.repeatStart && !endingStarts) {
+            return;
+        }
+        xml.start("barline");
+        xml.attribute("location", "left");
+        xml.endOpen();
+        if (header.repeatStart) {
+            xml.text("bar-style", "heavy-light");
+        }
+        if (endingStarts) {
+            xml.start("ending");
+            xml.attribute("number", endingNumbers(header.alternateEndings));
+            xml.attribute("type", "start");
+            xml.endEmpty();
+        }
+        if (header.repeatStart) {
+            xml.start("repeat");
+            xml.attribute("direction", "forward");
+            xml.endEmpty();
+        }
+        xml.close("barline");
+    }
+
+    // The end of an alternate ending (with a hook when a repeat ends there), an
+    // end repeat, or the final barline.
+    void writeRightBarline(XmlWriter& xml, std::size_t m) const {
+        const MeasureHeader& header = song_.measureHeader(m);
+        const bool last = m + 1 == song_.measureCount();
+        const bool endingStops =
+            header.alternateEndings != 0 &&
+            (last || song_.measureHeader(m + 1).alternateEndings != header.alternateEndings);
+        if (!last && !header.repeatEnd() && !endingStops) {
+            return;
+        }
+        xml.start("barline");
+        xml.attribute("location", "right");
+        xml.endOpen();
+        if (last || header.repeatEnd()) {
+            xml.text("bar-style", "light-heavy");
+        }
+        if (endingStops) {
+            xml.start("ending");
+            xml.attribute("number", endingNumbers(header.alternateEndings));
+            xml.attribute("type", header.repeatEnd() ? "stop" : "discontinue");
+            xml.endEmpty();
+        }
+        if (header.repeatEnd()) {
+            xml.start("repeat");
+            xml.attribute("direction", "backward");
+            if (header.repeatTimes != 2) {
+                xml.attribute("times", std::to_string(header.repeatTimes));
+            }
+            xml.endEmpty();
+        }
+        xml.close("barline");
     }
 
     void writeAttributes(XmlWriter& xml, std::size_t m) {
