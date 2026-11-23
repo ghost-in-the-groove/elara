@@ -365,6 +365,34 @@ add_test(NAME cli.edit_rejects_unplayable_tuning
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1"
     "tuning 0 capo 2")
 set_tests_properties(cli.edit_rejects_unplayable_tuning PROPERTIES WILL_FAIL TRUE)
+# Signs and jumps (ADR-0049): 0 | 1 segno | 2 to coda | 3 D.S. al Coda | 4 coda | 5,
+# saved, read back and played in order.
+set(ELARA_CLI_JUMPS "${CMAKE_CURRENT_BINARY_DIR}/cli-jumps.elara")
+add_test(NAME cli.edit_jumps
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_JUMPS}" "add-track electric-guitar"
+    "append-measures 6" "sign 1 segno" "sign 2 to-coda" "jump 3 dal-segno al-coda" "sign 4 coda")
+set_tests_properties(cli.edit_jumps PROPERTIES
+  FIXTURES_SETUP cli_jumps
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{[^}]*\"signs\":\\[\"segno\"\\]},{[^}]*\"signs\":\\[\"to-coda\"\\]},{[^}]*\"jump\":\"dal-segno\",\"jumpThen\":\"al-coda\"},{[^}]*\"signs\":\\[\"coda\"\\]},.*\"undo\":{\"count\":6,\"next\":\"Change navigation marks\"}")
+add_test(NAME cli.dump_jumps COMMAND elara-cli --json dump "${ELARA_CLI_JUMPS}")
+set_tests_properties(cli.dump_jumps PROPERTIES
+  FIXTURES_REQUIRED cli_jumps
+  PASS_REGULAR_EXPRESSION "\"jump\":\"dal-segno\",\"jumpThen\":\"al-coda\"")
+add_test(NAME cli.sequence_jumps COMMAND elara-cli sequence "${ELARA_CLI_JUMPS}")
+set_tests_properties(cli.sequence_jumps PROPERTIES
+  FIXTURES_REQUIRED cli_jumps
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 4 2 3 5 6\n")
+add_test(NAME cli.edit_clears_jumps
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2"
+    "sign 0 segno fine" "jump 1 da-capo" "sign 0 none" "jump 1 none")
+set_tests_properties(cli.edit_clears_jumps PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":6,")
+add_test(NAME cli.edit_rejects_unknown_sign
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "sign 0 dolce")
+add_test(NAME cli.edit_rejects_unknown_jump
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "jump 0 da-capo al-segno")
+set_tests_properties(cli.edit_rejects_unknown_sign cli.edit_rejects_unknown_jump
+  PROPERTIES WILL_FAIL TRUE)
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste

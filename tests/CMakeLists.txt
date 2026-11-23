@@ -28,6 +28,7 @@ elara_add_unit_tests(core
     core/test_song.cpp
     core/test_signature.cpp
     core/test_timeline.cpp
+    core/test_jumps.cpp
     core/test_document.cpp
     core/test_effects.cpp
     core/test_entry.cpp
