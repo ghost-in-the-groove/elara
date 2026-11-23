@@ -15,6 +15,7 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <cstdlib>
 #include <exception>
 #include <format>
 #include <iostream>
@@ -86,6 +87,18 @@ public:
     }
 
     [[nodiscard]] std::size_t index(std::size_t i) const { return number<std::size_t>(i); }
+
+    /// A decimal such as "0.75" or "-1" (strtod: from_chars for floating point
+    /// is not on every toolchain yet).
+    [[nodiscard]] double decimal(std::size_t i) const {
+        const std::string text(word(i));
+        char* end = nullptr;
+        const double value = std::strtod(text.c_str(), &end);
+        if (text.empty() || end != text.c_str() + text.size()) {
+            throw StepSyntaxError(std::format("{}: not a number: {}", verb(), text));
+        }
+        return value;
+    }
 
     /// Words from `i` to the end, joined by single spaces.
     [[nodiscard]] std::string rest(std::size_t i) const {
@@ -222,6 +235,18 @@ void runStep(Document& doc, const Step& step, EntryState& entry) {
             header.keySignature = *key;
         }
         doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
+        core::TrackMix mix{.volume = step.decimal(2), .pan = step.decimal(3)};
+        for (std::size_t i = 4; step.has(i); ++i) {
+            if (step.word(i) == "mute") {
+                mix.mute = true;
+            } else if (step.word(i) == "solo") {
+                mix.solo = true;
+            } else {
+                throw StepSyntaxError(std::format("mix: not mute or solo: {}", step.word(i)));
+            }
+        }
+        doc.execute(std::make_unique<core::SetTrackMix>(step.index(1), mix));
     } else if (verb == "tempo") {
         doc.execute(std::make_unique<SetStartTempo>(Tempo(step.number<int>(1))));
     } else if (verb == "title") {
@@ -359,6 +384,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "Steps in order, each quoted: \"add-track <preset> [at]\", "
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
+        "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "

@@ -216,6 +216,19 @@ private:
         }
         add(object, "instrument", inst);
 
+        if (const TrackMix& mix = value.mix(); mix != TrackMix{}) {
+            yyjson_mut_val* mixJson = yyjson_mut_obj(doc_);
+            if (mix.volume != TrackMix::kDefaultVolume) {
+                addNumber(mixJson, "volume", mix.volume);
+            }
+            if (mix.pan != 0.0) {
+                addNumber(mixJson, "pan", mix.pan);
+            }
+            addFlag(mixJson, "mute", mix.mute);
+            addFlag(mixJson, "solo", mix.solo);
+            add(object, "mix", mixJson);
+        }
+
         yyjson_mut_val* staves = yyjson_mut_arr(doc_);
         for (std::size_t s = 0; s < value.staffCount(); ++s) {
             yyjson_mut_arr_append(staves, staff(value.staff(s)));
@@ -519,6 +532,16 @@ private:
         return value == nullptr ? std::nullopt : std::optional(yyjson_get_num(value));
     }
 
+    std::optional<double> optionalNumberIn(yyjson_val* object, const char* key, double min,
+                                           double max) {
+        const auto value = optionalNumber(object, key);
+        if (value && !(*value >= min && *value <= max)) {
+            Scope scope(*this, key);
+            fail(std::format("{} is outside {}..{}", *value, min, max));
+        }
+        return value;
+    }
+
     std::optional<std::int64_t> optionalInteger(yyjson_val* object, const char* key,
                                                 std::int64_t min, std::int64_t max) {
         yyjson_val* value = yyjson_obj_get(object, key);
@@ -707,6 +730,14 @@ private:
             instrument.writtenOffset =
                 static_cast<int>(optionalInteger(inst, "writtenOffset", -127, 127).value_or(0));
         }
+        TrackMix mix;
+        if (yyjson_val* mixJson = optionalObject(object, "mix")) {
+            Scope scope(*this, "mix");
+            mix.volume = optionalNumberIn(mixJson, "volume", 0.0, 1.0).value_or(mix.volume);
+            mix.pan = optionalNumberIn(mixJson, "pan", -1.0, 1.0).value_or(mix.pan);
+            mix.mute = flag(mixJson, "mute");
+            mix.solo = flag(mixJson, "solo");
+        }
 
         yyjson_val* stavesJson = requiredArray(object, "staves");
         std::vector<Staff> staves;
@@ -730,8 +761,9 @@ private:
         const std::size_t index = guarded(
             [&] { return song.addTrack(Track(name, std::move(instrument), std::move(staves))); });
 
-        Scope stavesScope(*this, "staves");
         Track& track = song.track(index);
+        track.setMix(mix);
+        Scope stavesScope(*this, "staves");
         forEach(stavesJson, [&](std::size_t s, yyjson_val* staffJson) {
             readMeasures(staffJson, track.staff(s), song.measureCount());
         });

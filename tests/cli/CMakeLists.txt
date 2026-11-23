@@ -139,6 +139,15 @@ add_test(NAME cli.edit_save_point_survives_undo_redo
 set_tests_properties(cli.edit_save_point_survives_undo_redo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"modified\":false}")
 
+add_test(NAME cli.edit_sets_track_mix
+  COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
+set_tests_properties(cli.edit_sets_track_mix PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"mix\":{\"volume\":0.5,\"pan\":-0.25,\"mute\":false,\"solo\":true}.*\"next\":\"Change mix\"")
+
+add_test(NAME cli.edit_rejects_mix_out_of_range
+  COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
+set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
+
 # Keyboard entry at a caret (ADR-0021).
 add_test(NAME cli.edit_types_frets_at_the_caret
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "caret 0 0 0 6"

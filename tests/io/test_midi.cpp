@@ -34,6 +34,7 @@ using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::TimeSignature;
 using elara::core::Track;
+using elara::core::TrackMix;
 using elara::core::Tuplet;
 using elara::io::exportMidi;
 using elara::io::ExportResult;
@@ -711,6 +712,45 @@ TEST_CASE("MIDI import splits a format 0 file by channel and names tracks by pro
     CHECK(durationsOf(song.track(2).staff(0).measure(0).voices[1]) ==
           std::vector<Duration>{Duration(NoteValue::Quarter), Duration(NoteValue::Quarter),
                                 Duration(NoteValue::Half)});
+}
+
+// Channel volume (controller 7) and pan (controller 10) before the first note
+// set the track's mix; the last value before the notes wins, as after a reset.
+TEST_CASE("MIDI import reads each channel's volume and pan into its track's mix", "[io][midi]") {
+    const auto control = [](std::int64_t tick, int channel, int number, int value) {
+        return Event{tick, bytes({0xB0 | channel, number, value})};
+    };
+    const std::vector<Event> events{
+        control(0, 0, 7, 100),  control(0, 0, 7, 127),  control(0, 0, 10, 0),
+        control(0, 1, 10, 127), control(0, 2, 7, 64), // a channel without notes: no track
+        on(0, 0, 60),           on(0, 1, 64),           off(1920, 0, 60),
+        off(1920, 1, 64),       control(1920, 1, 7, 90)}; // a change: dropped
+    const auto imported = importMidi(bytesOf(smf(0, 480, {events})));
+    REQUIRE(imported.has_value());
+    const Song& song = imported->song;
+    REQUIRE(song.trackCount() == 2);
+    CHECK(song.track(0).mix() == TrackMix{.volume = 1.0, .pan = -1.0});
+    CHECK(song.track(1).mix() == TrackMix{.volume = TrackMix::kDefaultVolume, .pan = 1.0});
+    CHECK(std::ranges::find(imported->warnings, "volume and pan changes dropped") !=
+          imported->warnings.end());
+}
+
+TEST_CASE("MIDI export writes volume and pan, and reads them back", "[io][midi]") {
+    Song song = pianoSong(1);
+    song.addTrack(presetTrack("electric-bass"));
+    song.addTrack(presetTrack("violin"));
+    song.track(0).setMix(TrackMix{.volume = 1.0, .pan = -1.0});
+    song.track(1).setMix(TrackMix{.volume = 0.0, .pan = 1.0, .mute = true});
+    const auto exported = exportMidi(song);
+    CHECK(std::ranges::find(exported.warnings, "Electric Bass: mute and solo dropped") !=
+          exported.warnings.end());
+    const auto imported = importMidi(bytesOf(exported.data));
+    REQUIRE(imported.has_value());
+    REQUIRE(imported->song.trackCount() == 3);
+    CHECK(imported->song.track(0).mix() == TrackMix{.volume = 1.0, .pan = -1.0});
+    CHECK(imported->song.track(1).mix() == TrackMix{.volume = 0.0, .pan = 1.0});
+    // The default mix writes no controllers and reads back exactly.
+    CHECK(imported->song.track(2).mix() == TrackMix{});
 }
 
 TEST_CASE("MIDI import rejects what is not a Standard MIDI File", "[io][midi]") {

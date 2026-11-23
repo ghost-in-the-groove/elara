@@ -32,9 +32,11 @@ std::string tracksJson(const core::Song& song) {
                 }
             }
         }
-        out +=
-            std::format(R"({}{{"name":"{}","staves":{},"beats":{},"notes":{}}})", t == 0 ? "" : ",",
-                        jsonEscape(track.name()), track.staffCount(), beats, notes);
+        const core::TrackMix& mix = track.mix();
+        out += std::format(
+            R"({}{{"name":"{}","mix":{{"volume":{},"pan":{},"mute":{},"solo":{}}},"staves":{},"beats":{},"notes":{}}})",
+            t == 0 ? "" : ",", jsonEscape(track.name()), jsonNumber(mix.volume),
+            jsonNumber(mix.pan), mix.mute, mix.solo, track.staffCount(), beats, notes);
     }
     return out + "]";
 }
@@ -80,6 +82,11 @@ void printSongText(const core::Song& song) {
         }
         if (track.staff(0).capo() != 0) {
             std::cout << std::format(", capo {}", track.staff(0).capo());
+        }
+        if (const core::TrackMix& mix = track.mix(); mix != core::TrackMix{}) {
+            std::cout << std::format(", volume {}, pan {}{}{}", jsonNumber(mix.volume),
+                                     jsonNumber(mix.pan), mix.mute ? ", muted" : "",
+                                     mix.solo ? ", solo" : "");
         }
         std::cout << '\n';
     }
