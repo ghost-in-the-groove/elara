@@ -9,10 +9,15 @@ elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [-
 elara-cli [--json] devices
 elara-cli [--json] tone [--frequency 440] [--seconds 1]
 elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
+elara-cli [--json] fret --string N --fret N [--tuning guitar] [--capo 0] [--flats]
+elara-cli [--json] positions <PITCH> [--tuning guitar] [--capo 0] [--max-fret 30]
+elara-cli [--json] tunings
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
-spelling, MIDI number and equal-tempered frequency.
+spelling, MIDI number and equal-tempered frequency. `--tuning` takes a preset
+name from `tunings` or open strings from the lowest tab line, e.g.
+`"D2 A2 D3 G3 B3 E4"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
