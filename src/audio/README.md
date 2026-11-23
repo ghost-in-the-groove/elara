@@ -11,16 +11,19 @@ Two targets with different rules:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
-  ring and harmonics applied (ADR-0022);
+  ring and harmonics applied (ADR-0022), and bends, slides, hammer-ons and
+  vibrato sent as pitch events (ADR-0023);
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`; plucked timbres also play each note's `Touch`:
-  palm mute, dead note or harmonic, ADR-0022) and `OfflineRenderer`, which plays a sequence
+  palm mute, dead note or harmonic, ADR-0022; `glide()` moves a sounding
+  voice's pitch, ADR-0023) and `OfflineRenderer`, which plays a sequence
   through one synth per track into stereo, with an event log (ADR-0018). Each
   track sits in the stereo mix at its volume and pan, and mute and solo
   silence tracks (ADR-0020);
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
-  `updateMix()` changes the track levels while it plays. It is an
+  `updateMix()` changes the track levels while it plays, from a song or from
+  the tracks' mixes alone (a moving fader, ADR-0039). It is an
   `AudioSource`, the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), and `readWav()`/`decodeWav()` for
@@ -55,6 +58,6 @@ level, each track's timbre and every event with the frame it was dispatched
 at. `elara-cli play FILE` plays it on the default device. `elara-cli tune
 FILE.wav --json [--tuning guitar]` reports the pitch a tuner would show for a
 recording. Tests in
-`tests/audio/` check pitch, envelopes, touches, voice stealing, event frames and the
+`tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the
 player's transport by calling `render()` as an audio callback would; tests in
 `tests/cli/` run the commands on corpus files.

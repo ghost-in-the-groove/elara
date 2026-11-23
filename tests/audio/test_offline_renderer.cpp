@@ -5,6 +5,7 @@
 #include <elara/audio/tone_generator.hpp>
 #include <elara/core/song.hpp>
 
+#include "pitch_detection.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -287,4 +288,24 @@ TEST_CASE("OfflineRenderer: notes are struck with their touch", "[audio][render]
     REQUIRE_FALSE(renderer.log().empty());
     CHECK(renderer.log().front().touch == Touch::PalmMute);
     CHECK(peakLevel(frames(quiet, 1.0, 1.5)) < 0.01f * peakLevel(frames(render(open), 1.0, 1.5)));
+}
+
+// Pitch events reach the synth (ADR-0023): a bent note sounds at the pitch it
+// bends to.
+TEST_CASE("OfflineRenderer: a bent note sounds at the pitch it bends to",
+          "[audio][render][pitch]") {
+    Song s = song({track("Guitar", InstrumentKind::Fretted, 25)}, 1);
+    beats(s, 0, 0) = {beat(NoteValue::Whole, {57})};
+    beats(s, 0, 0)[0].notes[0].effects.bend =
+        elara::core::BendCurve({{.position = 0, .cents = 0}, {.position = 5, .cents = 200}});
+    const std::vector<float> stereo = render(s);
+    std::vector<float> left;
+    for (std::size_t i = 0; i < stereo.size(); i += 2) {
+        left.push_back(stereo[i]);
+    }
+    const auto from = static_cast<std::size_t>(frame(0.5));
+    const double pitch = elara::audio::test::pitchOf(
+        std::span<const float>(left).subspan(from, static_cast<std::size_t>(frame(0.3))), kRate);
+    const double expected = elara::audio::test::keyFrequency(59);
+    CHECK(std::abs(pitch - expected) < 0.01 * expected);
 }

@@ -117,8 +117,9 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
 `paste <m> [track <t>] [insert]`,
-`transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
-`save`. A malformed step exits with 2, a step the song rejects
+`transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
+`tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`, `undo`,
+`redo`, `save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
@@ -139,6 +140,15 @@ every pitched track does; drums never move. A fretted note keeps its string when
 its new fret is on the neck, else takes the nearest free string; a note no
 string can play rejects the step.
 
+`tuning` gives a fretted staff (the track's first unless `staff`) another
+tuning, a preset such as `guitar-drop-d` or open strings from the lowest
+(`D2 A2 D3 G3 B3 E4`), and capo (ADR-0046); either left out stays as it is.
+Notes keep their pitches and move to frets that play them, as `transpose`
+places them; with `frets` they keep their frets and sound what those play
+now, spelled in the key. A note the new tuning cannot play rejects the step.
+The output gives each track's `tuning` (its first staff's; `null` without
+strings) and `capo`.
+
 Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
 `caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
 `next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
@@ -153,7 +163,10 @@ whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
 caret's string is a drum lane, from the crash at the top to the hi-hat pedal
 (ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
 that General MIDI key's lane (moving the caret to it), and `delete` removes the
-lane's piece only. The output includes `"caret"` and `"input"`.
+lane's piece only. `effect <name>` toggles a note effect on the caret's notes
+(ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
+`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`. The
+output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

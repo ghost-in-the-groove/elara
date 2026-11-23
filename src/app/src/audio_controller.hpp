@@ -12,6 +12,7 @@
 
 namespace elara::audio {
 class Player;
+class Sequence;
 class SystemAudio;
 } // namespace elara::audio
 
@@ -72,6 +73,8 @@ signals:
 private:
     bool openDevice();
     void loadSong();
+    void songEdited();
+    void previewMix();
     void setPlaying(bool playing);
     void setErrorMessage(const QString& message);
     void pollPlayback();
@@ -80,6 +83,7 @@ private:
     QPointer<elara::app::ScoreDocument> document_;
     std::unique_ptr<elara::audio::SystemAudio> audio_;
     std::unique_ptr<elara::audio::Player> player_;
+    std::shared_ptr<const elara::audio::Sequence> loaded_; // what player_ plays
     QTimer pollTimer_;
     QTimer transportTimer_;
     bool playing_ = false;

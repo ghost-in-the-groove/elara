@@ -73,6 +73,12 @@ public:
     /// Releases every voice playing `key`. Drums ignore it and ring out.
     void noteOff(int key) noexcept;
 
+    /// Moves the pitch of every voice still holding `key` to `cents` above
+    /// the key (below when negative), in a straight line over `seconds`, or at
+    /// once for 0: bends, slides, hammer-ons and vibrato (ADR-0023). A new
+    /// note starts at its key. Drums ignore it.
+    void glide(int key, double cents, double seconds) noexcept;
+
     /// Releases every voice.
     void releaseAll() noexcept;
 

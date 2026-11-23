@@ -32,8 +32,10 @@ elara_add_unit_tests(core
     core/test_effects.cpp
     core/test_entry.cpp
     core/test_drum_entry.cpp
+    core/test_entry_effects.cpp
     core/test_validation.cpp
     core/test_performance.cpp
+    core/test_retune.cpp
     core/test_transpose.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
@@ -110,11 +112,11 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 17 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 23 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 25 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 20 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 22 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # The UI in Spanish: the catalog compiled into the executable loads and the

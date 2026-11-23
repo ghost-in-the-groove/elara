@@ -23,6 +23,8 @@ struct FrameEvent {
     std::int64_t frame = 0;
     EventKind kind = EventKind::NoteOn;
     Touch touch = Touch::Normal;
+    std::int16_t cents = 0;
+    float glide = 0.0f;
     int key = 60;
     int velocity = 80;
 };
@@ -36,6 +38,8 @@ eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
             result[event.track].push_back({.frame = std::llround(event.time * rate),
                                            .kind = event.kind,
                                            .touch = event.touch,
+                                           .cents = event.cents,
+                                           .glide = event.glide,
                                            .key = event.key,
                                            .velocity = event.velocity});
         }
@@ -59,16 +63,15 @@ struct TrackLevel {
     friend bool operator==(const TrackLevel&, const TrackLevel&) = default;
 };
 
-/// The level of track `t` from its mix (ADR-0020), times `headroom`: the fader
+/// The level of a track with `mix` (ADR-0020), times `headroom`: the fader
 /// as a gain of (volume / 0.8)^2, unity at the default position; a
 /// constant-power pan, unity in the centre and sqrt(2) on the side it goes to;
-/// silence when mute or solo keeps the track quiet.
-[[nodiscard]] inline TrackLevel levelOf(const core::Song& song, std::size_t t,
+/// silence when mute or solo keeps the track quiet (not `audible`).
+[[nodiscard]] inline TrackLevel levelOf(const core::TrackMix& mix, bool audible,
                                         float headroom) noexcept {
-    if (!song.audible(t)) {
+    if (!audible) {
         return {.left = 0.0f, .right = 0.0f};
     }
-    const core::TrackMix& mix = song.track(t).mix();
     const double fader = mix.volume / core::TrackMix::kDefaultVolume;
     const double gain = fader * fader * static_cast<double>(headroom) * std::numbers::sqrt2;
     // The same expression for both sides, so the centre is exactly even; a
@@ -80,6 +83,12 @@ struct TrackLevel {
     const double angle = (mix.pan + 1.0) * std::numbers::pi / 4.0;
     return {.left = static_cast<float>(gain * side(angle)),
             .right = static_cast<float>(gain * side((std::numbers::pi / 2.0) - angle))};
+}
+
+/// The level of track `t` of `song`, as above.
+[[nodiscard]] inline TrackLevel levelOf(const core::Song& song, std::size_t t,
+                                        float headroom) noexcept {
+    return levelOf(song.track(t).mix(), song.audible(t), headroom);
 }
 
 /// Adds `track` at its level to `left` and `right`. The level moves in a
@@ -126,10 +135,16 @@ void playTrack(Synth& synth, std::span<const FrameEvent> events, std::size_t& ne
             synth.render(out.subspan(done, at - done));
             done = at;
         }
-        if (event.kind == EventKind::NoteOn) {
+        switch (event.kind) {
+        case EventKind::NoteOn:
             synth.noteOn(event.key, event.velocity, event.touch);
-        } else {
+            break;
+        case EventKind::NoteOff:
             synth.noteOff(event.key);
+            break;
+        case EventKind::Pitch:
+            synth.glide(event.key, event.cents, static_cast<double>(event.glide));
+            break;
         }
         dispatched(event);
     }

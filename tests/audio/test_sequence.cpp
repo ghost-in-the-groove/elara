@@ -7,6 +7,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <utility>
@@ -21,6 +22,7 @@ using elara::audio::Sequence;
 using elara::audio::Touch;
 using elara::core::Accent;
 using elara::core::Beat;
+using elara::core::BendCurve;
 using elara::core::Duration;
 using elara::core::Dynamic;
 using elara::core::Fraction;
@@ -30,12 +32,16 @@ using elara::core::InstrumentKind;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pitch;
+using elara::core::SlideIn;
+using elara::core::SlideOut;
 using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::Track;
+using elara::core::TrackMix;
 using elara::core::Tuning;
+using elara::core::Vibrato;
 
 namespace {
 
@@ -101,6 +107,44 @@ std::vector<Touch> touches(const Sequence& sequence) {
     return result;
 }
 
+// An event as `kind time key value`: velocity for notes, cents and glide in
+// milliseconds for pitch changes, so a whole list compares at once.
+struct Event {
+    EventKind kind = EventKind::NoteOn;
+    double time = 0.0;
+    int key = 0;
+    int cents = 0;
+    double glide = 0.0;
+    friend bool operator==(const Event& a, const Event& b) {
+        return a.kind == b.kind && std::abs(a.time - b.time) < 1e-6 && a.key == b.key &&
+               a.cents == b.cents && std::abs(a.glide - b.glide) < 1e-6;
+    }
+};
+
+Event on(double time, int key) {
+    return {.kind = EventKind::NoteOn, .time = time, .key = key};
+}
+
+Event off(double time, int key) {
+    return {.kind = EventKind::NoteOff, .time = time, .key = key};
+}
+
+Event pitch(double time, int key, int cents, double glide = 0.0) {
+    return {.kind = EventKind::Pitch, .time = time, .key = key, .cents = cents, .glide = glide};
+}
+
+std::vector<Event> eventsOf(const Sequence& sequence) {
+    std::vector<Event> result;
+    for (const NoteEvent& event : sequence.events()) {
+        result.push_back({.kind = event.kind,
+                          .time = event.time,
+                          .key = event.key,
+                          .cents = event.cents,
+                          .glide = static_cast<double>(event.glide)});
+    }
+    return result;
+}
+
 std::vector<std::size_t> writtenOrder(const Sequence& sequence) {
     std::vector<std::size_t> order;
     for (const PlayedMeasure& measure : sequence.measures()) {
@@ -135,6 +179,21 @@ TEST_CASE("Sequence: measures and notes in seconds from the tempo", "[audio][seq
     CHECK(notes[3].key == 72);
     CHECK(notes[3].pass == 1);
     CHECK_THAT(notes[3].end, WithinAbs(4.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: the same when only the mix or the title changes", "[audio][sequence]") {
+    Song song = pianoSong(2);
+    voice(song, 0) = {beat(NoteValue::Whole, {note(60)})};
+    const Sequence before(song);
+
+    Song mixed = song;
+    mixed.track(0).setMix(TrackMix{.volume = 0.3, .pan = -1.0, .mute = true});
+    mixed.info().title = "Another title";
+    CHECK(Sequence(mixed) == before);
+
+    Song edited = song;
+    voice(edited, 1) = {beat(NoteValue::Whole, {note(62)})};
+    CHECK_FALSE(Sequence(edited) == before);
 }
 
 TEST_CASE("Sequence: repeats play their measures again", "[audio][sequence]") {
@@ -436,4 +495,109 @@ TEST_CASE("Sequence: drum notes take accents and ghosting, but no touch or parti
     CHECK(sequence.notes()[0].key == 38);
     CHECK(sequence.notes()[0].velocity == 48);
     CHECK(sequence.notes()[0].touch == Touch::Normal);
+}
+
+// Pitch articulations (ADR-0023).
+TEST_CASE("Sequence: hammer-ons and pull-offs sound on the voice of the note before them",
+          "[audio][sequence][pitch]") {
+    Song song = guitarSong(2);
+    const auto legato = [&](int string, int fret) {
+        Note result = fretted(song, string, fret);
+        result.effects.legatoFromPrevious = true;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Quarter, {fretted(song, 3, 2)}), // A3
+                      beat(NoteValue::Quarter, {legato(3, 4)}),        // hammer-on to B3
+                      beat(NoteValue::Quarter, {legato(3, 2)}),        // pull-off to A3
+                      beat(NoteValue::Quarter, {fretted(song, 3, 2)})};
+    // After a rest, or on a string that has not sounded, legato strikes.
+    voice(song, 1) = {beat(NoteValue::Quarter), beat(NoteValue::Quarter, {legato(3, 4)}),
+                      beat(NoteValue::Quarter, {legato(2, 1)}), beat(NoteValue::Quarter)};
+    const Sequence sequence(song);
+    std::vector<bool> struck;
+    for (const PlayedNote& note : sequence.notes()) {
+        struck.push_back(note.struck);
+    }
+    CHECK(struck == std::vector<bool>{true, false, false, true, true, true});
+    CHECK(eventsOf(sequence) == std::vector<Event>{on(0.0, 57), pitch(0.5, 57, 200),
+                                                   pitch(1.0, 57, 0), off(1.5, 57), on(1.5, 57),
+                                                   off(2.0, 57), on(2.5, 59), off(3.0, 59),
+                                                   on(3.0, 60), off(3.5, 60)});
+}
+
+TEST_CASE("Sequence: a bend follows its curve over the note", "[audio][sequence][pitch]") {
+    Song song = guitarSong(1);
+    const auto bent = [&](BendCurve curve) {
+        Note result = fretted(song, 3, 2); // A3
+        result.effects.bend = std::move(curve);
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Half, {bent(BendCurve({{.position = 0, .cents = 0},
+                                                             {.position = 50, .cents = 200},
+                                                             {.position = 100, .cents = 200}}))}),
+                      beat(NoteValue::Quarter, {bent(BendCurve::preBendRelease(100))}),
+                      beat(NoteValue::Quarter, {fretted(song, 3, 2)})};
+    // The whammy bar dips every note of its beat.
+    voice(song, 0)[2].effects.whammyBar = BendCurve({{.position = 0, .cents = 0},
+                                                     {.position = 50, .cents = -200},
+                                                     {.position = 100, .cents = 0}});
+    const Sequence sequence(song);
+    // Up a whole tone over half the note and held; bent a semitone before the
+    // attack, held half the note and released; dipped and back.
+    CHECK(eventsOf(sequence) == std::vector<Event>{on(0.0, 57), pitch(0.0, 57, 200, 0.5),
+                                                   off(1.0, 57), on(1.0, 57), pitch(1.0, 57, 100),
+                                                   pitch(1.25, 57, 0, 0.25), off(1.5, 57),
+                                                   on(1.5, 57), pitch(1.5, 57, -200, 0.25),
+                                                   pitch(1.75, 57, 0, 0.25), off(2.0, 57)});
+}
+
+TEST_CASE("Sequence: slides glide into, between and off notes", "[audio][sequence][pitch]") {
+    Song song = guitarSong(2);
+    const auto sliding = [&](int fret, SlideIn in, SlideOut out) {
+        Note result = fretted(song, 3, fret);
+        result.effects.slideIn = in;
+        result.effects.slideOut = out;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Quarter, {sliding(2, SlideIn::FromBelow, SlideOut::None)}),
+                      beat(NoteValue::Quarter, {sliding(2, SlideIn::None, SlideOut::Shift)}),
+                      beat(NoteValue::Quarter, {sliding(6, SlideIn::None, SlideOut::Downwards)}),
+                      beat(NoteValue::Quarter)};
+    voice(song, 1) = {beat(NoteValue::Quarter, {sliding(2, SlideIn::None, SlideOut::Legato)}),
+                      beat(NoteValue::Quarter, {sliding(6, SlideIn::None, SlideOut::None)}),
+                      beat(NoteValue::Half)};
+    const Sequence sequence(song);
+    // Into a note from five frets below in 0.1 s; a shift slide over the last
+    // 0.2 s to the next note, which is struck; off the string downwards; a
+    // legato slide to a note that is not struck again.
+    CHECK(eventsOf(sequence) ==
+          std::vector<Event>{on(0.0, 57), pitch(0.0, 57, -500), pitch(0.0, 57, 0, 0.1),
+                             off(0.5, 57), on(0.5, 57), pitch(0.8, 57, 400, 0.2), off(1.0, 57),
+                             on(1.0, 61), pitch(1.3, 61, -500, 0.2), off(1.5, 61), on(2.0, 57),
+                             pitch(2.3, 57, 400, 0.2), pitch(2.5, 57, 400), off(3.0, 57)});
+}
+
+TEST_CASE("Sequence: vibrato swings the pitch either side of the note",
+          "[audio][sequence][pitch]") {
+    Song song = guitarSong(1);
+    const auto shaking = [&](Vibrato vibrato) {
+        Note result = fretted(song, 3, 2);
+        result.effects.vibrato = vibrato;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Half, {shaking(Vibrato::Slight)}),
+                      beat(NoteValue::Half, {shaking(Vibrato::Wide)})};
+    const Sequence sequence(song);
+    std::vector<int> slight;
+    std::vector<int> wide;
+    for (const NoteEvent& event : sequence.events()) {
+        if (event.kind == EventKind::Pitch) {
+            CHECK(event.glide <= 1.0f / 22.0f + 1e-6f); // a quarter of a 5.5 Hz cycle
+            (event.time < 1.0 ? slight : wide).push_back(event.cents);
+        }
+    }
+    REQUIRE(slight.size() >= 8);
+    REQUIRE(wide.size() >= 8);
+    CHECK(std::vector<int>(slight.begin(), slight.begin() + 4) == std::vector<int>{20, 0, -20, 0});
+    CHECK(std::vector<int>(wide.begin(), wide.begin() + 4) == std::vector<int>{50, 0, -50, 0});
 }
