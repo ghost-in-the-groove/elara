@@ -1054,9 +1054,9 @@ void ScoreDocument::typeNoteName(int step, bool addToChord) {
     }
     pendingDigit_ = -1;
     try {
-        enter(core::enterPitch(document_->song(), caret_, static_cast<core::Step>(step), input_,
-                               addToChord ? core::PitchMode::AddToChord
-                                          : core::PitchMode::Replace));
+        enter(
+            core::enterPitch(document_->song(), caret_, static_cast<core::Step>(step), input_,
+                             addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
     } catch (const std::out_of_range&) {
         emit editFailed(caretFretted() ? tr("No string can play that note.")
                                        : tr("That note is out of range."));

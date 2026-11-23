@@ -69,7 +69,6 @@ void Startup::queueSteps() {
             queueEntry();
             queueMeasures();
             queuePitches();
-        queuePitches();
         }
         return;
     }
@@ -100,6 +99,7 @@ void Startup::queueSteps() {
         queueEdits();
         queueEntry();
         queueMeasures();
+        queuePitches();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
