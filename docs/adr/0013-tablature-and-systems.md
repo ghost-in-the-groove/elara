@@ -38,7 +38,8 @@ under the centre of the notehead standard notation draws for the same note, at
 1.3 staff spaces, and clears the line behind it. A note without a fret position
 takes the lowest fret that sounds it. Dead notes are `X`, ghost and tied notes
 are in parentheses, natural harmonics in angle brackets (`<12>`, `<3.2>`).
-Rests show only when the system has no standard notation of the staff.
+Rests show only when the system has no standard notation of the staff; so does
+the rhythm, under the staff (ADR-0041).
 
 **Guitar techniques.** On the tablature:
 
@@ -72,6 +73,5 @@ the staccato dot in a space when inside the staff.
   `standard_staff.cpp` and `tab_staff.cpp`.
 - A system of several tracks, line breaks and pages build on the same writers
   (ADR-0014).
-- Not covered yet: rhythm stems under tablature shown on its own, slurs in
-  standard notation, bends in standard notation, tremolo picking, whammy bar,
+- Not covered yet: slurs in standard notation, bends in standard notation, tremolo picking, whammy bar,
   tapping and slap marks, fingering, chord diagrams.
