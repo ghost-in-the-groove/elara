@@ -7,6 +7,7 @@ add_executable(elara-cli
   src/edit_commands.cpp
   src/file_commands.cpp
   src/font_commands.cpp
+  src/render_commands.cpp
   src/song_report.cpp
   src/theory_commands.cpp)
 

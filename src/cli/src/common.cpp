@@ -13,6 +13,14 @@
 #include <mach-o/dyld.h>
 #endif
 
+#include <elara/io/guitar_pro.hpp>
+#include <elara/io/midi.hpp>
+#include <elara/io/musicxml.hpp>
+#include <elara/io/native_format.hpp>
+
+#include <algorithm>
+#include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <iostream>
@@ -49,6 +57,11 @@ std::string jsonEscape(std::string_view text) {
         }
     }
     return out;
+}
+
+std::string jsonNumber(double value) {
+    const double rounded = std::round(value * 10'000.0) / 10'000.0;
+    return std::format("{}", rounded == 0.0 ? 0.0 : rounded);
 }
 
 std::filesystem::path executableDirectory() {
@@ -92,6 +105,37 @@ std::string utf8(const std::filesystem::path& path) {
         out.push_back(static_cast<char>(c));
     }
     return out;
+}
+
+std::filesystem::path defaultFontMetadata() {
+    return executableDirectory() / "fonts" / "Bravura.json";
+}
+
+std::expected<core::Song, std::string> openSong(const std::filesystem::path& path) {
+    std::string extension = utf8(path.extension());
+    std::ranges::transform(extension, extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (extension == ".elara") {
+        auto song = io::loadNative(path);
+        if (!song) {
+            return std::unexpected(song.error().message);
+        }
+        return std::move(*song);
+    }
+    std::expected<io::ImportResult, io::FormatError> imported =
+        std::unexpected(io::FormatError{.message = "unsupported file type"});
+    if (extension == ".musicxml" || extension == ".xml" || extension == ".mxl") {
+        imported = io::importMusicXmlFile(path);
+    } else if (extension == ".mid" || extension == ".midi" || extension == ".smf") {
+        imported = io::importMidiFile(path);
+    } else if (extension == ".gp" || extension == ".gpx" || extension == ".gp5" ||
+               extension == ".gp4" || extension == ".gp3") {
+        imported = io::importGuitarProFile(path);
+    }
+    if (!imported) {
+        return std::unexpected(imported.error().message);
+    }
+    return std::move(imported->song);
 }
 
 int fail(std::string_view message) {

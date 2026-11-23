@@ -61,6 +61,11 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | import the 20-track song from MIDI | 357 ms | first version: grids fitted per beat on every staff, voices, rhythms spelled |
 | 2026-11-23 | same | 287 ms | plain durations and grid spellings computed once instead of normalising fractions for every note |
 | 2026-11-23 | same | 40.5 ms | tracks written on all cores, warnings merged in track order: the same song on any number of threads. One thread still takes 287 ms, mostly fraction arithmetic in the grids: the place to look if single-core machines matter |
+| 2026-11-23 | load the Bravura SMuFL metadata | 10.5 ms | yyjson parse of a 1.2 MB file; done once per run |
+| 2026-11-23 | lay out one 500-measure staff of the large song (4000 two-note chords, 2000 beams) | 3.5 ms | first version, one thread: about 0.9 µs per chord; 12k glyphs, 15.5k lines |
+| 2026-11-23 | lay out 8 measures of that staff (a screenful) | 54 µs | relayout after an edit costs far less than a frame |
+| 2026-11-23 | lay out all 20 staves of the large song | 78 ms | one thread; staves are independent, so systems can lay them out in parallel when it shows |
+| 2026-11-23 | write the 500-measure staff as SVG (30k elements) | 29 ms | `std::format` per element; only tests and the CLI write SVG |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as
