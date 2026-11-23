@@ -22,6 +22,7 @@ namespace elara::audio::detail {
 struct FrameEvent {
     std::int64_t frame = 0;
     EventKind kind = EventKind::NoteOn;
+    Touch touch = Touch::Normal;
     int key = 60;
     int velocity = 80;
 };
@@ -34,6 +35,7 @@ eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
         if (event.track < tracks) {
             result[event.track].push_back({.frame = std::llround(event.time * rate),
                                            .kind = event.kind,
+                                           .touch = event.touch,
                                            .key = event.key,
                                            .velocity = event.velocity});
         }
@@ -125,7 +127,7 @@ void playTrack(Synth& synth, std::span<const FrameEvent> events, std::size_t& ne
             done = at;
         }
         if (event.kind == EventKind::NoteOn) {
-            synth.noteOn(event.key, event.velocity);
+            synth.noteOn(event.key, event.velocity, event.touch);
         } else {
             synth.noteOff(event.key);
         }

@@ -36,10 +36,12 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
             continue;
         }
         Fraction position = starts[m];
-        for (const Beat& beat : voice.beats) {
+        for (std::size_t b = 0; b < voice.beats.size(); ++b) {
+            const Beat& beat = voice.beats[b];
             const Fraction length = beat.duration.length();
             next.clear();
-            for (const Note& note : beat.notes) {
+            for (std::size_t n = 0; n < beat.notes.size(); ++n) {
+                const Note& note = beat.notes[n];
                 const int key = note.pitch.midiNumber();
                 const int string = note.position ? note.position->string : 0;
                 const auto joined = std::ranges::find_if(open, [&](const OpenNote& candidate) {
@@ -59,7 +61,9 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
                                .length = length,
                                .key = key,
                                .velocity = dynamicVelocity(note.effects.dynamic),
-                               .measure = m});
+                               .measure = m,
+                               .beat = b,
+                               .note = n});
             }
             std::swap(open, next);
             position += length;

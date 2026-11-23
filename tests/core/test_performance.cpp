@@ -58,10 +58,16 @@ TEST_CASE("Sounding notes start where their beat starts and last their written l
         beat(NoteValue::Eighth, {note(48)}),
         Beat{.duration = Duration(NoteValue::Eighth, 0, Tuplet(3, 2)), .notes = {note(50)}}};
 
+    // Each note also says where it was written: its measure, beat and note.
     const std::vector<SoundingNote> expected{
         {.start = Fraction(0), .length = Fraction(1, 4), .key = 60, .velocity = 80},
-        {.start = Fraction(1, 2), .length = Fraction(1, 2), .key = 64, .velocity = 80},
-        {.start = Fraction(1, 2), .length = Fraction(1, 2), .key = 67, .velocity = 112},
+        {.start = Fraction(1, 2), .length = Fraction(1, 2), .key = 64, .velocity = 80, .beat = 2},
+        {.start = Fraction(1, 2),
+         .length = Fraction(1, 2),
+         .key = 67,
+         .velocity = 112,
+         .beat = 2,
+         .note = 1},
         {.voice = 1,
          .start = Fraction(1),
          .length = Fraction(1, 8),
@@ -73,7 +79,8 @@ TEST_CASE("Sounding notes start where their beat starts and last their written l
          .length = Fraction(1, 12),
          .key = 50,
          .velocity = 80,
-         .measure = 1},
+         .measure = 1,
+         .beat = 1},
     };
     CHECK(soundingNotes(song) == expected);
 }
@@ -88,15 +95,27 @@ TEST_CASE("Tied notes sound as one note, across measures and only on the same pi
         beat(NoteValue::Quarter, {note(60, true)}), beat(NoteValue::Quarter),
         beat(NoteValue::Quarter, {note(60, true)})}; // after a rest: a new note
 
+    // A tied note keeps the place of its attack.
     const std::vector<SoundingNote> expected{
-        {.start = Fraction(1, 2), .length = Fraction(1), .key = 60, .velocity = 80},
-        {.start = Fraction(1, 2), .length = Fraction(1, 2), .key = 64, .velocity = 80},
-        {.start = Fraction(1), .length = Fraction(1, 4), .key = 65, .velocity = 80, .measure = 1},
+        {.start = Fraction(1, 2), .length = Fraction(1), .key = 60, .velocity = 80, .beat = 1},
+        {.start = Fraction(1, 2),
+         .length = Fraction(1, 2),
+         .key = 64,
+         .velocity = 80,
+         .beat = 1,
+         .note = 1},
+        {.start = Fraction(1),
+         .length = Fraction(1, 4),
+         .key = 65,
+         .velocity = 80,
+         .measure = 1,
+         .note = 1},
         {.start = Fraction(7, 4),
          .length = Fraction(1, 4),
          .key = 60,
          .velocity = 80,
-         .measure = 1},
+         .measure = 1,
+         .beat = 3},
     };
     CHECK(soundingNotes(song) == expected);
 }

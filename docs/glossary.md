@@ -72,6 +72,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | púa abajo / arriba | pick stroke | `PickStroke` | Down / up |
 | nota muerta | dead note | `deadNote` | |
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
+| ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
 | dinámica | dynamic | `Dynamic` | pp ... ff |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |

@@ -23,6 +23,7 @@ using elara::audio::peakLevel;
 using elara::audio::RenderOptions;
 using elara::audio::Sequence;
 using elara::audio::Timbre;
+using elara::audio::Touch;
 using elara::core::Beat;
 using elara::core::Duration;
 using elara::core::Dynamic;
@@ -178,10 +179,12 @@ TEST_CASE("OfflineRenderer: every event is dispatched at its time in frames", "[
 
     const int velocity = sequence.events().front().velocity;
     const auto on = [&](double seconds, int key) {
-        return LoggedEvent{frame(seconds), EventKind::NoteOn, 0, key, velocity};
+        return LoggedEvent{
+            .frame = frame(seconds), .kind = EventKind::NoteOn, .key = key, .velocity = velocity};
     };
     const auto off = [&](double seconds, int key) {
-        return LoggedEvent{frame(seconds), EventKind::NoteOff, 0, key, 0};
+        return LoggedEvent{
+            .frame = frame(seconds), .kind = EventKind::NoteOff, .key = key, .velocity = 0};
     };
     const std::vector<LoggedEvent> expected{on(0.0, 60), off(0.5, 60), on(0.5, 62), off(1.0, 62),
                                             on(1.0, 64), off(1.5, 64), on(1.5, 65), off(2.0, 65)};
@@ -267,4 +270,21 @@ TEST_CASE("OfflineRenderer: an empty song renders only the tail, silent", "[audi
     CHECK(stereo.size() == static_cast<std::size_t>(2 * frame(0.5)));
     CHECK(peakLevel(stereo) == 0.0f);
     CHECK(renderer.log().empty());
+}
+
+// Touches reach the synth (ADR-0022): a palm-muted note is logged as one and
+// is over long before an open note.
+TEST_CASE("OfflineRenderer: notes are struck with their touch", "[audio][render][articulation]") {
+    Song open = song({track("Guitar", InstrumentKind::Fretted, 25)}, 1);
+    beats(open, 0, 0) = {beat(NoteValue::Whole, {52})};
+    Song muted = open;
+    beats(muted, 0, 0)[0].notes[0].effects.palmMute = true;
+
+    const Sequence sequence(muted);
+    OfflineRenderer renderer(muted, sequence,
+                             {.sampleRate = kRate, .tail = 0.0, .logEvents = true});
+    const std::vector<float> quiet = renderer.renderRest();
+    REQUIRE_FALSE(renderer.log().empty());
+    CHECK(renderer.log().front().touch == Touch::PalmMute);
+    CHECK(peakLevel(frames(quiet, 1.0, 1.5)) < 0.01f * peakLevel(frames(render(open), 1.0, 1.5)));
 }

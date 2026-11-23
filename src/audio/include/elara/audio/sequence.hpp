@@ -2,6 +2,8 @@
 // The sequencer: a song as it is played, in seconds (ADR-0017).
 #pragma once
 
+#include <elara/audio/synth.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -21,7 +23,10 @@ struct PlayedMeasure {
     friend bool operator==(const PlayedMeasure&, const PlayedMeasure&) = default;
 };
 
-/// A note as it is played, in seconds from the start of the performance.
+/// A note as it is played, in seconds from the start of the performance,
+/// with its articulations applied (ADR-0022): its key is the pitch it sounds
+/// (a harmonic's partial), its velocity includes accents and ghosting, its end
+/// staccato and let ring, and its touch says how the string is struck.
 struct PlayedNote {
     std::size_t track = 0;
     std::size_t staff = 0;
@@ -31,6 +36,7 @@ struct PlayedNote {
     double end = 0.0;
     int key = 60; ///< sounding MIDI key; percussion: the General MIDI percussion key
     int velocity = 80;
+    Touch touch = Touch::Normal;
     friend bool operator==(const PlayedNote&, const PlayedNote&) = default;
 };
 
@@ -42,6 +48,7 @@ enum class EventKind : std::uint8_t { NoteOff, NoteOn };
 struct NoteEvent {
     double time = 0.0; ///< seconds from the start of the performance
     EventKind kind = EventKind::NoteOn;
+    Touch touch = Touch::Normal; ///< how a NoteOn strikes its key
     std::size_t track = 0;
     int key = 60;
     int velocity = 80;
