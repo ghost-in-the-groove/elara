@@ -4,7 +4,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cstddef>
+#include <cstdint>
 #include <stdexcept>
+#include <vector>
 
 using Catch::Matchers::WithinAbs;
 using elara::core::Duration;
@@ -100,4 +103,79 @@ TEST_CASE("Tempo rejects implausible speeds", "[core][timeline]") {
     CHECK_THROWS_AS(Tempo(Tempo::kMinBpm - 1), std::invalid_argument);
     CHECK_THROWS_AS(Tempo(Tempo::kMaxBpm + 1), std::invalid_argument);
     CHECK_THROWS_AS(Tempo(0), std::invalid_argument);
+}
+
+namespace {
+
+// A song of `count` empty measures.
+Song measures(std::size_t count) {
+    Song song;
+    song.appendMeasures(count);
+    return song;
+}
+
+// The alternate ending bit of the n-th time through.
+constexpr std::uint8_t ending(int n) {
+    return static_cast<std::uint8_t>(1U << (n - 1));
+}
+
+using Order = std::vector<std::size_t>;
+
+} // namespace
+
+TEST_CASE("Without repeats measures are played in order", "[core][timeline][repeats]") {
+    CHECK(measures(3).playOrder() == Order{0, 1, 2});
+    CHECK(measures(0).playOrder().empty());
+}
+
+TEST_CASE("A repeat plays its section as many times as it says", "[core][timeline][repeats]") {
+    Song song = measures(4);
+    song.measureHeader(1).repeatStart = true;
+    song.measureHeader(2).repeatTimes = 2;
+    CHECK(song.playOrder() == Order{0, 1, 2, 1, 2, 3});
+
+    song.measureHeader(2).repeatTimes = 3;
+    CHECK(song.playOrder() == Order{0, 1, 2, 1, 2, 1, 2, 3});
+}
+
+TEST_CASE("An end repeat without a start goes back to the start or to the previous repeat",
+          "[core][timeline][repeats]") {
+    Song song = measures(4);
+    song.measureHeader(1).repeatTimes = 2;
+    CHECK(song.playOrder() == Order{0, 1, 0, 1, 2, 3});
+
+    song.measureHeader(3).repeatTimes = 2;
+    CHECK(song.playOrder() == Order{0, 1, 0, 1, 2, 3, 2, 3});
+}
+
+TEST_CASE("Each time through plays only its alternate endings", "[core][timeline][repeats]") {
+    // |: 0 | 1 |1. 2 :|2. 3 | 4
+    Song song = measures(5);
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(2).alternateEndings = ending(1);
+    song.measureHeader(2).repeatTimes = 2;
+    song.measureHeader(3).alternateEndings = ending(2);
+    CHECK(song.playOrder() == Order{0, 1, 2, 0, 1, 3, 4});
+
+    // |: 0 | 1 |1.2. 2 :|3. 3 | 4, played three times
+    song.measureHeader(2).alternateEndings = ending(1) | ending(2);
+    song.measureHeader(2).repeatTimes = 3;
+    song.measureHeader(3).alternateEndings = ending(3);
+    CHECK(song.playOrder() == Order{0, 1, 2, 0, 1, 2, 0, 1, 3, 4});
+}
+
+TEST_CASE("After the alternate endings a new section starts", "[core][timeline][repeats]") {
+    // |: 0 |1. 1 :| 2 | 3 :|  - the second repeat goes back to measure 2
+    Song song = measures(4);
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(1).alternateEndings = ending(1);
+    song.measureHeader(1).repeatTimes = 2;
+    song.measureHeader(3).repeatTimes = 2;
+    CHECK(song.playOrder() == Order{0, 1, 0, 2, 3, 2, 3});
+}
+
+TEST_CASE("Endings for a time that never comes are not played", "[core][timeline][repeats]") {
+    Song song = measures(3);
+    song.measureHeader(1).alternateEndings = ending(3);
+    CHECK(song.playOrder() == Order{0, 2});
 }

@@ -90,6 +90,7 @@ on the number of threads (tested).
   archives are the compact choice for large scores.
 - Model features MusicXML lacks stay in the warning list until MusicXML (or a
   documented extension) can carry them. Notation features added to the model
-  (lyrics, repeats, grace notes...) need both directions and a round-trip case.
+  (lyrics, grace notes...) need both directions and a round-trip case, as
+  repeats and alternate endings got (ADR-0016).
 - `elara-cli export <song.elara> <out.musicxml|.mxl>` writes the file and prints
   the warnings.

@@ -236,7 +236,7 @@ TEST_CASE("MusicXML: voices are renumbered per staff and late voices padded", "[
 TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silently", "[musicxml]") {
     const ImportResult result = load("piano-voices.musicxml");
     CHECK(hasWarning(result, "chord symbol", "measure 1"));
-    CHECK(hasWarning(result, "repeat", "measure 2"));
+
     CHECK(hasWarning(result, "text", "measure 2"));
     CHECK(hasWarning(result, "lyric", "measure 2"));
     CHECK(hasWarning(result, "grace note", "measure 2"));
@@ -321,7 +321,7 @@ TEST_CASE("MusicXML: parts read on several threads give the same result as on on
         R"(<note><grace/><pitch><step>D</step><octave>4</octave></pitch><type>eighth</type></note>)",
         "",
         R"(<direction><direction-type><words>dolce</words></direction-type></direction>)",
-        "<barline><repeat direction=\"forward\"/></barline>"};
+        "<barline><fermata/></barline>"};
     std::string xml = R"(<score-partwise version="4.0"><part-list>)";
     for (std::size_t p = 0; p < kExtras.size(); ++p) {
         xml +=
@@ -385,6 +385,35 @@ TEST_CASE("MusicXML: notes without a type and gaps are written as standard value
                       R"(<duration>1</duration><type>16th</type></note>)"));
     CHECK(summary(voiceOf(result.song, 0, 0, 0)) == "4.=C4 4=r 16=r 4=r 16=D4");
     CHECK(result.warnings.empty());
+}
+
+TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[musicxml]") {
+    // |: 1 |1.2. 2 :|3. 3 |, played three times, as notation programs write it.
+    const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";
+    const ImportResult result = parse(
+        onePart(R"(<barline location="left"><bar-style>heavy-light</bar-style>)"
+                R"(<repeat direction="forward"/></barline>)" +
+                rest +
+                R"(</measure><measure number="2"><barline location="left">)"
+                R"(<ending number="1, 2" type="start">1., 2.</ending></barline>)" +
+                rest +
+                R"(<barline location="right"><bar-style>light-heavy</bar-style>)"
+                R"(<ending number="1, 2" type="stop"/><repeat direction="backward" times="3"/>)"
+                R"(</barline></measure><measure number="3"><barline location="left">)"
+                R"(<ending number="3" type="start">3.</ending></barline>)" +
+                rest +
+                R"(<barline location="right"><ending number="3" type="discontinue"/></barline>)"
+                R"(</measure><measure number="4">)" +
+                rest));
+    CHECK(result.warnings.empty());
+    const core::Song& song = result.song;
+    REQUIRE(song.measureCount() == 4);
+    CHECK(song.measureHeader(0).repeatStart);
+    CHECK(song.measureHeader(1).repeatTimes == 3);
+    CHECK(song.measureHeader(1).alternateEndings == 0b011);
+    CHECK(song.measureHeader(2).alternateEndings == 0b100);
+    CHECK(song.measureHeader(3).alternateEndings == 0);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 0, 1, 0, 2, 3});
 }
 
 TEST_CASE("MusicXML: a fifth voice on a staff is dropped with a warning", "[musicxml]") {

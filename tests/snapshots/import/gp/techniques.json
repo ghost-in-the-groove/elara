@@ -3,7 +3,6 @@
  "out": null,
  "warnings": [
   "section marks dropped (measure 1)",
-  "repeats dropped (written once) (measure 2)",
   "Lead Guitar: chord names and diagrams dropped (measure 3)",
   "Lead Guitar: grace notes dropped (measure 3)",
   "Lead Guitar: text dropped (measure 3)"
@@ -35,14 +34,22 @@
     ]
    },
    {
-    "keySignature": "G major"
+    "keySignature": "G major",
+    "repeatStart": true
    },
    {
     "timeSignature": "3/4",
-    "keySignature": "D major"
+    "keySignature": "D major",
+    "repeatTimes": 2,
+    "alternateEndings": [
+     1
+    ]
    },
    {
-    "keySignature": "D major"
+    "keySignature": "D major",
+    "alternateEndings": [
+     2
+    ]
    }
   ],
   "tracks": [

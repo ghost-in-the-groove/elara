@@ -42,6 +42,7 @@ using core::InstrumentKind;
 using core::KeyMode;
 using core::KeySignature;
 using core::Measure;
+using core::MeasureHeader;
 using core::Note;
 using core::NoteValue;
 using core::Pitch;
@@ -266,6 +267,9 @@ struct TrackData {
 struct HeaderData {
     TimeSignature time;
     KeySignature key;
+    bool repeatStart = false;
+    std::uint8_t repeatTimes = 0;
+    std::uint8_t alternateEndings = 0;
 };
 
 struct TempoMark {
@@ -440,15 +444,17 @@ private:
             if ((flags & 0x02U) != 0) {
                 denominator = in_.i8();
             }
-            if ((flags & 0x0CU) != 0) {
-                warnings_.add({}, "repeats dropped (written once)", m);
-            }
+            HeaderData header;
+            header.repeatStart = (flags & 0x04U) != 0;
             if (version_ < 500) {
+                // Guitar Pro 3 and 4 count the times the section is played again,
+                // and name one alternate ending: it takes every time up to its
+                // number that no earlier ending of the repeat took.
                 if ((flags & 0x08U) != 0) {
-                    in_.skip(1); // times played
+                    header.repeatTimes = repeatTimes(in_.u8() + 1);
                 }
                 if ((flags & 0x10U) != 0) {
-                    readAlternateEnding(m);
+                    header.alternateEndings = endingUpTo(in_.u8(), header.repeatStart);
                 }
                 if ((flags & 0x20U) != 0) {
                     readMarker(m);
@@ -457,8 +463,10 @@ private:
                     key = readKey(key, m);
                 }
             } else {
+                // Guitar Pro 5 counts the times the section is played, and keeps
+                // the alternate endings as bits (the first time in the lowest).
                 if ((flags & 0x08U) != 0) {
-                    in_.skip(1);
+                    header.repeatTimes = repeatTimes(in_.u8());
                 }
                 if ((flags & 0x20U) != 0) {
                     readMarker(m);
@@ -467,7 +475,7 @@ private:
                     key = readKey(key, m);
                 }
                 if ((flags & 0x10U) != 0) {
-                    readAlternateEnding(m);
+                    header.alternateEndings = in_.u8();
                 }
                 if ((flags & 0x03U) != 0) {
                     in_.skip(4); // beaming
@@ -487,13 +495,30 @@ private:
                                   m);
                 }
             }
-            headers_.push_back(HeaderData{.time = time, .key = key});
+            header.time = time;
+            header.key = key;
+            headers_.push_back(header);
         }
     }
 
-    void readAlternateEnding(std::size_t m) {
-        in_.skip(1);
-        warnings_.add({}, "alternate endings dropped", m);
+    static std::uint8_t repeatTimes(int times) {
+        return static_cast<std::uint8_t>(std::clamp(times, 2, 255));
+    }
+
+    // The times up to `number` that no earlier alternate ending of the current
+    // repeat takes (Guitar Pro 3 and 4).
+    [[nodiscard]] std::uint8_t endingUpTo(int number, bool repeatStartsHere) const {
+        unsigned taken = 0;
+        if (!repeatStartsHere) {
+            for (auto it = headers_.rbegin(); it != headers_.rend(); ++it) {
+                taken |= static_cast<unsigned>(it->alternateEndings);
+                if (it->repeatStart) {
+                    break;
+                }
+            }
+        }
+        const unsigned upTo = (1U << std::clamp(number, 0, MeasureHeader::kMaxEnding)) - 1U;
+        return static_cast<std::uint8_t>(upTo & ~taken);
     }
 
     void readMarker(std::size_t m) {
@@ -1076,8 +1101,12 @@ private:
         }
         song.appendMeasures(headers_.size());
         for (std::size_t m = 0; m < headers_.size(); ++m) {
-            song.measureHeader(m).timeSignature = headers_[m].time;
-            song.measureHeader(m).keySignature = headers_[m].key;
+            MeasureHeader& header = song.measureHeader(m);
+            header.timeSignature = headers_[m].time;
+            header.keySignature = headers_[m].key;
+            header.repeatStart = headers_[m].repeatStart;
+            header.repeatTimes = headers_[m].repeatTimes;
+            header.alternateEndings = headers_[m].alternateEndings;
         }
         if (startBpm_ >= core::Tempo::kMinBpm && startBpm_ <= core::Tempo::kMaxBpm) {
             song.setStartTempo(core::Tempo(startBpm_));

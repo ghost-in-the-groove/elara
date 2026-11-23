@@ -41,9 +41,11 @@ readers, which ignore entries they do not know.
   `effects`, empty trailing voices and measures are left out. Files stay small
   and a field added later has an obvious meaning when absent.
 - Layout: song `info`, start `tempo`, one entry per measure in `measures`
-  (time signature, key, tempo changes), then `tracks` with their `instrument`
-  and `staves`; a staff's `measures` is an array of measures, a measure an array
-  of voices, a voice an array of beats.
+  (time signature, key, tempo changes, `repeatStart`, `repeatTimes` and, in
+  `alternateEndings`, the times through a repeat such as `[1,2]`; ADR-0016),
+  then `tracks` with their `instrument` and `staves`; a staff's `measures` is
+  an array of measures, a measure an array of voices, a voice an array of
+  beats.
 
 **Libraries**, both MIT-licensed C libraries from vcpkg: **yyjson** (JSON read
 and write; one of the fastest parsers, small, no exceptions) and **miniz** (zip

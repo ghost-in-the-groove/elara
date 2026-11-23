@@ -61,7 +61,6 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     const core::Song& song = result.song;
     CHECK(result.warnings ==
           std::vector<std::string>{"section marks dropped (measure 1)",
-                                   "repeats dropped (written once) (measure 2)",
                                    "Lead Guitar: chord names and diagrams dropped (measure 3)",
                                    "Lead Guitar: grace notes dropped (measure 3)",
                                    "Lead Guitar: text dropped (measure 3)"});
@@ -72,6 +71,12 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     CHECK(song.info().words.empty());
     CHECK(song.info().transcriber == "Elara contributors");
     CHECK(song.info().notes == "Play with a pick\nSelf-made test file");
+    // Intro |: 2 |1. 3 :|2. 4 |
+    CHECK(song.measureHeader(1).repeatStart);
+    CHECK(song.measureHeader(2).repeatTimes == 2);
+    CHECK(song.measureHeader(2).alternateEndings == 0b01);
+    CHECK(song.measureHeader(3).alternateEndings == 0b10);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 1, 3});
 
     REQUIRE(song.measureCount() == 4);
     CHECK(song.startTempo() == core::Tempo(100));
@@ -168,6 +173,13 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
                                    "Drums: instrument and volume changes dropped (measure 2)",
                                    "Melody: trills dropped (measure 2)"});
     CHECK(core::validate(song).empty());
+    // |:1. 1 :|2. 2 |: one more time, and the second ending takes the times the
+    // first one leaves.
+    CHECK(song.measureHeader(0).repeatStart);
+    CHECK(song.measureHeader(0).repeatTimes == 2);
+    CHECK(song.measureHeader(0).alternateEndings == 0b01);
+    CHECK(song.measureHeader(1).alternateEndings == 0b10);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1});
     // Guitar Pro 4 has one author for words and music.
     CHECK(song.info().words == "Ghost in the Groove");
     CHECK(song.info().music == "Ghost in the Groove");

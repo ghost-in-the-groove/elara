@@ -3,7 +3,6 @@
  "out": null,
  "warnings": [
   "Piano: chord symbols dropped (measure 1)",
-  "Piano: repeats dropped (measure 2)",
   "Piano: text directions dropped (measure 2)",
   "Piano: lyrics dropped (measure 2)",
   "Piano: grace notes dropped (measure 2)"
@@ -29,7 +28,8 @@
      {
       "bpm": 80
      }
-    ]
+    ],
+    "repeatStart": true
    }
   ],
   "tracks": [

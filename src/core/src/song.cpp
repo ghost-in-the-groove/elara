@@ -4,6 +4,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace elara::core {
 
@@ -172,6 +173,45 @@ Fraction Song::measureStart(std::size_t measure) const {
         start += headers_[m].timeSignature.measureLength();
     }
     return start;
+}
+
+std::vector<std::size_t> Song::playOrder() const {
+    const std::size_t count = headers_.size();
+    const std::size_t limit = count * 256; // a guard: valid repeats stay far below it
+    std::vector<std::size_t> order;
+    order.reserve(count);
+    std::size_t start = 0; // first measure of the section being repeated
+    int time = 1;          // time through that section
+    bool jumped = false;   // the current measure was reached by repeating
+    std::size_t measure = 0;
+    while (measure < count && order.size() < limit) {
+        const MeasureHeader& header = headers_[measure];
+        if (header.repeatStart && !jumped) {
+            start = measure;
+            time = 1;
+        }
+        jumped = false;
+        const bool played = header.playedOnTime(time);
+        if (played) {
+            order.push_back(measure);
+            if (header.repeatEnd() && time < header.repeatTimes) {
+                ++time;
+                measure = start;
+                jumped = true;
+                continue;
+            }
+        }
+        // A new section starts after the last alternate ending, or after a
+        // finished repeat that no alternate ending follows.
+        const std::size_t next = measure + 1;
+        const bool nextIsEnding = next < count && headers_[next].alternateEndings != 0;
+        if (!nextIsEnding && (header.alternateEndings != 0 || (played && header.repeatEnd()))) {
+            start = next;
+            time = 1;
+        }
+        measure = next;
+    }
+    return order;
 }
 
 double Song::secondsAt(std::size_t measure, const Fraction& offset) const {

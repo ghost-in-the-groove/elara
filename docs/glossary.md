@@ -69,7 +69,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | vibrato | vibrato | `Vibrato` | |
 | dinámica | dynamic | `Dynamic` | pp ... ff |
-| repetición / casilla | repeat / volta | `Repeat`, `Volta` | |
+| repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
 | metrónomo | metronome | `Metronome` | |
 | bucle A-B | A-B loop | `LoopRange` | |

@@ -133,6 +133,13 @@ core::Song everythingSong() {
     song.measureHeader(2).keySignature = KeySignature(-1, KeyMode::Minor);
     song.measureHeader(3).timeSignature = TimeSignature(6, 8);
     song.measureHeader(3).keySignature = KeySignature(4, KeyMode::Major);
+    // |: 0 |1.2. 1 :|3. 2 |: 3 :|, the first repeat played three times
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(1).repeatTimes = 3;
+    song.measureHeader(1).alternateEndings = 0b011;
+    song.measureHeader(2).alternateEndings = 0b100;
+    song.measureHeader(3).repeatStart = true;
+    song.measureHeader(3).repeatTimes = 2;
 
     const Duration quarter(NoteValue::Quarter);
     const Duration eighth(NoteValue::Eighth);
@@ -333,9 +340,15 @@ core::Song randomSong(std::uint32_t seed) {
         } else {
             song.measureHeader(m) = song.measureHeader(m - 1).continuation();
         }
+        song.measureHeader(m).repeatStart = pick(0, 7) == 0;
+        song.measureHeader(m).repeatTimes =
+            pick(0, 7) == 0 ? static_cast<std::uint8_t>(pick(2, 4)) : std::uint8_t{0};
+        song.measureHeader(m).alternateEndings =
+            pick(0, 9) == 0 ? static_cast<std::uint8_t>(pick(1, 255)) : std::uint8_t{0};
         if (pick(0, 4) == 0) {
             song.measureHeader(m).tempoChanges.push_back(
-                TempoChange{.offset = Fraction(pick(0, 3), 8),
+                // Not at the very start, which is the song's tempo.
+                TempoChange{.offset = Fraction(pick(m == 0 ? 1 : 0, 3), 8),
                             .tempo = Tempo(static_cast<double>(pick(40, 220)))});
         }
     }

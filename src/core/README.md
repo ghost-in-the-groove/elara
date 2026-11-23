@@ -67,7 +67,9 @@ staves at once, and `addTrack` gives a new track as many measures as the song.
 Each `MeasureHeader` holds the time signature, the concert key and the tempo
 changes of its measure, so they move with it; new measures continue the meter
 and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
-`durationSeconds()` give the timeline (repeats are not unrolled yet).
+`durationSeconds()` give the timeline of the measures as written; the
+header's repeats and alternate endings say how they are played, and
+`playOrder()` lists the measures in that order (ADR-0016).
 Beat positions are derived from durations, never stored. How each instrument
 family is handled: `docs/instruments.md`.
 

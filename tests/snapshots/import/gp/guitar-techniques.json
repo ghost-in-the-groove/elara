@@ -2,7 +2,6 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
-  "repeats dropped (written once) (measure 2)",
   "Lead Guitar: grace notes dropped (measure 3)"
  ],
  "song": {
@@ -20,7 +19,8 @@
   },
   "measures": [
    {
-    "keySignature": "G major"
+    "keySignature": "G major",
+    "repeatStart": true
    },
    {
     "keySignature": "G major",
@@ -29,11 +29,19 @@
       "bpm": 80,
       "offset": "1/2"
      }
+    ],
+    "repeatTimes": 3,
+    "alternateEndings": [
+     1,
+     2
     ]
    },
    {
     "timeSignature": "3/4",
-    "keySignature": "G major"
+    "keySignature": "G major",
+    "alternateEndings": [
+     3
+    ]
    }
   ],
   "tracks": [

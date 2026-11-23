@@ -70,7 +70,7 @@ dependencies. Compressed `.mxl` files are zip archives read with miniz
   (`album`, `notes`) and, for what those leave empty, `credit`s.
 
 **Warnings, not failures.** What the model cannot hold yet (grace notes,
-lyrics, repeats, chord symbols, text, more than four voices...) is dropped and
+lyrics, chord symbols, text, more than four voices...) is dropped and
 listed in `ImportResult::warnings`, one line per part and feature with the
 first measure and a count, so users and tests see what was lost. Only an
 unreadable document is an error. Numbers are clamped where they are read, and
