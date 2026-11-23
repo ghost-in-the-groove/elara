@@ -322,19 +322,6 @@ Item {
                 radius: 2
                 color: "white"
 
-                // A click on a note moves playback to it; a drag still scrolls.
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    onTapped: (eventPoint, button) => {
-                        const scale = root.unit * root.shownZoom;
-                        const seconds = root.document.secondsAt(sheet.index,
-                                                                eventPoint.position.x / scale,
-                                                                eventPoint.position.y / scale);
-                        if (seconds >= 0)
-                            root.seekRequested(seconds);
-                    }
-                }
-
                 ScorePage {
                     anchors.fill: parent
                     document: root.document
@@ -395,14 +382,21 @@ Item {
                     }
                 }
 
-                // A click puts the caret on the beat and string under it.
+                // A click puts the caret on the beat and string under it and
+                // moves playback to that note; a drag still scrolls. One
+                // handler for both, so neither takes the click from the other.
                 TapHandler {
+                    acceptedButtons: Qt.LeftButton
                     gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: eventPoint => {
                         const scale = root.unit * root.shownZoom;
+                        const x = eventPoint.position.x / scale;
+                        const y = eventPoint.position.y / scale;
+                        const seconds = root.document.secondsAt(sheet.index, x, y);
                         root.forceActiveFocus();
-                        root.document.placeCaret(sheet.index, eventPoint.position.x / scale,
-                                                 eventPoint.position.y / scale);
+                        root.document.placeCaret(sheet.index, x, y);
+                        if (seconds >= 0)
+                            root.seekRequested(seconds);
                     }
                 }
             }
