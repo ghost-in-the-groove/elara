@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone.
+// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone, tune.
 #include <elara/audio/offline_renderer.hpp>
+#include <elara/audio/pitch_detector.hpp>
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
+#include <elara/audio/wav_reader.hpp>
 #include <elara/audio/wav_writer.hpp>
 
 #include "common.hpp"
@@ -364,6 +366,92 @@ int runPlay(bool json, const PlayOptions& options) {
                     : fail("playback did not finish; the audio callback may not be running");
 }
 
+struct TuneOptions {
+    std::string file;
+    double a4Hz = 440.0;
+    std::string tuning;
+};
+
+// Cents with a sign and one decimal, never "-0.0".
+std::string signedCents(double cents) {
+    const double rounded = std::round(cents * 10.0) / 10.0;
+    return std::format("{:+.1f}", rounded == 0.0 ? 0.0 : rounded);
+}
+
+// The tuner's reading of a recording: the median pitch of the windows, half a
+// window apart, where the detector hears one clearly.
+int runTune(bool json, const TuneOptions& options) {
+    std::optional<core::Tuning> tuning;
+    if (!options.tuning.empty()) {
+        tuning = tuningFromOption(options.tuning);
+        if (!tuning) {
+            return usageError(std::format("unknown tuning: {}", options.tuning));
+        }
+    }
+    const auto wav = audio::readWav(options.file);
+    if (!wav) {
+        return fail(std::format("{}: {}", options.file, wav.error()));
+    }
+    const double rate = wav->format.sampleRate;
+    if (rate <= 2.0 * audio::PitchDetector::kMaxFrequency) {
+        return fail(std::format("{}: a sample rate of {} Hz is too low for the tuner", options.file,
+                                wav->format.sampleRate));
+    }
+    const std::vector<float> samples = wav->mono();
+    audio::PitchDetector detector(rate);
+    const std::size_t window = detector.frameSize();
+    std::size_t windows = 0;
+    std::vector<audio::PitchEstimate> heard;
+    for (std::size_t at = 0; at + window <= samples.size(); at += window / 2) {
+        ++windows;
+        if (const auto estimate = detector.detect(std::span(samples).subspan(at, window))) {
+            heard.push_back(*estimate);
+        }
+    }
+    if (heard.empty()) {
+        return fail(std::format("{}: no clear pitch", options.file));
+    }
+    std::ranges::sort(heard, {}, &audio::PitchEstimate::frequency);
+    const std::size_t middle = heard.size() / 2;
+    const double frequency = heard.size() % 2 == 1
+                                 ? heard[middle].frequency
+                                 : (heard[middle - 1].frequency + heard[middle].frequency) / 2.0;
+    double clarity = 0.0;
+    for (const audio::PitchEstimate& estimate : heard) {
+        clarity += estimate.clarity;
+    }
+    clarity /= static_cast<double>(heard.size());
+    const auto reading = audio::tunerReading(frequency, options.a4Hz, tuning);
+    if (!reading) {
+        return fail(std::format("{}: {} Hz has no note", options.file, frequency));
+    }
+
+    if (json) {
+        std::string out = std::format(
+            R"({{"file":"{}","sampleRate":{},"windows":{},"pitched":{},"a4":{},"frequency":{},"note":"{}","cents":{},"clarity":{})",
+            jsonEscape(options.file), wav->format.sampleRate, windows, heard.size(),
+            jsonNumber(options.a4Hz), jsonNumber(frequency), reading->note.toString(),
+            jsonNumber(reading->cents), jsonNumber(clarity));
+        if (tuning) {
+            out += std::format(R"(,"tuning":"{}","string":{},"stringPitch":"{}","stringCents":{})",
+                               tuning->toString(), reading->string,
+                               tuning->openString(reading->string).toString(),
+                               jsonNumber(reading->stringCents));
+        }
+        std::cout << out << "}\n";
+        return kExitOk;
+    }
+    std::cout << std::format("{} {} cents ({:.2f} Hz, clarity {:.2f}, {} of {} windows)\n",
+                             reading->note.toString(), signedCents(reading->cents), frequency,
+                             clarity, heard.size(), windows);
+    if (tuning) {
+        std::cout << std::format("string {} ({}) {} cents\n", reading->string,
+                                 tuning->openString(reading->string).toString(),
+                                 signedCents(reading->stringCents));
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addAudioCommands(CLI::App& app, Context& context) {
@@ -428,6 +516,19 @@ void addAudioCommands(CLI::App& app, Context& context) {
     auto* tone = app.add_subcommand("tone", "Play a sine test tone on the default output device");
     addToneOptions(*tone, *play);
     tone->callback([&context, play] { context.exitCode = runTone(context.json, *play); });
+
+    auto tuned = std::make_shared<TuneOptions>();
+    auto* tune = app.add_subcommand(
+        "tune", "Detect the pitch of a WAV recording, as a tuner would: the nearest note, how many "
+                "cents off, and with --tuning the nearest open string");
+    tune->add_option("file", tuned->file, "A WAV file (PCM or float, any channels)")->required();
+    tune->add_option("--a4", tuned->a4Hz, "Reference frequency of A4 in Hz")
+        ->check(CLI::Range(400.0, 480.0))
+        ->capture_default_str();
+    tune->add_option("--tuning", tuned->tuning,
+                     "Name the nearest open string of a preset (\"guitar\", \"bass-5\") or of "
+                     "open strings (\"D2 A2 D3 G3 B3 E4\")");
+    tune->callback([&context, tuned] { context.exitCode = runTune(context.json, *tuned); });
 }
 
 } // namespace elara::cli

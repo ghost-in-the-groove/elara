@@ -28,6 +28,7 @@ one that replaces them.
 | [0020](0020-track-mix.md) | The track mix | Accepted |
 | [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
+| [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
 
 ## Template
 
