@@ -9,6 +9,7 @@ one that replaces them.
 | [0001](0001-technology-stack.md) | Technology stack | Accepted |
 | [0002](0002-juce-as-headless-audio-library.md) | JUCE as a headless audio library | Accepted |
 | [0003](0003-headless-verification.md) | Headless verification | Accepted |
+| [0004](0004-song-model.md) | Song model | Accepted |
 
 ## Template
 

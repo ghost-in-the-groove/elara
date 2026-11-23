@@ -36,7 +36,22 @@ the same (`isEnharmonicWith`). Spelling from context (key signature) comes with
 Tablature frets are written relative to the capo: with a capo at 2, fret 0 on the
 sixth string of a guitar sounds F#2.
 
-All of these are small `constexpr` value types without allocation; keep them
+## Song structure
+
+`Song > Track > Staff > Measure > Voice > Beat > Note` (ADR-0004).
+
+| Header | What it gives you |
+|---|---|
+| `measure.hpp` | `Note` (sounding `Pitch` + optional `FretPosition`), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
+| `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. |
+| `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`), `Track` (instrument + staves, `fromPreset()`), `MeasureHeader`, `SongInfo`, `Song`. |
+
+`Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
+staves at once, and `addTrack` gives a new track as many measures as the song.
+Beat positions are derived from durations, never stored. How each instrument
+family is handled: `docs/instruments.md`.
+
+The time types above are small `constexpr` value types without allocation; keep them
 that way, the sequencer and layout engine run them in hot loops
 (`python scripts/elara.py bench`).
 
