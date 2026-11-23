@@ -16,6 +16,18 @@ Item {
     property real zoom: 1.0
     readonly property real minZoom: 0.25
     readonly property real maxZoom: 4.0
+    /// Seconds into the song where the playback cursor stands; negative hides it.
+    property real cursorSeconds: -1
+    /// Scroll so that the cursor stays in view as it moves.
+    property bool followCursor: false
+    property color cursorColor: "#3f6ad8"
+    /// A click on the score asks to move playback there.
+    signal seekRequested(real seconds)
+    /// Where the cursor stands (ScoreDocument.cursorAt), empty when hidden.
+    /// Reading pageCount makes it follow relayouts too.
+    readonly property var cursor: cursorSeconds >= 0 && document.pageCount > 0
+                                  ? document.cursorAt(cursorSeconds) : ({})
+    readonly property bool cursorShown: cursor.page !== undefined
     /// The page under the middle of the view, from 1.
     readonly property int currentPage: Math.max(1, Math.min(document.pageCount,
                                                            Math.floor(centre) + 1))
@@ -204,6 +216,46 @@ Item {
         }
     }
 
+    // Brings the cursor into view when it leaves it: a third of the way down,
+    // and horizontally when the page is wider than the view.
+    onCursorChanged: {
+        if (!followCursor || !cursorShown || zooming)
+            return;
+        const scale = unit * shownZoom;
+        const top = cursor.page * (pageHeight + gap) + (cursor.y - 6) * scale;
+        const bottom = top + (cursor.height + 12) * scale;
+        if (top < list.contentY || bottom > list.contentY + list.height) {
+            const highest = list.originY - list.topMargin;
+            const lowest = list.originY + list.contentHeight + list.bottomMargin - list.height;
+            followY.to = Math.max(highest, Math.min(lowest, top - list.height / 3));
+            followY.restart();
+        }
+        const x = playhead.x;
+        if (list.contentWidth > list.width && (x < list.contentX + 40
+                                               || x > list.contentX + list.width - 40)) {
+            followX.to = Math.max(0, Math.min(list.contentWidth - list.width,
+                                              x - list.width / 3));
+            followX.restart();
+        }
+    }
+
+    NumberAnimation {
+        id: followY
+
+        target: list
+        property: "contentY"
+        duration: 420
+        easing.type: Easing.InOutCubic
+    }
+    NumberAnimation {
+        id: followX
+
+        target: list
+        property: "contentX"
+        duration: 420
+        easing.type: Easing.InOutCubic
+    }
+
     // Keep the page under the middle of the view in place while zooming.
     onShownZoomChanged: {
         zooming = true;
@@ -269,6 +321,19 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 radius: 2
                 color: "white"
+
+                // A click on a note moves playback to it; a drag still scrolls.
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onTapped: (eventPoint, button) => {
+                        const scale = root.unit * root.shownZoom;
+                        const seconds = root.document.secondsAt(sheet.index,
+                                                                eventPoint.position.x / scale,
+                                                                eventPoint.position.y / scale);
+                        if (seconds >= 0)
+                            root.seekRequested(seconds);
+                    }
+                }
 
                 ScorePage {
                     anchors.fill: parent
@@ -375,6 +440,37 @@ Item {
             NumberAnimation {
                 duration: 180
             }
+        }
+    }
+
+    // The playback cursor: a line across the system, over the pages.
+    Rectangle {
+        id: playhead
+
+        readonly property real scale: root.unit * root.shownZoom
+
+        objectName: "playhead"
+        parent: list.contentItem
+        z: 2
+        visible: root.cursorShown
+        width: Math.max(2, 0.28 * scale)
+        radius: width / 2
+        color: root.cursorColor
+        opacity: 0.9
+        x: root.cursorShown ? (list.contentWidth - root.pageWidth) / 2 + root.cursor.x * scale
+                              - width / 2 : 0
+        y: root.cursorShown ? root.cursor.page * (root.pageHeight + root.gap)
+                              + (root.cursor.y - 2) * scale : 0
+        height: root.cursorShown ? (root.cursor.height + 4) * scale : 0
+
+        // A soft glow either side.
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 5
+            height: parent.height
+            radius: width / 2
+            color: root.cursorColor
+            opacity: 0.12
         }
     }
 

@@ -54,4 +54,19 @@ const InstrumentPreset* findInstrumentPreset(std::string_view id) noexcept {
     return found == kPresets.end() ? nullptr : &*found;
 }
 
+namespace {
+
+constexpr std::array kDrumPieces{
+    DrumPiece{49, "Crash cymbal"}, DrumPiece{42, "Closed hi-hat"}, DrumPiece{46, "Open hi-hat"},
+    DrumPiece{51, "Ride cymbal"},  DrumPiece{53, "Ride bell"},     DrumPiece{50, "High tom"},
+    DrumPiece{47, "Mid tom"},      DrumPiece{38, "Snare"},         DrumPiece{37, "Side stick"},
+    DrumPiece{43, "Floor tom"},    DrumPiece{36, "Bass drum"},     DrumPiece{44, "Hi-hat pedal"},
+};
+
+} // namespace
+
+std::span<const DrumPiece> drumPieces() noexcept {
+    return kDrumPieces;
+}
+
 } // namespace elara::core

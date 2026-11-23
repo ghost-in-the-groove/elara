@@ -6,7 +6,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -16,9 +18,13 @@ using elara::audio::NoteEvent;
 using elara::audio::PlayedMeasure;
 using elara::audio::PlayedNote;
 using elara::audio::Sequence;
+using elara::audio::Touch;
+using elara::core::Accent;
 using elara::core::Beat;
 using elara::core::Duration;
+using elara::core::Dynamic;
 using elara::core::Fraction;
+using elara::core::HarmonicKind;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 using elara::core::Note;
@@ -29,6 +35,7 @@ using elara::core::Staff;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::Track;
+using elara::core::Tuning;
 
 namespace {
 
@@ -55,6 +62,43 @@ Beat beat(NoteValue value, std::vector<Note> notes = {}) {
 
 std::vector<Beat>& voice(Song& song, std::size_t measure, std::size_t v = 0) {
     return song.track(0).staff(0).measure(measure).voices.at(v).beats;
+}
+
+// `measures` measures of 4/4 at quarter = 120 on a guitar in standard tuning.
+Song guitarSong(std::size_t measures) {
+    Song song;
+    song.addTrack(Track("Guitar", Instrument{.name = "Guitar", .kind = InstrumentKind::Fretted},
+                        {Staff(elara::core::Clef::Treble8vb, Tuning::preset("guitar"))}));
+    song.appendMeasures(measures);
+    return song;
+}
+
+Note fretted(const Song& song, int string, int fret) {
+    return song.track(0).staff(0).frettedNote(string, fret);
+}
+
+std::vector<int> velocities(const Sequence& sequence) {
+    std::vector<int> result;
+    for (const PlayedNote& note : sequence.notes()) {
+        result.push_back(note.velocity);
+    }
+    return result;
+}
+
+std::vector<int> keys(const Sequence& sequence) {
+    std::vector<int> result;
+    for (const PlayedNote& note : sequence.notes()) {
+        result.push_back(note.key);
+    }
+    return result;
+}
+
+std::vector<Touch> touches(const Sequence& sequence) {
+    std::vector<Touch> result;
+    for (const PlayedNote& note : sequence.notes()) {
+        result.push_back(note.touch);
+    }
+    return result;
 }
 
 std::vector<std::size_t> writtenOrder(const Sequence& sequence) {
@@ -113,6 +157,36 @@ TEST_CASE("Sequence: repeats play their measures again", "[audio][sequence]") {
     CHECK_THAT(notes[1].start, WithinAbs(2.0, kEpsilon));
     CHECK(notes[2].key == 62);
     CHECK_THAT(notes[2].start, WithinAbs(4.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: the played measure at a time", "[audio][sequence]") {
+    // |: 0 :| 1, two seconds each: played 0 (0-2 s), 0 (2-4 s), 1 (4-6 s).
+    Song song = pianoSong(2);
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+    const Sequence sequence(song);
+    CHECK(sequence.playedMeasureAt(-1.0) == 0);
+    CHECK(sequence.playedMeasureAt(0.0) == 0);
+    CHECK(sequence.playedMeasureAt(1.999) == 0);
+    CHECK(sequence.playedMeasureAt(2.0) == 1);
+    CHECK(sequence.playedMeasureAt(5.5) == 2);
+    CHECK(sequence.playedMeasureAt(6.0) == 2); // the end belongs to the last measure
+    CHECK(sequence.playedMeasureAt(60.0) == 3);
+    CHECK(Sequence(pianoSong(0)).playedMeasureAt(0.0) == 0);
+}
+
+TEST_CASE("Sequence: a time in a measure the first time it is played", "[audio][sequence]") {
+    // |: 0 :| 1, two seconds each: played 0 (0-2 s), 0 (2-4 s), 1 (4-6 s).
+    Song song = pianoSong(2);
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+    const Sequence sequence(song);
+    REQUIRE(sequence.secondsAt(0, 0.0).has_value());
+    CHECK_THAT(*sequence.secondsAt(0, 0.0), WithinAbs(0.0, kEpsilon));
+    CHECK_THAT(*sequence.secondsAt(0, 0.5), WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(*sequence.secondsAt(1, 0.25), WithinAbs(4.5, kEpsilon));
+    CHECK_THAT(*sequence.secondsAt(1, 2.0), WithinAbs(6.0, kEpsilon)); // clamped to the measure
+    CHECK_FALSE(sequence.secondsAt(2, 0.0).has_value());               // never played
 }
 
 TEST_CASE("Sequence: every measure keeps the tempo written there", "[audio][sequence]") {
@@ -228,4 +302,138 @@ TEST_CASE("Sequence: a key struck by two voices at once is struck once", "[audio
     CHECK(sequence.events()[0].kind == EventKind::NoteOn);
     CHECK(sequence.events()[1].kind == EventKind::NoteOff);
     CHECK_THAT(sequence.events()[1].time, WithinAbs(2.0, kEpsilon));
+}
+
+// Articulations (ADR-0022).
+TEST_CASE("Sequence: accents, marcato and ghost notes play louder or softer by dynamics",
+          "[audio][sequence][articulation]") {
+    Song song = pianoSong(2);
+    const auto with = [](int key, Accent accent, bool ghost, Dynamic dynamic = Dynamic::MF) {
+        Note result = note(key);
+        result.effects.accent = accent;
+        result.effects.ghost = ghost;
+        result.effects.dynamic = dynamic;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Quarter, {with(60, Accent::Accent, false)}),
+                      beat(NoteValue::Quarter, {with(62, Accent::Marcato, false)}),
+                      beat(NoteValue::Quarter, {with(64, Accent::None, true)}),
+                      beat(NoteValue::Quarter, {with(65, Accent::Marcato, false, Dynamic::FFF)})};
+    voice(song, 1) = {beat(NoteValue::Half, {with(67, Accent::Accent, true)}),
+                      beat(NoteValue::Half, {with(69, Accent::None, true, Dynamic::PPP)})};
+    const Sequence sequence(song);
+    // mf is 80; one dynamic is 16; the velocity stays within 1..127.
+    CHECK(velocities(sequence) == std::vector<int>{96, 112, 48, 127, 64, 1});
+    CHECK(sequence.events().front().velocity == 96);
+}
+
+TEST_CASE("Sequence: staccato notes sound half their written length",
+          "[audio][sequence][articulation]") {
+    Song song = pianoSong(1);
+    Note shortened = note(60);
+    shortened.effects.staccato = true;
+    voice(song, 0) = {beat(NoteValue::Half, {shortened}), beat(NoteValue::Half, {note(62)})};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 2);
+    CHECK_THAT(sequence.notes()[0].end, WithinAbs(0.5, kEpsilon));
+    CHECK_THAT(sequence.notes()[1].start, WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(sequence.notes()[1].end, WithinAbs(2.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: let ring holds a note until its string is struck again",
+          "[audio][sequence][articulation]") {
+    Song song = guitarSong(2);
+    const auto ringing = [&](int string, int fret) {
+        Note result = fretted(song, string, fret);
+        result.effects.letRing = true;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Quarter, {ringing(1, 0)}),
+                      beat(NoteValue::Quarter, {ringing(2, 1)}),
+                      beat(NoteValue::Quarter, {fretted(song, 3, 2)}),
+                      beat(NoteValue::Quarter, {fretted(song, 1, 3)})};
+    voice(song, 1) = {beat(NoteValue::Half, {fretted(song, 2, 0), ringing(4, 2)}),
+                      beat(NoteValue::Half)};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 6);
+    const auto endOf = [&](int key) {
+        const auto found = std::ranges::find(sequence.notes(), key, &PlayedNote::key);
+        REQUIRE(found != sequence.notes().end());
+        return found->end;
+    };
+    CHECK_THAT(endOf(64), WithinAbs(1.5, kEpsilon)); // string 1 struck again at 1.5
+    CHECK_THAT(endOf(60), WithinAbs(2.0, kEpsilon)); // string 2 struck again at 2.0
+    CHECK_THAT(endOf(57), WithinAbs(1.5, kEpsilon)); // no let ring: as written
+    CHECK_THAT(endOf(52), WithinAbs(4.0, kEpsilon)); // never struck again: to the end
+}
+
+TEST_CASE("Sequence: palm mutes, dead notes and harmonics strike the string their own way",
+          "[audio][sequence][articulation]") {
+    Song song = guitarSong(1);
+    const auto played = [&](bool palmMute, bool dead, HarmonicKind harmonic) {
+        Note result = fretted(song, 6, 12);
+        result.effects.palmMute = palmMute;
+        result.effects.deadNote = dead;
+        result.effects.harmonic = {.kind = harmonic, .fretTenths = 120};
+        return result;
+    };
+    voice(song, 0) = {
+        beat(NoteValue::Eighth, {played(true, false, HarmonicKind::None)}),
+        beat(NoteValue::Eighth, {played(false, true, HarmonicKind::None)}),
+        beat(NoteValue::Eighth, {played(false, false, HarmonicKind::Natural)}),
+        beat(NoteValue::Eighth, {played(true, true, HarmonicKind::Natural)}),
+        beat(NoteValue::Eighth, {played(true, false, HarmonicKind::Natural)}),
+        beat(NoteValue::Eighth, {played(false, false, HarmonicKind::None)}),
+    };
+    const Sequence sequence(song);
+    // A dead note is dead whatever else it is; a harmonic beats a palm mute.
+    CHECK(touches(sequence) == std::vector<Touch>{Touch::PalmMute, Touch::Dead, Touch::Harmonic,
+                                                  Touch::Dead, Touch::Harmonic, Touch::Normal});
+    std::vector<Touch> struck;
+    for (const NoteEvent& event : sequence.events()) {
+        if (event.kind == EventKind::NoteOn) {
+            struck.push_back(event.touch);
+        }
+    }
+    CHECK(struck == touches(sequence));
+    CHECK(sizeof(NoteEvent) == 32); // the touch fits in padding
+}
+
+TEST_CASE("Sequence: a harmonic sounds the partial of its node",
+          "[audio][sequence][articulation]") {
+    Song song = guitarSong(1);
+    const auto harmonic = [&](int string, int fret, HarmonicKind kind, int tenths) {
+        Note result = fretted(song, string, fret);
+        result.effects.harmonic = {.kind = kind, .fretTenths = static_cast<std::int16_t>(tenths)};
+        return result;
+    };
+    voice(song, 0) = {
+        beat(NoteValue::Eighth, {harmonic(6, 7, HarmonicKind::Natural, 70)}),   // E2 + 19
+        beat(NoteValue::Eighth, {harmonic(6, 12, HarmonicKind::Natural, 120)}), // E2 + 12
+        beat(NoteValue::Eighth, {harmonic(6, 5, HarmonicKind::Natural, 50)}),   // E2 + 24
+        beat(NoteValue::Eighth, {harmonic(6, 1, HarmonicKind::Natural, 10)}),   // no node
+        beat(NoteValue::Eighth, {harmonic(3, 2, HarmonicKind::Artificial, 120)}),
+        beat(NoteValue::Eighth, {harmonic(3, 2, HarmonicKind::Pinch, 70)}),
+        beat(NoteValue::Eighth, {harmonic(3, 2, HarmonicKind::Tapped, 120)}),
+        beat(NoteValue::Eighth, {harmonic(3, 2, HarmonicKind::Semi, 120)}),
+    };
+    const Sequence sequence(song);
+    CHECK(keys(sequence) == std::vector<int>{59, 52, 64, 41, 69, 76, 69, 57});
+}
+
+TEST_CASE("Sequence: drum notes take accents and ghosting, but no touch or partial",
+          "[audio][sequence][articulation]") {
+    Song song;
+    song.addTrack(Track("Drums", Instrument{.kind = InstrumentKind::Percussion}, {Staff{}}));
+    song.appendMeasures(1);
+    Note snare = note(38);
+    snare.effects.ghost = true;
+    snare.effects.deadNote = true;
+    snare.effects.harmonic = {.kind = HarmonicKind::Artificial, .fretTenths = 120};
+    voice(song, 0) = {beat(NoteValue::Whole, {snare})};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 1);
+    CHECK(sequence.notes()[0].key == 38);
+    CHECK(sequence.notes()[0].velocity == 48);
+    CHECK(sequence.notes()[0].touch == Touch::Normal);
 }

@@ -144,6 +144,17 @@ std::string_view kindName(audio::EventKind kind) {
     return kind == audio::EventKind::NoteOn ? "on" : "off";
 }
 
+// How a note is struck (ADR-0022), printed only when it is not normal.
+std::string touchJson(audio::Touch touch) {
+    return touch == audio::Touch::Normal ? std::string()
+                                         : std::format(R"(,"touch":"{}")", audio::touchName(touch));
+}
+
+std::string touchText(audio::Touch touch) {
+    return touch == audio::Touch::Normal ? std::string()
+                                         : std::format("  {}", audio::touchName(touch));
+}
+
 std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions& options) {
     std::string json = std::format(R"({{"file":"{}","duration":{},"measures":[)",
                                    jsonEscape(options.file), jsonNumber(sequence.duration()));
@@ -159,9 +170,10 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
         for (std::size_t i = 0; i < sequence.notes().size(); ++i) {
             const audio::PlayedNote& note = sequence.notes()[i];
             json += std::format(
-                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}}})",
+                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}{}}})",
                 i == 0 ? "" : ",", note.track, note.staff, note.voice, note.pass,
-                jsonNumber(note.start), jsonNumber(note.end), note.key, note.velocity);
+                jsonNumber(note.start), jsonNumber(note.end), note.key, note.velocity,
+                touchJson(note.touch));
         }
         json += ']';
     }
@@ -169,9 +181,10 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
         json += R"(,"events":[)";
         for (std::size_t i = 0; i < sequence.events().size(); ++i) {
             const audio::NoteEvent& event = sequence.events()[i];
-            json += std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},"velocity":{}}})",
-                                i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
-                                event.track, event.key, event.velocity);
+            json +=
+                std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},"velocity":{}{}}})",
+                            i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
+                            event.track, event.key, event.velocity, touchJson(event.touch));
         }
         json += ']';
     }
@@ -198,14 +211,16 @@ int runSequence(bool json, const SequenceOptions& options) {
     if (options.notes) {
         for (const audio::PlayedNote& note : sequence.notes()) {
             std::cout << std::format(
-                "{:9.3f} {:9.3f}  track {} staff {} voice {}  key {:3} velocity {:3}\n", note.start,
-                note.end, note.track, note.staff, note.voice, note.key, note.velocity);
+                "{:9.3f} {:9.3f}  track {} staff {} voice {}  key {:3} velocity {:3}{}\n",
+                note.start, note.end, note.track, note.staff, note.voice, note.key, note.velocity,
+                touchText(note.touch));
         }
     }
     if (options.events) {
         for (const audio::NoteEvent& event : sequence.events()) {
-            std::cout << std::format("{:9.3f} {:3}  track {}  key {:3} velocity {:3}\n", event.time,
-                                     kindName(event.kind), event.track, event.key, event.velocity);
+            std::cout << std::format("{:9.3f} {:3}  track {}  key {:3} velocity {:3}{}\n",
+                                     event.time, kindName(event.kind), event.track, event.key,
+                                     event.velocity, touchText(event.touch));
         }
     }
     return kExitOk;
@@ -283,10 +298,10 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
             body += R"(,"events":[)";
             for (std::size_t i = 0; i < log.size(); ++i) {
                 const audio::LoggedEvent& event = log[i];
-                body +=
-                    std::format(R"({}{{"frame":{},"kind":"{}","track":{},"key":{},"velocity":{}}})",
-                                i == 0 ? "" : ",", event.frame, kindName(event.kind), event.track,
-                                event.key, event.velocity);
+                body += std::format(
+                    R"({}{{"frame":{},"kind":"{}","track":{},"key":{},"velocity":{}{}}})",
+                    i == 0 ? "" : ",", event.frame, kindName(event.kind), event.track, event.key,
+                    event.velocity, touchJson(event.touch));
             }
             body += ']';
         }
@@ -305,8 +320,9 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     }
     if (options.events) {
         for (const audio::LoggedEvent& event : log) {
-            std::cout << std::format("{:10} {:3}  track {}  key {:3} velocity {:3}\n", event.frame,
-                                     kindName(event.kind), event.track, event.key, event.velocity);
+            std::cout << std::format("{:10} {:3}  track {}  key {:3} velocity {:3}{}\n",
+                                     event.frame, kindName(event.kind), event.track, event.key,
+                                     event.velocity, touchText(event.touch));
         }
     }
     return kExitOk;

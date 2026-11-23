@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
+#include <elara/core/transpose.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -18,8 +23,27 @@ const Voice& voiceAt(const Song& song, const Caret& caret) {
     return song.track(caret.track).staff(caret.staff).measure(caret.measure).voices.at(caret.voice);
 }
 
+bool isDrumStaff(const Staff& staff) {
+    return staff.clef() == Clef::Percussion;
+}
+
 int stringCountOf(const Staff& staff) {
-    return staff.isFretted() ? staff.tuning()->stringCount() : 1;
+    if (staff.isFretted()) {
+        return staff.tuning()->stringCount();
+    }
+    return isDrumStaff(staff) ? static_cast<int>(drumPieces().size()) : 1;
+}
+
+/// The General MIDI key of drum lane `lane` (1 is the top).
+int laneKey(int lane) {
+    return drumPieces()[static_cast<std::size_t>(lane - 1)].key;
+}
+
+/// Where a hit sits among the lanes; keys without a lane go after them.
+std::size_t laneOf(const Note& note) {
+    const auto pieces = drumPieces();
+    const auto found = std::ranges::find(pieces, note.pitch.midiNumber(), &DrumPiece::key);
+    return static_cast<std::size_t>(found - pieces.begin());
 }
 
 /// The furthest index a caret can have in its voice: the free slot of a voice
@@ -48,6 +72,105 @@ Entry unchanged(const Caret& caret) {
 
 bool isOnString(const Note& note, int string) {
     return note.position && note.position->string == string;
+}
+
+/// Steps from C0: C4 is 28, B4 34.
+int diatonicIndex(const Pitch& pitch) {
+    return pitch.octave() * 7 + static_cast<int>(pitch.step());
+}
+
+int floorDiv(int value, int divisor) {
+    const int quotient = value / divisor;
+    return quotient * divisor > value ? quotient - 1 : quotient;
+}
+
+/// The interval from the sound to the written note of an instrument written
+/// `offset` semitones above its sound: a major second for 2, an octave for 12.
+Interval writtenInterval(int offset) {
+    const int octaves = floorDiv(offset, 12);
+    const int chromatic = offset - 12 * octaves;
+    return Interval{.steps = static_cast<int>(std::lround(chromatic * 7.0 / 12.0)) + 7 * octaves,
+                    .semitones = offset};
+}
+
+Interval inverse(Interval interval) {
+    return Interval{.steps = -interval.steps, .semitones = -interval.semitones};
+}
+
+/// The written note of the middle line of a staff with `clef`, as a step index.
+int middleLine(Clef clef) {
+    constexpr int kB4 = 34;
+    constexpr int kD3 = 22;
+    constexpr int kC4 = 28;
+    constexpr int kA3 = 26;
+    switch (clef) {
+    case Clef::Bass:
+    case Clef::Bass8vb:
+        return kD3;
+    case Clef::Alto:
+        return kC4;
+    case Clef::Tenor:
+        return kA3;
+    case Clef::Treble:
+    case Clef::Treble8vb:
+    case Clef::Percussion:
+        break;
+    }
+    return kB4;
+}
+
+const Note& highest(const std::vector<Note>& notes) {
+    return *std::ranges::max_element(notes, {},
+                                     [](const Note& note) { return note.pitch.midiNumber(); });
+}
+
+/// The highest note of the last beat with notes before the caret's, in its
+/// voice, looking back through earlier measures.
+const Note* previousNote(const Song& song, const Caret& caret) {
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    for (std::size_t m = caret.measure + 1; m-- > 0;) {
+        const std::vector<Beat>& beats = staff.measure(m).voices.at(caret.voice).beats;
+        std::size_t end = m == caret.measure ? std::min(caret.beat, beats.size()) : beats.size();
+        while (end-- > 0) {
+            if (!beats[end].isRest()) {
+                return &highest(beats[end].notes);
+            }
+        }
+    }
+    return nullptr;
+}
+
+/// Where a note of `pitch` goes on a fretted staff: the caret's string when it
+/// reaches it, otherwise the nearest string that does, skipping `taken` strings.
+FretPosition placeOnString(const Staff& staff, const Pitch& pitch, int caretString,
+                           const std::vector<int>& taken) {
+    std::optional<FretPosition> best;
+    for (const FretPosition& position : staff.tuning()->positionsFor(pitch, staff.capo())) {
+        if (std::ranges::find(taken, int{position.string}) != taken.end()) {
+            continue;
+        }
+        const int distance = std::abs(position.string - caretString);
+        if (!best || distance < std::abs(best->string - caretString)) {
+            best = position;
+        }
+    }
+    if (!best) {
+        throw std::out_of_range("enterPitch: no string can play the note");
+    }
+    return *best;
+}
+
+/// The step index of a new note on `step`: above `top` within an octave for a
+/// chord, otherwise at most three steps from `reference`.
+int stepIndex(int wanted, int reference, bool above) {
+    int delta = (((wanted - reference) % 7) + 7) % 7;
+    if (above) {
+        return reference + (delta == 0 ? 7 : delta);
+    }
+    if (delta > 3) {
+        delta -= 7;
+    }
+    return reference + delta;
 }
 
 } // namespace
@@ -147,6 +270,120 @@ Entry enterFret(const Song& song, const Caret& at, int fret, Duration duration) 
     return replace(caret, std::move(content), "Enter note");
 }
 
+Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration, PitchMode mode) {
+    Caret caret = clampCaret(song, at);
+    const Track& track = song.track(caret.track);
+    const Staff& staff = track.staff(caret.staff);
+    if (staff.clef() == Clef::Percussion || track.instrument().kind == InstrumentKind::Percussion) {
+        throw std::logic_error("enterPitch: a percussion staff has no note names");
+    }
+    const Interval toWritten = writtenInterval(track.instrument().writtenOffset);
+    const KeySignature writtenKey =
+        transposed(song.measureHeader(caret.measure).keySignature, toWritten);
+    const auto written = [&](const Note& note) {
+        const std::optional<Pitch> pitch = transposed(note.pitch, toWritten);
+        return diatonicIndex(pitch ? *pitch : note.pitch);
+    };
+
+    Measure content = measureAt(song, caret);
+    std::vector<Beat>& beats = content.voices.at(caret.voice).beats;
+    const bool onBeat = caret.beat < beats.size();
+    const bool chord = mode == PitchMode::AddToChord && onBeat && !beats[caret.beat].isRest();
+
+    int index = 0;
+    if (chord) {
+        index = stepIndex(static_cast<int>(step), written(highest(beats[caret.beat].notes)), true);
+    } else {
+        const Note* previous = previousNote(song, caret);
+        index = stepIndex(static_cast<int>(step),
+                          previous ? written(*previous) : middleLine(staff.clef()), false);
+    }
+    const int octave = floorDiv(index, 7);
+    const int alter = writtenKey.alterFor(step);
+    const int midi = (octave + 1) * 12 + Pitch(step, 0, 4).midiNumber() - 60 + alter;
+    if (midi < 0 || midi > 127) {
+        throw std::out_of_range("enterPitch: the note leaves the MIDI range");
+    }
+    const std::optional<Pitch> sounding =
+        transposed(Pitch(step, alter, octave), inverse(toWritten));
+    if (!sounding) {
+        throw std::out_of_range("enterPitch: the note leaves the MIDI range");
+    }
+
+    Note note{.pitch = *sounding};
+    if (staff.isFretted()) {
+        std::vector<int> taken;
+        if (chord) {
+            for (const Note& existing : beats[caret.beat].notes) {
+                if (existing.position) {
+                    taken.push_back(existing.position->string);
+                }
+            }
+        }
+        note.position = placeOnString(staff, note.pitch, caret.string, taken);
+        caret.string = note.position->string;
+    }
+
+    if (!onBeat) {
+        beats.push_back(Beat{.duration = duration, .notes = {std::move(note)}});
+        return replace(caret, std::move(content), "Enter note");
+    }
+    std::vector<Note>& notes = beats[caret.beat].notes;
+    if (!chord) {
+        if (notes.size() == 1 && notes.front() == note) {
+            return unchanged(caret);
+        }
+        notes = {std::move(note)};
+    } else if (note.position) {
+        // Chords keep their notes from the highest string down.
+        const int string = note.position->string;
+        const auto lower = std::ranges::find_if(notes, [&](const Note& existing) {
+            return existing.position && existing.position->string > string;
+        });
+        notes.insert(lower, std::move(note));
+    } else {
+        notes.insert(notes.begin(), std::move(note)); // the highest note first
+    }
+    return replace(caret, std::move(content), "Enter note");
+}
+
+Entry shiftPitch(const Song& song, const Caret& at, int semitones) {
+    const Caret caret = clampCaret(song, at);
+    if (semitones == 0 || onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const KeySignature& key = song.measureHeader(caret.measure).keySignature;
+    Measure content = measureAt(song, caret);
+    std::vector<Note>& notes = content.voices.at(caret.voice).beats[caret.beat].notes;
+    bool changed = false;
+    for (Note& note : notes) {
+        if (staff.isFretted()) {
+            if (!isOnString(note, caret.string)) {
+                continue;
+            }
+            const int fret = note.position->fret + semitones;
+            if (fret < 0 || staff.capo() + fret > Tuning::kMaxFret) {
+                throw std::out_of_range("shiftPitch: the note leaves the neck");
+            }
+            const Note moved = staff.frettedNote(caret.string, fret);
+            note.pitch = key.spell(moved.pitch.midiNumber());
+            note.position = moved.position;
+        } else {
+            const int midi = note.pitch.midiNumber() + semitones;
+            if (midi < 0 || midi > 127) {
+                throw std::out_of_range("shiftPitch: the note leaves the MIDI range");
+            }
+            note.pitch = key.spell(midi);
+        }
+        changed = true;
+    }
+    if (!changed) {
+        return unchanged(caret);
+    }
+    return replace(caret, std::move(content), "Change pitch");
+}
+
 Entry setBeatDuration(const Song& song, const Caret& at, Duration duration) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
@@ -173,8 +410,15 @@ Entry deleteAtCaret(const Song& song, const Caret& at) {
         beats.erase(beat);
         return replace(caret, std::move(content), "Delete");
     }
-    const auto removed = std::ranges::remove_if(
-        beat->notes, [&](const Note& note) { return isOnString(note, caret.string); });
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const bool drums = isDrumStaff(staff);
+    const bool fretted = staff.isFretted();
+    const auto removed = std::ranges::remove_if(beat->notes, [&](const Note& note) {
+        if (drums) {
+            return note.pitch.midiNumber() == laneKey(caret.string);
+        }
+        return !fretted || isOnString(note, caret.string);
+    });
     if (removed.empty()) {
         return unchanged(caret);
     }
@@ -200,6 +444,33 @@ Entry insertRest(const Song& song, const Caret& at, Duration duration) {
     beats.insert(beats.begin() + static_cast<std::ptrdiff_t>(caret.beat),
                  Beat{.duration = duration});
     return replace(caret, std::move(content), "Insert rest");
+}
+
+Entry toggleDrum(const Song& song, const Caret& at, Duration duration) {
+    const Caret caret = clampCaret(song, at);
+    if (!isDrumStaff(song.track(caret.track).staff(caret.staff))) {
+        throw std::logic_error("toggleDrum: the staff is not a percussion staff");
+    }
+    const int key = laneKey(caret.string);
+    Note hit{.pitch = Pitch::fromMidi(key)};
+    Measure content = measureAt(song, caret);
+    std::vector<Beat>& beats = content.voices.at(caret.voice).beats;
+    if (caret.beat == beats.size()) {
+        beats.push_back(Beat{.duration = duration, .notes = {std::move(hit)}});
+        return replace(caret, std::move(content), "Enter note");
+    }
+    std::vector<Note>& notes = beats[caret.beat].notes;
+    const auto same = std::ranges::find_if(
+        notes, [key](const Note& note) { return note.pitch.midiNumber() == key; });
+    if (same != notes.end()) {
+        notes.erase(same);
+        return replace(caret, std::move(content), "Delete");
+    }
+    const std::size_t lane = laneOf(hit);
+    const auto below =
+        std::ranges::find_if(notes, [lane](const Note& note) { return laneOf(note) > lane; });
+    notes.insert(below, std::move(hit));
+    return replace(caret, std::move(content), "Enter note");
 }
 
 } // namespace elara::core
