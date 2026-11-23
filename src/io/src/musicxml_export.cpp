@@ -7,23 +7,21 @@
 
 #include "archive.hpp"
 #include "musicxml_shared.hpp"
+#include "parallel.hpp"
 #include "warnings.hpp"
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cctype>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <exception>
 #include <format>
 #include <numeric>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1495,18 +1493,6 @@ void writeHeader(XmlWriter& xml, std::string& out, const SongInfo& info) {
     }
 }
 
-unsigned threadsFor(const MusicXmlExportOptions& options, std::size_t work, std::size_t parts) {
-    if (parts <= 1) {
-        return 1;
-    }
-    unsigned threads = options.threads;
-    if (threads == 0) {
-        constexpr std::size_t kParallelWork = 20'000; // beats + notes; measured
-        threads = work < kParallelWork ? 1 : std::max(1U, std::thread::hardware_concurrency());
-    }
-    return static_cast<unsigned>(std::min<std::size_t>({threads, parts, 64}));
-}
-
 constexpr std::string_view kMxlContainer =
     R"(<?xml version="1.0" encoding="UTF-8"?>
 <container>
@@ -1566,7 +1552,10 @@ ExportResult exportMusicXml(const Song& song, const MusicXmlExportOptions& optio
     }
     writer.close("part-list");
 
-    const unsigned threads = threadsFor(options, work, parts.size());
+    constexpr std::size_t kParallelWork = 20'000; // beats + notes; measured
+    const unsigned threads =
+        parts.size() <= 1 ? 1U
+                          : detail::threadsFor(options.threads, work, kParallelWork, parts.size());
     if (threads <= 1) {
         for (PartWriter& part : parts) {
             XmlWriter partWriter(xml, 1, !options.compressed);
@@ -1576,31 +1565,11 @@ ExportResult exportMusicXml(const Song& song, const MusicXmlExportOptions& optio
         // Parts only read the song: each is written to its own text on any
         // thread, then joined in score order.
         std::vector<std::string> texts(parts.size());
-        std::atomic<std::size_t> next{0};
-        std::vector<std::exception_ptr> errors(threads);
-        std::vector<std::thread> workers;
-        workers.reserve(threads);
-        for (unsigned t = 0; t < threads; ++t) {
-            workers.emplace_back([&, t] {
-                try {
-                    for (std::size_t i = next++; i < parts.size(); i = next++) {
-                        texts[i].reserve(songScan.work[i] * kBytesPerItem * 2);
-                        XmlWriter partWriter(texts[i], 1, !options.compressed);
-                        parts[i].writePart(partWriter);
-                    }
-                } catch (...) {
-                    errors[t] = std::current_exception();
-                }
-            });
-        }
-        for (std::thread& worker : workers) {
-            worker.join();
-        }
-        for (const std::exception_ptr& error : errors) {
-            if (error) {
-                std::rethrow_exception(error);
-            }
-        }
+        detail::forEachIndex(0, parts.size(), threads, [&](std::size_t i) {
+            texts[i].reserve(songScan.work[i] * kBytesPerItem * 2);
+            XmlWriter partWriter(texts[i], 1, !options.compressed);
+            parts[i].writePart(partWriter);
+        });
         for (const std::string& text : texts) {
             xml += text;
         }

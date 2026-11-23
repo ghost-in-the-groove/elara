@@ -56,7 +56,12 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | same | 88 ms | one part per thread into separate buffers, joined in score order (ADR-0008); same text on any number of threads |
 | 2026-11-23 | export it as `.mxl` | 669 ms, 1.09 MB | deflate of the indented text dominates |
 | 2026-11-23 | same | 391 ms, 566 KB | archives get compact XML (no indentation), which halves what deflate reads; deflate level 1 was only 40 ms faster but gave 5.5 MB |
+| 2026-11-23 | export the 20-track song as MIDI (1.2 MB, 160k notes) | 84.7 ms | first version, one thread; the sounding notes alone take 15 ms |
+| 2026-11-23 | same | 45 ms | each track encoded on its own thread into its own chunk, joined in order (ADR-0009): the same bytes on any number of threads. One thread: 74 ms. What is left is mostly the sounding notes and the slowest track |
+| 2026-11-23 | import the 20-track song from MIDI | 357 ms | first version: grids fitted per beat on every staff, voices, rhythms spelled |
+| 2026-11-23 | same | 287 ms | plain durations and grid spellings computed once instead of normalising fractions for every note |
+| 2026-11-23 | same | 40.5 ms | tracks written on all cores, warnings merged in track order: the same song on any number of threads. One thread still takes 287 ms, mostly fraction arithmetic in the grids: the place to look if single-core machines matter |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as
-MusicXML and as `.mxl`.
+MusicXML, as `.mxl` and as MIDI.

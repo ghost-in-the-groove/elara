@@ -7,6 +7,7 @@ add_library(elara_core STATIC
   src/fraction.cpp
   src/instrument.cpp
   src/measure.cpp
+  src/performance.cpp
   src/pitch.cpp
   src/signature.cpp
   src/song.cpp

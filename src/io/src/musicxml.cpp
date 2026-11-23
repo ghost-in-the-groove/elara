@@ -5,12 +5,12 @@
 
 #include "archive.hpp"
 #include "musicxml_shared.hpp"
+#include "parallel.hpp"
 #include "warnings.hpp"
 #include <pugixml.hpp>
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <charconv>
 #include <cmath>
 #include <cstdlib>
@@ -22,7 +22,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1614,20 +1613,6 @@ SongInfo readInfo(pugi::xml_node score) {
     return info;
 }
 
-/// Threads for the parts after the first: one for small documents, where
-/// starting threads costs more than it saves (measured on the benchmark score).
-unsigned threadsFor(const MusicXmlOptions& options, std::size_t bytes, std::size_t parts) {
-    if (parts <= 1) {
-        return 1;
-    }
-    unsigned threads = options.threads;
-    if (threads == 0) {
-        constexpr std::size_t kParallelBytes = std::size_t{1} << 20;
-        threads = bytes < kParallelBytes ? 1 : std::max(1U, std::thread::hardware_concurrency());
-    }
-    return static_cast<unsigned>(std::min<std::size_t>({threads, parts - 1, 64}));
-}
-
 std::expected<ImportResult, FormatError> importScore(pugi::xml_node score, std::size_t bytes,
                                                      const MusicXmlOptions& options) {
     const std::vector<PartInfo> partList = readPartList(score);
@@ -1659,35 +1644,12 @@ std::expected<ImportResult, FormatError> importScore(pugi::xml_node score, std::
     if (!parts.empty()) {
         readPart(0);
     }
-    const unsigned threads = threadsFor(options, bytes, parts.size());
-    if (threads <= 1) {
-        for (std::size_t i = 1; i < parts.size(); ++i) {
-            readPart(i);
-        }
-    } else {
-        std::atomic<std::size_t> next{1};
-        std::vector<std::exception_ptr> errors(threads);
-        std::vector<std::thread> workers;
-        workers.reserve(threads);
-        for (unsigned t = 0; t < threads; ++t) {
-            workers.emplace_back([&, t] {
-                try {
-                    for (std::size_t i = next++; i < parts.size(); i = next++) {
-                        readPart(i);
-                    }
-                } catch (...) {
-                    errors[t] = std::current_exception();
-                }
-            });
-        }
-        for (std::thread& worker : workers) {
-            worker.join();
-        }
-        for (const std::exception_ptr& error : errors) {
-            if (error) {
-                std::rethrow_exception(error);
-            }
-        }
+    if (parts.size() > 1) {
+        // Threads only for large documents (measured on the benchmark score).
+        constexpr std::size_t kParallelBytes = std::size_t{1} << 20;
+        detail::forEachIndex(
+            1, parts.size(),
+            detail::threadsFor(options.threads, bytes, kParallelBytes, parts.size() - 1), readPart);
     }
     Warnings merged;
     for (const Warnings& part : warnings) {

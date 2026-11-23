@@ -19,8 +19,8 @@ elara-cli [--json] rests <N/D> <DURATION>...      # e.g. rests 6/8 8 -> 8 8 4.
 elara-cli [--json] new <FILE> [--title T] [--track PRESET]... [--measures 4] [--time 4/4]
                        [--key "C major"] [--tempo 120] [--force]
 elara-cli [--json] dump <FILE>                    # with --json: the whole model
-elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl
-elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl
+elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl, .mid, .midi, .smf
+elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 ```
 
@@ -34,11 +34,12 @@ dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
 where `song` is the file's complete `song.json`: the model snapshot later tests
 compare against. `import --json` prints `{"file", "format", "out", "warnings",
-"song", "durationSeconds", "issues"}`: `warnings` lists what the file had that
-the model cannot hold yet (ADR-0007); `--out` also saves the song as `.elara`.
-`export --json` writes MusicXML (compressed for `.mxl`) and prints `{"file",
-"out", "format", "compressed", "bytes", "warnings"}`, where `warnings` lists
-what MusicXML could not hold (ADR-0008).
+"song", "durationSeconds", "issues"}`, with `format` `musicxml` or `midi`:
+`warnings` lists what the file had that the model cannot hold yet (ADR-0007,
+ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes
+MusicXML (compressed for `.mxl`) or MIDI and prints `{"file", "out", "format",
+"compressed", "bytes", "warnings"}`, where `warnings` lists what the format
+could not hold (ADR-0008, ADR-0009).
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
