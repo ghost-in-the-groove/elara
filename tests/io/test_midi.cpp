@@ -17,6 +17,7 @@
 #include <tuple>
 #include <vector>
 
+using elara::core::Accent;
 using elara::core::Beat;
 using elara::core::Duration;
 using elara::core::Dynamic;
@@ -637,6 +638,101 @@ TEST_CASE("MIDI import quantizes played music to the written rhythm", "[io][midi
                                                       triplet, Duration(NoteValue::Quarter)});
     CHECK(keysOf(voice) == std::vector<int>{72, 73, 74, 75, 76, 77, 78});
     CHECK(imported->warnings.empty());
+}
+
+// The dynamic, accent and ghost flag of each note of a voice, in order.
+std::vector<std::tuple<Dynamic, Accent, bool>> loudnessOf(const elara::core::Voice& voice) {
+    std::vector<std::tuple<Dynamic, Accent, bool>> result;
+    for (const Beat& beat : voice.beats) {
+        for (const Note& note : beat.notes) {
+            result.emplace_back(note.effects.dynamic, note.effects.accent, note.effects.ghost);
+        }
+    }
+    return result;
+}
+
+// A flute playing quarter notes B4 at 96 ticks per quarter, one per velocity.
+std::vector<Event> quartersAt(const std::vector<int>& velocities) {
+    std::vector<Event> events{program(0, 0, 73)};
+    std::int64_t tick = 0;
+    for (const int velocity : velocities) {
+        events.push_back(on(tick, 0, 71, velocity));
+        events.push_back(off(tick + 96, 0, 71));
+        tick += 96;
+    }
+    return events;
+}
+
+TEST_CASE("MIDI import keeps velocities written from dynamics note by note", "[io][midi]") {
+    // Elara's own velocities, and others' within two of them (pp 33, p 49, fff 126).
+    const auto imported =
+        importMidi(bytesOf(smf(0, 96, {quartersAt({48, 80, 112, 96, 33, 49, 126, 64})})));
+    REQUIRE(imported.has_value());
+    const auto& song = imported->song;
+    REQUIRE(song.measureCount() == 2);
+    using T = std::tuple<Dynamic, Accent, bool>;
+    CHECK(loudnessOf(song.track(0).staff(0).measure(0).voices[0]) ==
+          std::vector<T>{{Dynamic::P, Accent::None, false},
+                         {Dynamic::MF, Accent::None, false},
+                         {Dynamic::FF, Accent::None, false},
+                         {Dynamic::F, Accent::None, false}});
+    CHECK(loudnessOf(song.track(0).staff(0).measure(1).voices[0]) ==
+          std::vector<T>{{Dynamic::PP, Accent::None, false},
+                         {Dynamic::P, Accent::None, false},
+                         {Dynamic::FFF, Accent::None, false},
+                         {Dynamic::MP, Accent::None, false}});
+}
+
+TEST_CASE("MIDI import reads played velocities as a dynamic per measure, accents and ghost notes",
+          "[io][midi]") {
+    // Measure 1 around 76: mf, the last note well above it. Measure 2 around
+    // 84: still mf, the last note well below it. Measure 3 around 101: f.
+    // Measure 4 around 103: still f, one note well above it, the others near.
+    const auto imported = importMidi(bytesOf(
+        smf(0, 96,
+            {quartersAt({75, 78, 72, 105, 85, 88, 82, 50, 100, 104, 98, 102, 96, 127, 110, 70})})));
+    REQUIRE(imported.has_value());
+    const auto& staff = imported->song.track(0).staff(0);
+    REQUIRE(imported->song.measureCount() == 4);
+    using T = std::tuple<Dynamic, Accent, bool>;
+    constexpr T kMf{Dynamic::MF, Accent::None, false};
+    constexpr T kF{Dynamic::F, Accent::None, false};
+    CHECK(loudnessOf(staff.measure(0).voices[0]) ==
+          std::vector<T>{kMf, kMf, kMf, {Dynamic::MF, Accent::Accent, false}});
+    CHECK(loudnessOf(staff.measure(1).voices[0]) ==
+          std::vector<T>{kMf, kMf, kMf, {Dynamic::MF, Accent::None, true}});
+    CHECK(loudnessOf(staff.measure(2).voices[0]) == std::vector<T>{kF, kF, kF, kF});
+    CHECK(loudnessOf(staff.measure(3).voices[0]) ==
+          std::vector<T>{kF, {Dynamic::F, Accent::Accent, false}, kF, kF});
+}
+
+TEST_CASE("MIDI import gives a note held over a barline the loudness it was struck with",
+          "[io][midi]") {
+    // At 96 ticks per quarter: three soft quarters, a loud half note from beat
+    // 4 over the barline, then three loud quarters.
+    std::vector<Event> events{program(0, 0, 73)};
+    const std::vector<std::pair<int, int>> notes{{0, 60},   {96, 62},   {192, 58}, {288, 100},
+                                                 {480, 98}, {576, 102}, {672, 99}};
+    for (const auto& [tick, velocity] : notes) {
+        events.push_back(on(tick, 0, 71, velocity));
+        events.push_back(off(tick + (tick == 288 ? 192 : 96), 0, 71));
+    }
+    const auto imported = importMidi(bytesOf(smf(0, 96, {events})));
+    REQUIRE(imported.has_value());
+    const auto& staff = imported->song.track(0).staff(0);
+    using T = std::tuple<Dynamic, Accent, bool>;
+    // Measure 1 at mp: the loud note is an accent. Measure 2 at f: the held
+    // note keeps mp and only sustains.
+    CHECK(loudnessOf(staff.measure(0).voices[0]) ==
+          std::vector<T>{{Dynamic::MP, Accent::None, false},
+                         {Dynamic::MP, Accent::None, false},
+                         {Dynamic::MP, Accent::None, false},
+                         {Dynamic::MP, Accent::Marcato, false}});
+    const auto measure2 = loudnessOf(staff.measure(1).voices[0]);
+    REQUIRE(measure2.size() == 4);
+    CHECK(measure2[0] == T{Dynamic::MP, Accent::None, false});
+    CHECK(staff.measure(1).voices[0].beats[0].notes[0].effects.tiedFromPrevious);
+    CHECK(measure2[1] == T{Dynamic::F, Accent::None, false});
 }
 
 TEST_CASE("MIDI import puts held notes in their own voice", "[io][midi]") {
