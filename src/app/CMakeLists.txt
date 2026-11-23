@@ -31,6 +31,8 @@ qt_add_qml_module(elara
     qml/Main.qml
     qml/ScoreView.qml
     qml/EntryBar.qml
+    qml/MeasurePopup.qml
+    qml/SignatureFields.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml

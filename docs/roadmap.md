@@ -24,6 +24,10 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and fret/string <-> pitch mapping, capo
 - [x] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy
 - [x] Time and key signatures, tempo map
+- [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
+      `.elara` and the CLI (ADR-0049)
+  - [ ] Read and written by the Guitar Pro and MusicXML importers and exporters
+  - [ ] Drawn in the score
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill
@@ -85,6 +89,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Dynamics at the caret, holding until the next change; new notes take
         the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
+  - [x] Measures at the caret in the app: insert before or after, delete, time
+        and key signatures from that measure on (ADR-0033)
 - [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
   - [ ] Tuning presets and capo in the song panel
