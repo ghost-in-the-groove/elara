@@ -28,18 +28,26 @@ Two targets with different rules:
   `updateMix()` changes the track levels while it plays. It is an
   `AudioSource`, the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
-  block by block with `WavFileWriter`).
+  block by block with `WavFileWriter`), and `readWav()`/`decodeWav()` for
+  PCM and float WAV files;
+- the tuner's `PitchDetector` (YIN, ADR-0028) and `tunerReading()`, which names
+  the nearest note, its cents and the nearest open string; `Tuner`, which
+  turns a stream of samples into steady readings, and `SampleRing`, the
+  lock-free queue the audio input fills (ADR-0029).
 
 `elara_audio_juce` opens the
 system audio device through JUCE (ADR-0002) and exposes a plain C++ API
 (`elara::audio::SystemAudio`, `listOutputDevices()`); `SystemAudio::setSource()`
-plays an `AudioSource` such as a `Player`.
+plays an `AudioSource` such as a `Player`. `MicrophoneInput` (and
+`listInputDevices()`) listens to the default input on a device of its own and
+queues the loudest channel's samples in a `SampleRing` (ADR-0029).
 
 ## Real-time rule
 
 Code that runs inside the audio callback (`ToneGenerator`, `fadeGain`,
-`Synth` after construction, `Player::render()`, the callback in
-`system_audio.cpp`) must not allocate, lock, log, throw or do I/O.
+`Synth` after construction, `Player::render()`, `PitchDetector::detect()`,
+`SampleRing::write()`, the callbacks in
+`system_audio.cpp` and `microphone_input.cpp`) must not allocate, lock, log, throw or do I/O.
 Exchange data with the audio thread through atomics or lock-free queues only.
 
 ## Verifying without listening
@@ -50,7 +58,9 @@ what the sequencer would play; `elara-cli render-audio FILE --json --events
 [--out song.wav]` plays it through the built-in synthesizer and prints the
 level, each track's timbre and every event with the frame it was dispatched
 at. `elara-cli play FILE` plays it on the default device. All three take
-`--speed PERCENT` and `--metronome`. Tests in
+`--speed PERCENT` and `--metronome`. `elara-cli tune
+FILE.wav --json [--tuning guitar]` reports the pitch a tuner would show for a
+recording. Tests in
 `tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the
 player's transport by calling `render()` as an audio callback would; tests in
 `tests/cli/` run the commands on corpus files.

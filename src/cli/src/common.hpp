@@ -3,9 +3,11 @@
 #pragma once
 
 #include <elara/core/song.hpp>
+#include <elara/core/tuning.hpp>
 
 #include <expected>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -29,7 +31,7 @@ struct Context {
 /// Escapes text for a JSON string literal (without the quotes).
 [[nodiscard]] std::string jsonEscape(std::string_view text);
 
-/// A length for JSON output: four decimals at most, no "-0". Lengths computed
+/// A length for JSON output: four decimals at most, no "-0", no exponent. Lengths computed
 /// from font metrics carry binary noise (3.2760000000000002).
 [[nodiscard]] std::string jsonNumber(double value);
 
@@ -45,6 +47,10 @@ struct Context {
 
 /// A song from a .elara file or any file `import` reads; the error says why not.
 [[nodiscard]] std::expected<core::Song, std::string> openSong(const std::filesystem::path& path);
+
+/// A --tuning value: a preset name ("guitar", "bass-5") or open strings
+/// ("D2 A2 D3 G3 B3 E4"); std::nullopt for neither.
+[[nodiscard]] std::optional<core::Tuning> tuningFromOption(std::string_view text);
 
 /// Prints "error: <message>" on stderr and returns kExitError (runtime failure).
 int fail(std::string_view message);
