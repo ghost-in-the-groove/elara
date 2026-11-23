@@ -175,6 +175,24 @@ set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
 add_test(NAME cli.edit_rejects_unplayable_transpose
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
 set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+# Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
+# pasted into a new measure before the first, bringing its time signature.
+add_test(NAME cli.edit_copy_paste
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "note 0 0 6 3 1"
+    "copy 0 1" "paste 1")
+set_tests_properties(cli.edit_copy_paste PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":2,\"notes\":2}\\],\"measureCount\":2,.*\"undo\":{\"count\":4,\"next\":\"Paste\"}")
+add_test(NAME cli.edit_paste_insert
+  COMMAND elara-cli --json edit "add-track electric-guitar" "add-track flute" "append-measures 2"
+    "time 1 3/4" "note 0 1 6 3 2." "copy 1 1 track 0" "paste 0 insert")
+set_tests_properties(cli.edit_paste_insert PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"name\":\"Electric Guitar\",.*\"beats\":2,\"notes\":2}.*\"measureCount\":3,\"measures\":\\[{\"time\":\"3/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"3/4\",\"key\":\"C major\"}\\]")
+add_test(NAME cli.edit_rejects_paste_without_copy
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "paste 0")
+set_tests_properties(cli.edit_rejects_paste_without_copy PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_malformed_copy
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "copy 0 1 tracks 0")
+set_tests_properties(cli.edit_rejects_malformed_copy PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_malformed_transpose
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "transpose 2 bars 1")
 set_tests_properties(cli.edit_rejects_malformed_transpose PROPERTIES WILL_FAIL TRUE)
