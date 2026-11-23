@@ -102,9 +102,19 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
-`fill <track> <m>`, `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
-`undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
+`fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
+`paste <m> [track <t>] [insert]`,
+`transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1.
+
+`copy` keeps `n` measures from `m` of every track, or of `count` tracks from
+`t` (one when `count` is left out), for later `paste` steps; it is not an
+undoable edit. `paste` puts them over the measures from `m` of track `t` and
+the tracks after it, appending measures past the end, or into new measures
+before `m` with the copied time and key signatures (`insert`). Fretted notes
+find strings again on another tuning or capo, and lose their frets on a staff
+without one; drums paste only into drum tracks (ADR-0027).
 
 `transpose` moves pitched notes up (or down, when negative) by that many
 semitones, over every measure or `n` measures from `m`, of every track or the
