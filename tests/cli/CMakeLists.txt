@@ -282,6 +282,23 @@ add_test(NAME cli.edit_rejects_tie_without_note
 set_tests_properties(cli.edit_rejects_unknown_effect cli.edit_rejects_tie_without_note
   PROPERTIES WILL_FAIL TRUE)
 
+# Dynamics at the caret (ADR-0047): f from the second note holds to the end,
+# and a note typed after it is f too.
+set(ELARA_CLI_DYNAMICS "${CMAKE_CURRENT_BINARY_DIR}/cli-dynamics.elara")
+add_test(NAME cli.edit_sets_dynamic
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DYNAMICS}" "add-track flute" "append-measures 1"
+    "pitch C" right "pitch D" right "pitch E" "caret 0 0 1" "dynamic f" "caret 0 0 3" "pitch F")
+set_tests_properties(cli.edit_sets_dynamic PROPERTIES
+  FIXTURES_SETUP cli_dynamics
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":7,\"next\":\"Enter note\"}")
+add_test(NAME cli.dump_dynamics COMMAND elara-cli --json dump "${ELARA_CLI_DYNAMICS}")
+set_tests_properties(cli.dump_dynamics PROPERTIES
+  FIXTURES_REQUIRED cli_dynamics
+  PASS_REGULAR_EXPRESSION "{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"F5\",\"effects\":{\"dynamic\":\"f\"}}\\]}")
+add_test(NAME cli.edit_rejects_unknown_dynamic
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch C" "dynamic loud")
+set_tests_properties(cli.edit_rejects_unknown_dynamic PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
