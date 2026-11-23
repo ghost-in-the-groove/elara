@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
+import QtQuick.Effects
 import QtQuick.Layouts
 import Elara.App
 
@@ -54,6 +55,19 @@ ApplicationWindow {
 
     AudioController {
         id: audio
+
+        document: score
+        onErrorMessageChanged: {
+            if (errorMessage.length > 0)
+                toast.show(errorMessage);
+        }
+    }
+
+    /// "m:ss" for a number of seconds.
+    function clock(seconds: real): string {
+        const whole = Math.max(0, Math.floor(seconds));
+        const rest = whole % 60;
+        return Math.floor(whole / 60) + ":" + (rest < 10 ? "0" : "") + rest;
     }
 
     FileDialog {
@@ -280,6 +294,10 @@ ApplicationWindow {
 
             anchors.fill: parent
             document: score
+            cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
+            followCursor: true
+            onSeekRequested: seconds => audio.seek(seconds)
+            cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
             visible: opacity > 0
 
@@ -336,6 +354,141 @@ ApplicationWindow {
             }
         }
 
+        // The transport: floats over the bottom of the score, and slides in
+        // once there is one.
+        RectangularShadow {
+            anchors.fill: transport
+            offset.y: 4
+            radius: transport.radius
+            blur: 22
+            color: Qt.rgba(0, 0, 0, window.dark ? 0.5 : 0.18)
+            visible: transport.visible
+            opacity: transport.opacity
+        }
+
+        Rectangle {
+            id: transport
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: window.hasScore ? parent.height - height - 20 : parent.height + 12
+            width: transportRow.implicitWidth + 28
+            height: 56
+            radius: 28
+            color: window.dark ? "#26262e" : "#ffffff"
+            border.color: window.dark ? "#34343e" : "#e1e4ea"
+            opacity: window.hasScore ? 1.0 : 0.0
+            visible: opacity > 0
+
+            Behavior on y {
+                NumberAnimation {
+                    duration: 300
+                    easing.type: Easing.OutCubic
+                }
+            }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: 220
+                }
+            }
+
+            RowLayout {
+                id: transportRow
+
+                anchors.centerIn: parent
+                spacing: 10
+
+                IconButton {
+                    iconPath: "M6.5 6 L6.5 18 M18 6.5 L9.5 12 L18 17.5 Z"
+                    tip: qsTr("Back to the start (Home)")
+                    enabled: audio.playingSong || audio.position > 0
+                    onClicked: audio.stopPlayback()
+                }
+
+                RoundButton {
+                    id: playButton
+
+                    implicitWidth: 44
+                    implicitHeight: 44
+                    topInset: 0
+                    bottomInset: 0
+                    leftInset: 0
+                    rightInset: 0
+                    padding: 0
+                    focusPolicy: Qt.TabFocus
+                    Accessible.name: audio.playingSong ? qsTr("Pause") : qsTr("Play")
+                    ToolTip.visible: hovered
+                    ToolTip.delay: 600
+                    ToolTip.text: (audio.playingSong ? qsTr("Pause") : qsTr("Play"))
+                                  + qsTr(" (Space)")
+                    onClicked: audio.togglePlayback()
+
+                    background: Rectangle {
+                        radius: width / 2
+                        color: playButton.down ? Qt.darker(window.Material.accent, 1.15)
+                                               : playButton.hovered ? Qt.lighter(window.Material.accent, 1.12)
+                                                                    : window.Material.accent
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: 120
+                            }
+                        }
+                    }
+
+                    contentItem: Item {
+                        Icon {
+                            anchors.centerIn: parent
+                            width: 22
+                            height: 22
+                            color: "white"
+                            filled: true
+                            lineWidth: 1.5
+                            path: audio.playingSong ? "M7 5 L10 5 L10 19 L7 19 Z M14 5 L17 5 L17 19 L14 19 Z"
+                                                    : "M8 5 L19 12 L8 19 Z"
+                        }
+                    }
+
+                    // Gives a little under the pointer.
+                    scale: pressed ? 0.94 : 1.0
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 120
+                        }
+                    }
+                }
+
+                Label {
+                    text: window.clock(audio.position) + " / " + window.clock(score.duration)
+                    font.pixelSize: 13
+                    font.features: {
+                        "tnum": 1
+                    }
+                    opacity: 0.8
+                    Layout.preferredWidth: 86
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Slider {
+                    id: seekBar
+
+                    Layout.preferredWidth: 240
+                    from: 0
+                    to: Math.max(0.001, score.duration)
+                    focusPolicy: Qt.NoFocus
+                    onMoved: audio.seek(value)
+
+                    Binding {
+                        target: seekBar
+                        property: "value"
+                        value: audio.position
+                        when: !seekBar.pressed
+                        restoreMode: Binding.RestoreNone
+                    }
+                }
+            }
+        }
+
         TunerPane {
             id: tunerPane
 
@@ -359,7 +512,8 @@ ApplicationWindow {
             property bool shown: false
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: shown ? parent.height - height - 24 : parent.height + 8
+            y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
+                     : parent.height + 8
             width: Math.min(parent.width - 48, toastText.implicitWidth + 40)
             height: toastText.implicitHeight + 24
             radius: 10
@@ -447,6 +601,16 @@ ApplicationWindow {
         sequences: [StandardKey.ZoomOut]
         enabled: window.hasScore
         onActivated: scoreView.zoomOut()
+    }
+    Shortcut {
+        sequence: "Space"
+        enabled: window.hasScore
+        onActivated: audio.togglePlayback()
+    }
+    Shortcut {
+        sequence: "Home"
+        enabled: window.hasScore
+        onActivated: audio.stopPlayback()
     }
     Shortcut {
         sequence: "Ctrl+0"

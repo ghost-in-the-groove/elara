@@ -392,7 +392,14 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         for (const auto& writer : writers) {
             writer->draw(positions, start, barline);
         }
-        measures.push_back(MeasureBox{.index = m, .x = start, .width = barline - start});
+        MeasureBox box{.index = m, .x = start, .width = barline - start};
+        const core::Fraction length = song.measureHeader(m).timeSignature.measureLength();
+        box.onsets.reserve(positions.size());
+        for (const ColumnPosition& position : positions) {
+            box.onsets.push_back(
+                MeasureOnset{.at = (position.start / length).toDouble(), .x = position.x});
+        }
+        measures.push_back(std::move(box));
         const bool songEnd = m + 1 == song.measureCount();
         double after = barline;
         for (const auto& writer : writers) {

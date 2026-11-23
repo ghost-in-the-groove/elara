@@ -8,6 +8,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <initializer_list>
@@ -413,6 +414,22 @@ TEST_CASE("Staff layout: barlines and measure boxes", "[notation][layout]") {
         CHECK(glyphs(middle, Role::TimeSignature).empty()); // no change at measure 2
         CHECK(lines(middle, Role::Barline).size() == 1);    // not the end of the song
         CHECK(glyphs(middle, Role::Notehead)[0].measure == 1);
+    }
+    SECTION("the columns of notes, where the playback cursor stops") {
+        const DisplayList quarters =
+            layout(melody({note("G4", NoteValue::Half), note("A4"), note("B4")}));
+        REQUIRE(quarters.measures.size() == 1);
+        const auto& box = quarters.measures[0];
+        const auto heads = glyphs(quarters, Role::Notehead);
+        REQUIRE(box.onsets.size() == 3);
+        REQUIRE(heads.size() == 3);
+        const std::array<double, 3> at{0.0, 0.5, 0.75};
+        for (std::size_t i = 0; i < 3; ++i) {
+            CHECK_THAT(box.onsets[i].at, WithinAbs(at[i], kEpsilon));
+            CHECK_THAT(box.onsets[i].x, WithinAbs(heads[i].origin.x, kEpsilon));
+        }
+        CHECK(box.onsets.front().x > box.x);
+        CHECK(box.onsets.back().x < box.x + box.width);
     }
     SECTION("missing parts throw") {
         const Song song = melody({});

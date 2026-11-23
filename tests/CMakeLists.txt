@@ -52,7 +52,7 @@ elara_add_unit_tests(io
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 elara_add_unit_tests(notation
-  SOURCES notation/test_smufl.cpp notation/test_staff_layout.cpp
+  SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
   LIBRARIES elara::notation)
