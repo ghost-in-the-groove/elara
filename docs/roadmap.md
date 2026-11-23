@@ -74,7 +74,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 6 - Practice tools
 
-- [ ] Metronome with count-in, A-B loop, speed 25-200 %
+- [ ] Metronome with count-in, A-B loop, speed 25-200 % (engine and CLI done, ADR-0024; app controls to do)
 - [ ] Tuner (microphone input, pitch detection)
 
 ## Milestone 7 - Distribution

@@ -16,6 +16,7 @@ class Song;
 namespace elara::audio {
 
 class Sequence;
+struct CountIn;
 
 /// Plays a sequence in real time through one built-in Synth per track.
 ///
@@ -25,6 +26,9 @@ class Sequence;
 /// calls never wait for the audio thread: a loaded song is built on the control
 /// thread and handed over through an atomic pointer, and the transport is a set
 /// of atomics the audio thread reads at the start of each render().
+///
+/// For practice (ADR-0024) it counts in before playback starts and loops a
+/// passage.
 class Player final : public AudioSource {
 public:
     /// `maxBlockFrames` sizes the mixing buffers; render() splits longer blocks.
@@ -41,6 +45,20 @@ public:
 
     /// Starts or resumes playback; from the start when it stopped at the end.
     void play() noexcept;
+
+    /// The same, after the clicks of `countIn` (Sequence::countInAt()), on
+    /// wood blocks like the metronome. The position holds still while they
+    /// click. Ignored while playing; a pause ends the count-in.
+    void play(const CountIn& countIn) noexcept;
+
+    /// True from a play() with a count-in until its clicks are over.
+    [[nodiscard]] bool isCountingIn() const noexcept;
+
+    /// Loops from `from` to `to` seconds (clamped to the song): playback that
+    /// reaches `to` goes on from `from`, silencing what sounds as a seek does.
+    /// Playback that starts after `to` runs on to the end. `to <= from` ends
+    /// the loop.
+    void setLoop(double from, double to) noexcept;
 
     /// Holds the position; sounding notes are released and ring out.
     void pause() noexcept;
@@ -76,6 +94,7 @@ public:
 
 private:
     void renderBlock(std::span<float> left, std::span<float> right) noexcept;
+    void start(int clicks, std::int64_t interval) noexcept;
 
     double sampleRate_;
     std::size_t maxBlockFrames_;
@@ -87,11 +106,22 @@ private:
     std::atomic<bool> playing_{false};
     std::atomic<std::int64_t> seekTo_{-1}; // frame, -1 for none
     std::atomic<std::int64_t> position_{0};
+    // The count-in of the next start (written before playing_), and whether
+    // one clicks now.
+    std::atomic<int> countInClicks_{0};
+    std::atomic<std::int64_t> countInInterval_{0}; // frames
+    std::atomic<bool> countingIn_{false};
+    // The loop as two 32-bit frames, from in the high half; 0 for none.
+    std::atomic<std::uint64_t> loop_{0};
 
     // Audio thread only.
     Loaded* current_ = nullptr;
     std::int64_t frame_ = 0;
     bool wasPlaying_ = false;
+    int clicks_ = 0;              // of the count-in under way
+    std::int64_t interval_ = 0;   // frames between its clicks
+    std::int64_t countedIn_ = 0;  // frames of it played
+    std::int64_t countInEnd_ = 0; // frames it lasts
 };
 
 } // namespace elara::audio
