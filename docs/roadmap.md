@@ -72,6 +72,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
 - [ ] Copy/paste, insert/delete measures, transposition
+  - [x] Measures at the caret in the app: insert before or after, delete, time
+        and key signatures from that measure on (ADR-0033)
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)

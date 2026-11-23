@@ -132,12 +132,15 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption songPaneOption(
         QStringLiteral("song-pane"),
         QCoreApplication::translate("main", "Open the song and tracks panel at start."));
+    const QCommandLineOption measureOption(
+        QStringLiteral("measure"),
+        QCoreApplication::translate("main", "Open the caret's measure at start."));
     const QCommandLineOption languageOption(
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
         QStringLiteral("language"));
     parser.addOptions({trackOption, viewOption, smokeTest, screenshot, tunerOption, songPaneOption,
-                       languageOption});
+                       measureOption, languageOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -197,7 +200,8 @@ int main(int argc, char* argv[]) {
 
     engine.setInitialProperties({{QStringLiteral("initialFile"), options.file},
                                  {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
-                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)}});
+                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
+                                 {QStringLiteral("showMeasure"), parser.isSet(measureOption)}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()

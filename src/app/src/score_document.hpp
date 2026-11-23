@@ -78,6 +78,12 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
+    // The caret's measure.
+    Q_PROPERTY(int caretMeasure READ caretMeasure NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeNumerator READ caretTimeNumerator NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeDenominator READ caretTimeDenominator NOTIFY caretChanged)
+    Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
+    Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -167,6 +173,9 @@ public:
     /// Change the signature from the first measure until its next change.
     Q_INVOKABLE void setTimeSignature(int numerator, int denominator);
     Q_INVOKABLE void setKeySignature(int fifths, bool minor);
+    /// Change the signature from `measure` (0-based) until its next change.
+    Q_INVOKABLE void setTimeSignatureFrom(int measure, int numerator, int denominator);
+    Q_INVOKABLE void setKeySignatureFrom(int measure, int fifths, bool minor);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -216,6 +225,18 @@ public:
     Q_INVOKABLE void deleteAtCaret();
     Q_INVOKABLE void deleteBeat();
     Q_INVOKABLE void insertRest();
+
+    /// The caret's measure, 0-based, and its signatures.
+    [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
+    [[nodiscard]] int caretTimeNumerator() const;
+    [[nodiscard]] int caretTimeDenominator() const;
+    [[nodiscard]] int caretKeyFifths() const;
+    [[nodiscard]] bool caretKeyMinor() const;
+    /// Inserts an empty measure before the caret's measure, or after it, with
+    /// the signatures of the measure before it; the caret goes to it.
+    Q_INVOKABLE void insertMeasure(bool after);
+    /// Removes the caret's measure; the last measure of a song stays.
+    Q_INVOKABLE void removeMeasure();
 
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;

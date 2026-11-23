@@ -32,6 +32,7 @@ one that replaces them.
 | [0030](0030-translations.md) | Translations of the user interface | Accepted |
 | [0031](0031-editing-in-the-app.md) | Editing the song in the app | Accepted |
 | [0032](0032-keyboard-entry-in-the-app.md) | Keyboard entry in the app | Accepted |
+| [0033](0033-editing-measures-at-the-caret.md) | Editing measures at the caret | Accepted |
 
 ## Template
 

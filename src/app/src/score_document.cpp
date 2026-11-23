@@ -57,6 +57,11 @@ QString qstring(std::string_view text) {
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
 }
 
+// Whether a song has somewhere to put the caret.
+bool hasCaret(const core::Song& song) {
+    return song.trackCount() > 0 && song.measureCount() > 0;
+}
+
 const notation::PageLayoutOptions& pageOptions() {
     static const notation::PageLayoutOptions options =
         notation::pageOptions(notation::kA4, kStaffSpaceMm);
@@ -590,25 +595,78 @@ void ScoreDocument::setTempo(int bpm) {
 }
 
 void ScoreDocument::setTimeSignature(int numerator, int denominator) {
-    if (!document_ || document_->song().measureCount() == 0) {
+    setTimeSignatureFrom(0, numerator, denominator);
+}
+
+void ScoreDocument::setKeySignature(int fifths, bool minor) {
+    setKeySignatureFrom(0, fifths, minor);
+}
+
+void ScoreDocument::setTimeSignatureFrom(int measure, int numerator, int denominator) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
         return;
     }
     try {
-        execute(core::changeTimeSignature(document_->song(), 0,
+        execute(core::changeTimeSignature(document_->song(), static_cast<std::size_t>(measure),
                                           core::TimeSignature(numerator, denominator)));
     } catch (const std::invalid_argument&) {
         emit editFailed(tr("%1/%2 is not a time signature.").arg(numerator).arg(denominator));
     }
 }
 
-void ScoreDocument::setKeySignature(int fifths, bool minor) {
-    if (!document_ || document_->song().measureCount() == 0 ||
+void ScoreDocument::setKeySignatureFrom(int measure, int fifths, bool minor) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount()) ||
         std::abs(fifths) > core::KeySignature::kMaxFifths) {
         return;
     }
     execute(core::changeKeySignature(
-        document_->song(), 0,
+        document_->song(), static_cast<std::size_t>(measure),
         core::KeySignature(fifths, minor ? core::KeyMode::Minor : core::KeyMode::Major)));
+}
+
+int ScoreDocument::caretTimeNumerator() const {
+    return document_ && caret_.measure < document_->song().measureCount()
+               ? document_->song().measureHeader(caret_.measure).timeSignature.numerator()
+               : 4;
+}
+
+int ScoreDocument::caretTimeDenominator() const {
+    return document_ && caret_.measure < document_->song().measureCount()
+               ? document_->song().measureHeader(caret_.measure).timeSignature.denominator()
+               : 4;
+}
+
+int ScoreDocument::caretKeyFifths() const {
+    return document_ && caret_.measure < document_->song().measureCount()
+               ? document_->song().measureHeader(caret_.measure).keySignature.fifths()
+               : 0;
+}
+
+bool ScoreDocument::caretKeyMinor() const {
+    return document_ && caret_.measure < document_->song().measureCount() &&
+           document_->song().measureHeader(caret_.measure).keySignature.mode() ==
+               core::KeyMode::Minor;
+}
+
+void ScoreDocument::insertMeasure(bool after) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    const std::size_t at = caret_.measure + (after ? 1 : 0);
+    caret_.measure = at;
+    caret_.beat = 0;
+    pendingDigit_ = -1;
+    execute(std::make_unique<core::InsertMeasures>(at, 1));
+}
+
+void ScoreDocument::removeMeasure() {
+    if (!document_ || document_->song().measureCount() < 2) {
+        return;
+    }
+    pendingDigit_ = -1;
+    execute(std::make_unique<core::RemoveMeasures>(caret_.measure, 1));
 }
 
 void ScoreDocument::setMeasureCount(int count) {
@@ -709,6 +767,7 @@ void ScoreDocument::edited() {
         emit trackChanged();
     }
     clampCaret();
+    emit caretChanged();
     emit songChanged();
     emit historyChanged();
     relayout();
@@ -768,10 +827,6 @@ core::CaretMove coreMove(ScoreDocument::CaretMove move) {
         break;
     }
     return core::CaretMove::StringDown;
-}
-
-bool hasCaret(const core::Song& song) {
-    return song.trackCount() > 0 && song.measureCount() > 0;
 }
 
 } // namespace

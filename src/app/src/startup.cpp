@@ -67,6 +67,7 @@ void Startup::queueSteps() {
             });
             queueEdits();
             queueEntry();
+            queueMeasures();
         }
         return;
     }
@@ -96,6 +97,7 @@ void Startup::queueSteps() {
         });
         queueEdits();
         queueEntry();
+        queueMeasures();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -242,6 +244,64 @@ void Startup::queueEntry() {
             return false;
         }
         check(!score_->modified(), "undoing the entry did not restore the song");
+        return false;
+    });
+}
+
+// Measures at the caret: one inserted after it, given its own time and key
+// signatures, deleted again; then everything is undone.
+void Startup::queueMeasures() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("measure check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        if (score_->caretPage() < 0) {
+            return false;
+        }
+        measuresBefore_ = score_->measureCount();
+        firstNumerator_ = score_->timeNumerator();
+        score_->insertMeasure(true);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (measuresBefore_ == 0) {
+            return false;
+        }
+        check(score_->measureCount() == measuresBefore_ + 1, "the measure was not inserted");
+        check(score_->caretMeasure() == 1, "the caret is not on the new measure");
+        score_->setTimeSignatureFrom(score_->caretMeasure(), 3, 4);
+        score_->setKeySignatureFrom(score_->caretMeasure(), 2, false);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (measuresBefore_ == 0) {
+            return false;
+        }
+        check(score_->caretTimeNumerator() == 3 && score_->caretTimeDenominator() == 4,
+              "the time signature did not change at the caret");
+        check(score_->caretKeyFifths() == 2, "the key signature did not change at the caret");
+        check(score_->timeNumerator() == firstNumerator_, "the first measure changed");
+        score_->removeMeasure();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (measuresBefore_ == 0) {
+            return false;
+        }
+        check(score_->measureCount() == measuresBefore_, "the measure was not deleted");
+        for (int i = 0; i < 8 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (measuresBefore_ == 0) {
+            return false;
+        }
+        check(!score_->modified() && score_->measureCount() == measuresBefore_,
+              "undoing the measure edits did not restore the song");
         return false;
     });
 }
