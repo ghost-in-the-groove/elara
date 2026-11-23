@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
     addEditCommands(app, context);
     addFileCommands(app, context);
     addFontCommands(app, context);
+    addRenderCommands(app, context);
 
     try {
         app.parse(argc, argv);

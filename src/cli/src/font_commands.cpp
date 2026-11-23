@@ -6,7 +6,6 @@
 #include "common.hpp"
 #include <CLI/CLI.hpp>
 
-#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -30,12 +29,7 @@ struct FontOptions {
     std::string glyph;
 };
 
-// Metadata has three decimals at most, but widths and heights computed from it
-// carry binary noise (3.2760000000000002): four decimals at most, no "-0".
-std::string number(double value) {
-    const double rounded = std::round(value * 10'000.0) / 10'000.0;
-    return std::format("{}", rounded == 0.0 ? 0.0 : rounded);
-}
+std::string number(double value) { return jsonNumber(value); }
 
 std::string point(const notation::Point& p) {
     return std::format("[{},{}]", number(p.x), number(p.y));
@@ -138,7 +132,7 @@ int printFont(bool json, const EngravingFont& font, const std::filesystem::path&
 
 int runFont(bool json, const FontOptions& options) {
     const std::filesystem::path path = options.metadata.empty()
-                                           ? executableDirectory() / "fonts" / "Bravura.json"
+                                           ? defaultFontMetadata()
                                            : std::filesystem::path(options.metadata);
     const auto font = EngravingFont::fromMetadataFile(path);
     if (!font) {

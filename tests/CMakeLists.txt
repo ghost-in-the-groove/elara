@@ -45,7 +45,7 @@ elara_add_unit_tests(io
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 elara_add_unit_tests(notation
-  SOURCES notation/test_smufl.cpp
+  SOURCES notation/test_smufl.cpp notation/test_staff_layout.cpp
   LIBRARIES elara::notation)
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 

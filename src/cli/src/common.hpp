@@ -2,6 +2,9 @@
 // Shared plumbing for elara-cli subcommands.
 #pragma once
 
+#include <elara/core/song.hpp>
+
+#include <expected>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -26,12 +29,22 @@ struct Context {
 /// Escapes text for a JSON string literal (without the quotes).
 [[nodiscard]] std::string jsonEscape(std::string_view text);
 
+/// A length for JSON output: four decimals at most, no "-0". Lengths computed
+/// from font metrics carry binary noise (3.2760000000000002).
+[[nodiscard]] std::string jsonNumber(double value);
+
 /// The directory holding the running executable (empty if the system will not
 /// say). Files shipped with Elara, such as fonts/, sit next to it.
 [[nodiscard]] std::filesystem::path executableDirectory();
 
 /// A path as UTF-8 text, whatever the system's code page.
 [[nodiscard]] std::string utf8(const std::filesystem::path& path);
+
+/// The SMuFL metadata of the music font shipped next to elara-cli.
+[[nodiscard]] std::filesystem::path defaultFontMetadata();
+
+/// A song from a .elara file or any file `import` reads; the error says why not.
+[[nodiscard]] std::expected<core::Song, std::string> openSong(const std::filesystem::path& path);
 
 /// Prints "error: <message>" on stderr and returns kExitError (runtime failure).
 int fail(std::string_view message);
@@ -45,6 +58,7 @@ void addAudioCommands(CLI::App& app, Context& context);
 void addEditCommands(CLI::App& app, Context& context);
 void addFileCommands(CLI::App& app, Context& context);
 void addFontCommands(CLI::App& app, Context& context);
+void addRenderCommands(CLI::App& app, Context& context);
 void addTheoryCommands(CLI::App& app, Context& context);
 
 } // namespace elara::cli
