@@ -102,6 +102,15 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
 step the song rejects (missing track, nothing to undo) with 1.
 
+Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
+`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
+string (adding a beat of the input duration on the free slot after the last
+beat of a short measure), `duration <d>` sets the input duration and the
+caret beat's, `delete` removes the note on the caret's string (or the rest),
+`delete-beat` the whole beat, and `insert-rest` adds a rest before it. The
+output includes `"caret"` and `"input"`.
+
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
 - `--json` prints exactly one JSON object on stdout; human text otherwise.
