@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1697.143" viewBox="0 0 120 169.714">
+<style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
+<rect x="0" y="0" width="120" height="169.714" fill="white"/>
+<g fill="black" stroke="black">
+<line class="staffLine" x1="8.571" y1="25.26" x2="55.89" y2="25.26" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="26.76" x2="55.89" y2="26.76" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="28.26" x2="55.89" y2="28.26" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="29.76" x2="55.89" y2="29.76" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="31.26" x2="55.89" y2="31.26" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="32.76" x2="55.89" y2="32.76" stroke-width="0.13"/>
+<line class="barline" x1="30.372" y1="25.26" x2="30.372" y2="32.76" stroke-width="0.16"/>
+<line class="barline" x1="41.975" y1="25.26" x2="41.975" y2="32.76" stroke-width="0.16"/>
+<line class="slide" x1="47.136" y1="30.06" x2="49.787" y2="29.46" stroke-width="0.12"/>
+<line class="barline" x1="54.91" y1="25.26" x2="54.91" y2="32.76" stroke-width="0.16"/>
+<line class="barline" x1="55.64" y1="25.26" x2="55.64" y2="32.76" stroke-width="0.5"/>
+<text class="clef" x="9.183" y="29.042" stroke="none">&#xE06D;</text>
+<text class="timeSignature" x="11.715" y="28.01" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="11.715" y="30.01" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="43.053" y="28.01" stroke="none">&#xE083;</text>
+<text class="timeSignature" x="42.955" y="30.01" stroke="none">&#xE084;</text>
+<text class="rest" x="51.878" y="29.006" stroke="none">&#xE4E5;</text>
+<text class="vibrato" x="23.678" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="24.286" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="24.894" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="25.502" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="vibrato" x="26.11" y="22.653" stroke="none">&#xEAB2;</text>
+<text class="technique" x="46.001" y="19.203" stroke="none">&#xE610;</text>
+<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Guitar Techniques</text>
+<text class="t credit" x="60" y="14.511" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
+<rect class="knockout" x="15.32" y="32.188" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="15.785" y="33.228" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="18.32" y="30.688" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="18.785" y="31.728" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="20.052" y="30.688" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="20.517" y="31.728" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="19.3" y="29.392" width="0.703" height="0.748" fill="white" stroke="none"/>
+<text class="t technique" x="19.651" y="30.072" style="font-size:0.85px" text-anchor="middle" stroke="none">H</text>
+<rect class="knockout" x="21.784" y="29.188" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="22.25" y="30.228" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="23.516" y="27.688" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="23.982" y="28.728" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="26.104" y="26.188" width="3.172" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="27.69" y="27.228" style="font-size:1.3px" text-anchor="middle" stroke="none">&lt;12&gt;</text>
+<rect class="knockout" x="31.777" y="24.688" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="32.242" y="25.728" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="35.586" y="24.688" width="1.797" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="36.485" y="25.728" style="font-size:1.3px" text-anchor="middle" stroke="none">(3)</text>
+<rect class="knockout" x="38.947" y="32.188" width="1.075" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="39.485" y="33.228" style="font-size:1.3px" text-anchor="middle" stroke="none">X</text>
+<rect class="knockout" x="46.159" y="29.188" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="46.625" y="30.228" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="49.833" y="29.188" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="50.299" y="30.228" style="font-size:1.3px" text-anchor="middle" stroke="none">7</text>
+<text class="t technique" x="15.485" y="21.503" style="font-size:0.95px" text-anchor="start" stroke="none">P.M.</text>
+<text class="t technique" x="27.39" y="20.353" style="font-size:0.95px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
+<text class="t bend" x="25.343" y="23.953" style="font-size:0.95px" text-anchor="middle" stroke="none">full</text>
+<text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M18.876,30.642 C19.264,30.002 20.039,30.002 20.427,30.642 C20.039,30.082 19.264,30.082 18.876,30.642Z"/>
+<path class="bend" fill="none" stroke-width="0.12" d="M24.443,28.26 C24.983,28.26 25.343,26.818 25.343,24.653"/>
+<polygon class="bend" stroke="none" points="25.343,24.153 25.118,24.653 25.568,24.653"/>
+</g>
+</svg>

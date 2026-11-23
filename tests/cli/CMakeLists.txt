@@ -411,3 +411,24 @@ foreach(_file IN LISTS _corpus_files)
             "$<TARGET_FILE:elara-cli>" "${_file}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../snapshots/import/${_name}.json")
 endforeach()
+
+# Render snapshots: every corpus file laid out on A4 pages, all tracks as
+# notation and tablature, must write the SVG that
+# tests/snapshots/render/<folder>/<name>.svg holds (<name>-1.svg, -2.svg... for
+# several pages); the guitar techniques also as notation only and as tablature
+# only. Refreshed like the import snapshots.
+set(_render_snapshots "${CMAKE_CURRENT_SOURCE_DIR}/../snapshots/render")
+foreach(_file IN LISTS _corpus_files)
+  file(RELATIVE_PATH _relative "${ELARA_CORPUS}" "${_file}")
+  string(REGEX REPLACE "\.[^./]+$" "" _name "${_relative}")
+  string(REGEX REPLACE "[/.-]" "_" _test "${_name}")
+  add_test(NAME cli.render_snapshot_${_test}
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/check_render_snapshot.py"
+            "$<TARGET_FILE:elara-cli>" "${_file}" "${_render_snapshots}/${_name}" --view both)
+endforeach()
+foreach(_view IN ITEMS standard tab)
+  add_test(NAME cli.render_snapshot_gp_guitar_techniques_${_view}
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/check_render_snapshot.py"
+            "$<TARGET_FILE:elara-cli>" "${ELARA_CORPUS}/gp/guitar-techniques.gp"
+            "${_render_snapshots}/gp/guitar-techniques-${_view}" --view ${_view})
+endforeach()
