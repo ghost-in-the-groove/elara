@@ -40,6 +40,7 @@ qt_add_qml_module(elara
     qml/MusicSymbol.qml
     qml/TunerPane.qml
     qml/SongPane.qml
+    qml/TuningFields.qml
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp

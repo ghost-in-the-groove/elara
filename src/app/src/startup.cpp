@@ -74,6 +74,7 @@ void Startup::queueSteps() {
             queueEntry();
             queueMeasures();
             queueMix();
+            queueTuning();
         }
         return;
     }
@@ -105,6 +106,7 @@ void Startup::queueSteps() {
         queueEntry();
         queueMeasures();
         queueMix();
+        queueTuning();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -374,6 +376,60 @@ void Startup::queueMix() {
                   !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
               "undoing the mix did not restore the song");
         sequenceBefore_.reset();
+        return false;
+    });
+}
+
+// The first track's tuning from the song panel (ADR-0046): a capo a fret
+// higher keeping the frets, then the capo taken off keeping the sound, each
+// one undo step; both undone, the song must end as it started.
+void Startup::queueTuning() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tuning check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        tuningBefore_ = score_->trackTuning(0);
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const int capo = tuningBefore_.value(QStringLiteral("capo")).toInt() + 1;
+        score_->setTrackTuning(0, notes, capo, true);
+        const QVariantMap tuning = score_->trackTuning(0);
+        check(tuning.value(QStringLiteral("notes")).toString() == notes &&
+                  tuning.value(QStringLiteral("capo")).toInt() == capo,
+              "the capo was not moved");
+        const bool changed = score_->undoName() == ScoreDocument::tr("Change tuning");
+        check(changed, "the tuning is not one undo step");
+        return changed;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        // By its preset when it has one, else by its notes.
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const QString preset = tuningBefore_.value(QStringLiteral("preset")).toString();
+        score_->setTrackTuning(0, preset.isEmpty() ? notes : preset, 0, false);
+        const QVariantMap tuning = score_->trackTuning(0);
+        const bool changed = tuning.value(QStringLiteral("notes")).toString() == notes &&
+                             tuning.value(QStringLiteral("capo")).toInt() == 0;
+        check(changed, "the capo was not taken off");
+        if (!changed) {
+            return false;
+        }
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        check(!score_->modified() && score_->trackTuning(0) == tuningBefore_,
+              "undoing the tunings did not restore the song");
         return false;
     });
 }

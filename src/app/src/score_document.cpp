@@ -5,6 +5,7 @@
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/retune.hpp>
 #include <elara/io/native_format.hpp>
 #include <elara/io/open.hpp>
 #include <elara/notation/caret.hpp>
@@ -232,6 +233,27 @@ constexpr std::array kEditNames{
     Translation{"Delete", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete")},
     Translation{"Delete beat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete beat")},
     Translation{"Insert rest", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Insert rest")},
+    Translation{"Change tuning", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tuning")},
+};
+
+// The names of Tuning::presetNames().
+constexpr std::array kTuningNames{
+    Translation{"guitar", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, standard")},
+    Translation{"guitar-drop-d", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, drop D")},
+    Translation{"guitar-half-step-down",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, half a step down")},
+    Translation{"guitar-dadgad", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, DADGAD")},
+    Translation{"guitar-open-g", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, open G")},
+    Translation{"guitar-open-d", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Guitar, open D")},
+    Translation{"guitar-7", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Seven-string guitar")},
+    Translation{"guitar-8", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Eight-string guitar")},
+    Translation{"bass", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bass, standard")},
+    Translation{"bass-drop-d", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bass, drop D")},
+    Translation{"bass-5", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Five-string bass")},
+    Translation{"bass-6", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Six-string bass")},
+    Translation{"ukulele", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ukulele")},
+    Translation{"mandolin", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Mandolin")},
+    Translation{"banjo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Banjo")},
 };
 
 template <std::size_t N>
@@ -551,14 +573,20 @@ QVariantList ScoreDocument::tracks() const {
     for (std::size_t t = 0; t < song_->trackCount(); ++t) {
         const core::Track& track = song_->track(t);
         const core::TrackMix& mix = track.mix();
-        list.append(QVariantMap{{QStringLiteral("name"), names[static_cast<qsizetype>(t)]},
-                                {QStringLiteral("detail"), trackDetail(track)},
-                                {QStringLiteral("symbol"), trackSymbol(track)},
-                                {QStringLiteral("volume"), mix.volume},
-                                {QStringLiteral("pan"), mix.pan},
-                                {QStringLiteral("mute"), mix.mute},
-                                {QStringLiteral("solo"), mix.solo},
-                                {QStringLiteral("audible"), song_->audible(t)}});
+        const QVariantMap tuning = trackTuning(static_cast<int>(t));
+        list.append(
+            QVariantMap{{QStringLiteral("name"), names[static_cast<qsizetype>(t)]},
+                        {QStringLiteral("detail"), trackDetail(track)},
+                        {QStringLiteral("symbol"), trackSymbol(track)},
+                        {QStringLiteral("volume"), mix.volume},
+                        {QStringLiteral("pan"), mix.pan},
+                        {QStringLiteral("mute"), mix.mute},
+                        {QStringLiteral("solo"), mix.solo},
+                        {QStringLiteral("audible"), song_->audible(t)},
+                        {QStringLiteral("fretted"), tuning.value(QStringLiteral("fretted"))},
+                        {QStringLiteral("tuning"), tuning.value(QStringLiteral("notes"))},
+                        {QStringLiteral("tuningPreset"), tuning.value(QStringLiteral("preset"))},
+                        {QStringLiteral("capo"), tuning.value(QStringLiteral("capo"))}});
     }
     return list;
 }
@@ -572,6 +600,39 @@ QVariantList ScoreDocument::instrumentPresets() {
                         {QStringLiteral("group"), presetGroup(preset)}});
     }
     return list;
+}
+
+QVariantList ScoreDocument::tuningPresets() {
+    QVariantList list;
+    for (const std::string_view id : core::Tuning::presetNames()) {
+        const std::optional<core::Tuning> tuning = core::Tuning::preset(id);
+        list.append(QVariantMap{
+            {QStringLiteral("id"), qstring(id)},
+            {QStringLiteral("name"), translated(kTuningNames, id, id)},
+            {QStringLiteral("notes"), tuning ? qstring(tuning->toString()) : QString()}});
+    }
+    return list;
+}
+
+QVariantMap ScoreDocument::trackTuning(int track) const {
+    if (!song_ || track < 0 || static_cast<std::size_t>(track) >= song_->trackCount()) {
+        return {{QStringLiteral("fretted"), false}};
+    }
+    const core::Staff& staff = song_->track(static_cast<std::size_t>(track)).staff(0);
+    if (!staff.tuning()) {
+        return {{QStringLiteral("fretted"), false}};
+    }
+    QString preset;
+    for (const std::string_view id : core::Tuning::presetNames()) {
+        if (core::Tuning::preset(id) == staff.tuning()) {
+            preset = qstring(id);
+            break;
+        }
+    }
+    return {{QStringLiteral("fretted"), true},
+            {QStringLiteral("notes"), qstring(staff.tuning()->toString())},
+            {QStringLiteral("preset"), preset},
+            {QStringLiteral("capo"), staff.capo()}};
 }
 
 QString ScoreDocument::undoName() const {
@@ -845,6 +906,47 @@ void ScoreDocument::setTrackMix(int track, double volume, double pan, bool mute,
         return;
     }
     execute(std::make_unique<core::SetTrackMix>(index, mix));
+}
+
+void ScoreDocument::setTrackTuning(int track, const QString& tuning, int capo, bool keepFrets) {
+    if (!document_ || track < 0 ||
+        static_cast<std::size_t>(track) >= document_->song().trackCount()) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(track);
+    if (!document_->song().track(index).staff(0).tuning()) {
+        emit editFailed(tr("Only a track with strings has a tuning."));
+        return;
+    }
+    const std::string text = tuning.simplified().toStdString();
+    std::optional<core::Tuning> chosen = core::Tuning::preset(text);
+    if (!chosen) {
+        chosen = core::Tuning::parse(text);
+    }
+    if (!chosen) {
+        emit editFailed(tr("%1 is not a tuning: give open strings from the lowest, such as "
+                           "D2 A2 D3 G3 B3 E4.")
+                            .arg(tuning));
+        return;
+    }
+    const core::Retuning what{.track = index,
+                              .staff = 0,
+                              .tuning = *chosen,
+                              .capo = std::clamp(capo, 0, core::Tuning::kMaxFret),
+                              .keep = keepFrets ? core::Retune::Frets : core::Retune::Pitches};
+    std::unique_ptr<core::Command> command;
+    try {
+        command = core::makeRetune(document_->song(), what);
+    } catch (const std::invalid_argument&) {
+        const QString name = trackNames().value(track);
+        emit editFailed(keepFrets
+                            ? tr("Some frets of %1 do not fit that tuning and capo.").arg(name)
+                            : tr("That tuning cannot play every note of %1.").arg(name));
+        return;
+    }
+    if (command) {
+        execute(std::move(command));
+    }
 }
 
 void ScoreDocument::previewTrackMix(int track, double volume, double pan) {
