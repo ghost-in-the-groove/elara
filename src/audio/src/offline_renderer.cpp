@@ -31,6 +31,8 @@ struct OfflineRenderer::TrackPlayer {
                 dispatched.push_back({.frame = event.frame,
                                       .kind = event.kind,
                                       .touch = event.touch,
+                                      .cents = event.cents,
+                                      .glide = event.glide,
                                       .track = track,
                                       .key = event.key,
                                       .velocity = event.velocity});
