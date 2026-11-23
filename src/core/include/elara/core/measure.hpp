@@ -18,16 +18,16 @@ namespace elara::core {
 /// the staff's tuning and capo. Percussion notes use the General MIDI percussion
 /// key as the pitch's MIDI number.
 struct Note {
-    Pitch pitch;
-    std::optional<FretPosition> position;
+    Pitch pitch{};
+    std::optional<FretPosition> position{};
 
     friend bool operator==(const Note&, const Note&) = default;
 };
 
 /// Notes that start together and share a written duration. No notes = a rest.
 struct Beat {
-    Duration duration;
-    std::vector<Note> notes;
+    Duration duration{};
+    std::vector<Note> notes{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 
@@ -36,7 +36,7 @@ struct Beat {
 
 /// A sequence of beats. Positions are derived from the durations, never stored.
 struct Voice {
-    std::vector<Beat> beats;
+    std::vector<Beat> beats{};
 
     [[nodiscard]] bool isEmpty() const noexcept { return beats.empty(); }
 

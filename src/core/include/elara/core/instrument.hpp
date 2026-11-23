@@ -29,7 +29,7 @@ enum class Clef : std::uint8_t {
 };
 
 struct Instrument {
-    std::string name;
+    std::string name{};
     InstrumentKind kind = InstrumentKind::Pitched;
     int midiProgram = 0;   // General MIDI program, 0-based
     int writtenOffset = 0; // semitones the written note sits above the sound
