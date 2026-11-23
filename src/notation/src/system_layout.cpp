@@ -290,6 +290,11 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         core::Tempo tempo;
     };
     std::vector<Mark> marks;
+    // The tempo in force before each measure, carried along the system's
+    // consecutive measures: looking it up from the start of the song for each
+    // made long lines quadratic.
+    core::Tempo current = song.startTempo();
+    std::size_t next = 0; // the measure `current` is in force before
     for (const MeasureBox& box : measures) {
         const std::size_t m = box.index;
         const core::MeasureHeader& header = song.measureHeader(m);
@@ -300,9 +305,13 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
                 box.onsets, [at](const MeasureOnset& o) { return std::abs(o.at - at) < kEpsilon; });
             return onset != box.onsets.end() ? onset->x : box.x + at * box.width;
         };
-        core::Tempo current =
-            m == 0 ? song.startTempo()
-                   : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        if (m != next) {
+            current =
+                m == 0
+                    ? song.startTempo()
+                    : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        }
+        next = m + 1;
         const bool changedAtStart =
             !header.tempoChanges.empty() && header.tempoChanges.front().offset == core::Fraction();
         if (m == 0 && !changedAtStart) {
