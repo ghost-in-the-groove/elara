@@ -1003,17 +1003,17 @@ void saveNative(const Song& song, const std::filesystem::path& path) {
 std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in) {
-        return std::unexpected(FormatError{std::format("cannot open {}", displayPath(path))});
+        return std::unexpected(FormatError{"cannot open the file"});
     }
     const std::streamoff size = in.tellg();
     if (size < 0) {
-        return std::unexpected(FormatError{std::format("cannot read {}", displayPath(path))});
+        return std::unexpected(FormatError{"cannot read the file"});
     }
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
     in.seekg(0);
     in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (!in) {
-        return std::unexpected(FormatError{std::format("cannot read {}", displayPath(path))});
+        return std::unexpected(FormatError{"cannot read the file"});
     }
     return decodeNative(bytes);
 }

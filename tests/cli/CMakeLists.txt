@@ -144,3 +144,45 @@ set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME cli.edit_rejects_undo_without_history COMMAND elara-cli edit undo)
 set_tests_properties(cli.edit_rejects_undo_without_history PROPERTIES WILL_FAIL TRUE)
+
+# Song files: create, edit, dump (ADR-0006). The cases share files through fixtures.
+set(ELARA_CLI_SONG "${CMAKE_CURRENT_BINARY_DIR}/cli-song.elara")
+set(ELARA_CLI_EDITED "${CMAKE_CURRENT_BINARY_DIR}/cli-edited.elara")
+
+add_test(NAME cli.new_creates_song
+  COMMAND elara-cli --json new "${ELARA_CLI_SONG}" --force --title Etude
+    --track electric-guitar --track electric-bass --measures 8 --time 6/8 --key "D major" --tempo 90)
+set_tests_properties(cli.new_creates_song PROPERTIES
+  FIXTURES_SETUP cli_song
+  PASS_REGULAR_EXPRESSION "\"title\":\"Etude\",\"tracks\":2,\"measures\":8}")
+
+add_test(NAME cli.dump_reads_song COMMAND elara-cli --json dump "${ELARA_CLI_SONG}")
+set_tests_properties(cli.dump_reads_song PROPERTIES
+  FIXTURES_REQUIRED cli_song
+  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16\\.000,\"issues\":\\[\\]}")
+
+add_test(NAME cli.new_refuses_to_overwrite COMMAND elara-cli new "${ELARA_CLI_SONG}")
+set_tests_properties(cli.new_refuses_to_overwrite PROPERTIES
+  FIXTURES_REQUIRED cli_song
+  WILL_FAIL TRUE)
+
+add_test(NAME cli.edit_file_and_save
+  COMMAND elara-cli --json edit --in "${ELARA_CLI_SONG}" --out "${ELARA_CLI_EDITED}"
+    "note 0 0 6 3 4." "fill 0 0" undo redo)
+set_tests_properties(cli.edit_file_and_save PROPERTIES
+  FIXTURES_REQUIRED cli_song
+  FIXTURES_SETUP cli_edited
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Edit measure\"},\"redo\":{\"count\":0,\"next\":null},\"modified\":false}")
+
+add_test(NAME cli.dump_reads_edited_song COMMAND elara-cli --json dump "${ELARA_CLI_EDITED}")
+set_tests_properties(cli.dump_reads_edited_song PROPERTIES
+  FIXTURES_REQUIRED cli_edited
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\\.\",\"notes\":\\[{\"pitch\":\"G2\",\"string\":6,\"fret\":3}\\]},{\"duration\":\"4\\.\"}\\]\\]\\]")
+
+add_test(NAME cli.dump_rejects_missing_file
+  COMMAND elara-cli dump "${CMAKE_CURRENT_BINARY_DIR}/no-such-song.elara")
+set_tests_properties(cli.dump_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.dump_rejects_other_files
+  COMMAND elara-cli dump "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
+set_tests_properties(cli.dump_rejects_other_files PROPERTIES WILL_FAIL TRUE)
