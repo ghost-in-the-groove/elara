@@ -20,6 +20,9 @@ never part of `check` or CI: shared CI runners are too noisy to compare timings.
   stays readable. Record the result below with the reason for the change.
 - Compare runs on the same machine. Report the mean and keep an eye on the
   standard deviation: a change smaller than it is noise.
+- The same machine drifts between sessions by more than that. When a row looks
+  off, build the commit that recorded it in a second worktree and run the old
+  and new `elara_benchmarks` alternately; only that difference is the code's.
 - The audio thread has a hard budget (one buffer); everything else is judged by
   what a user would notice: opening a large song, editing, scrolling, rendering.
 
@@ -105,3 +108,35 @@ The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as
 MusicXML, as `.mxl`, as MIDI and as GPIF.
+
+### Periodic runs
+
+**2026-11-23, after the score's tempo marks, tuplets and rhythm under
+tablature.** Every benchmark ran again; the notation ones had been tagged
+`[!benchmark]`, which Catch2 hides unless asked, and now run with the others.
+Paths whose code did not change came out 10 to 15 % slower than their rows:
+the sounding notes take 12.7 ms against 11.2 ms, and the build of the commit
+that recorded the sequencer's 27.9 ms sequences the song in 31.4 to 32.3 ms
+today, as the current build does. The machine moved, not the code. The one
+regression was opening a `.gpx` file (see its row above), now fixed.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 11.2 ms | 12.7 ms |
+| sequence it; with every four measures repeated | 27.9 ms; 42 ms | 32.1 ms; 47.7 ms (the old build: 31.4 to 32.3 ms; 47.3 to 48.0 ms) |
+| render its first 10 s offline; on one thread | 24.6 ms; 111 ms | 28.1 ms; 116 ms |
+| build, copy and validate the 20-track song | 13.2 ms, 10.7 ms, 3.0 ms | 9.4 ms, 10.0 ms, 4.1 ms (± 1.2) |
+| seconds at its end (tempo map walk) | 11.6 µs | 18.7 µs (± 5.1) |
+| MusicXML import; export; export on one thread | 118 ms; 88 ms; 155 ms | 110 ms; 98 ms; 157 ms |
+| MIDI export; import | 45 ms; 40.5 ms | 31.4 ms; 44.6 ms |
+| GPIF import; on one thread | 125 ms; 211 ms | 125 ms; 238 ms |
+| 2 tracks from a literal-only `.gpx` | 28 ms | 41 ms; 28 to 31 ms once unpacked once |
+| lay out one 500-measure staff; 8 of its measures | 3.8 to 4.1 ms; 61 to 65 µs | 3.7 ms; 58 µs |
+| lay out its tablature alone | 1.4 ms | 2.6 ms: the rhythm under it is new (ADR-0041) |
+| notation and tablature: the staff; 8 measures; as SVG | 5.2 ms; 81 µs; 43 ms | 5.2 ms; 81 µs; 46 ms |
+| one track on A4 pages; on one thread | 3.4 to 3.6 ms; 9.4 ms | 4.2 ms; 11.1 ms |
+| the 20 staves on A4 pages; on one thread | 21 ms; 132 ms | 24.1 ms; 153 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.4, 8.5, 19, 11.5 ms | 5.6, 8.6, 19.3, 11.6 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.2, 8.3, 6.1, 4.8 ms | 5.4, 8.9, 6.1, 5.1 ms |
+| one tuner window: low E, high E, noise | 0.39, 0.10, 1.07 ms | 0.40, 0.10, 1.12 ms |
+| find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.37 µs; 1.6 µs |
