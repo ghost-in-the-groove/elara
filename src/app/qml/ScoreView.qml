@@ -21,6 +21,11 @@ Item {
     /// Scroll so that the cursor stays in view as it moves.
     property bool followCursor: false
     property color cursorColor: "#3f6ad8"
+    /// The height that floats over the bottom of the view (the transport):
+    /// the note entry bar stands above it.
+    property real bottomInset: 0
+    /// The height the note entry bar takes above that inset while it is shown.
+    readonly property real entryBarSpace: entryBar.shown ? entryBar.height + 12 : 0
     /// A click on the score asks to move playback there.
     signal seekRequested(real seconds)
     /// Where the cursor stands (ScoreDocument.cursorAt), empty when hidden.
@@ -417,10 +422,11 @@ Item {
     EntryBar {
         id: entryBar
 
+        objectName: "entryBar"
         readonly property bool shown: root.document.caretPage >= 0
 
         anchors.horizontalCenter: parent.horizontalCenter
-        y: shown ? parent.height - height - 18 : parent.height + 8
+        y: shown ? parent.height - height - root.bottomInset - 12 : parent.height + 8
         document: root.document
         dark: root.dark
         onMeasureRequested: root.openMeasurePopupAtCaret()

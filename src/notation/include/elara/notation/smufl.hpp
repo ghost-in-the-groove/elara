@@ -114,9 +114,17 @@ enum class Glyph : std::uint8_t {
     RepeatDot,
     Segno,
     Coda,
+    // Metronome marks
+    MetNoteWhole,
+    MetNoteHalfUp,
+    MetNoteQuarterUp,
+    MetNote8thUp,
+    MetNote16thUp,
+    MetNote32ndUp,
+    MetAugmentationDot,
 };
 
-inline constexpr std::size_t kGlyphCount = static_cast<std::size_t>(Glyph::Coda) + 1;
+inline constexpr std::size_t kGlyphCount = static_cast<std::size_t>(Glyph::MetAugmentationDot) + 1;
 
 /// The SMuFL name of a glyph ("noteheadBlack").
 [[nodiscard]] std::string_view glyphName(Glyph glyph) noexcept;

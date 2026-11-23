@@ -59,7 +59,7 @@ target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURR
 elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
   notation/test_page_layout.cpp
-  notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
+  notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
   LIBRARIES elara::notation)
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 
@@ -91,6 +91,7 @@ if(TARGET elara)
   # out, paints its first page and shows it in every view and with all tracks.
   # Then it edits the song (a new one without a file): adds a track, changes
   # the time signature, undoes, redoes, and checks the song ends as it began.
+  # The bars floating over the bottom of the score must not cover each other.
   add_test(NAME app.smoke COMMAND elara --smoke-test)
   add_test(NAME app.smoke_open_tracks
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
