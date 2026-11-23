@@ -432,3 +432,21 @@ foreach(_view IN ITEMS standard tab)
             "$<TARGET_FILE:elara-cli>" "${ELARA_CORPUS}/gp/guitar-techniques.gp"
             "${_render_snapshots}/gp/guitar-techniques-${_view}" --view ${_view})
 endforeach()
+
+# The sequencer (ADR-0017): measures in play order with their times, notes and
+# note events.
+add_test(NAME cli.sequence_repeats
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp")
+set_tests_properties(cli.sequence_repeats PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"measure\":0,\"start\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":2,[^}]*}\\],\"noteCount\":24,\"eventCount\":48}")
+add_test(NAME cli.sequence_endings
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5")
+set_tests_properties(cli.sequence_endings PROPERTIES
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 19 notes, 38 events in 13\\.950 s")
+add_test(NAME cli.sequence_events
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --notes --events)
+set_tests_properties(cli.sequence_events PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"duration\":8\\.4,.*\"notes\":\\[{\"track\":0,\"staff\":0,\"voice\":0,\"pass\":0,\"start\":0,\"end\":0\\.6,\"key\":60,\"velocity\":80},.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"time\":0\\.6,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"time\":0\\.6,\"kind\":\"on\",\"track\":0,\"key\":62,")
+add_test(NAME cli.sequence_rejects_missing_file
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
+set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)

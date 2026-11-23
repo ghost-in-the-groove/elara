@@ -85,6 +85,11 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | the same | 5.4 ms | each glyph filled on its own, outlines made once per glyph and size: Qt's rasteriser fills many small paths much faster than one large one (glyphs alone: 22 ms to 2.8 ms) |
 | 2026-11-23 | the same on a high-density screen (2 device pixels per pixel), and at 200 % | 8.5 ms, 19 ms | 70 ms and 131 ms before; pages are painted on worker threads, so this is latency, not stutter |
 | 2026-11-23 | paint an A4 page of the 20-staff score (1960 glyphs, 2781 lines, 1282 texts), high density | 11.5 ms | 132 ms before |
+| 2026-11-23 | sequence the 20-track song (500 measures, 160k notes, 320k events) | 74 ms | first version (ADR-0017): every note timed through the play order with fraction arithmetic, then one sort of all events |
+| 2026-11-23 | the same with every four measures repeated (1000 measures and 320k notes played) | 133 ms | |
+| 2026-11-23 | sequence the 20-track song | 42.5 ms | each written note timed once in its measure (a repeat only adds a sum), tempo as precomputed segments in doubles instead of fractions per call; events made track by track on all cores. Repeated: 62 ms |
+| 2026-11-23 | the same | 33 ms | the track lists merged pairwise, each round on all cores, instead of through a heap (20 ms of the 42); notes timed in blocks on all cores. Repeated: 45.5 ms |
+| 2026-11-23 | sounding notes of the 20-track song | 10.7 ms | 16 ms before: each voice read on its own thread and the lists merged pairwise instead of one stable sort of every note. The sequencer starts from them: 26 ms, repeated 40 ms (2.8x and 3.3x the first version) |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
