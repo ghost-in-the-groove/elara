@@ -1057,8 +1057,10 @@ private:
                     addTechniques(marks, *chords_[c].beat);
                 }
             }
-            const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
-            lanes_.column(marks, column.x + centre, end, measure_);
+            if (lanes_.wants(marks)) {
+                const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
+                lanes_.column(marks, column.x + centre, end, measure_);
+            }
         }
     }
 

@@ -70,8 +70,9 @@ units, so snapshots do not depend on a renderer's font rasteriser.
 
 - Tests assert positions in staff spaces against the font's metrics; `elara-cli
   render --json` and `--svg` show the same list for a whole file.
-- The constants live in one place (`staff_layout.cpp`) and are named; changing
-  one shows up in the layout tests and, later, the SVG snapshots.
-- Not covered yet: ties and slurs, tuplet numbers and brackets, articulations
-  and other markings, grace notes, notes of different voices colliding on one
-  line, justification, tablature.
+- The constants are named, in `standard_staff.cpp` and (spacing)
+  `layout_common.hpp`; changing one shows up in the layout tests and, later,
+  the SVG snapshots.
+- ADR-0013 adds tablature, ties, articulations and staves aligned in systems.
+  Not covered yet: slurs, tuplet numbers and brackets, other markings, grace
+  notes, notes of different voices colliding on one line, justification.

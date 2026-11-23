@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstddef>
 #include <iterator>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -93,6 +94,9 @@ void measureExtents(DisplayList& list, const EngravingFont& font, double staffHe
 }
 
 void shift(DisplayList& list, double dy) {
+    if (dy == 0.0) {
+        return;
+    }
     for (GlyphItem& item : list.glyphs) {
         item.origin.y += dy;
     }
@@ -127,6 +131,10 @@ void shift(DisplayList& list, double dy) {
 
 void append(DisplayList& to, DisplayList&& from) {
     const auto move = [](auto& into, auto& items) {
+        if (into.empty()) {
+            into = std::move(items); // the first staff: no copy
+            return;
+        }
         into.insert(into.end(), std::make_move_iterator(items.begin()),
                     std::make_move_iterator(items.end()));
     };
@@ -357,30 +365,10 @@ DisplayList StaffWriter::finish(double width) {
     return std::move(list_);
 }
 
-void StaffWriter::glyph(Glyph which, double x, double y, Role role) {
-    list_.glyphs.push_back(
-        GlyphItem{.glyph = which, .origin = {x, y}, .role = role, .measure = measure_});
-}
-
-double StaffWriter::glyphFrom(Glyph which, double x, double y, Role role) {
-    const BoundingBox& box = metrics(which).box;
-    glyph(which, x - box.southWest.x, y, role);
-    return x + box.width();
-}
-
 void StaffWriter::glyphCentred(Glyph which, double x, double y, Role role) {
     const BoundingBox& box = metrics(which).box;
     glyph(which, x - (box.southWest.x + box.northEast.x) / 2,
           y + (box.southWest.y + box.northEast.y) / 2, role);
-}
-
-void StaffWriter::line(Point from, Point to, double thickness, Role role, double dash) {
-    list_.lines.push_back(LineItem{.from = from,
-                                   .to = to,
-                                   .thickness = thickness,
-                                   .role = role,
-                                   .measure = measure_,
-                                   .dash = dash});
 }
 
 void StaffWriter::text(std::string content, Point origin, double size, Role role, TextAlign align,

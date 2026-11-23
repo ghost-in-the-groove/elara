@@ -10,6 +10,7 @@
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/smufl.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -100,6 +101,11 @@ struct ColumnTechniques {
     core::Vibrato vibrato = core::Vibrato::None;
     core::PickStroke pickStroke = core::PickStroke::None;
     core::HarmonicKind harmonic = core::HarmonicKind::None;
+
+    [[nodiscard]] bool any() const noexcept {
+        return palmMute || letRing || vibrato != core::Vibrato::None ||
+               pickStroke != core::PickStroke::None || harmonic != core::HarmonicKind::None;
+    }
 };
 
 /// Adds the marks of the notes of `beat` to `marks`.
@@ -120,6 +126,12 @@ public:
 
     /// Whether any lane has marks or open runs.
     [[nodiscard]] bool empty() const noexcept;
+
+    /// Whether column() has anything to do with `marks`: marks to add or runs
+    /// to end.
+    [[nodiscard]] bool wants(const ColumnTechniques& marks) const noexcept {
+        return marks.any() || std::ranges::any_of(runs_, [](const Run& run) { return run.open; });
+    }
 
     /// Ends open runs, places the used lanes above `top` (the highest ink of
     /// the staff, negative above it) and moves their marks into `list`.
@@ -197,12 +209,30 @@ protected:
     /// Draws what waits for the end of the line (technique lanes, open runs).
     virtual void close() {}
 
-    void glyph(Glyph which, double x, double y, Role role);
+    // Inline: layout draws tens of thousands of glyphs and lines.
+    void glyph(Glyph which, double x, double y, Role role) {
+        list_.glyphs.push_back(
+            GlyphItem{.glyph = which, .origin = {x, y}, .role = role, .measure = measure_});
+    }
+
     /// Draws `which` with the left of its box at `x`; returns the right of the box.
-    double glyphFrom(Glyph which, double x, double y, Role role);
+    double glyphFrom(Glyph which, double x, double y, Role role) {
+        const BoundingBox& box = metrics(which).box;
+        glyph(which, x - box.southWest.x, y, role);
+        return x + box.width();
+    }
+
     /// Draws `which` with its box centred on (x, y).
     void glyphCentred(Glyph which, double x, double y, Role role);
-    void line(Point from, Point to, double thickness, Role role, double dash = 0.0);
+    void line(Point from, Point to, double thickness, Role role, double dash = 0.0) {
+        list_.lines.push_back(LineItem{.from = from,
+                                       .to = to,
+                                       .thickness = thickness,
+                                       .role = role,
+                                       .measure = measure_,
+                                       .dash = dash});
+    }
+
     void text(std::string content, Point origin, double size, Role role,
               TextAlign align = TextAlign::Centre, bool knockout = false);
     void curve(Point from, Point to, double height, double thickness, double endThickness,

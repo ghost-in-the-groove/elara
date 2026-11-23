@@ -72,6 +72,12 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | lay out 8 measures of that staff (a screenful) | 54 µs | relayout after an edit costs far less than a frame |
 | 2026-11-23 | lay out all 20 staves of the large song | 78 ms | one thread; staves are independent, so systems can lay them out in parallel when it shows |
 | 2026-11-23 | write the 500-measure staff as SVG (30k elements) | 29 ms | `std::format` per element; only tests and the CLI write SVG |
+| 2026-11-23 | lay out one 500-measure staff, same song | 3.8 to 4.1 ms (3.84 ms before, same machine and run) | staff writers spaced by a system (ADR-0013), ties, articulations and technique lanes; per-measure buffers reused, the first staff moved instead of copied, drawing helpers inline |
+| 2026-11-23 | lay out 8 measures of that staff | 61 to 65 µs (54 µs before) | about 8 µs of fixed cost per call: the writer, its lanes and the system's buffers |
+| 2026-11-23 | lay out the tablature of that staff | 1.4 ms | 8000 fret numbers |
+| 2026-11-23 | lay out its notation and tablature together | 5.2 ms | the two staves cost about what they cost apart: the shared spacing pass is cheap |
+| 2026-11-23 | lay out 8 measures of notation and tablature | 81 µs | |
+| 2026-11-23 | write notation and tablature of the staff as SVG (46k elements) | 43 ms | text and knockout rectangles for every fret number |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as

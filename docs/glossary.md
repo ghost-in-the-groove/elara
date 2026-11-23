@@ -10,7 +10,10 @@ base speaks one vocabulary. American terms follow MusicXML.
 | pista | track | `Track` | One instrument |
 | instrumento | instrument | `Instrument`, `InstrumentPreset` | Kind, GM program, written offset |
 | pentagrama | staff | `Staff` | Plural `staves` |
-| tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004) |
+| tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004); `StaffView::Tablature` in layout |
+| sistema | system | `layoutSystem()` | Staves laid out together, notes that start together aligned (ADR-0013) |
+| lista de visualización | display list | `DisplayList` | What layout produces: glyphs, lines, beams, text and curves in staff spaces (ADR-0012) |
+| carril de técnicas | technique lane | `Lane` | Band above a staff for palm mute, let ring, vibrato... (ADR-0013) |
 | clave | clef | `Clef` | |
 | compás (unidad) | measure | `Measure` | Not "bar"; one staff's content |
 | cabecera de compás | measure header | `MeasureHeader` | Song-wide: signatures, repeats |
@@ -40,6 +43,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | ligadura de prolongación | tie | `tiedFromPrevious` | Same pitch, no new attack |
 | ligadura de expresión | slur | `Slur` | |
 | plica | stem | `Stem` | |
+| articulación | articulation | `staccato`, `Accent` | Staccato, accent, marcato |
 | barra (de corcheas) | beam | `Beam` | |
 | alteración | accidental | `Accidental` | |
 | altura | pitch | `Pitch` | step + alter + octave |
@@ -53,7 +57,9 @@ base speaks one vocabulary. American terms follow MusicXML.
 | bend | bend | `BendCurve` | Points of (percent of the note, cents) |
 | ligado ascendente / descendente | hammer-on / pull-off | `legatoFromPrevious` | Up = hammer-on, down = pull-off |
 | deslizamiento | slide | `SlideIn`, `SlideOut` | |
-| palm mute | palm mute | `palmMute` | |
+| palm mute | palm mute | `palmMute` | `P.M.` |
+| dejar sonar | let ring | `letRing` | |
+| púa abajo / arriba | pick stroke | `PickStroke` | Down / up |
 | nota muerta | dead note | `deadNote` | |
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | vibrato | vibrato | `Vibrato` | |

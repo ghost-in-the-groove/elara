@@ -215,8 +215,10 @@ public:
             for (const TabNote& note : column.notes) {
                 drawNote(note, centre);
             }
-            lanes_.column(marks, centre, nextColumnX(positions, column.start, barline) - kRunEndGap,
-                          measure_);
+            if (lanes_.wants(marks)) {
+                lanes_.column(marks, centre,
+                              nextColumnX(positions, column.start, barline) - kRunEndGap, measure_);
+            }
         }
     }
 
