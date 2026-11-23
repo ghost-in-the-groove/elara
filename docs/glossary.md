@@ -42,6 +42,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | nota sonora | sounding note | `SoundingNote`, `soundingNotes()` | A note as it sounds: start and length in whole notes from the start of the song, tied notes joined, velocity from the dynamic (ADR-0009) |
 | secuencia / compás tocado | sequence / played measure | `audio::Sequence`, `PlayedMeasure`, `PlayedNote` | The song as it is played: measures in play order with repeats unrolled, notes and note events in seconds (ADR-0017) |
 | evento de nota | note event | `NoteEvent`, `EventKind` | What a synthesizer is told: a key struck (`NoteOn`) or released (`NoteOff`) on a track at a time |
+| timbre | timbre | `audio::Timbre`, `timbreFor()` | The sound the built-in synthesizer gives a track, picked from its instrument (ADR-0018) |
+| registro de eventos | event log | `LoggedEvent`, `OfflineRenderer::log()` | The note events a render dispatched, each with its sample frame; what playback tests compare |
 | cuantización / rejilla | quantization / grid | MIDI import | Placing played or exported MIDI notes on a rhythm grid chosen per beat before writing them as notes, rests, ties and tuplets (ADR-0009) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |

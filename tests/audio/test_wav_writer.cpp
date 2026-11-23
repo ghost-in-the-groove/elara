@@ -5,6 +5,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -65,4 +69,49 @@ TEST_CASE("encodeWavPcm16 scales and clips samples", "[audio][wav]") {
     CHECK(sampleAt(2) == -32767);
     CHECK(sampleAt(3) == 32767);
     CHECK(sampleAt(4) == -32767);
+}
+
+TEST_CASE("WavFileWriter writes block by block what encodeWavPcm16 writes at once",
+          "[audio][wav]") {
+    std::vector<float> samples;
+    for (int i = 0; i < 2000; ++i) {
+        samples.push_back(static_cast<float>(i % 200) / 100.0f - 1.0f);
+    }
+    const elara::audio::WavFormat format{.sampleRate = 48000, .channels = 2};
+    const auto path = std::filesystem::temp_directory_path() / "elara-wav-writer-test.wav";
+    {
+        auto writer = elara::audio::WavFileWriter::create(path, format, samples.size() / 2);
+        REQUIRE(writer.has_value());
+        const std::span<const float> all(samples);
+        REQUIRE(writer->write(all.first(6)).has_value());
+        REQUIRE(writer->write(all.subspan(6, 994)).has_value());
+        REQUIRE(writer->write(all.subspan(1000)).has_value());
+        REQUIRE(writer->finish().has_value());
+    }
+    std::ifstream file(path, std::ios::binary);
+    const std::vector<char> raw((std::istreambuf_iterator<char>(file)),
+                                std::istreambuf_iterator<char>());
+    file.close();
+    std::filesystem::remove(path);
+    const auto expected = elara::audio::encodeWavPcm16(samples, format);
+    REQUIRE(raw.size() == expected.size());
+    for (std::size_t i = 0; i < raw.size(); ++i) {
+        REQUIRE(static_cast<std::byte>(raw[i]) == expected[i]);
+    }
+}
+
+TEST_CASE("WavFileWriter reports a file shorter or longer than its header says", "[audio][wav]") {
+    const elara::audio::WavFormat format{.sampleRate = 48000, .channels = 1};
+    const auto path = std::filesystem::temp_directory_path() / "elara-wav-writer-short.wav";
+    {
+        auto writer = elara::audio::WavFileWriter::create(path, format, 10);
+        REQUIRE(writer.has_value());
+        const std::vector<float> few(4, 0.0f);
+        REQUIRE(writer->write(few).has_value());
+        CHECK_FALSE(writer->finish().has_value());
+        const std::vector<float> many(20, 0.0f);
+        CHECK_FALSE(writer->write(many).has_value());
+    }
+    std::filesystem::remove(path);
+    CHECK_FALSE(elara::audio::WavFileWriter::create(path / "missing" / "x.wav", format, 1));
 }

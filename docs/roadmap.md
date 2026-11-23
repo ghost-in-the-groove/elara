@@ -62,7 +62,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] sfizz integration and guitar SFZ library selection
 - [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)
 - [ ] Mixer (volume, pan, mute, solo), playback cursor in the app
-- [ ] `elara-cli render-audio` offline render + event-log tests
+- [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 
 ## Milestone 5 - Editor
 

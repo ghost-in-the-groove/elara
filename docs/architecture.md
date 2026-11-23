@@ -13,7 +13,7 @@ flowchart TD
     cli -.-> io
     cli -.-> notation
     audio_juce["audio/backend_juce (JUCE)"] --> audio
-    audio["audio (DSP, WAV)"] --> core
+    audio["audio (sequencer, synth, WAV)"] --> core
     io["io (importers/exporters)"] -.-> core
     notation["notation (layout engine)"] -.-> core
     core["core (musical model)"]
@@ -28,7 +28,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/core` | `elara_core` | Musical model, commands with undo/redo | 1 |
 | `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-8 import (ADR-0010) | 1, 2 |
 | `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of standard notation and tablature into a display list, staves aligned in systems, line breaking and pages, SVG output (ADR-0012, ADR-0013, ADR-0014) | 3 |
-| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); real-time-safe DSP, offline rendering, WAV | 0, 4 |
+| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer and offline rendering (ADR-0018); real-time-safe DSP, WAV | 0, 4 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE; synths (FluidSynth, sfizz) | 0, 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
 | `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015) | 0+ |

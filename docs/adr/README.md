@@ -23,6 +23,7 @@ one that replaces them.
 | [0015](0015-score-view.md) | The score view: painting display lists in the app | Accepted |
 | [0016](0016-repeats.md) | Repeats and alternate endings | Accepted |
 | [0017](0017-sequencer.md) | The sequencer | Accepted |
+| [0018](0018-built-in-synthesizer.md) | The built-in synthesizer and offline rendering | Accepted |
 
 ## Template
 
