@@ -19,9 +19,11 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -94,6 +96,29 @@ int intOf(pugi::xml_node node, int fallback) {
     return intOf(textOf(node)).value_or(fallback);
 }
 
+/// Space-separated decimals ("0.5 0.61 1"), NaN where one does not read, so
+/// that each keeps its place.
+std::vector<double> decimalsOf(std::string_view text) {
+    std::vector<double> values;
+    std::size_t at = 0;
+    while (at < text.size()) {
+        const auto start = text.find_first_not_of(" \t\r\n", at);
+        if (start == std::string_view::npos) {
+            break;
+        }
+        auto end = text.find_first_of(" \t\r\n", start);
+        end = end == std::string_view::npos ? text.size() : end;
+        const std::string token(text.substr(start, end - start));
+        char* stop = nullptr;
+        const double value = std::strtod(token.c_str(), &stop);
+        values.push_back(stop == token.c_str() + token.size() && std::isfinite(value)
+                             ? value
+                             : std::numeric_limits<double>::quiet_NaN());
+        at = end;
+    }
+    return values;
+}
+
 /// Space-separated integers ("0 1 -1 -1").
 std::vector<int> intsOf(std::string_view text) {
     std::vector<int> values;
@@ -151,6 +176,7 @@ constexpr std::uint8_t kTablaturePart = 2;
 struct TrackLayout {
     std::string name;
     Instrument instrument;
+    core::TrackMix mix;
     std::vector<Staff> staves;
     std::vector<std::vector<int>> lowToHigh; // per staff: open strings, lowest first
     std::vector<int> drumKeys;               // per instrument articulation
@@ -166,6 +192,54 @@ std::optional<std::vector<int>> tuningOf(pugi::xml_node staff) {
         return std::nullopt;
     }
     return pitches;
+}
+
+// The mixer at the start of the song: the channel strip's pan (parameter 11)
+// and volume (parameter 12), both from 0 to 1, unless an automation sets them
+// at the very start; later automations are dropped. The playback state says
+// whether the track is muted or soloed.
+core::TrackMix mixOf(pugi::xml_node track, const std::string& name, Warnings& warnings) {
+    core::TrackMix mix;
+    const std::string_view state = textOf(track.child("PlaybackState"));
+    mix.mute = state == std::string_view("Mute");
+    mix.solo = state == std::string_view("Solo");
+    pugi::xml_node strip = track.child("RSE").child("ChannelStrip");
+    if (!strip) {
+        strip = track.child("ChannelStrip");
+    }
+    if (!strip) {
+        return mix;
+    }
+    constexpr std::size_t kPan = 11;
+    constexpr std::size_t kVolume = 12;
+    const std::vector<double> parameters = decimalsOf(textOf(strip.child("Parameters")));
+    double pan = parameters.size() > kVolume ? parameters[kPan] : 0.5;
+    double volume = parameters.size() > kVolume ? parameters[kVolume] : mix.volume;
+    const std::string_view bypassed = textOf(strip.child("ByPassedAutomations"));
+    bool changes = false;
+    for (const pugi::xml_node automation : strip.child("Automations").children("Automation")) {
+        const std::string type = trimmed(textOf(automation.child("Type")));
+        if (type != "DSPParam_11" && type != "DSPParam_12") {
+            continue;
+        }
+        if (intOf(automation.child("Bar"), 0) != 0 ||
+            automation.child("Position").text().as_double(0.0) != 0.0) {
+            changes = true;
+        } else if (bypassed.find(type) == std::string_view::npos) {
+            (type == "DSPParam_11" ? pan : volume) =
+                automation.child("Value").text().as_double(std::nan(""));
+        }
+    }
+    if (changes) {
+        warnings.add(name, "volume and pan changes dropped");
+    }
+    if (std::isfinite(volume)) {
+        mix.volume = std::clamp(volume, 0.0, 1.0);
+    }
+    if (std::isfinite(pan)) {
+        mix.pan = std::clamp((pan * 2.0) - 1.0, -1.0, 1.0);
+    }
+    return mix;
 }
 
 // `tablatureShown` is false when the full score shows the track without
@@ -280,6 +354,7 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
         .midiProgram = layout.percussion ? 0 : program,
         .writtenOffset = layout.percussion ? 0 : -(chromatic + 12 * octave),
     };
+    layout.mix = mixOf(track, layout.name, warnings);
     return layout;
 }
 
@@ -963,7 +1038,8 @@ private:
             if (hasLyrics(track)) {
                 warnings_.add(layout.name, "lyrics dropped");
             }
-            song.addTrack(core::Track(layout.name, layout.instrument, layout.staves));
+            song.track(song.addTrack(core::Track(layout.name, layout.instrument, layout.staves)))
+                .setMix(layout.mix);
             for (std::size_t s = 0; s < layout.staves.size(); ++s) {
                 staves_.push_back(StaffRef{.track = index, .staff = s});
             }

@@ -116,6 +116,13 @@ void SetStartTempo::swapWith(Song& song) noexcept {
     tempo_ = previous;
 }
 
+void SetTrackMix::swapWith(Song& song) {
+    Track& track = song.track(track_);
+    const TrackMix previous = track.mix();
+    track.setMix(mix_);
+    mix_ = previous;
+}
+
 // ---- Groups ------------------------------------------------------------------
 
 CommandGroup::CommandGroup(std::string name, std::vector<std::unique_ptr<Command>> commands)

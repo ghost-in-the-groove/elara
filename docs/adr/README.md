@@ -25,6 +25,7 @@ one that replaces them.
 | [0017](0017-sequencer.md) | The sequencer | Accepted |
 | [0018](0018-built-in-synthesizer.md) | The built-in synthesizer and offline rendering | Accepted |
 | [0019](0019-real-time-playback.md) | Real-time playback | Accepted |
+| [0020](0020-track-mix.md) | The track mix | Accepted |
 
 ## Template
 

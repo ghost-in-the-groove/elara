@@ -364,6 +364,10 @@ def write_track(w: Writer, index: int, t: dict) -> None:
     flags = 0x01 if t.get("drums") else 0
     if w.version >= 500:
         flags |= 0x08  # visible
+        if t.get("solo"):
+            flags |= 0x10
+        if t.get("mute"):
+            flags |= 0x20
     w.u8(flags)
     w.byte_string(t["name"], 40)
     strings = t["strings"]
@@ -440,10 +444,13 @@ def song_file(song: dict) -> bytes:
         w.i32(0)  # octave
     else:
         w.i32(song.get("key", 0))
-    programs = {t["channel"]: t.get("program", 0) for t in song["tracks"]}
+    channels = {t["channel"]: t for t in song["tracks"]}
     for slot in range(64):
-        w.i32(programs.get(slot + 1, 0))
-        w.out += bytes([104, 64, 0, 0, 0, 0, 0, 0])  # volume, balance... and padding
+        track = channels.get(slot + 1, {})
+        w.i32(track.get("program", 0))
+        # Volume and balance count sixteenths (8 is the centre); then chorus,
+        # reverb, phaser, tremolo and padding.
+        w.out += bytes([track.get("volume", 13), track.get("balance", 8), 0, 0, 0, 0, 0, 0])
     if v >= 500:
         for _ in range(19):
             w.i16(-1)  # no coda or segno
@@ -475,6 +482,7 @@ def song_file(song: dict) -> bytes:
 def techniques_gp5() -> dict:
     lead = {
         "name": "Lead Guitar", "channel": 1, "program": 29, "strings": STANDARD, "capo": 2,
+        "volume": 14, "balance": 10, "solo": True,
         "content": [
             # Measure 1: a palm-muted open string, a triplet with a hammer-on, a
             # full bend with vibrato (and a tempo change), a natural harmonic.
@@ -528,6 +536,7 @@ def techniques_gp5() -> dict:
 def quartet_gp4() -> dict:
     bass = {
         "name": "Bass", "channel": 2, "program": 33, "strings": [43, 38, 33, 28],
+        "volume": 12, "balance": 4,
         "content": [
             [[beat(0, [note(3, 3)], effects={"slap": 2}),
               beat(0, [note(3, 3)], effects={"slap": 3}),
@@ -545,6 +554,7 @@ def quartet_gp4() -> dict:
     }
     drums = {
         "name": "Drums", "channel": 10, "drums": True, "strings": [0, 0, 0, 0, 0, 0],
+        "volume": 16,
         "content": [
             [[beat(0, [note(5, 36), note(1, 42)]), beat(0, [note(3, 38), note(1, 42)]),
               beat(0, [note(5, 36), note(1, 42)]), beat(0, [note(3, 38), note(1, 42)])]],

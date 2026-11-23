@@ -139,6 +139,15 @@ add_test(NAME cli.edit_save_point_survives_undo_redo
 set_tests_properties(cli.edit_save_point_survives_undo_redo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"modified\":false}")
 
+add_test(NAME cli.edit_sets_track_mix
+  COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
+set_tests_properties(cli.edit_sets_track_mix PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"mix\":{\"volume\":0.5,\"pan\":-0.25,\"mute\":false,\"solo\":true}.*\"next\":\"Change mix\"")
+
+add_test(NAME cli.edit_rejects_mix_out_of_range
+  COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
+set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "transpose 2")
 set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
 
@@ -343,7 +352,7 @@ set_tests_properties(cli.render_tab PROPERTIES
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both

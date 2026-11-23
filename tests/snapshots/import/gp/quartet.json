@@ -53,6 +53,10 @@
      "midiProgram": 33,
      "writtenOffset": 12
     },
+    "mix": {
+     "volume": 0.75,
+     "pan": -0.5
+    },
     "staves": [
      {
       "clef": "bass-8vb",
@@ -153,6 +157,9 @@
      "name": "Acoustic Grand Piano",
      "kind": "keyboard"
     },
+    "mix": {
+     "volume": 0.8125
+    },
     "staves": [
      {
       "clef": "treble",
@@ -212,6 +219,9 @@
     "instrument": {
      "name": "Drums",
      "kind": "percussion"
+    },
+    "mix": {
+     "volume": 1
     },
     "staves": [
      {
@@ -314,6 +324,9 @@
      "name": "Flute",
      "kind": "pitched",
      "midiProgram": 73
+    },
+    "mix": {
+     "volume": 0.8125
     },
     "staves": [
      {
