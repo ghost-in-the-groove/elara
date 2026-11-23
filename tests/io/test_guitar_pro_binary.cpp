@@ -66,6 +66,9 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
                                    "Lead Guitar: text dropped (measure 3)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Techniques");
+    // Volume 14 and balance 10 of 16 on its channel; Guitar Pro 5 flags solo.
+    CHECK(song.track(0).mix() ==
+          core::TrackMix{.volume = 0.875, .pan = 0.25, .mute = false, .solo = true});
     CHECK(song.info().subtitle == "Guitar Pro 5");
     CHECK(song.info().music == "Ghost in the Groove");
     CHECK(song.info().words.empty());
@@ -173,6 +176,13 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
                                    "Drums: instrument and volume changes dropped (measure 2)",
                                    "Melody: trills dropped (measure 2)"});
     CHECK(core::validate(song).empty());
+    // Each track reads its own channel: the bass at 12 of 16, balance 4 (half
+    // left), the drums full, the others at Guitar Pro's default 13.
+    REQUIRE(song.trackCount() == 4);
+    CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.75, .pan = -0.5});
+    CHECK(song.track(1).mix() == core::TrackMix{.volume = 0.8125, .pan = 0.0});
+    CHECK(song.track(2).mix() == core::TrackMix{.volume = 1.0, .pan = 0.0});
+    CHECK(song.track(3).mix() == core::TrackMix{.volume = 0.8125, .pan = 0.0});
     // |:1. 1 :|2. 2 |: one more time, and the second ending takes the times the
     // first one leaves.
     CHECK(song.measureHeader(0).repeatStart);
@@ -248,6 +258,7 @@ TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong 
               "Nylon Guitar: chord names and diagrams dropped (2 times, first in measure 1)",
               "Nylon Guitar: text dropped (measure 2)"});
     CHECK(core::validate(song).empty());
+    CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.8125, .pan = 0.0});
     CHECK(song.info().title == "Corpus Melod\xc3\xad"
                                "a");
     CHECK(song.info().notes == "Self-made test file\nSecond line");

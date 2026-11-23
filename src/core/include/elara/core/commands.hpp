@@ -129,6 +129,21 @@ private:
     Tempo tempo_;
 };
 
+/// Changes how a track sits in the mix: volume, pan, mute and solo.
+class SetTrackMix final : public Command {
+public:
+    SetTrackMix(std::size_t track, TrackMix mix) : track_(track), mix_(mix) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Change mix"; }
+
+private:
+    void swapWith(Song& song);
+
+    std::size_t track_;
+    TrackMix mix_;
+};
+
 /// Several commands as one undo step, applied in order and reverted in reverse.
 /// If one fails, the ones already applied are reverted and the error propagates.
 class CommandGroup final : public Command {

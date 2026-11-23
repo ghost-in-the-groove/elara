@@ -251,10 +251,18 @@ struct StringState {
     bool legatoToNext = false; // a hammer-on or pull-off starts here
 };
 
+// One of the 64 MIDI channels of the song's channel table.
+struct ChannelData {
+    int program = 0;
+    int volume = 13; // 0 to 16
+    int balance = 8; // 0 (left) to 16 (right)
+};
+
 struct TrackData {
     std::string name;
     bool percussion = false;
     bool banjo = false;
+    core::TrackMix mix;
     std::vector<int> strings; // open strings as MIDI numbers, string 1 (highest) first
     int capo = 0;
     int program = 0;
@@ -409,9 +417,11 @@ private:
     }
 
     void readChannels() {
-        for (int& program : programs_) {
-            program = in_.i32();
-            in_.skip(6 + 2); // volume, balance, chorus, reverb, phaser, tremolo
+        for (ChannelData& channel : channels_) {
+            channel.program = in_.i32();
+            channel.volume = in_.i8();
+            channel.balance = in_.i8();
+            in_.skip(4 + 2); // chorus, reverb, phaser, tremolo, padding
         }
     }
 
@@ -570,10 +580,17 @@ private:
         }
         track.percussion = (flags & 0x01U) != 0 || channel == 10;
         track.banjo = (flags & 0x04U) != 0;
+        if (version_ >= 500) {
+            track.mix.solo = (flags & 0x10U) != 0;
+            track.mix.mute = (flags & 0x20U) != 0;
+        }
         if (port >= 1 && port <= 4 && channel >= 1 && channel <= 16) {
             const auto slot = static_cast<std::size_t>((port - 1) * 16 + channel - 1);
-            const int program = programs_[slot];
-            track.program = program >= 0 && program <= 127 ? program : 0;
+            const ChannelData& data = channels_[slot];
+            track.program = data.program >= 0 && data.program <= 127 ? data.program : 0;
+            // Volume and balance count sixteenths; 8 is the centre.
+            track.mix.volume = static_cast<double>(std::clamp(data.volume, 0, 16)) / 16.0;
+            track.mix.pan = static_cast<double>(std::clamp(data.balance, 0, 16) - 8) / 8.0;
         }
         if (!track.percussion && stringCount >= 1 && stringCount <= kStrings) {
             const auto used = std::span(tuning).first(static_cast<std::size_t>(stringCount));
@@ -1097,7 +1114,7 @@ private:
         Song song;
         song.info() = std::move(info_);
         for (TrackData& track : tracks_) {
-            song.addTrack(trackFor(track));
+            song.track(song.addTrack(trackFor(track))).setMix(track.mix);
         }
         song.appendMeasures(headers_.size());
         for (std::size_t m = 0; m < headers_.size(); ++m) {
@@ -1206,7 +1223,7 @@ private:
     int startBpm_ = 120;
     std::int32_t lyricsTrack_ = 0;
     bool hasLyrics_ = false;
-    std::array<int, 64> programs_{}; // four ports of sixteen MIDI channels
+    std::array<ChannelData, 64> channels_{}; // four ports of sixteen MIDI channels
     std::vector<std::size_t> jumps_;
     std::vector<HeaderData> headers_;
     std::vector<TrackData> tracks_;

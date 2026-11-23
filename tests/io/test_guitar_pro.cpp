@@ -188,11 +188,20 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     const ImportResult result = load("band.gp");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{"Clarinet: lyrics dropped",
+          std::vector<std::string>{"Clarinet: volume and pan changes dropped",
+                                   "Clarinet: lyrics dropped",
                                    "gradual tempo changes written as sudden ones",
                                    "Clarinet: short voices filled with rests (measure 2)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().words == "Ghost in the Groove");
+
+    // The mixer: the channel strip's volume and pan, or the automation that
+    // sets them at the start; the clarinet's later change is dropped.
+    REQUIRE(song.trackCount() == 4);
+    CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.7, .pan = -0.4});
+    CHECK(song.track(1).mix() == core::TrackMix{.volume = 0.795, .pan = 0.0});
+    CHECK(song.track(2).mix() == core::TrackMix{.volume = 0.9, .pan = 0.0});
+    CHECK(song.track(3).mix() == core::TrackMix{.volume = 0.6, .pan = 0.5});
     CHECK(song.info().music == "Ghost in the Groove");
     REQUIRE(song.measureHeader(1).tempoChanges.size() == 1);
     CHECK(song.measureHeader(1).tempoChanges[0].tempo ==

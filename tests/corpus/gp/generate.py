@@ -74,12 +74,29 @@ class Beat:
         self.elements, self.props = list(elements), list(props)
 
 
+def channel_strip(volume: float, pan: float, automations=()) -> str:
+    """The mixer of a track: parameter 11 is the pan and 12 the volume, both from
+    0 to 1; automations are (type, bar, position, value)."""
+    parameters = [0.5] * 16
+    parameters[11], parameters[12] = pan, volume
+    automation = "".join(
+        f"<Automation><Type>{kind}</Type><Linear>false</Linear><Bar>{bar}</Bar>"
+        f"<Position>{position}</Position><Visible>true</Visible><Value>{value}</Value>"
+        "</Automation>" for kind, bar, position, value in automations)
+    return (f'<RSE><ChannelStrip version="E56"><Parameters>'
+            f'{" ".join(str(p) for p in parameters)}</Parameters>'
+            f"<Automations>{automation}</Automations></ChannelStrip></RSE>")
+
+
 class Track:
     def __init__(self, name, *, set_type, set_name, program, staves, transpose=(0, 0),
-                 articulations=(), lyrics=""):
+                 articulations=(), lyrics="", volume=0.795, pan=0.5, state="Default",
+                 automations=()):
         self.name, self.set_type, self.set_name = name, set_type, set_name
         self.program, self.staves, self.transpose = program, staves, transpose
         self.articulations, self.lyrics = list(articulations), lyrics
+        self.volume, self.pan, self.state = volume, pan, state
+        self.automations = list(automations)
 
     def xml(self, track_id: int) -> str:
         elements = "".join(
@@ -107,7 +124,9 @@ class Track:
                 f"<Type>{self.set_type}</Type><LineCount>5</LineCount>"
                 f"<Elements>{elements}</Elements></InstrumentSet>"
                 f"<Transpose><Chromatic>{chromatic}</Chromatic><Octave>{octave}</Octave>"
-                f"</Transpose><Sounds><Sound><Name>{cdata(self.set_name)}</Name>"
+                f"</Transpose>{channel_strip(self.volume, self.pan, self.automations)}"
+                f"<PlaybackState>{self.state}</PlaybackState>"
+                f"<Sounds><Sound><Name>{cdata(self.set_name)}</Name>"
                 f"<Label>{cdata(self.set_name)}</Label><Path>Corpus</Path><Role>Factory</Role>"
                 f"<MIDI><LSB>0</LSB><MSB>0</MSB><Program>{self.program}</Program></MIDI>"
                 f"</Sound></Sounds>{lyrics}<Staves>{''.join(staves)}</Staves></Track>")
@@ -291,14 +310,18 @@ BAND_PARTS = [3, 1, 1, 1]  # bass: notation and tablature; the others: notation
 
 
 def band() -> str:
+    # The mixer: the bass a little left, the drums louder, and the clarinet
+    # starting quieter (an automation at the start) and getting louder later.
     bass = Track("Bass", set_type="electricBass", set_name="Electric Bass", program=33,
-                 transpose=(0, -1), staves=[{"tuning": [28, 33, 38, 43]}])
+                 transpose=(0, -1), staves=[{"tuning": [28, 33, 38, 43]}], volume=0.7, pan=0.3)
     piano = Track("Piano", set_type="grandPiano", set_name="Grand Piano", program=0,
                   staves=[{"tuning": GUITAR}, {"tuning": FIVE_STRING_BASS}])
     drums = Track("Drums", set_type="drumKit", set_name="Drums", program=0,
-                  staves=[{}], articulations=[("snare", 38), ("hiHat", 42), ("kickDrum", 36)])
+                  staves=[{}], articulations=[("snare", 38), ("hiHat", 42), ("kickDrum", 36)],
+                  volume=0.9)
     clarinet = Track("Clarinet", set_type="clarinet", set_name="Clarinet in Bb", program=71,
-                     transpose=(-2, 0), staves=[{"tuning": GUITAR}], lyrics="la la")
+                     transpose=(-2, 0), staves=[{"tuning": GUITAR}], lyrics="la la", pan=0.75,
+                     automations=[("DSPParam_12", 0, 0, 0.6), ("DSPParam_12", 1, 0.5, 0.8)])
 
     def bass_note(string, fret):
         return Note(string=string, fret=fret, midi=[28, 33, 38, 43][string] + fret)
@@ -348,9 +371,10 @@ class Gp6Track:
     table says whether it is a drum kit, and the tuning and capo sit on the track."""
 
     def __init__(self, name, *, program, channel, percussion=False, tuning=None, capo=0,
-                 flat=False):
+                 flat=False, volume=0.795, pan=0.5, state="Default"):
         self.name, self.program, self.channel = name, program, channel
         self.percussion, self.tuning, self.capo, self.flat = percussion, tuning, capo, flat
+        self.volume, self.pan, self.state = volume, pan, state
 
     def xml(self, track_id: int) -> str:
         table = "Percussion" if self.percussion else "Instrument"
@@ -369,7 +393,8 @@ class Gp6Track:
                 f"<PrimaryChannel>{self.channel}</PrimaryChannel>"
                 f"<SecondaryChannel>{self.channel}</SecondaryChannel>"
                 "<ForeOneChannelPerString>false</ForeOneChannelPerString></GeneralMidi>"
-                f"<PlaybackState>Default</PlaybackState>{properties}</Track>")
+                f"{channel_strip(self.volume, self.pan)}"
+                f"<PlaybackState>{self.state}</PlaybackState>{properties}</Track>")
 
 
 class BitWriter:
@@ -471,9 +496,10 @@ DUET_CAPO = 2
 
 
 def duet() -> bytes:
+    # The mixer: the guitar quieter and to the left, the drums muted.
     guitar = Gp6Track("Rhythm Guitar", program=25, channel=0, tuning=EB_STANDARD,
-                      capo=DUET_CAPO, flat=True)
-    drums = Gp6Track("Drums", program=0, channel=9, percussion=True)
+                      capo=DUET_CAPO, flat=True, volume=0.7, pan=0.25)
+    drums = Gp6Track("Drums", program=0, channel=9, percussion=True, state="Mute")
 
     def note(string, fret, **kwargs):
         return Note(string=string, fret=fret, midi=EB_STANDARD[string] + DUET_CAPO + fret,

@@ -53,6 +53,8 @@ struct Source {
     std::string trackName{};
     std::string instrumentName{};
     std::optional<int> program{};
+    std::optional<int> volume{}; // controller 7 before the first note
+    std::optional<int> pan{};    // controller 10 before the first note
     std::vector<RawNote> notes{};
 };
 
@@ -144,6 +146,11 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
         // Attacks waiting for their note-off, per channel and key (oldest first).
         std::vector<std::vector<std::pair<std::int64_t, int>>> sounding(16 * 128);
         bool hasChannelEvents = false;
+        // Volume and pan per channel, as set before its first note; they go to
+        // the channel's source, if it gets one.
+        std::array<std::optional<int>, 16> volumeOf{};
+        std::array<std::optional<int>, 16> panOf{};
+        std::array<bool, 16> started{};
         const std::size_t firstSource = out.sources.size();
         const auto source = [&](int channel) -> Source& {
             auto& index = sourceOf[static_cast<std::size_t>(channel)];
@@ -168,6 +175,7 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
             auto& queue = sounding[static_cast<std::size_t>(channel * 128 + (key & 0x7F))];
             if (kind == detail::kNoteOn && event.data[1] > 0) {
                 (void)source(channel);
+                started[static_cast<std::size_t>(channel)] = true;
                 queue.emplace_back(event.tick, event.data[1]);
             } else if (kind == detail::kNoteOff || kind == detail::kNoteOn) {
                 if (!queue.empty()) {
@@ -184,10 +192,25 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
                 } else if (s.program != event.data[0]) {
                     warnings.add("", "program changes dropped");
                 }
+            } else if (kind == detail::kController && (event.data[0] == 7 || event.data[0] == 10)) {
+                auto& setting =
+                    (event.data[0] == 7 ? volumeOf : panOf)[static_cast<std::size_t>(channel)];
+                if (!started[static_cast<std::size_t>(channel)]) {
+                    setting = event.data[1];
+                } else if (setting != event.data[1]) {
+                    warnings.add("", "volume and pan changes dropped");
+                }
             } else if (kind == detail::kController && event.data[0] == 64 && event.data[1] >= 64) {
                 warnings.add("", "sustain pedal dropped");
             } else if (kind == detail::kPitchBend && (event.data[0] != 0 || event.data[1] != 64)) {
                 warnings.add("", "pitch bends dropped");
+            }
+        }
+        for (std::size_t channel = 0; channel < sourceOf.size(); ++channel) {
+            if (sourceOf[channel]) {
+                Source& s = out.sources[*sourceOf[channel]];
+                s.volume = volumeOf[channel];
+                s.pan = panOf[channel];
             }
         }
         // Notes still sounding at the end of the track end there.
@@ -1002,7 +1025,17 @@ core::Track trackFor(const Source& source) {
             !source.notes.empty() && sum < 60LL * static_cast<long long>(source.notes.size());
         staves = {core::Staff(low ? core::Clef::Bass : core::Clef::Treble)};
     }
-    return core::Track(name, instrument, std::move(staves));
+    core::Track track(name, instrument, std::move(staves));
+    core::TrackMix mix;
+    if (source.volume) {
+        mix.volume = static_cast<double>(*source.volume) / 127.0;
+    }
+    if (source.pan) {
+        // 64 is the centre, 1 (or 0) hard left and 127 hard right.
+        mix.pan = std::clamp(static_cast<double>(*source.pan - 64) / 63.0, -1.0, 1.0);
+    }
+    track.setMix(mix);
+    return track;
 }
 
 // Writes a source's notes into its track, whose staves have the song's measures.

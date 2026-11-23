@@ -139,6 +139,15 @@ add_test(NAME cli.edit_save_point_survives_undo_redo
 set_tests_properties(cli.edit_save_point_survives_undo_redo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"modified\":false}")
 
+add_test(NAME cli.edit_sets_track_mix
+  COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
+set_tests_properties(cli.edit_sets_track_mix PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"mix\":{\"volume\":0.5,\"pan\":-0.25,\"mute\":false,\"solo\":true}.*\"next\":\"Change mix\"")
+
+add_test(NAME cli.edit_rejects_mix_out_of_range
+  COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
+set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "transpose 2")
 set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
 
