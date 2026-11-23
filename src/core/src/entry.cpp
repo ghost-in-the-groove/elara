@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -18,8 +19,27 @@ const Voice& voiceAt(const Song& song, const Caret& caret) {
     return song.track(caret.track).staff(caret.staff).measure(caret.measure).voices.at(caret.voice);
 }
 
+bool isDrumStaff(const Staff& staff) {
+    return staff.clef() == Clef::Percussion;
+}
+
 int stringCountOf(const Staff& staff) {
-    return staff.isFretted() ? staff.tuning()->stringCount() : 1;
+    if (staff.isFretted()) {
+        return staff.tuning()->stringCount();
+    }
+    return isDrumStaff(staff) ? static_cast<int>(drumPieces().size()) : 1;
+}
+
+/// The General MIDI key of drum lane `lane` (1 is the top).
+int laneKey(int lane) {
+    return drumPieces()[static_cast<std::size_t>(lane - 1)].key;
+}
+
+/// Where a hit sits among the lanes; keys without a lane go after them.
+std::size_t laneOf(const Note& note) {
+    const auto pieces = drumPieces();
+    const auto found = std::ranges::find(pieces, note.pitch.midiNumber(), &DrumPiece::key);
+    return static_cast<std::size_t>(found - pieces.begin());
 }
 
 /// The furthest index a caret can have in its voice: the free slot of a voice
@@ -173,8 +193,11 @@ Entry deleteAtCaret(const Song& song, const Caret& at) {
         beats.erase(beat);
         return replace(caret, std::move(content), "Delete");
     }
-    const auto removed = std::ranges::remove_if(
-        beat->notes, [&](const Note& note) { return isOnString(note, caret.string); });
+    const bool drums = isDrumStaff(song.track(caret.track).staff(caret.staff));
+    const auto removed = std::ranges::remove_if(beat->notes, [&](const Note& note) {
+        return drums ? note.pitch.midiNumber() == laneKey(caret.string)
+                     : isOnString(note, caret.string);
+    });
     if (removed.empty()) {
         return unchanged(caret);
     }
@@ -200,6 +223,33 @@ Entry insertRest(const Song& song, const Caret& at, Duration duration) {
     beats.insert(beats.begin() + static_cast<std::ptrdiff_t>(caret.beat),
                  Beat{.duration = duration});
     return replace(caret, std::move(content), "Insert rest");
+}
+
+Entry toggleDrum(const Song& song, const Caret& at, Duration duration) {
+    const Caret caret = clampCaret(song, at);
+    if (!isDrumStaff(song.track(caret.track).staff(caret.staff))) {
+        throw std::logic_error("toggleDrum: the staff is not a percussion staff");
+    }
+    const int key = laneKey(caret.string);
+    Note hit{.pitch = Pitch::fromMidi(key)};
+    Measure content = measureAt(song, caret);
+    std::vector<Beat>& beats = content.voices.at(caret.voice).beats;
+    if (caret.beat == beats.size()) {
+        beats.push_back(Beat{.duration = duration, .notes = {std::move(hit)}});
+        return replace(caret, std::move(content), "Enter note");
+    }
+    std::vector<Note>& notes = beats[caret.beat].notes;
+    const auto same = std::ranges::find_if(
+        notes, [key](const Note& note) { return note.pitch.midiNumber() == key; });
+    if (same != notes.end()) {
+        notes.erase(same);
+        return replace(caret, std::move(content), "Delete");
+    }
+    const std::size_t lane = laneOf(hit);
+    const auto below =
+        std::ranges::find_if(notes, [lane](const Note& note) { return laneOf(note) > lane; });
+    notes.insert(below, std::move(hit));
+    return replace(caret, std::move(content), "Enter note");
 }
 
 } // namespace elara::core

@@ -208,6 +208,26 @@ add_test(NAME cli.edit_deletes_at_the_caret
 set_tests_properties(cli.edit_deletes_at_the_caret PROPERTIES
   PASS_REGULAR_EXPRESSION "\"beats\":0,\"notes\":0}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":1,\"freeSlot\":true},\"input\":\"2\",\"undo\":{\"count\":6,\"next\":\"Delete\"}")
 
+# Drum entry (ADR-0035): a bass drum, a closed hi-hat and a snare on the first
+# beat, the hi-hat toggled off from its lane, then a snare on the second beat.
+set(ELARA_CLI_DRUMS "${CMAKE_CURRENT_BINARY_DIR}/cli-drums.elara")
+add_test(NAME cli.edit_types_drums
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DRUMS}" "add-track drum-kit" "append-measures 1"
+    "caret 0 0 0" "drum 36" "drum 42" "drum 38" "caret 0 0 0 2" drum right "drum 38")
+set_tests_properties(cli.edit_types_drums PROPERTIES
+  FIXTURES_SETUP cli_drums
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":1,\"string\":8,\"freeSlot\":false}")
+add_test(NAME cli.dump_drums COMMAND elara-cli --json dump "${ELARA_CLI_DRUMS}")
+set_tests_properties(cli.dump_drums PROPERTIES
+  FIXTURES_REQUIRED cli_drums
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"},{\"pitch\":\"C2\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_rejects_drum_on_guitar
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" drum)
+add_test(NAME cli.edit_rejects_drum_without_lane
+  COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
+set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
+  PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)

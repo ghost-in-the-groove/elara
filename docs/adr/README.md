@@ -31,6 +31,7 @@ one that replaces them.
 | [0027](0027-copy-and-paste.md) | Copying and pasting measures | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
 | [0029](0029-microphone-input.md) | Microphone input for the tuner | Accepted |
+| [0035](0035-drum-entry.md) | Drum entry | Accepted |
 
 ## Template
 

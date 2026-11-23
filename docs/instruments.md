@@ -70,6 +70,8 @@ tablature; percussion staves use a drum map; keyboards default to two staves.
 
 - Voices: hands in voice 1 (stems up), feet in voice 2 (stems down). This is a
   default of the drum map, not a rule of the model.
+- Entry (ADR-0035): the caret moves over one lane per kit piece of the table
+  above, top of the staff first, and toggles that piece's hit on its beat.
 - Later: a drum-tablature view (one text line per kit piece) for players who
   read it.
 

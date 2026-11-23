@@ -54,4 +54,15 @@ struct InstrumentPreset {
 /// nullptr when there is no preset with that id.
 [[nodiscard]] const InstrumentPreset* findInstrumentPreset(std::string_view id) noexcept;
 
+/// A piece of the drum kit: its General MIDI percussion key and English name.
+struct DrumPiece {
+    int key;
+    std::string_view name;
+};
+
+/// The kit pieces drum entry offers (ADR-0035), from the top of the staff down
+/// as the default drum map places them (docs/instruments.md): crash, hi-hats,
+/// ride, toms, snare, bass drum and hi-hat pedal.
+[[nodiscard]] std::span<const DrumPiece> drumPieces() noexcept;
+
 } // namespace elara::core
