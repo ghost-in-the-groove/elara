@@ -4,9 +4,11 @@ add_library(elara_audio STATIC
   src/offline_renderer.cpp
   src/pitch_detector.cpp
   src/player.cpp
+  src/sample_ring.cpp
   src/sequence.cpp
   src/synth.cpp
   src/tone_generator.cpp
+  src/tuner.cpp
   src/wav_reader.cpp
   src/wav_writer.cpp)
 add_library(elara::audio ALIAS elara_audio)
@@ -18,6 +20,7 @@ elara_target_warnings(elara_audio)
 # elara_audio_juce: the only target that sees JUCE (ADR-0002). Its public
 # header is plain C++; JUCE stays an implementation detail behind a pimpl.
 add_library(elara_audio_juce STATIC
+  backend_juce/src/microphone_input.cpp
   backend_juce/src/system_audio.cpp)
 add_library(elara::audio_juce ALIAS elara_audio_juce)
 

@@ -58,6 +58,14 @@ set_tests_properties(cli.tune_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.tune_rejects_other_files COMMAND elara-cli tune "${ELARA_CORPUS}/gp/band.gp")
 set_tests_properties(cli.tune_rejects_other_files PROPERTIES WILL_FAIL TRUE)
 
+# Listening needs an input device, which CI does not have; bad arguments fail
+# before the device is opened.
+add_test(NAME cli.listen_rejects_bad_duration COMMAND elara-cli listen --seconds 0)
+set_tests_properties(cli.listen_rejects_bad_duration PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.listen_rejects_unknown_tuning COMMAND elara-cli listen --tuning banjo-9)
+set_tests_properties(cli.listen_rejects_unknown_tuning PROPERTIES
+  PASS_REGULAR_EXPRESSION "unknown tuning: banjo-9")
+
 add_test(NAME cli.tune_rejects_unknown_tuning
   COMMAND elara-cli tune "${_tone_wav}" --tuning banjo-9)
 set_tests_properties(cli.tune_rejects_unknown_tuning PROPERTIES
