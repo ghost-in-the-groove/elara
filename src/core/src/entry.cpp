@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <optional>
@@ -171,6 +172,71 @@ int stepIndex(int wanted, int reference, bool above) {
         delta -= 7;
     }
     return reference + delta;
+}
+
+bool hasEffect(const NoteEffects& fx, NoteEffect effect) {
+    switch (effect) {
+    case NoteEffect::Tie:
+        return fx.tiedFromPrevious;
+    case NoteEffect::Legato:
+        return fx.legatoFromPrevious;
+    case NoteEffect::Slide:
+        return fx.slideOut != SlideOut::None;
+    case NoteEffect::Bend:
+        return !fx.bend.isEmpty();
+    case NoteEffect::Vibrato:
+        return fx.vibrato != Vibrato::None;
+    case NoteEffect::PalmMute:
+        return fx.palmMute;
+    case NoteEffect::DeadNote:
+        return fx.deadNote;
+    case NoteEffect::LetRing:
+        return fx.letRing;
+    case NoteEffect::Harmonic:
+        return fx.harmonic.kind != HarmonicKind::None;
+    case NoteEffect::Ghost:
+        return fx.ghost;
+    case NoteEffect::Accent:
+        return fx.accent != Accent::None;
+    case NoteEffect::Staccato:
+        return fx.staccato;
+    }
+    return false;
+}
+
+/// The beat just before the caret's in its voice, across the barline; null at
+/// the start of the song or after an empty measure.
+const Beat* beatBefore(const Song& song, const Caret& caret) {
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    if (caret.beat > 0) {
+        return &staff.measure(caret.measure).voices.at(caret.voice).beats.at(caret.beat - 1);
+    }
+    if (caret.measure == 0) {
+        return nullptr;
+    }
+    const std::vector<Beat>& beats = staff.measure(caret.measure - 1).voices.at(caret.voice).beats;
+    return beats.empty() ? nullptr : &beats.back();
+}
+
+/// The note of `previous` that a tie on `note` continues.
+const Note* tiedTo(const Beat* previous, const Note& note, bool fretted) {
+    if (previous == nullptr) {
+        return nullptr;
+    }
+    const auto& notes = previous->notes;
+    if (fretted) {
+        const auto found = std::ranges::find_if(notes, [&](const Note& candidate) {
+            return candidate.position && note.position &&
+                   candidate.position->string == note.position->string;
+        });
+        return found == notes.end() ? nullptr : &*found;
+    }
+    const auto same = std::ranges::find_if(
+        notes, [&](const Note& candidate) { return candidate.pitch.isEnharmonicWith(note.pitch); });
+    if (same != notes.end()) {
+        return &*same;
+    }
+    return notes.size() == 1 ? &notes.front() : nullptr;
 }
 
 } // namespace
@@ -471,6 +537,95 @@ Entry toggleDrum(const Song& song, const Caret& at, Duration duration) {
         std::ranges::find_if(notes, [lane](const Note& note) { return laneOf(note) > lane; });
     notes.insert(below, std::move(hit));
     return replace(caret, std::move(content), "Enter note");
+}
+
+Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
+    constexpr int kFullStep = 200; // cents
+    constexpr int kTenths = 10;
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const bool fretted = staff.isFretted();
+    const bool drums = isDrumStaff(staff);
+    Measure content = measureAt(song, caret);
+    std::vector<Note*> targets;
+    for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
+        const bool targeted = fretted
+                                  ? isOnString(note, caret.string)
+                                  : (!drums || note.pitch.midiNumber() == laneKey(caret.string));
+        if (targeted) {
+            targets.push_back(&note);
+        }
+    }
+    if (targets.empty()) {
+        return unchanged(caret);
+    }
+    if (effect == NoteEffect::Harmonic && !fretted) {
+        throw std::logic_error("toggleEffect: a harmonic needs strings");
+    }
+    const bool on = std::ranges::any_of(
+        targets, [effect](const Note* note) { return !hasEffect(note->effects, effect); });
+    const Beat* previous = effect == NoteEffect::Tie && on ? beatBefore(song, caret) : nullptr;
+    for (Note* note : targets) {
+        NoteEffects& fx = note->effects;
+        switch (effect) {
+        case NoteEffect::Tie:
+            if (on) {
+                const Note* from = tiedTo(previous, *note, fretted);
+                if (from == nullptr) {
+                    throw std::logic_error("toggleEffect: no note to tie to");
+                }
+                note->pitch = from->pitch;
+                note->position = from->position;
+            }
+            fx.tiedFromPrevious = on;
+            break;
+        case NoteEffect::Legato:
+            fx.legatoFromPrevious = on;
+            break;
+        case NoteEffect::Slide:
+            fx.slideOut = on ? SlideOut::Shift : SlideOut::None;
+            break;
+        case NoteEffect::Bend:
+            fx.bend = on ? BendCurve::bend(kFullStep) : BendCurve{};
+            break;
+        case NoteEffect::Vibrato:
+            fx.vibrato = on ? Vibrato::Slight : Vibrato::None;
+            break;
+        case NoteEffect::PalmMute:
+            fx.palmMute = on;
+            break;
+        case NoteEffect::DeadNote:
+            fx.deadNote = on;
+            break;
+        case NoteEffect::LetRing:
+            fx.letRing = on;
+            break;
+        case NoteEffect::Harmonic:
+            fx.harmonic = Harmonic{};
+            if (on) {
+                const int fret = note->position->fret;
+                if (!naturalHarmonicSemitones(fret)) {
+                    throw std::out_of_range("toggleEffect: no natural harmonic at that fret");
+                }
+                fx.harmonic = Harmonic{.kind = HarmonicKind::Natural,
+                                       .fretTenths = static_cast<std::int16_t>(fret * kTenths)};
+            }
+            break;
+        case NoteEffect::Ghost:
+            fx.ghost = on;
+            break;
+        case NoteEffect::Accent:
+            fx.accent = on ? Accent::Accent : Accent::None;
+            break;
+        case NoteEffect::Staccato:
+            fx.staccato = on;
+            break;
+        }
+    }
+    return replace(caret, std::move(content), "Change effect");
 }
 
 } // namespace elara::core
