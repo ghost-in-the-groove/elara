@@ -53,6 +53,9 @@
      "midiProgram": 27,
      "writtenOffset": 12
     },
+    "mix": {
+     "volume": 0.795
+    },
     "staves": [
      {
       "clef": "treble-8vb",

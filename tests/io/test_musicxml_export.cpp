@@ -313,6 +313,11 @@ core::Song everythingSong() {
                           uke.frettedNote(1, 3)})};
     }
 
+    // ---- The mix: MIDI volume and pan (mute and solo have no place).
+    song.track(g).setMix(TrackMix{.volume = 0.7, .pan = -0.4});
+    song.track(d).setMix(TrackMix{.volume = 0.9});
+    song.track(b).setMix(TrackMix{.volume = 0.795, .pan = 0.25});
+
     fillVoices(song);
     REQUIRE(core::validate(song).empty());
     return song;
@@ -541,6 +546,50 @@ TEST_CASE("MusicXML export: the document follows the MusicXML mapping", "[musicx
     // Readers compute accidentals, beams and stems themselves.
     CHECK(xml.contains(R"(<supports element="accidental" type="no"/>)"));
     CHECK(xml.contains(R"(<supports element="beam" type="no"/>)"));
+}
+
+TEST_CASE("MusicXML export: the mix is written as each instrument's MIDI volume and pan",
+          "[musicxml][export]") {
+    using namespace elara::core;
+    Song song;
+    song.appendMeasures(1);
+    const std::size_t piano = song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    const std::size_t drums = song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    const std::size_t organ = song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    song.track(drums).staff(0).measure(0).voices[0].beats = {
+        beatOf(Duration(NoteValue::Half), {pitched(Pitch::fromMidi(36))}),
+        beatOf(Duration(NoteValue::Half), {pitched(Pitch::fromMidi(38))})};
+    fillVoices(song);
+    song.track(piano).setMix(TrackMix{.volume = 1.0, .pan = -1.0, .mute = true});
+    song.track(drums).setMix(TrackMix{.volume = 0.5, .pan = 0.5, .solo = true});
+
+    const ExportResult exported = exportMusicXml(song);
+    const std::string& xml = exported.data;
+    CHECK(xml.contains("<volume>100</volume>"));
+    CHECK(xml.contains("<pan>-90</pan>"));
+    // Every drum of the kit carries the kit's mix.
+    std::size_t halves = 0;
+    for (std::size_t at = xml.find("<pan>45</pan>"); at != std::string::npos;
+         at = xml.find("<pan>45</pan>", at + 1)) {
+        ++halves;
+    }
+    CHECK(halves == 2);
+    CHECK(xml.contains("<volume>50</volume>"));
+    // The default mix writes nothing: three instruments carry a volume.
+    std::size_t volumes = 0;
+    for (std::size_t at = xml.find("<volume>"); at != std::string::npos;
+         at = xml.find("<volume>", at + 1)) {
+        ++volumes;
+    }
+    CHECK(volumes == 3);
+    CHECK(exported.warnings ==
+          std::vector<std::string>{"Piano: mute and solo dropped", "Drums: mute and solo dropped"});
+
+    const ImportResult back = reimport(exported);
+    REQUIRE(back.song.trackCount() == 3);
+    CHECK(back.song.track(piano).mix() == TrackMix{.volume = 1.0, .pan = -1.0});
+    CHECK(back.song.track(drums).mix() == TrackMix{.volume = 0.5, .pan = 0.5});
+    CHECK(back.song.track(organ).mix() == TrackMix{});
 }
 
 TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed predictably",

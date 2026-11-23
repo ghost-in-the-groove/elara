@@ -184,6 +184,11 @@ std::string decimal(double value) {
     return std::format("{}", value);
 }
 
+/// `value` with at most four decimals, so 0.7 * 100 is written as 70.
+double fourDecimals(double value) {
+    return std::round(value * 1e4) / 1e4;
+}
+
 // ---- Vocabulary -----------------------------------------------------------------
 
 constexpr std::array<std::string_view, 7> kStepNames{"C", "D", "E", "F", "G", "A", "B"};
@@ -465,6 +470,9 @@ public:
                 warnings_.add(track_.name(), "drum kit names other than the track name dropped", 0);
             }
         }
+        if (track_.mix().mute || track_.mix().solo) {
+            warnings_.add(track_.name(), "mute and solo dropped");
+        }
         const InstrumentKind readBack = kindReadBack();
         if (readBack != track_.instrument().kind && song_.measureCount() > 0) {
             warnings_.add(
@@ -496,6 +504,15 @@ public:
             xml.number("midi-program", program + 1);
             if (key) {
                 xml.number("midi-unpitched", *key + 1);
+            }
+            // The mix: the volume as a percentage, the pan in degrees from -90
+            // (hard left) to 90 (hard right). Every drum of a kit carries it.
+            const TrackMix& mix = track_.mix();
+            if (mix.volume != TrackMix::kDefaultVolume) {
+                xml.text("volume", decimal(fourDecimals(mix.volume * 100.0)));
+            }
+            if (mix.pan != 0.0) {
+                xml.text("pan", decimal(fourDecimals(mix.pan * 90.0)));
             }
             xml.close("midi-instrument");
         };

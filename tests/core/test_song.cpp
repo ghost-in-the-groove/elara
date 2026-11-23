@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 
@@ -20,6 +21,7 @@ using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Step;
 using elara::core::Track;
+using elara::core::TrackMix;
 using elara::core::Tuning;
 
 namespace {
@@ -124,6 +126,56 @@ TEST_CASE("Removing a track keeps the others", "[core][song]") {
     CHECK(song.track(0).instrument().kind == InstrumentKind::Percussion);
     CHECK_THROWS_AS(song.track(1), std::out_of_range);
     CHECK_THROWS_AS(song.removeTrack(1), std::out_of_range);
+}
+
+TEST_CASE("A new track sits in the middle of the mix", "[core][song]") {
+    const Track guitar = presetTrack("electric-guitar");
+    CHECK(guitar.mix() == TrackMix{});
+    CHECK(guitar.mix().volume == TrackMix::kDefaultVolume);
+    CHECK(guitar.mix().pan == 0.0);
+    CHECK_FALSE(guitar.mix().mute);
+    CHECK_FALSE(guitar.mix().solo);
+}
+
+TEST_CASE("A track's mix keeps volume from 0 to 1 and pan from -1 to 1", "[core][song]") {
+    Track guitar = presetTrack("electric-guitar");
+    guitar.setMix(TrackMix{.volume = 0.25, .pan = -1.0, .mute = true, .solo = false});
+    CHECK(guitar.mix() == TrackMix{.volume = 0.25, .pan = -1.0, .mute = true, .solo = false});
+    guitar.setMix(TrackMix{.volume = 1.0, .pan = 1.0, .mute = false, .solo = true});
+    CHECK(guitar.mix().solo);
+
+    const TrackMix before = guitar.mix();
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    CHECK_THROWS_AS(guitar.setMix(TrackMix{.volume = 1.01}), std::invalid_argument);
+    CHECK_THROWS_AS(guitar.setMix(TrackMix{.volume = -0.1}), std::invalid_argument);
+    CHECK_THROWS_AS(guitar.setMix(TrackMix{.pan = 1.5}), std::invalid_argument);
+    CHECK_THROWS_AS(guitar.setMix(TrackMix{.volume = nan}), std::invalid_argument);
+    CHECK_THROWS_AS(guitar.setMix(TrackMix{.pan = nan}), std::invalid_argument);
+    CHECK(guitar.mix() == before); // unchanged by a refused mix
+}
+
+TEST_CASE("Mute silences a track and solo silences the others", "[core][song]") {
+    Song song;
+    for (int t = 0; t < 3; ++t) {
+        song.addTrack(presetTrack("electric-guitar"));
+    }
+    CHECK(song.audible(0));
+    CHECK(song.audible(1));
+    CHECK(song.audible(2));
+
+    song.track(1).setMix(TrackMix{.mute = true});
+    CHECK(song.audible(0));
+    CHECK_FALSE(song.audible(1));
+
+    // Once a track is soloed, only soloed tracks sound, and mute still wins.
+    song.track(2).setMix(TrackMix{.solo = true});
+    CHECK_FALSE(song.audible(0));
+    CHECK_FALSE(song.audible(1));
+    CHECK(song.audible(2));
+    song.track(1).setMix(TrackMix{.mute = true, .solo = true});
+    CHECK_FALSE(song.audible(1));
+
+    CHECK_THROWS_AS((void)song.audible(3), std::out_of_range);
 }
 
 TEST_CASE("A track needs at least one staff", "[core][song]") {

@@ -78,3 +78,4 @@ base speaks one vocabulary. American terms follow MusicXML.
 | afinador | tuner | `Tuner` | |
 | banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |
 | mezclador | mixer | `Mixer` | |
+| mezcla de pista | track mix | `TrackMix` | Volume (fader position 0..1), pan (-1..1), mute, solo; `Song::audible()` (ADR-0020) |

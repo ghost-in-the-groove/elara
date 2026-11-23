@@ -66,6 +66,23 @@ double numberIn(pugi::xml_node node, double low, double high) {
     return std::isnan(value) ? 0.0 : std::clamp(value, low, high);
 }
 
+/// A decimal from `low` to `high`, or nullopt if the text is not one.
+std::optional<double> decimalIn(pugi::xml_node node, double low, double high) {
+    const char* text = node.text().get();
+    char* end = nullptr;
+    const double value = std::strtod(text, &end);
+    if (end == text) {
+        return std::nullopt;
+    }
+    while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') {
+        ++end;
+    }
+    if (*end != '\0' || !(value >= low && value <= high)) {
+        return std::nullopt;
+    }
+    return value;
+}
+
 int roundedIn(pugi::xml_node node, int low, int high) {
     return static_cast<int>(std::lround(numberIn(node, low, high)));
 }
@@ -256,6 +273,7 @@ struct PartInfo {
     std::string instrumentName{}; // the first <score-instrument>; drum names on percussion
     int midiProgram = 0;          // 0-based
     std::vector<std::pair<std::string, int>> drumKeys{}; // instrument id -> GM key
+    TrackMix mix{};
 };
 
 std::vector<PartInfo> readPartList(pugi::xml_node score) {
@@ -269,11 +287,30 @@ std::vector<PartInfo> readPartList(pugi::xml_node score) {
         }
         info.instrumentName = textOf(part.child("score-instrument").child("instrument-name"));
         bool programSet = false;
+        bool volumeSet = false;
+        bool panSet = false;
         for (pugi::xml_node midi : part.children("midi-instrument")) {
             const int program = midi.child("midi-program").text().as_int(0);
             if (!programSet && program >= 1 && program <= 128) {
                 info.midiProgram = program - 1;
                 programSet = true;
+            }
+            // The mix: the volume is a percentage, the pan in degrees from -90
+            // (hard left) to 90 (hard right); beyond is behind the listener,
+            // as far to the side as its mirror in front.
+            if (const auto volume = decimalIn(midi.child("volume"), 0.0, 100.0);
+                !volumeSet && volume) {
+                info.mix.volume = *volume / 100.0;
+                volumeSet = true;
+            }
+            if (auto pan = decimalIn(midi.child("pan"), -180.0, 180.0); !panSet && pan) {
+                if (*pan > 90.0) {
+                    *pan = 180.0 - *pan;
+                } else if (*pan < -90.0) {
+                    *pan = -180.0 - *pan;
+                }
+                info.mix.pan = *pan / 90.0;
+                panSet = true;
             }
             const int key = midi.child("midi-unpitched").text().as_int(0);
             if (key >= 1 && key <= 128) {
@@ -685,7 +722,9 @@ public:
     }
 
     [[nodiscard]] Track takeTrack() {
-        return Track(info_.name, layout_.instrument, std::move(layout_.staves));
+        Track track(info_.name, layout_.instrument, std::move(layout_.staves));
+        track.setMix(info_.mix);
+        return track;
     }
 
     /// Measures per staff, in order; fewer than the song's when the part is short.

@@ -33,6 +33,10 @@
      "midiProgram": 25,
      "writtenOffset": 12
     },
+    "mix": {
+     "volume": 0.7,
+     "pan": -0.5
+    },
     "staves": [
      {
       "clef": "treble-8vb",
@@ -109,6 +113,10 @@
     "instrument": {
      "name": "Drums",
      "kind": "percussion"
+    },
+    "mix": {
+     "volume": 0.795,
+     "mute": true
     },
     "staves": [
      {
