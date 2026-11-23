@@ -60,7 +60,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Sequencer: model -> timed events, tempo map, repeats (ADR-0017)
 - [ ] FluidSynth integration, MuseScore General SF3
 - [ ] sfizz integration and guitar SFZ library selection
-- [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)
+- [x] Articulation rendering (bends, slides, legato, palm mute, harmonics; ADR-0022, ADR-0023)
 - [ ] Mixer (volume, pan, mute, solo)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
