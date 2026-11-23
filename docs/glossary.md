@@ -77,7 +77,10 @@ base speaks one vocabulary. American terms follow MusicXML.
 | dinámica | dynamic | `Dynamic` | pp ... ff |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
-| metrónomo | metronome | `Metronome` | |
+| metrónomo | metronome | `SequenceOptions::metronome` | A click on every beat, a high wood block on the first; events on `Sequence::metronomeTrack()` (ADR-0024) |
+| pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
+| compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |
+| velocidad de reproducción | playback speed | `SequenceOptions::speed` | 0.25 to 2 times every written tempo (ADR-0024) |
 | bucle A-B | A-B loop | `LoopRange` | |
 | afinador | tuner | `Tuner` | |
 | banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |

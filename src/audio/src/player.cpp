@@ -27,9 +27,12 @@ struct Player::Loaded {
         detail::TrackLevel applied{}; // audio thread: the level last mixed at
     };
 
-    explicit Loaded(std::size_t trackCount) : levels(2 * trackCount) {}
+    // `players`: the song's tracks, and the metronome when it clicks.
+    Loaded(std::size_t trackCount, std::size_t players)
+        : songTracks(trackCount), levels(2 * players) {}
 
-    std::vector<Track> tracks{};
+    std::size_t songTracks = 0;
+    std::vector<Track> tracks{}; // the song's, then the metronome's if any
     std::vector<float> left{};
     std::vector<float> right{};
     std::int64_t endFrame = 0;
@@ -67,9 +70,10 @@ Player::~Player() {
 
 void Player::load(const core::Song& song, const Sequence& sequence) {
     const std::size_t tracks = song.trackCount();
-    auto loaded = std::make_unique<Loaded>(tracks);
-    auto events = detail::eventsByTrack(sequence, tracks, sampleRate_);
-    loaded->headroom = detail::headroom(events);
+    auto events = detail::eventsByTrack(sequence, tracks + 1, sampleRate_); // the metronome's last
+    const bool clicks = !events[tracks].empty();
+    auto loaded = std::make_unique<Loaded>(tracks, clicks ? tracks + 1 : tracks);
+    loaded->headroom = detail::headroom(std::span(events).first(tracks));
     loaded->endFrame = std::llround(sequence.duration() * sampleRate_);
     loaded->left.assign(maxBlockFrames_, 0.0f);
     loaded->right.assign(maxBlockFrames_, 0.0f);
@@ -83,6 +87,13 @@ void Player::load(const core::Song& song, const Sequence& sequence) {
              .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
              .applied = level});
     }
+    if (clicks) {
+        loaded->setLevel(tracks, detail::kMetronomeLevel);
+        loaded->tracks.push_back({.synth = Synth(Timbre::Drums, sampleRate_),
+                                  .events = std::move(events[tracks]),
+                                  .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+                                  .applied = detail::kMetronomeLevel});
+    }
     duration_ = sequence.duration();
     tidy();
     latest_ = loaded.get();
@@ -92,7 +103,7 @@ void Player::load(const core::Song& song, const Sequence& sequence) {
 }
 
 void Player::updateMix(const core::Song& song) noexcept {
-    if (latest_ == nullptr || song.trackCount() != latest_->tracks.size()) {
+    if (latest_ == nullptr || song.trackCount() != latest_->songTracks) {
         return;
     }
     for (std::size_t t = 0; t < song.trackCount(); ++t) {

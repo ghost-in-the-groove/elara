@@ -539,8 +539,7 @@ private:
     // Beams consecutive eighths and shorter of one voice inside one beat of the
     // meter (a dotted beat in compound meters).
     void groupBeams(std::size_t from, const TimeSignature& time) {
-        const bool compound =
-            time.numerator() > 3 && time.numerator() % 3 == 0 && time.denominator() >= 8;
+        const bool compound = time.isCompound() && time.denominator() >= 8;
         const Fraction window(compound ? 3 : 1, time.denominator());
         std::vector<std::size_t> group;
         std::int64_t groupWindow = -1;

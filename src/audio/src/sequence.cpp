@@ -7,6 +7,7 @@
 #include <elara/core/fraction.hpp>
 #include <elara/core/parallel.hpp>
 #include <elara/core/performance.hpp>
+#include <elara/core/signature.hpp>
 #include <elara/core/song.hpp>
 #include <elara/core/tempo.hpp>
 
@@ -39,13 +40,17 @@ constexpr double kWideVibrato = 50.0;
 constexpr double kSlideCents = 500.0; // slides in and off the string span five frets
 constexpr double kSlideIn = 0.1;      // seconds a slide into a note takes at most
 constexpr double kSlideOut = 0.2;     // seconds a slide out of a note takes at most
+constexpr double kClick = 0.05;       // seconds a metronome click is held at most
+constexpr int kAccentClick = 100;     // velocity of the first click of a measure
+constexpr int kClickVelocity = 80;
 
-// The tempo of every written measure as segments: from an offset (in whole
-// notes, as a double) on, seconds pass at a rate per whole note. Exact
-// offsets are converted once, so equal positions give equal seconds.
+// The tempo of every written measure, times `speed`, as segments: from an
+// offset (in whole notes, as a double) on, seconds pass at a rate per whole
+// note. Exact offsets are converted once, so equal positions give equal
+// seconds.
 class TempoMap {
 public:
-    explicit TempoMap(const core::Song& song) {
+    TempoMap(const core::Song& song, double speed) : speed_(speed) {
         first_.reserve(song.measureCount() + 1);
         core::Tempo tempo = song.startTempo();
         for (std::size_t m = 0; m < song.measureCount(); ++m) {
@@ -83,8 +88,11 @@ private:
         double perWhole = 0.0;
     };
 
-    static double perWhole(const core::Tempo& tempo) { return tempo.secondsFor(Fraction(1)); }
+    [[nodiscard]] double perWhole(const core::Tempo& tempo) const {
+        return tempo.secondsFor(Fraction(1)) / speed_;
+    }
 
+    double speed_ = 1.0;
     std::vector<Segment> segments_;
     std::vector<std::size_t> first_; // first segment of each measure
 };
@@ -298,6 +306,49 @@ void pitchLine(const Articulation& articulation, double length, double slideOut,
     }
 }
 
+// The metronome (ADR-0024): a click on every beat of every played measure,
+// a high block on the first. A beat is the time signature's pulse, so a
+// compound meter clicks its dotted beats. Each click is held kClick seconds,
+// or until the next one when that comes sooner.
+std::vector<NoteEvent> metronomeEvents(const core::Song& song,
+                                       const std::vector<PlayedMeasure>& measures,
+                                       const TempoMap& tempo, std::size_t track) {
+    struct Click {
+        double time = 0.0;
+        bool accent = false;
+    };
+    std::vector<Click> clicks;
+    for (const PlayedMeasure& measure : measures) {
+        const core::TimeSignature& time = song.measureHeader(measure.measure).timeSignature;
+        const Fraction pulse = time.pulseLength();
+        const Fraction length = time.measureLength();
+        bool first = true;
+        for (Fraction offset; offset < length; offset += pulse) {
+            clicks.push_back(
+                {.time = measure.start + tempo.secondsInto(measure.measure, offset.toDouble()),
+                 .accent = first});
+            first = false;
+        }
+    }
+    std::vector<NoteEvent> events;
+    events.reserve(2 * clicks.size());
+    for (std::size_t i = 0; i < clicks.size(); ++i) {
+        const int key = clicks[i].accent ? kMetronomeAccentKey : kMetronomeKey;
+        const double next = i + 1 < clicks.size() ? clicks[i + 1].time : clicks[i].time + kClick;
+        events.push_back({.time = clicks[i].time,
+                          .kind = EventKind::NoteOn,
+                          .track = track,
+                          .key = key,
+                          .velocity = clicks[i].accent ? kAccentClick : kClickVelocity});
+        events.push_back({.time = std::min(clicks[i].time + kClick, next),
+                          .kind = EventKind::NoteOff,
+                          .track = track,
+                          .key = key,
+                          .velocity = 0});
+    }
+    return events;
+}
+
 NoteEvent pitchEvent(double time, std::size_t track, int key, double cents, double glide) {
     return {.time = time,
             .kind = EventKind::Pitch,
@@ -380,9 +431,11 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
 
 } // namespace
 
-Sequence::Sequence(const core::Song& song) {
+Sequence::Sequence(const core::Song& song, SequenceOptions options)
+    : speed_(std::isnan(options.speed) ? 1.0 : std::clamp(options.speed, kMinSpeed, kMaxSpeed)),
+      metronome_(options.metronome), metronomeTrack_(song.trackCount()) {
     const std::size_t count = song.measureCount();
-    const TempoMap tempo(song);
+    const TempoMap tempo(song, speed_);
     std::vector<Fraction> lengths;
     std::vector<Fraction> written; // where each written measure starts
     lengths.reserve(count);
@@ -631,6 +684,9 @@ Sequence::Sequence(const core::Song& song) {
             }
             tracks[t] = std::move(events);
         });
+    if (metronome_) {
+        tracks.push_back(metronomeEvents(song, measures_, tempo, metronomeTrack_));
+    }
     // Every list is ordered, so is every merge of two: neighbours merged
     // pairwise, each round on all cores, leave one ordered list.
     std::size_t total = 0;

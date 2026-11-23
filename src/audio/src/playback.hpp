@@ -29,7 +29,9 @@ struct FrameEvent {
     int velocity = 80;
 };
 
-/// The sequence's events split by track, at frame round(t x rate).
+/// The sequence's events split by track, at frame round(t x rate). With
+/// one more list than the song has tracks, the last holds the metronome's
+/// events (Sequence::metronomeTrack()).
 [[nodiscard]] inline std::vector<std::vector<FrameEvent>>
 eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
     std::vector<std::vector<FrameEvent>> result(tracks);
@@ -49,7 +51,7 @@ eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
 
 /// Room for every track to play at once: 1/sqrt(n) for n tracks with notes.
 /// It does not depend on the mix, so muting a track leaves the others as loud.
-[[nodiscard]] inline float headroom(const std::vector<std::vector<FrameEvent>>& events) {
+[[nodiscard]] inline float headroom(std::span<const std::vector<FrameEvent>> events) {
     const auto sounding = std::ranges::count_if(
         events, [](const std::vector<FrameEvent>& track) { return !track.empty(); });
     return 1.0f / std::sqrt(static_cast<float>(std::max<std::ptrdiff_t>(sounding, 1)));
@@ -62,6 +64,10 @@ struct TrackLevel {
 
     friend bool operator==(const TrackLevel&, const TrackLevel&) = default;
 };
+
+/// The metronome's level (ADR-0024): fixed, in the centre, and left out of
+/// the headroom, so turning it on leaves the song as loud.
+inline constexpr TrackLevel kMetronomeLevel{.left = 1.25f, .right = 1.25f};
 
 /// The level of track `t` from its mix (ADR-0020), times `headroom`: the fader
 /// as a gain of (volume / 0.8)^2, unity at the default position; a

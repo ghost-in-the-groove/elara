@@ -309,3 +309,39 @@ TEST_CASE("OfflineRenderer: a bent note sounds at the pitch it bends to",
     const double expected = elara::audio::test::keyFrequency(59);
     CHECK(std::abs(pitch - expected) < 0.01 * expected);
 }
+
+// The metronome (ADR-0024) plays on a track of its own, after the song's, and
+// leaves the song as loud as without it.
+TEST_CASE("OfflineRenderer: the metronome clicks on a track of its own, the song as loud",
+          "[audio][render][practice]") {
+    Song s = song({track("Organ", InstrumentKind::Keyboard, 16)}, 1);
+    beats(s, 0, 0) = {beat(NoteValue::Whole, {60}, Dynamic::P)};
+    OfflineRenderer plain(s, Sequence(s), {.sampleRate = kRate, .tail = 0.0});
+    OfflineRenderer clicking(s, Sequence(s, {.metronome = true}),
+                             {.sampleRate = kRate, .tail = 0.0, .logEvents = true});
+    const std::vector<float> without = plain.renderRest();
+    const std::vector<float> with = clicking.renderRest();
+
+    CHECK(clicking.timbres().size() == 1);
+    std::vector<int> clicks;
+    for (const LoggedEvent& event : clicking.log()) {
+        if (event.track == 1 && event.kind == EventKind::NoteOn) {
+            clicks.push_back(event.key);
+        }
+    }
+    CHECK(clicks == std::vector<int>{elara::audio::kMetronomeAccentKey, elara::audio::kMetronomeKey,
+                                     elara::audio::kMetronomeKey, elara::audio::kMetronomeKey});
+    // A click is heard, and over before the next beat: between clicks the
+    // song is exactly as it is without them.
+    std::vector<float> click;
+    const auto struck = frames(with, 0.5, 0.55);
+    const auto under = frames(without, 0.5, 0.55);
+    for (std::size_t i = 0; i < struck.size(); ++i) {
+        click.push_back(struck[i] - under[i]);
+    }
+    CHECK(peakLevel(click) > 0.15f);
+    const auto between = frames(with, 0.4, 0.49);
+    const auto alone = frames(without, 0.4, 0.49);
+    CHECK(std::vector<float>(between.begin(), between.end()) ==
+          std::vector<float>(alone.begin(), alone.end()));
+}
