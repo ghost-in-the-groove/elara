@@ -19,6 +19,7 @@ elara-cli [--json] rests <N/D> <DURATION>...      # e.g. rests 6/8 8 -> 8 8 4.
 elara-cli [--json] new <FILE> [--title T] [--track PRESET]... [--measures 4] [--time 4/4]
                        [--key "C major"] [--tempo 120] [--force]
 elara-cli [--json] dump <FILE>                    # with --json: the whole model
+elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml, .mxl
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 ```
 
@@ -31,7 +32,9 @@ dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
 where `song` is the file's complete `song.json`: the model snapshot later tests
-compare against.
+compare against. `import --json` prints `{"file", "format", "out", "warnings",
+"song", "durationSeconds", "issues"}`: `warnings` lists what the file had that
+the model cannot hold yet (ADR-0007); `--out` also saves the song as `.elara`.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

@@ -12,6 +12,7 @@ one that replaces them.
 | [0004](0004-song-model.md) | Song model | Accepted |
 | [0005](0005-undo-with-reversible-commands.md) | Undo with reversible commands | Accepted |
 | [0006](0006-native-file-format.md) | Native file format | Accepted |
+| [0007](0007-musicxml-import.md) | MusicXML import | Accepted |
 
 ## Template
 

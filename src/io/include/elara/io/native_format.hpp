@@ -3,6 +3,7 @@
 #pragma once
 
 #include <elara/core/song.hpp>
+#include <elara/io/result.hpp>
 
 #include <cstdint>
 #include <expected>
@@ -18,17 +19,12 @@ inline constexpr int kNativeFormatVersion = 1;
 inline constexpr std::string_view kNativeMimeType = "application/vnd.elara.song+zip";
 inline constexpr std::string_view kNativeExtension = ".elara";
 
-/// Why a song could not be read. The message starts with the JSON path of the
-/// problem when there is one, e.g. "tracks[0].staves[0].clef: unknown clef: x".
-struct FormatError {
-    std::string message;
-};
-
 /// The song as the song.json text of a native file (compact JSON).
 [[nodiscard]] std::string songToJson(const core::Song& song);
 
-/// Reads song.json text. Rejects invalid JSON, a newer formatVersion and any
-/// value the model does not accept; ignores keys it does not know.
+/// Reads song.json text. Errors start with the JSON path of the problem when
+/// there is one, e.g. "tracks[0].staves[0].clef: unknown clef: x". Rejects invalid JSON, a newer
+/// formatVersion and any value the model does not accept; ignores keys it does not know.
 [[nodiscard]] std::expected<core::Song, FormatError> songFromJson(std::string_view json);
 
 /// The bytes of a native file: a zip archive with "mimetype" and "song.json".

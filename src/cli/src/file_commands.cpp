@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// File subcommands: new (create a .elara song) and dump (print one).
+// File subcommands: new (create a .elara song), dump (print one) and import
+// (read a foreign format, optionally saving it as .elara).
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
+#include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
 
 #include "common.hpp"
 #include "song_report.hpp"
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <exception>
 #include <filesystem>
 #include <format>
@@ -94,6 +98,67 @@ int runDump(bool json, const std::string& file) {
     return kExitOk;
 }
 
+struct ImportOptions {
+    std::string file;
+    std::string out;
+    bool force = false;
+};
+
+std::string lowercase(std::string text) {
+    std::ranges::transform(text, text.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+
+int runImport(bool json, const ImportOptions& options) {
+    const std::filesystem::path path(options.file);
+    const std::string extension = lowercase(displayPath(path.extension()));
+    if (extension != ".musicxml" && extension != ".xml" && extension != ".mxl") {
+        return usageError(std::format(
+            "cannot import {}: supported files are .musicxml, .xml and .mxl", options.file));
+    }
+    const auto imported = io::importMusicXmlFile(path);
+    if (!imported) {
+        return fail(std::format("{}: {}", options.file, imported.error().message));
+    }
+    const core::Song& song = imported->song;
+    if (!options.out.empty()) {
+        if (!options.force && std::filesystem::exists(options.out)) {
+            return fail(std::format("{} already exists (use --force to replace it)", options.out));
+        }
+        try {
+            io::saveNative(song, options.out);
+        } catch (const std::exception& error) {
+            return fail(error.what());
+        }
+    }
+    if (json) {
+        std::string warnings = "[";
+        for (const std::string& warning : imported->warnings) {
+            warnings +=
+                std::format("{}\"{}\"", warnings.size() > 1 ? "," : "", jsonEscape(warning));
+        }
+        warnings += ']';
+        const std::string out =
+            options.out.empty() ? "null" : std::format("\"{}\"", jsonEscape(options.out));
+        std::cout << std::format(R"({{"file":"{}","format":"musicxml","out":{},"warnings":{},)"
+                                 R"("song":{},"durationSeconds":{:.3f},"issues":{}}})",
+                                 jsonEscape(options.file), out, warnings, io::songToJson(song),
+                                 song.durationSeconds(), issuesJson(core::validate(song)))
+                  << '\n';
+    } else {
+        std::cout << std::format("imported {} (MusicXML)\n", options.file);
+        printSongText(song);
+        for (const std::string& warning : imported->warnings) {
+            std::cout << "warning: " << warning << '\n';
+        }
+        if (!options.out.empty()) {
+            std::cout << std::format("saved {}\n", options.out);
+        }
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addFileCommands(CLI::App& app, Context& context) {
@@ -122,6 +187,16 @@ void addFileCommands(CLI::App& app, Context& context) {
     dumpCommand->add_option("file", *dumped, "A .elara file")->required();
     dumpCommand->callback(
         [&context, dumped] { context.exitCode = runDump(context.json, *dumped); });
+
+    auto imported = std::make_shared<ImportOptions>();
+    auto* importCommand = app.add_subcommand(
+        "import", "Read a MusicXML file (.musicxml, .xml, .mxl): with --json, the song, what "
+                  "was dropped (warnings) and issues");
+    importCommand->add_option("file", imported->file, "File to import")->required();
+    importCommand->add_option("--out", imported->out, "Also save the song as a .elara file");
+    importCommand->add_flag("--force", imported->force, "Replace the --out file if it exists");
+    importCommand->callback(
+        [&context, imported] { context.exitCode = runImport(context.json, *imported); });
 }
 
 } // namespace elara::cli

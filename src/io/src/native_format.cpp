@@ -2,6 +2,7 @@
 #include <elara/core/version.hpp>
 #include <elara/io/native_format.hpp>
 
+#include "archive.hpp"
 #include <miniz.h>
 #include <yyjson.h>
 
@@ -26,7 +27,6 @@ namespace {
 using namespace core;
 
 constexpr std::string_view kFormatName = "elara";
-constexpr std::size_t kMaxSongJsonBytes = std::size_t{512} * 1024 * 1024; // zip-bomb guard
 
 // ---- Names of enumerations (kebab-case, index = enum value) -------------------
 
@@ -849,57 +849,6 @@ private:
     JsonPath path_;
 };
 
-// ---- Zip helpers ------------------------------------------------------------
-
-class ZipReader {
-public:
-    explicit ZipReader(std::span<const std::uint8_t> bytes) {
-        ok_ = mz_zip_reader_init_mem(&zip_, bytes.data(), bytes.size(), 0) != 0;
-    }
-    ZipReader(const ZipReader&) = delete;
-    ZipReader& operator=(const ZipReader&) = delete;
-    ZipReader(ZipReader&&) = delete;
-    ZipReader& operator=(ZipReader&&) = delete;
-    ~ZipReader() {
-        if (ok_) {
-            mz_zip_reader_end(&zip_);
-        }
-    }
-
-    [[nodiscard]] bool ok() const noexcept { return ok_; }
-
-    /// The entry's content; nullopt when it is missing. Throws ReadError when it
-    /// is damaged or larger than `limit`.
-    std::optional<std::string> entry(const char* name, std::size_t limit) {
-        const int index = mz_zip_reader_locate_file(&zip_, name, nullptr, 0);
-        if (index < 0) {
-            return std::nullopt;
-        }
-        const auto file = static_cast<mz_uint>(index);
-        mz_zip_archive_file_stat stat{};
-        if (mz_zip_reader_file_stat(&zip_, file, &stat) == 0) {
-            throw ReadError{std::format("{} is damaged", name)};
-        }
-        if (stat.m_uncomp_size > limit) {
-            throw ReadError{std::format("{} is too large ({} bytes)", name, stat.m_uncomp_size)};
-        }
-        std::string content(static_cast<std::size_t>(stat.m_uncomp_size), '\0');
-        if (mz_zip_reader_extract_to_mem(&zip_, file, content.data(), content.size(), 0) == 0) {
-            throw ReadError{std::format("{} is damaged", name)};
-        }
-        return content;
-    }
-
-private:
-    mz_zip_archive zip_{};
-    bool ok_ = false;
-};
-
-std::string displayPath(const std::filesystem::path& path) {
-    const std::u8string text = path.u8string();
-    return {reinterpret_cast<const char*>(text.data()), text.size()};
-}
-
 } // namespace
 
 std::string songToJson(const Song& song) {
@@ -953,7 +902,7 @@ std::vector<std::uint8_t> encodeNative(const Song& song) {
 
 std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
     try {
-        ZipReader zip(bytes);
+        detail::ZipReader zip(bytes);
         if (!zip.ok()) {
             return std::unexpected(FormatError{"not an Elara file (not a zip archive)"});
         }
@@ -962,13 +911,13 @@ std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> byte
             return std::unexpected(
                 FormatError{std::format("not an Elara file (mimetype {})", *mime)});
         }
-        const auto json = zip.entry("song.json", kMaxSongJsonBytes);
+        const auto json = zip.entry("song.json");
         if (!json) {
             return std::unexpected(FormatError{"not an Elara file (no song.json)"});
         }
         return songFromJson(*json);
-    } catch (const ReadError& failure) {
-        return std::unexpected(FormatError{failure.message});
+    } catch (const FormatError& failure) {
+        return std::unexpected(failure);
     }
 }
 
@@ -979,7 +928,7 @@ void saveNative(const Song& song, const std::filesystem::path& path) {
     {
         std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
         if (!out) {
-            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
+            throw std::runtime_error(std::format("cannot write {}", detail::displayPath(path)));
         }
         out.write(reinterpret_cast<const char*>(bytes.data()),
                   static_cast<std::streamsize>(bytes.size()));
@@ -987,7 +936,7 @@ void saveNative(const Song& song, const std::filesystem::path& path) {
         if (!out) {
             std::error_code ignored;
             std::filesystem::remove(temporary, ignored);
-            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
+            throw std::runtime_error(std::format("cannot write {}", detail::displayPath(path)));
         }
     }
     std::error_code error;
@@ -996,26 +945,13 @@ void saveNative(const Song& song, const std::filesystem::path& path) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
         throw std::runtime_error(
-            std::format("cannot replace {}: {}", displayPath(path), error.message()));
+            std::format("cannot replace {}: {}", detail::displayPath(path), error.message()));
     }
 }
 
 std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary | std::ios::ate);
-    if (!in) {
-        return std::unexpected(FormatError{"cannot open the file"});
-    }
-    const std::streamoff size = in.tellg();
-    if (size < 0) {
-        return std::unexpected(FormatError{"cannot read the file"});
-    }
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
-    in.seekg(0);
-    in.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    if (!in) {
-        return std::unexpected(FormatError{"cannot read the file"});
-    }
-    return decodeNative(bytes);
+    return detail::readFile(path).and_then(
+        [](const std::vector<std::uint8_t>& bytes) { return decodeNative(bytes); });
 }
 
 } // namespace elara::io
