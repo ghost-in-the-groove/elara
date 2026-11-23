@@ -11,8 +11,9 @@ Two targets with different rules:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
-  ring and harmonics applied (ADR-0022), and bends, slides, hammer-ons and
-  vibrato sent as pitch events (ADR-0023). For practice it plays at 25 % to
+  ring and harmonics applied (ADR-0022), bends, slides, hammer-ons and
+  vibrato sent as pitch events (ADR-0023), and strums and tremolo picking
+  spreading and repeating attacks (ADR-0025). For practice it plays at 25 % to
   200 % of the written tempo and adds a metronome on a track after the song's
   (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
   wood blocks at a fixed level. `carriedPosition()` finds where playback
