@@ -55,6 +55,7 @@ private:
     void queueMix();
     void finish(bool ok, const QString& detail);
     void clickCursor();
+    [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
     QPointer<QQuickWindow> window_;

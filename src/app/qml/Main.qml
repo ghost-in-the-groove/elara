@@ -448,6 +448,7 @@ ApplicationWindow {
             dark: window.dark
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
+            bottomInset: window.hasScore ? transport.height + 20 : 0
             onSeekRequested: seconds => audio.seek(seconds)
             cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
@@ -547,6 +548,7 @@ ApplicationWindow {
         Rectangle {
             id: transport
 
+            objectName: "transport"
             anchors.horizontalCenter: parent.horizontalCenter
             y: window.hasScore ? parent.height - height - 20 : parent.height + 12
             width: transportRow.implicitWidth + 28
@@ -690,7 +692,8 @@ ApplicationWindow {
             property bool shown: false
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
+            y: shown ? parent.height - height - scoreView.entryBarSpace
+                       - (window.hasScore ? transport.height + 36 : 24)
                      : parent.height + 8
             width: Math.min(parent.width - 48, toastText.implicitWidth + 40)
             height: toastText.implicitHeight + 24

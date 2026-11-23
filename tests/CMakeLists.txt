@@ -91,6 +91,7 @@ if(TARGET elara)
   # out, paints its first page and shows it in every view and with all tracks.
   # Then it edits the song (a new one without a file): adds a track, changes
   # the time signature, undoes, redoes, and checks the song ends as it began.
+  # The bars floating over the bottom of the score must not cover each other.
   add_test(NAME app.smoke COMMAND elara --smoke-test)
   add_test(NAME app.smoke_open_tracks
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
