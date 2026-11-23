@@ -22,11 +22,12 @@ struct GuitarProOptions {
 /// Reads a Guitar Pro file: Guitar Pro 7 and 8 files (.gp: a zip archive holding
 /// the score as GPIF XML), Guitar Pro 6 files (.gpx: a compressed container
 /// holding GPIF XML) and Guitar Pro 3, 4 and 5 files (.gp3, .gp4, .gp5: a binary
-/// stream). Tracks keep their tuning, capo, staves and fret positions;
-/// techniques the model holds (bends, slides, hammer-ons, harmonics, palm mutes,
-/// vibrato...) are kept, and what it cannot hold (repeats, grace notes, lyrics,
-/// chord diagrams...) is listed in ImportResult::warnings. Fails when the bytes
-/// are not a Guitar Pro file or the score is damaged.
+/// stream). Tracks keep their tuning, capo, staves and fret positions (a track
+/// Guitar Pro 6-8 shows without tablature keeps a tuning only on a guitar or a
+/// bass: Guitar Pro gives every track one); techniques the model holds (bends, slides, hammer-ons,
+/// harmonics, palm mutes, vibrato...) are kept, and what it cannot hold (repeats, grace notes,
+/// lyrics, chord diagrams...) is listed in ImportResult::warnings. Fails when the bytes are not a
+/// Guitar Pro file or the score is damaged.
 [[nodiscard]] std::expected<ImportResult, FormatError>
 importGuitarPro(std::span<const std::uint8_t> bytes, const GuitarProOptions& options = {});
 
