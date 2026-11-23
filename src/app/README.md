@@ -13,12 +13,12 @@ Qt Quick / QML user interface.
 | File | What it does |
 |---|---|
 | `src/score_painter.hpp` | `ScorePainter`: paints a display list with QPainter (glyph outlines of the bundled fonts, shapes), the same on every platform and thread. `ScoreFonts` loads Bravura and Arimo. Built as the `elara_app_view` library so that tests link it. |
-| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. Edits the song through `core::Document` (new song, song info, tempo, signatures, length, tracks; undo, redo) and saves it as `.elara` (ADR-0031). Holds the keyboard entry caret and input duration, and types frets, durations, rests and deletes at it (ADR-0032). Changes the time and key signatures from the caret's measure, and inserts or deletes measures there (ADR-0033). |
+| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. Edits the song through `core::Document` (new song, song info, tempo, signatures, length, tracks; undo, redo) and saves it as `.elara` (ADR-0031). Holds the keyboard entry caret and input duration, and types frets, note names, durations, rests and deletes at it, and moves pitches (ADR-0032, ADR-0034). Changes the time and key signatures from the caret's measure, and inserts or deletes measures there (ADR-0033). |
 | `src/score_page.hpp` | `ScorePage` (QML): one page as a texture, painted on a worker thread at its size in device pixels and painted again when zooming settles. |
 | `src/startup.hpp` | What the app does after its window loads: `--track`, `--view`, `--smoke-test`, `--screenshot` (`--tuner` is a property of the window). |
 | `qml/Main.qml` | The window: toolbar (new, open, save, undo, redo, view, track, zoom), welcome pane, pages, drag and drop, errors, status bar; asks to save unsaved changes before they would be lost. |
 | `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. |
-| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0). The caret over its page, keyboard entry (digits, arrows, Delete, Insert, `+`, `-`, `.`) and clicks that place the caret; the view scrolls to keep the caret in sight. Ctrl+M or a right click opens the caret's measure; Ctrl+Insert inserts a measure before it, Ctrl+Shift+Delete deletes it. |
+| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0). The caret over its page, keyboard entry (digits, arrows, Delete, Insert, `+`, `-`, `.`) and clicks that place the caret; the view scrolls to keep the caret in sight. Letters A to G type note names (with Shift they join the beat's chord) and Alt+Up/Down moves the pitch a semitone (with Ctrl an octave). Ctrl+M or a right click opens the caret's measure; Ctrl+Insert inserts a measure before it, Ctrl+Shift+Delete deletes it. |
 | `qml/EntryBar.qml` | The entry bar floating over the score: the note value typing uses, the dot, insert a rest, delete, the measure popup, and where the caret is. |
 | `qml/MeasurePopup.qml` | The caret's measure in a card next to it: its time and key signatures (from it until the next change), insert a measure before or after it, delete it. |
 | `qml/SignatureFields.qml` | Time signature, key signature and mode fields, shared by the song panel and the measure popup. |
@@ -79,6 +79,8 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--tuner] [--song-pane]
   step, a duration, a rest inserted and deleted, all undone back to the start.
   Last it inserts a measure after the caret, gives it 3/4 and two sharps,
   checks the first measure kept its signatures, deletes it and undoes all.
+  On a pitched track it types a C, checks the status names it, raises it a
+  semitone and undoes both.
 - `--language es` shows the UI in Spanish (`en` in English) instead of the
   system's language. With `--smoke-test` or `--screenshot` the app first prints
   `ui language: es`, which `app.smoke_spanish` checks; `app.language_unknown`

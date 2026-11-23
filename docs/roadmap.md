@@ -71,8 +71,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
-  - [x] Note names at the caret on any pitched staff, chords, semitone moves
-        (ADR-0034)
+  - [x] Note names at the caret on any pitched staff, chords, semitone moves, in
+        the CLI and the app (ADR-0034)
 - [ ] Copy/paste, insert/delete measures, transposition (insert/delete and transposition done, ADR-0026; copy/paste to do)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)

@@ -45,6 +45,7 @@ private:
     void queueEdits();
     void queueEntry();
     void queueMeasures();
+    void queuePitches();
     void finish(bool ok, const QString& detail);
     [[nodiscard]] bool checking() const;
 
@@ -67,6 +68,8 @@ private:
     bool entering_ = false;      ///< whether the shown track takes frets
     int measuresBefore_ = 0;     ///< measures when the measure edits start
     int firstNumerator_ = 0;     ///< the first time signature then
+    bool pitching_ = false;      ///< whether the caret takes note names
+    int typedMidi_ = -1;         ///< the note name typed, as a MIDI number
 };
 
 } // namespace elara::app
