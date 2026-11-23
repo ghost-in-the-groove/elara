@@ -3,6 +3,7 @@
 // drives them through (ADR-0012).
 #pragma once
 
+#include <elara/core/duration.hpp>
 #include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/measure.hpp>
@@ -74,6 +75,43 @@ struct ColumnPosition {
 /// Where the column after the one at `start` begins, or `barline` for the last.
 [[nodiscard]] double nextColumnX(std::span<const ColumnPosition> positions,
                                  const core::Fraction& start, double barline);
+
+// ---- Beams and tuplets (ADR-0012, ADR-0040) ---------------------------------------
+
+inline constexpr double kBeamletLength = 1.1;    // a beam that joins no other stem
+inline constexpr double kTupletGap = 0.4;        // between a tuplet number or bracket and the notes
+inline constexpr double kTupletHook = 0.6;       // the ends of a tuplet bracket, towards the notes
+inline constexpr double kTupletNumberGap = 0.25; // either side of the number in its bracket
+
+/// Flags or beams a note value needs (0 for a quarter or longer).
+[[nodiscard]] inline int beamCount(core::NoteValue value) {
+    return std::max(0, static_cast<int>(value) - static_cast<int>(core::NoteValue::Quarter));
+}
+
+/// A note or rest of one voice, as beams and tuplets see it.
+struct RhythmItem {
+    core::Fraction start; // from the start of the measure
+    core::Duration duration;
+    bool rest = false;
+};
+
+/// The beam groups of one voice: two or more consecutive eighths and shorter
+/// inside one beat of the meter (a dotted beat in compound meters), as indices
+/// into `items`.
+[[nodiscard]] std::vector<std::vector<std::size_t>> beamGroups(std::span<const RhythmItem> items,
+                                                               const core::TimeSignature& time);
+
+/// Consecutive items of one voice under one tuplet number, as indices.
+struct TupletSpan {
+    std::size_t first = 0;
+    std::size_t last = 0;
+    core::Tuplet tuplet;
+};
+
+/// The tuplets of one voice: consecutive items with the same ratio, a group
+/// closing once its written length is `actual` times a note value no shorter
+/// than any of its items (three eighths, or a quarter and an eighth, under a 3).
+[[nodiscard]] std::vector<TupletSpan> tupletSpans(std::span<const RhythmItem> items);
 
 struct Extents {
     double top = 0.0;
@@ -267,6 +305,27 @@ protected:
     /// The highest ink drawn so far, never below the top line.
     [[nodiscard]] double inkTop() const;
 
+    /// The digits of a tuplet number with their width and extents (SMuFL y, up).
+    struct TupletNumber {
+        std::string digits;
+        double width = 0.0;
+        double top = 0.0;
+        double bottom = 0.0;
+    };
+    [[nodiscard]] TupletNumber tupletNumber(int count) const;
+
+    /// Draws `number` centred on x with its baseline at `origin`.
+    void drawTupletNumber(const TupletNumber& number, double x, double origin);
+
+    /// How far from the nearest ink of its notes a tuplet bracket lies.
+    [[nodiscard]] static double bracketReach(const TupletNumber& number) {
+        return kTupletGap + std::max(kTupletHook, (number.top - number.bottom) / 2);
+    }
+
+    /// A tuplet bracket from `left` to `right` at y with hooks towards the notes
+    /// (down when `above`) and `number` in a gap in its middle.
+    void tupletBracket(const TupletNumber& number, double left, double right, double y, bool above);
+
     const EngravingFont& font_;
     const EngravingDefaults& defaults_;
     DisplayList list_;
@@ -288,11 +347,11 @@ private:
                                                               const EngravingFont& font,
                                                               bool techniques);
 
-/// Tablature of a fretted staff; with `rests`, rests show in it (when no
-/// standard notation of the staff shows them).
+/// Tablature of a fretted staff; `alone` (when no standard notation of the
+/// staff shows them), its rests and rhythm show in it (ADR-0041).
 [[nodiscard]] std::unique_ptr<StaffWriter> makeTabWriter(const core::Song& song, std::size_t track,
                                                          std::size_t staff,
-                                                         const EngravingFont& font, bool rests);
+                                                         const EngravingFont& font, bool alone);
 
 // ---- Lines of music --------------------------------------------------------------------
 

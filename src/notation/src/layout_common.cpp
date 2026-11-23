@@ -4,7 +4,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
+#include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -487,6 +490,111 @@ double StaffWriter::timeSignature(const core::TimeSignature& time, double x, dou
 
 double StaffWriter::inkTop() const {
     return inkExtents(list_, font_, height_).top;
+}
+
+StaffWriter::TupletNumber StaffWriter::tupletNumber(int count) const {
+    TupletNumber number{.digits = std::to_string(count),
+                        .width = 0.0,
+                        .top = std::numeric_limits<double>::lowest(),
+                        .bottom = std::numeric_limits<double>::max()};
+    for (const char digit : number.digits) {
+        const BoundingBox& box = metrics(offsetGlyph(Glyph::Tuplet0, digit - '0')).box;
+        number.width += box.width();
+        number.top = std::max(number.top, box.northEast.y);
+        number.bottom = std::min(number.bottom, box.southWest.y);
+    }
+    return number;
+}
+
+void StaffWriter::drawTupletNumber(const TupletNumber& number, double x, double origin) {
+    double from = x - number.width / 2;
+    for (const char digit : number.digits) {
+        from = glyphFrom(offsetGlyph(Glyph::Tuplet0, digit - '0'), from, origin, Role::Tuplet);
+    }
+}
+
+void StaffWriter::tupletBracket(const TupletNumber& number, double left, double right, double y,
+                                bool above) {
+    const double middle = (left + right) / 2;
+    const double hook = y + (above ? kTupletHook : -kTupletHook);
+    const double thickness = defaults_.tupletBracketThickness;
+    line({left, hook}, {left, y}, thickness, Role::Tuplet);
+    line({left, y}, {middle - number.width / 2 - kTupletNumberGap, y}, thickness, Role::Tuplet);
+    line({middle + number.width / 2 + kTupletNumberGap, y}, {right, y}, thickness, Role::Tuplet);
+    line({right, y}, {right, hook}, thickness, Role::Tuplet);
+    drawTupletNumber(number, middle, y + (number.top + number.bottom) / 2);
+}
+
+std::vector<std::vector<std::size_t>> beamGroups(std::span<const RhythmItem> items,
+                                                 const core::TimeSignature& time) {
+    const bool compound =
+        time.numerator() > 3 && time.numerator() % 3 == 0 && time.denominator() >= 8;
+    const core::Fraction window(compound ? 3 : 1, time.denominator());
+    std::vector<std::vector<std::size_t>> groups;
+    std::vector<std::size_t> group;
+    std::int64_t groupWindow = -1;
+    const auto flush = [&] {
+        if (group.size() >= 2) {
+            groups.push_back(group);
+        }
+        group.clear();
+    };
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const RhythmItem& item = items[i];
+        const core::Fraction position = item.start / window;
+        const std::int64_t index = position.numerator() / position.denominator();
+        const bool fits = item.start + item.duration.length() <= window * core::Fraction(index + 1);
+        if (item.rest || beamCount(item.duration.value()) == 0 || !fits) {
+            flush();
+            continue;
+        }
+        if (index != groupWindow) {
+            flush();
+            groupWindow = index;
+        }
+        group.push_back(i);
+    }
+    flush();
+    return groups;
+}
+
+std::vector<TupletSpan> tupletSpans(std::span<const RhythmItem> items) {
+    std::vector<TupletSpan> spans;
+    std::optional<TupletSpan> open;
+    core::Fraction written;
+    core::Fraction shortest;
+    const auto close = [&] {
+        if (open) {
+            spans.push_back(*open);
+            open.reset();
+        }
+    };
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const core::Duration& duration = items[i].duration;
+        const core::Tuplet tuplet = duration.tuplet();
+        if (open && open->tuplet != tuplet) {
+            close();
+        }
+        if (tuplet.isNone()) {
+            continue;
+        }
+        const core::NoteValue value = duration.value();
+        if (!open) {
+            open = TupletSpan{.first = i, .last = i, .tuplet = tuplet};
+            written = core::Fraction();
+            shortest = core::noteValueLength(value);
+        }
+        open->last = i;
+        written += core::Duration(value, duration.dots()).length();
+        shortest = std::min(shortest, core::noteValueLength(value));
+        const core::Fraction unit = written / core::Fraction(tuplet.actual());
+        const std::int64_t den = unit.denominator();
+        if (unit.numerator() == 1 && (den & (den - 1)) == 0 && unit >= shortest) {
+            close();
+        }
+    }
+    close();
+    return spans;
 }
 
 } // namespace elara::notation::detail

@@ -50,6 +50,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
+- [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [ ] Incremental relayout (only the systems an edit touches)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene

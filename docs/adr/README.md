@@ -39,6 +39,7 @@ one that replaces them.
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
+| [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
 
 ## Template
 
