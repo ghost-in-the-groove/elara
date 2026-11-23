@@ -51,6 +51,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
+- [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [ ] Incremental relayout (only the systems an edit touches)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
@@ -81,6 +82,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
+  - [x] Dynamics at the caret, holding until the next change; new notes take
+        the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)

@@ -5,10 +5,12 @@
 #include <elara/core/transpose.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <map>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -69,6 +71,47 @@ Entry replace(const Caret& caret, Measure content, std::string name) {
 
 Entry unchanged(const Caret& caret) {
     return Entry{.command = nullptr, .caret = caret};
+}
+
+/// Where the caret's beat (or the free slot) starts in its measure.
+Fraction caretStart(const Song& song, const Caret& caret) {
+    const std::vector<Beat>& beats = voiceAt(song, caret).beats;
+    Fraction start;
+    for (std::size_t b = 0; b < caret.beat && b < beats.size(); ++b) {
+        start += beats[b].duration.length();
+    }
+    return start;
+}
+
+/// The loudest dynamic of the notes struck in `notes`; tied notes only sustain.
+std::optional<Dynamic> struckDynamic(const std::vector<Note>& notes) {
+    std::optional<Dynamic> loudest;
+    for (const Note& note : notes) {
+        if (!note.effects.tiedFromPrevious && (!loudest || note.effects.dynamic > *loudest)) {
+            loudest = note.effects.dynamic;
+        }
+    }
+    return loudest;
+}
+
+/// The loudest struck dynamic at each start of measure m of `staff` with struck
+/// notes, over every voice, from `from` on.
+std::map<Fraction, Dynamic> struckStarts(const Staff& staff, std::size_t m, const Fraction& from) {
+    std::map<Fraction, Dynamic> starts;
+    for (const Voice& voice : staff.measure(m).voices) {
+        Fraction start;
+        for (const Beat& beat : voice.beats) {
+            if (const std::optional<Dynamic> struck = struckDynamic(beat.notes);
+                struck && !(start < from)) {
+                const auto [it, added] = starts.try_emplace(start, *struck);
+                if (!added && *struck > it->second) {
+                    it->second = *struck;
+                }
+            }
+            start += beat.duration.length();
+        }
+    }
+    return starts;
 }
 
 bool isOnString(const Note& note, int string) {
@@ -310,6 +353,7 @@ Entry enterFret(const Song& song, const Caret& at, int fret, Duration duration) 
     }
     Note note = staff.frettedNote(caret.string, fret);
     note.pitch = song.measureHeader(caret.measure).keySignature.spell(note.pitch.midiNumber());
+    note.effects.dynamic = dynamicAt(song, caret);
 
     Measure content = measureAt(song, caret);
     std::vector<Beat>& beats = content.voices.at(caret.voice).beats;
@@ -377,6 +421,7 @@ Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration
     }
 
     Note note{.pitch = *sounding};
+    note.effects.dynamic = dynamicAt(song, caret);
     if (staff.isFretted()) {
         std::vector<int> taken;
         if (chord) {
@@ -519,6 +564,7 @@ Entry toggleDrum(const Song& song, const Caret& at, Duration duration) {
     }
     const int key = laneKey(caret.string);
     Note hit{.pitch = Pitch::fromMidi(key)};
+    hit.effects.dynamic = dynamicAt(song, caret);
     Measure content = measureAt(song, caret);
     std::vector<Beat>& beats = content.voices.at(caret.voice).beats;
     if (caret.beat == beats.size()) {
@@ -626,6 +672,110 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
         }
     }
     return replace(caret, std::move(content), "Change effect");
+}
+
+Dynamic dynamicAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const Fraction until = caretStart(song, caret);
+    for (std::size_t m = caret.measure + 1; m-- > 0;) {
+        std::optional<Fraction> latest;
+        std::optional<Dynamic> loudest;
+        for (const Voice& voice : staff.measure(m).voices) {
+            Fraction start;
+            for (const Beat& beat : voice.beats) {
+                if (m == caret.measure && until < start) {
+                    break;
+                }
+                if (const std::optional<Dynamic> struck = struckDynamic(beat.notes)) {
+                    if (!latest || *latest < start) {
+                        latest = start;
+                        loudest = struck;
+                    } else if (*latest == start && *struck > *loudest) {
+                        loudest = struck;
+                    }
+                }
+                start += beat.duration.length();
+            }
+        }
+        if (loudest) {
+            return *loudest;
+        }
+    }
+    return Dynamic::MF;
+}
+
+Entry setDynamic(const Song& song, const Caret& at, Dynamic dynamic) {
+    const Caret caret = clampCaret(song, at);
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const Fraction from = caretStart(song, caret);
+
+    // The passage ends at the first start whose struck notes leave its dynamic.
+    std::optional<Dynamic> passage;
+    std::size_t endMeasure = staff.measureCount();
+    Fraction endStart;
+    for (std::size_t m = caret.measure;
+         m < staff.measureCount() && endMeasure == staff.measureCount(); ++m) {
+        for (const auto& [start, loudest] :
+             struckStarts(staff, m, m == caret.measure ? from : Fraction{})) {
+            if (!passage) {
+                passage = loudest;
+            } else if (loudest != *passage) {
+                endMeasure = m;
+                endStart = start;
+                break;
+            }
+        }
+    }
+    if (!passage) {
+        return unchanged(caret);
+    }
+    const auto inPassage = [&](std::size_t m, const Fraction& start) {
+        if (m == caret.measure && start < from) {
+            return false;
+        }
+        return m < endMeasure || (m == endMeasure && start < endStart);
+    };
+
+    // Struck notes in the passage change; tied notes follow the note they
+    // continue, the same pitch in the voice's beat before.
+    std::array<std::vector<int>, Measure::kMaxVoices> changed{}; // per voice: MIDI numbers
+    std::vector<std::unique_ptr<Command>> commands;
+    for (std::size_t m = caret.measure; m < staff.measureCount(); ++m) {
+        if (m > endMeasure && std::ranges::all_of(changed, &std::vector<int>::empty)) {
+            break;
+        }
+        Measure content = staff.measure(m);
+        for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
+            Fraction start;
+            for (Beat& beat : content.voices[v].beats) {
+                std::vector<int> next;
+                const bool inside = inPassage(m, start);
+                for (Note& note : beat.notes) {
+                    const int midi = note.pitch.midiNumber();
+                    const bool tied = note.effects.tiedFromPrevious;
+                    if (tied ? std::ranges::find(changed[v], midi) != changed[v].end() : inside) {
+                        note.effects.dynamic = dynamic;
+                        next.push_back(midi);
+                    }
+                }
+                changed[v] = std::move(next);
+                start += beat.duration.length();
+            }
+        }
+        if (content != staff.measure(m)) {
+            commands.push_back(std::make_unique<ReplaceMeasure>(
+                caret.track, caret.staff, m, std::move(content), "Change dynamic"));
+        }
+    }
+    if (commands.empty()) {
+        return unchanged(caret);
+    }
+    if (commands.size() == 1) {
+        return Entry{.command = std::move(commands.front()), .caret = caret};
+    }
+    return Entry{.command = std::make_unique<CommandGroup>("Change dynamic", std::move(commands)),
+                 .caret = caret};
 }
 
 } // namespace elara::core

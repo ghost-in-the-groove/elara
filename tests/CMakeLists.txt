@@ -33,6 +33,7 @@ elara_add_unit_tests(core
     core/test_entry.cpp
     core/test_drum_entry.cpp
     core/test_entry_effects.cpp
+    core/test_entry_dynamics.cpp
     core/test_validation.cpp
     core/test_performance.cpp
     core/test_retune.cpp
