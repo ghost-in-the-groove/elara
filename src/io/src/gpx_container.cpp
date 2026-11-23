@@ -42,47 +42,53 @@ std::uint32_t le32(std::span<const std::uint8_t> bytes, std::size_t at) {
     return value;
 }
 
-/// Bits from the most significant down, byte after byte.
+/// Bits from the most significant down, byte after byte. Up to eight bytes wait
+/// in a buffer, so most reads take a shift and a mask.
 class BitReader {
 public:
     struct EndOfInput {};
 
     explicit BitReader(std::span<const std::uint8_t> bytes) : bytes_(bytes) {}
 
-    unsigned bit() {
-        if (byte_ >= bytes_.size()) {
-            throw EndOfInput{};
-        }
-        const unsigned value = (static_cast<unsigned>(bytes_[byte_]) >> (7U - bit_)) & 1U;
-        if (++bit_ == 8) {
-            bit_ = 0;
-            ++byte_;
-        }
-        return value;
-    }
+    unsigned bit() { return bits(1); }
 
-    /// `count` bits, the first one the most significant.
+    /// `count` bits (at most 32), the first one the most significant. Throws
+    /// EndOfInput when fewer are left.
     unsigned bits(unsigned count) {
-        unsigned value = 0;
-        for (unsigned i = 0; i < count; ++i) {
-            value = (value << 1U) | bit();
+        if (count > available_) {
+            refill(count);
         }
-        return value;
+        available_ -= count;
+        const std::uint64_t mask = (std::uint64_t{1} << count) - 1U;
+        return static_cast<unsigned>((buffer_ >> available_) & mask);
     }
 
     /// `count` bits, the first one the least significant.
     unsigned bitsReversed(unsigned count) {
-        unsigned value = 0;
+        unsigned value = bits(count);
+        unsigned reversed = 0;
         for (unsigned i = 0; i < count; ++i) {
-            value |= bit() << i;
+            reversed = (reversed << 1U) | (value & 1U);
+            value >>= 1U;
         }
-        return value;
+        return reversed;
     }
 
 private:
+    void refill(unsigned count) {
+        while (available_ <= 56 && byte_ < bytes_.size()) {
+            buffer_ = (buffer_ << 8U) | bytes_[byte_++];
+            available_ += 8;
+        }
+        if (count > available_) {
+            throw EndOfInput{};
+        }
+    }
+
     std::span<const std::uint8_t> bytes_;
     std::size_t byte_ = 0;
-    unsigned bit_ = 0;
+    std::uint64_t buffer_ = 0;
+    unsigned available_ = 0; // bits of buffer_ not read yet, the lowest ones
 };
 
 /// After "BCFZ": the unpacked size (32 bits, little-endian), then chunks. A 0
@@ -110,12 +116,12 @@ std::vector<std::uint8_t> unpack(std::span<const std::uint8_t> packed) {
                 if (offset == 0 || offset > out.size()) {
                     throw damaged("a reference before the start");
                 }
-                const std::size_t from = out.size() - offset;
+                // The copy never reaches the bytes it adds: count <= offset.
+                const std::size_t at = out.size();
                 const std::size_t count = std::min(offset, length);
-                for (std::size_t i = 0; i < count; ++i) {
-                    const std::uint8_t value = out[from + i];
-                    out.push_back(value);
-                }
+                out.resize(at + count);
+                std::copy_n(out.begin() + static_cast<std::ptrdiff_t>(at - offset), count,
+                            out.begin() + static_cast<std::ptrdiff_t>(at));
             } else {
                 const unsigned count = in.bitsReversed(2);
                 for (unsigned i = 0; i < count; ++i) {

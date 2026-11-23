@@ -247,3 +247,32 @@ TEST_CASE("Guitar Pro: other versions and damaged files are errors with a reason
     REQUIRE_FALSE(imported.has_value());
     CHECK(imported.error().message == "Guitar Pro: measure 1 refers to missing rhythm 9");
 }
+
+TEST_CASE("Guitar Pro: the result does not depend on the number of threads", "[io][guitarpro]") {
+    for (const char* name : {"band.gp", "guitar-techniques.gp", "duet.gpx"}) {
+        const auto one = importGuitarProFile(corpusDir() / name, {.threads = 1});
+        const auto many = importGuitarProFile(corpusDir() / name, {.threads = 8});
+        REQUIRE(one.has_value());
+        REQUIRE(many.has_value());
+        CHECK(one->song == many->song);
+        CHECK(one->warnings == many->warnings);
+    }
+
+    // Two tracks, two measures: the second track's first bar and the first
+    // track's second bar name missing voices. The first in reading order wins.
+    const std::string damaged =
+        R"(<GPIF><Score /><Tracks><Track id="0"><Name>A</Name></Track>)"
+        R"(<Track id="1"><Name>B</Name></Track></Tracks><MasterBars>)"
+        "<MasterBar><Time>4/4</Time><Bars>0 1</Bars></MasterBar>"
+        "<MasterBar><Time>4/4</Time><Bars>2 3</Bars></MasterBar></MasterBars><Bars>"
+        R"(<Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar><Bar id="1"><Voices>9</Voices></Bar>)"
+        R"(<Bar id="2"><Voices>8</Voices></Bar><Bar id="3"><Voices>0</Voices></Bar></Bars>)"
+        R"(<Voices><Voice id="0"><Beats>0</Beats></Voice></Voices><Beats><Beat id="0">)"
+        R"(<Rhythm ref="0"/></Beat></Beats><Rhythms><Rhythm id="0"><NoteValue>Whole</NoteValue>)"
+        "</Rhythm></Rhythms></GPIF>";
+    for (const unsigned threads : {1U, 2U}) {
+        const auto imported = importGpif(damaged, {.threads = threads});
+        REQUIRE_FALSE(imported.has_value());
+        CHECK(imported.error().message == "Guitar Pro: measure 1 refers to missing voice 9");
+    }
+}
