@@ -41,6 +41,7 @@ one that replaces them.
 | [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
+| [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
 
 ## Template
 

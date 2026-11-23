@@ -316,6 +316,38 @@ set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
 add_test(NAME cli.edit_rejects_unplayable_transpose
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
 set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+# Retuning (ADR-0046): A2 at the fifth fret of the low string moves to the
+# seventh in drop D; with a capo and the frets kept, G2 at the third fret
+# sounds A2.
+set(ELARA_CLI_RETUNED "${CMAKE_CURRENT_BINARY_DIR}/cli-retuned.elara")
+add_test(NAME cli.edit_tuning
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_RETUNED}" "add-track electric-guitar"
+    "append-measures 1" "note 0 0 6 5 1" "tuning 0 guitar-drop-d")
+set_tests_properties(cli.edit_tuning PROPERTIES
+  FIXTURES_SETUP cli_retuned
+  PASS_REGULAR_EXPRESSION "\"tuning\":\"D2 A2 D3 G3 B3 E4\",\"capo\":0,.*\"undo\":{\"count\":4,\"next\":\"Change tuning\"}")
+add_test(NAME cli.dump_retuned COMMAND elara-cli --json dump "${ELARA_CLI_RETUNED}")
+set_tests_properties(cli.dump_retuned PROPERTIES
+  FIXTURES_REQUIRED cli_retuned
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"A2\",\"string\":6,\"fret\":7}\\]")
+set(ELARA_CLI_CAPO "${CMAKE_CURRENT_BINARY_DIR}/cli-capo.elara")
+add_test(NAME cli.edit_capo_keeping_frets
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CAPO}" "add-track electric-guitar"
+    "append-measures 1" "note 0 0 6 3 1" "tuning 0 capo 2 frets")
+set_tests_properties(cli.edit_capo_keeping_frets PROPERTIES
+  FIXTURES_SETUP cli_capo
+  PASS_REGULAR_EXPRESSION "\"tuning\":\"E2 A2 D3 G3 B3 E4\",\"capo\":2,")
+add_test(NAME cli.dump_capo COMMAND elara-cli --json dump "${ELARA_CLI_CAPO}")
+set_tests_properties(cli.dump_capo PROPERTIES
+  FIXTURES_REQUIRED cli_capo
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"A2\",\"string\":6,\"fret\":3}\\]")
+add_test(NAME cli.edit_rejects_unknown_tuning
+  COMMAND elara-cli edit "add-track electric-guitar" "tuning 0 guitar-banjo-x")
+set_tests_properties(cli.edit_rejects_unknown_tuning PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_unplayable_tuning
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1"
+    "tuning 0 capo 2")
+set_tests_properties(cli.edit_rejects_unplayable_tuning PROPERTIES WILL_FAIL TRUE)
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste
