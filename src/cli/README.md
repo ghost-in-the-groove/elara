@@ -117,7 +117,9 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `paste <m> [track <t>] [insert]`,
 `transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
 `save`. A malformed step exits with 2, a step the song rejects
-(missing track, nothing to undo) with 1.
+(missing track, nothing to undo) with 1. `time` and `key` change the signature
+from measure `m` until the next change of it, as the app does; a step that
+changes nothing adds no undo step.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an

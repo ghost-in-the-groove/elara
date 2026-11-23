@@ -256,22 +256,25 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         const std::size_t count = step.has(2) ? step.index(2) : 1;
         doc.execute(std::make_unique<RemoveMeasures>(step.index(1), count));
     } else if (verb == "time" || verb == "key") {
+        // From the measure until the next change of that signature.
         const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
+        std::unique_ptr<Command> change;
         if (verb == "time") {
             const auto time = TimeSignature::parse(step.word(2));
             if (!time) {
                 throw StepSyntaxError(std::format("not a time signature: {}", step.word(2)));
             }
-            header.timeSignature = *time;
+            change = changeTimeSignature(song, measure, *time);
         } else {
             const auto key = KeySignature::parse(step.rest(2));
             if (!key) {
                 throw StepSyntaxError(std::format("not a key: {}", step.rest(2)));
             }
-            header.keySignature = *key;
+            change = changeKeySignature(song, measure, *key);
         }
-        doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        if (change) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
         core::TrackMix mix{.volume = step.decimal(2), .pan = step.decimal(3)};
         for (std::size_t i = 4; step.has(i); ++i) {

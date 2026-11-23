@@ -163,4 +163,15 @@ private:
     std::vector<std::unique_ptr<Command>> commands_;
 };
 
+/// Changes the time signature from measure `from` until the next measure whose
+/// time signature differs from the one `from` had: what changing it "here"
+/// means in an editor. One undo step; null when nothing would change. Throws
+/// std::out_of_range when the song has no measure `from`.
+[[nodiscard]] std::unique_ptr<Command> changeTimeSignature(const Song& song, std::size_t from,
+                                                           TimeSignature time);
+
+/// The same for the key signature.
+[[nodiscard]] std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from,
+                                                          KeySignature key);
+
 } // namespace elara::core
