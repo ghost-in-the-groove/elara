@@ -18,8 +18,19 @@ ApplicationWindow {
     property bool showSongPane: false
     /// Open the caret's measure once the score is laid out (from the command line).
     property bool showMeasure: false
+    /// Open the first track's tuning in the song panel once there is a score
+    /// (from the command line).
+    property bool showTuning: false
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
+
+    onHasScoreChanged: {
+        if (hasScore && showTuning) {
+            showTuning = false;
+            showSongPane = true;
+            songPane.openTuning(0);
+        }
+    }
     /// What to do once unsaved changes are saved or discarded.
     property var pendingAction: null
     property bool closing: false

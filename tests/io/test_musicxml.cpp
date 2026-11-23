@@ -455,6 +455,54 @@ TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[
     CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 0, 1, 0, 2, 3});
 }
 
+TEST_CASE("MusicXML: signs and jumps become measure marks", "[musicxml]") {
+    // 1 | 2 segno | 3 To Coda | 4 D.S. al Coda | 5 coda | 6, written the ways
+    // notation programs write them: a glyph with a <sound>, text alone, text
+    // with a <sound>, a sign on the barline (ADR-0049).
+    const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";
+    const ImportResult result = parse(onePart(
+        R"(<direction><direction-type><words>dolce</words></direction-type></direction>)" + rest +
+        R"(</measure><measure number="2"><direction placement="above"><direction-type>)"
+        R"(<segno/></direction-type><sound segno="segno"/></direction>)" +
+        rest + R"(</measure><measure number="3">)" + rest +
+        R"(<direction><direction-type><coda/></direction-type><direction-type>)"
+        R"(<words>To Coda</words></direction-type></direction>)"
+        R"(</measure><measure number="4">)" +
+        rest +
+        R"(<direction><direction-type><words>D.S. al Coda</words></direction-type>)"
+        R"(<sound dalsegno="segno"/></direction>)"
+        R"(</measure><measure number="5"><barline location="left"><coda/></barline>)" +
+        rest + R"(</measure><measure number="6">)" + rest));
+    const core::Song& song = result.song;
+    REQUIRE(song.measureCount() == 6);
+    // Other text is still reported; navigation text is not.
+    CHECK(result.warnings.size() == 1);
+    CHECK(hasWarning(result, "text directions dropped", "measure 1"));
+    CHECK(song.measureHeader(1).segno);
+    CHECK(song.measureHeader(2).toCoda);
+    CHECK_FALSE(song.measureHeader(2).coda); // the glyph decorates "To Coda"
+    CHECK(song.measureHeader(3).jump == core::JumpTo::Segno);
+    CHECK(song.measureHeader(3).jumpThen == core::JumpThen::Coda);
+    CHECK(song.measureHeader(4).coda);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 3, 1, 2, 4, 5});
+}
+
+TEST_CASE("MusicXML: a jump given only for playback ends where the song says", "[musicxml]") {
+    // <sound dacapo="yes"/> says where the jump goes, not where it ends: the
+    // song has a Fine, so it is D.C. al Fine.
+    const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";
+    const ImportResult result =
+        parse(onePart(rest + R"(</measure><measure number="2">)" + rest +
+                      R"(<sound fine="yes"/></measure><measure number="3">)" + rest +
+                      R"(<direction><sound dacapo="yes"/></direction>)"));
+    CHECK(result.warnings.empty());
+    const core::Song& song = result.song;
+    CHECK(song.measureHeader(1).fine);
+    CHECK(song.measureHeader(2).jump == core::JumpTo::Start);
+    CHECK(song.measureHeader(2).jumpThen == core::JumpThen::Fine);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 0, 1});
+}
+
 TEST_CASE("MusicXML: a fifth voice on a staff is dropped with a warning", "[musicxml]") {
     std::string measure;
     for (int voice = 1; voice <= 5; ++voice) {
