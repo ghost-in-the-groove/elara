@@ -6,6 +6,7 @@
 #include <elara/core/song.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cmath>
 #include <cstddef>
@@ -14,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+using Catch::Matchers::WithinRel;
 using elara::audio::EventKind;
 using elara::audio::LoggedEvent;
 using elara::audio::OfflineRenderer;
@@ -32,6 +34,7 @@ using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Track;
+using elara::core::TrackMix;
 
 namespace {
 
@@ -93,7 +96,72 @@ Song band() {
     return s;
 }
 
+std::vector<float> render(const Song& s) {
+    const Sequence sequence(s);
+    OfflineRenderer renderer(s, sequence, {.sampleRate = kRate, .tail = 0.5});
+    return renderer.renderRest();
+}
+
+// The left and right channels of interleaved stereo.
+std::pair<std::vector<float>, std::vector<float>> channels(const std::vector<float>& stereo) {
+    std::pair<std::vector<float>, std::vector<float>> result;
+    for (std::size_t i = 0; i + 1 < stereo.size(); i += 2) {
+        result.first.push_back(stereo[i]);
+        result.second.push_back(stereo[i + 1]);
+    }
+    return result;
+}
+
 } // namespace
+
+// The fader is a gain of (volume / 0.8)^2 and the pan keeps the power
+// constant, unity in the centre (ADR-0020). A soft note keeps every level
+// below the limiter's knee, where the mix is linear.
+TEST_CASE("OfflineRenderer: the track mix sets each track's level and place",
+          "[audio][render][mix]") {
+    Song s = song({track("Organ", InstrumentKind::Keyboard, 16)}, 1);
+    beats(s, 0, 0) = {beat(NoteValue::Whole, {60}, Dynamic::P)};
+    const auto [left, right] = channels(render(s));
+    REQUIRE(left == right);
+    const float peak = peakLevel(left);
+    REQUIRE(peak > 0.01f);
+    REQUIRE(peak * 1.6f < 0.75f);
+
+    s.track(0).setMix(TrackMix{.pan = -1.0});
+    const auto [hardLeft, silentRight] = channels(render(s));
+    CHECK(peakLevel(silentRight) == 0.0f);
+    CHECK_THAT(peakLevel(hardLeft), WithinRel(peak * std::sqrt(2.0f), 1e-5f));
+
+    s.track(0).setMix(TrackMix{.pan = 0.5});
+    const auto [softLeft, loudRight] = channels(render(s));
+    CHECK_THAT(peakLevel(softLeft), WithinRel(peak * std::sqrt(2.0f) * std::cos(0.375f * 3.14159265f), 1e-4f));
+    CHECK_THAT(peakLevel(loudRight), WithinRel(peak * std::sqrt(2.0f) * std::sin(0.375f * 3.14159265f), 1e-4f));
+
+    s.track(0).setMix(TrackMix{.volume = 0.4});
+    CHECK_THAT(peakLevel(render(s)), WithinRel(peak / 4.0f, 1e-5f));
+    s.track(0).setMix(TrackMix{.volume = 1.0});
+    CHECK_THAT(peakLevel(render(s)), WithinRel(peak * 1.5625f, 1e-5f));
+    s.track(0).setMix(TrackMix{.volume = 0.0});
+    CHECK(peakLevel(render(s)) == 0.0f);
+    s.track(0).setMix(TrackMix{.mute = true});
+    CHECK(peakLevel(render(s)) == 0.0f);
+}
+
+TEST_CASE("OfflineRenderer: soloed tracks play alone, as loud as with the others",
+          "[audio][render][mix]") {
+    Song soloed = band();
+    soloed.track(1).setMix(TrackMix{.solo = true});
+    Song othersMuted = band();
+    othersMuted.track(0).setMix(TrackMix{.mute = true});
+    othersMuted.track(2).setMix(TrackMix{.mute = true});
+    const std::vector<float> bass = render(soloed);
+    CHECK(bass == render(othersMuted));
+    CHECK(bass != render(band()));
+    CHECK(peakLevel(bass) > 0.0f);
+    // A muted soloed track is silent too, and the others stay quiet.
+    soloed.track(1).setMix(TrackMix{.mute = true, .solo = true});
+    CHECK(peakLevel(render(soloed)) == 0.0f);
+}
 
 TEST_CASE("OfflineRenderer: every event is dispatched at its time in frames", "[audio][render]") {
     Song s = song({track("Piano", InstrumentKind::Keyboard, 0)}, 2);

@@ -32,6 +32,7 @@ using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Track;
+using elara::core::TrackMix;
 
 namespace {
 
@@ -85,6 +86,20 @@ std::vector<float> play(Player& player, double seconds, std::size_t block = 480)
     return left;
 }
 
+// Renders `seconds` of both channels in blocks of `block` frames.
+std::pair<std::vector<float>, std::vector<float>> playStereo(Player& player, double seconds,
+                                                             std::size_t block = 480) {
+    const auto frames = static_cast<std::size_t>(std::lround(seconds * kRate));
+    std::pair<std::vector<float>, std::vector<float>> out{std::vector<float>(frames),
+                                                          std::vector<float>(frames)};
+    for (std::size_t done = 0; done < frames; done += block) {
+        const std::size_t n = std::min(block, frames - done);
+        player.render(std::span<float>(out.first).subspan(done, n),
+                      std::span<float>(out.second).subspan(done, n));
+    }
+    return out;
+}
+
 std::span<const float> between(const std::vector<float>& samples, double from, double to) {
     const auto first = static_cast<std::size_t>(std::lround(from * kRate));
     const auto last = static_cast<std::size_t>(std::lround(to * kRate));
@@ -121,6 +136,71 @@ TEST_CASE("Player: plays what the offline renderer renders", "[audio][player]") 
     CHECK(live == offline);
     CHECK_FALSE(player.isPlaying()); // the end of the song
     CHECK_THAT(player.position(), WithinAbs(4.0, kFrame));
+}
+
+TEST_CASE("Player: plays the track mix as the offline renderer does", "[audio][player][mix]") {
+    Song s = song(2, 60);
+    s.track(0).setMix(TrackMix{.volume = 0.6, .pan = -0.5});
+    s.track(1).setMix(TrackMix{.volume = 1.0, .pan = 0.75});
+    const Sequence sequence(s);
+    OfflineRenderer renderer(s, sequence, {.sampleRate = kRate, .tail = 0.0});
+    const std::vector<float> stereo = renderer.renderRest();
+    std::vector<float> offlineLeft;
+    std::vector<float> offlineRight;
+    for (std::size_t i = 0; i + 1 < stereo.size(); i += 2) {
+        offlineLeft.push_back(stereo[i]);
+        offlineRight.push_back(stereo[i + 1]);
+    }
+
+    Player player(kRate, 256);
+    player.load(s, sequence);
+    player.play();
+    const auto [left, right] = playStereo(player, 4.0, 1000);
+    CHECK(left == offlineLeft);
+    CHECK(right == offlineRight);
+    CHECK(left != right);
+}
+
+// A mixer moves faders while the song plays: the player takes the new levels
+// without loading the song again, ramping over one block so nothing clicks.
+TEST_CASE("Player: a mix change takes over within a block, without reloading",
+          "[audio][player][mix]") {
+    Song s = song(2, 60);
+    Player player(kRate);
+    player.load(s, Sequence(s));
+    player.play();
+    const auto [before, beforeRight] = playStereo(player, 0.5);
+    REQUIRE(peakLevel(between(before, 0.4, 0.5)) > 0.0f);
+
+    Song muted = s;
+    muted.track(0).setMix(TrackMix{.mute = true});
+    muted.track(1).setMix(TrackMix{.mute = true});
+    player.updateMix(muted);
+    const auto [ramp, rampRight] = playStereo(player, 480 * kFrame);
+    CHECK(std::abs(ramp.front()) > 0.0f); // still almost at the old level
+    CHECK(ramp.back() == 0.0f);
+    const auto [silent, silentRight] = playStereo(player, 0.5);
+    CHECK(peakLevel(silent) == 0.0f);
+    CHECK(peakLevel(silentRight) == 0.0f);
+    CHECK(player.isPlaying());
+    CHECK_THAT(player.position(), WithinAbs(1.0 + (480 * kFrame), kFrame));
+
+    // A song with other tracks is not the loaded one: ignored.
+    Song other = muted;
+    other.addTrack(Track("Organ", Instrument{.kind = InstrumentKind::Keyboard}, {Staff{}}));
+    other.track(0).setMix(TrackMix{});
+    player.updateMix(other);
+    CHECK(peakLevel(playStereo(player, 0.2).first) == 0.0f);
+
+    // Hard left: the right channel goes quiet, the left plays on.
+    Song left = s;
+    left.track(0).setMix(TrackMix{.pan = -1.0});
+    left.track(1).setMix(TrackMix{.pan = -1.0});
+    player.updateMix(left);
+    (void)playStereo(player, 480 * kFrame);
+    const auto [loud, quiet] = playStereo(player, 0.5);
+    CHECK(peakLevel(loud) > 0.0f);
+    CHECK(peakLevel(quiet) == 0.0f);
 }
 
 TEST_CASE("Player: a pause holds the position and lets the notes ring out", "[audio][player]") {
