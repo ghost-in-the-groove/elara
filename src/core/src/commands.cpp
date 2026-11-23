@@ -96,11 +96,26 @@ void SetMeasureHeader::apply(Song& song) {
     const bool time = target.timeSignature != header_.timeSignature;
     const bool key = target.keySignature != header_.keySignature;
     const bool tempo = target.tempoChanges != header_.tempoChanges;
-    if (time && !key && !tempo) {
+    // The target with the new signs and jumps: equal to the new header when
+    // nothing else changes.
+    MeasureHeader marks = target;
+    marks.segno = header_.segno;
+    marks.segnoSegno = header_.segnoSegno;
+    marks.coda = header_.coda;
+    marks.doubleCoda = header_.doubleCoda;
+    marks.fine = header_.fine;
+    marks.toCoda = header_.toCoda;
+    marks.toDoubleCoda = header_.toDoubleCoda;
+    marks.jump = header_.jump;
+    marks.jumpThen = header_.jumpThen;
+    const bool navigation = marks != target;
+    if (navigation && marks == header_) {
+        name_ = "Change navigation marks";
+    } else if (!navigation && time && !key && !tempo) {
         name_ = "Change time signature";
-    } else if (key && !time && !tempo) {
+    } else if (!navigation && key && !time && !tempo) {
         name_ = "Change key signature";
-    } else if (tempo && !time && !key) {
+    } else if (!navigation && tempo && !time && !key) {
         name_ = "Change tempo";
     }
     std::swap(target, header_);

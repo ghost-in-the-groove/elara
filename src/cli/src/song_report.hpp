@@ -5,10 +5,12 @@
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace elara::cli {
@@ -18,7 +20,29 @@ namespace elara::cli {
 /// null without strings).
 [[nodiscard]] std::string tracksJson(const core::Song& song);
 
-/// `[{"time":"4/4","key":"C major"}, ...]`, one entry per measure.
+/// A navigation mark of a measure (ADR-0049) as files and steps name it.
+struct SignName {
+    std::string_view name;
+    bool core::MeasureHeader::* flag;
+};
+inline constexpr std::array kSignNames{
+    SignName{"segno", &core::MeasureHeader::segno},
+    SignName{"segno-segno", &core::MeasureHeader::segnoSegno},
+    SignName{"coda", &core::MeasureHeader::coda},
+    SignName{"double-coda", &core::MeasureHeader::doubleCoda},
+    SignName{"fine", &core::MeasureHeader::fine},
+    SignName{"to-coda", &core::MeasureHeader::toCoda},
+    SignName{"to-double-coda", &core::MeasureHeader::toDoubleCoda},
+};
+/// Names of core::JumpTo and core::JumpThen, by value.
+inline constexpr std::array kJumpToNames =
+    std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
+inline constexpr std::array kJumpThenNames =
+    std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
+
+/// `[{"time":"4/4","key":"C major"}, ...]`, one entry per measure, with
+/// `"signs":["segno","to-coda"]`, `"jump":"dal-segno"` and `"jumpThen":"al-coda"`
+/// where the measure has them.
 [[nodiscard]] std::string measuresJson(const core::Song& song);
 
 /// `[{"kind":"voice-incomplete","track":0,...,"beat":null,"note":null}, ...]`

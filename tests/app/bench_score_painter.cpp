@@ -56,4 +56,17 @@ TEST_CASE("Painting benchmarks", "[!benchmark][app][.]") {
     BENCHMARK("paint an A4 page of the 20-staff score at 100 %, high density") {
         return painter.render(full, 6.6, 2.0);
     };
+
+    // What a page left as it was by a relayout costs instead of a paint.
+    const auto pagesAgain = elara::notation::layoutPages(
+        song, both, *metrics, elara::notation::pageOptions(elara::notation::kA4));
+    const auto scoreAgain = elara::notation::layoutPages(
+        song, score, *metrics, elara::notation::pageOptions(elara::notation::kA4));
+    REQUIRE(pagesAgain.at(1) == page);
+    BENCHMARK("compare the page of notation and tablature with the same page laid out again") {
+        return pagesAgain.at(1) == page;
+    };
+    BENCHMARK("compare the page of all 20 staves with the same page laid out again") {
+        return scoreAgain.at(1) == full;
+    };
 }
