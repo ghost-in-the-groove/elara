@@ -167,6 +167,21 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
                                                         {.position = 100, .cents = 0}}));
 }
 
+TEST_CASE("Guitar Pro 5: directions become signs and jumps", "[io][guitarpro]") {
+    // 1 | 2 segno | 3 da coda | 4 D.S. al Coda | 5 coda | 6 (ADR-0049)
+    const ImportResult result = load("dal-segno.gp5");
+    const core::Song& song = result.song;
+    CHECK(result.warnings.empty());
+    CHECK(song.measureHeader(1).segno);
+    CHECK(song.measureHeader(2).toCoda);
+    CHECK(song.measureHeader(3).jump == core::JumpTo::Segno);
+    CHECK(song.measureHeader(3).jumpThen == core::JumpThen::Coda);
+    CHECK(song.measureHeader(4).coda);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 3, 1, 2, 4, 5});
+    // Nothing else: the other measures carry no marks.
+    CHECK(song.measureHeader(0) == song.measureHeader(5));
+}
+
 TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
           "[io][guitarpro]") {
     const ImportResult result = load("quartet.gp4");
