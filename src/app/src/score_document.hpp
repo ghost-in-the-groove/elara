@@ -47,10 +47,10 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QStringList nameFilters READ nameFilters CONSTANT)
 
 public:
-    enum class Status : std::uint8_t { Empty, Loading, Ready, Error };
+    enum class Status : quint8 { Empty, Loading, Ready, Error };
     Q_ENUM(Status)
     /// How the shown tracks are drawn (notation::TrackView).
-    enum class View : std::uint8_t { Standard, Tablature, Both };
+    enum class View : quint8 { Standard, Tablature, Both };
     Q_ENUM(View)
 
     /// `track` for every track of the song at once.

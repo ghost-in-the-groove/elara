@@ -87,7 +87,9 @@ double inkShare(const QImage& image) {
     std::size_t ink = 0;
     for (int y = 0; y < image.height(); ++y) {
         for (int x = 0; x < image.width(); ++x) {
-            ink += qGray(image.pixel(x, y)) < 128 ? 1 : 0;
+            if (qGray(image.pixel(x, y)) < 128) {
+                ++ink;
+            }
         }
     }
     return static_cast<double>(ink) / (static_cast<double>(image.width()) * image.height());
