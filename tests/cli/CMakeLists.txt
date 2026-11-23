@@ -343,7 +343,8 @@ file(GLOB _corpus_files CONFIGURE_DEPENDS
   "${ELARA_CORPUS}/musicxml/*.mxl"
   "${ELARA_CORPUS}/midi/*.mid"
   "${ELARA_CORPUS}/gp/*.gp"
-  "${ELARA_CORPUS}/gp/*.gp[345]")
+  "${ELARA_CORPUS}/gp/*.gp[345]"
+  "${ELARA_CORPUS}/gp/*.gpx")
 foreach(_file IN LISTS _corpus_files)
   file(RELATIVE_PATH _relative "${ELARA_CORPUS}" "${_file}")
   string(REGEX REPLACE "\.[^./]+$" "" _name "${_relative}")

@@ -26,7 +26,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | Module | Target | Responsibility | Milestone |
 |---|---|---|---|
 | `src/core` | `elara_core` | Musical model, commands with undo/redo | 1 |
-| `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-5 and 7-8 import (ADR-0010) | 1, 2 |
+| `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-8 import (ADR-0010) | 1, 2 |
 | `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of staff and tablature into a display list, SVG output (ADR-0012) | 3 |
 | `src/audio` | `elara_audio` | Real-time-safe DSP, sequencer, offline rendering, WAV | 0, 4 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE; synths (FluidSynth, sfizz) | 0, 4 |
