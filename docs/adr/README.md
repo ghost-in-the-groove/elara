@@ -40,6 +40,7 @@ one that replaces them.
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
+| [0042](0042-tempo-marks.md) | Tempo marks | Accepted |
 
 ## Template
 

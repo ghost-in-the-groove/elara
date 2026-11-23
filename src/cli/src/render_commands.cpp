@@ -193,9 +193,12 @@ std::string displayListJson(const notation::DisplayList& list) {
     json += R"(],"glyphs":[)";
     for (std::size_t i = 0; i < list.glyphs.size(); ++i) {
         const auto& item = list.glyphs[i];
-        json += std::format(R"({}{{"glyph":"{}","role":"{}","measure":{},"at":{}}})",
+        const std::string scale = item.scale == 1.0
+                                      ? std::string()
+                                      : std::format(R"(,"scale":{})", jsonNumber(item.scale));
+        json += std::format(R"({}{{"glyph":"{}","role":"{}","measure":{},"at":{}{}}})",
                             i == 0 ? "" : ",", notation::glyphName(item.glyph), roleName(item.role),
-                            item.measure, point(item.origin));
+                            item.measure, point(item.origin), scale);
     }
     json += R"(],"lines":[)";
     for (std::size_t i = 0; i < list.lines.size(); ++i) {
