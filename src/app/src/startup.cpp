@@ -549,6 +549,10 @@ void Startup::tick() {
         finish(false, editProblem_);
         return;
     }
+    if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
+        finish(false, overlap);
+        return;
+    }
     QString detail;
     if (score_ != nullptr && score_->pageCount() > 0) {
         std::printf("pages kept: %d\n", ScorePage::keptCount());
@@ -588,6 +592,26 @@ void Startup::clickCursor() {
                        .arg(audio->position())
                        .arg(expected);
     }
+}
+
+// The bars that float over the bottom of the score, the transport and the
+// note entry bar shown with the caret, must not cover each other.
+QString Startup::overlappingBars() const {
+    auto* transport = window_->findChild<QQuickItem*>(QStringLiteral("transport"));
+    auto* entry = window_->findChild<QQuickItem*>(QStringLiteral("entryBar"));
+    if (transport == nullptr || entry == nullptr) {
+        return QStringLiteral("no transport or note entry bar");
+    }
+    if (!transport->isVisible() || !entry->isVisible()) {
+        return {};
+    }
+    const auto sceneRect = [](const QQuickItem* item) {
+        return item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
+    };
+    if (sceneRect(transport).intersects(sceneRect(entry))) {
+        return QStringLiteral("the note entry bar overlaps the transport");
+    }
+    return {};
 }
 
 void Startup::finish(bool ok, const QString& detail) {
