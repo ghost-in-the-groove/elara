@@ -344,18 +344,44 @@ void TechniqueLanes::place(DisplayList& list, double top) {
 StaffWriter::StaffWriter(const EngravingFont& font, double height, std::size_t lines)
     : font_(font), defaults_(font.defaults()), height_(height), lines_(lines) {}
 
-double StaffWriter::barline(std::size_t m, double x, bool songEnd) {
+double StaffWriter::barline(std::size_t m, double x, bool songEnd, bool repeatEnd) {
     measure_ = m;
+    if (repeatEnd) {
+        x = repeatDots(x) + defaults_.repeatBarlineDotSeparation;
+    }
     const double thin = defaults_.thinBarlineThickness;
     line({x + thin / 2, 0.0}, {x + thin / 2, height_}, thin, Role::Barline);
     x += thin;
-    if (songEnd) {
+    if (songEnd || repeatEnd) {
         const double thick = defaults_.thickBarlineThickness;
         x += defaults_.thinThickBarlineSeparation;
         line({x + thick / 2, 0.0}, {x + thick / 2, height_}, thick, Role::Barline);
         x += thick;
     }
     return x;
+}
+
+double StaffWriter::opening(std::size_t m, double x) {
+    measure_ = m;
+    const double thick = defaults_.thickBarlineThickness;
+    line({x + thick / 2, 0.0}, {x + thick / 2, height_}, thick, Role::Barline);
+    x += thick + defaults_.thinThickBarlineSeparation;
+    const double thin = defaults_.thinBarlineThickness;
+    line({x + thin / 2, 0.0}, {x + thin / 2, height_}, thin, Role::Barline);
+    return repeatDots(x + thin + defaults_.repeatBarlineDotSeparation);
+}
+
+double StaffWriter::repeatDots(double x) {
+    // In the two spaces around the middle line, or either side of the middle
+    // space when there are an odd number of them (tablature).
+    const std::size_t spaces = lines_ > 1 ? lines_ - 1 : 0;
+    const double spacing = spaces > 0 ? height_ / static_cast<double>(spaces) : 1.0;
+    const double offset = spaces % 2 == 0 ? spacing / 2 : spacing;
+    const double middle = height_ / 2;
+    const double centre = x + widthOf(Glyph::RepeatDot) / 2;
+    glyphCentred(Glyph::RepeatDot, centre, middle - offset, Role::Repeat);
+    glyphCentred(Glyph::RepeatDot, centre, middle + offset, Role::Repeat);
+    return x + widthOf(Glyph::RepeatDot);
 }
 
 DisplayList StaffWriter::finish(double width) {
