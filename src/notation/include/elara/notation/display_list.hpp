@@ -42,9 +42,10 @@ enum class Role : std::uint8_t {
     TrackName,     ///< the name of a track left of its staves in the first system
     Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
     Volta,         ///< the bracket and numbers of an alternate ending
+    Tuplet,        ///< the number of a tuplet and its bracket
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Volta) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Tuplet) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

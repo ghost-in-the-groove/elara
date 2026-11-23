@@ -83,6 +83,7 @@
 <text class="notehead" x="33.883" y="30.599" stroke="none">&#xE0A4;</text>
 <text class="accidental" x="32.687" y="30.599" stroke="none">&#xE262;</text>
 <text class="notehead" x="39.593" y="25.599" stroke="none">&#xE0A4;</text>
+<text class="tuplet" x="27.03" y="29.042" stroke="none">&#xE883;</text>
 <text class="repeat" x="46.006" y="30.599" stroke="none">&#xE044;</text>
 <text class="repeat" x="46.006" y="31.599" stroke="none">&#xE044;</text>
 <text class="notehead" x="47.606" y="30.099" stroke="none">&#xE0A3;</text>
