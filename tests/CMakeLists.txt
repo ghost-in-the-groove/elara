@@ -107,11 +107,11 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 7 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 9 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 13 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 15 layouts\\)")
   set_tests_properties(app.smoke_open_views PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 10 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # The UI in Spanish: the catalog compiled into the executable loads and the

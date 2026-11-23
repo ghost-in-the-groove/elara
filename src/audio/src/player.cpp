@@ -100,6 +100,18 @@ void Player::updateMix(const core::Song& song) noexcept {
     }
 }
 
+void Player::updateMix(std::span<const core::TrackMix> mixes) noexcept {
+    if (latest_ == nullptr || mixes.size() != latest_->tracks.size()) {
+        return;
+    }
+    const bool anySolo =
+        std::ranges::any_of(mixes, [](const core::TrackMix& mix) { return mix.solo; });
+    for (std::size_t t = 0; t < mixes.size(); ++t) {
+        latest_->setLevel(t,
+                          detail::levelOf(mixes[t], mixes[t].audible(anySolo), latest_->headroom));
+    }
+}
+
 void Player::play() noexcept {
     if (position() >= duration_) {
         seek(0.0);

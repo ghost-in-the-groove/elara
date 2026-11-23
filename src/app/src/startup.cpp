@@ -70,6 +70,7 @@ void Startup::queueSteps() {
                 return true;
             });
             queueEdits();
+            queueMix();
         }
         return;
     }
@@ -98,6 +99,7 @@ void Startup::queueSteps() {
             return true;
         });
         queueEdits();
+        queueMix();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -190,6 +192,48 @@ void Startup::queueEdits() {
         }
         score_->setTrack(0);
         return true;
+    });
+}
+
+// The mixer (ADR-0039): a fader previewed without changing the song, then the
+// first track's mix set, soloed, as one undo step that keeps what playback
+// plays and silences the other tracks. Undone, the song must end as it started.
+void Startup::queueMix() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("mix check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        sequenceBefore_ = score_->sequence();
+        const auto tracks = static_cast<std::size_t>(score_->tracks().size());
+        score_->previewTrackMix(0, 0.25, 0.5);
+        check(score_->previewMixes().size() == tracks &&
+                  score_->previewMixes().front().volume == 0.25 && !score_->modified(),
+              "the fader preview changed the song");
+        score_->setTrackMix(0, 0.25, -0.5, false, true);
+        const QVariantMap first = score_->tracks().front().toMap();
+        check(first.value(QStringLiteral("volume")).toDouble() == 0.25 &&
+                  first.value(QStringLiteral("pan")).toDouble() == -0.5 &&
+                  first.value(QStringLiteral("solo")).toBool(),
+              "the mix was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change mix"), "the mix is not undoable");
+        check(score_->sequence() == sequenceBefore_, "a mix change stops playback");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantList tracks = score_->tracks();
+        check(tracks.size() < 2 || !tracks.at(1).toMap().value(QStringLiteral("audible")).toBool(),
+              "the solo did not silence the other tracks");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() &&
+                  !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
+              "undoing the mix did not restore the song");
+        sequenceBefore_.reset();
+        return false;
     });
 }
 
