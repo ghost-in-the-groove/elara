@@ -19,6 +19,7 @@ endfunction()
 elara_add_unit_tests(core
   SOURCES
     core/test_version.cpp
+    core/test_clipboard.cpp
     core/test_fraction.cpp
     core/test_duration.cpp
     core/test_pitch.cpp
