@@ -182,6 +182,22 @@
         <translation>Suelta para abrir</translation>
     </message>
     <message>
+        <source>Back to the start (Home)</source>
+        <translation>Volver al principio (Inicio)</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Pausa</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Reproducir</translation>
+    </message>
+    <message>
+        <source> (Space)</source>
+        <translation> (Espacio)</translation>
+    </message>
+    <message>
         <source>Page %1 of %2</source>
         <translation>Página %1 de %2</translation>
     </message>
@@ -705,6 +721,10 @@
     <message>
         <source>Save the window as an image once shown, and quit.</source>
         <translation>Guardar la ventana como imagen en cuanto se muestre, y salir.</translation>
+    </message>
+    <message>
+        <source>Move the playback cursor to this many seconds.</source>
+        <translation>Mueve el cursor de reproducción a esos segundos.</translation>
     </message>
     <message>
         <source>Open the tuner at start.</source>

@@ -134,6 +134,9 @@ void shift(DisplayList& list, double dx, double dy) {
     for (MeasureBox& measure : list.measures) {
         measure.x += dx;
         measure.y += dy;
+        for (MeasureOnset& onset : measure.onsets) {
+            onset.x += dx;
+        }
     }
     for (ColumnBox& column : list.columns) {
         column.x += dx;

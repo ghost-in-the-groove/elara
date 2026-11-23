@@ -19,6 +19,7 @@ endfunction()
 elara_add_unit_tests(core
   SOURCES
     core/test_version.cpp
+    core/test_clipboard.cpp
     core/test_fraction.cpp
     core/test_duration.cpp
     core/test_pitch.cpp
@@ -30,6 +31,7 @@ elara_add_unit_tests(core
     core/test_document.cpp
     core/test_effects.cpp
     core/test_entry.cpp
+    core/test_drum_entry.cpp
     core/test_validation.cpp
     core/test_performance.cpp
     core/test_transpose.cpp
@@ -51,7 +53,7 @@ elara_add_unit_tests(io
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 elara_add_unit_tests(notation
-  SOURCES notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
+  SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
   LIBRARIES elara::notation)

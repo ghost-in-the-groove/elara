@@ -215,6 +215,52 @@ add_test(NAME cli.edit_deletes_at_the_caret
 set_tests_properties(cli.edit_deletes_at_the_caret PROPERTIES
   PASS_REGULAR_EXPRESSION "\"beats\":0,\"notes\":0}.*\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":1,\"freeSlot\":true},\"input\":\"2\",\"undo\":{\"count\":6,\"next\":\"Delete\"}")
 
+# Note names (ADR-0034): each in the octave nearest the previous note, a chord
+# note above the highest, then a semitone down; on tablature the caret moves to
+# the string that reaches the note.
+set(ELARA_CLI_NAMES "${CMAKE_CURRENT_BINARY_DIR}/cli-note-names.elara")
+add_test(NAME cli.edit_types_note_names
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_NAMES}" "add-track flute" "append-measures 1"
+    "caret 0 0 0" "pitch C" right "pitch E" "pitch G add" right "pitch A" "shift -1")
+set_tests_properties(cli.edit_types_note_names PROPERTIES
+  FIXTURES_SETUP cli_note_names
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":2,\"string\":1,\"freeSlot\":false},\"input\":\"4\",\"undo\":{\"count\":7,\"next\":\"Change pitch\"}")
+add_test(NAME cli.dump_note_names COMMAND elara-cli --json dump "${ELARA_CLI_NAMES}")
+set_tests_properties(cli.dump_note_names PROPERTIES
+  FIXTURES_REQUIRED cli_note_names
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G5\"},{\"pitch\":\"E5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G#5\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_note_name_on_tablature
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
+    "pitch A")
+set_tests_properties(cli.edit_note_name_on_tablature PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":0,\"string\":3,\"freeSlot\":false}")
+add_test(NAME cli.edit_rejects_note_name_on_drums
+  COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "pitch C")
+add_test(NAME cli.edit_rejects_unknown_note_name
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch H")
+set_tests_properties(cli.edit_rejects_note_name_on_drums cli.edit_rejects_unknown_note_name
+  PROPERTIES WILL_FAIL TRUE)
+
+# Drum entry (ADR-0035): a bass drum, a closed hi-hat and a snare on the first
+# beat, the hi-hat toggled off from its lane, then a snare on the second beat.
+set(ELARA_CLI_DRUMS "${CMAKE_CURRENT_BINARY_DIR}/cli-drums.elara")
+add_test(NAME cli.edit_types_drums
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DRUMS}" "add-track drum-kit" "append-measures 1"
+    "caret 0 0 0" "drum 36" "drum 42" "drum 38" "caret 0 0 0 2" drum right "drum 38")
+set_tests_properties(cli.edit_types_drums PROPERTIES
+  FIXTURES_SETUP cli_drums
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":1,\"string\":8,\"freeSlot\":false}")
+add_test(NAME cli.dump_drums COMMAND elara-cli --json dump "${ELARA_CLI_DRUMS}")
+set_tests_properties(cli.dump_drums PROPERTIES
+  FIXTURES_REQUIRED cli_drums
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"},{\"pitch\":\"C2\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D2\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_rejects_drum_on_guitar
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" drum)
+add_test(NAME cli.edit_rejects_drum_without_lane
+  COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
+set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
+  PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
@@ -249,6 +295,24 @@ set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
 add_test(NAME cli.edit_rejects_unplayable_transpose
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
 set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+# Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
+# pasted into a new measure before the first, bringing its time signature.
+add_test(NAME cli.edit_copy_paste
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "note 0 0 6 3 1"
+    "copy 0 1" "paste 1")
+set_tests_properties(cli.edit_copy_paste PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":2,\"notes\":2}\\],\"measureCount\":2,.*\"undo\":{\"count\":4,\"next\":\"Paste\"}")
+add_test(NAME cli.edit_paste_insert
+  COMMAND elara-cli --json edit "add-track electric-guitar" "add-track flute" "append-measures 2"
+    "time 1 3/4" "note 0 1 6 3 2." "copy 1 1 track 0" "paste 0 insert")
+set_tests_properties(cli.edit_paste_insert PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"name\":\"Electric Guitar\",.*\"beats\":2,\"notes\":2}.*\"measureCount\":3,\"measures\":\\[{\"time\":\"3/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"3/4\",\"key\":\"C major\"}\\]")
+add_test(NAME cli.edit_rejects_paste_without_copy
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "paste 0")
+set_tests_properties(cli.edit_rejects_paste_without_copy PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_malformed_copy
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "copy 0 1 tracks 0")
+set_tests_properties(cli.edit_rejects_malformed_copy PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_malformed_transpose
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "transpose 2 bars 1")
 set_tests_properties(cli.edit_rejects_malformed_transpose PROPERTIES WILL_FAIL TRUE)
@@ -561,6 +625,17 @@ add_test(NAME cli.sequence_events
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --notes --events)
 set_tests_properties(cli.sequence_events PROPERTIES
   PASS_REGULAR_EXPRESSION "\"duration\":8\\.4,.*\"notes\":\\[{\"track\":0,\"staff\":0,\"voice\":0,\"pass\":0,\"start\":0,\"end\":0\\.6,\"key\":60,\"velocity\":80},.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"time\":0\\.6,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"time\":0\\.6,\"kind\":\"on\",\"track\":0,\"key\":62,")
+# Articulations (ADR-0022): the palm mute, the natural harmonic that rings
+# until its string is struck again in the next pass, the accented dead note
+# (ff 112 + 16, at most 127) and the staccato note (half of 1.125 s).
+add_test(NAME cli.sequence_articulations
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
+set_tests_properties(cli.sequence_articulations PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+add_test(NAME cli.render_audio_touches
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
+set_tests_properties(cli.render_audio_touches PROPERTIES
+  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  80  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
@@ -591,3 +666,27 @@ set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL 
 add_test(NAME cli.play_rejects_missing_file
   COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+# The playback cursor: guitar-techniques.gp plays measures 1 2 1 2 1 3, about
+# 2.5 s each, so 6 s is in the third measure played, the first one written.
+add_test(NAME cli.render_cursor_in_a_repeat
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --cursor-at 6)
+set_tests_properties(cli.render_cursor_in_a_repeat PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"cursor\":{\"seconds\":6,\"played\":2,\"measure\":0,\"page\":0,\"x\":[0-9.]+,\"y\":[0-9.]+,\"height\":4},\"pages\":\\[")
+add_test(NAME cli.render_cursor_after_the_end
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --cursor-at 99)
+set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
+  PASS_REGULAR_EXPRESSION "cursor at 99 s: after the end")
+
+# A click where the cursor stood at 6 s (the second time through measure 1)
+# starts playback on the same column the first time through: at 1 s.
+add_test(NAME cli.render_time_at_a_note
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --time-at 0 27.7 28)
+set_tests_properties(cli.render_time_at_a_note PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":27.7,\"y\":28,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+add_test(NAME cli.render_time_at_nothing
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
+set_tests_properties(cli.render_time_at_nothing PROPERTIES
+  PASS_REGULAR_EXPRESSION "time at page 1, x 1, y 1: no measure there")

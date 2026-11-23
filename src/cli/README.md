@@ -29,6 +29,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT]
+                           [--cursor-at SECONDS] [--time-at PAGE X Y]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -91,6 +92,16 @@ beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `font
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
 several.
 
+The playback cursor and clicks on the score (the app's transport): with
+`--cursor-at SECONDS`, `--json` adds `"cursor": {"seconds", "played",
+"measure", "page", "x", "y", "height"}` before the display lists: the measure
+played then (`played` counts repeats, `measure` is the written one) and the
+line across its system, standing on each column of notes as it starts; `null`
+after the end. `--time-at PAGE X Y` (the page from 0, x and y as the cursor
+gives them) adds `"timeAt": {"page", "x", "y", "measure", "seconds"}`: where a
+click there starts playback, on the column of notes under it the first time
+its measure plays; `measure` and `seconds` are `null` away from every measure.
+
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
 validation issues and the undo/redo state:
@@ -104,11 +115,21 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
-`fill <track> <m>`, `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
-`undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
+`fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
+`paste <m> [track <t>] [insert]`,
+`transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
+
+`copy` keeps `n` measures from `m` of every track, or of `count` tracks from
+`t` (one when `count` is left out), for later `paste` steps; it is not an
+undoable edit. `paste` puts them over the measures from `m` of track `t` and
+the tracks after it, appending measures past the end, or into new measures
+before `m` with the copied time and key signatures (`insert`). Fretted notes
+find strings again on another tuning or capo, and lose their frets on a staff
+without one; drums paste only into drum tracks (ADR-0027).
 
 `transpose` moves pitched notes up (or down, when negative) by that many
 semitones, over every measure or `n` measures from `m`, of every track or the
@@ -122,10 +143,17 @@ Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
 `caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
 `next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
 string (adding a beat of the input duration on the free slot after the last
-beat of a short measure), `duration <d>` sets the input duration and the
-caret beat's, `delete` removes the note on the caret's string (or the rest),
-`delete-beat` the whole beat, and `insert-rest` adds a rest before it. The
-output includes `"caret"` and `"input"`.
+beat of a short measure), `pitch <C..B> [add]` types a note name in the
+octave nearest the previous note (with `add`, above the beat's highest note;
+on tablature on the nearest string that reaches it, ADR-0034), `shift
+<semitones>` moves the caret's note, `duration <d>` sets the input duration and
+the caret beat's, `delete` removes the note on the caret's string (on a staff
+without strings, the beat's notes; on a rest, the rest), `delete-beat` the
+whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
+caret's string is a drum lane, from the crash at the top to the hi-hat pedal
+(ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
+that General MIDI key's lane (moving the caret to it), and `delete` removes the
+lane's piece only. The output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
