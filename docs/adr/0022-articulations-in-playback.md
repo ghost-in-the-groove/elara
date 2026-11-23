@@ -74,7 +74,6 @@ event that is not struck normally.
   later but adds none.
 - The note events stay 32 bytes: the touch fits in the padding after the
   event's kind.
-- Bends, slides, hammer-ons and pull-offs, vibrato, the whammy bar, tremolo
-  picking and strums are not played yet. They come with pitch events in the
-  synth, which this design leaves room for: a `Touch` is how a key is struck,
-  and pitch changes will be events of their own.
+- Bends, slides, hammer-ons and pull-offs, vibrato and the whammy bar need
+  pitch events in the synth: ADR-0023. A `Touch` stays how a key is struck;
+  pitch changes are events of their own.

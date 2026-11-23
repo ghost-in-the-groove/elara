@@ -61,9 +61,9 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
                                .length = length,
                                .key = key,
                                .velocity = dynamicVelocity(note.effects.dynamic),
-                               .measure = m,
-                               .beat = b,
-                               .note = n});
+                               .beat = static_cast<std::uint32_t>(b),
+                               .note = static_cast<std::uint32_t>(n),
+                               .measure = m});
             }
             std::swap(open, next);
             position += length;

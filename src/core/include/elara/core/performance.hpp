@@ -5,6 +5,7 @@
 #include <elara/core/fraction.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 namespace elara::core {
@@ -19,11 +20,13 @@ struct SoundingNote {
     std::size_t voice = 0;
     Fraction start{};
     Fraction length{};
-    int key = 60;            // sounding MIDI key; percussion: the General MIDI percussion key
-    int velocity = 80;       // from the note's dynamic (dynamicVelocity)
-    std::size_t measure = 0; // where the attack is
-    std::size_t beat = 0;    // the attack's beat in its voice of that measure
-    std::size_t note = 0;    // and its note in that beat, which holds its effects
+    int key = 60;      // sounding MIDI key; percussion: the General MIDI percussion key
+    int velocity = 80; // from the note's dynamic (dynamicVelocity)
+    // Where the attack is: its beat in its voice of `measure`, and its note in
+    // that beat, which holds its effects. 32 bits keep the struct at 80 bytes.
+    std::uint32_t beat = 0;
+    std::uint32_t note = 0;
+    std::size_t measure = 0;
 
     friend bool operator==(const SoundingNote&, const SoundingNote&) = default;
 };

@@ -23,6 +23,8 @@ struct FrameEvent {
     std::int64_t frame = 0;
     EventKind kind = EventKind::NoteOn;
     Touch touch = Touch::Normal;
+    std::int16_t cents = 0;
+    float glide = 0.0f;
     int key = 60;
     int velocity = 80;
 };
@@ -36,6 +38,8 @@ eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
             result[event.track].push_back({.frame = std::llround(event.time * rate),
                                            .kind = event.kind,
                                            .touch = event.touch,
+                                           .cents = event.cents,
+                                           .glide = event.glide,
                                            .key = event.key,
                                            .velocity = event.velocity});
         }
@@ -126,10 +130,16 @@ void playTrack(Synth& synth, std::span<const FrameEvent> events, std::size_t& ne
             synth.render(out.subspan(done, at - done));
             done = at;
         }
-        if (event.kind == EventKind::NoteOn) {
+        switch (event.kind) {
+        case EventKind::NoteOn:
             synth.noteOn(event.key, event.velocity, event.touch);
-        } else {
+            break;
+        case EventKind::NoteOff:
             synth.noteOff(event.key);
+            break;
+        case EventKind::Pitch:
+            synth.glide(event.key, event.cents, static_cast<double>(event.glide));
+            break;
         }
         dispatched(event);
     }

@@ -4,6 +4,7 @@
 #include <elara/audio/tone_generator.hpp>
 #include <elara/core/instrument.hpp>
 
+#include "pitch_detection.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -19,6 +20,7 @@ using elara::audio::timbreFor;
 using elara::audio::timbreName;
 using elara::audio::Touch;
 using elara::audio::touchName;
+using elara::audio::test::keyFrequency;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 
@@ -36,45 +38,8 @@ std::vector<float> render(Synth& synth, double seconds) {
     return out;
 }
 
-double keyFrequency(int key) {
-    return 440.0 * std::pow(2.0, (key - 69) / 12.0);
-}
-
-// The fundamental frequency of `x`, by the YIN difference function: the first
-// lag whose cumulative-mean-normalised difference dips below 0.15, refined by
-// a parabola through its neighbours.
 double pitchOf(std::span<const float> x) {
-    const auto maxLag = static_cast<std::size_t>(kRate / 30.0);
-    const std::size_t window = x.size() - maxLag;
-    std::vector<double> d(maxLag + 1, 0.0);
-    for (std::size_t lag = 1; lag <= maxLag; ++lag) {
-        double sum = 0.0;
-        for (std::size_t i = 0; i < window; ++i) {
-            const double diff = static_cast<double>(x[i]) - static_cast<double>(x[i + lag]);
-            sum += diff * diff;
-        }
-        d[lag] = sum;
-    }
-    double running = 0.0;
-    std::vector<double> normalised(maxLag + 1, 1.0);
-    for (std::size_t lag = 1; lag <= maxLag; ++lag) {
-        running += d[lag];
-        normalised[lag] = running > 0.0 ? d[lag] * static_cast<double>(lag) / running : 1.0;
-    }
-    for (std::size_t lag = static_cast<std::size_t>(kRate / 2000.0); lag < maxLag; ++lag) {
-        if (normalised[lag] < 0.15) {
-            while (lag + 1 < maxLag && normalised[lag + 1] < normalised[lag]) {
-                ++lag;
-            }
-            const double a = normalised[lag - 1];
-            const double b = normalised[lag];
-            const double c = normalised[lag + 1];
-            const double denominator = a - 2.0 * b + c;
-            const double shift = denominator != 0.0 ? 0.5 * (a - c) / denominator : 0.0;
-            return kRate / (static_cast<double>(lag) + shift);
-        }
-    }
-    return 0.0;
+    return elara::audio::test::pitchOf(x, kRate);
 }
 
 double rms(std::span<const float> x) {
@@ -359,4 +324,84 @@ TEST_CASE("Synth: touches have the names the command line prints", "[audio][synt
     CHECK(touchName(Touch::PalmMute) == "palm-mute");
     CHECK(touchName(Touch::Dead) == "dead");
     CHECK(touchName(Touch::Harmonic) == "harmonic");
+}
+
+// Glides (ADR-0023): bends, slides, hammer-ons and vibrato move a voice's pitch.
+TEST_CASE("Synth: a glide moves a sounding note to its new pitch", "[audio][synth][glide]") {
+    const Timbre timbre = GENERATE(Timbre::Piano, Timbre::Mallet, Timbre::Organ, Timbre::Guitar,
+                                   Timbre::Overdrive, Timbre::Bass, Timbre::Bowed, Timbre::Wind);
+    CAPTURE(timbreName(timbre));
+    const int key = timbre == Timbre::Bass ? 45 : 57;
+    Synth synth(timbre, kRate);
+    synth.noteOn(key, 100);
+    static_cast<void>(render(synth, 0.1));
+    synth.glide(key, 200.0, 0.0);
+    static_cast<void>(render(synth, 0.05));
+    const std::vector<float> bent = render(synth, 0.25);
+    const double expected = keyFrequency(key + 2);
+    CHECK(std::abs(pitchOf(bent) - expected) < 0.01 * expected);
+}
+
+TEST_CASE("Synth: a glide takes its time in a straight line", "[audio][synth][glide]") {
+    Synth synth(Timbre::Organ, kRate);
+    synth.noteOn(57, 100);
+    synth.glide(57, 1200.0, 1.0);
+    const std::vector<float> rising = render(synth, 1.3);
+    const auto at = [&](double from, double to) {
+        return pitchOf(between(rising, from, to));
+    };
+    CHECK(std::abs(at(0.0, 0.08) - keyFrequency(57, 40.0)) < 0.03 * keyFrequency(57, 40.0));
+    CHECK(std::abs(at(0.46, 0.54) - keyFrequency(57, 600.0)) < 0.03 * keyFrequency(57, 600.0));
+    CHECK(std::abs(at(1.1, 1.3) - keyFrequency(69)) < 0.01 * keyFrequency(69));
+}
+
+TEST_CASE("Synth: a new note starts at its key, whatever the last one glided to",
+          "[audio][synth][glide]") {
+    Synth synth(Timbre::Organ, kRate);
+    synth.noteOn(57, 100);
+    synth.glide(57, -300.0, 0.0);
+    static_cast<void>(render(synth, 0.1));
+    synth.noteOff(57);
+    synth.noteOn(57, 100);
+    static_cast<void>(render(synth, 0.2)); // the released voice has faded
+    const std::vector<float> fresh = render(synth, 0.25);
+    CHECK(std::abs(pitchOf(fresh) - keyFrequency(57)) < 0.01 * keyFrequency(57));
+    // A glide after the release moves nothing: the key is no longer held.
+    Synth released(Timbre::Organ, kRate);
+    released.noteOn(57, 100);
+    released.noteOff(57);
+    Synth untouched(Timbre::Organ, kRate);
+    untouched.noteOn(57, 100);
+    untouched.noteOff(57);
+    released.glide(57, 700.0, 0.0);
+    CHECK(render(released, 0.2) == render(untouched, 0.2));
+}
+
+TEST_CASE("Synth: a gliding voice does not depend on how frames are split into calls",
+          "[audio][synth][glide]") {
+    const Timbre timbre = GENERATE(Timbre::Guitar, Timbre::Piano, Timbre::Wind);
+    CAPTURE(timbreName(timbre));
+    const auto play = [&](std::size_t block) {
+        Synth synth(timbre, kRate);
+        synth.noteOn(52, 100);
+        synth.glide(52, 250.0, 0.3);
+        std::vector<float> out(frames(0.5));
+        for (std::size_t done = 0; done < out.size(); done += block) {
+            synth.render(std::span<float>(out).subspan(done, std::min(block, out.size() - done)));
+        }
+        return out;
+    };
+    const std::vector<float> whole = play(frames(0.5));
+    CHECK(play(1) == whole);
+    CHECK(play(37) == whole);
+    CHECK(play(256) == whole);
+}
+
+TEST_CASE("Synth: drums ignore glides", "[audio][synth][glide]") {
+    Synth bent(Timbre::Drums, kRate);
+    bent.noteOn(38, 100);
+    bent.glide(38, 500.0, 0.0);
+    Synth plain(Timbre::Drums, kRate);
+    plain.noteOn(38, 100);
+    CHECK(render(bent, 0.3) == render(plain, 0.3));
 }
