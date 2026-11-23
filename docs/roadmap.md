@@ -27,7 +27,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
-  - [ ] Drawn in the score
+  - [x] Drawn in the score
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill
@@ -59,8 +59,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
 - [ ] Incremental relayout (only the systems an edit touches)
-  - [x] Pages an edit leaves as they were keep their textures instead of being
-        painted again
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
@@ -93,11 +91,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Dynamics at the caret, holding until the next change; new notes take
         the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
-  - [x] Measures at the caret in the app: insert before or after, delete, time
-        and key signatures from that measure on (ADR-0033)
-- [x] Tuning and capo changes, keeping the pitches or the frets
+- [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
-  - [x] Tuning presets and capo in the song panel
+  - [ ] Tuning presets and capo in the song panel
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)

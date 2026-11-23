@@ -70,8 +70,15 @@ Coda, else al Fine when it has a Fine. The writer puts the glyph or text with
 its `<sound>` in the first part and names the second signs `segno-segno` and
 `double-coda`; other readers only need a jump's name to match its sign's.
 
-The score draws the signs above the system and the jump texts at the end of
-their measure in a change of its own.
+**In the score.** The marks are drawn above the first staff, over the
+alternate-ending brackets and under the tempo marks (`Role::Navigation`):
+segno and coda glyphs from the music font at the start of their measure (two
+side by side for segno segno and double coda), and the texts that close a
+measure in italics, ending at its barline: "Fine", "To Coda", "To Double Coda"
+and the jump ("D.C.", "D.S.", "D.S.S.", with " al Fine", " al Coda" or " al
+Double Coda"), the jump last. They share one line per system; a text that
+would overlap another mark goes up to the first line where it fits, and the
+signs keep the lowest line.
 
 ## Consequences
 
