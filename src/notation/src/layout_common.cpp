@@ -138,6 +138,9 @@ void shift(DisplayList& list, double dx, double dy) {
             onset.x += dx;
         }
     }
+    for (ColumnBox& column : list.columns) {
+        column.x += dx;
+    }
     list.top += dy;
     list.bottom += dy;
 }
@@ -154,6 +157,7 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.systems, from.systems);
     move(to.staves, from.staves);
     move(to.measures, from.measures);
+    move(to.columns, from.columns);
     move(to.glyphs, from.glyphs);
     move(to.lines, from.lines);
     move(to.beams, from.beams);

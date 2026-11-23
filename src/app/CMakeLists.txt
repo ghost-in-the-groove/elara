@@ -30,6 +30,7 @@ qt_add_qml_module(elara
   QML_FILES
     qml/Main.qml
     qml/ScoreView.qml
+    qml/EntryBar.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml

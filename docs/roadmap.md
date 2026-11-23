@@ -72,12 +72,17 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+  - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
+        undo step), note values and dots, rests, delete, clicks that place the
+        caret (ADR-0032)
   - [x] Note names at the caret on any pitched staff, chords, semitone moves
         (ADR-0034)
   - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
+  - [x] Dynamics at the caret, holding until the next change; new notes take
+        the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
