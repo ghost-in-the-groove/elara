@@ -31,7 +31,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/audio` | `elara_audio` | Real-time-safe DSP, sequencer, offline rendering, WAV | 0, 4 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE; synths (FluidSynth, sfizz) | 0, 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
-| `src/app` | `elara` | Qt Quick UI; draws the notation display list with the Qt scene graph | 0+ |
+| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015) | 0+ |
 
 ## Key decisions
 
@@ -40,8 +40,9 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
   Note`, ADR-0004). A live song is a `Document`: every edit is a reversible
   command, so undo/redo is uniform (ADR-0005).
 - **Notation is a pure function.** `elara_notation` turns the model into a
-  display list (glyphs, lines, positions) without Qt. The app renders that list
-  with the Qt scene graph; tests snapshot it as SVG/JSON. Systems are laid out
+  display list (glyphs, lines, positions) without Qt. The app paints that list
+  into page textures for the Qt scene graph (ADR-0015); tests snapshot it as
+  SVG/JSON and check the app's pixels without a screen. Systems are laid out
   independently of each other (in parallel), so re-layout can be incremental
   per system.
 - **Qt draws, JUCE plays** (ADR-0002). JUCE is used as a headless library inside

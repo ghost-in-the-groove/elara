@@ -10,6 +10,7 @@ and the `elara_core` model; nothing is stored in this module.
 | `midi.hpp` | Standard MIDI Files (ADR-0009): `importMidi()`/`importMidiFile()` infer notation (rhythm grids per beat, exact for files from notation programs and fitted for played music; voices, ties, tuplets, spelling in the key); `exportMidi()`/`exportMidiFile()` write a format 1 file from the song's sounding notes. |
 | `musicxml.hpp` | MusicXML import (ADR-0007): `importMusicXml()` for text, `importMusicXmlBytes()` for text or compressed `.mxl`, `importMusicXmlFile()`. MusicXML export (ADR-0008): `exportMusicXml()` gives the text or, with `compressed`, an `.mxl` archive; `exportMusicXmlFile()` picks by extension and writes atomically. Large documents are read and written one part per thread. |
 | `native_format.hpp` | The native `.elara` format (ADR-0006): `saveNative()`/`loadNative()` for files (atomic save), `encodeNative()`/`decodeNative()` for the zip bytes, `songToJson()`/`songFromJson()` for the `song.json` inside. Errors come back as `FormatError` with the JSON path of the problem. |
+| `open.hpp` | `openFile()`: any file Elara reads, chosen by its extension in any case (`.elara`, Guitar Pro, MusicXML, MIDI); `openExtensions()` lists them. The CLI and the app open files through it. |
 
 The `.elara` file is a zip archive with a `mimetype` entry and a `song.json`
 that uses the model's names and text forms (`"8."`, `"F#3"`, `"6/8"`) and omits

@@ -351,6 +351,43 @@ DisplayList layoutSystem(const core::Song& song, std::span<const StaffSelection>
     return detail::layoutLine(song, staves, font, first, last, {});
 }
 
+std::vector<StaffSelection> selectTracks(const core::Song& song,
+                                         std::span<const std::size_t> tracks, TrackView view) {
+    const bool standard = view != TrackView::Tablature;
+    const bool tablature = view != TrackView::Standard;
+    std::vector<StaffSelection> selection;
+    for (const std::size_t t : tracks) {
+        if (t >= song.trackCount()) {
+            throw std::out_of_range("selectTracks: no such track");
+        }
+        for (std::size_t s = 0; s < song.track(t).staffCount(); ++s) {
+            const bool fretted = song.track(t).staff(s).isFretted();
+            if (standard || !fretted) {
+                selection.push_back({.track = t, .staff = s, .view = StaffView::Standard});
+            }
+            if (tablature && fretted) {
+                selection.push_back({.track = t, .staff = s, .view = StaffView::Tablature});
+            }
+        }
+    }
+    return selection;
+}
+
+bool hasTablature(const core::Song& song, std::span<const std::size_t> tracks) {
+    return std::ranges::any_of(tracks, [&song](std::size_t t) {
+        if (t >= song.trackCount()) {
+            throw std::out_of_range("hasTablature: no such track");
+        }
+        const core::Track& track = song.track(t);
+        for (std::size_t s = 0; s < track.staffCount(); ++s) {
+            if (track.staff(s).isFretted()) {
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
 DisplayList layoutStaff(const core::Song& song, std::size_t track, std::size_t staff,
                         const EngravingFont& font, const StaffLayoutOptions& options) {
     const StaffSelection selection{.track = track, .staff = staff, .view = StaffView::Standard};

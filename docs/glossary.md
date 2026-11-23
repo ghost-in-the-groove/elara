@@ -10,7 +10,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | pista | track | `Track` | One instrument |
 | instrumento | instrument | `Instrument`, `InstrumentPreset` | Kind, GM program, written offset |
 | pentagrama | staff | `Staff` | Plural `staves` |
-| tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004); `StaffView::Tablature` in layout |
+| tablatura | tablature | view of a fretted `Staff` | Not a separate type (ADR-0004); `StaffView::Tablature` in layout, `TrackView` for whole tracks |
 | sistema | system | `layoutSystem()`, `SystemBox` | Staves laid out together, notes that start together aligned (ADR-0013); a line of a page (ADR-0014) |
 | página | page | `layoutPages()`, `PageLayoutOptions` | Systems stacked between margins, with the title on the first (ADR-0014) |
 | salto de línea | line break | `LineBreaker` | Where one system ends and the next starts, chosen to space the systems evenly (ADR-0014) |

@@ -7,8 +7,10 @@
 #include <elara/notation/smufl.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <span>
+#include <vector>
 
 namespace elara::notation {
 
@@ -26,6 +28,20 @@ struct StaffSelection {
     StaffView view = StaffView::Standard;
     friend bool operator==(const StaffSelection&, const StaffSelection&) = default;
 };
+
+/// How whole tracks are shown: their staves in standard notation, as tablature,
+/// or both (notation above tablature).
+enum class TrackView : std::uint8_t { Standard, Tablature, Both };
+
+/// Every staff of `tracks`, in order, shown as `view`. Staves without a tuning
+/// have no tablature, so they show standard notation in every view. Throws
+/// std::out_of_range for a missing track.
+[[nodiscard]] std::vector<StaffSelection>
+selectTracks(const core::Song& song, std::span<const std::size_t> tracks, TrackView view);
+
+/// Whether a staff of `tracks` has a tuning, so that it can be shown as
+/// tablature. Throws std::out_of_range for a missing track.
+[[nodiscard]] bool hasTablature(const core::Song& song, std::span<const std::size_t> tracks);
 
 /// Lays out measures of several staves on a single line, top to bottom in the
 /// order given, with notes that start together aligned and barlines shared.

@@ -15,6 +15,7 @@ and be listed here before it is merged.
 | [miniz](https://github.com/richgel999/miniz) | 3.1.2 | MIT | Zip container of the native format and `.mxl` (`elara_io`) | vcpkg |
 | [pugixml](https://github.com/zeux/pugixml) | 1.16 | MIT | XML parsing for MusicXML (`elara_io`) | vcpkg |
 | [Bravura](https://github.com/steinbergmedia/bravura) | 1.482 | SIL OFL 1.1 | Music notation font and its SMuFL metadata (`elara_notation`, ADR-0011) | Three pinned files + SHA-256, downloaded at configure time into `bin/fonts/` with the licence (`OFL.txt`) |
+| [Arimo](https://github.com/googlefonts/arimo) | Google Fonts commit `903d466` | SIL OFL 1.1 | Sans-serif text of scores in the app, metric-compatible with Arial and Helvetica (`elara`, ADR-0015) | Regular and italic, pinned files + SHA-256, downloaded at configure time into `bin/fonts/` and embedded in the app, with the licence (`Arimo-OFL.txt`) |
 
 ## Planned (licence checked, not yet integrated)
 
