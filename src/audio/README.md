@@ -14,18 +14,22 @@ Two targets with different rules:
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`) and `OfflineRenderer`, which plays a sequence
   through one synth per track into stereo, with an event log (ADR-0018);
+- `Player`, the same in real time: songs are handed to the audio thread through
+  atomic pointers and the transport is a set of atomics (ADR-0019). It is an
+  `AudioSource`, the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`).
 
 `elara_audio_juce` opens the
 system audio device through JUCE (ADR-0002) and exposes a plain C++ API
-(`elara::audio::SystemAudio`, `listOutputDevices()`).
+(`elara::audio::SystemAudio`, `listOutputDevices()`); `SystemAudio::setSource()`
+plays an `AudioSource` such as a `Player`.
 
 ## Real-time rule
 
 Code that runs inside the audio callback (`ToneGenerator`, `fadeGain`,
-`Synth` after construction, the callback in `system_audio.cpp`) must not
-allocate, lock, log, throw or do I/O.
+`Synth` after construction, `Player::render()`, the callback in
+`system_audio.cpp`) must not allocate, lock, log, throw or do I/O.
 Exchange data with the audio thread through atomics or lock-free queues only.
 
 ## Verifying without listening
@@ -35,5 +39,7 @@ reports frames and peak level; `elara-cli sequence FILE --json --events` prints
 what the sequencer would play; `elara-cli render-audio FILE --json --events
 [--out song.wav]` plays it through the built-in synthesizer and prints the
 level, each track's timbre and every event with the frame it was dispatched
-at. Tests in `tests/audio/` check pitch, envelopes, voice stealing and event
-frames; tests in `tests/cli/` run the commands on corpus files.
+at. `elara-cli play FILE` plays it on the default device. Tests in
+`tests/audio/` check pitch, envelopes, voice stealing, event frames and the
+player's transport by calling `render()` as an audio callback would; tests in
+`tests/cli/` run the commands on corpus files.
