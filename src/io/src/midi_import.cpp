@@ -711,8 +711,9 @@ private:
     }
 
     [[nodiscard]] bool usable(const MeasureInfo& measure, int subdivisions) const {
-        const auto& spelling = gridSpelling(measure.cell(), subdivisions);
-        const double unitTicks = measure.cell().toDouble() * ticksPerWhole_ / subdivisions;
+        const Fraction cell = measure.cell();
+        const auto& spelling = gridSpelling(cell, subdivisions);
+        const double unitTicks = cell.toDouble() * ticksPerWhole_ / subdivisions;
         return spelling && spelling->written >= Fraction(1, 128) && unitTicks >= 2.0;
     }
 
