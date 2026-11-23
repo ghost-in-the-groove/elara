@@ -72,7 +72,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         (ADR-0034)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Edit every element of milestone 1 from the UI
-- [ ] Spanish and English translations (Qt Linguist)
+- [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
 

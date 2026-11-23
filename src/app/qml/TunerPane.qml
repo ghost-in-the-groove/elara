@@ -394,24 +394,28 @@ Popup {
             }
         }
 
-        RowLayout {
+        // The whole width, so that long names ("Guitarra, un semitono abajo")
+        // are not cut.
+        ComboBox {
             Layout.fillWidth: true
             Layout.topMargin: 6
+            model: tuner.tuningLabels
+            currentIndex: tuner.tuning
+            onActivated: index => tuner.tuning = index
+            ToolTip.visible: hovered
+            ToolTip.delay: 600
+            ToolTip.text: qsTr("Instrument and tuning")
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
             spacing: 8
 
-            ComboBox {
-                Layout.fillWidth: true
-                model: tuner.tuningLabels
-                currentIndex: tuner.tuning
-                onActivated: index => tuner.tuning = index
-                ToolTip.visible: hovered
-                ToolTip.delay: 600
-                ToolTip.text: qsTr("Instrument and tuning")
-            }
-
             Label {
-                text: qsTr("A4")
+                Layout.fillWidth: true
+                text: qsTr("Reference A4")
                 opacity: 0.7
+                elide: Text.ElideRight
             }
 
             SpinBox {
