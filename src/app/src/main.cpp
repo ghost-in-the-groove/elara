@@ -137,8 +137,8 @@ int main(int argc, char* argv[]) {
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
         QStringLiteral("language"));
-    parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       languageOption});
+    parser.addOptions(
+        {trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption, languageOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
