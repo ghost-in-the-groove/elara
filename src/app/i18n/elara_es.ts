@@ -259,6 +259,40 @@
         <translation>Quitar pista</translation>
     </message>
     <message>
+        <source>M</source>
+        <comment>mute</comment>
+        <translation>M</translation>
+    </message>
+    <message>
+        <source>Mute</source>
+        <translation>Silenciar</translation>
+    </message>
+    <message>
+        <source>S</source>
+        <comment>solo</comment>
+        <translation>S</translation>
+    </message>
+    <message>
+        <source>Solo</source>
+        <translation>Solo</translation>
+    </message>
+    <message>
+        <source>Volume %1 %</source>
+        <translation>Volumen %1 %</translation>
+    </message>
+    <message>
+        <source>Pan %1 % left</source>
+        <translation>Panorama %1 % a la izquierda</translation>
+    </message>
+    <message>
+        <source>Pan %1 % right</source>
+        <translation>Panorama %1 % a la derecha</translation>
+    </message>
+    <message>
+        <source>Pan centre</source>
+        <translation>Panorama al centro</translation>
+    </message>
+    <message>
         <source>Add track…</source>
         <translation>Añadir pista…</translation>
     </message>

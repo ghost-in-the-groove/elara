@@ -17,7 +17,7 @@ Qt Quick / QML user interface.
 | `src/score_page.hpp` | `ScorePage` (QML): one page as a texture, painted on a worker thread at its size in device pixels and painted again when zooming settles. |
 | `src/startup.hpp` | What the app does after its window loads: `--track`, `--view`, `--seek`, `--smoke-test`, `--screenshot` (`--tuner` is a property of the window). |
 | `qml/Main.qml` | The window: toolbar (new, open, save, undo, redo, view, track, zoom), welcome pane, pages, transport, drag and drop, errors, status bar; asks to save unsaved changes before they would be lost. |
-| `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. |
+| `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. Under each track its mix: mute, solo, a volume and a pan fader, heard while they move and kept as one undo step when let go; a track mute or solo keeps quiet fades (ADR-0039). |
 | `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. |
 
 ## The tuner (ADR-0029)
@@ -52,7 +52,7 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). |
 | `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. |
 
 The transport floats over the bottom of the score: back to the start (Home),
