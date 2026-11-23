@@ -72,6 +72,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
   - [x] Note names at the caret on any pitched staff, chords, semitone moves
         (ADR-0034)
+  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,

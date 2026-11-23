@@ -147,8 +147,11 @@ on tablature on the nearest string that reaches it, ADR-0034), `shift
 <semitones>` moves the caret's note, `duration <d>` sets the input duration and
 the caret beat's, `delete` removes the note on the caret's string (on a staff
 without strings, the beat's notes; on a rest, the rest), `delete-beat` the
-whole beat, and `insert-rest` adds a rest before it. The output includes
-`"caret"` and `"input"`.
+whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
+caret's string is a drum lane, from the crash at the top to the hi-hat pedal
+(ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
+that General MIDI key's lane (moving the caret to it), and `delete` removes the
+lane's piece only. The output includes `"caret"` and `"input"`.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

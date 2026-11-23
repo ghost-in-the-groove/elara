@@ -34,6 +34,7 @@ one that replaces them.
 | [0030](0030-translations.md) | Translations of the user interface | Accepted |
 | [0031](0031-editing-in-the-app.md) | Editing the song in the app | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
+| [0035](0035-drum-entry.md) | Drum entry | Accepted |
 
 ## Template
 
