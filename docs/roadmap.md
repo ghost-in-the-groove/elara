@@ -34,7 +34,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 2 - Importers (`elara_io`)
 
 - [x] Self-made test corpus with `SOURCES.md`
-- [ ] Guitar Pro 3/4/5 (binary), GPX (6), GP (7-8) importers
+- [x] Guitar Pro 7-8 (`.gp`) import with `elara-cli import`
+- [ ] Guitar Pro 6 (`.gpx`) import
+- [ ] Guitar Pro 3/4/5 (binary) import
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip

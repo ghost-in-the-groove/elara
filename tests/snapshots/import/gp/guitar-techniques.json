@@ -1,0 +1,232 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [
+  "repeats dropped (written once) (measure 2)",
+  "Lead Guitar: grace notes dropped (measure 3)"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Guitar Techniques",
+   "artist": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 100
+  },
+  "measures": [
+   {
+    "keySignature": "G major"
+   },
+   {
+    "keySignature": "G major",
+    "tempoChanges": [
+     {
+      "bpm": 80,
+      "offset": "1/2"
+     }
+    ]
+   },
+   {
+    "timeSignature": "3/4",
+    "keySignature": "G major"
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Lead Guitar",
+    "instrument": {
+     "name": "Electric Guitar",
+     "kind": "fretted",
+     "midiProgram": 27,
+     "writtenOffset": 12
+    },
+    "staves": [
+     {
+      "clef": "treble-8vb",
+      "tuning": "D2 A2 D3 G3 B3 E4",
+      "capo": 2,
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E2",
+            "string": 6,
+            "fret": 0,
+            "effects": {
+             "palmMute": true
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "B2",
+            "string": 5,
+            "fret": 0
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "C#3",
+            "string": 5,
+            "fret": 2,
+            "effects": {
+             "legatoFromPrevious": true
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "E3",
+            "string": 4,
+            "fret": 0
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B3",
+            "string": 3,
+            "fret": 2,
+            "effects": {
+             "bend": [
+              [
+               0,
+               0
+              ],
+              [
+               60,
+               200
+              ]
+             ],
+             "vibrato": "slight"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C#5",
+            "string": 2,
+            "fret": 12,
+            "effects": {
+             "harmonic": {
+              "kind": "natural",
+              "fret": 12
+             },
+             "letRing": true
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A4",
+            "string": 1,
+            "fret": 3,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4",
+            "string": 1,
+            "fret": 3,
+            "effects": {
+             "tiedFromPrevious": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E2",
+            "string": 6,
+            "fret": 0,
+            "effects": {
+             "deadNote": true,
+             "accent": "accent",
+             "dynamic": "ff"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "A3",
+            "string": 4,
+            "fret": 5,
+            "effects": {
+             "slideOut": "shift",
+             "staccato": true
+            }
+           }
+          ],
+          "effects": {
+           "pickStroke": "down"
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "B3",
+            "string": 4,
+            "fret": 7
+           }
+          ]
+         },
+         {
+          "duration": "4"
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 7.35,
+ "issues": []
+}

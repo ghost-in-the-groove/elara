@@ -18,6 +18,17 @@ Community Group).
 | `drums.musicxml` | Percussion clef; unpitched notes mapped to General MIDI keys through `midi-unpitched`; chord of two drums |
 | `transposing.musicxml` | Pickup measures; B-flat clarinet with `transpose` and a written key; bass with an octave clef and its own `divisions` |
 
+## Guitar Pro 7-8 (`gp/`)
+
+Written by `gp/generate.py` (run it to rebuild them): a zip archive with the
+score as GPIF XML, every element written by hand following the structure of
+files saved by Guitar Pro 8 (ADR-0010).
+
+| File | Exercises |
+|---|---|
+| `guitar-techniques.gp` | Electric guitar in drop D with a capo; palm mute, hammer-on in a triplet, bend with vibrato, natural harmonic with let ring, tie, dead note with an accent, shift slide, staccato, pick stroke, dynamics; a tempo change in the middle of a bar; 4/4 then 3/4; a repeat and a grace note (reported) |
+| `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported) |
+
 ## MIDI (`midi/`)
 
 Written byte for byte by `midi/generate.py` (run it to rebuild them) from the
