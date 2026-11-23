@@ -43,7 +43,8 @@ public:
             }
             double energy = 0.0;
             for (int i = 0; i < numSamples; ++i) {
-                energy += static_cast<double>(inputs[channel][i]) * inputs[channel][i];
+                const auto sample = static_cast<double>(inputs[channel][i]);
+                energy += sample * sample;
             }
             if (channel == channel_) {
                 currentEnergy = energy;
@@ -59,7 +60,8 @@ public:
         if (currentEnergy < 0.0 || loudestEnergy > 4.0 * currentEnergy) {
             channel_ = loudest;
         }
-        const std::span<const float> samples(inputs[channel_], static_cast<std::size_t>(numSamples));
+        const std::span<const float> samples(inputs[channel_],
+                                             static_cast<std::size_t>(numSamples));
         float peak = 0.0f;
         for (const float sample : samples) {
             peak = std::max(peak, std::abs(sample));

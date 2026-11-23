@@ -201,7 +201,9 @@ TEST_CASE("The tuner smooths what it hears", "[audio][tuner]") {
         CHECK(tuner.reading()->note == pitch("D3"));
     }
     SECTION("a reference other than 440 Hz") {
-        tuner.setOptions({.a4 = 442.0});
+        TunerOptions options;
+        options.a4 = 442.0;
+        tuner.setOptions(options);
         tuner.observe(442.0, hop);
         CHECK(tuner.reading()->note == pitch("A4"));
         CHECK_THAT(tuner.reading()->cents, WithinAbs(0.0, 1e-9));

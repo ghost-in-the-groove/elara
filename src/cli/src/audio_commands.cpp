@@ -488,8 +488,8 @@ int runListen(bool json, const ListenOptions& options) {
         return fail(opened.error());
     }
     if (input.sampleRate() <= 2.0 * audio::PitchDetector::kMaxFrequency) {
-        return fail(std::format("a sample rate of {} Hz is too low for the tuner",
-                                input.sampleRate()));
+        return fail(
+            std::format("a sample rate of {} Hz is too low for the tuner", input.sampleRate()));
     }
     audio::Tuner tuner(input.sampleRate(), {.a4 = options.a4Hz, .tuning = tuning});
     if (!json) {
@@ -518,10 +518,10 @@ int runListen(bool json, const ListenOptions& options) {
                 std::cout << std::format("{:7.2f} s  {} {} cents ({:.2f} Hz){}\n", time,
                                          reading->note.toString(), signedCents(reading->cents),
                                          reading->frequency,
-                                         tuning ? std::format(", string {} {} cents",
-                                                              reading->string,
-                                                              signedCents(reading->stringCents))
-                                                : std::string())
+                                         tuning
+                                             ? std::format(", string {} {} cents", reading->string,
+                                                           signedCents(reading->stringCents))
+                                             : std::string())
                           << std::flush;
             }
         }
@@ -531,11 +531,13 @@ int runListen(bool json, const ListenOptions& options) {
         }
     }
     if (json) {
-        std::cout << std::format(
-                         R"({{"device":"{}","sampleRate":{},"seconds":{},"peak":{},"dropped":{},"readings":[{}]}})",
-                         jsonEscape(input.deviceDescription()), jsonNumber(input.sampleRate()),
-                         jsonNumber(options.seconds), jsonNumber(peak), input.dropped(), readings)
-                  << '\n';
+        std::cout
+            << std::format(
+                   R"({{"device":"{}","sampleRate":{},"seconds":{},"peak":{},"dropped":{},"readings":[{}]}})",
+                   jsonEscape(input.deviceDescription()), jsonNumber(input.sampleRate()),
+                   jsonNumber(options.seconds), jsonNumber(static_cast<double>(peak)),
+                   input.dropped(), readings)
+            << '\n';
     } else {
         std::cout << std::format("peak level {:.3f}\n", peak);
     }

@@ -28,7 +28,9 @@ public:
     std::size_t read(std::span<float> out) noexcept;
 
     /// Consumer: discards every sample waiting to be read.
-    void clear() noexcept { read_.store(written_.load(std::memory_order_acquire), std::memory_order_release); }
+    void clear() noexcept {
+        read_.store(written_.load(std::memory_order_acquire), std::memory_order_release);
+    }
 
     /// Consumer: samples waiting to be read.
     [[nodiscard]] std::size_t available() const noexcept;
