@@ -90,7 +90,8 @@ list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
 `"pages"`: one display list per page. Lengths are in staff spaces, y down from
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
-credits...); `columns` say where the notes starting at each time of a measure
+credits...); a glyph drawn at another size than the staff's has a `"scale"`;
+`columns` say where the notes starting at each time of a measure
 are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
 beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are

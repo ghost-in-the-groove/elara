@@ -143,10 +143,13 @@ std::string toSvg(const DisplayList& list, const SvgOptions& options) {
             number(beam.left.x), number(beam.left.y + half));
     }
     for (const GlyphItem& glyph : list.glyphs) {
-        svg += std::format(R"(<text class="{}" x="{}" y="{}" stroke="none">&#x{:X};</text>)"
+        const std::string size = glyph.scale == 1.0 ? std::string()
+                                                    : std::format(R"( style="font-size:{}px")",
+                                                                  number(4.0 * glyph.scale));
+        svg += std::format(R"(<text class="{}" x="{}" y="{}"{} stroke="none">&#x{:X};</text>)"
                            "\n",
                            roleName(glyph.role), number(glyph.origin.x), number(glyph.origin.y),
-                           static_cast<std::uint32_t>(codepoint(glyph.glyph)));
+                           size, static_cast<std::uint32_t>(codepoint(glyph.glyph)));
     }
     for (const TextItem& text : list.texts) {
         if (text.knockout) {
