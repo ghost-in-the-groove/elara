@@ -5,8 +5,8 @@
 #include "score_page.hpp"
 #include <QCoreApplication>
 #include <QImage>
-#include <QPointF>
 #include <QMouseEvent>
+#include <QPointF>
 #include <QQuickItem>
 #include <QVariantMap>
 
