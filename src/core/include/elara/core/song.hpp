@@ -4,6 +4,8 @@
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
 #include <elara/core/pitch.hpp>
+#include <elara/core/signature.hpp>
+#include <elara/core/tempo.hpp>
 #include <elara/core/tuning.hpp>
 
 #include <cstddef>
@@ -83,9 +85,19 @@ private:
     std::vector<Staff> staves_;
 };
 
-/// Song-wide information about one measure, shared by every staff. Time and key
-/// signatures, repeats and markers are added here.
+/// Song-wide information about one measure, shared by every staff. Tempo changes
+/// live here so they move with their measure. Repeats and markers come later.
 struct MeasureHeader {
+    TimeSignature timeSignature;
+    KeySignature keySignature;             // concert key
+    std::vector<TempoChange> tempoChanges; // ascending offsets inside the measure
+
+    /// The header a new measure after this one starts with: same meter and key,
+    /// no events.
+    [[nodiscard]] MeasureHeader continuation() const {
+        return MeasureHeader{.timeSignature = timeSignature, .keySignature = keySignature};
+    }
+
     friend bool operator==(const MeasureHeader&, const MeasureHeader&) = default;
 };
 
@@ -124,7 +136,9 @@ public:
     [[nodiscard]] const Track& track(std::size_t index) const;
 
     /// Inserts `count` empty measures before measure `at` (at == measureCount()
-    /// appends) in every staff. Throws std::out_of_range when at > measureCount().
+    /// appends) in every staff. Their headers continue the measure before them
+    /// (or the first measure when inserting at 0). Throws std::out_of_range when
+    /// at > measureCount().
     void insertMeasures(std::size_t at, std::size_t count = 1);
     void appendMeasures(std::size_t count) { insertMeasures(measureCount(), count); }
 
@@ -136,10 +150,35 @@ public:
     [[nodiscard]] MeasureHeader& measureHeader(std::size_t index);
     [[nodiscard]] const MeasureHeader& measureHeader(std::size_t index) const;
 
+    // ---- Timeline ----------------------------------------------------------
+    // Positions are (measure, offset in whole notes); measure == measureCount()
+    // with offset 0 is the end of the song. Repeats are not unrolled yet.
+
+    /// Tempo in force at the start of the song.
+    [[nodiscard]] const Tempo& startTempo() const noexcept { return startTempo_; }
+    void setStartTempo(const Tempo& tempo) noexcept { startTempo_ = tempo; }
+
+    /// Start of `measure` in whole notes from the start of the song. Throws
+    /// std::out_of_range when measure > measureCount().
+    [[nodiscard]] Fraction measureStart(std::size_t measure) const;
+    /// Length of the whole song in whole notes.
+    [[nodiscard]] Fraction length() const { return measureStart(measureCount()); }
+
+    /// Seconds from the start of the song to a position. Throws
+    /// std::out_of_range for a position outside the song.
+    [[nodiscard]] double secondsAt(std::size_t measure, const Fraction& offset = {}) const;
+    [[nodiscard]] double durationSeconds() const { return secondsAt(measureCount()); }
+
+    /// Tempo in force at a position (a change exactly there counts).
+    [[nodiscard]] Tempo tempoAt(std::size_t measure, const Fraction& offset = {}) const;
+
     friend bool operator==(const Song&, const Song&) = default;
 
 private:
+    void checkPosition(std::size_t measure, const Fraction& offset) const;
+
     SongInfo info_;
+    Tempo startTempo_;
     std::vector<MeasureHeader> headers_;
     std::vector<Track> tracks_;
 };

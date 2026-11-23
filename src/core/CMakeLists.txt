@@ -4,6 +4,7 @@ add_library(elara_core STATIC
   src/instrument.cpp
   src/measure.cpp
   src/pitch.cpp
+  src/signature.cpp
   src/song.cpp
   src/tuning.cpp
   src/version.cpp)

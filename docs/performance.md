@@ -37,3 +37,4 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | copy that song (full snapshot) | 5.2 ms | undo will use commands, not snapshots |
 | 2026-11-23 | insert a measure at the start of that song | 0.29 ms | all 20 staves shift |
 | 2026-11-23 | sum every voice length of that song | 1.6 ms | about 19 ns per beat |
+| 2026-11-23 | seconds at the end of that song (tempo map walk) | 11.6 µs | O(measures); playback will precompute a timeline |

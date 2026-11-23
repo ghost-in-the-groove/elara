@@ -12,6 +12,9 @@ elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
 elara-cli [--json] fret --string N --fret N [--tuning guitar] [--capo 0] [--flats]
 elara-cli [--json] positions <PITCH> [--tuning guitar] [--capo 0] [--max-fret 30]
 elara-cli [--json] tunings
+elara-cli [--json] key <KEY>                       # e.g. "D major", "Bb minor"
+elara-cli [--json] spell <MIDI> [--key "C major"]
+elara-cli [--json] meter <N/D> [--bpm 120] [--beat-unit quarter|dotted-quarter|eighth|...]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -25,5 +28,7 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 - Exit code 0 on success (and `--help`), 1 on a runtime error, 2 on bad arguments.
 - Errors go to stderr as `error: <message>`.
 - New features add a subcommand here *and* a CTest in `tests/cli/`.
+- Subcommands are grouped in `src/*_commands.cpp` (audio, theory); each registers
+  itself with a callback that stores its exit code in the shared `Context`.
 
 - **May depend on:** every Elara module except `app`. **Must not include:** Qt.
