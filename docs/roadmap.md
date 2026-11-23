@@ -49,7 +49,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tablature staff layout with effects notation
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [ ] Incremental relayout (only the systems an edit touches)
-- [ ] `elara-cli render --svg` snapshot tests
+- [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)
