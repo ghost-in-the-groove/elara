@@ -13,9 +13,12 @@ Two targets with different rules:
   note events in seconds, ADR-0017);
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`) and `OfflineRenderer`, which plays a sequence
-  through one synth per track into stereo, with an event log (ADR-0018);
+  through one synth per track into stereo, with an event log (ADR-0018). Each
+  track sits in the stereo mix at its volume and pan, and mute and solo
+  silence tracks (ADR-0020);
 - `Player`, the same in real time: songs are handed to the audio thread through
-  atomic pointers and the transport is a set of atomics (ADR-0019). It is an
+  atomic pointers and the transport is a set of atomics (ADR-0019), and
+  `updateMix()` changes the track levels while it plays. It is an
   `AudioSource`, the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`).
