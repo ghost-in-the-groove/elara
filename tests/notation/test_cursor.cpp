@@ -13,6 +13,7 @@ using elara::notation::cursorAt;
 using elara::notation::DisplayList;
 using elara::notation::MeasureBox;
 using elara::notation::MeasureOnset;
+using elara::notation::measurePositionAt;
 
 namespace {
 
@@ -91,6 +92,57 @@ TEST_CASE("cursorAt: from the start of the measure to a late first note", "[nota
     const std::vector<DisplayList> all{page};
     CHECK_THAT(cursorAt(all, 0, 0.25)->x, WithinAbs(20.0, kEpsilon));
     CHECK_THAT(cursorAt(all, 0, 0.75)->x, WithinAbs(40.0, kEpsilon));
+}
+
+namespace {
+
+// Two systems: measure 0 from y 10 to 14 with columns at x 14, 30 and 38;
+// measure 1 from y 30 to 34 with none.
+DisplayList twoSystems() {
+    DisplayList page;
+    page.measures = {MeasureBox{.index = 0,
+                                .x = 10.0,
+                                .width = 40.0,
+                                .y = 10.0,
+                                .height = 4.0,
+                                .onsets = {MeasureOnset{.at = 0.0, .x = 14.0},
+                                           MeasureOnset{.at = 0.5, .x = 30.0},
+                                           MeasureOnset{.at = 0.75, .x = 38.0}}},
+                     MeasureBox{.index = 1, .x = 10.0, .width = 40.0, .y = 30.0, .height = 4.0}};
+    return page;
+}
+
+} // namespace
+
+TEST_CASE("measurePositionAt: the column of notes under a point", "[notation][cursor]") {
+    const DisplayList page = twoSystems();
+    const auto onNote = measurePositionAt(page, 30.5, 12.0);
+    REQUIRE(onNote.has_value());
+    CHECK(onNote->measure == 0);
+    CHECK_THAT(onNote->fraction, WithinAbs(0.5, kEpsilon));
+    // A little left of a column still takes it, as on the left of a notehead.
+    CHECK_THAT(measurePositionAt(page, 29.5, 12.0)->fraction, WithinAbs(0.5, kEpsilon));
+    // Between columns: the one that has started.
+    CHECK_THAT(measurePositionAt(page, 35.0, 12.0)->fraction, WithinAbs(0.5, kEpsilon));
+    CHECK_THAT(measurePositionAt(page, 49.0, 12.0)->fraction, WithinAbs(0.75, kEpsilon));
+    // Before the first column: the start of the measure.
+    CHECK_THAT(measurePositionAt(page, 11.0, 12.0)->fraction, WithinAbs(0.0, kEpsilon));
+    // Above the staff, among ledger lines and chord names.
+    CHECK(measurePositionAt(page, 20.0, 6.0)->measure == 0);
+    // A measure without columns: its start.
+    const auto second = measurePositionAt(page, 45.0, 33.0);
+    REQUIRE(second.has_value());
+    CHECK(second->measure == 1);
+    CHECK_THAT(second->fraction, WithinAbs(0.0, kEpsilon));
+}
+
+TEST_CASE("measurePositionAt: nothing away from the measures", "[notation][cursor]") {
+    const DisplayList page = twoSystems();
+    CHECK_FALSE(measurePositionAt(page, 5.0, 12.0).has_value());  // left of the measures
+    CHECK_FALSE(measurePositionAt(page, 55.0, 12.0).has_value()); // right of them
+    CHECK_FALSE(measurePositionAt(page, 20.0, 22.0).has_value()); // between the systems
+    CHECK_FALSE(measurePositionAt(page, 20.0, 60.0).has_value()); // below them all
+    CHECK_FALSE(measurePositionAt(DisplayList{}, 20.0, 12.0).has_value());
 }
 
 TEST_CASE("cursorAt: nothing for a measure no page shows", "[notation][cursor]") {

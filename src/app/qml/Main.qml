@@ -278,6 +278,7 @@ ApplicationWindow {
             document: score
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
+            onSeekRequested: seconds => audio.seek(seconds)
             cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
             visible: opacity > 0

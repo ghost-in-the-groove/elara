@@ -4,10 +4,16 @@
 
 #include <algorithm>
 #include <iterator>
+#include <limits>
 
 namespace elara::notation {
 
 namespace {
+
+// How far above or below its staves a click still belongs to a system, and
+// how far left of a column it may start (a notehead's width), in staff spaces.
+constexpr double kSystemReach = 6.0;
+constexpr double kColumnReach = 1.0;
 
 // From the onset that has started to the next one (or to the measure's ends)
 // in proportion to the time between them.
@@ -34,6 +40,33 @@ std::optional<Cursor> cursorAt(std::span<const DisplayList> pages, std::size_t m
         }
     }
     return std::nullopt;
+}
+
+std::optional<MeasurePosition> measurePositionAt(const DisplayList& page, double x,
+                                                 double y) noexcept {
+    const MeasureBox* nearest = nullptr;
+    double nearestDistance = std::numeric_limits<double>::infinity();
+    for (const MeasureBox& box : page.measures) {
+        if (x < box.x || x > box.x + box.width) {
+            continue;
+        }
+        const double distance = std::max({box.y - y, y - (box.y + box.height), 0.0});
+        if (distance < nearestDistance) {
+            nearest = &box;
+            nearestDistance = distance;
+        }
+    }
+    if (nearest == nullptr || nearestDistance > kSystemReach) {
+        return std::nullopt;
+    }
+    double fraction = 0.0;
+    for (const MeasureOnset& onset : nearest->onsets) {
+        if (onset.x > x + kColumnReach) {
+            break;
+        }
+        fraction = onset.at;
+    }
+    return MeasurePosition{.measure = nearest->index, .fraction = fraction};
 }
 
 } // namespace elara::notation

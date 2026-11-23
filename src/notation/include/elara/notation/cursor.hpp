@@ -26,4 +26,19 @@ struct Cursor {
 [[nodiscard]] std::optional<Cursor> cursorAt(std::span<const DisplayList> pages,
                                              std::size_t measure, double fraction) noexcept;
 
+/// A time in a written measure, `fraction` of the way through it.
+struct MeasurePosition {
+    std::size_t measure = 0;
+    double fraction = 0.0;
+    friend bool operator==(const MeasurePosition&, const MeasurePosition&) = default;
+};
+
+/// Where playback would start for a click at (`x`, `y`) on `page`, in staff
+/// spaces: in the measure that spans `x` and lies nearest `y` (within a few
+/// staff spaces of its staves), the last column of notes that starts left of
+/// `x` or a notehead's width right of it, or the start of the measure before
+/// its first column; nothing away from every measure.
+[[nodiscard]] std::optional<MeasurePosition> measurePositionAt(const DisplayList& page, double x,
+                                                               double y) noexcept;
+
 } // namespace elara::notation

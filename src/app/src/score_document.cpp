@@ -212,6 +212,18 @@ QVariantMap ScoreDocument::cursorAt(double seconds) const {
             {QStringLiteral("height"), cursor->height}};
 }
 
+double ScoreDocument::secondsAt(int page, double x, double y) const {
+    if (!sequence_ || !pages_ || page < 0 || static_cast<std::size_t>(page) >= pages_->size()) {
+        return -1.0;
+    }
+    const auto position =
+        notation::measurePositionAt((*pages_)[static_cast<std::size_t>(page)], x, y);
+    if (!position) {
+        return -1.0;
+    }
+    return sequence_->secondsAt(position->measure, position->fraction).value_or(-1.0);
+}
+
 void ScoreDocument::setTrack(int track) {
     if (track == track_ || !song_ || track < kAllTracks ||
         track >= static_cast<int>(song_->trackCount())) {

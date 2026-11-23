@@ -5,8 +5,12 @@
 #include "score_page.hpp"
 #include <QCoreApplication>
 #include <QImage>
+#include <QMouseEvent>
+#include <QQuickItem>
+#include <QVariantMap>
 
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
@@ -96,6 +100,10 @@ void Startup::queueSteps() {
     };
     if (options_.smokeTest) {
         seekTo(score_->duration() / 2.0);
+        steps_.emplace_back([this] {
+            clickCursor();
+            return false;
+        });
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -145,7 +153,12 @@ void Startup::tick() {
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = ScorePage::paintCount();
-        if (step()) {
+        const bool changed = step();
+        if (!failure_.isEmpty()) {
+            finish(false, failure_);
+            return;
+        }
+        if (changed) {
             waiting_ = true;
             stepStarted_ = clock_.elapsed();
             return;
@@ -172,6 +185,36 @@ void Startup::tick() {
                      .arg(layouts_);
     }
     finish(true, detail);
+}
+
+// Clicks in the middle of the playback cursor, as a user would on the score:
+// playback must move to where ScoreDocument::secondsAt puts that point, which
+// checks that the cursor is drawn where the pages say and that the click is
+// read back in the same coordinates.
+void Startup::clickCursor() {
+    auto* audio = window_->findChild<AudioController*>();
+    auto* playhead = window_->findChild<QQuickItem*>(QStringLiteral("playhead"));
+    if (audio == nullptr || playhead == nullptr || !playhead->isVisible()) {
+        failure_ = QStringLiteral("no playback cursor");
+        return;
+    }
+    const QVariantMap cursor = score_->cursorAt(audio->position());
+    const double expected = score_->secondsAt(
+        cursor.value(QStringLiteral("page")).toInt(), cursor.value(QStringLiteral("x")).toDouble(),
+        cursor.value(QStringLiteral("y")).toDouble() +
+            cursor.value(QStringLiteral("height")).toDouble() / 2.0);
+    const QPointF at = playhead->mapToScene(QPointF(playhead->width() / 2, playhead->height() / 2));
+    for (const QEvent::Type type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+        QMouseEvent event(type, at, at, window_->mapToGlobal(at), Qt::LeftButton,
+                          type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
+                          Qt::NoModifier);
+        QCoreApplication::sendEvent(window_, &event);
+    }
+    if (expected < 0.0 || std::abs(audio->position() - expected) > 1e-6) {
+        failure_ = QStringLiteral("a click on the cursor moved playback to %1 s, not %2 s")
+                       .arg(audio->position())
+                       .arg(expected);
+    }
 }
 
 void Startup::finish(bool ok, const QString& detail) {

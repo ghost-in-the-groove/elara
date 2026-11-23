@@ -97,6 +97,10 @@ public:
     /// "x", "y" and "height" in staff spaces on it; empty when no page shows
     /// the measure played then.
     Q_INVOKABLE QVariantMap cursorAt(double seconds) const;
+    /// When playback would start for a click at (`x`, `y`) staff spaces on
+    /// page `page`: on the column of notes there, the first time its measure
+    /// plays; negative away from every measure.
+    Q_INVOKABLE double secondsAt(int page, double x, double y) const;
 
     /// The song and the sequence it plays as, built when it is opened; null
     /// before.

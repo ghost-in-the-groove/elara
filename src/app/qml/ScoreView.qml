@@ -19,6 +19,8 @@ Item {
     /// Scroll so that the cursor stays in view as it moves.
     property bool followCursor: false
     property color cursorColor: "#3f6ad8"
+    /// A click on the score asks to move playback there.
+    signal seekRequested(real seconds)
     /// Where the cursor stands (ScoreDocument.cursorAt), empty when hidden.
     /// Reading pageCount makes it follow relayouts too.
     readonly property var cursor: cursorSeconds >= 0 && document.pageCount > 0
@@ -175,6 +177,19 @@ Item {
                 radius: 2
                 color: "white"
 
+                // A click on a note moves playback to it; a drag still scrolls.
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    onTapped: (eventPoint, button) => {
+                        const scale = root.unit * root.shownZoom;
+                        const seconds = root.document.secondsAt(sheet.index,
+                                                                eventPoint.position.x / scale,
+                                                                eventPoint.position.y / scale);
+                        if (seconds >= 0)
+                            root.seekRequested(seconds);
+                    }
+                }
+
                 ScorePage {
                     anchors.fill: parent
                     document: root.document
@@ -197,6 +212,7 @@ Item {
 
         readonly property real scale: root.unit * root.shownZoom
 
+        objectName: "playhead"
         parent: list.contentItem
         z: 2
         visible: root.cursorShown

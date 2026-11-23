@@ -33,8 +33,8 @@ void reportSmokeTest(bool ok, const QString& detail);
 /// and painted, shows the track and view asked for and, for `--smoke-test`
 /// and `--screenshot`, checks the outcome and quits. The smoke test also
 /// shows the score in every view and with all its tracks, so that every
-/// relayout path runs without a screen, and moves the playback cursor
-/// halfway through the song.
+/// relayout path runs without a screen, moves the playback cursor halfway
+/// through the song and clicks on it.
 class Startup : public QObject {
 public:
     Startup(QQuickWindow* window, StartupOptions options, const bool& qmlWarnings);
@@ -45,6 +45,7 @@ private:
     void tick();
     void queueSteps();
     void finish(bool ok, const QString& detail);
+    void clickCursor();
     [[nodiscard]] bool checking() const;
 
     QPointer<QQuickWindow> window_;
@@ -61,6 +62,7 @@ private:
     int layouts_ = 0;
     qint64 settledAt_ = -1;
     bool queued_ = false;
+    QString failure_; ///< set by a step that went wrong
 };
 
 } // namespace elara::app

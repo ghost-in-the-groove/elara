@@ -15,6 +15,7 @@
 
 #include <array>
 #include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <expected>
 #include <filesystem>
@@ -54,7 +55,8 @@ struct RenderOptions {
     bool noCredits = false;
     std::string svg;
     std::string metadata;
-    double cursorAt = -1.0; // seconds; negative for no cursor
+    double cursorAt = -1.0;     // seconds; negative for no cursor
+    std::vector<double> timeAt; // page (from 0), x and y in staff spaces; empty for none
 };
 
 /// The playback cursor at `seconds`, as JSON ("null" when no page shows the
@@ -88,6 +90,35 @@ CursorReport cursorReport(const core::Song& song, std::span<const notation::Disp
             .text = std::format("cursor at {} s: measure {}, page {}, x {}, y {}\n", seconds,
                                 measure.measure + 1, cursor->page + 1, jsonNumber(cursor->x),
                                 jsonNumber(cursor->y))};
+}
+
+/// When playback would start for a click at `at` (page, x, y), as JSON, with
+/// the measure ("null" for both away from every measure).
+CursorReport timeReport(const core::Song& song, std::span<const notation::DisplayList> pages,
+                        std::span<const double> at) {
+    const double page = at[0];
+    const double x = at[1];
+    const double y = at[2];
+    std::optional<notation::MeasurePosition> position;
+    if (page >= 0.0 && page == std::floor(page) && page < static_cast<double>(pages.size())) {
+        position = notation::measurePositionAt(pages[static_cast<std::size_t>(page)], x, y);
+    }
+    std::optional<double> seconds;
+    if (position) {
+        seconds = audio::Sequence(song).secondsAt(position->measure, position->fraction);
+    }
+    if (!position || !seconds) {
+        return {.json = std::format(R"({{"page":{},"x":{},"y":{},"measure":null,"seconds":null}})",
+                                    jsonNumber(page), jsonNumber(x), jsonNumber(y)),
+                .text = std::format("time at page {}, x {}, y {}: no measure there\n",
+                                    jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y))};
+    }
+    return {.json = std::format(R"({{"page":{},"x":{},"y":{},"measure":{},"seconds":{}}})",
+                                jsonNumber(page), jsonNumber(x), jsonNumber(y), position->measure,
+                                jsonNumber(*seconds)),
+            .text = std::format("time at page {}, x {}, y {}: measure {}, {} s\n",
+                                jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
+                                position->measure + 1, jsonNumber(*seconds))};
 }
 
 std::string point(const notation::Point& p) {
@@ -410,6 +441,9 @@ int runRender(bool json, const RenderOptions& options) {
             body =
                 std::format(R"("cursor":{},)", cursorReport(*song, pages, options.cursorAt).json);
         }
+        if (!options.timeAt.empty()) {
+            body += std::format(R"("timeAt":{},)", timeReport(*song, pages, options.timeAt).json);
+        }
         if (paged) {
             body += R"("pages":[)";
             for (std::size_t p = 0; p < pages.size(); ++p) {
@@ -460,6 +494,9 @@ int runRender(bool json, const RenderOptions& options) {
     }
     if (options.cursorAt >= 0.0) {
         std::cout << cursorReport(*song, pages, options.cursorAt).text;
+    }
+    if (!options.timeAt.empty()) {
+        std::cout << timeReport(*song, pages, options.timeAt).text;
     }
     return kExitOk;
 }
@@ -515,6 +552,11 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->add_option("--cursor-at", options->cursorAt,
                      "Report where the playback cursor stands this many seconds into the song")
         ->check(CLI::NonNegativeNumber);
+    render
+        ->add_option("--time-at", options->timeAt,
+                     "Report when playback would start for a click at PAGE X Y (the page from 0, "
+                     "x and y in staff spaces, as the cursor reports them)")
+        ->expected(3);
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");
     render->add_option("--svg", options->svg,
