@@ -16,7 +16,10 @@ elara-cli [--json] key <KEY>                       # e.g. "D major", "Bb minor"
 elara-cli [--json] spell <MIDI> [--key "C major"]
 elara-cli [--json] meter <N/D> [--bpm 120] [--beat-unit quarter|dotted-quarter|eighth|...]
 elara-cli [--json] rests <N/D> <DURATION>...      # e.g. rests 6/8 8 -> 8 8 4.
-elara-cli [--json] edit <STEP>...                 # undoable edits on a new song
+elara-cli [--json] new <FILE> [--title T] [--track PRESET]... [--measures 4] [--time 4/4]
+                       [--key "C major"] [--tempo 120] [--force]
+elara-cli [--json] dump <FILE>                    # with --json: the whole model
+elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -25,8 +28,14 @@ name from `tunings` or open strings from the lowest tab line, e.g.
 `"D2 A2 D3 G3 B3 E4"`. Durations are written as in `rests`: `4` quarter, `8.`
 dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
 
-`edit` applies quoted steps to a new song through the undo history and prints
-the song, its validation issues and the undo/redo state:
+`new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
+`--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
+where `song` is the file's complete `song.json`: the model snapshot later tests
+compare against.
+
+`edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
+history, saves the result to `--out FILE` if given, and prints the song, its
+validation issues and the undo/redo state:
 
 ```text
 elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "time 2 6/8" "note 0 0 6 3 4" "fill 0 0" undo redo save

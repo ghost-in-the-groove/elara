@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
     addAudioCommands(app, context);
     addTheoryCommands(app, context);
     addEditCommands(app, context);
+    addFileCommands(app, context);
 
     try {
         app.parse(argc, argv);

@@ -35,6 +35,7 @@ int usageError(std::string_view message);
 // the exit code in the context.
 void addAudioCommands(CLI::App& app, Context& context);
 void addEditCommands(CLI::App& app, Context& context);
+void addFileCommands(CLI::App& app, Context& context);
 void addTheoryCommands(CLI::App& app, Context& context);
 
 } // namespace elara::cli

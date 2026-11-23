@@ -29,7 +29,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Measure validation (voice fills its measure), rests auto-fill
 - [x] Command pattern with undo/redo
 - [x] Native format v1 (zip container + JSON), round-trip tests
-- [ ] `elara-cli new`, `elara-cli dump --json` (model snapshot used by later tests)
+- [x] `elara-cli new`, `elara-cli dump --json` (model snapshot used by later tests)
 
 ## Milestone 2 - Importers (`elara_io`)
 

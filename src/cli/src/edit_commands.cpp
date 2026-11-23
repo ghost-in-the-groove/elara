@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Editing subcommands: edit (a script of undoable edits applied to a new song).
+// Editing subcommands: edit (a script of undoable edits applied to a new song or
+// a .elara file).
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/validation.hpp>
+#include <elara/io/native_format.hpp>
 
 #include "common.hpp"
+#include "song_report.hpp"
 #include <CLI/CLI.hpp>
 
 #include <charconv>
@@ -193,75 +196,42 @@ std::string jsonName(std::string_view name) {
     return name.empty() ? std::string("null") : std::format("\"{}\"", jsonEscape(name));
 }
 
-std::string jsonOptional(const std::optional<std::size_t>& value) {
-    return value ? std::to_string(*value) : std::string("null");
-}
-
 void printJson(const Document& doc) {
     const Song& song = doc.song();
-    std::string tracks;
-    for (std::size_t t = 0; t < song.trackCount(); ++t) {
-        const auto& track = song.track(t);
-        std::size_t beats = 0;
-        std::size_t notes = 0;
-        for (std::size_t s = 0; s < track.staffCount(); ++s) {
-            for (std::size_t m = 0; m < song.measureCount(); ++m) {
-                for (const auto& voice : track.staff(s).measure(m).voices) {
-                    beats += voice.beats.size();
-                    for (const auto& beat : voice.beats) {
-                        notes += beat.notes.size();
-                    }
-                }
-            }
-        }
-        tracks +=
-            std::format(R"({}{{"name":"{}","staves":{},"beats":{},"notes":{}}})", t == 0 ? "" : ",",
-                        jsonEscape(track.name()), track.staffCount(), beats, notes);
-    }
-    std::string measures;
-    for (std::size_t m = 0; m < song.measureCount(); ++m) {
-        const auto& header = song.measureHeader(m);
-        measures += std::format(R"({}{{"time":"{}","key":"{}"}})", m == 0 ? "" : ",",
-                                header.timeSignature.toString(), header.keySignature.toString());
-    }
-    std::string issues;
-    for (const auto& issue : core::validate(song)) {
-        issues += std::format(
-            R"({}{{"kind":"{}","track":{},"staff":{},"measure":{},"voice":{},"beat":{},"note":{}}})",
-            issues.empty() ? "" : ",", core::issueName(issue.kind), issue.track, issue.staff,
-            issue.measure, issue.voice, jsonOptional(issue.beat), jsonOptional(issue.note));
-    }
     std::cout
         << std::format(
-               R"({{"title":"{}","tempo":{},"tracks":[{}],"measureCount":{},"measures":[{}],"issues":[{}],"undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"modified":{}}})",
-               jsonEscape(song.info().title), song.startTempo().bpm(), tracks, song.measureCount(),
-               measures, issues, doc.undoCount(), jsonName(doc.undoName()), doc.redoCount(),
-               jsonName(doc.redoName()), doc.isModified())
+               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"modified":{}}})",
+               jsonEscape(song.info().title), song.startTempo().bpm(), tracksJson(song),
+               song.measureCount(), measuresJson(song), issuesJson(core::validate(song)),
+               doc.undoCount(), jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
+               doc.isModified())
         << '\n';
 }
 
 void printText(const Document& doc) {
-    const Song& song = doc.song();
-    std::cout << std::format("{}: {} track(s), {} measure(s), {} bpm\n",
-                             song.info().title.empty() ? "Untitled" : song.info().title,
-                             song.trackCount(), song.measureCount(), song.startTempo().bpm());
-    for (std::size_t t = 0; t < song.trackCount(); ++t) {
-        std::cout << std::format("  track {}: {}\n", t, song.track(t).name());
-    }
+    printSongText(doc.song());
     std::cout << std::format("undo: {} ({} step(s)), redo: {} ({} step(s)){}\n",
                              doc.canUndo() ? doc.undoName() : "-", doc.undoCount(),
                              doc.canRedo() ? doc.redoName() : "-", doc.redoCount(),
                              doc.isModified() ? ", modified" : "");
-    const auto issues = core::validate(song);
-    for (const auto& issue : issues) {
-        std::cout << std::format("  issue: {} (track {}, measure {}, voice {})\n",
-                                 core::issueName(issue.kind), issue.track, issue.measure,
-                                 issue.voice);
-    }
 }
 
-int runEdit(bool json, const std::vector<std::string>& steps) {
+struct EditOptions {
+    std::string in;  // start from this file instead of a new song
+    std::string out; // save the result here
+    std::vector<std::string> steps;
+};
+
+int runEdit(bool json, const EditOptions& options) {
     Document doc;
+    if (!options.in.empty()) {
+        auto loaded = io::loadNative(options.in);
+        if (!loaded) {
+            return fail(std::format("{}: {}", options.in, loaded.error().message));
+        }
+        doc = Document(std::move(*loaded));
+    }
+    const auto& steps = options.steps;
     for (std::size_t i = 0; i < steps.size(); ++i) {
         try {
             runStep(doc, Step(steps[i]));
@@ -270,6 +240,14 @@ int runEdit(bool json, const std::vector<std::string>& steps) {
         } catch (const std::exception& error) {
             return fail(std::format("step {} ({}): {}", i + 1, steps[i], error.what()));
         }
+    }
+    if (!options.out.empty()) {
+        try {
+            io::saveNative(doc.song(), options.out);
+        } catch (const std::exception& error) {
+            return fail(error.what());
+        }
+        doc.markSaved();
     }
     if (json) {
         printJson(doc);
@@ -282,19 +260,21 @@ int runEdit(bool json, const std::vector<std::string>& steps) {
 } // namespace
 
 void addEditCommands(CLI::App& app, Context& context) {
-    auto steps = std::make_shared<std::vector<std::string>>();
+    auto options = std::make_shared<EditOptions>();
     auto* editCommand = app.add_subcommand(
-        "edit", "Apply undoable edits to a new song and print the result and its history");
-    editCommand
-        ->add_option("steps", *steps,
-                     "Steps in order, each quoted: \"add-track <preset> [at]\", "
-                     "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
-                     "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
-                     "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
-                     "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
-                     "undo, redo, save")
-        ->required();
-    editCommand->callback([&context, steps] { context.exitCode = runEdit(context.json, *steps); });
+        "edit", "Apply undoable edits to a song and print the result and its history");
+    editCommand->add_option("--in", options->in, "Start from this .elara file (default: new song)");
+    editCommand->add_option("--out", options->out, "Save the result to this .elara file");
+    editCommand->add_option(
+        "steps", options->steps,
+        "Steps in order, each quoted: \"add-track <preset> [at]\", "
+        "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
+        "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
+        "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
+        "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
+        "undo, redo, save");
+    editCommand->callback(
+        [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }
 
 } // namespace elara::cli
