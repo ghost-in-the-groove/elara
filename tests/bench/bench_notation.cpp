@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Benchmarks for elara_notation: laying out staves and writing them as SVG.
+#include <elara/core/entry.hpp>
+#include <elara/notation/caret.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
@@ -13,6 +15,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
@@ -100,6 +103,25 @@ TEST_CASE("Notation benchmarks", "[!benchmark][notation]") {
     pages.threads = 1;
     BENCHMARK("the same on one thread") {
         return layoutPages(song, both, font, pages);
+    };
+
+    // Keyboard entry (ADR-0032): the app looks for the caret on every page
+    // after each move; the last measure is the worst case. Then a click.
+    const elara::core::Caret last{.measure = song.measureCount() - 1, .string = 3};
+    BENCHMARK("find the caret on the pages of one track (last measure)") {
+        for (const auto& page : paged) {
+            if (auto box = elara::notation::caretBox(page, song, last, font)) {
+                return box;
+            }
+        }
+        return std::optional<elara::notation::Rect>{};
+    };
+    const auto& lastPage = paged.back();
+    const auto box = elara::notation::caretBox(lastPage, song, last, font);
+    REQUIRE(box.has_value());
+    const elara::notation::Point centre{box->x + box->width / 2, box->y + box->height / 2};
+    BENCHMARK("pick the caret a click on a page points at") {
+        return elara::notation::caretAt(lastPage, song, centre, elara::core::Caret{}, font);
     };
     std::vector<StaffSelection> score;
     for (std::size_t t = 0; t < song.trackCount(); ++t) {
