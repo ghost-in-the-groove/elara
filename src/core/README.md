@@ -12,7 +12,7 @@ DAW timeline all read and edit (see `docs/architecture.md`).
 | Header | What it gives you |
 |---|---|
 | `fraction.hpp` | `Fraction`: exact, always-normalised rational. Every duration and time position is a `Fraction` of a whole note, so tuplets never drift. |
-| `duration.hpp` | `NoteValue`, `Tuplet`, `Duration` (value + dots + tuplet) and its sounding `length()`. |
+| `duration.hpp` | `NoteValue`, `Tuplet`, `Duration` (value + dots + tuplet), its sounding `length()` and text form (`"4"`, `"8."`, `"8*3:2"`, `"breve"`). |
 
 Positions are measured in whole notes from a reference point (the start of the
 song or of a measure) and are plain `Fraction`s.
@@ -51,6 +51,7 @@ sixth string of a guitar sounds F#2.
 | `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. |
 | `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`), `Track` (instrument + staves, `fromPreset()`), `MeasureHeader`, `SongInfo`, `Song`. |
+| `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()` and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
 staves at once, and `addTrack` gives a new track as many measures as the song.
@@ -60,6 +61,14 @@ and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
 `durationSeconds()` give the timeline (repeats are not unrolled yet).
 Beat positions are derived from durations, never stored. How each instrument
 family is handled: `docs/instruments.md`.
+
+Editing may leave a voice short or long; `validate()` reports it instead of
+refusing the edit. An empty voice counts as a measure rest. `fillWithRests()`
+completes a short voice the way engravers do: first the current beat (an
+unfinished tuplet with rests of the same tuplet), then the largest rests that
+start on a multiple of their own length, so beats stay visible (4/4 after a
+quarter: quarter + half, never a dotted half; 6/8 uses dotted rests by beat).
+It changes nothing and returns false when the gap cannot be written that way.
 
 The time types above are small `constexpr` value types without allocation; keep them
 that way, the sequencer and layout engine run them in hot loops

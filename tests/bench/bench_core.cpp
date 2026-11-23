@@ -4,6 +4,7 @@
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/song.hpp>
+#include <elara/core/validation.hpp>
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -128,6 +129,10 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
             }
         }
         return total;
+    };
+
+    BENCHMARK("validate the large song (fills, frets, ties)") {
+        return elara::core::validate(song).size();
     };
 }
 

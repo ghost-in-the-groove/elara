@@ -4,7 +4,10 @@
 #include <elara/core/fraction.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 
 namespace elara::core {
 
@@ -85,6 +88,13 @@ public:
         const std::int64_t valueDen = std::int64_t{1} << static_cast<int>(value_);
         return Fraction(2 * (2 * pow - 1) * tuplet_.normal(), valueDen * pow * tuplet_.actual());
     }
+
+    /// Compact text: the value ("breve", "1", "2", "4" ... "128"), one "." per dot,
+    /// then "*actual:normal" for a tuplet. Examples: "4", "8.", "16*3:2".
+    [[nodiscard]] std::string toString() const;
+
+    /// Inverse of toString(); nullopt for anything it would not produce.
+    [[nodiscard]] static std::optional<Duration> parse(std::string_view text);
 
     friend constexpr bool operator==(const Duration&, const Duration&) noexcept = default;
 

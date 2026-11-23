@@ -1,5 +1,6 @@
 # elara_core: the musical model. Pure C++23 - no Qt, no JUCE (see README.md).
 add_library(elara_core STATIC
+  src/duration.cpp
   src/effects.cpp
   src/fraction.cpp
   src/instrument.cpp
@@ -8,6 +9,7 @@ add_library(elara_core STATIC
   src/signature.cpp
   src/song.cpp
   src/tuning.cpp
+  src/validation.cpp
   src/version.cpp)
 add_library(elara::core ALIAS elara_core)
 
