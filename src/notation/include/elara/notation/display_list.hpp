@@ -3,6 +3,7 @@
 // curves at positions (ADR-0012).
 #pragma once
 
+#include <elara/core/fraction.hpp>
 #include <elara/notation/smufl.hpp>
 
 #include <cstddef>
@@ -41,9 +42,10 @@ enum class Role : std::uint8_t {
     TrackName,     ///< the name of a track left of its staves in the first system
     Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
     Volta,         ///< the bracket and numbers of an alternate ending
+    Tuplet,        ///< the number of a tuplet and its bracket
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Volta) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Tuplet) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;
@@ -142,6 +144,16 @@ struct MeasureBox {
     friend bool operator==(const MeasureBox&, const MeasureBox&) = default;
 };
 
+/// Where the notes of a measure starting `start` whole notes into it are placed
+/// (the left of an unshifted notehead), shared by every staff of the system:
+/// how an editor finds a beat on the score.
+struct ColumnBox {
+    std::size_t measure = 0;
+    core::Fraction start;
+    double x = 0.0;
+    friend bool operator==(const ColumnBox&, const ColumnBox&) = default;
+};
+
 /// How a staff is shown: standard notation or tablature (ADR-0004: tablature is
 /// a view of a fretted staff).
 enum class StaffView : std::uint8_t { Standard, Tablature };
@@ -185,6 +197,7 @@ struct DisplayList {
     std::vector<SystemBox> systems;
     std::vector<StaffBox> staves;
     std::vector<MeasureBox> measures;
+    std::vector<ColumnBox> columns; ///< in measure order, then time order
     std::vector<GlyphItem> glyphs;
     std::vector<LineItem> lines;
     std::vector<BeamItem> beams;

@@ -305,3 +305,49 @@ TEST_CASE("Undoing any sequence of edits restores the original song", "[core][do
     }
     CHECK(doc.song() == edited);
 }
+
+TEST_CASE("A time signature change runs until the next change", "[core][document]") {
+    // Measures 0-1 are in 4/4, 2-3 in 3/4 (smallSong()).
+    const Song original = smallSong();
+    Document doc(original);
+
+    doc.execute(elara::core::changeTimeSignature(doc.song(), 0, TimeSignature(6, 8)));
+    CHECK(doc.song().measureHeader(0).timeSignature == TimeSignature(6, 8));
+    CHECK(doc.song().measureHeader(1).timeSignature == TimeSignature(6, 8));
+    CHECK(doc.song().measureHeader(2).timeSignature == TimeSignature(3, 4));
+    CHECK(doc.undoCount() == 1);
+    CHECK(doc.undoName() == "Change time signature");
+
+    // From the middle of a run: the measures before it keep theirs.
+    doc.execute(elara::core::changeTimeSignature(doc.song(), 3, TimeSignature(2, 4)));
+    CHECK(doc.song().measureHeader(2).timeSignature == TimeSignature(3, 4));
+    CHECK(doc.song().measureHeader(3).timeSignature == TimeSignature(2, 4));
+
+    doc.undo();
+    doc.undo();
+    CHECK(doc.song() == original);
+
+    // Nothing to change, and a measure the song does not have.
+    CHECK(elara::core::changeTimeSignature(original, 2, TimeSignature(3, 4)) == nullptr);
+    CHECK_THROWS_AS(elara::core::changeTimeSignature(original, 4, TimeSignature(3, 4)),
+                    std::out_of_range);
+}
+
+TEST_CASE("A key signature change runs until the next change", "[core][document]") {
+    Song original = smallSong();
+    original.measureHeader(3).keySignature = KeySignature(-1, KeyMode::Minor);
+    Document doc(original);
+
+    doc.execute(elara::core::changeKeySignature(doc.song(), 1, KeySignature(2, KeyMode::Major)));
+    CHECK(doc.song().measureHeader(0).keySignature == KeySignature());
+    CHECK(doc.song().measureHeader(1).keySignature == KeySignature(2, KeyMode::Major));
+    CHECK(doc.song().measureHeader(2).keySignature == KeySignature(2, KeyMode::Major));
+    CHECK(doc.song().measureHeader(3).keySignature == KeySignature(-1, KeyMode::Minor));
+    CHECK(doc.undoName() == "Change key signature");
+    // The time signatures are left alone.
+    CHECK(doc.song().measureHeader(2).timeSignature == TimeSignature(3, 4));
+
+    doc.undo();
+    CHECK(doc.song() == original);
+    CHECK(elara::core::changeKeySignature(original, 0, KeySignature()) == nullptr);
+}

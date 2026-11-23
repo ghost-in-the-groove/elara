@@ -13,7 +13,9 @@
 
 namespace elara::cli {
 
-/// `[{"name":"Lead","staves":1,"beats":8,"notes":16}, ...]`
+/// `[{"name":"Lead","mix":{...},"tuning":"E2 A2 D3 G3 B3 E4","capo":0,"staves":1,
+/// "beats":8,"notes":16}, ...]`: the tuning and capo of the first staff (tuning
+/// null without strings).
 [[nodiscard]] std::string tracksJson(const core::Song& song);
 
 /// `[{"time":"4/4","key":"C major"}, ...]`, one entry per measure.

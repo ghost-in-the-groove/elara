@@ -25,9 +25,10 @@ Two targets with different rules:
   silence tracks (ADR-0020);
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
-  `updateMix()` changes the track levels while it plays. For practice it
-  counts in before it starts (`play(CountIn)`, from `Sequence::countInAt()`)
-  and loops a passage (`setLoop()`, ADR-0024). It is an `AudioSource`, the
+  `updateMix()` changes the track levels while it plays, from a song or from
+  the tracks' mixes alone (a moving fader, ADR-0039). For practice it counts
+  in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and
+  loops a passage (`setLoop()`, ADR-0024). It is an `AudioSource`, the
   interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), and `readWav()`/`decodeWav()` for

@@ -123,6 +123,15 @@ void SetTrackMix::swapWith(Song& song) {
     mix_ = previous;
 }
 
+void SetStaffTuning::swapWith(Song& song) {
+    Staff& staff = song.track(track_).staff(staff_);
+    std::optional<Tuning> previous = staff.tuning();
+    const int previousCapo = staff.capo();
+    staff.setTuning(std::move(tuning_), capo_);
+    tuning_ = std::move(previous);
+    capo_ = previousCapo;
+}
+
 // ---- Groups ------------------------------------------------------------------
 
 CommandGroup::CommandGroup(std::string name, std::vector<std::unique_ptr<Command>> commands)
@@ -152,6 +161,43 @@ void CommandGroup::revert(Song& song) {
     for (auto it = commands_.rbegin(); it != commands_.rend(); ++it) {
         (*it)->revert(song);
     }
+}
+
+// ---- Signatures --------------------------------------------------------------
+
+namespace {
+
+// One SetMeasureHeader per measure from `from` while `field` of its header
+// equals the value it had at `from`, each setting `field` to `value`.
+template <typename Value, typename Field>
+std::unique_ptr<Command> changeRun(const Song& song, std::size_t from, const Value& value,
+                                   Field field, std::string name) {
+    if (from >= song.measureCount()) {
+        throw std::out_of_range(name + ": no such measure");
+    }
+    const Value old = song.measureHeader(from).*field;
+    if (old == value) {
+        return nullptr;
+    }
+    std::vector<std::unique_ptr<Command>> steps;
+    for (std::size_t m = from; m < song.measureCount() && song.measureHeader(m).*field == old;
+         ++m) {
+        MeasureHeader header = song.measureHeader(m);
+        header.*field = value;
+        steps.push_back(std::make_unique<SetMeasureHeader>(m, std::move(header)));
+    }
+    return std::make_unique<CommandGroup>(std::move(name), std::move(steps));
+}
+
+} // namespace
+
+std::unique_ptr<Command> changeTimeSignature(const Song& song, std::size_t from,
+                                             TimeSignature time) {
+    return changeRun(song, from, time, &MeasureHeader::timeSignature, "Change time signature");
+}
+
+std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from, KeySignature key) {
+    return changeRun(song, from, key, &MeasureHeader::keySignature, "Change key signature");
 }
 
 } // namespace elara::core

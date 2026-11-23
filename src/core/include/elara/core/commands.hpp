@@ -4,6 +4,7 @@
 #pragma once
 
 #include <elara/core/document.hpp>
+#include <elara/core/tuning.hpp>
 
 #include <cstddef>
 #include <memory>
@@ -148,6 +149,25 @@ private:
     TrackMix mix_;
 };
 
+/// Gives a staff another tuning and capo, its notes staying where they are
+/// (makeRetune moves them with it, ADR-0046).
+class SetStaffTuning final : public Command {
+public:
+    SetStaffTuning(std::size_t track, std::size_t staff, std::optional<Tuning> tuning, int capo)
+        : track_(track), staff_(staff), tuning_(std::move(tuning)), capo_(capo) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Change tuning"; }
+
+private:
+    void swapWith(Song& song);
+
+    std::size_t track_;
+    std::size_t staff_;
+    std::optional<Tuning> tuning_;
+    int capo_;
+};
+
 /// Several commands as one undo step, applied in order and reverted in reverse.
 /// If one fails, the ones already applied are reverted and the error propagates.
 class CommandGroup final : public Command {
@@ -162,5 +182,16 @@ private:
     std::string name_;
     std::vector<std::unique_ptr<Command>> commands_;
 };
+
+/// Changes the time signature from measure `from` until the next measure whose
+/// time signature differs from the one `from` had: what changing it "here"
+/// means in an editor. One undo step; null when nothing would change. Throws
+/// std::out_of_range when the song has no measure `from`.
+[[nodiscard]] std::unique_ptr<Command> changeTimeSignature(const Song& song, std::size_t from,
+                                                           TimeSignature time);
+
+/// The same for the key signature.
+[[nodiscard]] std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from,
+                                                          KeySignature key);
 
 } // namespace elara::core

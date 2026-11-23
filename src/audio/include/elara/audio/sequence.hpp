@@ -141,6 +141,10 @@ public:
     [[nodiscard]] std::optional<double> secondsAt(std::size_t measure,
                                                   double fraction) const noexcept;
 
+    /// Equal when they play the same: a song whose mix or title changed plays
+    /// as before, so playback can carry on (ADR-0039).
+    friend bool operator==(const Sequence&, const Sequence&) = default;
+
 private:
     // A tempo in played time: from `time` on, seconds per whole note.
     struct TempoPoint {
