@@ -233,7 +233,7 @@ TEST_CASE("Guitar Pro: other versions and damaged files are errors with a reason
     };
     CHECK(error(bytesOf("\x18"
                         "FICHIER GUITAR PRO v5.00")) ==
-          "Guitar Pro: Guitar Pro 3-5 files are not supported yet");
+          "Guitar Pro: damaged file: it ends early (byte 25)");
     CHECK(error(bytesOf("BCFZ....")) ==
           "Guitar Pro: Guitar Pro 6 files (.gpx) are not supported yet");
     CHECK(error(bytesOf("hello")) == "Guitar Pro: not a Guitar Pro file");

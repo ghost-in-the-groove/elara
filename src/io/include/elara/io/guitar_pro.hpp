@@ -12,9 +12,10 @@
 
 namespace elara::io {
 
-/// Reads a Guitar Pro file. Guitar Pro 7 and 8 files (.gp: a zip archive holding
-/// the score as GPIF XML) are read; Guitar Pro 3-6 files are recognised and
-/// refused with a message saying so. Tracks keep their tuning, capo, staves and
+/// Reads a Guitar Pro file: Guitar Pro 7 and 8 files (.gp: a zip archive holding
+/// the score as GPIF XML) and Guitar Pro 3, 4 and 5 files (.gp3, .gp4, .gp5: a
+/// binary stream); Guitar Pro 6 files (.gpx) are recognised and refused with a
+/// message saying so. Tracks keep their tuning, capo, staves and
 /// fret positions; techniques the model holds (bends, slides, hammer-ons,
 /// harmonics, palm mutes, vibrato...) are kept, and what it cannot hold
 /// (repeats, grace notes, lyrics, chord diagrams...) is listed in
@@ -23,7 +24,7 @@ namespace elara::io {
 [[nodiscard]] std::expected<ImportResult, FormatError>
 importGuitarPro(std::span<const std::uint8_t> bytes);
 
-/// Reads a .gp file (and recognises .gpx, .gp5, .gp4 and .gp3 files).
+/// Reads a .gp, .gp5, .gp4 or .gp3 file (and recognises .gpx files).
 [[nodiscard]] std::expected<ImportResult, FormatError>
 importGuitarProFile(const std::filesystem::path& path);
 
