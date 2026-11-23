@@ -14,7 +14,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "notehead",  "accidental", "dot",          "stem",          "flag",         "beam",
     "rest",      "fretNumber", "tie",          "slur",          "technique",    "bend",
     "slide",     "vibrato",    "articulation", "measureNumber", "credit",       "trackName",
-    "repeat",    "volta",      "tuplet",
+    "repeat",    "volta",      "tuplet",       "tempo",         "dynamic",
 };
 
 // Advance widths in em of a Helvetica-like font for printable ASCII; other

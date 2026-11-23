@@ -25,6 +25,10 @@ elara-cli [--json] import <FILE> [--out FILE.elara] [--force]  # .musicxml, .xml
 elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml, .mxl, .mid, .midi
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
+elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metronome]
+elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
+                                 [--events] [--speed 100] [--metronome]
+elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
@@ -86,7 +90,8 @@ list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
 `"pages"`: one display list per page. Lengths are in staff spaces, y down from
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
-credits...); `columns` say where the notes starting at each time of a measure
+credits...); a glyph drawn at another size than the staff's has a `"scale"`;
+`columns` say where the notes starting at each time of a measure
 are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
 beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
@@ -176,6 +181,12 @@ lane's piece only. `effect <name>` toggles a note effect on the caret's notes
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.
+
+`sequence`, `render-audio` and `play` play a song for practice (ADR-0024):
+`--speed` from 25 to 200 percent of the written tempo, and `--metronome` clicks
+every beat on a track after the song's last. Their JSON says `"speed"` (1 for
+the written tempo) and `"metronome"`; `sequence` puts them after
+`"duration"`, the others at the end.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

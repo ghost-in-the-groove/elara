@@ -43,9 +43,11 @@ enum class Role : std::uint8_t {
     Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
     Volta,         ///< the bracket and numbers of an alternate ending
     Tuplet,        ///< the number of a tuplet and its bracket
+    Tempo,         ///< a tempo mark: its note and "= 120"
+    Dynamic,       ///< a dynamics mark under a staff: "p", "mf", "ff"
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Tuplet) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Dynamic) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;
@@ -56,6 +58,7 @@ struct GlyphItem {
     Point origin;
     Role role{};
     std::size_t measure = 0; ///< index of the measure it belongs to in the song
+    double scale = 1.0;      ///< of the glyph's size: 1 at the staff's size
     friend bool operator==(const GlyphItem&, const GlyphItem&) = default;
 };
 

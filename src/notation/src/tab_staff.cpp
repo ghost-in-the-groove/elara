@@ -44,9 +44,14 @@ constexpr double kBendWidth = 0.9;      // horizontal run of a bend or release a
 constexpr double kArrowLength = 0.5;
 constexpr double kArrowWidth = 0.45;
 constexpr double kBendLabelSize = 0.95;
-constexpr double kBendLabelGap = 0.2; // between an arrowhead and its label
-constexpr double kReleaseDrop = 0.6;  // a release ends this far above its string
-constexpr double kRunEndGap = 0.3;    // a technique run ends before the next column
+constexpr double kBendLabelGap = 0.2;  // between an arrowhead and its label
+constexpr double kReleaseDrop = 0.6;   // a release ends this far above its string
+constexpr double kRunEndGap = 0.3;     // a technique run ends before the next column
+constexpr double kRhythmGap = 0.8;     // between the last string and the rhythm stems
+constexpr double kRhythmStem = 2.5;    // rhythm stems of quarters and shorter
+constexpr double kRhythmDotGap = 0.3;  // between a rhythm stem and its dots
+constexpr double kRhythmDotRise = 0.9; // dots this far above the end of their stem
+constexpr double kDotSeparation = 0.25;
 
 struct TabNote {
     const core::Note* note = nullptr;
@@ -99,13 +104,15 @@ std::string harmonicFret(const core::Harmonic& harmonic, int fret) {
 class TabWriter final : public StaffWriter {
 public:
     TabWriter(const core::Song& song, const core::Staff& staff, const EngravingFont& font,
-              bool rests)
+              bool alone)
         : StaffWriter(font, kLineSpace * (staff.tuning()->stringCount() - 1),
                       static_cast<std::size_t>(staff.tuning()->stringCount())),
-          song_(song), staff_(staff), tuning_(*staff.tuning()), rests_(rests), lanes_(font) {}
+          song_(song), staff_(staff), tuning_(*staff.tuning()), alone_(alone), lanes_(font),
+          dynamics_(font) {}
 
     double header(std::size_t first) override {
         measure_ = first;
+        dynamics_.start(staff_, first);
         const Glyph clef = lineCount() >= 5 ? Glyph::TabClef6 : Glyph::TabClef4;
         const BoundingBox& box = metrics(clef).box;
         double x = glyphFrom(clef, kClefX, height() / 2 + (box.southWest.y + box.northEast.y) / 2,
@@ -147,22 +154,30 @@ public:
             }
         }
         ink.clear();
+        rhythm_.clear();
         if (!notes) {
             columns_.clear(); // a measure of rests: one centred rest, if any
             return;
         }
+        if (alone_) {
+            readRhythm(staff_.measure(m));
+        }
         for (const TabColumn& column : columns_) {
             const double centre = centreOf(column);
             ColumnInk item{.start = column.start, .longest = column.longest};
+            const auto beat = std::ranges::find(rhythm_, column.start, &RhythmItem::start);
+            if (beat != rhythm_.end() && !beat->rest && beat->duration.dots() > 0) {
+                item.right = centre + kRhythmDotGap + dotsWidth(beat->duration.dots());
+            }
             if (column.notes.empty()) {
-                const double width = rests_ ? widthOf(restFor(*column.beats.front())) : 0.0;
+                const double width = alone_ ? widthOf(restFor(*column.beats.front())) : 0.0;
                 item.left = centre - width / 2;
                 item.right = centre + width / 2;
                 ink.push_back(item);
                 continue;
             }
             item.left = centre;
-            item.right = centre;
+            item.right = std::max(item.right, centre);
             for (const TabNote& note : column.notes) {
                 const core::NoteEffects& effects = note.note->effects;
                 const double half = note.width / 2 + kFretPadding;
@@ -188,13 +203,13 @@ public:
     }
 
     [[nodiscard]] double emptyWidth() const override {
-        return rests_ ? widthOf(Glyph::RestWhole) : 0.0;
+        return alone_ ? widthOf(Glyph::RestWhole) : 0.0;
     }
 
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override {
         measure_ = measureIndex_;
         if (columns_.empty()) {
-            if (rests_) {
+            if (alone_) {
                 glyphCentred(Glyph::RestWhole, (start + barline) / 2, height() / 2, Role::Rest);
             }
             lanes_.column({}, barline, barline, measure_);
@@ -204,13 +219,19 @@ public:
             column.x = columnX(positions, column.start);
             const double centre = column.x + centreOf(column);
             if (column.notes.empty()) {
-                if (rests_) {
+                if (alone_) {
                     glyphCentred(restFor(*column.beats.front()), centre, height() / 2, Role::Rest);
                 }
             }
             ColumnTechniques marks;
+            std::optional<core::Dynamic> loudest;
             for (const core::Beat* beat : column.beats) {
                 addTechniques(marks, *beat);
+                addStruck(loudest, *beat);
+            }
+            // Dynamics go under the standard notation when the system has it.
+            if (alone_ && loudest) {
+                dynamics_.strike(*loudest, centre, measure_);
             }
             for (const TabNote& note : column.notes) {
                 drawNote(note, centre);
@@ -220,9 +241,147 @@ public:
                               nextColumnX(positions, column.start, barline) - kRunEndGap, measure_);
             }
         }
+        if (!rhythm_.empty()) {
+            drawRhythm();
+        }
     }
 
 private:
+    // The rhythm shown under the staff: the first voice of the measure with
+    // notes (ADR-0041).
+    void readRhythm(const core::Measure& measure) {
+        for (const core::Voice& voice : measure.voices) {
+            if (std::ranges::none_of(voice.beats,
+                                     [](const core::Beat& beat) { return !beat.isRest(); })) {
+                continue;
+            }
+            Fraction at;
+            for (const core::Beat& beat : voice.beats) {
+                rhythm_.push_back(
+                    RhythmItem{.start = at, .duration = beat.duration, .rest = beat.isRest()});
+                at += beat.duration.length();
+            }
+            return;
+        }
+    }
+
+    [[nodiscard]] double dotsWidth(int dots) const {
+        return dots * widthOf(Glyph::AugmentationDot) + (dots - 1) * kDotSeparation;
+    }
+
+    // Stems down from under the staff, flags, beams, dots and tuplet numbers
+    // of the rhythm voice, as standard notation would write them: no stem for
+    // whole notes, half the stem for halves, horizontal beams at the stems'
+    // end.
+    void drawRhythm() {
+        const double top = height() + kRhythmGap;
+        const double end = top + kRhythmStem;
+        const double stemWidth = defaults_.stemThickness;
+        rhythmX_.clear();
+        for (const RhythmItem& item : rhythm_) {
+            const auto column =
+                std::ranges::lower_bound(columns_, item.start, {}, &TabColumn::start);
+            rhythmX_.push_back(column->x + centreOf(*column));
+        }
+        const std::vector<std::vector<std::size_t>> groups =
+            beamGroups(rhythm_, song_.measureHeader(measureIndex_).timeSignature);
+        std::vector<int> groupOf(rhythm_.size(), -1);
+        for (std::size_t g = 0; g < groups.size(); ++g) {
+            for (const std::size_t i : groups[g]) {
+                groupOf[i] = static_cast<int>(g);
+            }
+        }
+        for (std::size_t i = 0; i < rhythm_.size(); ++i) {
+            const RhythmItem& item = rhythm_[i];
+            const core::NoteValue value = item.duration.value();
+            if (item.rest || value < core::NoteValue::Half) {
+                continue;
+            }
+            const double x = rhythmX_[i];
+            line({x, value == core::NoteValue::Half ? top + kRhythmStem / 2 : top}, {x, end},
+                 stemWidth, Role::Stem);
+            if (groupOf[i] < 0 && beamCount(value) > 0) {
+                const Glyph flag = offsetGlyph(Glyph::Flag8thDown, 2 * (beamCount(value) - 1));
+                const Point attach = metrics(flag).anchor(Anchor::StemDownSW).value_or(Point{});
+                glyph(flag, x - stemWidth / 2 - attach.x, end + attach.y, Role::Flag);
+            }
+            double dotX = x + kRhythmDotGap;
+            for (int d = 0; d < item.duration.dots(); ++d) {
+                dotX = glyphFrom(Glyph::AugmentationDot, dotX, end - kRhythmDotRise, Role::Dot) +
+                       kDotSeparation;
+            }
+        }
+        for (const std::vector<std::size_t>& group : groups) {
+            rhythmBeams(group, end);
+        }
+        for (const TupletSpan& span : tupletSpans(rhythm_)) {
+            const int g = groupOf[span.first];
+            bool beamed = g >= 0;
+            for (std::size_t i = span.first; beamed && i <= span.last; ++i) {
+                beamed = groupOf[i] == g;
+            }
+            if (beamed) {
+                beamed = std::ranges::none_of(
+                    groups[static_cast<std::size_t>(g)],
+                    [this](std::size_t i) { return rhythm_[i].duration.tuplet().isNone(); });
+            }
+            const TupletNumber number = tupletNumber(span.tuplet.actual());
+            const double middle = (rhythmX_[span.first] + rhythmX_[span.last]) / 2;
+            if (beamed) {
+                drawTupletNumber(number, middle, end + kTupletGap + number.top);
+                continue;
+            }
+            const double half = std::max((rhythmX_[span.last] - rhythmX_[span.first]) / 2,
+                                         number.width / 2 + kTupletNumberGap + kTupletHook);
+            tupletBracket(number, middle - half, middle + half, end + bracketReach(number), false);
+        }
+    }
+
+    // The beams of one group, the primary one at the end of the stems and the
+    // others above it; a lone shorter note gets a short beam towards its group.
+    void rhythmBeams(const std::vector<std::size_t>& group, double end) {
+        const double thickness = defaults_.beamThickness;
+        const double stemWidth = defaults_.stemThickness;
+        const double step = thickness + defaults_.beamSpacing;
+        int levels = 1;
+        for (const std::size_t i : group) {
+            levels = std::max(levels, beamCount(rhythm_[i].duration.value()));
+        }
+        const auto count = [&](std::size_t k) {
+            return beamCount(rhythm_[group[k]].duration.value());
+        };
+        for (int level = 1; level <= levels; ++level) {
+            const double y = end - thickness / 2 - (level - 1) * step;
+            const auto add = [&](double left, double right) {
+                list_.beams.push_back(BeamItem{.left = {left, y},
+                                               .right = {right, y},
+                                               .thickness = thickness,
+                                               .measure = measure_});
+            };
+            std::size_t k = 0;
+            while (k < group.size()) {
+                if (count(k) < level) {
+                    ++k;
+                    continue;
+                }
+                std::size_t j = k;
+                while (j + 1 < group.size() && count(j + 1) >= level) {
+                    ++j;
+                }
+                const double leftStem = rhythmX_[group[k]];
+                const double rightStem = rhythmX_[group[j]];
+                if (j > k) {
+                    add(leftStem - stemWidth / 2, rightStem + stemWidth / 2);
+                } else if (k == 0) {
+                    add(leftStem - stemWidth / 2, leftStem - stemWidth / 2 + kBeamletLength);
+                } else {
+                    add(rightStem + stemWidth / 2 - kBeamletLength, rightStem + stemWidth / 2);
+                }
+                k = j + 1;
+            }
+        }
+    }
+
     // Where fret numbers go from the column's x: under the centre of the
     // notehead the standard notation draws for the first note.
     [[nodiscard]] double centreOf(const TabColumn& column) const {
@@ -367,15 +526,17 @@ private:
             .centre = centre, .halfWidth = half, .fret = note.fret, .slideOut = effects.slideOut};
     }
 
-    void close(double /*width*/) override {
-        if (lanes_.empty()) {
-            return;
+    void close(double width) override {
+        if (!lanes_.empty()) {
+            lanes_.place(list_, inkTop());
+            const double tip = lanes_.bottom(Lane::Bend);
+            for (const PendingBend& bend : pendingBends_) {
+                measure_ = bend.measure;
+                bendArrows(bend, tip);
+            }
         }
-        lanes_.place(list_, inkTop());
-        const double tip = lanes_.bottom(Lane::Bend);
-        for (const PendingBend& bend : pendingBends_) {
-            measure_ = bend.measure;
-            bendArrows(bend, tip);
+        if (!dynamics_.empty()) {
+            dynamics_.place(list_, inkBottom(), height(), width);
         }
     }
 
@@ -427,8 +588,11 @@ private:
     const core::Song& song_;
     const core::Staff& staff_;
     const core::Tuning& tuning_;
-    bool rests_;
+    bool alone_; // no standard notation of the staff: rests and rhythm show here
+    std::vector<RhythmItem> rhythm_; // the voice whose rhythm shows, in the measure read last
+    std::vector<double> rhythmX_;    // the stems' x
     TechniqueLanes lanes_;
+    DynamicMarks dynamics_;
     std::size_t measureIndex_ = 0;
     std::vector<TabColumn> columns_;
     std::array<std::optional<LastNote>, core::Tuning::kMaxStrings + 1> last_{};
@@ -439,8 +603,8 @@ private:
 
 std::unique_ptr<StaffWriter> makeTabWriter(const core::Song& song, std::size_t track,
                                            std::size_t staff, const EngravingFont& font,
-                                           bool rests) {
-    return std::make_unique<TabWriter>(song, song.track(track).staff(staff), font, rests);
+                                           bool alone) {
+    return std::make_unique<TabWriter>(song, song.track(track).staff(staff), font, alone);
 }
 
 } // namespace elara::notation::detail

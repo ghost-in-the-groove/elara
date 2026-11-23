@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "layout_common.hpp"
 
+#include <elara/core/song.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
+#include <limits>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -23,6 +28,11 @@ constexpr double kRunHook = 0.4;       // the line's closing hook
 constexpr double kRunLineGap = 0.25;   // between the text and its line
 constexpr double kVibratoLift = 0.25;  // vibrato strokes above the bottom of their lane
 constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3};
+
+// Dynamics marks, in staff spaces (ADR-0044).
+constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
+constexpr double kDynamicInkGap = 0.5;   // at least between the ink above and the marks
+constexpr double kDynamicGap = 0.4;      // at least between neighbouring marks
 
 } // namespace
 
@@ -51,8 +61,8 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
     };
     for (const GlyphItem& item : list.glyphs) {
         const BoundingBox& box = font.metrics(item.glyph).box;
-        cover(item.origin.y - box.northEast.y);
-        cover(item.origin.y - box.southWest.y);
+        cover(item.origin.y - box.northEast.y * item.scale);
+        cover(item.origin.y - box.southWest.y * item.scale);
     }
     for (const LineItem& item : list.lines) {
         cover(item.from.y);
@@ -164,6 +174,116 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.texts, from.texts);
     move(to.curves, from.curves);
     move(to.polygons, from.polygons);
+}
+
+Glyph dynamicGlyph(core::Dynamic dynamic) noexcept {
+    switch (dynamic) {
+    case core::Dynamic::PPP:
+        return Glyph::DynamicPPP;
+    case core::Dynamic::PP:
+        return Glyph::DynamicPP;
+    case core::Dynamic::P:
+        return Glyph::DynamicPiano;
+    case core::Dynamic::MP:
+        return Glyph::DynamicMP;
+    case core::Dynamic::MF:
+        return Glyph::DynamicMF;
+    case core::Dynamic::F:
+        return Glyph::DynamicForte;
+    case core::Dynamic::FF:
+        return Glyph::DynamicFF;
+    case core::Dynamic::FFF:
+        return Glyph::DynamicFFF;
+    }
+    return Glyph::DynamicMF;
+}
+
+void addStruck(std::optional<core::Dynamic>& loudest, const core::Beat& beat) {
+    for (const core::Note& note : beat.notes) {
+        if (!note.effects.tiedFromPrevious && (!loudest || note.effects.dynamic > *loudest)) {
+            loudest = note.effects.dynamic;
+        }
+    }
+}
+
+core::Dynamic dynamicBefore(const core::Staff& staff, std::size_t m) {
+    while (m > 0) {
+        --m;
+        // The latest start in the measure with struck notes, over every voice.
+        std::optional<core::Fraction> latest;
+        std::optional<core::Dynamic> loudest;
+        for (const core::Voice& voice : staff.measure(m).voices) {
+            core::Fraction at;
+            for (const core::Beat& beat : voice.beats) {
+                std::optional<core::Dynamic> struck;
+                addStruck(struck, beat);
+                if (struck) {
+                    if (!latest || *latest < at) {
+                        latest = at;
+                        loudest = struck;
+                    } else if (*latest == at && *struck > *loudest) {
+                        loudest = struck;
+                    }
+                }
+                at += beat.duration.length();
+            }
+        }
+        if (loudest) {
+            return *loudest;
+        }
+    }
+    return core::Dynamic::MF;
+}
+
+void DynamicMarks::strike(core::Dynamic dynamic, double centre, std::size_t measure) {
+    if (!known_) {
+        current_ = staff_ != nullptr ? dynamicBefore(*staff_, first_) : core::Dynamic::MF;
+        known_ = true;
+    }
+    if (dynamic != current_) {
+        marks_.push_back(Mark{.dynamic = dynamic, .centre = centre, .measure = measure});
+        current_ = dynamic;
+    }
+}
+
+void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, double end) {
+    if (marks_.empty()) {
+        return;
+    }
+    double ascent = 0.0;
+    for (const Mark& mark : marks_) {
+        ascent = std::max(ascent, font_.metrics(dynamicGlyph(mark.dynamic)).box.northEast.y);
+    }
+    const double baseline =
+        std::max(staffHeight + kDynamicBaseline, bottom + kDynamicInkGap + ascent);
+    // Centred by eye under their notes, moved right off the mark before...
+    origins_.clear();
+    double right = -std::numeric_limits<double>::infinity();
+    for (const Mark& mark : marks_) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(mark.dynamic)).box;
+        const double middle = font_.metrics(dynamicGlyph(mark.dynamic))
+                                  .anchor(Anchor::OpticalCenter)
+                                  .value_or(Point{.x = (box.southWest.x + box.northEast.x) / 2})
+                                  .x;
+        const double x = std::max(mark.centre - middle, right + kDynamicGap - box.southWest.x);
+        origins_.push_back(x);
+        right = x + box.northEast.x;
+    }
+    // ...and left, off the end of the line and the mark after; never off the
+    // start of the line, overlapping when there is no room at all.
+    double limit = end;
+    for (std::size_t i = marks_.size(); i-- > 0;) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(marks_[i].dynamic)).box;
+        origins_[i] = std::max(std::min(origins_[i], limit - box.northEast.x), -box.southWest.x);
+        limit = origins_[i] + box.southWest.x - kDynamicGap;
+    }
+    for (std::size_t i = 0; i < marks_.size(); ++i) {
+        list.glyphs.push_back(GlyphItem{.glyph = dynamicGlyph(marks_[i].dynamic),
+                                        .origin = {origins_[i], baseline},
+                                        .role = Role::Dynamic,
+                                        .measure = marks_[i].measure});
+    }
+    marks_.clear();
 }
 
 std::string bendLabel(int cents) {
@@ -491,6 +611,114 @@ double StaffWriter::timeSignature(const core::TimeSignature& time, double x, dou
 
 double StaffWriter::inkTop() const {
     return inkExtents(list_, font_, height_).top;
+}
+
+double StaffWriter::inkBottom() const {
+    return inkExtents(list_, font_, height_).bottom;
+}
+
+StaffWriter::TupletNumber StaffWriter::tupletNumber(int count) const {
+    TupletNumber number{.digits = std::to_string(count),
+                        .width = 0.0,
+                        .top = std::numeric_limits<double>::lowest(),
+                        .bottom = std::numeric_limits<double>::max()};
+    for (const char digit : number.digits) {
+        const BoundingBox& box = metrics(offsetGlyph(Glyph::Tuplet0, digit - '0')).box;
+        number.width += box.width();
+        number.top = std::max(number.top, box.northEast.y);
+        number.bottom = std::min(number.bottom, box.southWest.y);
+    }
+    return number;
+}
+
+void StaffWriter::drawTupletNumber(const TupletNumber& number, double x, double origin) {
+    double from = x - number.width / 2;
+    for (const char digit : number.digits) {
+        from = glyphFrom(offsetGlyph(Glyph::Tuplet0, digit - '0'), from, origin, Role::Tuplet);
+    }
+}
+
+void StaffWriter::tupletBracket(const TupletNumber& number, double left, double right, double y,
+                                bool above) {
+    const double middle = (left + right) / 2;
+    const double hook = y + (above ? kTupletHook : -kTupletHook);
+    const double thickness = defaults_.tupletBracketThickness;
+    line({left, hook}, {left, y}, thickness, Role::Tuplet);
+    line({left, y}, {middle - number.width / 2 - kTupletNumberGap, y}, thickness, Role::Tuplet);
+    line({middle + number.width / 2 + kTupletNumberGap, y}, {right, y}, thickness, Role::Tuplet);
+    line({right, y}, {right, hook}, thickness, Role::Tuplet);
+    drawTupletNumber(number, middle, y + (number.top + number.bottom) / 2);
+}
+
+std::vector<std::vector<std::size_t>> beamGroups(std::span<const RhythmItem> items,
+                                                 const core::TimeSignature& time) {
+    const bool compound = time.isCompound() && time.denominator() >= 8;
+    const core::Fraction window(compound ? 3 : 1, time.denominator());
+    std::vector<std::vector<std::size_t>> groups;
+    std::vector<std::size_t> group;
+    std::int64_t groupWindow = -1;
+    const auto flush = [&] {
+        if (group.size() >= 2) {
+            groups.push_back(group);
+        }
+        group.clear();
+    };
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const RhythmItem& item = items[i];
+        const core::Fraction position = item.start / window;
+        const std::int64_t index = position.numerator() / position.denominator();
+        const bool fits = item.start + item.duration.length() <= window * core::Fraction(index + 1);
+        if (item.rest || beamCount(item.duration.value()) == 0 || !fits) {
+            flush();
+            continue;
+        }
+        if (index != groupWindow) {
+            flush();
+            groupWindow = index;
+        }
+        group.push_back(i);
+    }
+    flush();
+    return groups;
+}
+
+std::vector<TupletSpan> tupletSpans(std::span<const RhythmItem> items) {
+    std::vector<TupletSpan> spans;
+    std::optional<TupletSpan> open;
+    core::Fraction written;
+    core::Fraction shortest;
+    const auto close = [&] {
+        if (open) {
+            spans.push_back(*open);
+            open.reset();
+        }
+    };
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const core::Duration& duration = items[i].duration;
+        const core::Tuplet tuplet = duration.tuplet();
+        if (open && open->tuplet != tuplet) {
+            close();
+        }
+        if (tuplet.isNone()) {
+            continue;
+        }
+        const core::NoteValue value = duration.value();
+        if (!open) {
+            open = TupletSpan{.first = i, .last = i, .tuplet = tuplet};
+            written = core::Fraction();
+            shortest = core::noteValueLength(value);
+        }
+        open->last = i;
+        written += core::Duration(value, duration.dots()).length();
+        shortest = std::min(shortest, core::noteValueLength(value));
+        const core::Fraction unit = written / core::Fraction(tuplet.actual());
+        const std::int64_t den = unit.denominator();
+        if (unit.numerator() == 1 && (den & (den - 1)) == 0 && unit >= shortest) {
+            close();
+        }
+    }
+    close();
+    return spans;
 }
 
 } // namespace elara::notation::detail
