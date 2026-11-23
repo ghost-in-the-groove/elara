@@ -28,6 +28,7 @@ elara_add_unit_tests(core
     core/test_song.cpp
     core/test_signature.cpp
     core/test_timeline.cpp
+    core/test_jumps.cpp
     core/test_document.cpp
     core/test_effects.cpp
     core/test_entry.cpp
@@ -103,19 +104,37 @@ if(TARGET elara)
   # The song panel open while the song is edited.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --song-pane "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
+  # The measure popup open at the caret while the measures are edited.
+  add_test(NAME app.smoke_measure
+    COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner app.smoke_song_pane
+    app.smoke_tuner app.smoke_song_pane app.smoke_measure
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 15 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 21 layouts\\)")
-  set_tests_properties(app.smoke_open_views PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 25 layouts\\)")
+  set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 22 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+
+  # A song of several pages: the notes typed on the first page leave the others
+  # as they were, so those keep their textures instead of being painted again.
+  set(ELARA_APP_LONG_SONG "${CMAKE_CURRENT_BINARY_DIR}/app-long-song.elara")
+  add_test(NAME app.make_long_song
+    COMMAND elara-cli edit --out "${ELARA_APP_LONG_SONG}" "add-track electric-guitar"
+      "append-measures 160")
+  set_tests_properties(app.make_long_song PROPERTIES FIXTURES_SETUP app_long_song)
+  add_test(NAME app.smoke_keeps_pages COMMAND elara --smoke-test "${ELARA_APP_LONG_SONG}")
+  set_tests_properties(app.smoke_keeps_pages PROPERTIES
+    FIXTURES_REQUIRED app_long_song
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "pages kept: [1-9][0-9]*[\r\n]+smoke-test: ok \\([0-9]+ pages")
 
   # The UI in Spanish: the catalog compiled into the executable loads and the
   # window loads with it. Every string has a translation in every language.
@@ -126,7 +145,7 @@ if(TARGET elara)
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
     TIMEOUT 60)
   set_tests_properties(app.smoke_spanish PROPERTIES
-    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+smoke-test: ok")
+    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
   set_tests_properties(app.language_unknown PROPERTIES
     PASS_REGULAR_EXPRESSION "no translation for language \"xx\"")
   add_test(NAME app.translations_complete

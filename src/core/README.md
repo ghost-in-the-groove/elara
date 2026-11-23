@@ -72,8 +72,9 @@ Each `MeasureHeader` holds the time signature, the concert key and the tempo
 changes of its measure, so they move with it; new measures continue the meter
 and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
 `durationSeconds()` give the timeline of the measures as written; the
-header's repeats and alternate endings say how they are played, and
-`playOrder()` lists the measures in that order (ADR-0016).
+header's repeats and alternate endings (ADR-0016), signs and jumps
+(ADR-0049) say how they are played, and `playOrder()` lists the measures in
+that order.
 Beat positions are derived from durations, never stored. How each instrument
 family is handled: `docs/instruments.md`.
 

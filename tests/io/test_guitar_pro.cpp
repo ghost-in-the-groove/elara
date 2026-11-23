@@ -291,6 +291,23 @@ TEST_CASE("Guitar Pro: a tuning that is never shown is dropped unless the instru
     CHECK(open(kFlute, std::string("\0\0\0\1\0\0\0", 7)).staff(0).isFretted());
 }
 
+TEST_CASE("Guitar Pro: directions become signs and jumps", "[io][guitarpro]") {
+    // 1 | 2 segno | 3 segno segno | 4 da coda, da double coda
+    // | 5 D.S.S. al Double Coda | 6 coda | 7 double coda (ADR-0049)
+    const ImportResult result = load("double-coda.gp");
+    const core::Song& song = result.song;
+    CHECK(result.warnings.empty());
+    CHECK(song.measureHeader(1).segno);
+    CHECK(song.measureHeader(2).segnoSegno);
+    CHECK(song.measureHeader(3).toCoda);
+    CHECK(song.measureHeader(3).toDoubleCoda);
+    CHECK(song.measureHeader(4).jump == core::JumpTo::SegnoSegno);
+    CHECK(song.measureHeader(4).jumpThen == core::JumpThen::DoubleCoda);
+    CHECK(song.measureHeader(5).coda);
+    CHECK(song.measureHeader(6).doubleCoda);
+    CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 3, 4, 2, 3, 6});
+}
+
 TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {
     const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
     const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";

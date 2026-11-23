@@ -43,6 +43,10 @@ constexpr std::array kDynamicNames =
     std::to_array<std::string_view>({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"});
 constexpr std::array kStrokeNames = std::to_array<std::string_view>({"none", "down", "up"});
 constexpr std::array kBassNames = std::to_array<std::string_view>({"none", "tap", "slap", "pop"});
+constexpr std::array kJumpToNames =
+    std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
+constexpr std::array kJumpThenNames =
+    std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
 
 template <typename Enum, std::size_t N>
 std::string_view nameOf(const std::array<std::string_view, N>& names, Enum value) {
@@ -197,6 +201,17 @@ private:
                 }
             }
             add(object, "alternateEndings", endings);
+        }
+        addFlag(object, "segno", value.segno);
+        addFlag(object, "segnoSegno", value.segnoSegno);
+        addFlag(object, "coda", value.coda);
+        addFlag(object, "doubleCoda", value.doubleCoda);
+        addFlag(object, "fine", value.fine);
+        addFlag(object, "toCoda", value.toCoda);
+        addFlag(object, "toDoubleCoda", value.toDoubleCoda);
+        addEnumIfNot(object, "jump", kJumpToNames, value.jump, JumpTo::None);
+        if (value.jump != JumpTo::None) {
+            addEnumIfNot(object, "jumpThen", kJumpThenNames, value.jumpThen, JumpThen::End);
         }
         return object;
     }
@@ -712,6 +727,17 @@ private:
                 header.alternateEndings =
                     static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             });
+        }
+        header.segno = flag(object, "segno");
+        header.segnoSegno = flag(object, "segnoSegno");
+        header.coda = flag(object, "coda");
+        header.doubleCoda = flag(object, "doubleCoda");
+        header.fine = flag(object, "fine");
+        header.toCoda = flag(object, "toCoda");
+        header.toDoubleCoda = flag(object, "toDoubleCoda");
+        header.jump = enumValue(object, "jump", kJumpToNames, JumpTo::None);
+        if (header.jump != JumpTo::None) {
+            header.jumpThen = enumValue(object, "jumpThen", kJumpThenNames, JumpThen::End);
         }
         return header;
     }
