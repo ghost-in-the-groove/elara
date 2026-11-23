@@ -34,6 +34,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | documento | document | `Document` | A song being edited: song + undo/redo history + save point |
 | orden / acción de edición | command | `Command` | One reversible edit (`apply`/`revert`), ADR-0005 |
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
+| cursor de edición | caret | `Caret` | Beat and string where typing enters notes; the free slot follows the last beat of a short measure (ADR-0021) |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
 | importación / aviso | import / warning | `ImportResult`, `warnings` | A foreign file read into the model; each warning is a feature it had that the model cannot hold yet (ADR-0007) |
@@ -44,6 +45,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | evento de nota | note event | `NoteEvent`, `EventKind` | What a synthesizer is told: a key struck (`NoteOn`) or released (`NoteOff`) on a track at a time |
 | timbre | timbre | `audio::Timbre`, `timbreFor()` | The sound the built-in synthesizer gives a track, picked from its instrument (ADR-0018) |
 | reproductor / transporte | player / transport | `audio::Player`: `play()`, `pause()`, `seek()`, `position()` | Plays a song in real time; the transport is where it is and whether it moves (ADR-0019) |
+| cursor de reproducción | playback cursor | `notation::cursorAt`, `ScoreDocument::cursorAt` | The line across a system that shows what plays; it stands on each column of notes as it starts |
 | registro de eventos | event log | `LoggedEvent`, `OfflineRenderer::log()` | The note events a render dispatched, each with its sample frame; what playback tests compare |
 | cuantización / rejilla | quantization / grid | MIDI import | Placing played or exported MIDI notes on a rhythm grid chosen per beat before writing them as notes, rests, ties and tuplets (ADR-0009) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
@@ -59,6 +61,9 @@ base speaks one vocabulary. American terms follow MusicXML.
 | altura | pitch | `Pitch` | step + alter + octave |
 | nombre de nota | step | `Step` | C D E F G A B |
 | enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
+| intervalo | interval | `Interval` | Diatonic steps and semitones: a major second is {1, 2} |
+| portapapeles | clipboard | `MeasureClip`, `copyMeasures()`, `makePaste()` | Copied measures of some tracks, pasted over measures or into new ones (ADR-0027) |
+| transposición | transposition | `Transposition`, `makeTranspose()` | Moving notes by an interval; keys follow when every pitched track moves (ADR-0026) |
 | afinación | tuning | `Tuning` | |
 | cuerda | string | `string` (index) | 1 = highest |
 | traste | fret | `fret` | Relative to the capo |
@@ -83,7 +88,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | velocidad de reproducción | playback speed | `SequenceOptions::speed` | 0.25 to 2 times every written tempo (ADR-0024) |
 | bucle A-B | A-B loop | `Player::setLoop()` | Playback that reaches B goes on from A (ADR-0024) |
 | claqueta (cuenta previa) | count-in | `CountIn`, `Sequence::countInAt()` | One measure of beats before playback starts, at the tempo there (ADR-0024) |
-| afinador | tuner | `Tuner` | |
+| afinador | tuner | `Tuner`, `PitchDetector`, `tunerReading()` | YIN pitch detection; the nearest note, its cents and the nearest open string (ADR-0028); smoothed readings from the audio input (ADR-0029) |
 | banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |
 | mezclador | mixer | `Mixer` | |
 | mezcla de pista | track mix | `TrackMix` | Volume (fader position 0..1), pan (-1..1), mute, solo; `Song::audible()` (ADR-0020) |

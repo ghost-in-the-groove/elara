@@ -6,8 +6,10 @@ look at a score, so every capability must be observable from here:
 ```text
 elara-cli [--json] version
 elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [--sample-rate 48000]
-elara-cli [--json] devices
+elara-cli [--json] devices                         # outputs and inputs
 elara-cli [--json] tone [--frequency 440] [--seconds 1]
+elara-cli [--json] tune <FILE.wav> [--a4 440] [--tuning guitar]   # the tuner's reading of a recording
+elara-cli [--json] listen [--seconds 5] [--a4 440] [--tuning guitar] # tune from the default input
 elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
 elara-cli [--json] fret --string N --fret N [--tuning guitar] [--capo 0] [--flats]
 elara-cli [--json] positions <PITCH> [--tuning guitar] [--capo 0] [--max-fret 30]
@@ -33,6 +35,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT]
+                           [--cursor-at SECONDS] [--time-at PAGE X Y]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -40,6 +43,18 @@ spelling, MIDI number and equal-tempered frequency. `--tuning` takes a preset
 name from `tunings` or open strings from the lowest tab line, e.g.
 `"D2 A2 D3 G3 B3 E4"`. Durations are written as in `rests`: `4` quarter, `8.`
 dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
+
+`tune` reads a WAV file (PCM or float, channels mixed to mono), detects the
+pitch in windows half a window apart (ADR-0028) and reports the median of the
+windows that have a clear one: `{"file", "sampleRate", "windows", "pitched",
+"a4", "frequency", "note", "cents", "clarity"}`, and with `--tuning` also
+`"tuning", "string", "stringPitch", "stringCents"` for the nearest open string.
+It fails when no window has a clear pitch. `listen` opens the default audio
+input (ADR-0029) and prints each change of the tuner's reading as it happens;
+with `--json`, at the end: `{"device", "sampleRate", "seconds", "peak",
+"dropped", "readings"}`, each reading `{"time", "note", "cents",
+"frequency"}` (plus `"string", "stringCents"` with `--tuning`) or `{"time",
+"note": null}` when the note stops. `devices` lists `"outputs"` and `"inputs"`.
 
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
 `--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
@@ -81,6 +96,16 @@ credits...). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
 several.
 
+The playback cursor and clicks on the score (the app's transport): with
+`--cursor-at SECONDS`, `--json` adds `"cursor": {"seconds", "played",
+"measure", "page", "x", "y", "height"}` before the display lists: the measure
+played then (`played` counts repeats, `measure` is the written one) and the
+line across its system, standing on each column of notes as it starts; `null`
+after the end. `--time-at PAGE X Y` (the page from 0, x and y as the cursor
+gives them) adds `"timeAt": {"page", "x", "y", "measure", "seconds"}`: where a
+click there starts playback, on the column of notes under it the first time
+its measure plays; `measure` and `seconds` are `null` away from every measure.
+
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its
 validation issues and the undo/redo state:
@@ -94,8 +119,43 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
-`fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
-step the song rejects (missing track, nothing to undo) with 1.
+`fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
+`paste <m> [track <t>] [insert]`,
+`transpose <semitones> [measures <m> <n>] [tracks <t>...]`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
+(missing track, nothing to undo) with 1.
+
+`copy` keeps `n` measures from `m` of every track, or of `count` tracks from
+`t` (one when `count` is left out), for later `paste` steps; it is not an
+undoable edit. `paste` puts them over the measures from `m` of track `t` and
+the tracks after it, appending measures past the end, or into new measures
+before `m` with the copied time and key signatures (`insert`). Fretted notes
+find strings again on another tuning or capo, and lose their frets on a staff
+without one; drums paste only into drum tracks (ADR-0027).
+
+`transpose` moves pitched notes up (or down, when negative) by that many
+semitones, over every measure or `n` measures from `m`, of every track or the
+listed ones (ADR-0026). Notes keep the degree of their spelling in the key the
+interval leads to: C# up a semitone in C major is D. Key signatures move when
+every pitched track does; drums never move. A fretted note keeps its string when
+its new fret is on the neck, else takes the nearest free string; a note no
+string can play rejects the step.
+
+Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
+`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
+string (adding a beat of the input duration on the free slot after the last
+beat of a short measure), `pitch <C..B> [add]` types a note name in the
+octave nearest the previous note (with `add`, above the beat's highest note;
+on tablature on the nearest string that reaches it, ADR-0034), `shift
+<semitones>` moves the caret's note, `duration <d>` sets the input duration and
+the caret beat's, `delete` removes the note on the caret's string (on a staff
+without strings, the beat's notes; on a rest, the rest), `delete-beat` the
+whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
+caret's string is a drum lane, from the crash at the top to the hi-hat pedal
+(ADR-0035): `drum` toggles the lane's piece on the caret's beat, `drum <key>`
+that General MIDI key's lane (moving the caret to it), and `delete` removes the
+lane's piece only. The output includes `"caret"` and `"input"`.
 
 `sequence`, `render-audio` and `play` play a song for practice (ADR-0024):
 `--speed` from 25 to 200 percent of the written tempo, and `--metronome` clicks

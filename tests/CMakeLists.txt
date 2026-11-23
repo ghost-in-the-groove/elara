@@ -19,6 +19,7 @@ endfunction()
 elara_add_unit_tests(core
   SOURCES
     core/test_version.cpp
+    core/test_clipboard.cpp
     core/test_fraction.cpp
     core/test_duration.cpp
     core/test_pitch.cpp
@@ -29,15 +30,19 @@ elara_add_unit_tests(core
     core/test_timeline.cpp
     core/test_document.cpp
     core/test_effects.cpp
+    core/test_entry.cpp
+    core/test_drum_entry.cpp
     core/test_validation.cpp
     core/test_performance.cpp
+    core/test_transpose.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
 elara_add_unit_tests(audio
   SOURCES audio/test_offline_renderer.cpp audio/test_player.cpp audio/test_sequence.cpp
           audio/test_synth.cpp audio/test_tone_generator.cpp
-          audio/test_wav_writer.cpp
+          audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
+          audio/test_tuner.cpp
   LIBRARIES elara::audio)
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
@@ -48,7 +53,7 @@ elara_add_unit_tests(io
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 elara_add_unit_tests(notation
-  SOURCES notation/test_smufl.cpp notation/test_staff_layout.cpp
+  SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
   LIBRARIES elara::notation)
@@ -87,7 +92,11 @@ if(TARGET elara)
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   add_test(NAME app.smoke_open_missing
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/missing.gp")
+  # The tuner opened at start. Without an audio input (as in CI) it says so
+  # instead of listening; either way its QML must load without warnings.
+  add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
+    app.smoke_tuner
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
@@ -97,4 +106,25 @@ if(TARGET elara)
   set_tests_properties(app.smoke_open_views PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 4 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+
+  # The UI in Spanish: the catalog compiled into the executable loads and the
+  # window loads with it. Every string has a translation in every language.
+  add_test(NAME app.smoke_spanish COMMAND elara --smoke-test --language es)
+  add_test(NAME app.language_unknown COMMAND elara --smoke-test --language xx)
+  set_tests_properties(app.smoke_spanish app.language_unknown PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60)
+  set_tests_properties(app.smoke_spanish PROPERTIES
+    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+smoke-test: ok")
+  set_tests_properties(app.language_unknown PROPERTIES
+    PASS_REGULAR_EXPRESSION "no translation for language \"xx\"")
+  add_test(NAME app.translations_complete
+    COMMAND ${CMAKE_COMMAND}
+      -DLUPDATE=$<TARGET_FILE:Qt6::lupdate>
+      -DLCONVERT=$<TARGET_FILE:Qt6::lconvert>
+      -DAPP_DIR=${PROJECT_SOURCE_DIR}/src/app
+      -DSOURCE_LANGUAGE=en
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/translations
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/app/check_translations.cmake)
 endif()

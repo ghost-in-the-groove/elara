@@ -96,5 +96,5 @@ if(ELARA_BUILD_TESTS)
 endif()
 
 if(ELARA_BUILD_APP)
-  find_package(Qt6 6.12 REQUIRED COMPONENTS Concurrent Quick QuickControls2)
+  find_package(Qt6 6.12 REQUIRED COMPONENTS Concurrent Quick QuickControls2 LinguistTools)
 endif()

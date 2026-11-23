@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace elara::core {
@@ -128,6 +129,17 @@ public:
     /// Before the start, the first measure's; after the end, the last one's.
     /// No clicks when there is no measure.
     [[nodiscard]] CountIn countInAt(double seconds) const noexcept;
+
+    /// The index in measures() of the measure played at `seconds`: the first
+    /// one for earlier times, the last one at its very end, and
+    /// measures().size() after that or when there is none.
+    [[nodiscard]] std::size_t playedMeasureAt(double seconds) const noexcept;
+
+    /// The time `fraction` of the way through written measure `measure` (0 at
+    /// its start, 1 at its end, clamped) the first time it is played; nothing
+    /// when it never is.
+    [[nodiscard]] std::optional<double> secondsAt(std::size_t measure,
+                                                  double fraction) const noexcept;
 
 private:
     // A tempo in played time: from `time` on, seconds per whole note.

@@ -10,6 +10,8 @@ Item {
     property string path
     property color color: "black"
     property real lineWidth: 2
+    /// Fill the shape with the colour too (play and pause symbols).
+    property bool filled: false
 
     implicitWidth: 20
     implicitHeight: 20
@@ -24,7 +26,7 @@ Item {
         ShapePath {
             strokeColor: root.color
             strokeWidth: root.lineWidth
-            fillColor: "transparent"
+            fillColor: root.filled ? root.color : "transparent"
             capStyle: ShapePath.RoundCap
             joinStyle: ShapePath.RoundJoin
 

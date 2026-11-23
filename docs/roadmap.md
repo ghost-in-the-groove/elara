@@ -61,21 +61,26 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] FluidSynth integration, MuseScore General SF3
 - [ ] sfizz integration and guitar SFZ library selection
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics; ADR-0022, ADR-0023)
-- [ ] Mixer (volume, pan, mute, solo), playback cursor in the app
+- [ ] Mixer (volume, pan, mute, solo)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
+- [x] Transport, playback cursor and click-to-seek in the app, `elara-cli render --cursor-at`
+  and `--time-at`
 
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
-- [ ] Copy/paste, insert/delete measures, transposition
+  - [x] Note names at the caret on any pitched staff, chords, semitone moves
+        (ADR-0034)
+  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
+- [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Edit every element of milestone 1 from the UI
-- [ ] Spanish and English translations (Qt Linguist)
+- [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
 
 - [ ] Metronome with count-in, A-B loop, speed 25-200 % (engine and CLI done, ADR-0024; app controls to do)
-- [ ] Tuner (microphone input, pitch detection)
+- [x] Tuner: pitch detection, microphone input, the app panel, `elara-cli tune` and `listen` (ADR-0028, ADR-0029)
 
 ## Milestone 7 - Distribution
 
