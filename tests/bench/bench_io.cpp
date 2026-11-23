@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Benchmarks for elara_io: the native format and MusicXML import and export.
+// Benchmarks for elara_io: the native format, MusicXML and MIDI import and export.
+#include <elara/core/performance.hpp>
+#include <elara/io/midi.hpp>
 #include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
 
@@ -7,10 +9,12 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <format>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -122,5 +126,48 @@ TEST_CASE("MusicXML export benchmarks", "[benchmark][io]") {
     };
     BENCHMARK("export the large song as .mxl (MusicXML + deflate)") {
         return elara::io::exportMusicXml(song, {.compressed = true}).data.size();
+    };
+}
+
+namespace {
+
+// (track, start, length, key, velocity) of every note, sorted: what a song plays.
+std::vector<std::tuple<std::size_t, elara::core::Fraction, elara::core::Fraction, int, int>>
+playedNotes(const elara::core::Song& song) {
+    std::vector<std::tuple<std::size_t, elara::core::Fraction, elara::core::Fraction, int, int>>
+        notes;
+    for (const auto& note : elara::core::soundingNotes(song)) {
+        notes.emplace_back(note.track, note.start, note.length, note.key, note.velocity);
+    }
+    std::ranges::sort(notes);
+    return notes;
+}
+
+} // namespace
+
+TEST_CASE("MIDI benchmarks", "[benchmark][io]") {
+    const elara::core::Song song = elara::bench::largeSong();
+    const elara::io::ExportResult exported = elara::io::exportMidi(song);
+    const std::vector<std::uint8_t> bytes(exported.data.begin(), exported.data.end());
+    const auto back = elara::io::importMidi(bytes);
+    REQUIRE(back.has_value());
+    REQUIRE(back->warnings.empty());
+    REQUIRE(playedNotes(back->song) == playedNotes(song)); // fret positions are not in MIDI
+    std::printf("large song as MIDI: %zu bytes\n", exported.data.size());
+
+    BENCHMARK("export the large song as MIDI") {
+        return elara::io::exportMidi(song).data.size();
+    };
+    BENCHMARK("export the large song as MIDI on one thread") {
+        return elara::io::exportMidi(song, {.threads = 1}).data.size();
+    };
+    BENCHMARK("import the large song from MIDI") {
+        return elara::io::importMidi(bytes)->song.measureCount();
+    };
+    BENCHMARK("import the large song from MIDI on one thread") {
+        return elara::io::importMidi(bytes, {.threads = 1})->song.measureCount();
+    };
+    BENCHMARK("sounding notes of the large song") {
+        return elara::core::soundingNotes(song).size();
     };
 }

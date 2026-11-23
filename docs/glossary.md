@@ -30,6 +30,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
 | importación / aviso | import / warning | `ImportResult`, `warnings` | A foreign file read into the model; each warning is a feature it had that the model cannot hold yet (ADR-0007) |
 | exportación | export | `ExportResult`, `exportMusicXml()` | The song written in a foreign format; each warning is a feature that format cannot hold (ADR-0008) |
+| nota sonora | sounding note | `SoundingNote`, `soundingNotes()` | A note as it sounds: start and length in whole notes from the start of the song, tied notes joined, velocity from the dynamic (ADR-0009) |
+| cuantización / rejilla | quantization / grid | MIDI import | Placing played or exported MIDI notes on a rhythm grid chosen per beat before writing them as notes, rests, ties and tuplets (ADR-0009) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |

@@ -253,3 +253,24 @@ add_test(NAME cli.export_rejects_unknown_types
 set_tests_properties(cli.export_rejects_unknown_types PROPERTIES
   FIXTURES_REQUIRED cli_imported
   WILL_FAIL TRUE)
+
+# MIDI (ADR-0009): the imported guitar song goes out as MIDI and in again.
+set(ELARA_CLI_MIDI "${CMAKE_CURRENT_BINARY_DIR}/cli-exported.mid")
+
+add_test(NAME cli.export_midi
+  COMMAND elara-cli --json export "${ELARA_CLI_IMPORTED}" "${ELARA_CLI_MIDI}" --force)
+set_tests_properties(cli.export_midi PROPERTIES
+  FIXTURES_REQUIRED cli_imported
+  FIXTURES_SETUP cli_midi
+  PASS_REGULAR_EXPRESSION "\"format\":\"midi\",\"compressed\":false")
+
+add_test(NAME cli.import_reads_exported_midi
+  COMMAND elara-cli --json import "${ELARA_CLI_MIDI}")
+set_tests_properties(cli.import_reads_exported_midi PROPERTIES
+  FIXTURES_REQUIRED cli_midi
+  PASS_REGULAR_EXPRESSION "\"format\":\"midi\".*\"issues\":\\[\\]")
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid" "MThd, but not a MIDI file")
+add_test(NAME cli.import_rejects_damaged_midi
+  COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid")
+set_tests_properties(cli.import_rejects_damaged_midi PROPERTIES WILL_FAIL TRUE)

@@ -53,6 +53,7 @@ sixth string of a guitar sounds F#2.
 | `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`), `Track` (instrument + staves, `fromPreset()`), `MeasureHeader`, `SongInfo`, `Song`. |
 | `document.hpp` | `Document` (a song being edited: undo/redo history with a limit, save point, `isModified()`) and the `Command` interface (ADR-0005). |
 | `commands.hpp` | The edits: `InsertMeasures`, `RemoveMeasures`, `InsertTrack`, `RemoveTrack`, `ReplaceMeasure` (any note-level edit), `SetMeasureHeader`, `SetSongInfo`, `SetStartTempo` and `CommandGroup` (one undo step). |
+| `performance.hpp` | `soundingNotes(song)`: every note as it sounds (start and length in whole notes from the start of the song, ties joined, velocity from the dynamic), ordered by time; what MIDI export writes and playback will build on (ADR-0009). |
 | `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()` and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all

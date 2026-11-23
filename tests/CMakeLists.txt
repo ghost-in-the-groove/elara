@@ -30,6 +30,7 @@ elara_add_unit_tests(core
     core/test_document.cpp
     core/test_effects.cpp
     core/test_validation.cpp
+    core/test_performance.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
@@ -39,7 +40,7 @@ elara_add_unit_tests(audio
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
 elara_add_unit_tests(io
-  SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp
+  SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp io/test_midi.cpp
   LIBRARIES elara::io miniz::miniz)
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
