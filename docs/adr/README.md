@@ -24,6 +24,7 @@ one that replaces them.
 | [0016](0016-repeats.md) | Repeats and alternate endings | Accepted |
 | [0017](0017-sequencer.md) | The sequencer | Accepted |
 | [0018](0018-built-in-synthesizer.md) | The built-in synthesizer and offline rendering | Accepted |
+| [0019](0019-real-time-playback.md) | Real-time playback | Accepted |
 
 ## Template
 

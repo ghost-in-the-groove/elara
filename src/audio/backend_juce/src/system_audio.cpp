@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/audio/audio_source.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
 
@@ -10,6 +11,8 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <span>
+#include <vector>
 
 namespace elara::audio {
 
@@ -18,8 +21,9 @@ namespace {
 constexpr float kToneAmplitude = 0.2f;
 constexpr double kFadeSeconds = 0.005;
 
-/// Audio-thread voice. Everything shared with other threads is atomic; the
-/// callback never allocates, locks or blocks.
+/// Audio-thread voice and the source it plays. Everything shared with other
+/// threads is atomic, or (the source) changed only while the callback is
+/// removed; the callback never allocates, locks or blocks.
 class ToneCallback final : public juce::AudioIODeviceCallback {
 public:
     void request(double frequencyHz, double seconds) noexcept {
@@ -34,6 +38,9 @@ public:
     [[nodiscard]] bool isPlaying() const noexcept {
         return playing_.load(std::memory_order_acquire);
     }
+
+    // Only while the callback is removed from the device.
+    void setSource(AudioSource* source) noexcept { source_ = source; }
 
     void
     audioDeviceIOCallbackWithContext(const float* const* /*inputs*/, int /*numInputs*/,
@@ -50,17 +57,27 @@ public:
             totalFrames_ = std::min(totalFrames_, position_ + fadeFrames_);
         }
 
-        for (int i = 0; i < numSamples; ++i) {
-            float sample = 0.0f;
-            if (position_ < totalFrames_) {
-                sample = generator_.next() * fadeGain(position_, totalFrames_, fadeFrames_);
-                ++position_;
-            }
-            for (int channel = 0; channel < numOutputs; ++channel) {
-                if (outputs[channel] != nullptr) {
-                    outputs[channel][i] = sample;
+        for (int start = 0; start < numSamples;) {
+            const int count = std::min(numSamples - start, static_cast<int>(left_.size()));
+            renderSource(static_cast<std::size_t>(count));
+            for (int i = 0; i < count; ++i) {
+                float tone = 0.0f;
+                if (position_ < totalFrames_) {
+                    tone = generator_.next() * fadeGain(position_, totalFrames_, fadeFrames_);
+                    ++position_;
+                }
+                const auto frame = static_cast<std::size_t>(i);
+                const float left = left_[frame] + tone;
+                const float right = right_[frame] + tone;
+                for (int channel = 0; channel < numOutputs; ++channel) {
+                    if (outputs[channel] != nullptr) {
+                        outputs[channel][start + i] = numOutputs == 1    ? 0.5f * (left + right)
+                                                      : channel % 2 == 0 ? left
+                                                                         : right;
+                    }
                 }
             }
+            start += count;
         }
 
         if (position_ >= totalFrames_ && !restart_.load(std::memory_order_acquire)) {
@@ -71,11 +88,27 @@ public:
     void audioDeviceAboutToStart(juce::AudioIODevice* device) override {
         sampleRate_ = device->getCurrentSampleRate();
         fadeFrames_ = std::max<std::int64_t>(1, std::llround(kFadeSeconds * sampleRate_));
+        // Before the callbacks start, so the callback itself never allocates.
+        const auto frames =
+            static_cast<std::size_t>(std::max(device->getCurrentBufferSizeSamples(), 256));
+        left_.assign(frames, 0.0f);
+        right_.assign(frames, 0.0f);
     }
 
     void audioDeviceStopped() override { playing_.store(false, std::memory_order_release); }
 
 private:
+    void renderSource(std::size_t frames) noexcept {
+        const std::span<float> left(left_.data(), frames);
+        const std::span<float> right(right_.data(), frames);
+        if (source_ != nullptr) {
+            source_->render(left, right);
+        } else {
+            std::ranges::fill(left, 0.0f);
+            std::ranges::fill(right, 0.0f);
+        }
+    }
+
     std::atomic<double> frequencyHz_{440.0};
     std::atomic<double> seconds_{0.0};
     std::atomic<bool> restart_{false};
@@ -88,6 +121,9 @@ private:
     ToneGenerator generator_;
     std::int64_t totalFrames_ = 0;
     std::int64_t position_ = 0;
+    AudioSource* source_ = nullptr;
+    std::vector<float> left_ = std::vector<float>(512, 0.0f);
+    std::vector<float> right_ = std::vector<float>(512, 0.0f);
 };
 
 } // namespace
@@ -154,6 +190,22 @@ std::string SystemAudio::deviceDescription() const {
     return std::format("{} / {} @ {:.0f} Hz, {} samples", device->getTypeName().toStdString(),
                        device->getName().toStdString(), device->getCurrentSampleRate(),
                        device->getCurrentBufferSizeSamples());
+}
+
+double SystemAudio::sampleRate() const {
+    auto* device = impl_->deviceManager.getCurrentAudioDevice();
+    return device == nullptr ? 0.0 : device->getCurrentSampleRate();
+}
+
+void SystemAudio::setSource(AudioSource* source) {
+    if (impl_->isOpen) {
+        // removeAudioCallback() waits for a callback in progress to finish.
+        impl_->deviceManager.removeAudioCallback(&impl_->callback);
+    }
+    impl_->callback.setSource(source);
+    if (impl_->isOpen) {
+        impl_->deviceManager.addAudioCallback(&impl_->callback);
+    }
 }
 
 void SystemAudio::playTone(double frequencyHz, double seconds) noexcept {

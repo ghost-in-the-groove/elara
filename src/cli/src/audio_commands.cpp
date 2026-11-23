@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-audio, render-tone, devices, tone.
+// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone.
 #include <elara/audio/offline_renderer.hpp>
+#include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
@@ -297,6 +298,56 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     return kExitOk;
 }
 
+struct PlayOptions {
+    std::string file;
+    double from = 0.0;
+    double seconds = 0.0; // 0: to the end
+};
+
+int runPlay(bool json, const PlayOptions& options) {
+    const auto song = openSong(options.file);
+    if (!song) {
+        return fail(song.error());
+    }
+    const audio::Sequence sequence(*song);
+    audio::SystemAudio system;
+    if (auto opened = system.open(); !opened) {
+        return fail(opened.error());
+    }
+    audio::Player player(system.sampleRate());
+    player.load(*song, sequence);
+    player.seek(options.from);
+    const double from = player.position();
+    player.play();
+    system.setSource(&player);
+
+    using namespace std::chrono_literals;
+    const double length = options.seconds > 0.0 ? options.seconds : sequence.duration() - from;
+    const auto deadline =
+        std::chrono::steady_clock::now() + std::chrono::duration<double>(length) + 2s;
+    while (player.isPlaying() && player.position() < from + length &&
+           std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(20ms);
+    }
+    const bool finished = player.position() >= from + length - 0.05;
+    player.pause();
+    std::this_thread::sleep_for(500ms); // let the last notes ring out
+    const double to = player.position();
+    system.setSource(nullptr);
+
+    if (json) {
+        std::cout << std::format(R"({{"file":"{}","device":"{}","from":{},"to":{},"finished":{}}})",
+                                 jsonEscape(options.file), jsonEscape(system.deviceDescription()),
+                                 jsonNumber(from), jsonNumber(to), finished ? "true" : "false")
+                  << '\n';
+    } else {
+        std::cout << std::format("played {} from {:.3f} s to {:.3f} s on {}\n", options.file, from,
+                                 to, system.deviceDescription());
+    }
+    return finished ? kExitOk
+                    : fail("playback did not finish; the audio callback may not be running");
+}
+
 } // namespace
 
 void addAudioCommands(CLI::App& app, Context& context) {
@@ -328,6 +379,19 @@ void addAudioCommands(CLI::App& app, Context& context) {
                           "List the note events dispatched, with their sample frames");
     renderAudio->callback(
         [&context, rendering] { context.exitCode = runRenderAudio(context.json, *rendering); });
+
+    auto playing = std::make_shared<PlayOptions>();
+    auto* playCommand = app.add_subcommand(
+        "play", "Play a song through the built-in synthesizer on the default output device");
+    playCommand->add_option("file", playing->file, "A .elara file or any file import reads")
+        ->required();
+    playCommand->add_option("--from", playing->from, "Start this many seconds into the song")
+        ->check(CLI::NonNegativeNumber)
+        ->capture_default_str();
+    playCommand->add_option("--seconds", playing->seconds, "Stop after this many seconds")
+        ->check(CLI::NonNegativeNumber);
+    playCommand->callback(
+        [&context, playing] { context.exitCode = runPlay(context.json, *playing); });
 
     auto render = std::make_shared<RenderOptions>();
     auto* renderTone =
