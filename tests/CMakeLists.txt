@@ -22,6 +22,7 @@ elara_add_unit_tests(core
     core/test_fraction.cpp
     core/test_duration.cpp
     core/test_pitch.cpp
+    core/test_tuning.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 

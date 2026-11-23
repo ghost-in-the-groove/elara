@@ -5,6 +5,7 @@
 #include <elara/audio/tone_generator.hpp>
 #include <elara/audio/wav_writer.hpp>
 #include <elara/core/pitch.hpp>
+#include <elara/core/tuning.hpp>
 #include <elara/core/version.hpp>
 
 #include <CLI/CLI.hpp>
@@ -132,6 +133,112 @@ int runPitch(bool json, const PitchOptions& options) {
     return kExitOk;
 }
 
+// --tuning takes a preset name ("guitar", "bass-5") or open strings ("D2 A2 D3 G3 B3 E4").
+std::optional<elara::core::Tuning> tuningFromOption(std::string_view text) {
+    if (auto preset = elara::core::Tuning::preset(text)) {
+        return preset;
+    }
+    return elara::core::Tuning::parse(text);
+}
+
+struct FretOptions {
+    std::string tuning = "guitar";
+    int string = 1;
+    int fret = 0;
+    int capo = 0;
+    bool flats = false;
+};
+
+int runFret(bool json, const FretOptions& options) {
+    using elara::core::Tuning;
+    const auto tuning = tuningFromOption(options.tuning);
+    if (!tuning) {
+        return usageError(std::format("unknown tuning: {}", options.tuning));
+    }
+    if (options.string < 1 || options.string > tuning->stringCount()) {
+        return usageError(std::format("string {} does not exist on a {}-string tuning",
+                                      options.string, tuning->stringCount()));
+    }
+    if (options.fret < 0 || options.capo < 0 || options.capo + options.fret > Tuning::kMaxFret) {
+        return usageError(std::format("capo + fret must stay within 0..{}", Tuning::kMaxFret));
+    }
+    const int midi = tuning->midiAt(options.string, options.fret, options.capo);
+    const auto pitch =
+        elara::core::Pitch::fromMidi(midi, options.flats ? elara::core::SpellingPreference::Flats
+                                                         : elara::core::SpellingPreference::Sharps);
+    if (json) {
+        std::cout
+            << std::format(
+                   R"({{"tuning":"{}","string":{},"fret":{},"capo":{},"midi":{},"pitch":"{}","frequency":{:.4f}}})",
+                   tuning->toString(), options.string, options.fret, options.capo, midi,
+                   pitch.toString(), pitch.frequency())
+            << '\n';
+    } else {
+        std::cout << std::format("string {} fret {} (capo {}): {}  MIDI {}\n", options.string,
+                                 options.fret, options.capo, pitch.toString(), midi);
+    }
+    return kExitOk;
+}
+
+struct PositionsOptions {
+    std::string pitch;
+    std::string tuning = "guitar";
+    int capo = 0;
+    int maxFret = elara::core::Tuning::kMaxFret;
+};
+
+int runPositions(bool json, const PositionsOptions& options) {
+    const auto tuning = tuningFromOption(options.tuning);
+    if (!tuning) {
+        return usageError(std::format("unknown tuning: {}", options.tuning));
+    }
+    const auto pitch = elara::core::Pitch::parse(options.pitch);
+    if (!pitch) {
+        return usageError(
+            std::format("not a pitch (expected e.g. C4, F#3, Bb2): {}", options.pitch));
+    }
+    const auto positions = tuning->positionsFor(*pitch, options.capo, options.maxFret);
+    if (json) {
+        std::string list;
+        for (const auto& position : positions) {
+            if (!list.empty()) {
+                list += ',';
+            }
+            list += std::format(R"({{"string":{},"fret":{}}})", position.string, position.fret);
+        }
+        std::cout << std::format(
+                         R"({{"pitch":"{}","midi":{},"tuning":"{}","capo":{},"positions":[{}]}})",
+                         pitch->toString(), pitch->midiNumber(), tuning->toString(), options.capo,
+                         list)
+                  << '\n';
+    } else {
+        for (const auto& position : positions) {
+            std::cout << std::format("string {} fret {}\n", position.string, position.fret);
+        }
+    }
+    return kExitOk;
+}
+
+int runTunings(bool json) {
+    using elara::core::Tuning;
+    std::string list;
+    for (const auto name : Tuning::presetNames()) {
+        const auto strings = Tuning::preset(name)->toString();
+        if (json) {
+            if (!list.empty()) {
+                list += ',';
+            }
+            list += std::format(R"({{"name":"{}","strings":"{}"}})", name, strings);
+        } else {
+            std::cout << std::format("{:<24} {}\n", name, strings);
+        }
+    }
+    if (json) {
+        std::cout << R"({"tunings":[)" << list << "]}\n";
+    }
+    return kExitOk;
+}
+
 int runRenderTone(bool json, const ToneOptions& tone, const std::string& out,
                   std::uint32_t sampleRate) {
     const auto samples = elara::audio::renderTone(tone.frequencyHz, static_cast<double>(sampleRate),
@@ -240,6 +347,31 @@ int main(int argc, char** argv) {
         ->check(CLI::Range(400.0, 480.0))
         ->capture_default_str();
 
+    const std::string tuningHelp = "Tuning preset (see `tunings`) or open strings, lowest first";
+
+    FretOptions fretOptions;
+    auto* fret = app.add_subcommand("fret", "Show the pitch of a string/fret position");
+    fret->add_option("--tuning", fretOptions.tuning, tuningHelp)->capture_default_str();
+    fret->add_option("--string", fretOptions.string, "String number, 1 = top tab line")->required();
+    fret->add_option("--fret", fretOptions.fret, "Fret, relative to the capo")->required();
+    fret->add_option("--capo", fretOptions.capo, "Capo fret (0 = none)")->capture_default_str();
+    fret->add_flag("--flats", fretOptions.flats, "Spell the result with flats, not sharps");
+
+    PositionsOptions positionsOptions;
+    auto* positions =
+        app.add_subcommand("positions", "List every string/fret position that sounds a pitch");
+    positions->add_option("pitch", positionsOptions.pitch, "Pitch such as C4, F#3, Bb2")
+        ->required();
+    positions->add_option("--tuning", positionsOptions.tuning, tuningHelp)->capture_default_str();
+    positions->add_option("--capo", positionsOptions.capo, "Capo fret (0 = none)")
+        ->check(CLI::Range(0, elara::core::Tuning::kMaxFret))
+        ->capture_default_str();
+    positions->add_option("--max-fret", positionsOptions.maxFret, "Highest fret above the capo")
+        ->check(CLI::Range(0, elara::core::Tuning::kMaxFret))
+        ->capture_default_str();
+
+    auto* tunings = app.add_subcommand("tunings", "List the tuning presets");
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError& error) {
@@ -262,6 +394,15 @@ int main(int argc, char** argv) {
         }
         if (*pitch) {
             return runPitch(json, pitchOptions);
+        }
+        if (*fret) {
+            return runFret(json, fretOptions);
+        }
+        if (*positions) {
+            return runPositions(json, positionsOptions);
+        }
+        if (*tunings) {
+            return runTunings(json);
         }
     } catch (const std::exception& error) {
         return fail(error.what());

@@ -27,6 +27,15 @@ A `Pitch` keeps its spelling: B#3, C4 and Dbb4 are different pitches that sound
 the same (`isEnharmonicWith`). Spelling from context (key signature) comes with
 `KeySignature`.
 
+## Fretted instruments
+
+| Header | What it gives you |
+|---|---|
+| `tuning.hpp` | `Tuning` (1 to 12 open strings, string 1 = top tab line), `midiAt(string, fret, capo)`, `positionsFor(pitch, capo, maxFret)` returning `FretPosition`s, text form ("E2 A2 D3 G3 B3 E4", lowest tab line first) and named presets (guitar, drop D, DADGAD, 7/8-string, bass 4/5/6, ukulele, mandolin, banjo). |
+
+Tablature frets are written relative to the capo: with a capo at 2, fret 0 on the
+sixth string of a guitar sounds F#2.
+
 All of these are small `constexpr` value types without allocation; keep them
 that way, the sequencer and layout engine run them in hot loops
 (`python scripts/elara.py bench`).

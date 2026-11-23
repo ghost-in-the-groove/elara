@@ -2,6 +2,7 @@
 add_library(elara_core STATIC
   src/fraction.cpp
   src/pitch.cpp
+  src/tuning.cpp
   src/version.cpp)
 add_library(elara::core ALIAS elara_core)
 

@@ -30,7 +30,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
 | afinación | tuning | `Tuning` | |
 | cuerda | string | `string` (index) | 1 = highest |
-| traste | fret | `fret` | |
+| traste | fret | `fret` | Relative to the capo |
+| posición (cuerda/traste) | fret position | `FretPosition` | |
 | cejilla | capo | `capo` | |
 | bend | bend | `Bend` | Curve of (time, pitch) points |
 | ligado ascendente / descendente | hammer-on / pull-off | `Legato` | |
