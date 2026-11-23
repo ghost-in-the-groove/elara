@@ -114,7 +114,10 @@ void Song::insertMeasures(std::size_t at, std::size_t count) {
         throw std::out_of_range("Song: insert position past the end");
     }
     const auto offset = static_cast<std::ptrdiff_t>(at);
-    headers_.insert(headers_.begin() + offset, count, MeasureHeader{});
+    const MeasureHeader header = headers_.empty() ? MeasureHeader{}
+                                 : at > 0         ? headers_[at - 1].continuation()
+                                                  : headers_.front().continuation();
+    headers_.insert(headers_.begin() + offset, count, header);
     for (auto& track : tracks_) {
         for (auto& staff : track.staves_) {
             staff.measures_.insert(staff.measures_.begin() + offset, count, Measure{});
@@ -142,6 +145,64 @@ MeasureHeader& Song::measureHeader(std::size_t index) {
 
 const MeasureHeader& Song::measureHeader(std::size_t index) const {
     return checkedAt(headers_, index, "Song: no such measure");
+}
+
+// ---- Timeline ---------------------------------------------------------------
+
+void Song::checkPosition(std::size_t measure, const Fraction& offset) const {
+    const bool inside = measure < headers_.size() && offset >= Fraction(0) &&
+                        offset <= headers_[measure].timeSignature.measureLength();
+    const bool atEnd = measure == headers_.size() && offset.isZero();
+    if (!inside && !atEnd) {
+        throw std::out_of_range("Song: position outside the song");
+    }
+}
+
+Fraction Song::measureStart(std::size_t measure) const {
+    if (measure > headers_.size()) {
+        throw std::out_of_range("Song: no such measure");
+    }
+    Fraction start;
+    for (std::size_t m = 0; m < measure; ++m) {
+        start += headers_[m].timeSignature.measureLength();
+    }
+    return start;
+}
+
+double Song::secondsAt(std::size_t measure, const Fraction& offset) const {
+    checkPosition(measure, offset);
+    double seconds = 0.0;
+    Tempo tempo = startTempo_;
+    for (std::size_t m = 0; m <= measure && m < headers_.size(); ++m) {
+        const MeasureHeader& header = headers_[m];
+        const Fraction end = m == measure ? offset : header.timeSignature.measureLength();
+        Fraction cursor;
+        for (const TempoChange& change : header.tempoChanges) {
+            if (m == measure && change.offset > end) {
+                break;
+            }
+            const Fraction at = change.offset < end ? change.offset : end;
+            seconds += tempo.secondsFor(at - cursor);
+            cursor = at;
+            tempo = change.tempo;
+        }
+        seconds += tempo.secondsFor(end - cursor);
+    }
+    return seconds;
+}
+
+Tempo Song::tempoAt(std::size_t measure, const Fraction& offset) const {
+    checkPosition(measure, offset);
+    Tempo tempo = startTempo_;
+    for (std::size_t m = 0; m <= measure && m < headers_.size(); ++m) {
+        for (const TempoChange& change : headers_[m].tempoChanges) {
+            if (m == measure && change.offset > offset) {
+                break;
+            }
+            tempo = change.tempo;
+        }
+    }
+    return tempo;
 }
 
 } // namespace elara::core

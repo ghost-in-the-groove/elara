@@ -17,6 +17,11 @@ DAW timeline all read and edit (see `docs/architecture.md`).
 Positions are measured in whole notes from a reference point (the start of the
 song or of a measure) and are plain `Fraction`s.
 
+| Header | What it gives you |
+|---|---|
+| `signature.hpp` | `TimeSignature` (measure and beat length, "6/8" text) and `KeySignature` (circle-of-fifths position + `KeyMode`; tonic, accidentals, "Bb minor" text, `spell()` of a MIDI number in context: diatonic first, raised leading tone in minor, then naturals, then sharps or flats by key). |
+| `tempo.hpp` | `Tempo` (bpm of a beat unit, e.g. dotted quarter = 60) and `TempoChange` (a tempo at an offset inside a measure). |
+
 ## Pitch
 
 | Header | What it gives you |
@@ -48,6 +53,10 @@ sixth string of a guitar sounds F#2.
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
 staves at once, and `addTrack` gives a new track as many measures as the song.
+Each `MeasureHeader` holds the time signature, the concert key and the tempo
+changes of its measure, so they move with it; new measures continue the meter
+and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
+`durationSeconds()` give the timeline (repeats are not unrolled yet).
 Beat positions are derived from durations, never stored. How each instrument
 family is handled: `docs/instruments.md`.
 

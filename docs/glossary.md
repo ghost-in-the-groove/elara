@@ -15,7 +15,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | compás (unidad) | measure | `Measure` | Not "bar"; one staff's content |
 | cabecera de compás | measure header | `MeasureHeader` | Song-wide: signatures, repeats |
 | indicación de compás | time signature | `TimeSignature` | |
-| armadura | key signature | `KeySignature` | |
+| armadura | key signature | `KeySignature` | `fifths` + `KeyMode` (major/minor) |
+| tónica | tonic | `tonic()` | |
 | voz | voice | `Voice` | Up to 4 per staff |
 | tiempo / pulso (posición) | beat | `Beat` | Group of notes starting together |
 | nota | note | `Note` | |
@@ -46,7 +47,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | vibrato | vibrato | `Vibrato` | |
 | dinámica | dynamic | `Dynamic` | pp ... ff |
 | repetición / casilla | repeat / volta | `Repeat`, `Volta` | |
-| tempo | tempo | `Tempo` | BPM map |
+| tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
 | metrónomo | metronome | `Metronome` | |
 | bucle A-B | A-B loop | `LoopRange` | |
 | afinador | tuner | `Tuner` | |

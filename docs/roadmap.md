@@ -23,7 +23,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Pitch and spelling (step, alter, octave), MIDI number conversion
 - [x] Tuning and fret/string <-> pitch mapping, capo
 - [x] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy
-- [ ] Time and key signatures, tempo map
+- [x] Time and key signatures, tempo map
 - [ ] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [ ] Measure validation (voice fills its measure), rests auto-fill

@@ -70,3 +70,31 @@ set_tests_properties(cli.fret_rejects_unknown_tuning PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.fret_rejects_missing_string
   COMMAND elara-cli fret --tuning bass --string 5 --fret 0)
 set_tests_properties(cli.fret_rejects_missing_string PROPERTIES WILL_FAIL TRUE)
+
+# Key signatures, spelling in context and meters.
+add_test(NAME cli.key_with_sharps COMMAND elara-cli --json key "D major")
+set_tests_properties(cli.key_with_sharps PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"key\":\"D major\",\"fifths\":2,\"mode\":\"major\",\"tonic\":\"D\",\"accidentals\":\\[\"F#\",\"C#\"\\]")
+
+add_test(NAME cli.key_with_flats COMMAND elara-cli --json key "bb minor")
+set_tests_properties(cli.key_with_flats PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"key\":\"Bb minor\",\"fifths\":-5,\"mode\":\"minor\",\"tonic\":\"Bb\",\"accidentals\":\\[\"Bb\",\"Eb\",\"Ab\",\"Db\",\"Gb\"\\]")
+
+add_test(NAME cli.key_rejects_eight_sharps COMMAND elara-cli key "G# major")
+set_tests_properties(cli.key_rejects_eight_sharps PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.spell_leading_tone_in_minor COMMAND elara-cli --json spell 61 --key "D minor")
+set_tests_properties(cli.spell_leading_tone_in_minor PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"midi\":61,\"key\":\"D minor\",\"pitch\":\"C#4\"")
+
+add_test(NAME cli.spell_in_flat_key COMMAND elara-cli --json spell 61 --key "F major")
+set_tests_properties(cli.spell_in_flat_key PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"pitch\":\"Db4\"")
+
+add_test(NAME cli.meter_compound_time
+  COMMAND elara-cli --json meter 6/8 --bpm 60 --beat-unit dotted-quarter)
+set_tests_properties(cli.meter_compound_time PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"measureLength\":\"3/4\",\"beatLength\":\"1/8\",\"tempo\":{\"bpm\":60,\"beatUnit\":\"dotted-quarter\"},\"secondsPerMeasure\":2\\.0000}")
+
+add_test(NAME cli.meter_rejects_bad_meter COMMAND elara-cli meter 5/3)
+set_tests_properties(cli.meter_rejects_bad_meter PROPERTIES WILL_FAIL TRUE)

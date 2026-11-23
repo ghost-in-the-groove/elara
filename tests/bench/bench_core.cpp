@@ -114,6 +114,10 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
         });
     };
 
+    BENCHMARK("seconds at the end of the large song (tempo map walk)") {
+        return song.durationSeconds();
+    };
+
     BENCHMARK("sum every voice length of the large song") {
         elara::core::Fraction total;
         for (std::size_t t = 0; t < song.trackCount(); ++t) {
