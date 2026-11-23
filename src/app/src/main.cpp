@@ -129,12 +129,15 @@ int main(int argc, char* argv[]) {
         QStringLiteral("png"));
     const QCommandLineOption tunerOption(
         QStringLiteral("tuner"), QCoreApplication::translate("main", "Open the tuner at start."));
+    const QCommandLineOption songPaneOption(
+        QStringLiteral("song-pane"),
+        QCoreApplication::translate("main", "Open the song and tracks panel at start."));
     const QCommandLineOption languageOption(
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
         QStringLiteral("language"));
-    parser.addOptions(
-        {trackOption, viewOption, smokeTest, screenshot, tunerOption, languageOption});
+    parser.addOptions({trackOption, viewOption, smokeTest, screenshot, tunerOption, songPaneOption,
+                       languageOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -193,7 +196,8 @@ int main(int argc, char* argv[]) {
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
 
     engine.setInitialProperties({{QStringLiteral("initialFile"), options.file},
-                                 {QStringLiteral("showTuner"), parser.isSet(tunerOption)}});
+                                 {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
+                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()

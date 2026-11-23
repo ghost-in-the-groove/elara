@@ -42,6 +42,7 @@ public:
 private:
     void tick();
     void queueSteps();
+    void queueEdits();
     void finish(bool ok, const QString& detail);
     [[nodiscard]] bool checking() const;
 
@@ -59,6 +60,8 @@ private:
     int layouts_ = 0;
     qint64 settledAt_ = -1;
     bool queued_ = false;
+    qsizetype tracksBefore_ = 0; ///< tracks when the smoke test's edits start
+    QString editProblem_;        ///< the first edit check that failed
 };
 
 } // namespace elara::app

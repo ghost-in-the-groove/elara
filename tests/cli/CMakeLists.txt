@@ -171,6 +171,13 @@ add_test(NAME cli.edit_undo_and_redo_history
 set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
   PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
 
+# A signature change runs until the next change, as in the app.
+add_test(NAME cli.edit_signature_runs_to_next_change
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8"
+    "time 1 3/4" "key 0 D major")
+set_tests_properties(cli.edit_signature_runs_to_next_change PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"D major\"},{\"time\":\"3/4\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"}\\].*\"undo\":{\"count\":5,")
+
 add_test(NAME cli.edit_reports_incomplete_measure
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 3 4")
 set_tests_properties(cli.edit_reports_incomplete_measure PROPERTIES

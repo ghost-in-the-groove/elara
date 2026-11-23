@@ -103,7 +103,9 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
-step the song rejects (missing track, nothing to undo) with 1.
+step the song rejects (missing track, nothing to undo) with 1. `time` and `key`
+change the signature from measure `m` until the next change of it, as the app
+does; a step that changes nothing adds no undo step.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
