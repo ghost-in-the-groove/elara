@@ -47,20 +47,27 @@ OfflineRenderer::OfflineRenderer(const core::Song& song, const Sequence& sequenc
     const double rate = options_.sampleRate;
     frames_ = std::llround((sequence.duration() + std::max(0.0, options_.tail)) * rate);
     const std::size_t tracks = song.trackCount();
-    auto events = detail::eventsByTrack(sequence, tracks, rate);
-    const float headroom = detail::headroom(events);
-    levels_.reserve(2 * tracks);
+    auto events = detail::eventsByTrack(sequence, tracks + 1, rate); // the metronome's last
+    const float headroom = detail::headroom(std::span(events).first(tracks));
+    levels_.reserve(2 * (tracks + 1));
     for (std::size_t t = 0; t < tracks; ++t) {
         const detail::TrackLevel level = detail::levelOf(song, t, headroom);
         levels_.push_back(level.left);
         levels_.push_back(level.right);
     }
     timbres_.reserve(tracks);
-    players_.reserve(tracks);
+    players_.reserve(tracks + 1);
     for (std::size_t t = 0; t < tracks; ++t) {
         timbres_.push_back(timbreFor(song.track(t).instrument()));
         players_.push_back(
             TrackPlayer{.synth = Synth(timbres_.back(), rate), .events = std::move(events[t])});
+    }
+    // The metronome plays after the tracks, so its index is its track's.
+    if (!events[tracks].empty()) {
+        levels_.push_back(detail::kMetronomeLevel.left);
+        levels_.push_back(detail::kMetronomeLevel.right);
+        players_.push_back(
+            TrackPlayer{.synth = Synth(Timbre::Drums, rate), .events = std::move(events[tracks])});
     }
 }
 

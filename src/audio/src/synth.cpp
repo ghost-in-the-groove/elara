@@ -170,6 +170,19 @@ DrumSound drumSound(int key) {
                 .noiseT60 = 0.02f,
                 .noiseLevel = 0.1f,
                 .highpass = 3000.0f};
+    case 76: // high wood block: the metronome's first beat
+    case 77: // low wood block, a fifth below: its other beats
+    {
+        const float f = key == 76 ? 1260.0f : 840.0f;
+        return {.toneStart = 1.04f * f,
+                .toneEnd = f,
+                .sweep = 0.004f,
+                .toneT60 = 0.1f,
+                .toneLevel = 0.8f,
+                .noiseT60 = 0.01f,
+                .noiseLevel = 0.15f,
+                .highpass = 2000.0f};
+    }
     default: // everything else: a short, bright burst
         return {.noiseT60 = 0.12f, .noiseLevel = 0.35f, .highpass = 3000.0f};
     }
