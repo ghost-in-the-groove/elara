@@ -347,7 +347,8 @@ core::Song randomSong(std::uint32_t seed) {
             pick(0, 9) == 0 ? static_cast<std::uint8_t>(pick(1, 255)) : std::uint8_t{0};
         if (pick(0, 4) == 0) {
             song.measureHeader(m).tempoChanges.push_back(
-                TempoChange{.offset = Fraction(pick(0, 3), 8),
+                // Not at the very start, which is the song's tempo.
+                TempoChange{.offset = Fraction(pick(m == 0 ? 1 : 0, 3), 8),
                             .tempo = Tempo(static_cast<double>(pick(40, 220)))});
         }
     }
