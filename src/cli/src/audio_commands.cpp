@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-tone, devices, tone.
+// Audio subcommands: sequence, render-audio, render-tone, devices, tone.
+#include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
@@ -8,15 +9,21 @@
 #include "common.hpp"
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <iostream>
 #include <memory>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
+#include <vector>
 
 namespace elara::cli {
 
@@ -189,6 +196,107 @@ int runSequence(bool json, const SequenceOptions& options) {
     return kExitOk;
 }
 
+struct RenderAudioOptions {
+    std::string file;
+    std::string out;
+    std::uint32_t sampleRate = 48000;
+    double tail = 2.0;
+    bool events = false;
+};
+
+int runRenderAudio(bool json, const RenderAudioOptions& options) {
+    const auto song = openSong(options.file);
+    if (!song) {
+        return fail(song.error());
+    }
+    const audio::Sequence sequence(*song);
+    audio::OfflineRenderer renderer(*song, sequence,
+                                    {.sampleRate = static_cast<double>(options.sampleRate),
+                                     .tail = options.tail,
+                                     .logEvents = true});
+    std::optional<audio::WavFileWriter> writer;
+    if (!options.out.empty()) {
+        auto created = audio::WavFileWriter::create(
+            options.out, {.sampleRate = options.sampleRate, .channels = 2},
+            static_cast<std::uint64_t>(renderer.frames()));
+        if (!created) {
+            return fail(created.error());
+        }
+        writer.emplace(std::move(*created));
+    }
+
+    // One second at a time: tracks render in parallel inside each call.
+    std::vector<float> block(2 * static_cast<std::size_t>(options.sampleRate));
+    float peak = 0.0f;
+    double sumOfSquares = 0.0;
+    while (const std::size_t frames = renderer.render(block)) {
+        const std::span<const float> rendered(block.data(), 2 * frames);
+        peak = std::max(peak, audio::peakLevel(rendered));
+        for (const float sample : rendered) {
+            sumOfSquares += static_cast<double>(sample) * static_cast<double>(sample);
+        }
+        if (writer) {
+            if (auto written = writer->write(rendered); !written) {
+                return fail(written.error());
+            }
+        }
+    }
+    if (writer) {
+        if (auto finished = writer->finish(); !finished) {
+            return fail(finished.error());
+        }
+    }
+    const auto frames = renderer.frames();
+    const double seconds = static_cast<double>(frames) / options.sampleRate;
+    const double rms =
+        frames > 0 ? std::sqrt(sumOfSquares / (2.0 * static_cast<double>(frames))) : 0.0;
+    const auto& log = renderer.log();
+
+    if (json) {
+        std::string body = std::format(
+            R"({{"file":"{}","out":{},"sampleRate":{},"channels":2,"frames":{},"seconds":{},"peak":{:.4f},"rms":{:.4f},"tracks":[)",
+            jsonEscape(options.file),
+            options.out.empty() ? std::string("null") : '"' + jsonEscape(options.out) + '"',
+            options.sampleRate, frames, jsonNumber(seconds), peak, rms);
+        for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
+            body += std::format(R"({}{{"track":{},"name":"{}","timbre":"{}"}})", t == 0 ? "" : ",",
+                                t, jsonEscape(song->track(t).name()),
+                                audio::timbreName(renderer.timbres()[t]));
+        }
+        body += std::format(R"(],"eventCount":{})", log.size());
+        if (options.events) {
+            body += R"(,"events":[)";
+            for (std::size_t i = 0; i < log.size(); ++i) {
+                const audio::LoggedEvent& event = log[i];
+                body +=
+                    std::format(R"({}{{"frame":{},"kind":"{}","track":{},"key":{},"velocity":{}}})",
+                                i == 0 ? "" : ",", event.frame, kindName(event.kind), event.track,
+                                event.key, event.velocity);
+            }
+            body += ']';
+        }
+        std::cout << body << "}\n";
+        return kExitOk;
+    }
+    std::cout << std::format("rendered {:.3f} s ({} frames @ {} Hz, stereo), peak {:.4f}, "
+                             "rms {:.4f}, {} events\n",
+                             seconds, frames, options.sampleRate, peak, rms, log.size());
+    for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
+        std::cout << std::format("  track {} {}: {}\n", t + 1, song->track(t).name(),
+                                 audio::timbreName(renderer.timbres()[t]));
+    }
+    if (!options.out.empty()) {
+        std::cout << std::format("wrote {}\n", options.out);
+    }
+    if (options.events) {
+        for (const audio::LoggedEvent& event : log) {
+            std::cout << std::format("{:10} {:3}  track {}  key {:3} velocity {:3}\n", event.frame,
+                                     kindName(event.kind), event.track, event.key, event.velocity);
+        }
+    }
+    return kExitOk;
+}
+
 } // namespace
 
 void addAudioCommands(CLI::App& app, Context& context) {
@@ -202,6 +310,24 @@ void addAudioCommands(CLI::App& app, Context& context) {
     sequence->add_flag("--events", sequenced->events, "List the note events for a synthesizer");
     sequence->callback(
         [&context, sequenced] { context.exitCode = runSequence(context.json, *sequenced); });
+
+    auto rendering = std::make_shared<RenderAudioOptions>();
+    auto* renderAudio = app.add_subcommand(
+        "render-audio", "Play a song through the built-in synthesizer offline, optionally into a "
+                        "16-bit stereo WAV file, and report its level and the events dispatched");
+    renderAudio->add_option("file", rendering->file, "A .elara file or any file import reads")
+        ->required();
+    renderAudio->add_option("--out", rendering->out, "Output WAV path");
+    renderAudio->add_option("--sample-rate", rendering->sampleRate, "Sample rate in Hz")
+        ->check(CLI::IsMember({44100, 48000, 96000}))
+        ->capture_default_str();
+    renderAudio->add_option("--tail", rendering->tail, "Seconds rendered after the last measure")
+        ->check(CLI::Range(0.0, 30.0))
+        ->capture_default_str();
+    renderAudio->add_flag("--events", rendering->events,
+                          "List the note events dispatched, with their sample frames");
+    renderAudio->callback(
+        [&context, rendering] { context.exitCode = runRenderAudio(context.json, *rendering); });
 
     auto render = std::make_shared<RenderOptions>();
     auto* renderTone =

@@ -90,6 +90,8 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | sequence the 20-track song | 42.5 ms | each written note timed once in its measure (a repeat only adds a sum), tempo as precomputed segments in doubles instead of fractions per call; events made track by track on all cores. Repeated: 62 ms |
 | 2026-11-23 | the same | 33 ms | the track lists merged pairwise, each round on all cores, instead of through a heap (20 ms of the 42); notes timed in blocks on all cores. Repeated: 45.5 ms |
 | 2026-11-23 | sounding notes of the 20-track song | 10.7 ms | 16 ms before: each voice read on its own thread and the lists merged pairwise instead of one stable sort of every note. The sequencer starts from them: 26 ms, repeated 40 ms (2.8x and 3.3x the first version) |
+| 2026-11-23 | one second of 32 voices of the built-in synthesizer at 48 kHz: plucked strings, piano partials, sawtooths, drums | 5.2, 8.5, 6.0, 5.1 ms | first version (ADR-0018): 3.4 to 5.5 ns per voice and frame, so 20 tracks of 32 voices take under a fifth of one core. Keeping the four partials in local arrays so that they could be one vector operation made the piano slower (11.6 ms) and was dropped |
+| 2026-11-23 | render the first 10 s of the large song (20 guitar tracks) offline | 26.4 ms | tracks on every core, mixed in track order (ADR-0018): 380 times faster than real time. One thread: 113 ms |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.

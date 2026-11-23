@@ -459,3 +459,25 @@ set_tests_properties(cli.sequence_events PROPERTIES
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+
+# The built-in synthesizer, offline (ADR-0018). melody.musicxml lasts 8.4 s;
+# with the default 2 s tail that is 10.4 s, 499200 frames at 48 kHz.
+set(_melody_wav "${CMAKE_CURRENT_BINARY_DIR}/melody.wav")
+add_test(NAME cli.render_audio_events
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/musicxml/melody.musicxml"
+          --out "${_melody_wav}" --events)
+set_tests_properties(cli.render_audio_events PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"sampleRate\":48000,\"channels\":2,\"frames\":499200,\"seconds\":10\\.4,\"peak\":0\\.[0-9]*[1-9][0-9]*,\"rms\":0\\.[0-9]+,\"tracks\":\\[{\"track\":0,\"name\":\"Flute\",\"timbre\":\"wind\"}\\],\"eventCount\":20,\"events\":\\[{\"frame\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"frame\":28800,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"frame\":28800,\"kind\":\"on\",\"track\":0,\"key\":62,"
+  FIXTURES_SETUP melody_wav)
+# 44-byte header + 499200 stereo 16-bit frames.
+add_test(NAME cli.render_audio_file
+  COMMAND "${CMAKE_COMMAND}" -DFILE=${_melody_wav} -DEXPECTED_SIZE=1996844
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/check_file_size.cmake")
+set_tests_properties(cli.render_audio_file PROPERTIES FIXTURES_REQUIRED melody_wav)
+add_test(NAME cli.render_audio_band
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --sample-rate 44100 --tail 1)
+set_tests_properties(cli.render_audio_band PROPERTIES
+  PASS_REGULAR_EXPRESSION "rendered 6\\.333 s \\(279300 frames @ 44100 Hz, stereo\\), peak 0\\.[0-9]+, rms 0\\.[0-9]+, 96 events\n  track 1 Bass: bass\n  track 2 Piano: piano\n  track 3 Drums: drums\n  track 4 Clarinet: wind\n")
+add_test(NAME cli.render_audio_rejects_missing_file
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/missing.gp")
+set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
