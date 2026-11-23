@@ -8,6 +8,7 @@
 #include <elara/core/validation.hpp>
 
 #include "general_midi.hpp"
+#include "gp_directions.hpp"
 #include "midi_shared.hpp"
 #include "warnings.hpp"
 
@@ -338,7 +339,7 @@ public:
         if (version_ >= 500) {
             in_.skip(version_ == 500 ? 2 : 1);
         }
-        warnLyricsAndJumps(measureCount);
+        warnLyrics();
         for (std::size_t m = 0; m < measureCount; ++m) {
             for (TrackData& track : tracks_) {
                 readMeasure(track, m);
@@ -426,11 +427,9 @@ private:
     }
 
     void readDirections() {
-        // Where the coda, segno and "da capo" signs and jumps sit, or -1.
-        for (int i = 0; i < 19; ++i) {
-            if (const int measure = in_.i16(); measure > 0) {
-                jumps_.push_back(static_cast<std::size_t>(measure - 1));
-            }
+        // The measure (from 1) of each sign and jump, in GpDirection order, or -1.
+        for (int& measure : directions_) {
+            measure = in_.i16();
         }
     }
 
@@ -606,16 +605,27 @@ private:
         tracks_.push_back(std::move(track));
     }
 
-    void warnLyricsAndJumps(std::size_t measureCount) {
+    void warnLyrics() {
         if (hasLyrics_) {
             const bool known =
                 lyricsTrack_ >= 1 && std::cmp_less_equal(lyricsTrack_, tracks_.size());
             warnings_.add(known ? tracks_[static_cast<std::size_t>(lyricsTrack_ - 1)].name : "",
                           "lyrics dropped");
         }
-        for (const std::size_t measure : jumps_) {
-            if (measure < measureCount) {
-                warnings_.add({}, "jumps (coda, segno) dropped", measure);
+    }
+
+    void addDirections(Song& song) {
+        for (std::size_t d = 0; d < directions_.size(); ++d) {
+            const int measure = directions_[d];
+            if (measure <= 0) {
+                continue;
+            }
+            const auto m = static_cast<std::size_t>(measure - 1);
+            if (m >= song.measureCount()) {
+                warnings_.add({}, "signs and jumps past the last measure dropped");
+            } else if (!detail::applyDirection(song.measureHeader(m),
+                                               static_cast<detail::GpDirection>(d))) {
+                warnings_.add({}, "two jumps in one measure: the last one kept", m);
             }
         }
     }
@@ -1125,6 +1135,7 @@ private:
             header.repeatTimes = headers_[m].repeatTimes;
             header.alternateEndings = headers_[m].alternateEndings;
         }
+        addDirections(song);
         if (startBpm_ >= core::Tempo::kMinBpm && startBpm_ <= core::Tempo::kMaxBpm) {
             song.setStartTempo(core::Tempo(startBpm_));
         } else {
@@ -1223,8 +1234,8 @@ private:
     int startBpm_ = 120;
     std::int32_t lyricsTrack_ = 0;
     bool hasLyrics_ = false;
-    std::array<ChannelData, 64> channels_{}; // four ports of sixteen MIDI channels
-    std::vector<std::size_t> jumps_;
+    std::array<ChannelData, 64> channels_{};              // four ports of sixteen MIDI channels
+    std::array<int, detail::kGpDirections> directions_{}; // 0: none (Guitar Pro 3 and 4)
     std::vector<HeaderData> headers_;
     std::vector<TrackData> tracks_;
     std::vector<TempoMark> tempos_;

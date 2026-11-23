@@ -501,6 +501,45 @@ TEST_CASE("MusicXML export: random songs come back unchanged", "[musicxml][expor
     }
 }
 
+TEST_CASE("MusicXML export: signs and jumps come back unchanged", "[musicxml][export]") {
+    using namespace elara::core;
+    // Every jump, to every ending, next to every sign (ADR-0049).
+    for (const JumpTo to : {JumpTo::Start, JumpTo::Segno, JumpTo::SegnoSegno}) {
+        for (const JumpThen then :
+             {JumpThen::End, JumpThen::Fine, JumpThen::Coda, JumpThen::DoubleCoda}) {
+            Song song;
+            song.appendMeasures(7);
+            song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
+            song.measureHeader(1).segno = true;
+            song.measureHeader(2).segnoSegno = true;
+            song.measureHeader(2).fine = true;
+            song.measureHeader(3).toCoda = true;
+            song.measureHeader(3).toDoubleCoda = true;
+            song.measureHeader(4).jump = to;
+            song.measureHeader(4).jumpThen = then;
+            song.measureHeader(5).coda = true;
+            song.measureHeader(5).segno = true;
+            song.measureHeader(6).doubleCoda = true;
+            fillVoices(song);
+            INFO(std::format("jump {} then {}", static_cast<int>(to), static_cast<int>(then)));
+            requireSame(song, roundTrip(song));
+        }
+    }
+
+    Song song;
+    song.appendMeasures(2);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
+    song.measureHeader(0).segnoSegno = true;
+    song.measureHeader(1).jump = JumpTo::SegnoSegno;
+    song.measureHeader(1).jumpThen = JumpThen::DoubleCoda;
+    fillVoices(song);
+    const std::string xml = exportMusicXml(song).data;
+    CHECK(xml.contains("<segno/>"));
+    CHECK(xml.contains(R"(<sound segno="segno-segno"/>)"));
+    CHECK(xml.contains("<words>D.S.S. al Double Coda</words>"));
+    CHECK(xml.contains(R"(<sound dalsegno="segno-segno"/>)"));
+}
+
 TEST_CASE("MusicXML export: the document follows the MusicXML mapping", "[musicxml][export]") {
     using namespace elara::core;
     Song song;

@@ -452,9 +452,13 @@ def song_file(song: dict) -> bytes:
         # reverb, phaser, tremolo and padding.
         w.out += bytes([track.get("volume", 13), track.get("balance", 8), 0, 0, 0, 0, 0, 0])
     if v >= 500:
-        for _ in range(19):
-            w.i16(-1)  # no coda or segno
-        w.i32(0)
+        # The measure (from 1) of each sign and jump, or -1: coda, double coda,
+        # segno, segno segno, fine, the twelve D.C./D.S./D.S.S. jumps (plain, al
+        # coda, al double coda, al fine), da coda, da double coda.
+        directions = song.get("directions", {})
+        for index in range(19):
+            w.i16(directions.get(index, -1))
+        w.i32(0)  # master reverb
     headers = song["measures"]
     w.i32(len(headers))
     w.i32(len(song["tracks"]))
@@ -620,8 +624,28 @@ def melody_gp3() -> dict:
     }
 
 
+def dal_segno_gp5() -> dict:
+    # 1 | 2 segno | 3 da coda | 4 D.S. al Coda | 5 coda | 6: played
+    # 1 2 3 4 2 3 5 6.
+    guitar = {
+        "name": "Guitar", "channel": 1, "program": 27, "strings": STANDARD,
+        "content": [[[beat(-2, [note(1, fret)])], [EMPTY]] for fret in (0, 1, 3, 5, 7, 8)],
+    }
+    return {
+        "version": 510,
+        "info": {"title": "Corpus Navigation", "subtitle": "Guitar Pro 5",
+                 "artist": "Ghost in the Groove", "copyright": "CC0 1.0",
+                 "tab": "Elara contributors"},
+        "tempo": 120, "key": 0,
+        "directions": {2: 2, 17: 3, 10: 4, 0: 5},
+        "measures": [{"time": (4, 4)}, {}, {}, {}, {}, {}],
+        "tracks": [guitar],
+    }
+
+
 FILES = {
     "techniques.gp5": techniques_gp5,
+    "dal-segno.gp5": dal_segno_gp5,
     "quartet.gp4": quartet_gp4,
     "melody.gp3": melody_gp3,
 }

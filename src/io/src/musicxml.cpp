@@ -618,6 +618,103 @@ BendCurve bendCurveOf(const std::vector<Bend>& bends) {
     return released ? BendCurve::bendRelease(cents) : BendCurve::bend(cents);
 }
 
+/// The signs and jumps one <direction>, <sound> or <barline> sets (ADR-0049).
+struct Navigation {
+    int segno = 0;  ///< 1: segno, 2: segno segno
+    int coda = 0;   ///< 1: coda, 2: double coda
+    int toCoda = 0; ///< 1: To Coda, 2: To Double Coda
+    bool fine = false;
+    JumpTo jump = JumpTo::None;
+    std::optional<JumpThen> then{}; ///< empty: not said (a <sound> alone)
+
+    /// Takes what `other` sets, keeping this one's ending of the same jump.
+    void merge(const Navigation& other) {
+        segno = other.segno != 0 ? other.segno : segno;
+        coda = other.coda != 0 ? other.coda : coda;
+        toCoda = other.toCoda != 0 ? other.toCoda : toCoda;
+        fine = fine || other.fine;
+        if (other.jump != JumpTo::None) {
+            then = other.then ? other.then : (other.jump == jump ? then : std::nullopt);
+            jump = other.jump;
+        }
+    }
+};
+
+/// 2 for the second sign of a kind: the `segno`, `coda`, `tocoda` and
+/// `dalsegno` attributes name their sign, and Elara writes "segno-segno" and
+/// "double-coda" for the second ones.
+int signKind(std::string_view id, std::string_view second) {
+    return id == second ? 2 : 1;
+}
+
+/// What the <sound> attributes of a direction say about the play order.
+Navigation soundNavigation(pugi::xml_node sound) {
+    Navigation navigation;
+    if (const pugi::xml_attribute segno = sound.attribute("segno")) {
+        navigation.segno = signKind(segno.value(), "segno-segno");
+    }
+    if (const pugi::xml_attribute coda = sound.attribute("coda")) {
+        navigation.coda = signKind(coda.value(), "double-coda");
+    }
+    if (const pugi::xml_attribute toCoda = sound.attribute("tocoda")) {
+        navigation.toCoda = signKind(toCoda.value(), "double-coda");
+    }
+    navigation.fine = static_cast<bool>(sound.attribute("fine"));
+    if (sound.attribute("dacapo").as_bool()) {
+        navigation.jump = JumpTo::Start;
+    }
+    if (const pugi::xml_attribute segno = sound.attribute("dalsegno")) {
+        navigation.jump =
+            signKind(segno.value(), "segno-segno") == 2 ? JumpTo::SegnoSegno : JumpTo::Segno;
+    }
+    return navigation;
+}
+
+/// The usual navigation texts ("D.S. al Coda", "Da Capo", "Fine", "To Coda"),
+/// read letter by letter without case, or empty for any other text.
+std::optional<Navigation> navigationWords(std::string_view text) {
+    std::string letters;
+    for (const char c : text) {
+        const auto lower = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+        if (lower >= 'a' && lower <= 'z') {
+            letters += lower;
+        }
+    }
+    if (letters == "fine") {
+        return Navigation{.fine = true};
+    }
+    if (letters == "tocoda" || letters == "todoublecoda") {
+        return Navigation{.toCoda = letters == "tocoda" ? 1 : 2};
+    }
+    // The longer prefix first: "dss" also starts with "ds".
+    constexpr std::array<std::pair<std::string_view, JumpTo>, 6> kTargets{{
+        {"dalsegnosegno", JumpTo::SegnoSegno},
+        {"dss", JumpTo::SegnoSegno},
+        {"dalsegno", JumpTo::Segno},
+        {"ds", JumpTo::Segno},
+        {"dacapo", JumpTo::Start},
+        {"dc", JumpTo::Start},
+    }};
+    constexpr std::array<std::pair<std::string_view, JumpThen>, 4> kEndings{{
+        {"", JumpThen::End},
+        {"alfine", JumpThen::Fine},
+        {"alcoda", JumpThen::Coda},
+        {"aldoublecoda", JumpThen::DoubleCoda},
+    }};
+    const std::string_view all = letters;
+    for (const auto& [prefix, to] : kTargets) {
+        if (!all.starts_with(prefix)) {
+            continue;
+        }
+        for (const auto& [suffix, then] : kEndings) {
+            if (all.substr(prefix.size()) == suffix) {
+                return Navigation{.jump = to, .then = then};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 /// Song-wide results the first part writes and the other parts only read.
 struct ScoreState {
     std::vector<MeasureHeader> headers{};
@@ -719,6 +816,9 @@ public:
             readMeasure(measure, index);
             ++index;
         }
+        if (first_) {
+            endOpenJumps();
+        }
     }
 
     [[nodiscard]] Track takeTrack() {
@@ -758,6 +858,7 @@ private:
         } else {
             concertKey_ = score_.headers[index].keySignature;
         }
+        jumpEndOpen_ = false;
 
         // Buffers reused from measure to measure.
         std::vector<Event>& events = events_;
@@ -801,8 +902,11 @@ private:
                 cursor += divisionsToWholes(child.child("duration").text().as_int(0));
                 end = std::max(end, cursor);
             } else if (name == "direction") {
-                readDirection(child, cursor, index, dynamics, tempos);
+                readDirection(child, cursor, index, dynamics, tempos, first_ ? &header : nullptr);
             } else if (name == "sound") {
+                if (first_) {
+                    navigate(header, soundNavigation(child), index);
+                }
                 if (auto tempo = readSound(child, index)) {
                     tempos.push_back(TempoMark{.onset = cursor, .tempo = *tempo});
                 }
@@ -861,6 +965,9 @@ private:
             if (endingStops_) {
                 ending_ = 0;
                 endingStops_ = false;
+            }
+            if (header.jump != JumpTo::None && jumpEndOpen_) {
+                openJumps_.push_back(index);
             }
             score_.headers.push_back(std::move(header));
         }
@@ -950,13 +1057,6 @@ private:
     }
 
     std::optional<Tempo> readSound(pugi::xml_node sound, std::size_t index) {
-        constexpr std::array kJumps{"dacapo"sv, "dalsegno"sv, "fine"sv,
-                                    "tocoda"sv, "segno"sv,    "coda"sv};
-        if (std::ranges::any_of(kJumps, [&](std::string_view name) {
-                return static_cast<bool>(sound.attribute(name.data()));
-            })) {
-            warn("jumps (D.C., D.S., segno, coda, fine) dropped", index);
-        }
         if (const pugi::xml_attribute tempo = sound.attribute("tempo")) {
             return makeTempo(tempo.as_double(0.0), Duration{}, index);
         }
@@ -984,8 +1084,10 @@ private:
         return makeTempo(*perMinute, Duration(*value, dotCount), index);
     }
 
+    // `header`: the first part's measure, which takes the signs and jumps.
     void readDirection(pugi::xml_node direction, const Fraction& cursor, std::size_t index,
-                       std::vector<DynamicMark>& dynamics, std::vector<TempoMark>& tempos) {
+                       std::vector<DynamicMark>& dynamics, std::vector<TempoMark>& tempos,
+                       MeasureHeader* header) {
         const Fraction onset = std::max(
             Fraction(0), cursor + divisionsToWholes(direction.child("offset").text().as_int(0)));
         std::optional<std::size_t> staff;
@@ -993,6 +1095,9 @@ private:
             staff = staffFor(number.text().as_int(1)).staff;
         }
         std::optional<Tempo> tempo;
+        std::string words;
+        bool segnoGlyph = false;
+        bool codaGlyph = false;
         for (pugi::xml_node type : direction.children("direction-type")) {
             for (pugi::xml_node mark : type.children()) {
                 const std::string_view name = mark.name();
@@ -1005,13 +1110,13 @@ private:
                 } else if (name == "metronome") {
                     tempo = readMetronome(mark, index);
                 } else if (name == "words") {
-                    if (!textOf(mark).empty()) {
-                        warn("text directions dropped", index);
-                    }
+                    words += textView(mark);
                 } else if (name == "rehearsal") {
                     warn("rehearsal marks dropped", index);
-                } else if (name == "segno" || name == "coda") {
-                    warn("jumps (D.C., D.S., segno, coda, fine) dropped", index);
+                } else if (name == "segno") {
+                    segnoGlyph = true;
+                } else if (name == "coda") {
+                    codaGlyph = true;
                 } else if (name == "wedge" && !stop) {
                     warn("hairpins dropped", index);
                 } else if (name == "octave-shift" && !stop) {
@@ -1021,7 +1126,13 @@ private:
                 }
             }
         }
+        const std::optional<Navigation> fromWords = navigationWords(words);
+        if (!fromWords && words.find_first_not_of(" \t\r\n") != std::string::npos) {
+            warn("text directions dropped", index);
+        }
+        Navigation navigation = fromWords.value_or(Navigation{});
         if (const pugi::xml_node sound = direction.child("sound")) {
+            navigation.merge(soundNavigation(sound));
             const auto soundTempo = readSound(sound, index);
             if (!tempo) {
                 tempo = soundTempo;
@@ -1029,6 +1140,66 @@ private:
         }
         if (tempo) {
             tempos.push_back(TempoMark{.onset = onset, .tempo = *tempo});
+        }
+        if (header != nullptr) {
+            // A glyph alone is a sign; next to a jump or "To Coda" it decorates it.
+            const bool jumps = navigation.jump != JumpTo::None || navigation.toCoda != 0;
+            if (segnoGlyph && navigation.segno == 0 && !jumps) {
+                navigation.segno = 1;
+            }
+            if (codaGlyph && navigation.coda == 0 && !jumps) {
+                navigation.coda = 1;
+            }
+            navigate(*header, navigation, index);
+        }
+    }
+
+    void navigate(MeasureHeader& header, const Navigation& navigation, std::size_t index) {
+        header.segno = header.segno || navigation.segno == 1;
+        header.segnoSegno = header.segnoSegno || navigation.segno == 2;
+        header.coda = header.coda || navigation.coda == 1;
+        header.doubleCoda = header.doubleCoda || navigation.coda == 2;
+        header.toCoda = header.toCoda || navigation.toCoda == 1;
+        header.toDoubleCoda = header.toDoubleCoda || navigation.toCoda == 2;
+        header.fine = header.fine || navigation.fine;
+        if (navigation.jump == JumpTo::None) {
+            return;
+        }
+        if (navigation.then) {
+            if (header.jump != JumpTo::None &&
+                (header.jump != navigation.jump ||
+                 (!jumpEndOpen_ && header.jumpThen != *navigation.then))) {
+                warn("two jumps in one measure: the last one kept", index);
+            }
+            header.jumpThen = *navigation.then;
+            jumpEndOpen_ = false;
+        } else if (header.jump != navigation.jump) {
+            if (header.jump != JumpTo::None) {
+                warn("two jumps in one measure: the last one kept", index);
+            }
+            header.jumpThen = JumpThen::End;
+            jumpEndOpen_ = true;
+        }
+        header.jump = navigation.jump;
+    }
+
+    // A jump read from <sound> alone says where it goes, not where it ends:
+    // al Coda when the song has a To Coda, al Fine when it has a Fine.
+    void endOpenJumps() {
+        const auto has = [&](bool MeasureHeader::* flag) {
+            return std::ranges::any_of(score_.headers,
+                                       [&](const MeasureHeader& header) { return header.*flag; });
+        };
+        JumpThen then = JumpThen::End;
+        if (has(&MeasureHeader::toCoda)) {
+            then = JumpThen::Coda;
+        } else if (has(&MeasureHeader::toDoubleCoda)) {
+            then = JumpThen::DoubleCoda;
+        } else if (has(&MeasureHeader::fine)) {
+            then = JumpThen::Fine;
+        }
+        for (const std::size_t m : openJumps_) {
+            score_.headers[m].jumpThen = then;
         }
     }
 
@@ -1041,8 +1212,16 @@ private:
         if (barline.child("fermata")) {
             warn("fermatas dropped", index);
         }
-        if (barline.child("segno") || barline.child("coda")) {
-            warn("jumps (D.C., D.S., segno, coda, fine) dropped", index);
+        if (first_) {
+            // <segno/> and <coda/>, named for playback by the attributes.
+            Navigation navigation;
+            if (barline.child("segno") || barline.attribute("segno")) {
+                navigation.segno = signKind(barline.attribute("segno").value(), "segno-segno");
+            }
+            if (barline.child("coda") || barline.attribute("coda")) {
+                navigation.coda = signKind(barline.attribute("coda").value(), "double-coda");
+            }
+            navigate(header, navigation, index);
         }
     }
 
@@ -1618,9 +1797,11 @@ private:
     const PartInfo& info_;
     PartLayout layout_;
     bool first_;
-    std::uint8_t ending_ = 0;  // the alternate ending being read, as times
-    bool endingStops_ = false; // it stops at the end of this measure
-    ScoreState& score_;        // written by the first part only
+    std::uint8_t ending_ = 0;              // the alternate ending being read, as times
+    bool endingStops_ = false;             // it stops at the end of this measure
+    bool jumpEndOpen_ = false;             // this measure's jump came without its ending
+    std::vector<std::size_t> openJumps_{}; // the measures whose jump ending is inferred
+    ScoreState& score_;                    // written by the first part only
     Warnings& warnings_;
     int divisions_ = 1;
     Fraction oneDivision_{1, 4};

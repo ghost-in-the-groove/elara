@@ -719,6 +719,29 @@ add_test(NAME cli.sequence_endings
   COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5")
 set_tests_properties(cli.sequence_endings PROPERTIES
   PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 19 notes, 59 events in 13\\.950 s")
+# Signs and jumps read from Guitar Pro (ADR-0049): D.S. al Coda from a Guitar
+# Pro 5 file, D.S.S. al Double Coda from GPIF.
+add_test(NAME cli.sequence_dal_segno COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/dal-segno.gp5")
+set_tests_properties(cli.sequence_dal_segno PROPERTIES
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 4 2 3 5 6\n")
+add_test(NAME cli.sequence_double_coda
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/double-coda.gp")
+set_tests_properties(cli.sequence_double_coda PROPERTIES
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 4 5 3 4 7\n")
+# ... and kept on the way to MusicXML: saved, exported, read back.
+set(ELARA_CLI_DOUBLE_CODA "${CMAKE_CURRENT_BINARY_DIR}/cli-double-coda")
+add_test(NAME cli.import_double_coda COMMAND elara-cli import "${ELARA_CORPUS}/gp/double-coda.gp"
+  --out "${ELARA_CLI_DOUBLE_CODA}.elara" --force)
+set_tests_properties(cli.import_double_coda PROPERTIES FIXTURES_SETUP cli_double_coda)
+add_test(NAME cli.export_double_coda COMMAND elara-cli export "${ELARA_CLI_DOUBLE_CODA}.elara"
+  "${ELARA_CLI_DOUBLE_CODA}.musicxml" --force)
+set_tests_properties(cli.export_double_coda PROPERTIES
+  FIXTURES_REQUIRED cli_double_coda FIXTURES_SETUP cli_double_coda_exported)
+add_test(NAME cli.sequence_exported_double_coda
+  COMMAND elara-cli sequence "${ELARA_CLI_DOUBLE_CODA}.musicxml")
+set_tests_properties(cli.sequence_exported_double_coda PROPERTIES
+  FIXTURES_REQUIRED cli_double_coda_exported
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 4 5 3 4 7\n")
 add_test(NAME cli.sequence_events
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --notes --events)
 set_tests_properties(cli.sequence_events PROPERTIES
