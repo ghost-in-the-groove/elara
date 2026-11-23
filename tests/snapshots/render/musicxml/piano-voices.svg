@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1697.143" viewBox="0 0 120 169.714">
+<style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
+<rect x="0" y="0" width="120" height="169.714" fill="white"/>
+<g fill="black" stroke="black">
+<line class="staffLine" x1="8.571" y1="18.911" x2="39.009" y2="18.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="19.911" x2="39.009" y2="19.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="20.911" x2="39.009" y2="20.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="21.911" x2="39.009" y2="21.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="22.911" x2="39.009" y2="22.911" stroke-width="0.13"/>
+<line class="stem" x1="19.231" y1="20.243" x2="19.231" y2="15.911" stroke-width="0.12"/>
+<line class="stem" x1="23.474" y1="18.743" x2="23.474" y2="15.411" stroke-width="0.12"/>
+<line class="stem" x1="22.414" y1="21.579" x2="22.414" y2="24.911" stroke-width="0.12"/>
+<line class="barline" x1="26.677" y1="18.911" x2="26.677" y2="22.911" stroke-width="0.16"/>
+<line class="stem" x1="30.661" y1="20.579" x2="30.661" y2="23.911" stroke-width="0.12"/>
+<line class="barline" x1="38.029" y1="18.911" x2="38.029" y2="22.911" stroke-width="0.16"/>
+<line class="barline" x1="38.759" y1="18.911" x2="38.759" y2="22.911" stroke-width="0.5"/>
+<line class="staffLine" x1="8.571" y1="26.911" x2="39.009" y2="26.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="27.911" x2="39.009" y2="27.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="28.911" x2="39.009" y2="28.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="29.911" x2="39.009" y2="29.911" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="30.911" x2="39.009" y2="30.911" stroke-width="0.13"/>
+<line class="barline" x1="26.677" y1="26.911" x2="26.677" y2="30.911" stroke-width="0.16"/>
+<line class="stem" x1="30.661" y1="28.079" x2="30.661" y2="31.411" stroke-width="0.12"/>
+<line class="barline" x1="38.029" y1="26.911" x2="38.029" y2="30.911" stroke-width="0.16"/>
+<line class="barline" x1="38.759" y1="26.911" x2="38.759" y2="30.911" stroke-width="0.5"/>
+<line class="barline" x1="8.651" y1="18.911" x2="8.651" y2="30.911" stroke-width="0.16"/>
+<text class="clef" x="9.171" y="21.911" stroke="none">&#xE050;</text>
+<text class="keySignature" x="12.755" y="20.911" stroke="none">&#xE260;</text>
+<text class="timeSignature" x="14.559" y="19.911" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="14.559" y="21.911" stroke="none">&#xE084;</text>
+<text class="notehead" x="18.111" y="19.411" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="18.111" y="20.411" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="22.354" y="18.911" stroke="none">&#xE0A3;</text>
+<text class="rest" x="18.111" y="22.911" stroke="none">&#xE4E4;</text>
+<text class="notehead" x="22.354" y="21.411" stroke="none">&#xE0A3;</text>
+<text class="timeSignature" x="27.661" y="19.911" stroke="none">&#xE086;</text>
+<text class="timeSignature" x="27.657" y="21.911" stroke="none">&#xE088;</text>
+<text class="notehead" x="30.601" y="20.411" stroke="none">&#xE0A4;</text>
+<text class="dot" x="32.081" y="20.411" stroke="none">&#xE1E7;</text>
+<text class="rest" x="34.271" y="20.911" stroke="none">&#xE4E5;</text>
+<text class="dot" x="35.651" y="20.411" stroke="none">&#xE1E7;</text>
+<text class="clef" x="9.191" y="27.911" stroke="none">&#xE062;</text>
+<text class="keySignature" x="12.827" y="29.911" stroke="none">&#xE260;</text>
+<text class="timeSignature" x="14.631" y="27.911" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="14.631" y="29.911" stroke="none">&#xE084;</text>
+<text class="notehead" x="18.111" y="27.911" stroke="none">&#xE0A2;</text>
+<text class="timeSignature" x="27.661" y="27.911" stroke="none">&#xE086;</text>
+<text class="timeSignature" x="27.657" y="29.911" stroke="none">&#xE088;</text>
+<text class="notehead" x="30.601" y="27.911" stroke="none">&#xE0A3;</text>
+<text class="dot" x="32.081" y="27.411" stroke="none">&#xE1E7;</text>
+<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Piano</text>
+</g>
+</svg>
