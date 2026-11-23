@@ -61,9 +61,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] FluidSynth integration, MuseScore General SF3
 - [ ] sfizz integration and guitar SFZ library selection
 - [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)
-- [ ] Mixer (volume, pan, mute, solo), playback cursor in the app
+- [ ] Mixer (volume, pan, mute, solo)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
+- [x] Transport, playback cursor and click-to-seek in the app, `elara-cli render --cursor-at`
+  and `--time-at`
 
 ## Milestone 5 - Editor
 

@@ -21,8 +21,9 @@ struct StartupOptions {
     QUrl file;                ///< opened by the window as it loads
     std::optional<int> track; ///< a track to show, or ScoreDocument::kAllTracks
     std::optional<ScoreDocument::View> view;
-    bool smokeTest = false; ///< check the window (and the file), then quit
-    QString screenshot;     ///< save the window here once shown, then quit
+    std::optional<double> seek; ///< seconds to move the transport to, paused
+    bool smokeTest = false;     ///< check the window (and the file), then quit
+    QString screenshot;         ///< save the window here once shown, then quit
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -32,7 +33,8 @@ void reportSmokeTest(bool ok, const QString& detail);
 /// and painted, shows the track and view asked for and, for `--smoke-test`
 /// and `--screenshot`, checks the outcome and quits. The smoke test also
 /// shows the score in every view and with all its tracks, so that every
-/// relayout path runs without a screen.
+/// relayout path runs without a screen, moves the playback cursor halfway
+/// through the song and clicks on it.
 class Startup : public QObject {
 public:
     Startup(QQuickWindow* window, StartupOptions options, const bool& qmlWarnings);
@@ -44,6 +46,7 @@ private:
     void queueSteps();
     void queueEdits();
     void finish(bool ok, const QString& detail);
+    void clickCursor();
     [[nodiscard]] bool checking() const;
 
     QPointer<QQuickWindow> window_;
@@ -62,6 +65,7 @@ private:
     bool queued_ = false;
     qsizetype tracksBefore_ = 0; ///< tracks when the smoke test's edits start
     QString editProblem_;        ///< the first edit check that failed
+    QString failure_; ///< set by a step that went wrong
 };
 
 } // namespace elara::app
