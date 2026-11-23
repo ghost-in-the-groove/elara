@@ -50,7 +50,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [ ] Incremental relayout (only the systems an edit touches)
 - [ ] `elara-cli render --svg` snapshot tests
-- [ ] Qt scene graph renderer in the app; open-file dialog
+- [x] Score view in the app: pages painted on worker threads and shown as scene
+      graph textures, open-file dialog and drag and drop, track and view selection,
+      smooth zoom (ADR-0015)
 
 ## Milestone 4 - Playback  -> usable as a player
 

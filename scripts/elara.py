@@ -341,9 +341,26 @@ def cmd_bench(args: argparse.Namespace) -> int:
         return code
     if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara_benchmarks"])) != 0:
         return code
+    filters = _strip_dashes(args.args)
     exe = build_dir(preset) / "bin" / f"elara_benchmarks{EXE}"
-    return subprocess.run([str(exe), *_strip_dashes(args.args)], cwd=ROOT,
+    code = subprocess.run([str(exe), *filters, "--allow-running-no-tests"], cwd=ROOT,
                           env=build_env(), check=False).returncode
+    if code != 0:
+        return code
+    # The painting benchmarks live with the app tests (they need Qt).
+    cache = (build_dir(preset) / "CMakeCache.txt").read_text(encoding="utf-8", errors="replace")
+    if "ELARA_BUILD_APP:BOOL=ON" not in cache:
+        return 0
+    if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara_app_tests"])) != 0:
+        return code
+    env = dict(build_env())
+    qt = env.get("QT_ROOT_DIR")
+    if IS_WINDOWS and qt:
+        env["PATH"] = str(Path(qt) / "bin") + os.pathsep + env.get("PATH", "")
+    app_tests = build_dir(preset) / "bin" / f"elara_app_tests{EXE}"
+    app_filters = filters or ["[!benchmark]"]
+    return subprocess.run([str(app_tests), *app_filters, "--allow-running-no-tests"], cwd=ROOT,
+                          env=env, check=False).returncode
 
 
 def cmd_app(args: argparse.Namespace) -> int:

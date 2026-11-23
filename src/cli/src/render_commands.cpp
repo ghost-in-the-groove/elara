@@ -253,20 +253,10 @@ selectStaves(const core::Song& song, const RenderOptions& options) {
         }
         tracks.push_back(index);
     }
-    for (const std::size_t t : tracks) {
-        for (std::size_t s = 0; s < song.track(t).staffCount(); ++s) {
-            const bool fretted = song.track(t).staff(s).isFretted();
-            if (standard || !fretted) {
-                selection.push_back(
-                    {.track = t, .staff = s, .view = notation::StaffView::Standard});
-            }
-            if (tablature && fretted) {
-                selection.push_back(
-                    {.track = t, .staff = s, .view = notation::StaffView::Tablature});
-            }
-        }
-    }
-    return selection;
+    const notation::TrackView view = !tablature  ? notation::TrackView::Standard
+                                     : !standard ? notation::TrackView::Tablature
+                                                 : notation::TrackView::Both;
+    return notation::selectTracks(song, tracks, view);
 }
 
 notation::PageLayoutOptions pageLayoutOptions(const RenderOptions& options) {
