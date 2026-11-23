@@ -33,9 +33,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 2 - Importers (`elara_io`)
 
-- [ ] Self-made test corpus with `SOURCES.md`
+- [x] Self-made test corpus with `SOURCES.md`
 - [ ] Guitar Pro 3/4/5 (binary), GPX (6), GP (7-8) importers
-- [ ] MusicXML import/export (partwise), MIDI import/export
+- [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
+- [ ] MusicXML export
+- [ ] MIDI import/export
 - [ ] `elara-cli import <file> --json` snapshot tests per corpus file
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer

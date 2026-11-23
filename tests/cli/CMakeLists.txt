@@ -186,3 +186,35 @@ set_tests_properties(cli.dump_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.dump_rejects_other_files
   COMMAND elara-cli dump "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
 set_tests_properties(cli.dump_rejects_other_files PROPERTIES WILL_FAIL TRUE)
+
+# Import (ADR-0007) from the self-made corpus.
+set(ELARA_CORPUS "${CMAKE_CURRENT_SOURCE_DIR}/../corpus")
+set(ELARA_CLI_IMPORTED "${CMAKE_CURRENT_BINARY_DIR}/cli-imported.elara")
+
+add_test(NAME cli.import_musicxml
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/melody.musicxml")
+set_tests_properties(cli.import_musicxml PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"format\":\"musicxml\",\"out\":null,\"warnings\":\\[\\],\"song\":{.*\"title\":\"Corpus Melody\".*\"issues\":\\[\\]}")
+
+add_test(NAME cli.import_musicxml_reports_warnings
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/piano-voices.musicxml")
+set_tests_properties(cli.import_musicxml_reports_warnings PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[[^]]*\"Piano: grace notes dropped \\(measure 2\\)\"")
+
+add_test(NAME cli.import_musicxml_saves_native
+  COMMAND elara-cli import "${ELARA_CORPUS}/musicxml/guitar-tab.musicxml"
+    --out "${ELARA_CLI_IMPORTED}" --force)
+set_tests_properties(cli.import_musicxml_saves_native PROPERTIES FIXTURES_SETUP cli_imported)
+
+add_test(NAME cli.dump_reads_imported_song COMMAND elara-cli --json dump "${ELARA_CLI_IMPORTED}")
+set_tests_properties(cli.dump_reads_imported_song PROPERTIES
+  FIXTURES_REQUIRED cli_imported
+  PASS_REGULAR_EXPRESSION "\"clef\":\"treble-8vb\",\"tuning\":\"D2 A2 D3 G3 B3 E4\",\"capo\":2")
+
+add_test(NAME cli.import_rejects_unknown_types
+  COMMAND elara-cli import "${CMAKE_CURRENT_SOURCE_DIR}/CMakeLists.txt")
+set_tests_properties(cli.import_rejects_unknown_types PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.import_rejects_missing_file
+  COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/no-such-score.musicxml")
+set_tests_properties(cli.import_rejects_missing_file PROPERTIES WILL_FAIL TRUE)

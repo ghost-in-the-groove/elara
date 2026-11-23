@@ -28,6 +28,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
+| importación / aviso | import / warning | `ImportResult`, `warnings` | A foreign file read into the model; each warning is a feature it had that the model cannot hold yet (ADR-0007) |
 | figura / duración | duration, note value | `Duration`, `NoteValue` | Length is a `Fraction` of a whole note |
 | posición temporal | time position | `Fraction` | Whole notes from the song or measure start |
 | puntillo | dot | `dots` | |

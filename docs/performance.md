@@ -49,6 +49,10 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | read that `song.json` back into a song | 35.3 ms | parsing is a small part; most is building the model and parsing pitches and durations |
 | 2026-11-23 | save the 20-track song as a `.elara` file (JSON + deflate) | 70.4 ms | 41 KB: the benchmark song repeats one pattern, real songs compress far less |
 | 2026-11-23 | open that `.elara` file | 51.3 ms | inflate + read; fast enough for open/save. If it ever shows, write tracks in parallel or emit JSON directly |
+| 2026-11-23 | import the 20-track song from MusicXML (33 MB, string and fret on every note) | 265 ms | first version; pugixml alone parses the text in about 100 ms |
+| 2026-11-23 | same | 238 ms | each `<note>`'s children found in one pass instead of a dozen `child()` scans; per-measure buffers reused; beats and chords reserved once |
+| 2026-11-23 | same | 118 ms | parts after the first read on all cores (ADR-0007); what is left is mostly the XML parse. The result equals the song built in memory and does not depend on the number of threads |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
-`-- "[io]"` prints the size of the large song as JSON and as a `.elara` file.
+`-- "[io]"` prints the size of the large song as JSON, as a `.elara` file and
+as MusicXML.
