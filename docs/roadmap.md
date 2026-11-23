@@ -71,7 +71,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
-- [ ] Copy/paste, insert/delete measures, transposition
+- [ ] Copy/paste, insert/delete measures, transposition (insert/delete and transposition done, ADR-0026; copy/paste to do)
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
