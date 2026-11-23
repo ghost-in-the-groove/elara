@@ -16,6 +16,7 @@ elara-cli [--json] key <KEY>                       # e.g. "D major", "Bb minor"
 elara-cli [--json] spell <MIDI> [--key "C major"]
 elara-cli [--json] meter <N/D> [--bpm 120] [--beat-unit quarter|dotted-quarter|eighth|...]
 elara-cli [--json] rests <N/D> <DURATION>...      # e.g. rests 6/8 8 -> 8 8 4.
+elara-cli [--json] edit <STEP>...                 # undoable edits on a new song
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -23,6 +24,20 @@ spelling, MIDI number and equal-tempered frequency. `--tuning` takes a preset
 name from `tunings` or open strings from the lowest tab line, e.g.
 `"D2 A2 D3 G3 B3 E4"`. Durations are written as in `rests`: `4` quarter, `8.`
 dotted eighth, `8*3:2` triplet eighth, `breve` double whole note.
+
+`edit` applies quoted steps to a new song through the undo history and prints
+the song, its validation issues and the undo/redo state:
+
+```text
+elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "time 2 6/8" "note 0 0 6 3 4" "fill 0 0" undo redo save
+```
+
+Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
+`append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
+`key <m> <key>`, `tempo <bpm>`, `title <text>`,
+`note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
+`fill <track> <m>`, `undo`, `redo`, `save`. A malformed step exits with 2, a
+step the song rejects (missing track, nothing to undo) with 1.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

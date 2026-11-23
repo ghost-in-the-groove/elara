@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// The edits a Document understands (ADR-0005). Note-level edits replace the
+// measure that holds them; structure has its own commands.
+#pragma once
+
+#include <elara/core/document.hpp>
+
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace elara::core {
+
+/// Inserts empty measures in every staff (see Song::insertMeasures).
+class InsertMeasures final : public Command {
+public:
+    explicit InsertMeasures(std::size_t at, std::size_t count = 1) : at_(at), count_(count) {}
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    [[nodiscard]] std::string_view name() const noexcept override { return "Insert measures"; }
+
+private:
+    std::size_t at_;
+    std::size_t count_;
+};
+
+/// Removes measures [at, at + count) from every staff, keeping them for undo.
+class RemoveMeasures final : public Command {
+public:
+    explicit RemoveMeasures(std::size_t at, std::size_t count = 1) : at_(at), count_(count) {}
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    [[nodiscard]] std::string_view name() const noexcept override { return "Remove measures"; }
+
+private:
+    std::size_t at_;
+    std::size_t count_;
+    std::vector<MeasureHeader> headers_;
+    std::vector<Measure> measures_; // track by track, staff by staff
+};
+
+/// Inserts a track before track `at` (see Song::insertTrack).
+class InsertTrack final : public Command {
+public:
+    InsertTrack(std::size_t at, Track track) : at_(at), track_(std::move(track)) {}
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    [[nodiscard]] std::string_view name() const noexcept override { return "Add track"; }
+
+private:
+    std::size_t at_;
+    std::optional<Track> track_; // empty while the song holds it
+};
+
+/// Removes a track, keeping it for undo.
+class RemoveTrack final : public Command {
+public:
+    explicit RemoveTrack(std::size_t index) : index_(index) {}
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    [[nodiscard]] std::string_view name() const noexcept override { return "Remove track"; }
+
+private:
+    std::size_t index_;
+    std::optional<Track> track_; // set while removed
+};
+
+/// Replaces one measure of one staff: the way notes, rests and effects change.
+class ReplaceMeasure final : public Command {
+public:
+    ReplaceMeasure(std::size_t track, std::size_t staff, std::size_t measure, Measure content)
+        : track_(track), staff_(staff), measure_(measure), content_(std::move(content)) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Edit measure"; }
+
+private:
+    void swapWith(Song& song);
+
+    std::size_t track_;
+    std::size_t staff_;
+    std::size_t measure_;
+    Measure content_; // the new content before apply(), the old one after
+};
+
+/// Replaces a measure header: time signature, key signature, tempo changes.
+class SetMeasureHeader final : public Command {
+public:
+    SetMeasureHeader(std::size_t measure, MeasureHeader header)
+        : measure_(measure), header_(std::move(header)) {}
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    /// Names what changed, e.g. "Change time signature", once applied.
+    [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+
+private:
+    std::size_t measure_;
+    MeasureHeader header_;
+    std::string_view name_ = "Change measure header";
+};
+
+/// Replaces the title, artist and other song information.
+class SetSongInfo final : public Command {
+public:
+    explicit SetSongInfo(SongInfo info) : info_(std::move(info)) {}
+    void apply(Song& song) override { std::swap(song.info(), info_); }
+    void revert(Song& song) override { std::swap(song.info(), info_); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Edit song info"; }
+
+private:
+    SongInfo info_;
+};
+
+/// Changes the tempo at the start of the song.
+class SetStartTempo final : public Command {
+public:
+    explicit SetStartTempo(Tempo tempo) : tempo_(tempo) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Change tempo"; }
+
+private:
+    void swapWith(Song& song) noexcept;
+
+    Tempo tempo_;
+};
+
+/// Several commands as one undo step, applied in order and reverted in reverse.
+/// If one fails, the ones already applied are reverted and the error propagates.
+class CommandGroup final : public Command {
+public:
+    /// Throws std::invalid_argument if a command is null.
+    CommandGroup(std::string name, std::vector<std::unique_ptr<Command>> commands);
+    void apply(Song& song) override;
+    void revert(Song& song) override;
+    [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+
+private:
+    std::string name_;
+    std::vector<std::unique_ptr<Command>> commands_;
+};
+
+} // namespace elara::core

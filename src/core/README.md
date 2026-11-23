@@ -51,6 +51,8 @@ sixth string of a guitar sounds F#2.
 | `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. |
 | `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`), `Track` (instrument + staves, `fromPreset()`), `MeasureHeader`, `SongInfo`, `Song`. |
+| `document.hpp` | `Document` (a song being edited: undo/redo history with a limit, save point, `isModified()`) and the `Command` interface (ADR-0005). |
+| `commands.hpp` | The edits: `InsertMeasures`, `RemoveMeasures`, `InsertTrack`, `RemoveTrack`, `ReplaceMeasure` (any note-level edit), `SetMeasureHeader`, `SetSongInfo`, `SetStartTempo` and `CommandGroup` (one undo step). |
 | `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()` and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
@@ -69,6 +71,13 @@ unfinished tuplet with rests of the same tuplet), then the largest rests that
 start on a multiple of their own length, so beats stay visible (4/4 after a
 quarter: quarter + half, never a dotted half; 6/8 uses dotted rests by beat).
 It changes nothing and returns false when the gap cannot be written that way.
+
+Build a song with the `Song` API (importers, tests); once it is open for
+editing, wrap it in a `Document` and change it only through commands. Commands
+swap or move data with the song instead of copying it, so undo costs memory in
+proportion to what was edited (ADR-0005). A new kind of edit needs a command
+whose `revert()` restores the song exactly; the random-edit test in
+`tests/core/test_document.cpp` checks that with `Song ==`.
 
 The time types above are small `constexpr` value types without allocation; keep them
 that way, the sequencer and layout engine run them in hot loops

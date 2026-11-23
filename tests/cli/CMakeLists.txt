@@ -117,3 +117,30 @@ set_tests_properties(cli.rests_rejects_overfull PROPERTIES WILL_FAIL TRUE)
 
 add_test(NAME cli.rests_rejects_bad_duration COMMAND elara-cli rests 4/4 3)
 set_tests_properties(cli.rests_rejects_bad_duration PROPERTIES WILL_FAIL TRUE)
+
+# Undoable edits on a new song (ADR-0005).
+add_test(NAME cli.edit_undo_and_redo_history
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8" undo)
+set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
+
+add_test(NAME cli.edit_reports_incomplete_measure
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 3 4")
+set_tests_properties(cli.edit_reports_incomplete_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"notes\":1}.*\"issues\":\\[{\"kind\":\"voice-incomplete\",\"track\":0,\"staff\":0,\"measure\":0,\"voice\":0,\"beat\":null,\"note\":null}\\]")
+
+add_test(NAME cli.edit_fill_completes_measure
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 3 4" "fill 0 0")
+set_tests_properties(cli.edit_fill_completes_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"beats\":3,\"notes\":1}.*\"issues\":\\[\\]")
+
+add_test(NAME cli.edit_save_point_survives_undo_redo
+  COMMAND elara-cli --json edit "title Etude" "append-measures 2" save undo redo)
+set_tests_properties(cli.edit_save_point_survives_undo_redo PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"modified\":false}")
+
+add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "transpose 2")
+set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME cli.edit_rejects_undo_without_history COMMAND elara-cli edit undo)
+set_tests_properties(cli.edit_rejects_undo_without_history PROPERTIES WILL_FAIL TRUE)

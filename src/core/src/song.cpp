@@ -85,7 +85,10 @@ const Staff& Track::staff(std::size_t index) const {
 
 // ---- Song -----------------------------------------------------------------
 
-std::size_t Song::addTrack(Track track) {
+std::size_t Song::insertTrack(std::size_t at, Track track) {
+    if (at > tracks_.size()) {
+        throw std::out_of_range("Song: track index past the end");
+    }
     for (auto& staff : track.staves_) {
         if (staff.measures_.empty()) {
             staff.measures_.resize(headers_.size());
@@ -93,13 +96,14 @@ std::size_t Song::addTrack(Track track) {
             throw std::invalid_argument("Song: track has a different number of measures");
         }
     }
-    tracks_.push_back(std::move(track));
-    return tracks_.size() - 1;
+    tracks_.insert(tracks_.begin() + static_cast<std::ptrdiff_t>(at), std::move(track));
+    return at;
 }
 
-void Song::removeTrack(std::size_t index) {
-    checkedAt(tracks_, index, "Song: no such track");
+Track Song::takeTrack(std::size_t index) {
+    Track taken = std::move(checkedAt(tracks_, index, "Song: no such track"));
     tracks_.erase(tracks_.begin() + static_cast<std::ptrdiff_t>(index));
+    return taken;
 }
 
 Track& Song::track(std::size_t index) {

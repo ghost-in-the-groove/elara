@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace elara::core {
@@ -102,15 +103,15 @@ struct MeasureHeader {
 };
 
 struct SongInfo {
-    std::string title;
-    std::string subtitle;
-    std::string artist;
-    std::string album;
-    std::string words;
-    std::string music;
-    std::string copyright;
-    std::string transcriber;
-    std::string notes;
+    std::string title{};
+    std::string subtitle{};
+    std::string artist{};
+    std::string album{};
+    std::string words{};
+    std::string music{};
+    std::string copyright{};
+    std::string transcriber{};
+    std::string notes{};
 
     friend bool operator==(const SongInfo&, const SongInfo&) = default;
 };
@@ -128,10 +129,17 @@ public:
     /// Appends a track and returns its index. Its staves get measureCount() empty
     /// measures. Throws std::invalid_argument if a staff already holds a different
     /// number of measures (e.g. a track copied from another song).
-    std::size_t addTrack(Track track);
+    std::size_t addTrack(Track track) { return insertTrack(trackCount(), std::move(track)); }
+
+    /// Inserts a track before track `at` (at == trackCount() appends), with the
+    /// same rules as addTrack(). Throws std::out_of_range when at > trackCount().
+    std::size_t insertTrack(std::size_t at, Track track);
+
+    /// Removes a track and returns it. Throws std::out_of_range for a missing track.
+    Track takeTrack(std::size_t index);
 
     /// Throws std::out_of_range for a missing track.
-    void removeTrack(std::size_t index);
+    void removeTrack(std::size_t index) { (void)takeTrack(index); }
     [[nodiscard]] Track& track(std::size_t index);
     [[nodiscard]] const Track& track(std::size_t index) const;
 
