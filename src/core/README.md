@@ -47,7 +47,8 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
-| `measure.hpp` | `Note` (sounding `Pitch` + optional `FretPosition`), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
+| `effects.hpp` | `NoteEffects` (tie and hammer-on/pull-off from the previous note, slides in/out, `BendCurve` in cents, `Harmonic`, vibrato, palm mute, dead and ghost notes, let ring, staccato, accent, `Dynamic`) and `BeatEffects` (pick stroke, strum, tremolo picking, whammy bar, bass tap/slap/pop); `naturalHarmonicSemitones()`, `dynamicVelocity()`. |
+| `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. |
 | `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`), `Track` (instrument + staves, `fromPreset()`), `MeasureHeader`, `SongInfo`, `Song`. |
 

@@ -30,12 +30,15 @@ enum class NoteValue : std::uint8_t {
 /// "`actual` notes in the time of `normal` notes": a triplet is Tuplet(3, 2).
 class Tuplet {
 public:
+    static constexpr int kMaxCount = 64; // far beyond real tuplets; keeps a byte each
+
     constexpr Tuplet() noexcept = default;
 
-    /// Throws std::invalid_argument unless both counts are positive.
-    constexpr Tuplet(int actual, int normal) : actual_(actual), normal_(normal) {
-        if (actual <= 0 || normal <= 0) {
-            throw std::invalid_argument("Tuplet: counts must be positive");
+    /// Throws std::invalid_argument unless both counts are in 1..kMaxCount.
+    constexpr Tuplet(int actual, int normal)
+        : actual_(static_cast<std::uint8_t>(actual)), normal_(static_cast<std::uint8_t>(normal)) {
+        if (actual <= 0 || normal <= 0 || actual > kMaxCount || normal > kMaxCount) {
+            throw std::invalid_argument("Tuplet: counts must be in 1..64");
         }
     }
 
@@ -49,8 +52,8 @@ public:
     friend constexpr bool operator==(const Tuplet&, const Tuplet&) noexcept = default;
 
 private:
-    int actual_ = 1;
-    int normal_ = 1;
+    std::uint8_t actual_ = 1;
+    std::uint8_t normal_ = 1;
 };
 
 /// How a note or rest is written: note value, dots and tuplet. Its sounding

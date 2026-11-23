@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdio>
 #include <vector>
 
 using elara::core::Duration;
@@ -128,4 +129,15 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
         }
         return total;
     };
+}
+
+// Not a timing: prints the size of the model's value types so memory changes show
+// up next to the benchmarks (python scripts/elara.py bench -- "[memory]").
+TEST_CASE("model memory footprint", "[benchmark][core][memory]") {
+    using namespace elara::core;
+    std::printf("sizeof: Note %zu, NoteEffects %zu, BendCurve %zu, Harmonic %zu, Beat %zu, "
+                "BeatEffects %zu, Voice %zu, Measure %zu\n",
+                sizeof(Note), sizeof(NoteEffects), sizeof(BendCurve), sizeof(Harmonic),
+                sizeof(Beat), sizeof(BeatEffects), sizeof(Voice), sizeof(Measure));
+    SUCCEED();
 }

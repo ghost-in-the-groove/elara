@@ -42,7 +42,8 @@ Note Staff::frettedNote(int string, int fret, SpellingPreference preference) con
     }
     const int midi = tuning_->midiAt(string, fret, capo_);
     return Note{.pitch = Pitch::fromMidi(midi, preference),
-                .position = FretPosition{.string = string, .fret = fret}};
+                .position = FretPosition{.string = static_cast<std::int8_t>(string),
+                                         .fret = static_cast<std::int8_t>(fret)}};
 }
 
 // ---- Track ----------------------------------------------------------------

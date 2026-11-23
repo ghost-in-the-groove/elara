@@ -27,6 +27,7 @@ elara_add_unit_tests(core
     core/test_song.cpp
     core/test_signature.cpp
     core/test_timeline.cpp
+    core/test_effects.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 

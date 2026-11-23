@@ -2,6 +2,7 @@
 #pragma once
 
 #include <elara/core/duration.hpp>
+#include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/tuning.hpp>
@@ -20,6 +21,7 @@ namespace elara::core {
 struct Note {
     Pitch pitch{};
     std::optional<FretPosition> position{};
+    NoteEffects effects{};
 
     friend bool operator==(const Note&, const Note&) = default;
 };
@@ -28,6 +30,7 @@ struct Note {
 struct Beat {
     Duration duration{};
     std::vector<Note> notes{};
+    BeatEffects effects{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 

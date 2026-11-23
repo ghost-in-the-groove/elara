@@ -50,7 +50,8 @@ std::vector<FretPosition> Tuning::positionsFor(const Pitch& pitch, int capo, int
     for (int string = 1; string <= count_; ++string) {
         const int fret = pitch.midiNumber() - openString(string).midiNumber() - capo;
         if (fret >= 0 && fret <= highestFret) {
-            positions.push_back({.string = string, .fret = fret});
+            positions.push_back({.string = static_cast<std::int8_t>(string),
+                                 .fret = static_cast<std::int8_t>(fret)});
         }
     }
     return positions;
