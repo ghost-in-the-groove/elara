@@ -531,8 +531,7 @@ void StaffWriter::tupletBracket(const TupletNumber& number, double left, double 
 
 std::vector<std::vector<std::size_t>> beamGroups(std::span<const RhythmItem> items,
                                                  const core::TimeSignature& time) {
-    const bool compound =
-        time.numerator() > 3 && time.numerator() % 3 == 0 && time.denominator() >= 8;
+    const bool compound = time.isCompound() && time.denominator() >= 8;
     const core::Fraction window(compound ? 3 : 1, time.denominator());
     std::vector<std::vector<std::size_t>> groups;
     std::vector<std::size_t> group;

@@ -29,6 +29,7 @@ one that replaces them.
 | [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
 | [0023](0023-pitch-articulations.md) | Bends, slides and legato in playback | Accepted |
+| [0024](0024-practice-playback.md) | Practice playback: speed, metronome, count-in, loop | Accepted |
 | [0026](0026-transposition.md) | Transposition | Accepted |
 | [0027](0027-copy-and-paste.md) | Copying and pasting measures | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
