@@ -4,10 +4,13 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace elara::io::detail {
@@ -33,14 +36,30 @@ public:
     /// they had been added here: a line already present counts them instead.
     void append(const Warnings& other) {
         for (const Entry& entry : other.entries_) {
-            const auto same = std::ranges::find_if(entries_, [&entry](const Entry& mine) {
-                return mine.who == entry.who && mine.what == entry.what;
-            });
-            if (same == entries_.end()) {
-                entries_.push_back(entry);
-            } else {
-                same->count += entry.count;
+            appendEntry(entry);
+        }
+    }
+
+    /// Adds the entries of `parts` (each read on its own, measure by measure, as
+    /// staves read on several threads are) in the order one reading measure by
+    /// measure, part after part, would have added them: by the measure they
+    /// first happened in, then by part. Entries without a measure come last.
+    void appendByMeasure(std::span<const Warnings> parts) {
+        struct Ref {
+            std::size_t measure;
+            std::size_t part;
+            const Entry* entry;
+        };
+        std::vector<Ref> refs;
+        for (std::size_t p = 0; p < parts.size(); ++p) {
+            for (const Entry& entry : parts[p].entries_) {
+                refs.push_back(Ref{entry.measure.value_or(SIZE_MAX), p, &entry});
             }
+        }
+        std::ranges::stable_sort(refs, {},
+                                 [](const Ref& ref) { return std::pair(ref.measure, ref.part); });
+        for (const Ref& ref : refs) {
+            appendEntry(*ref.entry);
         }
     }
 
@@ -74,6 +93,18 @@ private:
         std::optional<std::size_t> measure{};
         std::size_t count = 0;
     };
+
+    void appendEntry(const Entry& entry) {
+        const auto same = std::ranges::find_if(entries_, [&entry](const Entry& mine) {
+            return mine.who == entry.who && mine.what == entry.what;
+        });
+        if (same == entries_.end()) {
+            entries_.push_back(entry);
+        } else {
+            same->count += entry.count;
+        }
+    }
+
     std::vector<Entry> entries_;
 };
 

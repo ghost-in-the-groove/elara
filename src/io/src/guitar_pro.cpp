@@ -11,6 +11,7 @@
 #include "gpx_container.hpp"
 #include "guitar_pro_binary.hpp"
 #include "midi_shared.hpp"
+#include "parallel.hpp"
 #include "warnings.hpp"
 #include <pugixml.hpp>
 
@@ -367,24 +368,513 @@ BendCurve bendOf(pugi::xml_node note) {
 
 // ---- The score -----------------------------------------------------------------
 
-/// Elements by id, for one GPIF collection (<Bars>, <Voices>...).
-class ById {
-public:
-    ById(pugi::xml_node collection, const char* element) {
-        for (const pugi::xml_node node : collection.children(element)) {
-            if (const auto id = intOf(node.attribute("id").value())) {
-                nodes_.emplace(*id, node);
+/// What the reader uses of a <Beat>, found in one pass over its children and
+/// one over its properties rather than a search for each.
+struct BeatFields {
+    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush;
+    bool text = false, chord = false, fading = false, wah = false, arpeggio = false,
+         hairpin = false, ottava = false, whammyBar = false, slapped = false, popped = false;
+
+    explicit BeatFields(pugi::xml_node beat) {
+        for (const pugi::xml_node child : beat.children()) {
+            const std::string_view name = child.name();
+            if (name == "Rhythm") {
+                rhythm = child;
+            } else if (name == "Notes") {
+                notes = child;
+            } else if (name == "Dynamic") {
+                dynamic = child;
+            } else if (name == "Properties") {
+                readProperties(child);
+            } else if (name == "GraceNotes") {
+                graceNotes = child;
+            } else if (name == "Tremolo") {
+                tremolo = child;
+            } else {
+                text = text || name == "FreeText";
+                chord = chord || name == "Chord";
+                fading = fading || name == "Fadding";
+                wah = wah || name == "Wah";
+                arpeggio = arpeggio || name == "Arpeggio";
+                hairpin = hairpin || name == "Hairpin";
+                ottava = ottava || name == "Ottavia";
             }
         }
     }
 
-    [[nodiscard]] pugi::xml_node find(int id) const {
-        const auto it = nodes_.find(id);
-        return it == nodes_.end() ? pugi::xml_node{} : it->second;
+private:
+    void readProperties(pugi::xml_node properties) {
+        for (const pugi::xml_node node : properties.children("Property")) {
+            const std::string_view name = node.attribute("name").value();
+            if (name == "PickStroke") {
+                pickStroke = node;
+            } else if (name == "Brush") {
+                brush = node;
+            } else {
+                whammyBar = whammyBar || name == "WhammyBar";
+                slapped = slapped || name == "Slapped";
+                popped = popped || name == "Popped";
+            }
+        }
+    }
+};
+
+/// What the reader uses of a <Note>, found in one pass over its children and
+/// one over its properties rather than a search for each.
+struct NoteFields {
+    pugi::xml_node tie, vibrato, accent, articulation;
+    pugi::xml_node string, fret, midi, concertPitch, slide, harmonicType, harmonicFret;
+    bool letRing = false, ghost = false, trill = false, ornament = false;
+    bool palmMuted = false, muted = false, hopoDestination = false, bended = false, tapped = false;
+
+    explicit NoteFields(pugi::xml_node note) {
+        for (const pugi::xml_node child : note.children()) {
+            const std::string_view name = child.name();
+            if (name == "Properties") {
+                readProperties(child);
+            } else if (name == "Tie") {
+                tie = child;
+            } else if (name == "Vibrato") {
+                vibrato = child;
+            } else if (name == "Accent") {
+                accent = child;
+            } else if (name == "InstrumentArticulation") {
+                articulation = child;
+            } else {
+                letRing = letRing || name == "LetRing";
+                ghost = ghost || name == "AntiAccent";
+                trill = trill || name == "Trill";
+                ornament = ornament || name == "Ornament";
+            }
+        }
     }
 
 private:
-    std::unordered_map<int, pugi::xml_node> nodes_;
+    void readProperties(pugi::xml_node properties) {
+        for (const pugi::xml_node node : properties.children("Property")) {
+            const std::string_view name = node.attribute("name").value();
+            if (name == "Fret") {
+                fret = node;
+            } else if (name == "String") {
+                string = node;
+            } else if (name == "Midi") {
+                midi = node;
+            } else if (name == "ConcertPitch") {
+                concertPitch = node;
+            } else if (name == "Slide") {
+                slide = node;
+            } else if (name == "HarmonicType") {
+                harmonicType = node;
+            } else if (name == "HarmonicFret") {
+                harmonicFret = node;
+            } else {
+                palmMuted = palmMuted || name == "PalmMuted";
+                muted = muted || name == "Muted";
+                hopoDestination = hopoDestination || name == "HopoDestination";
+                bended = bended || name == "Bended";
+                tapped = tapped || name == "Tapped" || name == "LeftHandTapped";
+            }
+        }
+    }
+};
+
+/// Elements by id, for one GPIF collection (<Bars>, <Voices>...).
+class ById {
+public:
+    ById(pugi::xml_node collection, const char* element) {
+        std::vector<std::pair<int, pugi::xml_node>> found;
+        bool dense = true;
+        int largest = -1;
+        for (const pugi::xml_node node : collection.children(element)) {
+            if (const auto id = intOf(node.attribute("id").value())) {
+                found.emplace_back(*id, node);
+                dense = dense && *id >= 0;
+                largest = std::max(largest, *id);
+            }
+        }
+        // Guitar Pro numbers each collection from 0: a table indexed by id then,
+        // a map for anything sparser. The first element with an id wins.
+        if (dense && static_cast<std::size_t>(largest + 1) <= 2 * found.size() + 1024) {
+            table_.resize(static_cast<std::size_t>(largest + 1));
+            for (const auto& [id, node] : found) {
+                pugi::xml_node& slot = table_[static_cast<std::size_t>(id)];
+                slot = slot ? slot : node;
+            }
+            return;
+        }
+        for (const auto& [id, node] : found) {
+            map_.emplace(id, node);
+        }
+    }
+
+    [[nodiscard]] pugi::xml_node find(int id) const {
+        if (map_.empty()) {
+            return id >= 0 && static_cast<std::size_t>(id) < table_.size()
+                       ? table_[static_cast<std::size_t>(id)]
+                       : pugi::xml_node{};
+        }
+        const auto it = map_.find(id);
+        return it == map_.end() ? pugi::xml_node{} : it->second;
+    }
+
+    [[nodiscard]] std::size_t size() const noexcept {
+        return map_.empty() ? table_.size() : map_.size();
+    }
+
+private:
+    std::vector<pugi::xml_node> table_;
+    std::unordered_map<int, pugi::xml_node> map_;
+};
+
+/// Reads the bars of one staff, measure by measure. It touches only its staff,
+/// its own warnings and its own rhythm cache, so staves can be read on several
+/// threads; the GPIF collections are only looked up.
+class StaffReader {
+public:
+    StaffReader(const ById& voices, const ById& beats, const ById& notes, const ById& rhythms,
+                const TrackLayout& layout, std::size_t staffIndex, Staff& staff)
+        : voices_(voices), beats_(beats), notes_(notes), rhythms_(rhythms), layout_(layout),
+          staffIndex_(staffIndex), staff_(staff) {}
+
+    /// Reads `bar` into measure `m` of the staff.
+    void readBar(pugi::xml_node bar, std::size_t m, const KeySignature& key,
+                 const TimeSignature& time) {
+        const TrackLayout& layout = layout_;
+        Staff& staff = staff_;
+        if (m > 0 && !layout.percussion) {
+            const std::string clef = trimmed(textOf(bar.child("Clef")));
+            if (!clef.empty() && clefFor(clef, -1) != clefFor(clefNameOf(staff.clef()), -1)) {
+                warnings_.add(layout.name, "clef changes dropped", m);
+            }
+        }
+        if (bar.child("SimileMark")) {
+            warnings_.add(layout.name, "repeat signs (simile) dropped", m);
+        }
+        Measure& measure = staff.measure(m);
+        const std::vector<int> voiceIds = intsOf(textOf(bar.child("Voices")));
+        for (std::size_t v = 0; v < voiceIds.size(); ++v) {
+            if (voiceIds[v] < 0) {
+                continue;
+            }
+            if (v >= Measure::kMaxVoices) {
+                warnings_.add(layout.name, "voices beyond the fourth dropped", m);
+                break;
+            }
+            const pugi::xml_node voiceNode = voices_.find(voiceIds[v]);
+            if (!voiceNode) {
+                throw FormatError{std::format("Guitar Pro: measure {} refers to missing voice {}",
+                                              m + 1, voiceIds[v])};
+            }
+            Voice& voice = measure.voices[v];
+            for (const int beatId : intsOf(textOf(voiceNode.child("Beats")))) {
+                if (auto beat = readBeat(beatId, layout, staffIndex_, staff, key, m)) {
+                    voice.beats.push_back(std::move(*beat));
+                }
+            }
+            const core::VoiceFill fill = core::voiceFill(voice, time);
+            if (fill == core::VoiceFill::Incomplete && !voice.isEmpty()) {
+                (void)core::fillWithRests(voice, time);
+                warnings_.add(layout.name, "short voices filled with rests", m);
+            } else if (fill == core::VoiceFill::Overfull) {
+                warnings_.add(layout.name, "voices longer than their measure kept as written", m);
+            }
+        }
+    }
+
+    [[nodiscard]] Warnings takeWarnings() { return std::move(warnings_); }
+
+private:
+    static std::string_view clefNameOf(Clef clef) {
+        switch (clef) {
+        case Clef::Bass:
+        case Clef::Bass8vb:
+            return "F4";
+        case Clef::Alto:
+            return "C3";
+        case Clef::Tenor:
+            return "C4";
+        case Clef::Percussion:
+            return "Neutral";
+        case Clef::Treble:
+        case Clef::Treble8vb:
+            return "G2";
+        }
+        return "G2";
+    }
+
+    Duration durationOf(int rhythmId, const std::string& who, std::size_t m) {
+        if (const auto known = durations_.find(rhythmId); known != durations_.end()) {
+            return known->second;
+        }
+        const pugi::xml_node rhythm = rhythms_.find(rhythmId);
+        if (!rhythm) {
+            throw FormatError{
+                std::format("Guitar Pro: measure {} refers to missing rhythm {}", m + 1, rhythmId)};
+        }
+        const auto value = noteValueFor(trimmed(textOf(rhythm.child("NoteValue"))));
+        if (!value) {
+            warnings_.add(who, "note values shorter than a 128th written as 128ths", m);
+        }
+        const int dots = std::clamp(rhythm.child("AugmentationDot").attribute("count").as_int(0), 0,
+                                    Duration::kMaxDots);
+        Tuplet tuplet;
+        if (const pugi::xml_node primary = rhythm.child("PrimaryTuplet")) {
+            const int actual = primary.attribute("num").as_int(1);
+            const int normal = primary.attribute("den").as_int(1);
+            if (actual >= 1 && normal >= 1 && actual <= Tuplet::kMaxCount &&
+                normal <= Tuplet::kMaxCount) {
+                tuplet = Tuplet(actual, normal);
+            }
+        }
+        if (rhythm.child("SecondaryTuplet")) {
+            warnings_.add(who, "nested tuplets written as their outer tuplet", m);
+        }
+        const Duration duration(value.value_or(NoteValue::HundredTwentyEighth), dots, tuplet);
+        durations_.emplace(rhythmId, duration);
+        return duration;
+    }
+
+    std::optional<Beat> readBeat(int beatId, const TrackLayout& layout, std::size_t staffIndex,
+                                 const Staff& staff, const KeySignature& key, std::size_t m) {
+        const pugi::xml_node node = beats_.find(beatId);
+        if (!node) {
+            throw FormatError{
+                std::format("Guitar Pro: measure {} refers to missing beat {}", m + 1, beatId)};
+        }
+        const std::string& who = layout.name;
+        const BeatFields fields(node);
+        if (fields.graceNotes) {
+            warnings_.add(who, "grace notes dropped", m);
+            return std::nullopt;
+        }
+        Beat beat{.duration = durationOf(fields.rhythm.attribute("ref").as_int(-1), who, m)};
+        warnBeat(fields, who, m);
+        readBeatEffects(fields, beat.effects, who, m);
+        const Dynamic dynamic = dynamicFor(trimmed(textOf(fields.dynamic))).value_or(Dynamic::MF);
+        for (const int noteId : intsOf(textOf(fields.notes))) {
+            const pugi::xml_node noteNode = notes_.find(noteId);
+            if (!noteNode) {
+                throw FormatError{
+                    std::format("Guitar Pro: measure {} refers to missing note {}", m + 1, noteId)};
+            }
+            if (auto note = readNote(noteNode, layout, staffIndex, staff, key, m)) {
+                note->effects.dynamic = dynamic;
+                beat.notes.push_back(std::move(*note));
+            }
+        }
+        return beat;
+    }
+
+    void warnBeat(const BeatFields& fields, const std::string& who, std::size_t m) {
+        if (fields.text) {
+            warnings_.add(who, "text dropped", m);
+        }
+        if (fields.chord) {
+            warnings_.add(who, "chord names and diagrams dropped", m);
+        }
+        if (fields.fading) {
+            warnings_.add(who, "volume swells dropped", m);
+        }
+        if (fields.wah) {
+            warnings_.add(who, "wah dropped", m);
+        }
+        if (fields.arpeggio) {
+            warnings_.add(who, "arpeggios dropped", m);
+        }
+        if (fields.hairpin) {
+            warnings_.add(who, "crescendos and diminuendos dropped", m);
+        }
+        if (fields.ottava) {
+            warnings_.add(who, "octave signs dropped", m);
+        }
+        if (fields.whammyBar) {
+            warnings_.add(who, "whammy bar dropped", m);
+        }
+    }
+
+    void readBeatEffects(const BeatFields& fields, core::BeatEffects& effects,
+                         const std::string& who, std::size_t m) {
+        if (const std::string_view pick = textOf(fields.pickStroke.child("Direction"));
+            !pick.empty()) {
+            effects.pickStroke = pick == "Up" ? core::PickStroke::Up : core::PickStroke::Down;
+        }
+        if (const std::string_view brush = textOf(fields.brush.child("Direction"));
+            !brush.empty()) {
+            effects.strum = brush == "Up" ? core::Strum::Up : core::Strum::Down;
+        }
+        if (fields.slapped) {
+            effects.bassTechnique = core::BassTechnique::Slap;
+        } else if (fields.popped) {
+            effects.bassTechnique = core::BassTechnique::Pop;
+        }
+        if (const pugi::xml_node tremolo = fields.tremolo) {
+            const std::string speed = trimmed(textOf(tremolo));
+            if (speed == "1/2") {
+                effects.tremoloPicking = NoteValue::Eighth;
+            } else if (speed == "1/4") {
+                effects.tremoloPicking = NoteValue::Sixteenth;
+            } else if (speed == "1/8") {
+                effects.tremoloPicking = NoteValue::ThirtySecond;
+            } else {
+                warnings_.add(who, "unknown tremolo picking speeds dropped", m);
+            }
+        }
+    }
+
+    std::optional<Note> readNote(pugi::xml_node node, const TrackLayout& layout,
+                                 std::size_t staffIndex, const Staff& staff,
+                                 const KeySignature& key, std::size_t m) {
+        const std::string& who = layout.name;
+        const NoteFields fields(node);
+        const auto midiProperty = [&fields]() -> std::optional<int> {
+            if (fields.midi) {
+                return intOf(textOf(fields.midi.child("Number")));
+            }
+            return std::nullopt;
+        };
+        Note note;
+        if (layout.percussion) {
+            std::optional<int> drum = midiProperty();
+            if (!drum) {
+                const auto articulation = intOf(textOf(fields.articulation));
+                if (articulation && *articulation >= 0 &&
+                    static_cast<std::size_t>(*articulation) < layout.drumKeys.size()) {
+                    drum = layout.drumKeys[static_cast<std::size_t>(*articulation)];
+                }
+            }
+            if (!drum || *drum < 0 || *drum > 127) {
+                // Guitar Pro 6 names drums by kit element instead (not read yet).
+                warnings_.add(who, "drum notes without a MIDI key dropped", m);
+                return std::nullopt;
+            }
+            note.pitch = Pitch::fromMidi(*drum);
+        } else {
+            const std::vector<int>& strings = layout.lowToHigh[staffIndex];
+            // Strings count from 0, the lowest; frets from the capo.
+            const auto stringIndex = intOf(textOf(fields.string.child("String")));
+            const auto fret = intOf(textOf(fields.fret.child("Fret")));
+            std::optional<int> midi = midiProperty();
+            std::optional<core::FretPosition> position;
+            if (!strings.empty() && stringIndex && fret && *stringIndex >= 0 &&
+                static_cast<std::size_t>(*stringIndex) < strings.size()) {
+                const int open = strings[static_cast<std::size_t>(*stringIndex)];
+                int relative = *fret;
+                // Frets count from the capo; a sounding pitch that says
+                // otherwise wins.
+                if (midi && open + staff.capo() + relative != *midi && open + relative == *midi) {
+                    relative -= staff.capo();
+                }
+                if (relative >= 0 && staff.capo() + relative <= Tuning::kMaxFret) {
+                    position =
+                        core::FretPosition{.string = static_cast<std::int8_t>(
+                                               static_cast<int>(strings.size()) - *stringIndex),
+                                           .fret = static_cast<std::int8_t>(relative)};
+                    midi = midi.value_or(open + staff.capo() + relative);
+                    if (*midi != open + staff.capo() + relative) {
+                        position.reset(); // inconsistent: keep the sound
+                        warnings_.add(who, "fret positions that disagree with the pitch dropped",
+                                      m);
+                    }
+                }
+            }
+            const auto concert = pitchOf(fields.concertPitch.child("Pitch"));
+            if (!midi && concert) {
+                midi = concert->midiNumber();
+            }
+            if (!midi || *midi < 0 || *midi > 127) {
+                warnings_.add(who, "notes without a pitch dropped", m);
+                return std::nullopt;
+            }
+            note.pitch = concert && concert->midiNumber() == *midi ? *concert : key.spell(*midi);
+            note.position = position;
+        }
+        readNoteEffects(node, fields, note.effects, who, m);
+        return note;
+    }
+
+    void readNoteEffects(pugi::xml_node node, const NoteFields& fields, core::NoteEffects& effects,
+                         const std::string& who, std::size_t m) {
+        effects.tiedFromPrevious = fields.tie.attribute("destination").as_bool(false);
+        effects.letRing = fields.letRing;
+        if (const pugi::xml_node vibrato = fields.vibrato) {
+            effects.vibrato =
+                textOf(vibrato) == std::string_view("Wide") ? Vibrato::Wide : Vibrato::Slight;
+        }
+        if (const pugi::xml_node accent = fields.accent) {
+            const int flags = intOf(accent, 0);
+            effects.staccato = (flags & 1) != 0;
+            if ((flags & 4) != 0) {
+                effects.accent = Accent::Marcato;
+            } else if ((flags & 8) != 0) {
+                effects.accent = Accent::Accent;
+            }
+            if ((flags & 16) != 0) {
+                warnings_.add(who, "tenuto marks dropped", m);
+            }
+        }
+        effects.ghost = fields.ghost;
+        effects.palmMute = fields.palmMuted;
+        effects.deadNote = fields.muted;
+        effects.legatoFromPrevious = fields.hopoDestination;
+        if (const pugi::xml_node slide = fields.slide) {
+            const int flags = intOf(slide.child("Flags"), 0);
+            if ((flags & 1) != 0) {
+                effects.slideOut = SlideOut::Shift;
+            } else if ((flags & 2) != 0) {
+                effects.slideOut = SlideOut::Legato;
+            } else if ((flags & 4) != 0) {
+                effects.slideOut = SlideOut::Downwards;
+            } else if ((flags & 8) != 0) {
+                effects.slideOut = SlideOut::Upwards;
+            }
+            if ((flags & 16) != 0) {
+                effects.slideIn = SlideIn::FromBelow;
+            } else if ((flags & 32) != 0) {
+                effects.slideIn = SlideIn::FromAbove;
+            }
+        }
+        if (fields.bended) {
+            effects.bend = bendOf(node);
+        }
+        if (const pugi::xml_node type = fields.harmonicType) {
+            const std::string kind = trimmed(textOf(type.child("HType")));
+            const double fret = fields.harmonicFret.child("HFret").text().as_double(12.0);
+            const auto tenths =
+                static_cast<std::int16_t>(std::clamp(std::lround(fret * 10.0), 0L, 300L));
+            if (kind == "Natural") {
+                effects.harmonic = {.kind = HarmonicKind::Natural, .fretTenths = tenths};
+            } else if (kind == "Artificial") {
+                effects.harmonic = {.kind = HarmonicKind::Artificial, .fretTenths = tenths};
+            } else if (kind == "Pinch") {
+                effects.harmonic = {.kind = HarmonicKind::Pinch, .fretTenths = tenths};
+            } else if (kind == "Tap") {
+                effects.harmonic = {.kind = HarmonicKind::Tapped, .fretTenths = tenths};
+            } else if (kind == "Semi") {
+                effects.harmonic = {.kind = HarmonicKind::Semi, .fretTenths = tenths};
+            } else if (!kind.empty() && kind != "NoHarmonic") {
+                warnings_.add(who, "feedback harmonics dropped", m);
+            }
+        }
+        if (fields.tapped) {
+            warnings_.add(who, "tapping dropped", m);
+        }
+        if (fields.trill) {
+            warnings_.add(who, "trills dropped", m);
+        }
+        if (fields.ornament) {
+            warnings_.add(who, "ornaments dropped", m);
+        }
+    }
+
+    const ById& voices_;
+    const ById& beats_;
+    const ById& notes_;
+    const ById& rhythms_;
+    const TrackLayout& layout_;
+    std::size_t staffIndex_;
+    Staff& staff_;
+    Warnings warnings_;
+    std::unordered_map<int, Duration> durations_;
 };
 
 class GpifReader {
@@ -394,7 +884,7 @@ public:
           beats_(root.child("Beats"), "Beat"), notes_(root.child("Notes"), "Note"),
           rhythms_(root.child("Rhythms"), "Rhythm"), warnings_(warnings) {}
 
-    Song read() {
+    Song read(unsigned threads) {
         Song song;
         readInfo(song);
         for (const pugi::xml_node masterBar : root_.child("MasterBars").children("MasterBar")) {
@@ -404,9 +894,7 @@ public:
         song.appendMeasures(masterBars_.size());
         readHeaders(song);
         readTempos(song);
-        for (std::size_t m = 0; m < masterBars_.size(); ++m) {
-            readMeasure(song, m);
-        }
+        readStaves(song, threads);
         return song;
     }
 
@@ -595,345 +1083,66 @@ private:
         }
     }
 
-    void readMeasure(Song& song, std::size_t m) {
-        const std::vector<int> ids = intsOf(textOf(masterBars_[m].child("Bars")));
-        if (ids.size() < staves_.size()) {
-            warnings_.add({}, "bars missing from the score left empty", m);
-        }
-        const KeySignature& key = song.measureHeader(m).keySignature;
-        const TimeSignature& time = song.measureHeader(m).timeSignature;
-        for (std::size_t flat = 0; flat < staves_.size() && flat < ids.size(); ++flat) {
-            const pugi::xml_node bar = bars_.find(ids[flat]);
-            if (!bar) {
-                throw FormatError{std::format("Guitar Pro: measure {} refers to missing bar {}",
-                                              m + 1, ids[flat])};
+    /// Every staff is read on its own, on several threads for large scores. The
+    /// warnings are merged in the order a reading measure by measure gives them,
+    /// and of several damaged bars the first in that order is reported, so the
+    /// result never depends on the number of threads.
+    void readStaves(Song& song, unsigned threads) {
+        std::vector<std::vector<int>> barIds;
+        barIds.reserve(masterBars_.size());
+        std::vector<Warnings> parts(staves_.size() + 1); // the score's, then each staff's
+        for (std::size_t m = 0; m < masterBars_.size(); ++m) {
+            barIds.push_back(intsOf(textOf(masterBars_[m].child("Bars"))));
+            if (barIds.back().size() < staves_.size()) {
+                parts[0].add({}, "bars missing from the score left empty", m);
             }
+        }
+        struct Damage {
+            std::size_t measure = 0;
+            std::optional<FormatError> error;
+        };
+        std::vector<Damage> damage(staves_.size());
+        const auto readStaff = [&](std::size_t flat) {
             const StaffRef ref = staves_[flat];
-            const TrackLayout& layout = layouts_[ref.track];
-            Staff& staff = song.track(ref.track).staff(ref.staff);
-            if (m > 0 && !layout.percussion) {
-                const std::string clef = trimmed(textOf(bar.child("Clef")));
-                if (!clef.empty() && clefFor(clef, -1) != clefFor(clefNameOf(staff.clef()), -1)) {
-                    warnings_.add(layout.name, "clef changes dropped", m);
-                }
-            }
-            if (bar.child("SimileMark")) {
-                warnings_.add(layout.name, "repeat signs (simile) dropped", m);
-            }
-            Measure& measure = staff.measure(m);
-            const std::vector<int> voiceIds = intsOf(textOf(bar.child("Voices")));
-            for (std::size_t v = 0; v < voiceIds.size(); ++v) {
-                if (voiceIds[v] < 0) {
-                    continue;
-                }
-                if (v >= Measure::kMaxVoices) {
-                    warnings_.add(layout.name, "voices beyond the fourth dropped", m);
-                    break;
-                }
-                const pugi::xml_node voiceNode = voices_.find(voiceIds[v]);
-                if (!voiceNode) {
-                    throw FormatError{std::format(
-                        "Guitar Pro: measure {} refers to missing voice {}", m + 1, voiceIds[v])};
-                }
-                Voice& voice = measure.voices[v];
-                for (const int beatId : intsOf(textOf(voiceNode.child("Beats")))) {
-                    if (auto beat = readBeat(beatId, layout, ref.staff, staff, key, m)) {
-                        voice.beats.push_back(std::move(*beat));
+            StaffReader reader(voices_, beats_, notes_, rhythms_, layouts_[ref.track], ref.staff,
+                               song.track(ref.track).staff(ref.staff));
+            std::size_t m = 0;
+            const auto fail = [&](std::string message) {
+                damage[flat] = Damage{.measure = m, .error = FormatError{std::move(message)}};
+            };
+            try {
+                for (; m < barIds.size(); ++m) {
+                    if (flat >= barIds[m].size()) {
+                        continue;
                     }
-                }
-                const core::VoiceFill fill = core::voiceFill(voice, time);
-                if (fill == core::VoiceFill::Incomplete && !voice.isEmpty()) {
-                    (void)core::fillWithRests(voice, time);
-                    warnings_.add(layout.name, "short voices filled with rests", m);
-                } else if (fill == core::VoiceFill::Overfull) {
-                    warnings_.add(layout.name, "voices longer than their measure kept as written",
-                                  m);
-                }
-            }
-        }
-    }
-
-    static std::string_view clefNameOf(Clef clef) {
-        switch (clef) {
-        case Clef::Bass:
-        case Clef::Bass8vb:
-            return "F4";
-        case Clef::Alto:
-            return "C3";
-        case Clef::Tenor:
-            return "C4";
-        case Clef::Percussion:
-            return "Neutral";
-        case Clef::Treble:
-        case Clef::Treble8vb:
-            return "G2";
-        }
-        return "G2";
-    }
-
-    Duration durationOf(int rhythmId, const std::string& who, std::size_t m) {
-        if (const auto known = durations_.find(rhythmId); known != durations_.end()) {
-            return known->second;
-        }
-        const pugi::xml_node rhythm = rhythms_.find(rhythmId);
-        if (!rhythm) {
-            throw FormatError{
-                std::format("Guitar Pro: measure {} refers to missing rhythm {}", m + 1, rhythmId)};
-        }
-        const auto value = noteValueFor(trimmed(textOf(rhythm.child("NoteValue"))));
-        if (!value) {
-            warnings_.add(who, "note values shorter than a 128th written as 128ths", m);
-        }
-        const int dots = std::clamp(rhythm.child("AugmentationDot").attribute("count").as_int(0), 0,
-                                    Duration::kMaxDots);
-        Tuplet tuplet;
-        if (const pugi::xml_node primary = rhythm.child("PrimaryTuplet")) {
-            const int actual = primary.attribute("num").as_int(1);
-            const int normal = primary.attribute("den").as_int(1);
-            if (actual >= 1 && normal >= 1 && actual <= Tuplet::kMaxCount &&
-                normal <= Tuplet::kMaxCount) {
-                tuplet = Tuplet(actual, normal);
-            }
-        }
-        if (rhythm.child("SecondaryTuplet")) {
-            warnings_.add(who, "nested tuplets written as their outer tuplet", m);
-        }
-        const Duration duration(value.value_or(NoteValue::HundredTwentyEighth), dots, tuplet);
-        durations_.emplace(rhythmId, duration);
-        return duration;
-    }
-
-    std::optional<Beat> readBeat(int beatId, const TrackLayout& layout, std::size_t staffIndex,
-                                 const Staff& staff, const KeySignature& key, std::size_t m) {
-        const pugi::xml_node node = beats_.find(beatId);
-        if (!node) {
-            throw FormatError{
-                std::format("Guitar Pro: measure {} refers to missing beat {}", m + 1, beatId)};
-        }
-        const std::string& who = layout.name;
-        if (node.child("GraceNotes")) {
-            warnings_.add(who, "grace notes dropped", m);
-            return std::nullopt;
-        }
-        Beat beat{.duration = durationOf(node.child("Rhythm").attribute("ref").as_int(-1), who, m)};
-        warnBeat(node, who, m);
-        readBeatEffects(node, beat.effects, who, m);
-        const Dynamic dynamic =
-            dynamicFor(trimmed(textOf(node.child("Dynamic")))).value_or(Dynamic::MF);
-        for (const int noteId : intsOf(textOf(node.child("Notes")))) {
-            const pugi::xml_node noteNode = notes_.find(noteId);
-            if (!noteNode) {
-                throw FormatError{
-                    std::format("Guitar Pro: measure {} refers to missing note {}", m + 1, noteId)};
-            }
-            if (auto note = readNote(noteNode, layout, staffIndex, staff, key, m)) {
-                note->effects.dynamic = dynamic;
-                beat.notes.push_back(std::move(*note));
-            }
-        }
-        return beat;
-    }
-
-    void warnBeat(pugi::xml_node node, const std::string& who, std::size_t m) {
-        if (node.child("FreeText")) {
-            warnings_.add(who, "text dropped", m);
-        }
-        if (node.child("Chord")) {
-            warnings_.add(who, "chord names and diagrams dropped", m);
-        }
-        if (node.child("Fadding")) {
-            warnings_.add(who, "volume swells dropped", m);
-        }
-        if (node.child("Wah")) {
-            warnings_.add(who, "wah dropped", m);
-        }
-        if (node.child("Arpeggio")) {
-            warnings_.add(who, "arpeggios dropped", m);
-        }
-        if (node.child("Hairpin")) {
-            warnings_.add(who, "crescendos and diminuendos dropped", m);
-        }
-        if (node.child("Ottavia")) {
-            warnings_.add(who, "octave signs dropped", m);
-        }
-        if (property(node, "WhammyBar")) {
-            warnings_.add(who, "whammy bar dropped", m);
-        }
-    }
-
-    void readBeatEffects(pugi::xml_node node, core::BeatEffects& effects, const std::string& who,
-                         std::size_t m) {
-        const auto direction = [&](std::string_view name) -> std::string_view {
-            return textOf(property(node, name).child("Direction"));
-        };
-        if (const std::string_view pick = direction("PickStroke"); !pick.empty()) {
-            effects.pickStroke = pick == "Up" ? core::PickStroke::Up : core::PickStroke::Down;
-        }
-        if (const std::string_view brush = direction("Brush"); !brush.empty()) {
-            effects.strum = brush == "Up" ? core::Strum::Up : core::Strum::Down;
-        }
-        if (property(node, "Slapped")) {
-            effects.bassTechnique = core::BassTechnique::Slap;
-        } else if (property(node, "Popped")) {
-            effects.bassTechnique = core::BassTechnique::Pop;
-        }
-        if (const pugi::xml_node tremolo = node.child("Tremolo")) {
-            const std::string speed = trimmed(textOf(tremolo));
-            if (speed == "1/2") {
-                effects.tremoloPicking = NoteValue::Eighth;
-            } else if (speed == "1/4") {
-                effects.tremoloPicking = NoteValue::Sixteenth;
-            } else if (speed == "1/8") {
-                effects.tremoloPicking = NoteValue::ThirtySecond;
-            } else {
-                warnings_.add(who, "unknown tremolo picking speeds dropped", m);
-            }
-        }
-    }
-
-    std::optional<Note> readNote(pugi::xml_node node, const TrackLayout& layout,
-                                 std::size_t staffIndex, const Staff& staff,
-                                 const KeySignature& key, std::size_t m) {
-        const std::string& who = layout.name;
-        const auto midiProperty = [&]() -> std::optional<int> {
-            if (const pugi::xml_node midi = property(node, "Midi")) {
-                return intOf(textOf(midi.child("Number")));
-            }
-            return std::nullopt;
-        };
-        Note note;
-        if (layout.percussion) {
-            std::optional<int> drum = midiProperty();
-            if (!drum) {
-                const auto articulation = intOf(textOf(node.child("InstrumentArticulation")));
-                if (articulation && *articulation >= 0 &&
-                    static_cast<std::size_t>(*articulation) < layout.drumKeys.size()) {
-                    drum = layout.drumKeys[static_cast<std::size_t>(*articulation)];
-                }
-            }
-            if (!drum || *drum < 0 || *drum > 127) {
-                // Guitar Pro 6 names drums by kit element instead (not read yet).
-                warnings_.add(who, "drum notes without a MIDI key dropped", m);
-                return std::nullopt;
-            }
-            note.pitch = Pitch::fromMidi(*drum);
-        } else {
-            const std::vector<int>& strings = layout.lowToHigh[staffIndex];
-            // Strings count from 0, the lowest; frets from the capo.
-            const auto stringIndex = intOf(textOf(property(node, "String").child("String")));
-            const auto fret = intOf(textOf(property(node, "Fret").child("Fret")));
-            std::optional<int> midi = midiProperty();
-            std::optional<core::FretPosition> position;
-            if (!strings.empty() && stringIndex && fret && *stringIndex >= 0 &&
-                static_cast<std::size_t>(*stringIndex) < strings.size()) {
-                const int open = strings[static_cast<std::size_t>(*stringIndex)];
-                int relative = *fret;
-                // Frets count from the capo; a sounding pitch that says
-                // otherwise wins.
-                if (midi && open + staff.capo() + relative != *midi && open + relative == *midi) {
-                    relative -= staff.capo();
-                }
-                if (relative >= 0 && staff.capo() + relative <= Tuning::kMaxFret) {
-                    position =
-                        core::FretPosition{.string = static_cast<std::int8_t>(
-                                               static_cast<int>(strings.size()) - *stringIndex),
-                                           .fret = static_cast<std::int8_t>(relative)};
-                    midi = midi.value_or(open + staff.capo() + relative);
-                    if (*midi != open + staff.capo() + relative) {
-                        position.reset(); // inconsistent: keep the sound
-                        warnings_.add(who, "fret positions that disagree with the pitch dropped",
-                                      m);
+                    const pugi::xml_node bar = bars_.find(barIds[m][flat]);
+                    if (!bar) {
+                        throw FormatError{
+                            std::format("Guitar Pro: measure {} refers to missing bar {}", m + 1,
+                                        barIds[m][flat])};
                     }
+                    const core::MeasureHeader& header = song.measureHeader(m);
+                    reader.readBar(bar, m, header.keySignature, header.timeSignature);
                 }
+            } catch (const FormatError& error) {
+                fail(error.message);
+            } catch (const std::invalid_argument& error) {
+                fail(std::format("Guitar Pro: {}", error.what()));
+            } catch (const std::out_of_range& error) {
+                fail(std::format("Guitar Pro: {}", error.what()));
             }
-            const auto concert = pitchOf(property(node, "ConcertPitch").child("Pitch"));
-            if (!midi && concert) {
-                midi = concert->midiNumber();
-            }
-            if (!midi || *midi < 0 || *midi > 127) {
-                warnings_.add(who, "notes without a pitch dropped", m);
-                return std::nullopt;
-            }
-            note.pitch = concert && concert->midiNumber() == *midi ? *concert : key.spell(*midi);
-            note.position = position;
+            parts[flat + 1] = reader.takeWarnings();
+        };
+        constexpr std::size_t kParallelNotes = 20'000; // measured on the benchmark song
+        detail::forEachIndex(
+            0, staves_.size(),
+            detail::threadsFor(threads, notes_.size(), kParallelNotes, staves_.size()), readStaff);
+        const auto first = std::ranges::min_element(
+            damage, {}, [](const Damage& d) { return d.error ? d.measure : SIZE_MAX; });
+        if (first != damage.end() && first->error) {
+            throw *first->error;
         }
-        readNoteEffects(node, note.effects, who, m);
-        return note;
-    }
-
-    void readNoteEffects(pugi::xml_node node, core::NoteEffects& effects, const std::string& who,
-                         std::size_t m) {
-        effects.tiedFromPrevious = node.child("Tie").attribute("destination").as_bool(false);
-        effects.letRing = static_cast<bool>(node.child("LetRing"));
-        if (const pugi::xml_node vibrato = node.child("Vibrato")) {
-            effects.vibrato =
-                textOf(vibrato) == std::string_view("Wide") ? Vibrato::Wide : Vibrato::Slight;
-        }
-        if (const pugi::xml_node accent = node.child("Accent")) {
-            const int flags = intOf(accent, 0);
-            effects.staccato = (flags & 1) != 0;
-            if ((flags & 4) != 0) {
-                effects.accent = Accent::Marcato;
-            } else if ((flags & 8) != 0) {
-                effects.accent = Accent::Accent;
-            }
-            if ((flags & 16) != 0) {
-                warnings_.add(who, "tenuto marks dropped", m);
-            }
-        }
-        effects.ghost = static_cast<bool>(node.child("AntiAccent"));
-        effects.palmMute = static_cast<bool>(property(node, "PalmMuted"));
-        effects.deadNote = static_cast<bool>(property(node, "Muted"));
-        effects.legatoFromPrevious = static_cast<bool>(property(node, "HopoDestination"));
-        if (const pugi::xml_node slide = property(node, "Slide")) {
-            const int flags = intOf(slide.child("Flags"), 0);
-            if ((flags & 1) != 0) {
-                effects.slideOut = SlideOut::Shift;
-            } else if ((flags & 2) != 0) {
-                effects.slideOut = SlideOut::Legato;
-            } else if ((flags & 4) != 0) {
-                effects.slideOut = SlideOut::Downwards;
-            } else if ((flags & 8) != 0) {
-                effects.slideOut = SlideOut::Upwards;
-            }
-            if ((flags & 16) != 0) {
-                effects.slideIn = SlideIn::FromBelow;
-            } else if ((flags & 32) != 0) {
-                effects.slideIn = SlideIn::FromAbove;
-            }
-        }
-        if (property(node, "Bended")) {
-            effects.bend = bendOf(node);
-        }
-        if (const pugi::xml_node type = property(node, "HarmonicType")) {
-            const std::string kind = trimmed(textOf(type.child("HType")));
-            const double fret =
-                property(node, "HarmonicFret").child("HFret").text().as_double(12.0);
-            const auto tenths =
-                static_cast<std::int16_t>(std::clamp(std::lround(fret * 10.0), 0L, 300L));
-            if (kind == "Natural") {
-                effects.harmonic = {.kind = HarmonicKind::Natural, .fretTenths = tenths};
-            } else if (kind == "Artificial") {
-                effects.harmonic = {.kind = HarmonicKind::Artificial, .fretTenths = tenths};
-            } else if (kind == "Pinch") {
-                effects.harmonic = {.kind = HarmonicKind::Pinch, .fretTenths = tenths};
-            } else if (kind == "Tap") {
-                effects.harmonic = {.kind = HarmonicKind::Tapped, .fretTenths = tenths};
-            } else if (kind == "Semi") {
-                effects.harmonic = {.kind = HarmonicKind::Semi, .fretTenths = tenths};
-            } else if (!kind.empty() && kind != "NoHarmonic") {
-                warnings_.add(who, "feedback harmonics dropped", m);
-            }
-        }
-        if (property(node, "Tapped") || property(node, "LeftHandTapped")) {
-            warnings_.add(who, "tapping dropped", m);
-        }
-        if (node.child("Trill")) {
-            warnings_.add(who, "trills dropped", m);
-        }
-        if (node.child("Ornament")) {
-            warnings_.add(who, "ornaments dropped", m);
-        }
+        warnings_.appendByMeasure(parts);
     }
 
     struct StaffRef {
@@ -952,7 +1161,6 @@ private:
     std::vector<TrackLayout> layouts_;
     std::vector<StaffRef> staves_; // every staff of every track, in score order
     std::size_t staffOffset_ = 0;
-    std::unordered_map<int, Duration> durations_;
 };
 
 bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, std::size_t at = 0) {
@@ -965,7 +1173,8 @@ bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, st
 
 } // namespace
 
-std::expected<ImportResult, FormatError> importGpif(std::string_view xml) {
+std::expected<ImportResult, FormatError> importGpif(std::string_view xml,
+                                                    const GuitarProOptions& options) {
     pugi::xml_document document;
     const pugi::xml_parse_result parsed = document.load_buffer(xml.data(), xml.size());
     if (!parsed) {
@@ -979,7 +1188,7 @@ std::expected<ImportResult, FormatError> importGpif(std::string_view xml) {
     Warnings warnings;
     try {
         ImportResult result;
-        result.song = GpifReader(root, warnings).read();
+        result.song = GpifReader(root, warnings).read(options.threads);
         result.warnings = warnings.lines();
         return result;
     } catch (const FormatError& error) {
@@ -991,7 +1200,8 @@ std::expected<ImportResult, FormatError> importGpif(std::string_view xml) {
     }
 }
 
-std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::uint8_t> bytes) {
+std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::uint8_t> bytes,
+                                                         const GuitarProOptions& options) {
     if (detail::looksLikeZip(bytes)) {
         detail::ZipReader zip(bytes);
         if (!zip.ok()) {
@@ -1008,7 +1218,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
                 FormatError{"Guitar Pro: no Content/score.gpif in the archive (not a Guitar Pro 7 "
                             "or 8 file)"});
         }
-        return importGpif(*score);
+        return importGpif(*score, options);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
         std::optional<std::string> score;
@@ -1021,7 +1231,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
             return std::unexpected(FormatError{
                 "Guitar Pro: no score.gpif in the container (not a Guitar Pro 6 file)"});
         }
-        return importGpif(*score);
+        return importGpif(*score, options);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {
         try {
@@ -1033,14 +1243,15 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
     return std::unexpected(FormatError{"Guitar Pro: not a Guitar Pro file"});
 }
 
-std::expected<ImportResult, FormatError> importGuitarProFile(const std::filesystem::path& path) {
+std::expected<ImportResult, FormatError> importGuitarProFile(const std::filesystem::path& path,
+                                                             const GuitarProOptions& options) {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         return std::unexpected(FormatError{std::format("cannot open {}", path.string())});
     }
     const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
                                           std::istreambuf_iterator<char>()};
-    return importGuitarPro(bytes);
+    return importGuitarPro(bytes, options);
 }
 
 } // namespace elara::io

@@ -61,7 +61,13 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | import the 20-track song from MIDI | 357 ms | first version: grids fitted per beat on every staff, voices, rhythms spelled |
 | 2026-11-23 | same | 287 ms | plain durations and grid spellings computed once instead of normalising fractions for every note |
 | 2026-11-23 | same | 40.5 ms | tracks written on all cores, warnings merged in track order: the same song on any number of threads. One thread still takes 287 ms, mostly fraction arithmetic in the grids: the place to look if single-core machines matter |
+| 2026-11-23 | import the 20-track song from GPIF (39 MB: every bar, voice, beat and note under its own id) | 434 ms | first measurement; one thread |
+| 2026-11-23 | same | 299 ms | each note's and beat's children and properties found in one pass instead of a search per feature (a note asked for a dozen properties) |
+| 2026-11-23 | same | 240 ms | bars, voices, beats and notes looked up in tables indexed by id (Guitar Pro numbers them from 0) instead of hash maps |
+| 2026-11-23 | same | 125 ms | each staff read on its own thread, warnings merged in reading order (ADR-0010): the same song, warnings and errors on any number of threads. One thread: 211 ms; most of what is left is the XML parse. Parsing without end-of-line and attribute normalisation gained nothing |
+| 2026-11-23 | import 2 of those tracks from a `.gpx` container written as literal bytes only (4.4 MB) | 55 ms | the same GPIF alone: 17 ms, so unpacking took 38 ms, reading the stream bit by bit |
+| 2026-11-23 | same | 28 ms | bits taken from a 64-bit buffer with a shift and a mask; back references copied as a block |
 
 `python scripts/elara.py bench -- "[memory]"` prints the size of the model types;
 `-- "[io]"` prints the size of the large song as JSON, as a `.elara` file, as
-MusicXML, as `.mxl` and as MIDI.
+MusicXML, as `.mxl`, as MIDI and as GPIF.

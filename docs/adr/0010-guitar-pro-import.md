@@ -116,6 +116,16 @@ other version. Drum notes that give a MIDI key keep it. Guitar Pro 6 also
 names drums by kit element and variation, a table this reader does not have
 yet, so such notes are dropped with a warning.
 
+**Threads.** A GPIF score is parsed once; then each staff is read on its own,
+measure by measure, on every core when the score has more than 20 000 notes
+(`GuitarProOptions::threads` overrides it). A staff reader only looks the
+collections up and writes its own staff, warnings and rhythm cache. Warnings
+are merged in the order one reading measure by measure, staff after staff,
+gives them, and of several damaged bars the first in that order is reported,
+so the song, the warnings and the errors never depend on the number of
+threads. Guitar Pro 3-5 streams can only be read in order and stay on one
+thread.
+
 **Corpus.** `tests/corpus/gp/generate.py` writes self-made `.gp` and `.gpx`
 files (with its own compressor for the container) and `generate_binary.py`
 self-made `.gp5`, `.gp4` and `.gp3` files from the same structures. The
