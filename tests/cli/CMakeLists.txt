@@ -274,3 +274,21 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid" "MThd, but not a MIDI file"
 add_test(NAME cli.import_rejects_damaged_midi
   COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid")
 set_tests_properties(cli.import_rejects_damaged_midi PROPERTIES WILL_FAIL TRUE)
+
+# Snapshot tests: every corpus file imported with --json must give what
+# tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
+# intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+file(GLOB _corpus_files CONFIGURE_DEPENDS
+  "${ELARA_CORPUS}/musicxml/*.musicxml"
+  "${ELARA_CORPUS}/musicxml/*.mxl"
+  "${ELARA_CORPUS}/midi/*.mid")
+foreach(_file IN LISTS _corpus_files)
+  file(RELATIVE_PATH _relative "${ELARA_CORPUS}" "${_file}")
+  string(REGEX REPLACE "\.[^./]+$" "" _name "${_relative}")
+  string(REGEX REPLACE "[/.-]" "_" _test "${_name}")
+  add_test(NAME cli.snapshot_${_test}
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/check_snapshot.py"
+            "$<TARGET_FILE:elara-cli>" "${_file}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../snapshots/import/${_name}.json")
+endforeach()

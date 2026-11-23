@@ -38,7 +38,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip
-- [ ] `elara-cli import <file> --json` snapshot tests per corpus file
+- [x] `elara-cli import <file> --json` snapshot tests per corpus file
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
 

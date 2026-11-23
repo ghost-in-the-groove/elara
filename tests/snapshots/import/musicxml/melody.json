@@ -1,0 +1,144 @@
+{
+ "format": "musicxml",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Melody",
+   "music": "Ghost in the Groove",
+   "copyright": "CC0 1.0"
+  },
+  "tempo": {
+   "bpm": 100
+  },
+  "measures": [
+   {},
+   {},
+   {
+    "timeSignature": "3/4",
+    "keySignature": "G major"
+   },
+   {
+    "timeSignature": "3/4",
+    "keySignature": "G major"
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Flute",
+    "instrument": {
+     "name": "Flute",
+     "kind": "pitched",
+     "midiProgram": 73
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D4"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E4"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A4"
+           }
+          ]
+         },
+         {
+          "duration": "4"
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "Bb4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "B4"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "A4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 8.4,
+ "issues": []
+}

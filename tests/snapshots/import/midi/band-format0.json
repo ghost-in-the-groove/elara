@@ -1,0 +1,571 @@
+{
+ "format": "midi",
+ "out": null,
+ "warnings": [
+  "lyrics dropped"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Band"
+  },
+  "tempo": {
+   "bpm": 100
+  },
+  "measures": [
+   {
+    "timeSignature": "3/4",
+    "keySignature": "Bb major"
+   },
+   {
+    "timeSignature": "3/4",
+    "keySignature": "Bb major"
+   },
+   {
+    "timeSignature": "6/8",
+    "keySignature": "Bb major",
+    "tempoChanges": [
+     {
+      "bpm": 80
+     }
+    ]
+   },
+   {
+    "timeSignature": "6/8",
+    "keySignature": "Bb major"
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Electric Bass (finger)",
+    "instrument": {
+     "name": "Electric Bass (finger)",
+     "kind": "fretted",
+     "midiProgram": 33,
+     "writtenOffset": 12
+    },
+    "staves": [
+     {
+      "clef": "bass-8vb",
+      "tuning": "E1 A1 D2 G2",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "Bb2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F3",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2.",
+          "notes": [
+           {
+            "pitch": "Eb3",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2.",
+          "notes": [
+           {
+            "pitch": "Bb2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2.",
+          "notes": [
+           {
+            "pitch": "F2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Acoustic Guitar (steel)",
+    "instrument": {
+     "name": "Acoustic Guitar (steel)",
+     "kind": "fretted",
+     "midiProgram": 25,
+     "writtenOffset": 12
+    },
+    "staves": [
+     {
+      "clef": "treble-8vb",
+      "tuning": "E2 A2 D3 G3 B3 E4",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Eb4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Eb4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Eb4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Eb4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "Bb3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Flute",
+    "instrument": {
+     "name": "Flute",
+     "kind": "pitched",
+     "midiProgram": 73
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "Bb4"
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "Eb5"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2.",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "Eb5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "Db5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 8.1,
+ "issues": []
+}

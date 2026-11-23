@@ -1,0 +1,366 @@
+{
+ "format": "midi",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Drums"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Drums",
+    "instrument": {
+     "name": "Drums",
+     "kind": "percussion"
+    },
+    "staves": [
+     {
+      "clef": "percussion",
+      "measures": [
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C#3",
+            "effects": {
+             "dynamic": "fff"
+            }
+           },
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ],
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "A#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ],
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "ff"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G#2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 4.0,
+ "issues": []
+}

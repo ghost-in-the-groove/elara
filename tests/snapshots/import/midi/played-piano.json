@@ -1,0 +1,423 @@
+{
+ "format": "midi",
+ "out": null,
+ "warnings": [
+  "sustain pedal dropped"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Played Piano",
+   "copyright": "CC0 1.0"
+  },
+  "tempo": {
+   "bpm": 92
+  },
+  "measures": [
+   {
+    "keySignature": "D major"
+   },
+   {
+    "keySignature": "D major"
+   },
+   {
+    "keySignature": "D major"
+   },
+   {
+    "keySignature": "D major"
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Acoustic Grand Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C#5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "B4"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "B4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C#5"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D5",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "G5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "E5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C#5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C#5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "D5",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A3",
+            "effects": {
+             "dynamic": "p"
+            }
+           },
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "G2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "G2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "E3",
+            "effects": {
+             "dynamic": "p"
+            }
+           },
+           {
+            "pitch": "A2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "E3",
+            "effects": {
+             "dynamic": "p"
+            }
+           },
+           {
+            "pitch": "A2",
+            "effects": {
+             "dynamic": "p"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A3",
+            "effects": {
+             "dynamic": "p"
+            }
+           },
+           {
+            "pitch": "D3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 10.435,
+ "issues": []
+}

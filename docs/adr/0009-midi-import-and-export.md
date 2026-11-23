@@ -53,7 +53,9 @@ applied there.
    one exists, else moves to the next measure. Keys apply at measure starts.
    Tempos are read in quarter notes per minute, rounded to hundredths, so what
    the writer wrote comes back. The song lasts until the last note or
-   end-of-track event.
+   end-of-track event, except that a final measure holding only releases or a
+   track end less than a sixteenth note past the barline (played music) is not
+   kept.
 3. *Instruments.* The program decides the kind (`kindForProgram`, shared with the
    writer): channel 10 drums, programs 1-8 keyboards (two staves split at middle
    C), 25-40 fretted (a guitar or bass preset with its tuning; no fret positions),
