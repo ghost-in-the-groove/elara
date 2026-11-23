@@ -26,10 +26,6 @@ Fraction ceilToMultiple(const Fraction& value, const Fraction& step) {
     return step * Fraction(whole);
 }
 
-bool isCompound(const TimeSignature& time) {
-    return time.numerator() > 3 && time.numerator() % 3 == 0;
-}
-
 void appendRest(Voice& voice, const Duration& duration) {
     voice.beats.push_back(Beat{.duration = duration, .notes = {}});
 }
@@ -160,7 +156,7 @@ bool fillWithRests(Voice& voice, const TimeSignature& time) {
         break;
     }
     const Fraction end = time.measureLength();
-    const Fraction beat = isCompound(time) ? Fraction(3, time.denominator()) : time.beatLength();
+    const Fraction beat = time.pulseLength();
     Fraction position = voice.length();
 
     // 1. Finish the current beat. Off the 1/128 grid means an unfinished tuplet:
@@ -172,7 +168,7 @@ bool fillWithRests(Voice& voice, const TimeSignature& time) {
     const auto partial =
         onGrid ? plainDurations() : plainDurations(voice.beats.back().duration.tuplet());
     // 2. Whole beats, aligned to the start of the measure.
-    const auto whole = isCompound(time) ? dottedBeatDurations(beat) : plainDurations();
+    const auto whole = time.isCompound() ? dottedBeatDurations(beat) : plainDurations();
 
     const std::size_t written = voice.beats.size();
     if (!fillAligned(voice, position, beatEnd, beatStart, partial) ||
