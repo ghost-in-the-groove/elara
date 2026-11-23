@@ -43,14 +43,6 @@ std::optional<int> parseMidi(std::string_view text) {
     return value;
 }
 
-// --tuning takes a preset name ("guitar", "bass-5") or open strings ("D2 A2 D3 G3 B3 E4").
-std::optional<Tuning> tuningFromOption(std::string_view text) {
-    if (auto preset = Tuning::preset(text)) {
-        return preset;
-    }
-    return Tuning::parse(text);
-}
-
 SpellingPreference preferenceFor(bool flats) {
     return flats ? SpellingPreference::Flats : SpellingPreference::Sharps;
 }
