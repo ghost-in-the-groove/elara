@@ -459,7 +459,10 @@ Pane {
                             }
                         }
 
-                        TuningFields {
+                        // Made only while the tuning shows or closes: a song with many
+                        // tracks would otherwise build every row's fields again
+                        // whenever a track is added or removed.
+                        Loader {
                             id: tuning
 
                             anchors.left: parent.left
@@ -468,11 +471,14 @@ Pane {
                             anchors.topMargin: 8
                             anchors.leftMargin: 8
                             anchors.rightMargin: 10
-                            visible: row.tuningOpen || row.height > 95
+                            active: row.tuningOpen || row.height > 95
                             opacity: row.tuningOpen ? 1.0 : 0.0
-                            document: root.document
-                            track: row.index
-                            info: row.modelData
+
+                            sourceComponent: TuningFields {
+                                document: root.document
+                                track: row.index
+                                info: row.modelData
+                            }
 
                             Behavior on opacity {
                                 NumberAnimation {

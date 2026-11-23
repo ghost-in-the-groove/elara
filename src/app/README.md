@@ -56,7 +56,7 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on its layout thread; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). |
 | `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. |
 
 The transport floats over the bottom of the score: back to the start (Home),
