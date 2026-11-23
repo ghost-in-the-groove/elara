@@ -203,6 +203,45 @@ TEST_CASE("Player: a mix change takes over within a block, without reloading",
     CHECK(peakLevel(quiet) == 0.0f);
 }
 
+// While a fader moves, the mixer passes the mixes alone, so the song is not
+// copied for every step of the drag.
+TEST_CASE("Player: a mix change from the mixes alone sounds as one from the song",
+          "[audio][player][mix]") {
+    const Song s = song(2, 60);
+    Song soloed = s;
+    soloed.track(0).setMix(TrackMix{.volume = 0.5, .pan = 0.5});
+    soloed.track(1).setMix(TrackMix{.solo = true});
+    const std::vector<TrackMix> mixes{soloed.track(0).mix(), soloed.track(1).mix()};
+
+    Player fromSong(kRate);
+    fromSong.load(s, Sequence(s));
+    fromSong.play();
+    fromSong.updateMix(soloed);
+    Player fromMixes(kRate);
+    fromMixes.load(s, Sequence(s));
+    fromMixes.play();
+    fromMixes.updateMix(mixes);
+    const auto [left, right] = playStereo(fromSong, 0.5);
+    const auto [mixesLeft, mixesRight] = playStereo(fromMixes, 0.5);
+    CHECK(peakLevel(left) > 0.0f);
+    CHECK(left == mixesLeft);
+    CHECK(right == mixesRight);
+
+    // The solo on the second track keeps the first one quiet.
+    const std::vector<TrackMix> onlyFirst{TrackMix{}, TrackMix{.mute = true}};
+    fromMixes.updateMix(onlyFirst);
+    const std::vector<TrackMix> soloFirst{TrackMix{.solo = true}, TrackMix{}};
+    fromSong.updateMix(soloFirst);
+    (void)playStereo(fromSong, 480 * kFrame);
+    (void)playStereo(fromMixes, 480 * kFrame);
+    CHECK(playStereo(fromSong, 0.3).first == playStereo(fromMixes, 0.3).first);
+
+    // Mixes for another number of tracks are not the loaded song's: ignored.
+    const std::vector<TrackMix> three(3, TrackMix{.mute = true});
+    fromMixes.updateMix(three);
+    CHECK(peakLevel(playStereo(fromMixes, 0.3).first) > 0.0f);
+}
+
 TEST_CASE("Player: a pause holds the position and lets the notes ring out", "[audio][player]") {
     const Song s = song(2, 60);
     Player player(kRate);
@@ -304,4 +343,44 @@ TEST_CASE("Player: control calls from another thread while the audio thread rend
     audio.join();
     player.tidy();
     CHECK(player.position() <= player.duration());
+}
+
+// The metronome (ADR-0024) plays live as offline. The mix applies to the
+// song's tracks only: muting them all leaves the clicks.
+TEST_CASE("Player: plays the metronome, which the track mix leaves alone",
+          "[audio][player][practice]") {
+    const Song s = song(1, 60);
+    const Sequence sequence(s, {.metronome = true});
+    OfflineRenderer renderer(s, sequence, {.sampleRate = kRate, .tail = 0.0});
+    const std::vector<float> stereo = renderer.renderRest();
+    std::vector<float> offline;
+    for (std::size_t i = 0; i < stereo.size(); i += 2) {
+        offline.push_back(stereo[i]);
+    }
+
+    Player player(kRate, 256);
+    player.load(s, sequence);
+    player.play();
+    CHECK(play(player, 2.0, 1000) == offline);
+
+    Song muted = s;
+    muted.track(0).setMix(TrackMix{.mute = true});
+    muted.track(1).setMix(TrackMix{.mute = true});
+    player.load(s, sequence);
+    player.updateMix(muted);
+    player.seek(0.0);
+    player.play();
+    const std::vector<float> clicks = play(player, 1.5);
+    CHECK(peakLevel(between(clicks, 0.4, 0.49)) == 0.0f);
+    CHECK(peakLevel(between(clicks, 1.0, 1.05)) > 0.01f); // the third beat's click
+
+    // The same from the mixes alone, as a moving fader gives them.
+    const std::vector<TrackMix> mutedMixes(s.trackCount(), TrackMix{.mute = true});
+    player.load(s, sequence);
+    player.updateMix(mutedMixes);
+    player.seek(0.0);
+    player.play();
+    const std::vector<float> previewed = play(player, 1.5);
+    CHECK(peakLevel(between(previewed, 0.4, 0.49)) == 0.0f);
+    CHECK(peakLevel(between(previewed, 1.0, 1.05)) > 0.01f);
 }

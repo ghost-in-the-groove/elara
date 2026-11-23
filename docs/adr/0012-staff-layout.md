@@ -74,5 +74,5 @@ units, so snapshots do not depend on a renderer's font rasteriser.
   `layout_common.hpp`; changing one shows up in the layout tests and, later,
   the SVG snapshots.
 - ADR-0013 adds tablature, ties, articulations and staves aligned in systems.
-  Not covered yet: slurs, tuplet numbers and brackets, other markings, grace
+  ADR-0040 adds tuplet numbers and brackets. Not covered yet: slurs, other markings, grace
   notes, notes of different voices colliding on one line, justification.

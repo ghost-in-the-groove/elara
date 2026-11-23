@@ -22,6 +22,22 @@ TEST_CASE("Time signature gives the measure and beat lengths", "[core][signature
     CHECK(TimeSignature(6, 8) != TimeSignature(3, 4)); // same length, different meter
 }
 
+TEST_CASE("Time signature counts dotted beats in compound meters", "[core][signature]") {
+    CHECK(TimeSignature(6, 8).isCompound());
+    CHECK(TimeSignature(9, 8).isCompound());
+    CHECK(TimeSignature(12, 16).isCompound());
+    CHECK(TimeSignature(6, 4).isCompound());
+    CHECK_FALSE(TimeSignature(3, 8).isCompound()); // one beat of three would be a waltz in one
+    CHECK_FALSE(TimeSignature(3, 4).isCompound());
+    CHECK_FALSE(TimeSignature(4, 4).isCompound());
+    CHECK_FALSE(TimeSignature(7, 8).isCompound());
+    CHECK(TimeSignature(6, 8).pulseLength() == Fraction(3, 8));
+    CHECK(TimeSignature(12, 8).pulseLength() == Fraction(3, 8));
+    CHECK(TimeSignature(3, 4).pulseLength() == Fraction(1, 4));
+    CHECK(TimeSignature(7, 8).pulseLength() == Fraction(1, 8));
+    CHECK(TimeSignature(2, 2).pulseLength() == Fraction(1, 2));
+}
+
 TEST_CASE("Time signature validates and round-trips text", "[core][signature]") {
     CHECK_THROWS_AS(TimeSignature(0, 4), std::invalid_argument);
     CHECK_THROWS_AS(TimeSignature(TimeSignature::kMaxNumerator + 1, 4), std::invalid_argument);

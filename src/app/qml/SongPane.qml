@@ -40,6 +40,80 @@ Pane {
         opacity: 0.55
     }
 
+    // Mute or solo: a round letter, lit in its colour when on.
+    component MixToggle: AbstractButton {
+        id: toggle
+
+        property string tip
+        property color tint
+
+        implicitWidth: 26
+        implicitHeight: 26
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        Accessible.role: Accessible.CheckBox
+        Accessible.name: tip
+        Accessible.checked: checked
+        ToolTip.visible: hovered
+        ToolTip.delay: 500
+        ToolTip.text: tip
+
+        background: Rectangle {
+            radius: height / 2
+            color: toggle.checked ? toggle.tint
+                                  : toggle.hovered ? Qt.alpha(Material.foreground, 0.12)
+                                                   : Qt.alpha(Material.foreground, 0.06)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 120
+                }
+            }
+        }
+        contentItem: Label {
+            text: toggle.text
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 11
+            font.weight: Font.Bold
+            color: toggle.checked ? "white" : Material.foreground
+        }
+    }
+
+    // A fader of the mixer: compact, with its value in a tip while it moves.
+    // released() follows the drag, and also a click on the groove.
+    component MixSlider: Slider {
+        id: slider
+
+        property string tip
+        /// A pan: a tick marks the centre of the groove.
+        property bool centred: false
+
+        signal released
+
+        Layout.preferredHeight: 30
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        onPressedChanged: {
+            if (!pressed)
+                released();
+        }
+        Accessible.name: tip
+        ToolTip.visible: pressed || hovered
+        ToolTip.delay: pressed ? 0 : 500
+        ToolTip.text: tip
+
+        Rectangle {
+            visible: slider.centred
+            x: slider.leftPadding + (slider.availableWidth - width) / 2
+            anchors.verticalCenter: parent.verticalCenter
+            width: 2
+            height: 10
+            radius: 1
+            color: Qt.alpha(Material.foreground, 0.35)
+        }
+    }
+
     component FieldLabel: Label {
         Layout.preferredWidth: 104
         opacity: 0.75
@@ -185,7 +259,7 @@ Pane {
                         readonly property bool shown: root.document.track === index
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 56
+                        Layout.preferredHeight: 94
                         radius: 12
                         color: shown ? Qt.alpha(Material.accent, root.dark ? 0.22 : 0.12)
                                      : hover.hovered ? Qt.alpha(Material.foreground, 0.06)
@@ -206,10 +280,23 @@ Pane {
                         }
 
                         RowLayout {
-                            anchors.fill: parent
+                            id: header
+
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: 56
                             anchors.leftMargin: 8
                             anchors.rightMargin: 4
                             spacing: 10
+                            // A track that mute or solo keeps quiet fades.
+                            opacity: row.modelData.audible ? 1.0 : 0.45
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: 140
+                                }
+                            }
 
                             Rectangle {
                                 Layout.preferredWidth: 40
@@ -258,6 +345,63 @@ Pane {
                                         duration: 120
                                     }
                                 }
+                            }
+                        }
+
+                        // The track's mix (ADR-0039): mute, solo, volume and
+                        // pan. Playback hears a fader while it moves; letting go
+                        // keeps it as one undo step.
+                        RowLayout {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: header.bottom
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 10
+                            height: 34
+                            spacing: 6
+
+                            MixToggle {
+                                text: qsTr("M", "mute")
+                                tip: qsTr("Mute")
+                                checked: row.modelData.mute
+                                tint: "#e5484d"
+                                onClicked: root.document.setTrackMix(row.index, volume.value, pan.value,
+                                                                     !row.modelData.mute, row.modelData.solo)
+                            }
+                            MixToggle {
+                                text: qsTr("S", "solo")
+                                tip: qsTr("Solo")
+                                checked: row.modelData.solo
+                                tint: "#f5a524"
+                                onClicked: root.document.setTrackMix(row.index, volume.value, pan.value,
+                                                                     row.modelData.mute, !row.modelData.solo)
+                            }
+                            MixSlider {
+                                id: volume
+
+                                Layout.fillWidth: true
+                                from: 0
+                                to: 1
+                                value: row.modelData.volume
+                                tip: qsTr("Volume %1 %").arg(Math.round(value * 100))
+                                onMoved: root.document.previewTrackMix(row.index, value, pan.value)
+                                onReleased: root.document.setTrackMix(row.index, value, pan.value,
+                                                                      row.modelData.mute, row.modelData.solo)
+                            }
+                            MixSlider {
+                                id: pan
+
+                                Layout.preferredWidth: 76
+                                centred: true
+                                from: -1
+                                to: 1
+                                value: row.modelData.pan
+                                tip: value < -0.005 ? qsTr("Pan %1 % left").arg(Math.round(-value * 100))
+                                                    : value > 0.005 ? qsTr("Pan %1 % right").arg(Math.round(value * 100))
+                                                                    : qsTr("Pan centre")
+                                onMoved: root.document.previewTrackMix(row.index, volume.value, value)
+                                onReleased: root.document.setTrackMix(row.index, volume.value, value,
+                                                                      row.modelData.mute, row.modelData.solo)
                             }
                         }
                     }

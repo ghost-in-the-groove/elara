@@ -261,6 +261,44 @@ add_test(NAME cli.edit_rejects_drum_without_lane
 set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
   PROPERTIES WILL_FAIL TRUE)
 
+# Note effects (ADR-0037): palm mute and let ring on fret 5, let ring off again;
+# a tie on fret 7 after it takes fret 5; a natural harmonic on fret 12.
+set(ELARA_CLI_EFFECTS "${CMAKE_CURRENT_BINARY_DIR}/cli-effects.elara")
+add_test(NAME cli.edit_toggles_effects
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_EFFECTS}" "add-track electric-guitar" "append-measures 1"
+    "caret 0 0 0 3" "fret 5" "effect palm-mute" "effect let-ring" "effect let-ring"
+    right "fret 7" "effect tie" right "fret 12" "effect harmonic")
+set_tests_properties(cli.edit_toggles_effects PROPERTIES
+  FIXTURES_SETUP cli_effects
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":10,\"next\":\"Change effect\"}")
+add_test(NAME cli.dump_effects COMMAND elara-cli --json dump "${ELARA_CLI_EFFECTS}")
+set_tests_properties(cli.dump_effects PROPERTIES
+  FIXTURES_REQUIRED cli_effects
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"C4\",\"string\":3,\"fret\":5,\"effects\":{\"palmMute\":true}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C4\",\"string\":3,\"fret\":5,\"effects\":{\"tiedFromPrevious\":true}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G4\",\"string\":3,\"fret\":12,\"effects\":{\"harmonic\":{\"kind\":\"natural\"")
+add_test(NAME cli.edit_rejects_unknown_effect
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect wah")
+add_test(NAME cli.edit_rejects_tie_without_note
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect tie")
+set_tests_properties(cli.edit_rejects_unknown_effect cli.edit_rejects_tie_without_note
+  PROPERTIES WILL_FAIL TRUE)
+
+# Dynamics at the caret (ADR-0047): f from the second note holds to the end,
+# and a note typed after it is f too.
+set(ELARA_CLI_DYNAMICS "${CMAKE_CURRENT_BINARY_DIR}/cli-dynamics.elara")
+add_test(NAME cli.edit_sets_dynamic
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DYNAMICS}" "add-track flute" "append-measures 1"
+    "pitch C" right "pitch D" right "pitch E" "caret 0 0 1" "dynamic f" "caret 0 0 3" "pitch F")
+set_tests_properties(cli.edit_sets_dynamic PROPERTIES
+  FIXTURES_SETUP cli_dynamics
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":7,\"next\":\"Enter note\"}")
+add_test(NAME cli.dump_dynamics COMMAND elara-cli --json dump "${ELARA_CLI_DYNAMICS}")
+set_tests_properties(cli.dump_dynamics PROPERTIES
+  FIXTURES_REQUIRED cli_dynamics
+  PASS_REGULAR_EXPRESSION "{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"F5\",\"effects\":{\"dynamic\":\"f\"}}\\]}")
+add_test(NAME cli.edit_rejects_unknown_dynamic
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch C" "dynamic loud")
+set_tests_properties(cli.edit_rejects_unknown_dynamic PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
 set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
@@ -295,6 +333,38 @@ set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
 add_test(NAME cli.edit_rejects_unplayable_transpose
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
 set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+# Retuning (ADR-0046): A2 at the fifth fret of the low string moves to the
+# seventh in drop D; with a capo and the frets kept, G2 at the third fret
+# sounds A2.
+set(ELARA_CLI_RETUNED "${CMAKE_CURRENT_BINARY_DIR}/cli-retuned.elara")
+add_test(NAME cli.edit_tuning
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_RETUNED}" "add-track electric-guitar"
+    "append-measures 1" "note 0 0 6 5 1" "tuning 0 guitar-drop-d")
+set_tests_properties(cli.edit_tuning PROPERTIES
+  FIXTURES_SETUP cli_retuned
+  PASS_REGULAR_EXPRESSION "\"tuning\":\"D2 A2 D3 G3 B3 E4\",\"capo\":0,.*\"undo\":{\"count\":4,\"next\":\"Change tuning\"}")
+add_test(NAME cli.dump_retuned COMMAND elara-cli --json dump "${ELARA_CLI_RETUNED}")
+set_tests_properties(cli.dump_retuned PROPERTIES
+  FIXTURES_REQUIRED cli_retuned
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"A2\",\"string\":6,\"fret\":7}\\]")
+set(ELARA_CLI_CAPO "${CMAKE_CURRENT_BINARY_DIR}/cli-capo.elara")
+add_test(NAME cli.edit_capo_keeping_frets
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CAPO}" "add-track electric-guitar"
+    "append-measures 1" "note 0 0 6 3 1" "tuning 0 capo 2 frets")
+set_tests_properties(cli.edit_capo_keeping_frets PROPERTIES
+  FIXTURES_SETUP cli_capo
+  PASS_REGULAR_EXPRESSION "\"tuning\":\"E2 A2 D3 G3 B3 E4\",\"capo\":2,")
+add_test(NAME cli.dump_capo COMMAND elara-cli --json dump "${ELARA_CLI_CAPO}")
+set_tests_properties(cli.dump_capo PROPERTIES
+  FIXTURES_REQUIRED cli_capo
+  PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"A2\",\"string\":6,\"fret\":3}\\]")
+add_test(NAME cli.edit_rejects_unknown_tuning
+  COMMAND elara-cli edit "add-track electric-guitar" "tuning 0 guitar-banjo-x")
+set_tests_properties(cli.edit_rejects_unknown_tuning PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_unplayable_tuning
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1"
+    "tuning 0 capo 2")
+set_tests_properties(cli.edit_rejects_unplayable_tuning PROPERTIES WILL_FAIL TRUE)
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste
@@ -516,12 +586,12 @@ set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_tab
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view tab)
 set_tests_properties(cli.render_tab PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,.*\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
+  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,\"accidental\":0,\"dot\":1,\"stem\":11,\"flag\":1,\"beam\":1,\"rest\":1,\"fretNumber\":11,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
 
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -616,11 +686,11 @@ endforeach()
 add_test(NAME cli.sequence_repeats
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp")
 set_tests_properties(cli.sequence_repeats PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"measure\":0,\"start\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":2,[^}]*}\\],\"noteCount\":24,\"eventCount\":48}")
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"measure\":0,\"start\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":2,[^}]*}\\],\"noteCount\":24,\"eventCount\":91}")
 add_test(NAME cli.sequence_endings
   COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5")
 set_tests_properties(cli.sequence_endings PROPERTIES
-  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 19 notes, 38 events in 13\\.950 s")
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 19 notes, 59 events in 13\\.950 s")
 add_test(NAME cli.sequence_events
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --notes --events)
 set_tests_properties(cli.sequence_events PROPERTIES
@@ -632,6 +702,13 @@ add_test(NAME cli.sequence_articulations
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_articulations PROPERTIES
   PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+# Pitch articulations (ADR-0023): the hammer-on in the triplet is not struck
+# but moves the voice of the note before it up a whole tone, and the shift
+# slide goes up to the next note over the last 0.2 s.
+add_test(NAME cli.sequence_pitch
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
+set_tests_properties(cli.sequence_pitch PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"pitch\",\"track\":0,\"key\":47,\"cents\":200,\"glide\":0},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":12\\.9625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.2}")
 add_test(NAME cli.render_audio_touches
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
 set_tests_properties(cli.render_audio_touches PROPERTIES
@@ -639,6 +716,25 @@ set_tests_properties(cli.render_audio_touches PROPERTIES
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# Practice playback (ADR-0024): half speed doubles every time; the metronome
+# clicks every beat of band.gp (two 4/4 measures at quarter = 90) on a fifth
+# track, a high block on each first beat.
+add_test(NAME cli.sequence_speed
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --speed 50)
+set_tests_properties(cli.sequence_speed PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"duration\":16\\.8,\"speed\":0\\.5,\"metronome\":false,\"measures\":\\[{\"measure\":0,\"start\":0,\"end\":4\\.8}")
+add_test(NAME cli.sequence_metronome
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/band.gp" --metronome --events)
+set_tests_properties(cli.sequence_metronome PROPERTIES
+  PASS_REGULAR_EXPRESSION "112 events in 5\\.333 s\nat 100 % speed, metronome on track 4\n.*\n +0\\.000 on   track 4  key  76 velocity 100\n.*\n +0\\.667 on   track 4  key  77 velocity  80\n.*\n +2\\.667 on   track 4  key  76 velocity 100\n")
+add_test(NAME cli.render_audio_metronome
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/musicxml/melody.musicxml" --tail 0
+          --metronome --speed 200)
+set_tests_properties(cli.render_audio_metronome PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"seconds\":4\\.2,.*\"eventCount\":4[0-9],\"speed\":2,\"metronome\":true}")
+add_test(NAME cli.sequence_rejects_speed
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --speed 300)
+set_tests_properties(cli.sequence_rejects_speed PROPERTIES WILL_FAIL TRUE)
 
 # The built-in synthesizer, offline (ADR-0018). melody.musicxml lasts 8.4 s;
 # with the default 2 s tail that is 10.4 s, 499200 frames at 48 kHz.

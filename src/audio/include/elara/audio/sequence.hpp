@@ -38,22 +38,50 @@ struct PlayedNote {
     int key = 60; ///< sounding MIDI key; percussion: the General MIDI percussion key
     int velocity = 80;
     Touch touch = Touch::Normal;
+    /// False when it continues the previous note on its string without a new
+    /// attack: a hammer-on, a pull-off or the end of a legato slide (ADR-0023).
+    bool struck = true;
     friend bool operator==(const PlayedNote&, const PlayedNote&) = default;
 };
 
-enum class EventKind : std::uint8_t { NoteOff, NoteOn };
+/// NoteOff and NoteOn release and strike a key; Pitch moves the pitch of the
+/// voice struck as a key (ADR-0023).
+enum class EventKind : std::uint8_t { NoteOff, NoteOn, Pitch };
 
 /// What a synthesizer is told, track by track: a key struck again while it
 /// sounds is released and struck again, and released when the last of its
-/// notes ends.
+/// notes ends. A Pitch event moves the voice struck as `key` to `cents` above
+/// that key over `glide` seconds (Synth::glide()): bends, slides, vibrato and
+/// the notes joined to it by hammer-ons and pull-offs.
 struct NoteEvent {
     double time = 0.0; ///< seconds from the start of the performance
     EventKind kind = EventKind::NoteOn;
     Touch touch = Touch::Normal; ///< how a NoteOn strikes its key
+    std::int16_t cents = 0;      ///< Pitch: the offset to reach
+    float glide = 0.0f;          ///< Pitch: seconds to reach it; 0 at once
     std::size_t track = 0;
     int key = 60;
     int velocity = 80;
     friend bool operator==(const NoteEvent&, const NoteEvent&) = default;
+};
+
+/// The playback speed's range: a quarter of the written tempo to twice it.
+inline constexpr double kMinSpeed = 0.25;
+inline constexpr double kMaxSpeed = 2.0;
+
+/// The metronome's keys (General MIDI percussion): a high wood block on the
+/// first beat of a measure, a low one on the others.
+inline constexpr int kMetronomeAccentKey = 76;
+inline constexpr int kMetronomeKey = 77;
+
+/// How a song is played for practice (ADR-0024).
+struct SequenceOptions {
+    /// Times every written tempo, from kMinSpeed to kMaxSpeed (clamped; 1
+    /// when it is not a number). Effects timed in seconds, such as vibrato
+    /// and slides, keep their pace.
+    double speed = 1.0;
+    /// A click on every beat, as events on Sequence::metronomeTrack().
+    bool metronome = false;
 };
 
 /// A song as it is played: its measures in play order (repeats unrolled,
@@ -66,12 +94,20 @@ struct NoteEvent {
 /// audio thread can read it without locks.
 class Sequence {
 public:
-    explicit Sequence(const core::Song& song);
+    explicit Sequence(const core::Song& song, SequenceOptions options = {});
+
+    /// The speed played at, as clamped from the options.
+    [[nodiscard]] double speed() const noexcept { return speed_; }
+    /// Whether the metronome's clicks are among the events.
+    [[nodiscard]] bool metronome() const noexcept { return metronome_; }
+    /// The track the metronome's events are on: one past the song's last.
+    [[nodiscard]] std::size_t metronomeTrack() const noexcept { return metronomeTrack_; }
 
     [[nodiscard]] const std::vector<PlayedMeasure>& measures() const noexcept { return measures_; }
     /// Ordered by start, then track, staff, voice and key.
     [[nodiscard]] const std::vector<PlayedNote>& notes() const noexcept { return notes_; }
-    /// Ordered by time, releases before attacks, then by track and key.
+    /// Ordered by time, releases before attacks before pitch changes, then by
+    /// track and key.
     [[nodiscard]] const std::vector<NoteEvent>& events() const noexcept { return events_; }
     /// Seconds from the start to the end of the last played measure.
     [[nodiscard]] double duration() const noexcept { return duration_; }
@@ -91,11 +127,18 @@ public:
     [[nodiscard]] std::optional<double> secondsAt(std::size_t measure,
                                                   double fraction) const noexcept;
 
+    /// Equal when they play the same: a song whose mix or title changed plays
+    /// as before, so playback can carry on (ADR-0039).
+    friend bool operator==(const Sequence&, const Sequence&) = default;
+
 private:
     std::vector<PlayedMeasure> measures_;
     std::vector<PlayedNote> notes_;
     std::vector<NoteEvent> events_;
     double duration_ = 0.0;
+    double speed_ = 1.0;
+    bool metronome_ = false;
+    std::size_t metronomeTrack_ = 0;
 };
 
 } // namespace elara::audio

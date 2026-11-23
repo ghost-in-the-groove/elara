@@ -6,6 +6,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/native_format.hpp>
@@ -153,6 +154,33 @@ struct EntryState {
     core::Duration input{core::NoteValue::Quarter};
 };
 
+// The names `effect <name>` takes (ADR-0037).
+constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectNames{{
+    {"tie", core::NoteEffect::Tie},
+    {"legato", core::NoteEffect::Legato},
+    {"slide", core::NoteEffect::Slide},
+    {"bend", core::NoteEffect::Bend},
+    {"vibrato", core::NoteEffect::Vibrato},
+    {"palm-mute", core::NoteEffect::PalmMute},
+    {"dead-note", core::NoteEffect::DeadNote},
+    {"let-ring", core::NoteEffect::LetRing},
+    {"harmonic", core::NoteEffect::Harmonic},
+    {"ghost", core::NoteEffect::Ghost},
+    {"accent", core::NoteEffect::Accent},
+    {"staccato", core::NoteEffect::Staccato},
+}};
+
+constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
+    {"ppp", core::Dynamic::PPP},
+    {"pp", core::Dynamic::PP},
+    {"p", core::Dynamic::P},
+    {"mp", core::Dynamic::MP},
+    {"mf", core::Dynamic::MF},
+    {"f", core::Dynamic::F},
+    {"ff", core::Dynamic::FF},
+    {"fff", core::Dynamic::FFF},
+}};
+
 /// Runs a keyboard entry step; false when `step` is not one.
 bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     using namespace core;
@@ -213,6 +241,22 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             entry.caret.string = static_cast<int>(found - pieces.begin()) + 1;
         }
         edit = toggleDrum(song, entry.caret, entry.input);
+    } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kEffectNames, [name](const auto& effect) { return effect.first == name; });
+        if (found == kEffectNames.end()) {
+            throw StepSyntaxError(std::format("not an effect: {}", name));
+        }
+        edit = toggleEffect(song, entry.caret, found->second);
+    } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kDynamicNames, [name](const auto& dynamic) { return dynamic.first == name; });
+        if (found == kDynamicNames.end()) {
+            throw StepSyntaxError(std::format("not a dynamic: {}", name));
+        }
+        edit = setDynamic(song, entry.caret, found->second);
     } else {
         return false;
     }
@@ -359,6 +403,43 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
             }
         }
         doc.execute(makeTranspose(song, what));
+    } else if (verb ==
+               "tuning") { // tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]
+        Retuning what{.track = step.index(1)};
+        std::string notes;
+        std::optional<int> capo;
+        for (std::size_t i = 2; step.has(i); ++i) {
+            const std::string_view word = step.word(i);
+            if (word == "capo") {
+                capo = step.number<int>(++i);
+            } else if (word == "staff") {
+                what.staff = step.index(++i);
+            } else if (word == "frets") {
+                what.keep = Retune::Frets;
+            } else {
+                notes += notes.empty() ? "" : " ";
+                notes += word;
+            }
+        }
+        const Staff& staff = song.track(what.track).staff(what.staff);
+        if (!notes.empty()) {
+            auto tuning = Tuning::preset(notes);
+            if (!tuning) {
+                tuning = Tuning::parse(notes);
+            }
+            if (!tuning) {
+                throw StepSyntaxError(std::format("not a tuning: {}", notes));
+            }
+            what.tuning = *tuning;
+        } else if (staff.tuning()) {
+            what.tuning = *staff.tuning(); // only the capo changes
+        } else {
+            throw std::invalid_argument("the staff has no strings");
+        }
+        what.capo = capo.value_or(staff.capo());
+        if (auto change = makeRetune(song, what)) {
+            doc.execute(std::move(change));
+        }
     } else {
         throw StepSyntaxError(std::format("unknown step: {}", verb));
     }
@@ -478,7 +559,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", undo, redo, save");
+        "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

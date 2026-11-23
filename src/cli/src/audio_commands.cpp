@@ -134,14 +134,47 @@ int runTone(bool json, const ToneOptions& tone) {
     return finished ? kExitOk : fail("tone did not finish; the audio callback may not be running");
 }
 
+// How the playback commands play a song for practice (ADR-0024).
+struct PracticeOptions {
+    int speed = 100; // percent of the written tempo
+    bool metronome = false;
+
+    [[nodiscard]] audio::SequenceOptions sequence() const {
+        return {.speed = speed / 100.0, .metronome = metronome};
+    }
+};
+
+void addPracticeOptions(CLI::App& command, PracticeOptions& options) {
+    command.add_option("--speed", options.speed, "Play at this percentage of the written tempo")
+        ->check(CLI::Range(25, 200))
+        ->capture_default_str();
+    command.add_flag("--metronome", options.metronome,
+                     "Click every beat, on a track after the song's last");
+}
+
+// `"speed":0.5,"metronome":true`
+std::string practiceJson(const audio::Sequence& sequence) {
+    return std::format(R"("speed":{},"metronome":{})", jsonNumber(sequence.speed()),
+                       sequence.metronome() ? "true" : "false");
+}
+
 struct SequenceOptions {
     std::string file;
     bool notes = false;
     bool events = false;
+    PracticeOptions practice;
 };
 
 std::string_view kindName(audio::EventKind kind) {
-    return kind == audio::EventKind::NoteOn ? "on" : "off";
+    switch (kind) {
+    case audio::EventKind::NoteOn:
+        return "on";
+    case audio::EventKind::NoteOff:
+        return "off";
+    case audio::EventKind::Pitch:
+        return "pitch";
+    }
+    return "off";
 }
 
 // How a note is struck (ADR-0022), printed only when it is not normal.
@@ -155,9 +188,29 @@ std::string touchText(audio::Touch touch) {
                                          : std::format("  {}", audio::touchName(touch));
 }
 
+// What an event does after its key: the velocity it strikes or releases
+// with, or the offset a pitch event moves to and how long it takes.
+template <typename Event>
+std::string eventJson(const Event& event) {
+    if (event.kind == audio::EventKind::Pitch) {
+        return std::format(R"("cents":{},"glide":{})", event.cents,
+                           jsonNumber(static_cast<double>(event.glide)));
+    }
+    return std::format(R"("velocity":{}{})", event.velocity, touchJson(event.touch));
+}
+
+template <typename Event>
+std::string eventText(const Event& event) {
+    if (event.kind == audio::EventKind::Pitch) {
+        return std::format("cents {:5} glide {:.3f}", event.cents, event.glide);
+    }
+    return std::format("velocity {:3}{}", event.velocity, touchText(event.touch));
+}
+
 std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions& options) {
-    std::string json = std::format(R"({{"file":"{}","duration":{},"measures":[)",
-                                   jsonEscape(options.file), jsonNumber(sequence.duration()));
+    std::string json =
+        std::format(R"({{"file":"{}","duration":{},{},"measures":[)", jsonEscape(options.file),
+                    jsonNumber(sequence.duration()), practiceJson(sequence));
     for (std::size_t k = 0; k < sequence.measures().size(); ++k) {
         const audio::PlayedMeasure& measure = sequence.measures()[k];
         json += std::format(R"({}{{"measure":{},"start":{},"end":{}}})", k == 0 ? "" : ",",
@@ -170,10 +223,10 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
         for (std::size_t i = 0; i < sequence.notes().size(); ++i) {
             const audio::PlayedNote& note = sequence.notes()[i];
             json += std::format(
-                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}{}}})",
+                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}{}{}}})",
                 i == 0 ? "" : ",", note.track, note.staff, note.voice, note.pass,
                 jsonNumber(note.start), jsonNumber(note.end), note.key, note.velocity,
-                touchJson(note.touch));
+                touchJson(note.touch), note.struck ? "" : R"(,"struck":false)");
         }
         json += ']';
     }
@@ -181,10 +234,9 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
         json += R"(,"events":[)";
         for (std::size_t i = 0; i < sequence.events().size(); ++i) {
             const audio::NoteEvent& event = sequence.events()[i];
-            json +=
-                std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},"velocity":{}{}}})",
-                            i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
-                            event.track, event.key, event.velocity, touchJson(event.touch));
+            json += std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},{}}})",
+                                i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
+                                event.track, event.key, eventJson(event));
         }
         json += ']';
     }
@@ -196,7 +248,7 @@ int runSequence(bool json, const SequenceOptions& options) {
     if (!song) {
         return fail(song.error());
     }
-    const audio::Sequence sequence(*song);
+    const audio::Sequence sequence(*song, options.practice.sequence());
     if (json) {
         std::cout << sequenceJson(sequence, options) << '\n';
         return kExitOk;
@@ -208,19 +260,25 @@ int runSequence(bool json, const SequenceOptions& options) {
     std::cout << std::format("played measures:{}\n{} measures, {} notes, {} events in {:.3f} s\n",
                              order, sequence.measures().size(), sequence.notes().size(),
                              sequence.events().size(), sequence.duration());
+    if (options.practice.speed != 100 || sequence.metronome()) {
+        std::cout << std::format(
+            "at {} % speed{}\n", options.practice.speed,
+            sequence.metronome() ? std::format(", metronome on track {}", sequence.metronomeTrack())
+                                 : std::string());
+    }
     if (options.notes) {
         for (const audio::PlayedNote& note : sequence.notes()) {
             std::cout << std::format(
-                "{:9.3f} {:9.3f}  track {} staff {} voice {}  key {:3} velocity {:3}{}\n",
+                "{:9.3f} {:9.3f}  track {} staff {} voice {}  key {:3} velocity {:3}{}{}\n",
                 note.start, note.end, note.track, note.staff, note.voice, note.key, note.velocity,
-                touchText(note.touch));
+                touchText(note.touch), note.struck ? "" : "  legato");
         }
     }
     if (options.events) {
         for (const audio::NoteEvent& event : sequence.events()) {
-            std::cout << std::format("{:9.3f} {:3}  track {}  key {:3} velocity {:3}{}\n",
-                                     event.time, kindName(event.kind), event.track, event.key,
-                                     event.velocity, touchText(event.touch));
+            std::cout << std::format("{:9.3f} {:3}  track {}  key {:3} {}\n", event.time,
+                                     kindName(event.kind), event.track, event.key,
+                                     eventText(event));
         }
     }
     return kExitOk;
@@ -232,6 +290,7 @@ struct RenderAudioOptions {
     std::uint32_t sampleRate = 48000;
     double tail = 2.0;
     bool events = false;
+    PracticeOptions practice;
 };
 
 int runRenderAudio(bool json, const RenderAudioOptions& options) {
@@ -239,7 +298,7 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     if (!song) {
         return fail(song.error());
     }
-    const audio::Sequence sequence(*song);
+    const audio::Sequence sequence(*song, options.practice.sequence());
     audio::OfflineRenderer renderer(*song, sequence,
                                     {.sampleRate = static_cast<double>(options.sampleRate),
                                      .tail = options.tail,
@@ -298,14 +357,13 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
             body += R"(,"events":[)";
             for (std::size_t i = 0; i < log.size(); ++i) {
                 const audio::LoggedEvent& event = log[i];
-                body += std::format(
-                    R"({}{{"frame":{},"kind":"{}","track":{},"key":{},"velocity":{}{}}})",
-                    i == 0 ? "" : ",", event.frame, kindName(event.kind), event.track, event.key,
-                    event.velocity, touchJson(event.touch));
+                body += std::format(R"({}{{"frame":{},"kind":"{}","track":{},"key":{},{}}})",
+                                    i == 0 ? "" : ",", event.frame, kindName(event.kind),
+                                    event.track, event.key, eventJson(event));
             }
             body += ']';
         }
-        std::cout << body << "}\n";
+        std::cout << body << ',' << practiceJson(sequence) << "}\n";
         return kExitOk;
     }
     std::cout << std::format("rendered {:.3f} s ({} frames @ {} Hz, stereo), peak {:.4f}, "
@@ -315,14 +373,20 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
         std::cout << std::format("  track {} {}: {}\n", t + 1, song->track(t).name(),
                                  audio::timbreName(renderer.timbres()[t]));
     }
+    if (options.practice.speed != 100) {
+        std::cout << std::format("  at {} % speed\n", options.practice.speed);
+    }
+    if (sequence.metronome()) {
+        std::cout << std::format("  metronome on track {}\n", sequence.metronomeTrack() + 1);
+    }
     if (!options.out.empty()) {
         std::cout << std::format("wrote {}\n", options.out);
     }
     if (options.events) {
         for (const audio::LoggedEvent& event : log) {
-            std::cout << std::format("{:10} {:3}  track {}  key {:3} velocity {:3}{}\n",
-                                     event.frame, kindName(event.kind), event.track, event.key,
-                                     event.velocity, touchText(event.touch));
+            std::cout << std::format("{:10} {:3}  track {}  key {:3} {}\n", event.frame,
+                                     kindName(event.kind), event.track, event.key,
+                                     eventText(event));
         }
     }
     return kExitOk;
@@ -332,6 +396,7 @@ struct PlayOptions {
     std::string file;
     double from = 0.0;
     double seconds = 0.0; // 0: to the end
+    PracticeOptions practice;
 };
 
 int runPlay(bool json, const PlayOptions& options) {
@@ -339,7 +404,7 @@ int runPlay(bool json, const PlayOptions& options) {
     if (!song) {
         return fail(song.error());
     }
-    const audio::Sequence sequence(*song);
+    const audio::Sequence sequence(*song, options.practice.sequence());
     audio::SystemAudio system;
     if (auto opened = system.open(); !opened) {
         return fail(opened.error());
@@ -366,9 +431,11 @@ int runPlay(bool json, const PlayOptions& options) {
     system.setSource(nullptr);
 
     if (json) {
-        std::cout << std::format(R"({{"file":"{}","device":"{}","from":{},"to":{},"finished":{}}})",
-                                 jsonEscape(options.file), jsonEscape(system.deviceDescription()),
-                                 jsonNumber(from), jsonNumber(to), finished ? "true" : "false")
+        std::cout << std::format(
+                         R"({{"file":"{}","device":"{}","from":{},"to":{},"finished":{},{}}})",
+                         jsonEscape(options.file), jsonEscape(system.deviceDescription()),
+                         jsonNumber(from), jsonNumber(to), finished ? "true" : "false",
+                         practiceJson(sequence))
                   << '\n';
     } else {
         std::cout << std::format("played {} from {:.3f} s to {:.3f} s on {}\n", options.file, from,
@@ -571,6 +638,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
         ->required();
     sequence->add_flag("--notes", sequenced->notes, "List the notes as played");
     sequence->add_flag("--events", sequenced->events, "List the note events for a synthesizer");
+    addPracticeOptions(*sequence, sequenced->practice);
     sequence->callback(
         [&context, sequenced] { context.exitCode = runSequence(context.json, *sequenced); });
 
@@ -589,6 +657,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     renderAudio->add_flag("--events", rendering->events,
                           "List the note events dispatched, with their sample frames");
+    addPracticeOptions(*renderAudio, rendering->practice);
     renderAudio->callback(
         [&context, rendering] { context.exitCode = runRenderAudio(context.json, *rendering); });
 
@@ -602,6 +671,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     playCommand->add_option("--seconds", playing->seconds, "Stop after this many seconds")
         ->check(CLI::NonNegativeNumber);
+    addPracticeOptions(*playCommand, playing->practice);
     playCommand->callback(
         [&context, playing] { context.exitCode = runPlay(context.json, *playing); });
 

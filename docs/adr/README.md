@@ -28,6 +28,8 @@ one that replaces them.
 | [0020](0020-track-mix.md) | The track mix | Accepted |
 | [0021](0021-keyboard-entry.md) | Keyboard entry at a caret | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
+| [0023](0023-pitch-articulations.md) | Bends, slides and legato in playback | Accepted |
+| [0024](0024-practice-playback.md) | Practice playback: speed, metronome, count-in, loop | Accepted |
 | [0026](0026-transposition.md) | Transposition | Accepted |
 | [0027](0027-copy-and-paste.md) | Copying and pasting measures | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
@@ -38,6 +40,13 @@ one that replaces them.
 | [0033](0033-editing-measures-at-the-caret.md) | Editing measures at the caret | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
+| [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
+| [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
+| [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
+| [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
+| [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
+| [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
+| [0047](0047-dynamics-at-the-caret.md) | Dynamics at the caret | Accepted |
 
 ## Template
 

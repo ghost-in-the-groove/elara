@@ -35,60 +35,11 @@
            {
             "pitch": "C#3",
             "effects": {
-             "dynamic": "fff"
-            }
-           },
-           {
-            "pitch": "F#2",
-            "effects": {
-             "dynamic": "f"
-            }
-           }
-          ]
-         },
-         {
-          "duration": "8",
-          "notes": [
-           {
-            "pitch": "F#2",
-            "effects": {
-             "dynamic": "mp"
-            }
-           }
-          ]
-         },
-         {
-          "duration": "8",
-          "notes": [
-           {
-            "pitch": "F#2",
-            "effects": {
+             "accent": "accent",
              "dynamic": "f"
             }
            },
            {
-            "pitch": "D2",
-            "effects": {
-             "dynamic": "ff"
-            }
-           }
-          ]
-         },
-         {
-          "duration": "8",
-          "notes": [
-           {
-            "pitch": "F#2",
-            "effects": {
-             "dynamic": "mp"
-            }
-           }
-          ]
-         },
-         {
-          "duration": "8",
-          "notes": [
-           {
             "pitch": "F#2",
             "effects": {
              "dynamic": "f"
@@ -102,7 +53,7 @@
            {
             "pitch": "F#2",
             "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
             }
            }
           ]
@@ -119,7 +70,7 @@
            {
             "pitch": "D2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -130,7 +81,57 @@
            {
             "pitch": "F#2",
             "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
             }
            }
           ]
@@ -143,7 +144,7 @@
            {
             "pitch": "C2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -154,7 +155,8 @@
            {
             "pitch": "G#2",
             "effects": {
-             "dynamic": "mp"
+             "ghost": true,
+             "dynamic": "f"
             }
            }
           ]
@@ -165,7 +167,7 @@
            {
             "pitch": "C2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -187,7 +189,8 @@
            {
             "pitch": "G#2",
             "effects": {
-             "dynamic": "mp"
+             "ghost": true,
+             "dynamic": "f"
             }
            }
           ]
@@ -213,7 +216,7 @@
            {
             "pitch": "F#2",
             "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
             }
            }
           ]
@@ -230,18 +233,7 @@
            {
             "pitch": "D2",
             "effects": {
-             "dynamic": "ff"
-            }
-           }
-          ]
-         },
-         {
-          "duration": "8",
-          "notes": [
-           {
-            "pitch": "F#2",
-            "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
             }
            }
           ]
@@ -263,7 +255,18 @@
            {
             "pitch": "F#2",
             "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
             }
            }
           ]
@@ -280,7 +283,7 @@
            {
             "pitch": "D2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -291,7 +294,7 @@
            {
             "pitch": "A#2",
             "effects": {
-             "dynamic": "mp"
+             "dynamic": "f"
             }
            }
           ]
@@ -304,7 +307,7 @@
            {
             "pitch": "C2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -315,7 +318,8 @@
            {
             "pitch": "G#2",
             "effects": {
-             "dynamic": "mp"
+             "ghost": true,
+             "dynamic": "f"
             }
            }
           ]
@@ -326,7 +330,7 @@
            {
             "pitch": "C2",
             "effects": {
-             "dynamic": "ff"
+             "dynamic": "f"
             }
            }
           ]
@@ -348,7 +352,8 @@
            {
             "pitch": "G#2",
             "effects": {
-             "dynamic": "mp"
+             "ghost": true,
+             "dynamic": "f"
             }
            }
           ]

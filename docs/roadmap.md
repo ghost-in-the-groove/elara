@@ -40,6 +40,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip
+  - [x] Played velocities as a dynamic per measure, accents and ghost notes (ADR-0045)
 - [x] `elara-cli import <file> --json` snapshot tests per corpus file
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
@@ -49,6 +50,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tablature staff layout with effects notation
 - [x] Systems and pages: line breaking, justification, multi-track scores
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
+- [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
+- [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [ ] Incremental relayout (only the systems an edit touches)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
@@ -60,8 +63,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Sequencer: model -> timed events, tempo map, repeats (ADR-0017)
 - [ ] FluidSynth integration, MuseScore General SF3
 - [ ] sfizz integration and guitar SFZ library selection
-- [ ] Articulation rendering (bends, slides, legato, palm mute, harmonics)
-- [ ] Mixer (volume, pan, mute, solo)
+- [x] Articulation rendering (bends, slides, legato, palm mute, harmonics; ADR-0022, ADR-0023)
+- [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
 - [x] Transport, playback cursor and click-to-seek in the app, `elara-cli render --cursor-at`
@@ -76,9 +79,17 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Note names at the caret on any pitched staff, chords, semitone moves, in
         the CLI and the app (ADR-0034)
   - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
+  - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
+        palm mutes, dead and ghost notes, let ring, harmonics, accents,
+        staccato (ADR-0037)
+  - [x] Dynamics at the caret, holding until the next change; new notes take
+        the dynamic in force (ADR-0047)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)
+- [ ] Tuning and capo changes, keeping the pitches or the frets
+  - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
+  - [ ] Tuning presets and capo in the song panel
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)

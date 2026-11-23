@@ -22,6 +22,7 @@ constexpr double kLowestString = 20.0;        // Hz: sets the length of the dela
 constexpr std::size_t kBlock = 256;           // frames mixed per pass over the voices
 constexpr std::uint32_t kTidyEvery = 1024;    // frames between phasor renormalisations
 constexpr std::size_t kMaxPartials = 4;
+constexpr std::uint32_t kGlideStep = 32; // frames between pitch updates while a voice glides
 constexpr float kVoiceLevel = 0.4f;
 
 double keyFrequency(int key) {
@@ -169,6 +170,19 @@ DrumSound drumSound(int key) {
                 .noiseT60 = 0.02f,
                 .noiseLevel = 0.1f,
                 .highpass = 3000.0f};
+    case 76: // high wood block: the metronome's first beat
+    case 77: // low wood block, a fifth below: its other beats
+    {
+        const float f = key == 76 ? 1260.0f : 840.0f;
+        return {.toneStart = 1.04f * f,
+                .toneEnd = f,
+                .sweep = 0.004f,
+                .toneT60 = 0.1f,
+                .toneLevel = 0.8f,
+                .noiseT60 = 0.01f,
+                .noiseLevel = 0.15f,
+                .highpass = 2000.0f};
+    }
     default: // everything else: a short, bright burst
         return {.noiseT60 = 0.12f, .noiseLevel = 0.35f, .highpass = 3000.0f};
     }
@@ -189,6 +203,14 @@ struct Synth::Voice {
     float release = 0.0f;  // per-frame multiplier once released
     float follower = 0.0f; // peak follower of the voice's output
 
+    // Pitch: an offset in cents from the key, moved by glide().
+    double frequency = 0.0; // Hz at no offset
+    double cents = 0.0;
+    double centsTarget = 0.0;
+    double centsStep = 0.0;        // per frame while gliding
+    std::uint32_t glide = 0;       // frames left to glide
+    std::uint32_t untilRetune = 0; // frames until the next pitch update while gliding
+
     // Partials (piano, mallet, organ): phasors turned by a fixed rotation.
     std::size_t partials = 0;
     std::array<float, kMaxPartials> re{};
@@ -197,6 +219,7 @@ struct Synth::Voice {
     std::array<float, kMaxPartials> sine{};
     std::array<float, kMaxPartials> amplitude{};
     std::array<float, kMaxPartials> decay{};
+    std::array<double, kMaxPartials> omega{}; // radians per frame at no offset
 
     // Sawtooth (bowed, wind).
     double phase = 0.0;
@@ -205,9 +228,10 @@ struct Synth::Voice {
     float lowpassCoefficient = 0.0f;
 
     // Plucked string (guitar, overdrive, bass): Karplus-Strong.
-    std::size_t line = 0; // offset of its delay line
-    std::uint32_t length = 0;
-    std::uint32_t index = 0;
+    std::size_t line = 0;     // offset of its delay line
+    std::uint32_t length = 0; // whole frames of loop delay
+    std::uint32_t read = 0;   // where the line is read: `length` frames behind `write`
+    std::uint32_t write = 0;
     float previous = 0.0f;
     float allpass = 0.0f;
     float allpassIn = 0.0f;
@@ -238,6 +262,7 @@ struct Context {
     float followerFall;
     std::uint32_t minimumLife;
     float* strings;
+    std::uint32_t lineLength; // frames in each delay line
 };
 
 // Advances the envelope by one frame and returns its level.
@@ -336,22 +361,65 @@ void renderSaw(Voice& voice, std::span<float> out, const Context& context) noexc
 void renderString(Voice& voice, std::span<float> out, const Context& context) noexcept {
     float* line = context.strings + voice.line;
     for (float& sample : out) {
-        const float x = line[voice.index];
+        const float x = line[voice.read];
         const float averaged = 0.5f * (x + voice.previous);
         voice.previous = x;
         const float delayed =
             voice.allpass * averaged + voice.allpassIn - voice.allpass * voice.allpassOut;
         voice.allpassIn = averaged;
         voice.allpassOut = delayed;
-        line[voice.index] = delayed * voice.loopGain;
-        if (++voice.index == voice.length) {
-            voice.index = 0;
+        line[voice.write] = delayed * voice.loopGain;
+        if (++voice.write == context.lineLength) {
+            voice.write = 0;
+        }
+        if (++voice.read == context.lineLength) {
+            voice.read = 0;
         }
         const float value = x * envelope(voice) * voice.gain;
         sample += value;
         if (ended(voice, value, context)) {
             return;
         }
+    }
+}
+
+// Sets a plucked string's loop delay for `frequency`: the line, half a frame
+// of averaging and the all-pass.
+void tuneString(Voice& voice, double frequency, double rate, std::size_t lineLength) noexcept {
+    const double delay = std::min(rate / frequency, static_cast<double>(lineLength - 1)) - 0.5;
+    const double whole = std::max(1.0, std::floor(delay - 0.1));
+    const double fraction = std::clamp(delay - whole, 0.1, 1.1);
+    voice.length = static_cast<std::uint32_t>(whole);
+    voice.allpass = static_cast<float>((1.0 - fraction) / (1.0 + fraction));
+}
+
+// Tunes a voice to its key plus its current offset.
+void retune(Voice& voice, Timbre timbre, double rate, std::size_t lineLength) noexcept {
+    const double ratio = std::exp2(voice.cents / 1200.0);
+    switch (timbre) {
+    case Timbre::Piano:
+    case Timbre::Mallet:
+    case Timbre::Organ:
+        for (std::size_t p = 0; p < voice.partials; ++p) {
+            const double w = std::min(voice.omega[p] * ratio, kTwoPi * 0.45);
+            voice.cosine[p] = static_cast<float>(std::cos(w));
+            voice.sine[p] = static_cast<float>(std::sin(w));
+        }
+        break;
+    case Timbre::Bowed:
+    case Timbre::Wind:
+        voice.step = voice.frequency * ratio / rate;
+        break;
+    case Timbre::Guitar:
+    case Timbre::Overdrive:
+    case Timbre::Bass: {
+        tuneString(voice, voice.frequency * ratio, rate, lineLength);
+        const auto line = static_cast<std::uint32_t>(lineLength);
+        voice.read = (voice.write + line - voice.length) % line;
+        break;
+    }
+    case Timbre::Drums:
+        break;
     }
 }
 
@@ -529,6 +597,7 @@ void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
     voice.order = ++struck_;
     voice.gain = kVoiceLevel * static_cast<float>(std::pow(velocity / 127.0, 1.5));
     const double frequency = keyFrequency(key);
+    voice.frequency = frequency;
     const double brightness = velocity / 127.0;
 
     const auto startAttack = [&](double seconds) {
@@ -551,6 +620,7 @@ void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
         voice.sine[p] = static_cast<float>(std::sin(w));
         voice.amplitude[p] = static_cast<float>(level);
         voice.decay[p] = t60 > 0.0 ? fall60(t60, rate) : 1.0f;
+        voice.omega[p] = w;
     };
     const auto normalisePartials = [&] {
         float total = 0.0f;
@@ -611,13 +681,7 @@ void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
     case Timbre::Overdrive:
     case Timbre::Bass: {
         const bool bass = timbre_ == Timbre::Bass;
-        // Loop delay: the line, half a frame of averaging and the all-pass.
-        const double delay =
-            std::min(rate / frequency, static_cast<double>(stringLength_ - 1)) - 0.5;
-        const double whole = std::max(1.0, std::floor(delay - 0.1));
-        const double fraction = std::clamp(delay - whole, 0.1, 1.1);
-        voice.length = static_cast<std::uint32_t>(whole);
-        voice.allpass = static_cast<float>((1.0 - fraction) / (1.0 + fraction));
+        tuneString(voice, frequency, rate, stringLength_);
         double t60 = bass ? std::clamp(6.0 * std::sqrt(55.0 / frequency), 1.0, 10.0)
                           : std::clamp(4.0 * std::sqrt(110.0 / frequency), 0.6, 8.0);
         auto smoothing =
@@ -670,6 +734,8 @@ void Synth::noteOn(int key, int velocity, Touch touch) noexcept {
                 line[i] /= peak;
             }
         }
+        voice.read = 0;
+        voice.write = voice.length;
         startHeld();
         voice.release = fall60(bass ? 0.12 : 0.15, rate);
         break;
@@ -709,6 +775,29 @@ void Synth::noteOff(int key) noexcept {
     }
 }
 
+void Synth::glide(int key, double cents, double seconds) noexcept {
+    if (timbre_ == Timbre::Drums) {
+        return;
+    }
+    const auto frames =
+        static_cast<std::uint32_t>(std::lround(std::clamp(seconds, 0.0, 60.0) * sampleRate_));
+    for (Voice& voice : voices_) {
+        if (voice.key != key || (voice.stage != Stage::Attack && voice.stage != Stage::Held)) {
+            continue;
+        }
+        voice.centsTarget = cents;
+        voice.untilRetune = 0;
+        if (frames == 0) {
+            voice.cents = cents;
+            voice.glide = 0;
+            retune(voice, timbre_, sampleRate_, stringLength_);
+        } else {
+            voice.centsStep = (cents - voice.cents) / frames;
+            voice.glide = frames;
+        }
+    }
+}
+
 void Synth::releaseAll() noexcept {
     for (Voice& voice : voices_) {
         if (voice.stage == Stage::Attack || voice.stage == Stage::Held) {
@@ -740,30 +829,51 @@ void Synth::render(std::span<float> out) noexcept {
 void Synth::renderBlock(std::span<float> out) noexcept {
     const std::span<float> mix(scratch_.data(), out.size());
     std::ranges::fill(mix, 0.0f);
-    const Context context{
-        .followerFall = followerFall_, .minimumLife = minimumLife_, .strings = strings_.data()};
-    for (Voice& voice : voices_) {
-        if (voice.stage == Stage::Off) {
-            continue;
-        }
+    const Context context{.followerFall = followerFall_,
+                          .minimumLife = minimumLife_,
+                          .strings = strings_.data(),
+                          .lineLength = static_cast<std::uint32_t>(stringLength_)};
+    const auto renderVoice = [&](Voice& voice, std::span<float> part) {
         switch (timbre_) {
         case Timbre::Piano:
         case Timbre::Mallet:
         case Timbre::Organ:
-            renderPartials(voice, mix, context);
+            renderPartials(voice, part, context);
             break;
         case Timbre::Bowed:
         case Timbre::Wind:
-            renderSaw(voice, mix, context);
+            renderSaw(voice, part, context);
             break;
         case Timbre::Guitar:
         case Timbre::Overdrive:
         case Timbre::Bass:
-            renderString(voice, mix, context);
+            renderString(voice, part, context);
             break;
         case Timbre::Drums:
-            renderDrum(voice, mix, context);
+            renderDrum(voice, part, context);
             break;
+        }
+    };
+    for (Voice& voice : voices_) {
+        // A gliding voice is retuned every kGlideStep of its own frames, so
+        // the output does not depend on how render() splits them.
+        std::span<float> rest = mix;
+        while (voice.stage != Stage::Off && !rest.empty()) {
+            std::size_t n = rest.size();
+            if (voice.glide > 0 && voice.untilRetune == 0) {
+                const std::uint32_t step = std::min(voice.glide, kGlideStep);
+                voice.glide -= step;
+                voice.cents =
+                    voice.glide == 0 ? voice.centsTarget : voice.cents + (voice.centsStep * step);
+                retune(voice, timbre_, sampleRate_, stringLength_);
+                voice.untilRetune = kGlideStep;
+            }
+            if (voice.untilRetune > 0) {
+                n = std::min<std::size_t>(n, voice.untilRetune);
+                voice.untilRetune -= static_cast<std::uint32_t>(n);
+            }
+            renderVoice(voice, rest.first(n));
+            rest = rest.subspan(n);
         }
     }
     if (timbre_ == Timbre::Overdrive) {
