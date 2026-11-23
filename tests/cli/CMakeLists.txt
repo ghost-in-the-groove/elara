@@ -494,9 +494,9 @@ set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
 # starts playback on the same column the first time through: at 1 s.
 add_test(NAME cli.render_time_at_a_note
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --time-at 0 24.7735 28)
+          --layout page --time-at 0 27.7 28)
 set_tests_properties(cli.render_time_at_a_note PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":24.7735,\"y\":28,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":27.7,\"y\":28,\"measure\":0,\"seconds\":1},\"pages\":\\[")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES
