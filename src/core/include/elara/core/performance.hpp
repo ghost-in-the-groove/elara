@@ -22,6 +22,8 @@ struct SoundingNote {
     int key = 60;            // sounding MIDI key; percussion: the General MIDI percussion key
     int velocity = 80;       // from the note's dynamic (dynamicVelocity)
     std::size_t measure = 0; // where the attack is
+    std::size_t beat = 0;    // the attack's beat in its voice of that measure
+    std::size_t note = 0;    // and its note in that beat, which holds its effects
 
     friend bool operator==(const SoundingNote&, const SoundingNote&) = default;
 };
@@ -29,7 +31,8 @@ struct SoundingNote {
 /// Every note of the song as written: a tied note extends the note it is tied to
 /// (the same pitch, and string on a fretted staff, in the previous beat of its
 /// voice). Ordered by start, then track, staff, voice and key. Articulations
-/// (staccato, bends, slides...) are not applied: that is playback's job.
+/// (staccato, bends, slides...) are not applied: that is playback's job, which
+/// finds them through each note's measure, beat and note.
 [[nodiscard]] std::vector<SoundingNote> soundingNotes(const Song& song);
 
 } // namespace elara::core

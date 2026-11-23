@@ -171,6 +171,13 @@ add_test(NAME cli.edit_undo_and_redo_history
 set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
   PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
 
+# A signature change runs until the next change, as in the app.
+add_test(NAME cli.edit_signature_runs_to_next_change
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8"
+    "time 1 3/4" "key 0 D major")
+set_tests_properties(cli.edit_signature_runs_to_next_change PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"D major\"},{\"time\":\"3/4\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"},{\"time\":\"6/8\",\"key\":\"D major\"}\\].*\"undo\":{\"count\":5,")
+
 add_test(NAME cli.edit_reports_incomplete_measure
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 3 4")
 set_tests_properties(cli.edit_reports_incomplete_measure PROPERTIES
@@ -633,6 +640,17 @@ add_test(NAME cli.sequence_events
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --notes --events)
 set_tests_properties(cli.sequence_events PROPERTIES
   PASS_REGULAR_EXPRESSION "\"duration\":8\\.4,.*\"notes\":\\[{\"track\":0,\"staff\":0,\"voice\":0,\"pass\":0,\"start\":0,\"end\":0\\.6,\"key\":60,\"velocity\":80},.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"time\":0\\.6,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"time\":0\\.6,\"kind\":\"on\",\"track\":0,\"key\":62,")
+# Articulations (ADR-0022): the palm mute, the natural harmonic that rings
+# until its string is struck again in the next pass, the accented dead note
+# (ff 112 + 16, at most 127) and the staccato note (half of 1.125 s).
+add_test(NAME cli.sequence_articulations
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
+set_tests_properties(cli.sequence_articulations PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+add_test(NAME cli.render_audio_touches
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
+set_tests_properties(cli.render_audio_touches PROPERTIES
+  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  80  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
