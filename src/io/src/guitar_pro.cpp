@@ -141,6 +141,9 @@ Clef clefFor(std::string_view name, int octave) {
     return octave == -1 ? Clef::Treble8vb : Clef::Treble;
 }
 
+// The PartConfiguration flag of a track the full score shows as tablature.
+constexpr std::uint8_t kTablaturePart = 2;
+
 struct TrackLayout {
     std::string name;
     Instrument instrument;
@@ -161,8 +164,11 @@ std::optional<std::vector<int>> tuningOf(pugi::xml_node staff) {
     return pitches;
 }
 
+// `tablatureShown` is false when the full score shows the track without
+// tablature.
 TrackLayout readTrack(pugi::xml_node track, std::size_t index,
-                      const std::vector<std::string>& clefs, Warnings& warnings) {
+                      const std::vector<std::string>& clefs, bool tablatureShown,
+                      Warnings& warnings) {
     TrackLayout layout;
     const pugi::xml_node set = track.child("InstrumentSet");
     const std::string setName = trimmed(textOf(set.child("Name")));
@@ -203,6 +209,15 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
     const auto ownerOf = [&](std::size_t s) {
         return property(staffNodes[s], "Tuning") || staffNodes.size() > 1 ? staffNodes[s] : track;
     };
+    // Guitar Pro gives every track a tuning, a flute's or a piano's too. A
+    // tuning the score never shows as tablature is the track's own only on a
+    // fretted instrument.
+    const bool tuned =
+        !layout.percussion &&
+        (tablatureShown || detail::kindForProgram(program, false) == InstrumentKind::Fretted);
+    const auto tuningAt = [&](std::size_t s) {
+        return tuned ? tuningOf(ownerOf(s)) : std::nullopt;
+    };
 
     const int chromatic = intOf(track.child("Transpose").child("Chromatic"), 0);
     int octave = intOf(track.child("Transpose").child("Octave"), 0);
@@ -210,7 +225,7 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
     // below their notes, as in every other version.
     if (!track.child("Transpose") && !layout.percussion &&
         std::ranges::any_of(std::views::iota(std::size_t{0}, staffNodes.size()),
-                            [&](std::size_t s) { return tuningOf(ownerOf(s)).has_value(); })) {
+                            [&](std::size_t s) { return tuningAt(s).has_value(); })) {
         octave = -1;
     }
 
@@ -219,7 +234,7 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
         const std::string_view clefName = s < clefs.size() ? clefs[s] : std::string_view("G2");
         const Clef clef = layout.percussion ? Clef::Percussion : clefFor(clefName, octave);
         const pugi::xml_node owner = ownerOf(s);
-        const auto pitches = layout.percussion ? std::nullopt : tuningOf(owner);
+        const auto pitches = tuningAt(s);
         if (!pitches) {
             layout.staves.emplace_back(clef);
             layout.lowToHigh.emplace_back();
@@ -879,10 +894,11 @@ private:
 
 class GpifReader {
 public:
-    GpifReader(pugi::xml_node root, Warnings& warnings)
+    GpifReader(pugi::xml_node root, std::vector<std::uint8_t> parts, Warnings& warnings)
         : root_(root), bars_(root.child("Bars"), "Bar"), voices_(root.child("Voices"), "Voice"),
           beats_(root.child("Beats"), "Beat"), notes_(root.child("Notes"), "Note"),
-          rhythms_(root.child("Rhythms"), "Rhythm"), warnings_(warnings) {}
+          rhythms_(root.child("Rhythms"), "Rhythm"), warnings_(warnings), parts_(std::move(parts)) {
+    }
 
     Song read(unsigned threads) {
         Song song;
@@ -921,8 +937,14 @@ private:
     }
 
     void readTracks(Song& song) {
+        const auto tracks = root_.child("Tracks").children("Track");
+        // Part configurations that do not fit the score are ignored.
+        if (parts_.size() !=
+            static_cast<std::size_t>(std::distance(tracks.begin(), tracks.end()))) {
+            parts_.clear();
+        }
         std::size_t index = 0;
-        for (const pugi::xml_node track : root_.child("Tracks").children("Track")) {
+        for (const pugi::xml_node track : tracks) {
             // Each staff's clef comes from its first bar.
             const std::size_t staffCount =
                 std::max<std::size_t>(1, static_cast<std::size_t>(std::distance(
@@ -932,7 +954,8 @@ private:
             for (std::size_t s = 0; s < staffCount; ++s) {
                 clefs.push_back(trimmed(textOf(firstBar(staffOffset_ + s).child("Clef"))));
             }
-            TrackLayout layout = readTrack(track, index, clefs, warnings_);
+            const bool tablatureShown = parts_.empty() || (parts_[index] & kTablaturePart) != 0;
+            TrackLayout layout = readTrack(track, index, clefs, tablatureShown, warnings_);
             if (hasLyrics(track)) {
                 warnings_.add(layout.name, "lyrics dropped");
             }
@@ -1157,11 +1180,43 @@ private:
     ById notes_;
     ById rhythms_;
     Warnings& warnings_;
+    std::vector<std::uint8_t> parts_; // per track, what the full score shows
     std::vector<pugi::xml_node> masterBars_;
     std::vector<TrackLayout> layouts_;
     std::vector<StaffRef> staves_; // every staff of every track, in score order
     std::size_t staffOffset_ = 0;
 };
+
+// What the full score shows of each track, read from Guitar Pro's
+// PartConfiguration: the number of score views, then for each view a byte
+// (multi-measure rests), its number of tracks and a byte of flags per track
+// (kTablaturePart and others); numbers are big-endian and the full score comes
+// first. Empty when the bytes do not hold that.
+std::vector<std::uint8_t> fullScoreParts(std::string_view bytes) {
+    const auto number = [bytes](std::size_t at) -> std::optional<std::size_t> {
+        if (bytes.size() < at + 4) {
+            return std::nullopt;
+        }
+        std::size_t value = 0;
+        for (std::size_t i = at; i < at + 4; ++i) {
+            value = (value << 8U) | static_cast<std::size_t>(static_cast<unsigned char>(bytes[i]));
+        }
+        return value;
+    };
+    constexpr std::size_t kFlagsAt = 9;
+    const auto views = number(0);
+    const auto tracks = number(5);
+    if (!views || *views == 0 || !tracks || bytes.size() - kFlagsAt < *tracks) {
+        return {};
+    }
+    const std::string_view flags = bytes.substr(kFlagsAt, *tracks);
+    return {flags.begin(), flags.end()};
+}
+
+// Reads the GPIF document `xml` with the PartConfiguration bytes beside it
+// (empty when there are none).
+std::expected<ImportResult, FormatError> importScore(std::string_view xml, std::string_view parts,
+                                                     const GuitarProOptions& options);
 
 bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, std::size_t at = 0) {
     if (bytes.size() < at + prefix.size()) {
@@ -1175,6 +1230,13 @@ bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, st
 
 std::expected<ImportResult, FormatError> importGpif(std::string_view xml,
                                                     const GuitarProOptions& options) {
+    return importScore(xml, {}, options);
+}
+
+namespace {
+
+std::expected<ImportResult, FormatError> importScore(std::string_view xml, std::string_view parts,
+                                                     const GuitarProOptions& options) {
     pugi::xml_document document;
     const pugi::xml_parse_result parsed = document.load_buffer(xml.data(), xml.size());
     if (!parsed) {
@@ -1188,7 +1250,7 @@ std::expected<ImportResult, FormatError> importGpif(std::string_view xml,
     Warnings warnings;
     try {
         ImportResult result;
-        result.song = GpifReader(root, warnings).read(options.threads);
+        result.song = GpifReader(root, fullScoreParts(parts), warnings).read(options.threads);
         result.warnings = warnings.lines();
         return result;
     } catch (const FormatError& error) {
@@ -1199,6 +1261,19 @@ std::expected<ImportResult, FormatError> importGpif(std::string_view xml,
         return std::unexpected(FormatError{std::format("Guitar Pro: {}", error.what())});
     }
 }
+
+// The PartConfiguration file of an archive or container, or nothing: it only
+// says how tracks are shown, so a damaged one is ignored.
+template <typename Read>
+std::string partsOf(Read read) {
+    try {
+        return read().value_or(std::string());
+    } catch (const FormatError&) {
+        return {};
+    }
+}
+
+} // namespace
 
 std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::uint8_t> bytes,
                                                          const GuitarProOptions& options) {
@@ -1218,7 +1293,9 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
                 FormatError{"Guitar Pro: no Content/score.gpif in the archive (not a Guitar Pro 7 "
                             "or 8 file)"});
         }
-        return importGpif(*score, options);
+        const std::string parts =
+            partsOf([&zip] { return zip.entry("Content/PartConfiguration"); });
+        return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
         std::optional<std::string> score;
@@ -1231,7 +1308,9 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
             return std::unexpected(FormatError{
                 "Guitar Pro: no score.gpif in the container (not a Guitar Pro 6 file)"});
         }
-        return importGpif(*score, options);
+        const std::string parts =
+            partsOf([bytes] { return detail::gpxEntry(bytes, "PartConfiguration"); });
+        return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {
         try {

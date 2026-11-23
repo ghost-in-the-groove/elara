@@ -197,12 +197,25 @@ def score(*, info, tempos, tracks, master_bars, header=GP8_HEADER) -> str:
             "</GPIF>\n")
 
 
-def gp_file(gpif: str) -> bytes:
+def part_configuration(flags: list[int]) -> bytes:
+    """Guitar Pro's PartConfiguration with one score view, the full score: the
+    number of views, then for each view a byte (multi-measure rests), its number
+    of tracks and a byte per track (1 standard notation, 2 tablature), then the
+    view on screen; numbers are big-endian."""
+    def number(value: int) -> bytes:
+        return value.to_bytes(4, "big")
+    return number(1) + bytes([0]) + number(len(flags)) + bytes(flags) + number(0)
+
+
+def gp_file(gpif: str, parts: bytes | None = None) -> bytes:
     import io
     buffer = io.BytesIO()
+    entries: list[tuple[str, str | bytes]] = [("VERSION", "7.0"), ("meta.json", "{\n}\n"),
+                                              ("Content/score.gpif", gpif)]
+    if parts is not None:
+        entries.append(("Content/PartConfiguration", parts))
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        for name, data in (("VERSION", "7.0"), ("meta.json", "{\n}\n"),
-                           ("Content/score.gpif", gpif)):
+        for name, data in entries:
             entry = zipfile.ZipInfo(name, date_time=(2026, 11, 23, 0, 0, 0))
             entry.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(entry, data)
@@ -266,15 +279,22 @@ def guitar_techniques() -> str:
 
 # ---- band.gp ---------------------------------------------------------------------
 
+# Guitar Pro gives every staff a tuning, a piano's or a clarinet's too; its part
+# configuration shows those tracks without tablature.
+GUITAR = [40, 45, 50, 55, 59, 64]
+FIVE_STRING_BASS = [23, 28, 33, 38, 43]
+BAND_PARTS = [3, 1, 1, 1]  # bass: notation and tablature; the others: notation
+
+
 def band() -> str:
     bass = Track("Bass", set_type="electricBass", set_name="Electric Bass", program=33,
                  transpose=(0, -1), staves=[{"tuning": [28, 33, 38, 43]}])
     piano = Track("Piano", set_type="grandPiano", set_name="Grand Piano", program=0,
-                  staves=[{}, {}])
+                  staves=[{"tuning": GUITAR}, {"tuning": FIVE_STRING_BASS}])
     drums = Track("Drums", set_type="drumKit", set_name="Drums", program=0,
                   staves=[{}], articulations=[("snare", 38), ("hiHat", 42), ("kickDrum", 36)])
     clarinet = Track("Clarinet", set_type="clarinet", set_name="Clarinet in Bb", program=71,
-                     transpose=(-2, 0), staves=[{}], lyrics="la la")
+                     transpose=(-2, 0), staves=[{"tuning": GUITAR}], lyrics="la la")
 
     def bass_note(string, fret):
         return Note(string=string, fret=fret, midi=[28, 33, 38, 43][string] + fret)
@@ -482,7 +502,7 @@ def duet() -> bytes:
 
 FILES = {
     "guitar-techniques.gp": lambda: gp_file(guitar_techniques()),
-    "band.gp": lambda: gp_file(band()),
+        "band.gp": lambda: gp_file(band(), part_configuration(BAND_PARTS)),
     "duet.gpx": duet,
 }
 
