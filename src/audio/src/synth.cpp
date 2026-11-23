@@ -820,24 +820,24 @@ void Synth::renderBlock(std::span<float> out) noexcept {
                           .minimumLife = minimumLife_,
                           .strings = strings_.data(),
                           .lineLength = static_cast<std::uint32_t>(stringLength_)};
-    const auto renderVoice = [&](Voice& voice, std::span<float> out) {
+    const auto renderVoice = [&](Voice& voice, std::span<float> part) {
         switch (timbre_) {
         case Timbre::Piano:
         case Timbre::Mallet:
         case Timbre::Organ:
-            renderPartials(voice, out, context);
+            renderPartials(voice, part, context);
             break;
         case Timbre::Bowed:
         case Timbre::Wind:
-            renderSaw(voice, out, context);
+            renderSaw(voice, part, context);
             break;
         case Timbre::Guitar:
         case Timbre::Overdrive:
         case Timbre::Bass:
-            renderString(voice, out, context);
+            renderString(voice, part, context);
             break;
         case Timbre::Drums:
-            renderDrum(voice, out, context);
+            renderDrum(voice, part, context);
             break;
         }
     };
