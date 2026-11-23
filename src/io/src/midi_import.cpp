@@ -882,10 +882,103 @@ core::Dynamic dynamicFor(int velocity) {
     return best;
 }
 
+// ---- Loudness (ADR-0045) ----------------------------------------------------------
+
+constexpr int kOnDynamic = 2;    // a velocity this close to a dynamic's was written from it
+constexpr int kHoldDynamic = 12; // a measure keeps the dynamic before within this of it
+constexpr int kAccentFrom = 20;  // above the measure's dynamic: an accent from here...
+constexpr int kMarcatoFrom = 36; // ...a marcato from here
+constexpr int kGhostFrom = 28;   // below it: a ghost note from here
+
+// A note struck at `start` with `velocity`.
+struct Strike {
+    Fraction start{};
+    int velocity = 0;
+};
+
+// How a staff's velocities are written.
+struct StaffLoudness {
+    bool written = true; // every velocity on a dynamic's: each note its nearest dynamic
+    std::vector<std::optional<core::Dynamic>> measures{}; // played: the dynamic of each measure
+};
+
+struct Loudness {
+    core::Dynamic dynamic = core::Dynamic::MF;
+    core::Accent accent = core::Accent::None;
+    bool ghost = false;
+};
+
+// The measure that `at` falls in.
+std::size_t measureAt(const std::vector<MeasureInfo>& measures, const Fraction& at) {
+    const auto after = std::ranges::upper_bound(measures, at, {}, &MeasureInfo::start);
+    return after == measures.begin() ? 0 : static_cast<std::size_t>(after - measures.begin()) - 1;
+}
+
+// Velocities all within kOnDynamic of a dynamic's were written from dynamics
+// (by Elara or another notation program) and stay one per note. Others were
+// played: each measure takes the dynamic nearest its median velocity, or keeps
+// the dynamic before when that is within kHoldDynamic of the median.
+StaffLoudness staffLoudness(const std::vector<Strike>& strikes,
+                            const std::vector<MeasureInfo>& measures) {
+    StaffLoudness result;
+    result.written = std::ranges::all_of(strikes, [](const Strike& strike) {
+        return std::abs(core::dynamicVelocity(dynamicFor(strike.velocity)) - strike.velocity) <=
+               kOnDynamic;
+    });
+    if (result.written) {
+        return result;
+    }
+    std::vector<std::vector<int>> velocities(measures.size());
+    for (const Strike& strike : strikes) {
+        velocities[measureAt(measures, strike.start)].push_back(strike.velocity);
+    }
+    result.measures.resize(measures.size());
+    std::optional<core::Dynamic> previous;
+    for (std::size_t m = 0; m < measures.size(); ++m) {
+        std::vector<int>& heard = velocities[m];
+        if (heard.empty()) {
+            continue;
+        }
+        std::ranges::sort(heard);
+        const std::size_t middle = heard.size() / 2;
+        const double median = heard.size() % 2 == 1
+                                  ? static_cast<double>(heard[middle])
+                                  : static_cast<double>(heard[middle - 1] + heard[middle]) / 2.0;
+        core::Dynamic dynamic = dynamicFor(static_cast<int>(std::lround(median)));
+        if (previous && std::abs(median - static_cast<double>(core::dynamicVelocity(*previous))) <=
+                            static_cast<double>(kHoldDynamic)) {
+            dynamic = *previous;
+        }
+        result.measures[m] = dynamic;
+        previous = dynamic;
+    }
+    return result;
+}
+
+// How a note struck in measure m with `velocity` is written: played notes well
+// above their measure's dynamic are accented (marcato when far above), well
+// below it ghost notes.
+Loudness loudnessOf(int velocity, const StaffLoudness& staff, std::size_t m) {
+    if (staff.written || !staff.measures[m]) {
+        return Loudness{.dynamic = dynamicFor(velocity)};
+    }
+    Loudness result{.dynamic = *staff.measures[m]};
+    const int above = velocity - core::dynamicVelocity(result.dynamic);
+    if (above >= kMarcatoFrom) {
+        result.accent = core::Accent::Marcato;
+    } else if (above >= kAccentFrom) {
+        result.accent = core::Accent::Accent;
+    } else if (above <= -kGhostFrom) {
+        result.ghost = true;
+    }
+    return result;
+}
+
 // Writes one voice's chords into the staff's measures, with rests between them
 // and ties where a chord is cut by a barline or a beat.
 void writeVoice(const std::vector<Chord>& chords, std::size_t voiceIndex, bool percussion,
-                const std::vector<MeasureInfo>& measures, const Grids& grids, core::Staff& staff) {
+                const std::vector<MeasureInfo>& measures, const Grids& grids,
+                const StaffLoudness& loudness, core::Staff& staff) {
     std::size_t next = 0;
     for (std::size_t m = 0; m < measures.size(); ++m) {
         const MeasureInfo& measure = measures[m];
@@ -918,13 +1011,19 @@ void writeVoice(const std::vector<Chord>& chords, std::size_t voiceIndex, bool p
                 rests(start);
             }
             bool tied = chord.start < measure.start;
+            const std::size_t struck = measureAt(measures, chord.start);
             for (const Duration& d : spellRhythm(measure, subdivisions, start - measure.start,
                                                  end - measure.start, false)) {
                 Beat beat{.duration = d};
                 for (const auto& [key, velocity] : chord.notes) {
                     Note note{.pitch = percussion ? Pitch::fromMidi(key) : measure.key.spell(key)};
                     note.effects.tiedFromPrevious = tied;
-                    note.effects.dynamic = dynamicFor(velocity);
+                    const Loudness heard = loudnessOf(velocity, loudness, struck);
+                    note.effects.dynamic = heard.dynamic;
+                    if (!tied) { // a tied note only sustains
+                        note.effects.accent = heard.accent;
+                        note.effects.ghost = heard.ghost;
+                    }
                     beat.notes.push_back(note);
                 }
                 beats.push_back(std::move(beat));
@@ -1074,10 +1173,17 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
                         {.start = start, .key = raw.key, .velocity = raw.velocity});
                 }
             }
+            std::vector<Strike> strikes;
+            for (const auto& hand : hands) {
+                for (const PlacedNote& hit : hand) {
+                    strikes.push_back({.start = hit.start, .velocity = hit.velocity});
+                }
+            }
+            const StaffLoudness loudness = staffLoudness(strikes, measures);
             for (std::size_t v = 0; v < hands.size(); ++v) {
                 const Voices placed =
                     assignVoices(drumHits(std::move(hands[v]), measures), shortened);
-                writeVoice(placed[0], v, true, measures, grids, result.staff(s));
+                writeVoice(placed[0], v, true, measures, grids, loudness, result.staff(s));
             }
             continue;
         }
@@ -1095,9 +1201,15 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
             }
             notes.push_back(note);
         }
+        std::vector<Strike> strikes;
+        strikes.reserve(notes.size());
+        for (const PlacedNote& note : notes) {
+            strikes.push_back({.start = note.start, .velocity = note.velocity});
+        }
+        const StaffLoudness loudness = staffLoudness(strikes, measures);
         const Voices placed = assignVoices(std::move(notes), shortened);
         for (std::size_t v = 0; v < placed.size(); ++v) {
-            writeVoice(placed[v], v, false, measures, grids, result.staff(s));
+            writeVoice(placed[v], v, false, measures, grids, loudness, result.staff(s));
         }
     }
     if (shortened) {
