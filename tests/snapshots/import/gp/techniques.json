@@ -1,0 +1,359 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [
+  "section marks dropped (measure 1)",
+  "repeats dropped (written once) (measure 2)",
+  "Lead Guitar: chord names and diagrams dropped (measure 3)",
+  "Lead Guitar: grace notes dropped (measure 3)",
+  "Lead Guitar: text dropped (measure 3)"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Techniques",
+   "subtitle": "Guitar Pro 5",
+   "artist": "Ghost in the Groove",
+   "music": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors",
+   "notes": "Play with a pick\nSelf-made test file"
+  },
+  "tempo": {
+   "bpm": 100
+  },
+  "measures": [
+   {
+    "keySignature": "G major",
+    "tempoChanges": [
+     {
+      "bpm": 80,
+      "offset": "1/2"
+     }
+    ]
+   },
+   {
+    "keySignature": "G major"
+   },
+   {
+    "timeSignature": "3/4",
+    "keySignature": "D major"
+   },
+   {
+    "keySignature": "D major"
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Lead Guitar",
+    "instrument": {
+     "name": "Overdriven Guitar",
+     "kind": "fretted",
+     "midiProgram": 29,
+     "writtenOffset": 12
+    },
+    "staves": [
+     {
+      "clef": "treble-8vb",
+      "tuning": "E2 A2 D3 G3 B3 E4",
+      "capo": 2,
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "string": 6,
+            "fret": 0,
+            "effects": {
+             "palmMute": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "C#3",
+            "string": 5,
+            "fret": 2,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "D#3",
+            "string": 5,
+            "fret": 4,
+            "effects": {
+             "legatoFromPrevious": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8*3:2",
+          "notes": [
+           {
+            "pitch": "F#3",
+            "string": 4,
+            "fret": 2,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C#4",
+            "string": 3,
+            "fret": 4,
+            "effects": {
+             "bend": [
+              [
+               0,
+               0
+              ],
+              [
+               50,
+               200
+              ],
+              [
+               100,
+               200
+              ]
+             ],
+             "vibrato": "slight",
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#5",
+            "string": 1,
+            "fret": 12,
+            "effects": {
+             "harmonic": {
+              "kind": "natural",
+              "fret": 12
+             },
+             "letRing": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D4",
+            "string": 3,
+            "fret": 5
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D4",
+            "string": 3,
+            "fret": 5,
+            "effects": {
+             "tiedFromPrevious": true
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E3",
+            "string": 4,
+            "fret": 0,
+            "effects": {
+             "deadNote": true,
+             "accent": "marcato",
+             "dynamic": "ff"
+            }
+           }
+          ]
+         }
+        ],
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "string": 6,
+            "fret": 0,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2"
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4.",
+          "notes": [
+           {
+            "pitch": "E4",
+            "string": 2,
+            "fret": 3,
+            "effects": {
+             "slideOut": "shift",
+             "staccato": true,
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "pickStroke": "down"
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F#4",
+            "string": 2,
+            "fret": 5,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4"
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G#4",
+            "string": 1,
+            "fret": 2,
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "E4",
+            "string": 2,
+            "fret": 3,
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "B3",
+            "string": 3,
+            "fret": 2,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "strum": "up"
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B4",
+            "string": 1,
+            "fret": 5,
+            "effects": {
+             "slideOut": "downwards",
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "tremoloPicking": "16"
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C#5",
+            "string": 1,
+            "fret": 7,
+            "effects": {
+             "harmonic": {
+              "kind": "tapped",
+              "fret": 12
+             },
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "whammyBar": [
+            [
+             0,
+             0
+            ],
+            [
+             50,
+             -100
+            ],
+            [
+             100,
+             0
+            ]
+           ]
+          }
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 10.95,
+ "issues": []
+}

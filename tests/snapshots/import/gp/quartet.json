@@ -1,0 +1,408 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [
+  "triplet feel dropped",
+  "Melody: lyrics dropped",
+  "Drums: instrument and volume changes dropped (measure 2)",
+  "Melody: trills dropped (measure 2)"
+ ],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Band",
+   "subtitle": "Guitar Pro 4",
+   "artist": "Ghost in the Groove",
+   "words": "Ghost in the Groove",
+   "music": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 90
+  },
+  "measures": [
+   {
+    "keySignature": "F major"
+   },
+   {
+    "keySignature": "F major",
+    "tempoChanges": [
+     {
+      "bpm": 120
+     }
+    ]
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Bass",
+    "instrument": {
+     "name": "Electric Bass (finger)",
+     "kind": "fretted",
+     "midiProgram": 33,
+     "writtenOffset": 12
+    },
+    "staves": [
+     {
+      "clef": "bass-8vb",
+      "tuning": "E1 A1 D2 G2",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2",
+            "string": 3,
+            "fret": 3,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "bassTechnique": "slap"
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C2",
+            "string": 3,
+            "fret": 3,
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "bassTechnique": "pop"
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F2",
+            "string": 2,
+            "fret": 3,
+            "effects": {
+             "slideIn": "from-below",
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G3",
+            "string": 1,
+            "fret": 12,
+            "effects": {
+             "harmonic": {
+              "kind": "natural",
+              "fret": 12
+             },
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F1",
+            "string": 4,
+            "fret": 1,
+            "effects": {
+             "letRing": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Acoustic Grand Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "C4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2"
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "accent": "accent",
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Drums",
+    "instrument": {
+     "name": "Drums",
+     "kind": "percussion"
+    },
+    "staves": [
+     {
+      "clef": "percussion",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "C2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F#2",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "D2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C#3",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Melody",
+    "instrument": {
+     "name": "Flute",
+     "kind": "pitched",
+     "midiProgram": 73
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "vibrato": "slight",
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D5",
+            "effects": {
+             "bend": [
+              [
+               0,
+               0
+              ],
+              [
+               100,
+               100
+              ]
+             ],
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "tiedFromPrevious": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 4.667,
+ "issues": []
+}

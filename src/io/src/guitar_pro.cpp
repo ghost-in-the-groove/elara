@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Guitar Pro import (ADR-0010). Guitar Pro 7 and 8 keep the score as GPIF XML
 // inside a zip archive; this reader follows the structure of files saved by
-// Guitar Pro (the format has no public specification).
+// Guitar Pro (the format has no public specification). Guitar Pro 3-5 files go
+// to guitar_pro_binary.cpp.
 #include <elara/core/validation.hpp>
 #include <elara/io/guitar_pro.hpp>
 
 #include "archive.hpp"
+#include "guitar_pro_binary.hpp"
 #include "midi_shared.hpp"
 #include "warnings.hpp"
 #include <pugixml.hpp>
@@ -985,8 +987,11 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
             FormatError{"Guitar Pro: Guitar Pro 6 files (.gpx) are not supported yet"});
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {
-        return std::unexpected(
-            FormatError{"Guitar Pro: Guitar Pro 3-5 files are not supported yet"});
+        try {
+            return detail::readGuitarProBinary(bytes);
+        } catch (const FormatError& error) {
+            return std::unexpected(error);
+        }
     }
     return std::unexpected(FormatError{"Guitar Pro: not a Guitar Pro file"});
 }
