@@ -12,8 +12,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <unordered_map>
@@ -31,6 +33,12 @@ constexpr std::size_t kParallelNotes = 20'000;  // notes from which work goes on
 constexpr std::size_t kParallelEvents = 40'000; // events from which merges go on several threads
 constexpr std::size_t kNotesPerBlock = 8192;    // written notes timed together on one thread
 constexpr int kDynamicStep = 16;                // velocity between two dynamics (mf 80, f 96)
+constexpr double kVibratoRate = 5.5;            // Hz
+constexpr double kSlightVibrato = 20.0;         // cents either side
+constexpr double kWideVibrato = 50.0;
+constexpr double kSlideCents = 500.0; // slides in and off the string span five frets
+constexpr double kSlideIn = 0.1;      // seconds a slide into a note takes at most
+constexpr double kSlideOut = 0.2;     // seconds a slide out of a note takes at most
 
 // The tempo of every written measure as segments: from an offset (in whole
 // notes, as a double) on, seconds pass at a rate per whole note. Exact
@@ -91,11 +99,14 @@ bool earlier(const NoteEvent& a, const NoteEvent& b) {
     return a.track != b.track ? a.track < b.track : a.key < b.key;
 }
 
-// The events of one track from its notes (`mine`, indices into `notes` in
-// start order): a key struck while it sounds is released first, unless it was
-// struck at that very time, and released when its last note ends. Releases
-// at a time come before attacks. Ordered as events() are.
+// The note-on and note-off events of one track from its notes (`mine`,
+// indices into `notes` in start order): a key struck while it sounds is
+// released first, unless it was struck at that very time, and released when
+// its last note ends (`ends`: a struck note's end, or that of the last note
+// joined to it). Notes that are not struck have no events. Releases at a time
+// come before attacks. Ordered as events() are.
 std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
+                                   const std::vector<double>& ends,
                                    std::span<const std::size_t> mine, std::size_t track) {
     struct Release {
         double time = 0.0;
@@ -104,8 +115,8 @@ std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
     std::vector<Release> releases;
     releases.reserve(mine.size());
     for (const std::size_t i : mine) {
-        if (notes[i].key >= 0 && notes[i].key < kKeys) {
-            releases.push_back({.time = notes[i].end, .key = notes[i].key});
+        if (notes[i].struck && notes[i].key >= 0 && notes[i].key < kKeys) {
+            releases.push_back({.time = ends[i], .key = notes[i].key});
         }
     }
     std::ranges::sort(releases, {}, &Release::time);
@@ -127,7 +138,7 @@ std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
     std::size_t next = 0;
     for (const std::size_t i : mine) {
         const PlayedNote& note = notes[i];
-        if (note.key < 0 || note.key >= kKeys) {
+        if (!note.struck || note.key < 0 || note.key >= kKeys) {
             continue;
         }
         while (next < releases.size() && releases[next].time <= note.start) {
@@ -179,8 +190,122 @@ struct Articulation {
     Touch touch = Touch::Normal;
     bool staccato = false;
     bool letRing = false;
-    int string = 0; // 0 when the note has no fret position
+    bool moves = false; // a bend, whammy bar, slide, hammer-on or vibrato (ADR-0023)
+    int string = 0;     // 0 when the note has no fret position
+    const core::NoteEffects* effects = nullptr;
+    const core::BeatEffects* beat = nullptr;
 };
+
+// A point of a note's pitch line: seconds from its start, cents from its key.
+struct PitchPoint {
+    double time = 0.0;
+    double cents = 0.0;
+};
+
+// A bend curve at `fraction` of the note (0 to 1), interpolated.
+double curveAt(const core::BendCurve& curve, double fraction) {
+    const std::vector<core::BendPoint>& points = curve.points();
+    if (points.empty()) {
+        return 0.0;
+    }
+    const double position = fraction * 100.0;
+    if (position <= points.front().position) {
+        return points.front().cents;
+    }
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        if (position <= points[i].position) {
+            const core::BendPoint& a = points[i - 1];
+            const core::BendPoint& b = points[i];
+            return a.cents + ((b.cents - a.cents) * (position - a.position) /
+                              static_cast<double>(b.position - a.position));
+        }
+    }
+    return points.back().cents;
+}
+
+// A triangle wave of `depth` cents either side at kVibratoRate, rising first.
+double vibratoAt(double depth, double time) {
+    if (depth == 0.0) {
+        return 0.0;
+    }
+    const double quarters = time * kVibratoRate * 4.0;
+    const double whole = std::floor(quarters);
+    constexpr std::array<double, 4> kCorners{0.0, 1.0, 0.0, -1.0};
+    const auto corner = static_cast<std::size_t>(whole) % 4;
+    const double from = kCorners[corner];
+    const double to = kCorners[(corner + 1) % 4];
+    return depth * (from + ((to - from) * (quarters - whole)));
+}
+
+// The pitch of a note over its `length` seconds as a line through `out`, in
+// cents from its key; empty when it does not move. A slide out goes
+// `slideOut` cents (none when 0) over the end of the note.
+void pitchLine(const Articulation& articulation, double length, double slideOut,
+               std::vector<double>& times, std::vector<PitchPoint>& out) {
+    out.clear();
+    if (length <= 0.0) {
+        return;
+    }
+    const core::NoteEffects& effects = *articulation.effects;
+    const core::BendCurve& whammy = articulation.beat->whammyBar;
+    const double depth = effects.vibrato == core::Vibrato::Wide     ? kWideVibrato
+                         : effects.vibrato == core::Vibrato::Slight ? kSlightVibrato
+                                                                    : 0.0;
+    const double slideIn = effects.slideIn == core::SlideIn::FromBelow   ? -kSlideCents
+                           : effects.slideIn == core::SlideIn::FromAbove ? kSlideCents
+                                                                         : 0.0;
+    const double in = std::min(length / 2.0, kSlideIn);
+    const double out0 = length - std::min(length / 2.0, kSlideOut);
+
+    times.assign({0.0, length});
+    for (const core::BendCurve* curve : {&effects.bend, &whammy}) {
+        for (const core::BendPoint& point : curve->points()) {
+            times.push_back(length * point.position / 100.0);
+        }
+    }
+    if (slideIn != 0.0) {
+        times.push_back(in);
+    }
+    if (slideOut != 0.0) {
+        times.push_back(out0);
+    }
+    if (depth != 0.0) {
+        const double quarter = 1.0 / (4.0 * kVibratoRate);
+        for (double t = quarter; t < length; t += quarter) {
+            times.push_back(t);
+        }
+    }
+    std::ranges::sort(times);
+    const auto [first, last] = std::ranges::unique(times);
+    times.erase(first, last);
+
+    bool moves = false;
+    for (const double t : times) {
+        double cents =
+            curveAt(effects.bend, t / length) + curveAt(whammy, t / length) + vibratoAt(depth, t);
+        if (t < in) {
+            cents += slideIn * (1.0 - (t / in));
+        }
+        if (t > out0) {
+            cents += slideOut * (t - out0) / (length - out0);
+        }
+        moves = moves || cents != 0.0;
+        out.push_back({.time = t, .cents = cents});
+    }
+    if (!moves) {
+        out.clear();
+    }
+}
+
+NoteEvent pitchEvent(double time, std::size_t track, int key, double cents, double glide) {
+    return {.time = time,
+            .kind = EventKind::Pitch,
+            .cents = static_cast<std::int16_t>(std::clamp(std::lround(cents), -32767L, 32767L)),
+            .glide = static_cast<float>(glide),
+            .track = track,
+            .key = key,
+            .velocity = 0};
+}
 
 // The key a harmonic sounds: a partial of the open string (natural) or of
 // the fretted note (artificial, pinch, tapped). A semi-harmonic keeps the
@@ -218,11 +343,17 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
                                  .beats[sounding.beat]
                                  .notes[sounding.note];
     const core::NoteEffects& effects = note.effects;
+    const core::Beat& beat = track.staff(sounding.staff)
+                                 .measure(sounding.measure)
+                                 .voices[sounding.voice]
+                                 .beats[sounding.beat];
     Articulation result{.key = sounding.key,
                         .velocity = sounding.velocity,
                         .staccato = effects.staccato,
                         .letRing = effects.letRing,
-                        .string = note.position ? note.position->string : 0};
+                        .string = note.position ? note.position->string : 0,
+                        .effects = &effects,
+                        .beat = &beat.effects};
     if (effects.accent == core::Accent::Accent) {
         result.velocity += kDynamicStep;
     } else if (effects.accent == core::Accent::Marcato) {
@@ -236,6 +367,10 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
         return result; // keys are drums: no partials, no touches
     }
     result.key = harmonicKey(note, sounding.key);
+    result.moves = !effects.bend.isEmpty() || !beat.effects.whammyBar.isEmpty() ||
+                   effects.slideIn != core::SlideIn::None ||
+                   effects.slideOut != core::SlideOut::None || effects.legatoFromPrevious ||
+                   effects.vibrato != core::Vibrato::None;
     if (effects.deadNote) {
         result.touch = Touch::Dead;
     } else if (effects.harmonic.kind != core::HarmonicKind::None) {
@@ -326,6 +461,7 @@ Sequence::Sequence(const core::Song& song) {
     std::vector<std::size_t> writtenAs; // the sounding note each played note is
     writtenAs.reserve(played);
     bool letRing = false;
+    bool moves = false;
     for (std::size_t k = 0; k < measures_.size(); ++k) {
         const std::size_t m = measures_[k].measure;
         const double base = measures_[k].start;
@@ -345,7 +481,12 @@ Sequence::Sequence(const core::Song& song) {
                                         .touch = articulation.touch});
             writtenAs.push_back(i);
             letRing = letRing || articulation.letRing;
+            moves = moves || articulation.moves;
         }
+    }
+    std::vector<double> writtenEnds(notes_.size());
+    for (std::size_t p = 0; p < notes_.size(); ++p) {
+        writtenEnds[p] = notes_[p].end;
     }
 
     // Let ring: a note rings on until its string (without a fret position,
@@ -375,6 +516,47 @@ Sequence::Sequence(const core::Song& song) {
         }
     }
 
+    // Hammer-ons, pull-offs and legato slides join a note to the previous
+    // note on its string, which keeps sounding; shift and legato slides go
+    // to the next note on the string (ADR-0023).
+    std::vector<std::size_t> head(notes_.size()); // the struck note each note sounds on
+    std::iota(head.begin(), head.end(), std::size_t{0});
+    std::vector<int> slideTo(notes_.size(), -1); // the key a slide out goes to
+    if (moves) {
+        std::unordered_map<std::uint64_t, std::size_t> previous;
+        for (std::size_t p = 0; p < notes_.size(); ++p) {
+            const Articulation& articulation = articulations[writtenAs[p]];
+            if (articulation.string == 0 || articulation.effects == nullptr) {
+                continue;
+            }
+            const PlayedNote& note = notes_[p];
+            const std::uint64_t slot = (static_cast<std::uint64_t>(note.track) << 40U) |
+                                       (static_cast<std::uint64_t>(note.staff) << 16U) |
+                                       static_cast<std::uint64_t>(articulation.string);
+            const auto [found, added] = previous.try_emplace(slot, p);
+            if (added) {
+                continue;
+            }
+            const std::size_t q = found->second;
+            found->second = p;
+            const core::SlideOut slide = articulations[writtenAs[q]].effects->slideOut;
+            if (slide == core::SlideOut::Shift || slide == core::SlideOut::Legato) {
+                slideTo[q] = note.key;
+            }
+            const bool joined =
+                articulation.effects->legatoFromPrevious || slide == core::SlideOut::Legato;
+            if (joined && notes_[q].end >= note.start) {
+                head[p] = head[q];
+                notes_[p].struck = false;
+            }
+        }
+    }
+    std::vector<double> ends(notes_.size()); // a struck note's end, or its last joined note's
+    for (std::size_t p = 0; p < notes_.size(); ++p) {
+        ends[p] = notes_[p].end;
+        ends[head[p]] = std::max(ends[head[p]], notes_[p].end);
+    }
+
     // The notes of each track, in order (a counting sort by track).
     const std::size_t trackCount = song.trackCount();
     std::vector<std::size_t> trackStart(trackCount + 1);
@@ -397,9 +579,51 @@ Sequence::Sequence(const core::Song& song) {
     core::forEachIndex(
         0, trackCount, core::threadsFor(0, notes_.size(), kParallelNotes, trackCount),
         [&](std::size_t t) {
-            tracks[t] = trackEvents(
-                notes_,
-                std::span(byTrack).subspan(trackStart[t], trackStart[t + 1] - trackStart[t]), t);
+            const auto mine =
+                std::span(byTrack).subspan(trackStart[t], trackStart[t + 1] - trackStart[t]);
+            std::vector<NoteEvent> events = trackEvents(notes_, ends, mine, t);
+            if (!moves) {
+                tracks[t] = std::move(events);
+                return;
+            }
+            // Pitch events on the key each note sounds on: a joined note
+            // jumps to its own pitch, then every note follows its line.
+            const std::size_t noteEvents = events.size();
+            std::vector<double> times;
+            std::vector<PitchPoint> line;
+            for (const std::size_t p : mine) {
+                const PlayedNote& note = notes_[p];
+                const int key = notes_[head[p]].key;
+                const Articulation& articulation = articulations[writtenAs[p]];
+                if (key < 0 || key >= kKeys || articulation.effects == nullptr ||
+                    (!articulation.moves && note.struck && slideTo[p] < 0)) {
+                    continue;
+                }
+                const core::SlideOut slide = articulation.effects->slideOut;
+                const double slideOut = slide == core::SlideOut::Downwards ? -kSlideCents
+                                        : slide == core::SlideOut::Upwards ? kSlideCents
+                                        : slideTo[p] >= 0 ? 100.0 * (slideTo[p] - note.key)
+                                                          : 0.0;
+                pitchLine(articulation, writtenEnds[p] - note.start, slideOut, times, line);
+                const double base = 100.0 * (note.key - key);
+                if (!note.struck) {
+                    events.push_back(pitchEvent(
+                        note.start, t, key, base + (line.empty() ? 0.0 : line.front().cents), 0.0));
+                } else if (!line.empty() && line.front().cents != 0.0) {
+                    events.push_back(pitchEvent(note.start, t, key, line.front().cents, 0.0));
+                }
+                for (std::size_t i = 1; i < line.size(); ++i) {
+                    if (line[i].cents != line[i - 1].cents) {
+                        events.push_back(pitchEvent(note.start + line[i - 1].time, t, key,
+                                                    base + line[i].cents,
+                                                    line[i].time - line[i - 1].time));
+                    }
+                }
+            }
+            if (events.size() > noteEvents) {
+                std::ranges::stable_sort(events, earlier);
+            }
+            tracks[t] = std::move(events);
         });
     // Every list is ordered, so is every merge of two: neighbours merged
     // pairwise, each round on all cores, leave one ordered list.

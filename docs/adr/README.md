@@ -27,6 +27,7 @@ one that replaces them.
 | [0019](0019-real-time-playback.md) | Real-time playback | Accepted |
 | [0020](0020-track-mix.md) | The track mix | Accepted |
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
+| [0023](0023-pitch-articulations.md) | Bends, slides and legato in playback | Accepted |
 
 ## Template
 

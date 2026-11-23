@@ -37,18 +37,27 @@ struct PlayedNote {
     int key = 60; ///< sounding MIDI key; percussion: the General MIDI percussion key
     int velocity = 80;
     Touch touch = Touch::Normal;
+    /// False when it continues the previous note on its string without a new
+    /// attack: a hammer-on, a pull-off or the end of a legato slide (ADR-0023).
+    bool struck = true;
     friend bool operator==(const PlayedNote&, const PlayedNote&) = default;
 };
 
-enum class EventKind : std::uint8_t { NoteOff, NoteOn };
+/// NoteOff and NoteOn release and strike a key; Pitch moves the pitch of the
+/// voice struck as a key (ADR-0023).
+enum class EventKind : std::uint8_t { NoteOff, NoteOn, Pitch };
 
 /// What a synthesizer is told, track by track: a key struck again while it
 /// sounds is released and struck again, and released when the last of its
-/// notes ends.
+/// notes ends. A Pitch event moves the voice struck as `key` to `cents` above
+/// that key over `glide` seconds (Synth::glide()): bends, slides, vibrato and
+/// the notes joined to it by hammer-ons and pull-offs.
 struct NoteEvent {
     double time = 0.0; ///< seconds from the start of the performance
     EventKind kind = EventKind::NoteOn;
     Touch touch = Touch::Normal; ///< how a NoteOn strikes its key
+    std::int16_t cents = 0;      ///< Pitch: the offset to reach
+    float glide = 0.0f;          ///< Pitch: seconds to reach it; 0 at once
     std::size_t track = 0;
     int key = 60;
     int velocity = 80;
@@ -70,7 +79,8 @@ public:
     [[nodiscard]] const std::vector<PlayedMeasure>& measures() const noexcept { return measures_; }
     /// Ordered by start, then track, staff, voice and key.
     [[nodiscard]] const std::vector<PlayedNote>& notes() const noexcept { return notes_; }
-    /// Ordered by time, releases before attacks, then by track and key.
+    /// Ordered by time, releases before attacks before pitch changes, then by
+    /// track and key.
     [[nodiscard]] const std::vector<NoteEvent>& events() const noexcept { return events_; }
     /// Seconds from the start to the end of the last played measure.
     [[nodiscard]] double duration() const noexcept { return duration_; }

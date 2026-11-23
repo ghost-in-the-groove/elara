@@ -11,10 +11,12 @@ Two targets with different rules:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
-  ring and harmonics applied (ADR-0022);
+  ring and harmonics applied (ADR-0022), and bends, slides, hammer-ons and
+  vibrato sent as pitch events (ADR-0023);
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`; plucked timbres also play each note's `Touch`:
-  palm mute, dead note or harmonic, ADR-0022) and `OfflineRenderer`, which plays a sequence
+  palm mute, dead note or harmonic, ADR-0022; `glide()` moves a sounding
+  voice's pitch, ADR-0023) and `OfflineRenderer`, which plays a sequence
   through one synth per track into stereo, with an event log (ADR-0018). Each
   track sits in the stereo mix at its volume and pan, and mute and solo
   silence tracks (ADR-0020);
@@ -45,6 +47,6 @@ what the sequencer would play; `elara-cli render-audio FILE --json --events
 [--out song.wav]` plays it through the built-in synthesizer and prints the
 level, each track's timbre and every event with the frame it was dispatched
 at. `elara-cli play FILE` plays it on the default device. Tests in
-`tests/audio/` check pitch, envelopes, touches, voice stealing, event frames and the
+`tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the
 player's transport by calling `render()` as an audio callback would; tests in
 `tests/cli/` run the commands on corpus files.
