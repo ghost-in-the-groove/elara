@@ -88,9 +88,9 @@ private:
 /// Song-wide information about one measure, shared by every staff. Tempo changes
 /// live here so they move with their measure. Repeats and markers come later.
 struct MeasureHeader {
-    TimeSignature timeSignature;
-    KeySignature keySignature;             // concert key
-    std::vector<TempoChange> tempoChanges; // ascending offsets inside the measure
+    TimeSignature timeSignature{};
+    KeySignature keySignature{};             // concert key
+    std::vector<TempoChange> tempoChanges{}; // ascending offsets inside the measure
 
     /// The header a new measure after this one starts with: same meter and key,
     /// no events.

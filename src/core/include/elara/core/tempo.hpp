@@ -42,8 +42,8 @@ private:
 
 /// A tempo that starts `offset` whole notes into a measure.
 struct TempoChange {
-    Fraction offset;
-    Tempo tempo;
+    Fraction offset{};
+    Tempo tempo{};
 
     friend constexpr bool operator==(const TempoChange&, const TempoChange&) noexcept = default;
 };
