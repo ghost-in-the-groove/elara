@@ -72,6 +72,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+  - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
+        undo step), note values and dots, rests, delete, clicks that place the
+        caret (ADR-0032)
   - [x] Note names at the caret on any pitched staff, chords, semitone moves
         (ADR-0034)
   - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)

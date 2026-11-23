@@ -2,6 +2,7 @@
 // The pages of a score on a desk, scrolled vertically and zoomed smoothly.
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
 import QtQuick.Effects
 import Elara.App
 
@@ -9,6 +10,7 @@ Item {
     id: root
 
     required property ScoreDocument document
+    property bool dark: false
 
     /// 1 shows pages at their paper size (96 logical pixels per inch).
     property real zoom: 1.0
@@ -63,6 +65,116 @@ Item {
     }
     function toTop() {
         list.contentY = list.originY - list.topMargin;
+    }
+
+    // Keyboard entry: the caret follows the keys and stays in view.
+    property bool revealPending: false
+
+    function reveal() {
+        revealPending = true;
+        revealCaret();
+    }
+    function revealCaret() {
+        const page = document.caretPage;
+        if (page < 0 || pageHeight <= 0)
+            return;
+        const scale = unit * shownZoom;
+        const caret = document.caretRect;
+        const margin = 56;
+        let y = scrollY.running ? scrollY.to : list.contentY;
+        let x = scrollX.running ? scrollX.to : list.contentX;
+        const top = list.originY + page * (pageHeight + gap) + caret.y * scale;
+        const bottom = top + caret.height * scale;
+        if (top - margin < y)
+            y = top - margin;
+        else if (bottom + margin > y + list.height)
+            y = bottom + margin - list.height;
+        const left = list.originX + (list.contentWidth - pageWidth) / 2 + caret.x * scale;
+        const right = left + caret.width * scale;
+        if (left - margin < x)
+            x = Math.max(list.originX, left - margin);
+        else if (right + margin > x + list.width)
+            x = right + margin - list.width;
+        if (y !== list.contentY || x !== list.contentX)
+            scrollTo(y, x);
+    }
+    function scrollTo(y: real, x: real) {
+        scrollY.stop();
+        scrollX.stop();
+        scrollY.to = y;
+        scrollX.to = x;
+        scrollY.start();
+        scrollX.start();
+    }
+
+    focus: true
+    activeFocusOnTab: true
+
+    Keys.onPressed: event => {
+        const control = (event.modifiers & Qt.ControlModifier) !== 0;
+        const alt = (event.modifiers & Qt.AltModifier) !== 0;
+        if (alt || document.pageCount === 0)
+            return;
+        if (!control && event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
+            document.typeDigit(event.key - Qt.Key_0);
+        } else if (event.key === Qt.Key_Right) {
+            document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
+        } else if (event.key === Qt.Key_Left) {
+            document.moveCaret(control ? ScoreDocument.PreviousMeasure : ScoreDocument.PreviousBeat);
+        } else if (event.key === Qt.Key_Up && !control) {
+            document.moveCaret(ScoreDocument.StringUp);
+        } else if (event.key === Qt.Key_Down && !control) {
+            document.moveCaret(ScoreDocument.StringDown);
+        } else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
+            if (control)
+                document.deleteBeat();
+            else
+                document.deleteAtCaret();
+        } else if (event.key === Qt.Key_Insert && !control) {
+            document.insertRest();
+        } else if (!control && event.key === Qt.Key_Plus) {
+            document.longerDuration();
+        } else if (!control && event.key === Qt.Key_Minus) {
+            document.shorterDuration();
+        } else if (!control && event.key === Qt.Key_Period) {
+            document.toggleDot();
+        } else {
+            return;
+        }
+        event.accepted = true;
+        reveal();
+    }
+
+    Connections {
+        target: root.document
+
+        // A song just opened or started: typing goes to it.
+        function onSourceChanged() {
+            root.forceActiveFocus();
+        }
+        function onCaretChanged() {
+            if (root.revealPending) {
+                root.revealCaret();
+                root.revealPending = root.document.busy;
+            }
+        }
+    }
+
+    NumberAnimation {
+        id: scrollY
+
+        target: list
+        property: "contentY"
+        duration: 160
+        easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+        id: scrollX
+
+        target: list
+        property: "contentX"
+        duration: 160
+        easing.type: Easing.OutCubic
     }
 
     Behavior on shownZoom {
@@ -129,6 +241,7 @@ Item {
         bottomMargin: root.gap
         clip: true
         reuseItems: true
+        keyNavigationEnabled: false
         cacheBuffer: Math.max(0, Math.round(root.pageHeight))
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.AutoFlickIfNeeded
@@ -177,19 +290,6 @@ Item {
                 radius: 2
                 color: "white"
 
-                // A click on a note moves playback to it; a drag still scrolls.
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    onTapped: (eventPoint, button) => {
-                        const scale = root.unit * root.shownZoom;
-                        const seconds = root.document.secondsAt(sheet.index,
-                                                                eventPoint.position.x / scale,
-                                                                eventPoint.position.y / scale);
-                        if (seconds >= 0)
-                            root.seekRequested(seconds);
-                    }
-                }
-
                 ScorePage {
                     anchors.fill: parent
                     document: root.document
@@ -202,6 +302,81 @@ Item {
                         }
                     }
                 }
+
+                // The caret: where typing goes. It glides between beats on a
+                // page, and keeps up with zooming without gliding.
+                Rectangle {
+                    readonly property real scale: root.unit * root.shownZoom
+                    readonly property rect box: root.document.caretRect
+
+                    visible: root.document.caretPage === sheet.index
+                    x: box.x * scale
+                    y: box.y * scale
+                    width: box.width * scale
+                    height: box.height * scale
+                    radius: Math.min(width, height) * 0.22
+                    color: Qt.alpha(Material.accent, root.activeFocus ? 0.22 : 0.1)
+                    border.color: Qt.alpha(Material.accent, root.activeFocus ? 0.9 : 0.4)
+                    border.width: 1.5
+
+                    Behavior on x {
+                        enabled: root.shownZoom === root.zoom
+                        NumberAnimation {
+                            duration: 90
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                    Behavior on y {
+                        enabled: root.shownZoom === root.zoom
+                        NumberAnimation {
+                            duration: 90
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+                }
+
+                // A click puts the caret on the beat and string under it and
+                // moves playback to that note; a drag still scrolls. One
+                // handler for both, so neither takes the click from the other.
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                    onTapped: eventPoint => {
+                        const scale = root.unit * root.shownZoom;
+                        const x = eventPoint.position.x / scale;
+                        const y = eventPoint.position.y / scale;
+                        const seconds = root.document.secondsAt(sheet.index, x, y);
+                        root.forceActiveFocus();
+                        root.document.placeCaret(sheet.index, x, y);
+                        if (seconds >= 0)
+                            root.seekRequested(seconds);
+                    }
+                }
+            }
+        }
+    }
+
+    EntryBar {
+        id: entryBar
+
+        readonly property bool shown: root.document.caretPage >= 0
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: shown ? parent.height - height - 18 : parent.height + 8
+        document: root.document
+        dark: root.dark
+        opacity: shown ? 1.0 : 0.0
+        visible: opacity > 0
+
+        Behavior on y {
+            NumberAnimation {
+                duration: 220
+                easing.type: Easing.OutCubic
+            }
+        }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 180
             }
         }
     }

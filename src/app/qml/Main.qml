@@ -431,6 +431,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: songPane.left
             document: score
+            dark: window.dark
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
             onSeekRequested: seconds => audio.seek(seconds)

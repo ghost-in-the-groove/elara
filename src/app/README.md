@@ -13,12 +13,13 @@ Qt Quick / QML user interface.
 | File | What it does |
 |---|---|
 | `src/score_painter.hpp` | `ScorePainter`: paints a display list with QPainter (glyph outlines of the bundled fonts, shapes), the same on every platform and thread. `ScoreFonts` loads Bravura and Arimo. Built as the `elara_app_view` library so that tests link it. |
-| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. Edits the song through `core::Document` (new song, song info, tempo, signatures, length, tracks; undo, redo) and saves it as `.elara` (ADR-0031). |
+| `src/score_document.hpp` | `ScoreDocument` (QML): opens a file and lays out a track, or all of them, as notation, tablature or both on A4 pages, on worker threads. Edits the song through `core::Document` (new song, song info, tempo, signatures, length, tracks; undo, redo) and saves it as `.elara` (ADR-0031). Holds the keyboard entry caret and input duration, and types frets, durations, rests and deletes at it (ADR-0032). |
 | `src/score_page.hpp` | `ScorePage` (QML): one page as a texture, painted on a worker thread at its size in device pixels and painted again when zooming settles. |
 | `src/startup.hpp` | What the app does after its window loads: `--track`, `--view`, `--seek`, `--smoke-test`, `--screenshot` (`--tuner` is a property of the window). |
 | `qml/Main.qml` | The window: toolbar (new, open, save, undo, redo, view, track, zoom), welcome pane, pages, transport, drag and drop, errors, status bar; asks to save unsaved changes before they would be lost. |
 | `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. Under each track its mix: mute, solo, a volume and a pan fader, heard while they move and kept as one undo step when let go; a track mute or solo keeps quiet fades (ADR-0039). |
-| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. |
+| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. The caret over its page, keyboard entry (digits, arrows, Delete, Insert, `+`, `-`, `.`) and clicks that place the caret and move playback to the note there; the view scrolls to keep the caret in sight. |
+| `qml/EntryBar.qml` | The entry bar floating over the score: the note value typing uses, the dot, insert a rest, delete, and where the caret is. |
 
 ## The tuner (ADR-0029)
 
@@ -82,7 +83,9 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
 - `--song-pane` opens the song panel at start (`app.smoke_song_pane`).
 - After the views, `--smoke-test` edits the song, or a new one when no file is
   given: it adds a track, changes the time signature, undoes both, redoes and
-  undoes again, and fails unless the song ends as it began.
+  undoes again, and fails unless the song ends as it began. Then, on a fretted
+  track, it types: a click on the caret, two digits for fret 12 as one undo
+  step, a duration, a rest inserted and deleted, all undone back to the start.
 - `--language es` shows the UI in Spanish (`en` in English) instead of the
   system's language. With `--smoke-test` or `--screenshot` the app first prints
   `ui language: es`, which `app.smoke_spanish` checks; `app.language_unknown`
