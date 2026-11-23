@@ -68,9 +68,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
-- [ ] Copy/paste, insert/delete measures, transposition (insert/delete and transposition done, ADR-0026; copy/paste to do)
+  - [x] Note names at the caret on any pitched staff, chords, semitone moves
+        (ADR-0034)
+- [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Edit every element of milestone 1 from the UI
-- [ ] Spanish and English translations (Qt Linguist)
+- [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
 

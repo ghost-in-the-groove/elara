@@ -61,6 +61,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | nombre de nota | step | `Step` | C D E F G A B |
 | enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
 | intervalo | interval | `Interval` | Diatonic steps and semitones: a major second is {1, 2} |
+| portapapeles | clipboard | `MeasureClip`, `copyMeasures()`, `makePaste()` | Copied measures of some tracks, pasted over measures or into new ones (ADR-0027) |
 | transposición | transposition | `Transposition`, `makeTranspose()` | Moving notes by an interval; keys follow when every pitched track moves (ADR-0026) |
 | afinación | tuning | `Tuning` | |
 | cuerda | string | `string` (index) | 1 = highest |

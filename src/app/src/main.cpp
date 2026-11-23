@@ -10,11 +10,14 @@
 #include <QDir>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QQmlApplicationEngine>
 #include <QQmlError>
 #include <QQuickWindow>
 #include <QString>
 #include <QStringList>
+#include <QTranslator>
 #include <QUrl>
 #include <QVariantMap>
 #include <QtGlobal>
@@ -23,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <optional>
+#include <string_view>
 
 namespace {
 
@@ -35,6 +39,46 @@ bool hasArgument(int argc, char* argv[], const char* name) {
         }
     }
     return false;
+}
+
+// The value of an option given as "--name value" or "--name=value". The
+// language is read before the parser, whose help text it translates.
+std::optional<QString> argumentValue(int argc, char* argv[], std::string_view name) {
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view argument = argv[i];
+        if (argument == name && i + 1 < argc) {
+            return QString::fromLocal8Bit(argv[i + 1]);
+        }
+        if (argument.size() > name.size() && argument.starts_with(name) &&
+            argument[name.size()] == '=') {
+            return QString::fromLocal8Bit(argv[i] + name.size() + 1);
+        }
+    }
+    return std::nullopt;
+}
+
+// Installs the translation of the UI for the language asked for, or else for
+// the system's languages, falling back to English. English has a catalog of
+// its own for plural forms ("1 measure"). Qt's own strings, such as the
+// parser's help, come from Qt's catalogs when they are installed.
+bool installTranslations(const std::optional<QString>& language, QTranslator& elara,
+                         QTranslator& qt) {
+    const QString directory = QStringLiteral(":/i18n");
+    QLocale locale;
+    if (language) {
+        if (!elara.load(QStringLiteral("elara_") + *language, directory)) {
+            return false;
+        }
+        locale = QLocale(*language);
+    } else if (!elara.load(locale, QStringLiteral("elara"), QStringLiteral("_"), directory)) {
+        static_cast<void>(elara.load(QStringLiteral("elara_en"), directory));
+    }
+    QCoreApplication::installTranslator(&elara);
+    if (qt.load(locale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        QCoreApplication::installTranslator(&qt);
+    }
+    return true;
 }
 
 } // namespace
@@ -50,6 +94,15 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setOrganizationName(QStringLiteral("Elara"));
     QGuiApplication::setApplicationVersion(QString::fromUtf8(
         elara::core::version().data(), static_cast<qsizetype>(elara::core::version().size())));
+
+    const std::optional<QString> language = argumentValue(argc, argv, "--language");
+    QTranslator elaraTranslator;
+    QTranslator qtTranslator;
+    if (!installTranslations(language, elaraTranslator, qtTranslator)) {
+        std::fprintf(stderr, "elara: no translation for language \"%s\"; try en or es\n",
+                     language->toLocal8Bit().constData());
+        return EXIT_FAILURE;
+    }
 
     QCommandLineParser parser;
     parser.setApplicationDescription(
@@ -76,7 +129,12 @@ int main(int argc, char* argv[]) {
         QStringLiteral("png"));
     const QCommandLineOption tunerOption(
         QStringLiteral("tuner"), QCoreApplication::translate("main", "Open the tuner at start."));
-    parser.addOptions({trackOption, viewOption, smokeTest, screenshot, tunerOption});
+    const QCommandLineOption languageOption(
+        QStringLiteral("language"),
+        QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
+        QStringLiteral("language"));
+    parser.addOptions(
+        {trackOption, viewOption, smokeTest, screenshot, tunerOption, languageOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -113,6 +171,10 @@ int main(int argc, char* argv[]) {
     options.smokeTest = parser.isSet(smokeTest);
     options.screenshot = parser.value(screenshot);
     const bool checking = options.smokeTest || !options.screenshot.isEmpty();
+    if (checking) {
+        // The catalog the UI is shown with, which app.smoke_spanish checks.
+        std::printf("ui language: %s\n", qPrintable(elaraTranslator.language()));
+    }
 
     // The music font for the logo and the UI's music symbols.
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Bravura.otf"));
