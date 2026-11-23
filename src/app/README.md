@@ -18,7 +18,7 @@ Qt Quick / QML user interface.
 | `src/startup.hpp` | What the app does after its window loads: `--track`, `--view`, `--seek`, `--smoke-test`, `--screenshot` (`--tuner` is a property of the window). |
 | `qml/Main.qml` | The window: toolbar (new, open, save, undo, redo, view, track, zoom), welcome pane, pages, transport, drag and drop, errors, status bar; asks to save unsaved changes before they would be lost. |
 | `qml/SongPane.qml` | The song panel at the right of the score (Ctrl+I): title, artist, tempo, time and key signatures from the first measure, length, and the tracks, which can be shown, removed or added for any instrument preset. |
-| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. The caret over its page, keyboard entry (digits, arrows, Delete, Insert, `+`, `-`, `.`) and clicks that place the caret; the view scrolls to keep the caret in sight. |
+| `qml/ScoreView.qml` | Pages on a desk in a `ListView`, smooth zoom (Ctrl + wheel, pinch, Ctrl +/-/0), the playback cursor and scrolling after it. The caret over its page, keyboard entry (digits, arrows, Delete, Insert, `+`, `-`, `.`) and clicks that place the caret and move playback to the note there; the view scrolls to keep the caret in sight. |
 | `qml/EntryBar.qml` | The entry bar floating over the score: the note value typing uses, the dot, insert a rest, delete, and where the caret is. |
 
 ## The tuner (ADR-0029)
