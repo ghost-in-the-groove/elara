@@ -886,6 +886,16 @@ constexpr std::array kInputValues{core::NoteValue::Whole,      core::NoteValue::
                                   core::NoteValue::Sixteenth,  core::NoteValue::ThirtySecond,
                                   core::NoteValue::SixtyFourth};
 
+// The tuplets the input offers (ADR-0050): actual notes in the time of normal
+// ones.
+struct InputTuplet {
+    int actual;
+    int normal;
+};
+constexpr std::array kInputTuplets{InputTuplet{2, 3}, InputTuplet{3, 2}, InputTuplet{4, 3},
+                                   InputTuplet{5, 4}, InputTuplet{6, 4}, InputTuplet{7, 4},
+                                   InputTuplet{9, 8}};
+
 // 1 for a whole note, 2 for a half note... 64.
 int denominatorOf(core::NoteValue value) {
     const auto steps = static_cast<int>(value) - static_cast<int>(core::NoteValue::Whole);
@@ -1044,13 +1054,27 @@ void ScoreDocument::setInputValue(int value) {
     if (it == kInputValues.end()) {
         return;
     }
-    setInput(core::Duration(*it, input_.dots()));
+    setInput(core::Duration(*it, input_.dots(), input_.tuplet()));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
 
 void ScoreDocument::toggleDot() {
-    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1));
+    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1, input_.tuplet()));
+    runEntry(
+        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+}
+
+void ScoreDocument::setInputTuplet(int actual) {
+    core::Tuplet tuplet;
+    if (actual != 0 && actual != inputTuplet()) {
+        const auto found = std::ranges::find(kInputTuplets, actual, &InputTuplet::actual);
+        if (found == kInputTuplets.end()) {
+            return;
+        }
+        tuplet = core::Tuplet(found->actual, found->normal);
+    }
+    setInput(core::Duration(input_.value(), input_.dots(), tuplet));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
@@ -1116,7 +1140,12 @@ void ScoreDocument::followBeat() {
                                         .voices.at(caret_.voice)
                                         .beats.at(caret_.beat)
                                         .duration;
-    if (duration.tuplet().isNone() && duration.dots() <= 1 && inputIndex(duration.value())) {
+    const core::Tuplet tuplet = duration.tuplet();
+    const bool offered =
+        tuplet.isNone() || std::ranges::any_of(kInputTuplets, [&tuplet](const InputTuplet& item) {
+            return item.actual == tuplet.actual() && item.normal == tuplet.normal();
+        });
+    if (offered && duration.dots() <= 1 && inputIndex(duration.value())) {
         setInput(duration);
     }
 }

@@ -149,6 +149,9 @@ Item {
             document.removeMeasure();
         } else if (!control && event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
             document.typeDigit(event.key - Qt.Key_0);
+        } else if (control && event.key >= Qt.Key_2 && event.key <= Qt.Key_9 && event.key !== Qt.Key_8) {
+            // Ctrl and a digit: that tuplet, or none when the input has it (ADR-0050).
+            document.setInputTuplet(event.key - Qt.Key_0);
         } else if (event.key === Qt.Key_Right) {
             document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
         } else if (event.key === Qt.Key_Left) {

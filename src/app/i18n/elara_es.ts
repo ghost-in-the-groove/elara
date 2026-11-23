@@ -47,6 +47,42 @@
         <translation>Con puntillo (.)</translation>
     </message>
     <message>
+        <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
+        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
+    </message>
+    <message>
+        <source>Duplet (2 in the time of 3)</source>
+        <translation>Dosillo (2 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Triplet (3 in the time of 2)</source>
+        <translation>Tresillo (3 en el tiempo de 2)</translation>
+    </message>
+    <message>
+        <source>Quadruplet (4 in the time of 3)</source>
+        <translation>Cuatrillo (4 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Quintuplet (5 in the time of 4)</source>
+        <translation>Quintillo (5 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Sextuplet (6 in the time of 4)</source>
+        <translation>Seisillo (6 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Septuplet (7 in the time of 4)</source>
+        <translation>Septillo (7 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Nonuplet (9 in the time of 8)</source>
+        <translation>Nonillo (9 en el tiempo de 8)</translation>
+    </message>
+    <message>
+        <source>No tuplet</source>
+        <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
         <source>Insert a rest (Insert)</source>
         <translation>Insertar un silencio (Insert)</translation>
     </message>
