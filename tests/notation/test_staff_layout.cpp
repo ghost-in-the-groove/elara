@@ -527,6 +527,153 @@ TEST_CASE("Staff layout: beams meet every stem of their group", "[notation][layo
     CHECK_THAT(shortest.right.x, WithinAbs(stems[5].from.x + stems[5].thickness / 2, kEpsilon));
 }
 
+TEST_CASE("Staff layout: tuplets show their number", "[notation][layout]") {
+    const Tuplet triplet(3, 2);
+    const auto group = [](std::initializer_list<std::string_view> pitches, NoteValue value,
+                          Tuplet tuplet) {
+        std::vector<Beat> beats;
+        for (const std::string_view text : pitches) {
+            beats.push_back(chord({text}, value, 0, tuplet));
+        }
+        return beats;
+    };
+    const auto then = [](std::vector<Beat> beats, const std::vector<Beat>& more) {
+        beats.insert(beats.end(), more.begin(), more.end());
+        return beats;
+    };
+    const auto top = [](const GlyphItem& item) {
+        return item.origin.y - bravura().metrics(item.glyph).box.northEast.y;
+    };
+    const auto bottom = [](const GlyphItem& item) {
+        return item.origin.y - bravura().metrics(item.glyph).box.southWest.y;
+    };
+    const auto centreX = [](const std::vector<GlyphItem>& digits) {
+        return (left(digits.front()) + right(digits.back())) / 2;
+    };
+    const auto tip = [](const LineItem& stem) {
+        return std::min(stem.from.y, stem.to.y);
+    };
+    // The y of a beam's edge at x: its top edge, or its bottom one.
+    const auto beamEdge = [](const BeamItem& beam, double x, bool upper) {
+        const double t = (x - beam.left.x) / (beam.right.x - beam.left.x);
+        return beam.left.y + t * (beam.right.y - beam.left.y) +
+               (upper ? -beam.thickness / 2 : beam.thickness / 2);
+    };
+    const std::vector<Beat> rests{note("G4", NoteValue::Half), note("G4")};
+
+    SECTION("a beamed triplet: the number over the beam, no bracket") {
+        const DisplayList list =
+            layout(melody(then(group({"G4", "A4", "B4"}, NoteValue::Eighth, triplet), rests)));
+        const auto numbers = glyphs(list, Role::Tuplet);
+        REQUIRE(numbers.size() == 1);
+        CHECK(numbers[0].glyph == Glyph::Tuplet3);
+        CHECK(lines(list, Role::Tuplet).empty());
+        const auto stems = lines(list, Role::Stem);
+        REQUIRE(list.beams.size() == 1);
+        const double middle = (stems[0].from.x + stems[2].from.x) / 2;
+        CHECK_THAT(centreX(numbers), WithinAbs(middle, kEpsilon));
+        const double beam = beamEdge(list.beams[0], middle, true);
+        CHECK(bottom(numbers[0]) < beam - 0.25);
+        CHECK(bottom(numbers[0]) > beam - 1.0);
+        CHECK(list.top <= top(numbers[0]) + kEpsilon);
+    }
+    SECTION("stems down: the number under the beam") {
+        const DisplayList list =
+            layout(melody(then(group({"D5", "E5", "F5"}, NoteValue::Eighth, triplet), rests)));
+        const auto numbers = glyphs(list, Role::Tuplet);
+        REQUIRE(numbers.size() == 1);
+        REQUIRE(list.beams.size() == 1);
+        const double beam = beamEdge(list.beams[0], centreX(numbers), false);
+        CHECK(top(numbers[0]) > beam + 0.25);
+        CHECK(top(numbers[0]) < beam + 1.0);
+        CHECK(list.bottom >= bottom(numbers[0]) - kEpsilon);
+    }
+    SECTION("unbeamed notes: a bracket with the number in a gap") {
+        const DisplayList list =
+            layout(melody(then(group({"G4", "A4", "B4"}, NoteValue::Quarter, triplet),
+                               {note("G4", NoteValue::Half)})));
+        CHECK(list.beams.empty());
+        const auto numbers = glyphs(list, Role::Tuplet);
+        REQUIRE(numbers.size() == 1);
+        const auto bracket = lines(list, Role::Tuplet);
+        REQUIRE(bracket.size() == 4);
+        // Left hook, left half, right half, right hook (sorted by their left end).
+        const double y = bracket[1].from.y;
+        CHECK(bracket[1].to.y == y);
+        CHECK(bracket[2].from.y == y);
+        CHECK(bracket[2].to.y == y);
+        CHECK(bracket[0].from.x == bracket[0].to.x);
+        CHECK(bracket[3].from.x == bracket[3].to.x);
+        CHECK(std::max(bracket[0].from.y, bracket[0].to.y) > y); // hooks point to the notes
+        CHECK(std::max(bracket[3].from.y, bracket[3].to.y) > y);
+        // Above every stem, the number in its gap and clear of the stems too.
+        const auto stems = lines(list, Role::Stem);
+        double highest = 0.0;
+        for (const LineItem& stem : stems) {
+            CHECK(tip(stem) > y);
+            highest = std::min(highest, tip(stem));
+        }
+        CHECK(bottom(numbers[0]) < highest);
+        CHECK(std::max(bracket[1].from.x, bracket[1].to.x) < left(numbers[0]));
+        CHECK(std::min(bracket[2].from.x, bracket[2].to.x) > right(numbers[0]));
+        const auto heads = glyphs(list, Role::Notehead);
+        CHECK(bracket[0].from.x <= left(heads[0]) + kEpsilon);
+        CHECK(bracket[3].from.x >= right(heads[2]) - kEpsilon);
+        CHECK(bracket[3].from.x < left(heads[3]));
+    }
+    SECTION("a rest at the end of a beamed triplet asks for a bracket") {
+        auto beats = group({"G4", "A4"}, NoteValue::Eighth, triplet);
+        beats.push_back(Beat{.duration = Duration(NoteValue::Eighth, 0, triplet)});
+        const DisplayList list = layout(melody(then(beats, rests)));
+        CHECK(list.beams.size() == 1);
+        CHECK(glyphs(list, Role::Tuplet).size() == 1);
+        CHECK(lines(list, Role::Tuplet).size() == 4);
+    }
+    SECTION("a group ends when its notes fill the time of its normal count") {
+        const auto numbersOf = [](const DisplayList& list) {
+            std::vector<Glyph> found;
+            for (const GlyphItem& item : glyphs(list, Role::Tuplet)) {
+                found.push_back(item.glyph);
+            }
+            return found;
+        };
+        const std::initializer_list<std::string_view> six{"G4", "A4", "B4", "C5", "B4", "A4"};
+        // Two triplets of sixteenths under one beam: a number each, no bracket.
+        const DisplayList triplets =
+            layout(melody(then(group(six, NoteValue::Sixteenth, triplet), rests)));
+        CHECK(triplets.beams.size() == 2); // primary and secondary
+        CHECK(numbersOf(triplets) == std::vector<Glyph>{Glyph::Tuplet3, Glyph::Tuplet3});
+        CHECK(lines(triplets, Role::Tuplet).empty());
+        // One sextuplet.
+        const DisplayList sextuplet =
+            layout(melody(then(group(six, NoteValue::Sixteenth, Tuplet(6, 4)), rests)));
+        CHECK(numbersOf(sextuplet) == std::vector<Glyph>{Glyph::Tuplet6});
+        // A quarter and an eighth, then three eighths: two triplets.
+        const DisplayList two =
+            layout(melody(then(then(group({"G4"}, NoteValue::Quarter, triplet),
+                                    group({"A4", "B4", "C5", "D5"}, NoteValue::Eighth, triplet)),
+                               {note("G4", NoteValue::Half)})));
+        CHECK(numbersOf(two) == std::vector<Glyph>{Glyph::Tuplet3, Glyph::Tuplet3});
+        // Ten thirty-seconds in the time of eight: both digits, side by side.
+        const DisplayList ten =
+            layout(melody(then(group({"G4", "A4", "B4", "C5", "D5", "C5", "B4", "A4", "G4", "A4"},
+                                     NoteValue::ThirtySecond, Tuplet(10, 8)),
+                               rests)));
+        const auto digits = glyphs(ten, Role::Tuplet);
+        REQUIRE(digits.size() == 2);
+        CHECK(digits[0].glyph == Glyph::Tuplet1);
+        CHECK(digits[1].glyph == Glyph::Tuplet0);
+        CHECK_THAT(left(digits[1]), WithinAbs(right(digits[0]), 0.05));
+        CHECK_THAT(digits[0].origin.y, WithinAbs(digits[1].origin.y, kEpsilon));
+    }
+    SECTION("no number without tuplets") {
+        const DisplayList list =
+            layout(melody(std::vector<Beat>(8, note("G4", NoteValue::Eighth))));
+        CHECK(glyphs(list, Role::Tuplet).empty());
+        CHECK(lines(list, Role::Tuplet).empty());
+    }
+}
+
 TEST_CASE("Staff layout: rests", "[notation][layout]") {
     const DisplayList list =
         layout(melody({rest(NoteValue::Half), rest(NoteValue::Quarter), rest(NoteValue::Eighth),
