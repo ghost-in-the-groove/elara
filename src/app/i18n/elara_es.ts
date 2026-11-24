@@ -385,6 +385,29 @@
     </message>
 </context>
 <context>
+    <name>PracticeControls</name>
+    <message>
+        <source>Metronome</source>
+        <translation>Metrónomo</translation>
+    </message>
+    <message>
+        <source>Playback speed: %1 %</source>
+        <translation>Velocidad de reproducción: %1 %</translation>
+    </message>
+    <message>
+        <source>Playback speed</source>
+        <translation>Velocidad de reproducción</translation>
+    </message>
+    <message>
+        <source>%1 %</source>
+        <translation>%1 %</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Velocidad</translation>
+    </message>
+</context>
+<context>
     <name>QObject</name>
     <message>
         <source>The music font is missing.</source>

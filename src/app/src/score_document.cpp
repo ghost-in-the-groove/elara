@@ -122,8 +122,9 @@ std::vector<std::size_t> shownTracks(const core::Song& song, int track) {
 // same with it (the mix or the song's info changed), so playback carries on
 // (ADR-0039); a new one otherwise. Runs on a worker thread.
 std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
-                                                   std::shared_ptr<const audio::Sequence> heard) {
-    auto sequence = std::make_shared<const audio::Sequence>(song);
+                                                   std::shared_ptr<const audio::Sequence> heard,
+                                                   audio::SequenceOptions practice) {
+    auto sequence = std::make_shared<const audio::Sequence>(song, practice);
     if (heard && *sequence == *heard) {
         return heard;
     }
@@ -167,7 +168,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
-ScoreLayout openAndLayOut(const QUrl& file) {
+ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice) {
     ScoreLayout result;
     result.source = file;
     try {
@@ -185,7 +186,7 @@ ScoreLayout openAndLayOut(const QUrl& file) {
         const std::array<std::size_t, 1> first{0};
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
-        auto sequence = std::make_shared<const audio::Sequence>(*song);
+        auto sequence = std::make_shared<const audio::Sequence>(*song, practice);
         result = layOut(std::move(song), 0, view);
         result.source = file;
         result.opened = true;
@@ -490,8 +491,8 @@ void ScoreDocument::open(const QUrl& file) {
     errorMessage_.clear();
     emit statusChanged();
     setPending(+1);
-    QtConcurrent::run([file] {
-        return openAndLayOut(file);
+    QtConcurrent::run([file, practice = practice_] {
+        return openAndLayOut(file, practice);
     }).then(this, [this, generation](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
@@ -538,10 +539,10 @@ void ScoreDocument::resequence() {
     const std::uint64_t generation = ++sequenceGeneration_;
     sequencing_ = song_;
     setPending(+1);
-    QtConcurrent::run([song = song_, heard = sequence_] {
+    QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
         SequenceResult result;
         try {
-            result.sequence = sequenceFor(*song, heard);
+            result.sequence = sequenceFor(*song, heard, practice);
         } catch (const std::exception& error) {
             result.error = qstring(error.what());
         }
@@ -600,6 +601,9 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         newSequence = layout.sequence != sequence_;
         sequence_ = layout.sequence;
     }
+    // The speed or the metronome changed while the song was opening.
+    const bool practiceMoved = sequence_ && (sequence_->speed() != practice_.speed ||
+                                             sequence_->metronome() != practice_.metronome);
     if (layout.opened) {
         emit songReplaced();
     }
@@ -632,6 +636,40 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         status_ = Status::Ready;
         errorMessage_.clear();
         emit statusChanged();
+    }
+    if (practiceMoved && sequencing_ != song_) {
+        resequence();
+    }
+}
+
+// ---- Practice -----------------------------------------------------------------
+
+int ScoreDocument::speed() const noexcept {
+    return static_cast<int>(std::lround(practice_.speed * 100.0));
+}
+
+void ScoreDocument::setSpeed(int percent) {
+    const double clamped = std::clamp(percent, static_cast<int>(audio::kMinSpeed * 100),
+                                      static_cast<int>(audio::kMaxSpeed * 100)) /
+                           100.0;
+    if (clamped == practice_.speed) {
+        return;
+    }
+    practice_.speed = clamped;
+    emit practiceChanged();
+    if (song_) {
+        resequence();
+    }
+}
+
+void ScoreDocument::setMetronome(bool on) {
+    if (on == practice_.metronome) {
+        return;
+    }
+    practice_.metronome = on;
+    emit practiceChanged();
+    if (song_) {
+        resequence();
     }
 }
 
@@ -766,7 +804,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     sequencing_.reset();
     document_.emplace(std::move(song));
     song_ = std::make_shared<const core::Song>(document_->song());
-    sequence_ = std::make_shared<const audio::Sequence>(*song_);
+    sequence_ = std::make_shared<const audio::Sequence>(*song_, practice_);
     sequenceSong_ = song_;
     source_.clear();
     track_ = 0;
