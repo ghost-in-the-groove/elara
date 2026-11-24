@@ -10,6 +10,7 @@
 #include <elara/notation/display_list.hpp>
 
 #include "score_painter.hpp"
+#include "track_list.hpp"
 #include <QElapsedTimer>
 #include <QObject>
 #include <QRectF>
@@ -71,6 +72,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int keyFifths READ keyFifths NOTIFY songChanged)
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY songChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY songChanged)
+    Q_PROPERTY(QAbstractItemModel* trackList READ trackList CONSTANT)
     Q_PROPERTY(QVariantList instrumentPresets READ instrumentPresets CONSTANT)
     Q_PROPERTY(QVariantList tuningPresets READ tuningPresets CONSTANT)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
@@ -186,6 +188,9 @@ public:
     /// "audible") and tuning ("fretted", "tuning", "tuningPreset", "capo", as
     /// trackTuning() names them "fretted", "notes", "preset" and "capo").
     [[nodiscard]] QVariantList tracks() const;
+    /// tracks() as a model the song panel keeps its rows in: what changes
+    /// changes only its rows. Follows songChanged.
+    [[nodiscard]] QAbstractItemModel* trackList() { return &trackList_; }
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
     [[nodiscard]] static QVariantList instrumentPresets();
@@ -384,6 +389,7 @@ private:
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
     void setPending(int delta);
+    void resequence();
 
     QUrl source_;
     Status status_ = Status::Empty;
@@ -391,7 +397,9 @@ private:
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
     std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
+    std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
+    TrackList trackList_{this};                       ///< tracks(), kept up to date
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
@@ -410,7 +418,8 @@ private:
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
     int pending_ = 0;
-    std::uint64_t generation_ = 0;
+    std::uint64_t generation_ = 0;         ///< of layouts: only the latest is shown
+    std::uint64_t sequenceGeneration_ = 0; ///< of sequences: only the latest is played
 };
 
 } // namespace elara::app

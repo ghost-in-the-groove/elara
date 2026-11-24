@@ -50,6 +50,21 @@ std::string measuresJson(const core::Song& song) {
         const auto& header = song.measureHeader(m);
         out += std::format(R"({}{{"time":"{}","key":"{}")", m == 0 ? "" : ",",
                            header.timeSignature.toString(), header.keySignature.toString());
+        if (header.repeatStart) {
+            out += R"(,"repeatStart":true)";
+        }
+        if (header.repeatEnd()) {
+            out += std::format(R"(,"repeatTimes":{})", header.repeatTimes);
+        }
+        if (header.alternateEndings != 0) {
+            std::string endings;
+            for (int time = 1; time <= core::MeasureHeader::kMaxEnding; ++time) {
+                if (((header.alternateEndings >> (time - 1)) & 1U) != 0) {
+                    endings += std::format("{}{}", endings.empty() ? "" : ",", time);
+                }
+            }
+            out += std::format(R"(,"endings":[{}])", endings);
+        }
         std::string signs;
         for (const SignName& sign : kSignNames) {
             if (header.*sign.flag) {

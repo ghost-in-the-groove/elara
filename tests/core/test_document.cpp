@@ -162,6 +162,27 @@ TEST_CASE("Content, header, info and tempo edits are undoable", "[core][document
     CHECK(doc.song() == original);
 }
 
+TEST_CASE("Header edits are named for what they change", "[core][document]") {
+    Document doc(smallSong());
+    const auto edit = [&doc](auto change) {
+        MeasureHeader header = doc.song().measureHeader(1);
+        change(header);
+        doc.execute(std::make_unique<SetMeasureHeader>(1, header));
+        return doc.undoName();
+    };
+    CHECK(edit([](MeasureHeader& h) { h.repeatStart = true; }) == "Change repeats");
+    CHECK(edit([](MeasureHeader& h) { h.repeatTimes = 3; }) == "Change repeats");
+    CHECK(edit([](MeasureHeader& h) { h.alternateEndings = 0b011; }) == "Change repeats");
+    CHECK(edit([](MeasureHeader& h) { h.segno = true; }) == "Change navigation marks");
+    CHECK(edit([](MeasureHeader& h) { h.keySignature = KeySignature(2, KeyMode::Major); }) ==
+          "Change key signature");
+    // Repeats and something else at once: a general name.
+    CHECK(edit([](MeasureHeader& h) {
+              h.repeatTimes = 0;
+              h.coda = true;
+          }) == "Change measure header");
+}
+
 TEST_CASE("A group is one undo step", "[core][document]") {
     const Song original = smallSong();
     Document doc(original);

@@ -35,6 +35,20 @@ int pagesUpdated() {
     return ScorePage::paintCount() + ScorePage::keptCount();
 }
 
+// The first item named `name` under `item`, searching the items it shows: a
+// Repeater's delegates are there, not among its QObject children.
+QQuickItem* findItem(QQuickItem* item, const QString& name) {
+    if (item == nullptr || item->objectName() == name) {
+        return item;
+    }
+    for (QQuickItem* child : item->childItems()) {
+        if (QQuickItem* found = findItem(child, name)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
+
 } // namespace
 
 void reportSmokeTest(bool ok, const QString& detail) {
@@ -483,6 +497,10 @@ void Startup::queueMix() {
     };
     steps_.emplace_back([this, check] {
         sequenceBefore_ = score_->sequence();
+        // A row of the song panel: the mix changes below change rows, but
+        // must not make them again.
+        trackRow_ = findItem(window_->contentItem(), QStringLiteral("trackRow"));
+        check(trackRow_ != nullptr, "the song panel lists no track");
         const auto tracks = static_cast<std::size_t>(score_->tracks().size());
         score_->previewTrackMix(0, 0.25, 0.5);
         check(score_->previewMixes().size() == tracks &&
@@ -509,6 +527,7 @@ void Startup::queueMix() {
         check(!score_->modified() &&
                   !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
               "undoing the mix did not restore the song");
+        check(trackRow_ != nullptr, "a mix change made the song panel's rows again");
         sequenceBefore_.reset();
         return false;
     });
@@ -808,6 +827,9 @@ void Startup::queueKeepPosition() {
     });
     steps_.emplace_back([this, check] {
         check("an undo");
+        // Made while an edit's sequence is still being built, the new song
+        // must still be what playback plays once everything settles.
+        score_->addTrack(QStringLiteral("electric-bass"));
         score_->newSong(QStringLiteral("electric-guitar"));
         return true;
     });

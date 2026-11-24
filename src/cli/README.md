@@ -127,7 +127,9 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
 `tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`,
 `sign <m> <segno|segno-segno|coda|double-coda|fine|to-coda|to-double-coda>...`
 or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
-[al-fine|al-coda|al-double-coda]`, `undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
+[al-fine|al-coda|al-double-coda]`, `repeat <m> [start] [end <times>]` or
+`repeat <m> none`, `ending <m> <time>...` or `ending <m> none`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
@@ -136,6 +138,11 @@ changes nothing adds no undo step.
 clears them) and `jump` its jump, with what ends the music after it (ADR-0049).
 The measures of `edit` and `dump` list them as `"signs":["segno","to-coda"]`,
 `"jump":"dal-segno"` and `"jumpThen":"al-coda"`; `sequence` plays them.
+`repeat` gives measure `m` exactly a start repeat, an end repeat played
+`times` times (2 to 255), both or neither, and `ending` the times through the
+repeat that play it (1 to 8); each is one undo step, "Change repeats"
+(ADR-0016). The measures list them as `"repeatStart":true`, `"repeatTimes":3`
+and `"endings":[1,2]`.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an
