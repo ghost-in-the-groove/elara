@@ -1092,6 +1092,7 @@ private:
             song.measureHeader(m).keySignature = key;
             readRepeats(bar, song.measureHeader(m), m);
             readDirections(bar, song.measureHeader(m), m);
+            readSection(bar, song.measureHeader(m));
             warnMasterBar(bar, m);
         }
     }
@@ -1136,10 +1137,18 @@ private:
         }
     }
 
-    void warnMasterBar(pugi::xml_node bar, std::size_t m) {
-        if (bar.child("Section")) {
-            warnings_.add({}, "section marks dropped", m);
+    // <Section><Letter>A</Letter><Text>Intro</Text></Section>: the section that
+    // starts at the bar, named by its text, or by its letter without one
+    // (ADR-0062).
+    static void readSection(pugi::xml_node bar, MeasureHeader& header) {
+        const pugi::xml_node section = bar.child("Section");
+        header.section = trimmed(textOf(section.child("Text")));
+        if (header.section.empty()) {
+            header.section = trimmed(textOf(section.child("Letter")));
         }
+    }
+
+    void warnMasterBar(pugi::xml_node bar, std::size_t m) {
         if (bar.child("Fermatas")) {
             warnings_.add({}, "fermatas dropped", m);
         }

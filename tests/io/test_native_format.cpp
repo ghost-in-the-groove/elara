@@ -77,6 +77,7 @@ core::Song richSong() {
     song.measureHeader(1).toDoubleCoda = true;
     song.measureHeader(1).jump = JumpTo::SegnoSegno;
     song.measureHeader(1).jumpThen = JumpThen::DoubleCoda;
+    song.measureHeader(2).section = "Chorus";
 
     // Guitar, measure 0: every note effect, a chord, a tuplet and a second voice.
     Staff& lead = song.track(0).staff(0);
@@ -166,7 +167,9 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default
     CHECK(json.find(R"("tiedFromPrevious":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
-    CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2]})") != std::string::npos);
+    CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2],"section":"Chorus"})") !=
+          std::string::npos);
+    CHECK(json.find(R"("section":"")") == std::string::npos);
     CHECK(json.find(R"({"alternateEndings":[3]})") != std::string::npos);
     CHECK(json.find(R"("repeatStart":false)") == std::string::npos);
     CHECK(json.find(R"("segno":true,"segnoSegno":true,"coda":true,"doubleCoda":true})") !=

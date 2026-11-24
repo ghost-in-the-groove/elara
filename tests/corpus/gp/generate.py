@@ -541,11 +541,17 @@ def double_coda() -> str:
                   "<Jump>DaCoda</Jump><Jump>DaDoubleCoda</Jump>",
                   "<Jump>DaSegnoSegnoAlDoubleCoda</Jump>", "<Target>Coda</Target>",
                   "<Target>DoubleCoda</Target>"]
+    # Sections: one with a letter and a text, one with a letter alone.
+    sections = {0: ("A", "Intro"), 5: ("B", "")}
     master_bars = []
     for measure, direction in enumerate(directions):
         bar = [[Beat("Whole", [Note(string=5, fret=measure, midi=GUITAR[5] + measure)])]]
-        master_bars.append({"time": "4/4", "bars": [("G2", bar)],
-                            "extra": f"<Directions>{direction}</Directions>" if direction else ""})
+        extra = f"<Directions>{direction}</Directions>" if direction else ""
+        if measure in sections:
+            letter, text = sections[measure]
+            extra += (f"<Section><Letter>{cdata(letter)}</Letter>"
+                      f"<Text>{cdata(text)}</Text></Section>")
+        master_bars.append({"time": "4/4", "bars": [("G2", bar)], "extra": extra})
     return score(
         info={"Title": "Corpus Navigation", "Artist": "Ghost in the Groove",
               "Copyright": "CC0 1.0", "Tabber": "Elara contributors"},

@@ -30,7 +30,7 @@ element written by hand following the structure of files saved by Guitar Pro
 | `guitar-techniques.gp` | Electric guitar in drop D with a capo; palm mute, hammer-on in a triplet, bend with vibrato, natural harmonic with let ring, tie, dead note with an accent, shift slide, staccato, pick stroke, dynamics; a tempo change in the middle of a bar; 4/4 then 3/4; a repeat and a grace note (reported) |
 | `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported); the piano and the clarinet carry the default tunings Guitar Pro gives every staff, and its part configuration shows them without tablature |
 | `duet.gpx` | Guitar Pro 6: a container with three files, compressed with literals and back references; steel-string guitar in E-flat tuning (spelled with flats) with a capo, both on the track; a drum kit from the General MIDI table whose notes give their MIDI keys; E-flat major; a tempo without a beat unit; let ring; a drum note that names only a kit element (reported) |
-| `double-coda.gp` | Signs and jumps (ADR-0049): segno, segno segno, coda and double coda signs, "Da Coda" and "Da Double Coda" on one bar, "Da Segno Segno al Double Coda"; played 1 2 3 4 5 3 4 7 |
+| `double-coda.gp` | Signs and jumps (ADR-0049): segno, segno segno, coda and double coda signs, "Da Coda" and "Da Double Coda" on one bar, "Da Segno Segno al Double Coda"; played 1 2 3 4 5 3 4 7; an "Intro" section (letter A) and a section with only the letter B |
 
 ## Guitar Pro 3-5 (`gp/`)
 
@@ -40,7 +40,7 @@ neutral values.
 
 | File | Exercises |
 |---|---|
-| `techniques.gp5` | Guitar Pro 5.10: overdriven guitar with a capo; palm mute, hammer-on in a triplet, full bend with vibrato, natural harmonic with let ring, a tie that does not repeat its fret, dead note with a heavy accent, dynamics, a second voice, shift slide with staccato and a down pick stroke, upward strum, tremolo picking, slide out, tapped harmonic, whammy-bar dip; a tempo change in the middle of a measure; G then D major; 4/4, 3/4; a marker, a repeat, a chord diagram, a grace note and text (reported) |
+| `techniques.gp5` | Guitar Pro 5.10: overdriven guitar with a capo; palm mute, hammer-on in a triplet, full bend with vibrato, natural harmonic with let ring, a tie that does not repeat its fret, dead note with a heavy accent, dynamics, a second voice, shift slide with staccato and a down pick stroke, upward strum, tremolo picking, slide out, tapped harmonic, whammy-bar dip; a tempo change in the middle of a measure; G then D major; 4/4, 3/4; an "Intro" marker, a repeat; a chord diagram, a grace note and text (reported) |
 | `quartet.gp4` | Guitar Pro 4.06: bass with slap, pop, slide in and a harmonic; piano and flute programs that keep only their pitches; drums on channel 10; F major; a tempo change from a mix table, a tie, a bend, vibrato; triplet feel, lyrics, a volume change and a trill (reported) |
 | `melody.gp3` | Guitar Pro 3.00: a Windows-1252 title; nylon guitar with a per-beat natural harmonic, hammer-on, slide, tapped quintuplet, wide vibrato with let ring, whammy-bar dip and a downward strum; A minor, 4/4 then 6/8; chord diagrams in both formats and text (reported) |
 | `dal-segno.gp5` | Guitar Pro 5.10 directions (ADR-0049): a segno, "Da Coda", "Da Segno al Coda" and a coda sign; played 1 2 3 4 2 3 5 6 |

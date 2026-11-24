@@ -936,9 +936,18 @@ private:
         xml.close("direction");
     }
 
-    // The signs open the measure.
+    // The section's name (ADR-0062) and the signs open the measure.
     void writeSigns(XmlWriter& xml, std::size_t m) const {
         const MeasureHeader& header = song_.measureHeader(m);
+        if (!header.section.empty()) {
+            xml.start("direction");
+            xml.attribute("placement", "above");
+            xml.endOpen();
+            xml.open("direction-type");
+            xml.text("rehearsal", header.section);
+            xml.close("direction-type");
+            xml.close("direction");
+        }
         if (header.segno) {
             writeNavigation(xml, "segno", {}, "segno", "segno");
         }

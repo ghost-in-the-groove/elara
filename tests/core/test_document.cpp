@@ -424,3 +424,29 @@ TEST_CASE("A key signature change runs until the next change", "[core][document]
     CHECK(doc.song() == original);
     CHECK(elara::core::changeKeySignature(original, 0, KeySignature()) == nullptr);
 }
+
+TEST_CASE("A section is named at the measure it starts and only there", "[core][document]") {
+    Song original = smallSong();
+    Document doc(original);
+
+    doc.execute(elara::core::changeSection(doc.song(), 0, "Intro"));
+    doc.execute(elara::core::changeSection(doc.song(), 2, "Chorus"));
+    CHECK(doc.song().measureHeader(0).section == "Intro");
+    CHECK(doc.song().measureHeader(1).section.empty());
+    CHECK(doc.song().measureHeader(2).section == "Chorus");
+    CHECK(doc.undoName() == "Change section");
+    // Signatures and tempo are left alone, and a new measure starts no section.
+    CHECK(doc.song().measureHeader(2).timeSignature == original.measureHeader(2).timeSignature);
+    CHECK(doc.song().measureHeader(0).continuation().section.empty());
+
+    // The name it has already needs no edit; an empty name takes it off.
+    CHECK(elara::core::changeSection(doc.song(), 2, "Chorus") == nullptr);
+    doc.execute(elara::core::changeSection(doc.song(), 0, ""));
+    CHECK(doc.song().measureHeader(0).section.empty());
+
+    while (doc.canUndo()) {
+        doc.undo();
+    }
+    CHECK(doc.song() == original);
+    CHECK_THROWS_AS(elara::core::changeSection(original, 4, "Outro"), std::out_of_range);
+}

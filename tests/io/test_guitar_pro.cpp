@@ -306,6 +306,10 @@ TEST_CASE("Guitar Pro: directions become signs and jumps", "[io][guitarpro]") {
     CHECK(song.measureHeader(5).coda);
     CHECK(song.measureHeader(6).doubleCoda);
     CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 3, 4, 2, 3, 6});
+    // Sections are named by their text, or by their letter without one (ADR-0062).
+    CHECK(song.measureHeader(0).section == "Intro");
+    CHECK(song.measureHeader(1).section.empty());
+    CHECK(song.measureHeader(5).section == "B");
 }
 
 TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {
