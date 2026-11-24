@@ -85,6 +85,7 @@ void Startup::queueSteps() {
             queueMeasures();
             queuePitches();
             queueMix();
+            queueNavigation();
             queueTuning();
         }
         return;
@@ -119,6 +120,7 @@ void Startup::queueSteps() {
         queueMeasures();
         queuePitches();
         queueMix();
+        queueNavigation();
         queueTuning();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -506,6 +508,44 @@ void Startup::queueMix() {
                   !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
               "undoing the mix did not restore the song");
         sequenceBefore_.reset();
+        return false;
+    });
+}
+
+// Signs and jumps from the measure popup (ADR-0049): a segno on the first
+// measure, then a D.S. al Coda on it, each one undo step named for them; both
+// undone, the song must end as it started.
+void Startup::queueNavigation() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("navigation check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("segno"), true}});
+        check(score_->navigationAt(0).value(QStringLiteral("segno")).toBool(),
+              "the segno was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change navigation marks"),
+              "the marks are not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("jump"), 2}, {QStringLiteral("jumpThen"), 2}});
+        const QVariantMap marks = score_->navigationAt(0);
+        check(marks.value(QStringLiteral("jump")).toInt() == 2 &&
+                  marks.value(QStringLiteral("jumpThen")).toInt() == 2 &&
+                  marks.value(QStringLiteral("segno")).toBool(),
+              "the jump was not set beside the segno");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantMap marks = score_->navigationAt(0);
+        check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
+                  marks.value(QStringLiteral("jump")).toInt() == 0,
+              "undoing the marks did not restore the song");
         return false;
     });
 }

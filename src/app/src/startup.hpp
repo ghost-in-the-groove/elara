@@ -55,6 +55,7 @@ private:
     void queueMeasures();
     void queuePitches();
     void queueMix();
+    void queueNavigation();
     void queueTuning();
     void finish(bool ok, const QString& detail);
     void clickCursor();
