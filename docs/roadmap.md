@@ -24,6 +24,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and fret/string <-> pitch mapping, capo
 - [x] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy
 - [x] Time and key signatures, tempo map
+  - [x] A tempo change from any measure, with the CLI `tempo-from` step (ADR-0042)
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
@@ -84,12 +85,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret, in the
+        CLI and the app (ADR-0035)
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
   - [x] Note names at the caret on any pitched staff, chords, semitone moves, in
         the CLI and the app (ADR-0034)
-  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)

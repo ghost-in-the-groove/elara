@@ -118,7 +118,8 @@ elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "tim
 Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
-pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
+pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
+(ADR-0042), `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
 `paste <m> [track <t>] [insert]`,
