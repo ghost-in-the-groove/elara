@@ -151,6 +151,10 @@
         <translation>Marcato</translation>
     </message>
     <message>
+        <source>Dynamics</source>
+        <translation>Dinámicas</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1172,6 +1176,10 @@
         <translation>Cambiar efectos del tiempo</translation>
     </message>
     <message>
+        <source>Change dynamic</source>
+        <translation>Cambiar dinámica</translation>
+    </message>
+    <message>
         <source>Change slide</source>
         <translation>Cambiar deslizamiento</translation>
     </message>
@@ -1516,6 +1524,10 @@
     <message>
         <source>Pop</source>
         <translation>Pop</translation>
+    </message>
+    <message>
+        <source>Dynamics go on notes: put the caret on one.</source>
+        <translation>Las dinámicas van en notas: pon el cursor en una.</translation>
     </message>
     <message>
         <source>Slide in from below</source>
