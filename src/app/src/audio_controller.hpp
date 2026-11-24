@@ -13,6 +13,7 @@
 
 namespace elara::audio {
 class Player;
+class SoundBank;
 class Sequence;
 class SystemAudio;
 } // namespace elara::audio
@@ -38,6 +39,11 @@ class AudioController : public QObject {
     Q_PROPERTY(bool looping READ looping NOTIFY loopChanged)
     Q_PROPERTY(double loopFrom READ loopFrom NOTIFY loopChanged)
     Q_PROPERTY(double loopTo READ loopTo NOTIFY loopChanged)
+    // The sound of the tracks (ADR-0043): a SoundFont, or the built-in synthesizer.
+    Q_PROPERTY(QString soundFont READ soundFont NOTIFY soundFontChanged)
+    Q_PROPERTY(QString soundFontName READ soundFontName NOTIFY soundFontChanged)
+    Q_PROPERTY(bool loadingSoundFont READ loadingSoundFont NOTIFY loadingSoundFontChanged)
+    Q_PROPERTY(bool rememberSound MEMBER rememberSound_ NOTIFY rememberSoundChanged)
 
 public:
     explicit AudioController(QObject* parent = nullptr);
@@ -87,6 +93,20 @@ public:
     /// in the music when the speed or a tempo changes; another song ends it.
     Q_INVOKABLE void markLoop();
     Q_INVOKABLE void clearLoop();
+    /// The SoundFont the tracks play through; empty for the built-in synthesizer.
+    [[nodiscard]] QString soundFont() const { return soundFont_; }
+    /// Its file name without the extension.
+    [[nodiscard]] QString soundFontName() const;
+    /// True while a SoundFont opens.
+    [[nodiscard]] bool loadingSoundFont() const { return loading_ > 0; }
+    /// Opens the SoundFont at `file` (a path or a file URL) on a worker; once
+    /// it has, the tracks play through it. A file that does not open leaves
+    /// the sound as it was and says why in errorMessage().
+    Q_INVOKABLE void setSoundFont(const QString& file);
+    /// Plays the tracks through the built-in synthesizer again.
+    Q_INVOKABLE void useBuiltinSound();
+    /// Opens the SoundFont chosen last time, when rememberSound is on.
+    Q_INVOKABLE void restoreSoundFont();
 
     Q_INVOKABLE void playTestTone(double frequencyHz = 440.0, double seconds = 1.5);
 
@@ -100,6 +120,9 @@ signals:
     void countInChanged();
     void countingInChanged();
     void loopChanged();
+    void soundFontChanged();
+    void loadingSoundFontChanged();
+    void rememberSoundChanged();
 
 private:
     bool openDevice();
@@ -115,6 +138,7 @@ private:
     void applyLoop();
 
     enum class Loop : std::uint8_t { None, Marked, Looping };
+    void useSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank, const QString& file);
 
     QPointer<elara::app::ScoreDocument> document_;
     std::unique_ptr<elara::audio::SystemAudio> audio_;
@@ -131,6 +155,11 @@ private:
     Loop loop_ = Loop::None;
     double loopFrom_ = 0.0;
     double loopTo_ = 0.0;
+    std::shared_ptr<const elara::audio::SoundBank> bank_; // null for the built-in synthesizer
+    QString soundFont_;
+    int loading_ = 0;      // SoundFonts opening
+    int soundRequest_ = 0; // the last one asked for wins
+    bool rememberSound_ = false;
     QString deviceDescription_;
     QString errorMessage_;
 };

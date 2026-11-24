@@ -120,6 +120,7 @@ void Startup::queueSteps() {
             queueTuning();
             queueTempo();
             queueEffects();
+            queueContinuous();
         }
         return;
     }
@@ -147,6 +148,7 @@ void Startup::queueSteps() {
             score_->setTrack(0);
             return true;
         });
+        queueContinuous();
         queueEdits();
         queueEntry();
         queueTuplets();
@@ -181,6 +183,9 @@ void Startup::queueSteps() {
         });
         queuePractice();
         queueLoop();
+        if (!options_.soundFont.isEmpty()) {
+            queueSoundFont();
+        }
         queueKeepPosition();
     }
     if (options_.track) {
@@ -199,9 +204,60 @@ void Startup::queueSteps() {
             return true;
         });
     }
+    if (options_.continuous) {
+        steps_.emplace_back([this] {
+            if (score_->continuous()) {
+                return false;
+            }
+            score_->setContinuous(true);
+            return true;
+        });
+    }
     if (options_.seek) {
         seekTo(*options_.seek);
     }
+}
+
+// The continuous view (ADR-0057): the pages give way to strips of one endless
+// page, no higher than a page, stacked without gaps, then come back as they
+// were.
+void Startup::queueContinuous() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("continuous view check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        pagesBefore_ = score_->pageCount();
+        check(!score_->continuous() && !score_->showsStrips(), "the score starts in strips");
+        score_->setContinuous(true);
+        check(score_->continuous(), "the continuous view was not asked for");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->showsStrips(), "the score is not shown in strips");
+        const QList<qreal> tops = score_->pageTops();
+        check(tops.size() == score_->pageCount() + 1 && tops.front() == 0.0,
+              "the strips' tops do not match them");
+        const double height = score_->pageSize().height();
+        for (qsizetype s = 1; s < tops.size(); ++s) {
+            check(tops[s] > tops[s - 1] && tops[s] - tops[s - 1] <= height + 1e-6,
+                  "a strip is empty or higher than a page");
+        }
+        score_->setContinuous(false);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->showsStrips() && score_->pageCount() == pagesBefore_,
+              "the pages did not come back");
+        const QList<qreal> tops = score_->pageTops();
+        const double height = score_->pageSize().height();
+        check(tops.size() == pagesBefore_ + 1 &&
+                  std::abs(tops.back() - height * pagesBefore_) < 1e-6,
+              "the pages are not a page high each");
+        return false;
+    });
 }
 
 // Edits, undone and redone: a track added and shown, the time signature
@@ -1331,6 +1387,48 @@ void Startup::queueLoop() {
         check(audio->countIn(), QStringLiteral("the count-in did not turn on"));
         audio->setCountIn(false);
         audio->seek(positionBefore_);
+        return false;
+    });
+}
+
+// The SoundFont given with `--soundfont` opens on a worker; once it has, the
+// window plays through it and prints its name. A file that is no SoundFont
+// then fails with a message and leaves it in place, and the built-in
+// synthesizer comes back.
+void Startup::queueSoundFont() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("SoundFont check failed: %1").arg(what);
+        }
+    };
+    const auto opened = [this](AudioController* audio) {
+        if (audio == nullptr || audio->loadingSoundFont()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        std::printf("sound: %s\n", qPrintable(audio->soundFontName()));
+        check(audio->soundFont() == options_.soundFont && audio->errorMessage().isEmpty(),
+              QStringLiteral("%1 did not open: %2").arg(options_.soundFont, audio->errorMessage()));
+        audio->setSoundFont(options_.soundFont + QStringLiteral(".missing"));
+        return false;
+    });
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        check(!audio->errorMessage().isEmpty() && audio->soundFont() == options_.soundFont,
+              QStringLiteral("a missing file did not fail, or replaced the SoundFont"));
+        audio->useBuiltinSound();
+        check(audio->soundFont().isEmpty() && audio->soundFontName().isEmpty(),
+              QStringLiteral("the built-in synthesizer did not come back"));
         return false;
     });
 }

@@ -33,7 +33,7 @@ elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metrono
                          [--count-in] [--loop FROM TO] [--soundfont FILE.sf2]
 elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
-                           [--count N] [--view standard|tab|both] [--layout line|page|scroll]
+                           [--count N] [--view standard|tab|both] [--layout line|page|scroll|strips]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT]
                            [--cursor-at SECONDS] [--time-at PAGE X Y]
@@ -84,7 +84,10 @@ line at their natural spacing; `--layout page` breaks them into systems on
 pages of `--paper` with staff spaces `--staff-space` mm apart and `--margin` mm
 margins, with the title and credits on the first page (unless `--no-credits`);
 `--layout scroll` stacks the systems on one page as long as the music,
-`--width` staff spaces wide (ADR-0014). `--measures-per-system` fixes how many
+`--width` staff spaces wide (ADR-0014); `--layout strips` cuts that page into
+strips of whole systems no higher than `--strip-height` staff spaces (the
+paper's height by default), one display list and, with `--svg`, one file each
+(ADR-0057). `--measures-per-system` fixes how many
 measures each system holds. `--json` prints `{"file", "track", "staff",
 "first", "count", "svg", "view", "layout", ...}` (`"tracks"` instead of
 `"track"` and `"staff"` with `--tracks`) followed, for a line, by the display

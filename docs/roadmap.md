@@ -70,6 +70,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)
+  - [x] Continuous view: the music as one scroll, cut into strips of whole
+        systems between them (ADR-0057)
 
 ## Milestone 4 - Playback  -> usable as a player
 
@@ -77,6 +79,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] FluidSynth integration, MuseScore General SF3
   - [x] SoundFont playback through FluidSynth: sound banks in the renderer and the
         player, `elara-cli soundfont`, `render-audio`/`play --soundfont` (ADR-0043)
+  - [x] A SoundFont chosen in the app (any SF2 or SF3, such as MuseScore
+        General), kept for the next start, `--soundfont FILE`
 - [ ] sfizz integration and guitar SFZ library selection
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics, strums, tremolo picking; ADR-0022, ADR-0023, ADR-0025)
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)

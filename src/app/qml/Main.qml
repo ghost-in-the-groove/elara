@@ -20,6 +20,11 @@ ApplicationWindow {
     /// Open the first track's tuning in the song panel once there is a score
     /// (from the command line).
     property bool showTuning: false
+    /// A SoundFont to play through (from the command line).
+    property string initialSoundFont
+    /// Whether choices such as the SoundFont are kept for the next start; off
+    /// for checks and screenshots.
+    property bool rememberSettings: true
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
 
@@ -54,6 +59,11 @@ ApplicationWindow {
             score.open(initialFile);
         if (showTuner)
             tunerPane.open();
+        audio.rememberSound = rememberSettings;
+        if (initialSoundFont.length > 0)
+            audio.setSoundFont(initialSoundFont);
+        else if (rememberSettings)
+            audio.restoreSoundFont();
     }
 
     onClosing: close => {
@@ -162,6 +172,14 @@ ApplicationWindow {
         title: qsTr("Open a score")
         nameFilters: score.nameFilters
         onAccepted: score.open(selectedFile)
+    }
+
+    FileDialog {
+        id: soundFontDialog
+
+        title: qsTr("Choose a SoundFont")
+        nameFilters: [qsTr("SoundFonts (*.sf2 *.sf3)")]
+        onAccepted: audio.setSoundFont(selectedFile)
     }
 
     FileDialog {
@@ -398,6 +416,20 @@ ApplicationWindow {
 
                     y: moreButton.height
 
+                    MenuItem {
+                        text: audio.loadingSoundFont ? qsTr("Opening the SoundFont…")
+                                                     : audio.soundFontName.length > 0
+                                                       ? qsTr("SoundFont: %1").arg(audio.soundFontName)
+                                                       : qsTr("Choose a SoundFont…")
+                        enabled: !audio.loadingSoundFont
+                        onTriggered: soundFontDialog.open()
+                    }
+                    MenuItem {
+                        text: qsTr("Use the built-in synthesizer")
+                        enabled: audio.soundFont.length > 0 && !audio.loadingSoundFont
+                        onTriggered: audio.useBuiltinSound()
+                    }
+                    MenuSeparator {}
                     MenuItem {
                         text: audio.playing ? qsTr("Playing…") : qsTr("Play a test tone")
                         enabled: !audio.playing
@@ -765,7 +797,9 @@ ApplicationWindow {
             anchors.rightMargin: 10
             spacing: 10
 
+            // Strips have no page numbers.
             Label {
+                visible: !score.showsStrips
                 text: qsTr("Page %1 of %2").arg(scoreView.currentPage).arg(score.pageCount)
                 font.pixelSize: Theme.fontSmall
                 font.features: {
@@ -774,6 +808,7 @@ ApplicationWindow {
                 opacity: 0.75
             }
             Rectangle {
+                visible: !score.showsStrips
                 implicitWidth: 3
                 implicitHeight: 3
                 radius: 1.5
@@ -790,6 +825,43 @@ ApplicationWindow {
             }
             Item {
                 Layout.fillWidth: true
+            }
+
+            // Pages or one continuous scroll (ADR-0057), as one group.
+            Rectangle {
+                implicitWidth: layoutRow.implicitWidth
+                implicitHeight: 24
+                radius: height / 2
+                color: Theme.hover
+
+                Row {
+                    id: layoutRow
+
+                    anchors.centerIn: parent
+
+                    IconButton {
+                        objectName: "pageViewButton"
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        // Two pages, one under the other.
+                        iconPath: "M7 3 L17 3 L17 10.5 L7 10.5 Z M7 13.5 L17 13.5 L17 21 L7 21 Z"
+                        tip: qsTr("Page view")
+                        checked: !score.continuous
+                        onClicked: score.continuous = false
+                    }
+                    IconButton {
+                        objectName: "continuousViewButton"
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        // One long sheet with systems on it.
+                        iconPath: "M7 3 L17 3 L17 21 L7 21 Z M10 7.5 L14 7.5 M10 12 L14 12 M10 16.5 L14 16.5"
+                        tip: qsTr("Continuous view")
+                        checked: score.continuous
+                        onClicked: score.continuous = true
+                    }
+                }
             }
 
             // Zoom, as one group: out, the level (a click fits the width), in.
