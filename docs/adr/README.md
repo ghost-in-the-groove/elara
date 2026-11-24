@@ -65,6 +65,7 @@ one that replaces them.
 | [0057](0057-continuous-view.md) | Continuous view | Accepted |
 | [0058](0058-kinds-of-note-effects.md) | Kinds of note effects at the caret | Accepted |
 | [0059](0059-song-credits.md) | Song credits | Accepted |
+| [0060](0060-whammy-bar-and-bass-techniques.md) | Whammy bar and bass techniques at the caret | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
 | [0064](0064-app-icon.md) | The app icon | Accepted |
 

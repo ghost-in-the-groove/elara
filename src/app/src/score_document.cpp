@@ -1524,6 +1524,12 @@ QString ScoreDocument::caretStatus() const {
     if (const int tremolo = caretTremolo(); tremolo != 0) {
         parts.append(tr("Tremolo picking 1/%1").arg(tremolo));
     }
+    if (const int whammy = caretWhammyForm(); whammy != 0) {
+        parts.append(whammyName(whammy, caretWhammyCents()));
+    }
+    if (const int technique = caretBassTechnique(); technique != 0) {
+        parts.append(bassTechniqueName(technique));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -1934,6 +1940,69 @@ void ScoreDocument::setTremolo(int value) {
     applyBeatEffects(effects);
 }
 
+void ScoreDocument::setWhammy(int form, int cents) {
+    if (form < 0 || form >= static_cast<int>(core::BendForm::Custom)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    try {
+        effects.whammyBar = core::whammyCurve(static_cast<core::BendForm>(form), cents);
+    } catch (const std::invalid_argument&) {
+        return;
+    }
+    applyBeatEffects(effects);
+}
+
+void ScoreDocument::setBassTechnique(int technique) {
+    if (technique < 0 || technique > static_cast<int>(core::BassTechnique::Pop)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.bassTechnique = static_cast<core::BassTechnique>(technique);
+    applyBeatEffects(effects);
+}
+
+QString ScoreDocument::whammyAmount(int cents) const {
+    constexpr int kStep = 200;
+    const int depth = std::abs(cents);
+    const QString steps = depth == kStep ? QStringLiteral("1") : bendAmount(depth);
+    return (cents < 0 ? QStringLiteral("-") : QStringLiteral("+")) + steps;
+}
+
+QString ScoreDocument::whammyName(int form, int cents) const {
+    const QString amount = whammyAmount(cents);
+    const bool dive = cents < 0;
+    switch (static_cast<core::BendForm>(form)) {
+    case core::BendForm::None:
+        return {};
+    case core::BendForm::Bend:
+        return (dive ? tr("Dive %1") : tr("Pull-up %1")).arg(amount);
+    case core::BendForm::BendRelease:
+        return (dive ? tr("Dip %1") : tr("Inverted dip %1")).arg(amount);
+    case core::BendForm::PreBend:
+        return (dive ? tr("Pre-dive %1") : tr("Pre-pull-up %1")).arg(amount);
+    case core::BendForm::PreBendRelease:
+        return (dive ? tr("Pre-dive and return %1") : tr("Pre-pull-up and return %1")).arg(amount);
+    case core::BendForm::Custom:
+        break;
+    }
+    return tr("Whammy bar (custom curve)");
+}
+
+QString ScoreDocument::bassTechniqueName(int technique) const {
+    switch (static_cast<core::BassTechnique>(technique)) {
+    case core::BassTechnique::None:
+        return {};
+    case core::BassTechnique::Tap:
+        return tr("Tapping");
+    case core::BassTechnique::Slap:
+        return tr("Slap");
+    case core::BassTechnique::Pop:
+        return tr("Pop");
+    }
+    return {};
+}
+
 core::NoteEffects ScoreDocument::noteEffectsAtCaret() const {
     if (!document_ || !hasCaret(document_->song())) {
         return {};
@@ -2101,6 +2170,18 @@ int ScoreDocument::caretPickStroke() const {
 int ScoreDocument::caretTremolo() const {
     const auto speed = beatEffectsAtCaret().tremoloPicking;
     return speed ? denominatorOf(*speed) : 0;
+}
+
+int ScoreDocument::caretWhammyForm() const {
+    return static_cast<int>(core::whammyForm(beatEffectsAtCaret().whammyBar));
+}
+
+int ScoreDocument::caretWhammyCents() const {
+    return core::whammyCents(beatEffectsAtCaret().whammyBar);
+}
+
+int ScoreDocument::caretBassTechnique() const {
+    return static_cast<int>(beatEffectsAtCaret().bassTechnique);
 }
 
 int ScoreDocument::caretBendForm() const {
