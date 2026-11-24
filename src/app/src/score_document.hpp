@@ -264,7 +264,8 @@ public:
     /// The caret on its page, in staff spaces from the page's top-left corner.
     [[nodiscard]] QRectF caretRect() const { return caretRect_; }
     /// Where the caret is, for a status line: "Measure 3 · Beat 2 · String 4 ·
-    /// Fret 5 · A3", or the beat's notes on a staff without strings.
+    /// Fret 5 · A3", the beat's notes on a staff without strings, or the lane's
+    /// kit piece on a drum staff ("Measure 1 · Beat 1 · Snare").
     [[nodiscard]] QString caretStatus() const;
     /// Whether the caret's staff has strings, so that digits type frets.
     [[nodiscard]] bool caretFretted() const;
@@ -285,6 +286,10 @@ public:
     [[nodiscard]] std::vector<core::Pitch> pitchesAtCaret() const;
     /// Whether note names can be typed at the caret (its staff is not percussion).
     [[nodiscard]] bool caretPitched() const;
+    /// Whether the caret is on a drum staff, where its string is a lane (ADR-0035).
+    [[nodiscard]] bool caretOnDrums() const;
+    /// The translated name of drum lane `lane` (1 at the top of the staff).
+    [[nodiscard]] static QString laneName(int lane);
 
     Q_INVOKABLE void moveCaret(CaretMove move);
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
@@ -313,6 +318,9 @@ public:
     Q_INVOKABLE void typeNoteName(int step, bool addToChord);
     /// Moves the caret's note by `semitones` (12 for an octave).
     Q_INVOKABLE void shiftPitch(int semitones);
+    /// On a drum staff, adds the lane's kit piece to the caret's beat or removes
+    /// it when it is there (ADR-0035).
+    Q_INVOKABLE void toggleDrum();
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
