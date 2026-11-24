@@ -60,6 +60,7 @@ private:
     void finish(bool ok, const QString& detail);
     void clickCursor();
     void queueKeepPosition();
+    void queuePractice();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 

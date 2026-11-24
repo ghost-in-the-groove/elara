@@ -61,11 +61,12 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from where playback is; only another song (`songReplaced`) goes back to the start. |
-| `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from the same place in the music (`audio::carriedPosition`: the same share of the same played measure after another speed or a tempo edit, else the same time); only another song (`songReplaced`) goes back to the start. |
+| `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. `speed` (25 to 200 %) and `metronome`: what every sequence is built with, kept from song to song; changing either builds the sequence again (ADR-0024). |
+| `qml/PracticeControls.qml` | In the transport: the metronome button, and the speed as a pill that opens a slider with 50, 75 and 100 %. The song is sequenced again once the slider is let go. |
 
 The transport floats over the bottom of the score: back to the start (Home),
-play and pause (Space), the time and a seek bar. A click on a note moves
+play and pause (Space), the time, a seek bar, the metronome and the speed. A click on a note moves
 playback to it. While the cursor moves, the view scrolls to keep it a third of
 the way down.
 
