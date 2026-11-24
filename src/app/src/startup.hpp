@@ -62,6 +62,7 @@ private:
     void queueRepeats();
     void queueTuning();
     void queueTempo();
+    void queueEffects();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     void queueKeepPosition();
@@ -110,6 +111,8 @@ private:
     bool selecting_ = false;      ///< whether the selection steps run
     int lengthBefore_ = 0;        ///< the song's length before pasting
     int pasteAt_ = 0;             ///< the measure pasted at
+    bool effecting_ = false;      ///< whether the note effect steps run
+    int effectsBefore_ = 0;       ///< the caret's effects before they were toggled
 };
 
 } // namespace elara::app

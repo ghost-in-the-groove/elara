@@ -188,6 +188,16 @@ Item {
             reveal();
             return;
         }
+        // Note effects: T tie, H hammer-on or pull-off, S slide, U bend,
+        // V vibrato, P palm mute, X dead note, L let ring, N harmonic,
+        // O ghost note, > accent, ' staccato.
+        const effect = control ? -1 : document.effectForKey(event.text);
+        if (effect >= 0) {
+            document.toggleEffect(effect);
+            event.accepted = true;
+            reveal();
+            return;
+        }
         if (control && event.key === Qt.Key_M) {
             openMeasurePopupAtCaret();
             event.accepted = true;
