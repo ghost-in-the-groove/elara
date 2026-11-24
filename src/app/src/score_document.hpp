@@ -151,6 +151,10 @@ public:
     Q_INVOKABLE void open(const QUrl& file);
     /// Lays out the score again (after a track or view change).
     Q_INVOKABLE void relayout();
+    /// What asked for the layout shown last: "open", "new", "track",
+    /// "view", "relayout" or "e" and the edit's number. The smoke test
+    /// prints it beside each layout.
+    [[nodiscard]] const QString& layoutCause() const { return layoutCause_; }
 
     /// Where the playback cursor stands `seconds` into the song: "page", and
     /// "x", "y" and "height" in staff spaces on it; empty when no page shows
@@ -398,6 +402,7 @@ private:
     /// Finds the caret on the pages shown.
     void placeCaretBox();
     void edited();
+    void relayoutFor(const QString& cause);
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
     void setPending(int delta);
@@ -430,6 +435,7 @@ private:
     View view_ = View::Both;
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
+    QString layoutCause_;
     int pending_ = 0;
     std::uint64_t generation_ = 0;         ///< of layouts: only the latest is shown
     std::uint64_t sequenceGeneration_ = 0; ///< of sequences: only the latest is played

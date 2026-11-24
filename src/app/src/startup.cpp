@@ -78,7 +78,7 @@ void Startup::start() {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
             ++layouts_;
-            layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
+            layoutSteps_ += QStringLiteral(" %1:%2").arg(stepsRun_).arg(score_->layoutCause());
         });
     }
     clock_.start();
@@ -1034,7 +1034,8 @@ void Startup::finish(bool ok, const QString& detail) {
         }
     }
     reportSmokeTest(ok, outcome);
-    // Which steps each layout followed, after the result the tests read: when
+    // Which step each layout followed and what asked for it (an edit and its
+    // number, a track or view change), after the result the tests read: when
     // the count of layouts they expect is off on one platform, this says where.
     if (!layoutSteps_.isEmpty()) {
         std::printf("layouts after steps:%s\n", qPrintable(layoutSteps_));

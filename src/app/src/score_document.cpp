@@ -445,7 +445,7 @@ void ScoreDocument::setTrack(int track) {
     track_ = track;
     emit trackChanged();
     clampCaret();
-    relayout();
+    relayoutFor(QStringLiteral("track"));
 }
 
 void ScoreDocument::setView(View view) {
@@ -454,7 +454,7 @@ void ScoreDocument::setView(View view) {
     }
     view_ = view;
     emit viewChanged();
-    relayout();
+    relayoutFor(QStringLiteral("view"));
 }
 
 int ScoreDocument::pageCount() const {
@@ -499,11 +499,16 @@ void ScoreDocument::open(const QUrl& file) {
             fail(result.error);
             return;
         }
+        layoutCause_ = QStringLiteral("open");
         apply(result);
     });
 }
 
 void ScoreDocument::relayout() {
+    relayoutFor(QStringLiteral("relayout"));
+}
+
+void ScoreDocument::relayoutFor(const QString& cause) {
     if (!song_) {
         return;
     }
@@ -511,7 +516,7 @@ void ScoreDocument::relayout() {
     setPending(+1);
     QtConcurrent::run([song = song_, track = track_, view = view_] {
         return layOut(song, track, view);
-    }).then(this, [this, generation](const ScoreLayout& result) {
+    }).then(this, [this, generation, cause](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
             return;
@@ -520,6 +525,7 @@ void ScoreDocument::relayout() {
             fail(result.error);
             return;
         }
+        layoutCause_ = cause;
         apply(result);
     });
     // An edit's sequence is built beside its layout, on another worker: the
@@ -817,7 +823,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     emit trackChanged();
     emit viewChanged();
     emit historyChanged();
-    relayout();
+    relayoutFor(QStringLiteral("new"));
 }
 
 void ScoreDocument::setSongTitle(const QString& title) {
@@ -1088,7 +1094,7 @@ void ScoreDocument::edited() {
     emit caretChanged();
     emit songChanged();
     emit historyChanged();
-    relayout();
+    relayoutFor(QStringLiteral("e%1").arg(edits_));
 }
 
 void ScoreDocument::setTrackMix(int track, double volume, double pan, bool mute, bool solo) {
