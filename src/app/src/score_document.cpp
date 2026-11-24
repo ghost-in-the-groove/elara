@@ -16,6 +16,7 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
+#include "when_done.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
@@ -492,19 +493,19 @@ void ScoreDocument::open(const QUrl& file) {
     errorMessage_.clear();
     emit statusChanged();
     setPending(+1);
-    QtConcurrent::run([file, practice = practice_] {
-        return openAndLayOut(file, practice);
-    }).then(this, [this, generation](const ScoreLayout& result) {
-        setPending(-1);
-        if (generation != generation_) {
-            return;
-        }
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        apply(result);
-    });
+    whenDone(
+        QtConcurrent::run([file, practice = practice_] { return openAndLayOut(file, practice); }),
+        this, [this, generation](const ScoreLayout& result) {
+            setPending(-1);
+            if (generation != generation_) {
+                return;
+            }
+            if (!result.error.isEmpty()) {
+                fail(result.error);
+                return;
+            }
+            apply(result);
+        });
 }
 
 void ScoreDocument::relayout() {
@@ -513,19 +514,20 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    QtConcurrent::run([song = song_, track = track_, view = view_] {
-        return layOut(song, track, view);
-    }).then(this, [this, generation](const ScoreLayout& result) {
-        setPending(-1);
-        if (generation != generation_) {
-            return;
-        }
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        apply(result);
-    });
+    whenDone(QtConcurrent::run([song = song_, track = track_, view = view_] {
+                 return layOut(song, track, view);
+             }),
+             this, [this, generation](const ScoreLayout& result) {
+                 setPending(-1);
+                 if (generation != generation_) {
+                     return;
+                 }
+                 if (!result.error.isEmpty()) {
+                     fail(result.error);
+                     return;
+                 }
+                 apply(result);
+             });
     // An edit's sequence is built beside its layout, on another worker: the
     // pages show as soon as they are laid out instead of waiting for it.
     if (sequenceSong_ != song_ && sequencing_ != song_) {
@@ -540,32 +542,33 @@ void ScoreDocument::resequence() {
     const std::uint64_t generation = ++sequenceGeneration_;
     sequencing_ = song_;
     setPending(+1);
-    QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
-        SequenceResult result;
-        try {
-            result.sequence = sequenceFor(*song, heard, practice);
-        } catch (const std::exception& error) {
-            result.error = qstring(error.what());
-        }
-        return result;
-    }).then(this, [this, generation, song = song_](const SequenceResult& result) {
-        setPending(-1);
-        if (generation != sequenceGeneration_) {
-            return;
-        }
-        sequencing_.reset();
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        // The song and its sequence change together, so whoever hears
-        // sequenceChanged sees them as a pair.
-        sequenceSong_ = song;
-        if (result.sequence != sequence_) {
-            sequence_ = result.sequence;
-            emit sequenceChanged();
-        }
-    });
+    whenDone(QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
+                 SequenceResult result;
+                 try {
+                     result.sequence = sequenceFor(*song, heard, practice);
+                 } catch (const std::exception& error) {
+                     result.error = qstring(error.what());
+                 }
+                 return result;
+             }),
+             this, [this, generation, song = song_](const SequenceResult& result) {
+                 setPending(-1);
+                 if (generation != sequenceGeneration_) {
+                     return;
+                 }
+                 sequencing_.reset();
+                 if (!result.error.isEmpty()) {
+                     fail(result.error);
+                     return;
+                 }
+                 // The song and its sequence change together, so whoever hears
+                 // sequenceChanged sees them as a pair.
+                 sequenceSong_ = song;
+                 if (result.sequence != sequence_) {
+                     sequence_ = result.sequence;
+                     emit sequenceChanged();
+                 }
+             });
 }
 
 std::shared_ptr<const notation::DisplayList> ScoreDocument::page(int index) const {
