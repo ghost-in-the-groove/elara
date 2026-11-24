@@ -70,6 +70,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)
+  - [x] Continuous view: the music as one scroll, cut into strips of whole
+        systems between them (ADR-0057)
 
 ## Milestone 4 - Playback  -> usable as a player
 
@@ -140,4 +142,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 7 - Distribution
 
 - [ ] Installers: MSIX/MSI (Windows), DMG (macOS), AppImage/Flatpak (Linux)
+  - [x] Portable packages built and smoke-tested by CI: ZIP (Windows), disk image
+        (macOS), tarball (Linux), `elara.py package` (ADR-0048)
 - [ ] Release automation and 1.0

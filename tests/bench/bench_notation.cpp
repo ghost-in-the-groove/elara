@@ -42,7 +42,7 @@ const EngravingFont& bravura() {
 
 } // namespace
 
-TEST_CASE("Notation benchmarks", "[!benchmark][notation]") {
+TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     const auto song = elara::bench::largeSong();
     const EngravingFont& font = bravura();
     const auto list = layoutStaff(song, 0, 0, font);

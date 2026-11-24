@@ -53,6 +53,7 @@ struct ScoreLayout {
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     int track = 0;
     ScoreDocument::View view = ScoreDocument::View::Both;
+    bool continuous = false; ///< the pages are strips of one endless page
     bool hasTablature = false;
     int milliseconds = 0;
     QString error;
@@ -140,15 +141,17 @@ struct SequenceResult {
     QString error;
 };
 
-// Lays out `track` (or every track) of `song` as `view` on A4 pages, through
-// `cache` so that only what changed since its last layout is laid out again.
-// Runs on a worker thread and never throws.
+// Lays out `track` (or every track) of `song` as `view` on A4 pages or, when
+// `continuous`, on one endless page cut into strips as high as A4 pages
+// (ADR-0057). Goes through `cache` so that only what changed since its last
+// layout is laid out again. Runs on a worker thread and never throws.
 ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view,
-                   notation::PageLayoutCache& cache) {
+                   bool continuous, notation::PageLayoutCache& cache) {
     ScoreLayout result;
     result.song = song;
     result.track = track;
     result.view = view;
+    result.continuous = continuous;
     const notation::EngravingFont* font = musicMetrics();
     if (font == nullptr) {
         result.error = QObject::tr("The music font is missing.");
@@ -159,7 +162,14 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.hasTablature = notation::hasTablature(*song, tracks);
         const auto staves = notation::selectTracks(*song, tracks, trackView(view));
         const auto start = std::chrono::steady_clock::now();
-        auto pages = cache.layout(song, staves, *font, pageOptions());
+        notation::PageLayoutOptions options = pageOptions();
+        if (continuous) {
+            options.height = 0.0;
+        }
+        auto pages = cache.layout(song, staves, *font, options);
+        if (continuous) {
+            pages = notation::cutIntoStrips(pages.front(), pageOptions().height);
+        }
         const auto elapsed = std::chrono::steady_clock::now() - start;
         result.milliseconds = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
@@ -173,7 +183,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
-ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice,
+ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, bool continuous,
                           notation::PageLayoutCache& cache) {
     ScoreLayout result;
     result.source = file;
@@ -193,7 +203,7 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice,
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
         auto sequence = std::make_shared<const audio::Sequence>(*song, practice);
-        result = layOut(std::move(song), 0, view, cache);
+        result = layOut(std::move(song), 0, view, continuous, cache);
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
@@ -507,6 +517,15 @@ QSizeF ScoreDocument::pageSize() const {
     return {pageOptions().width, pageOptions().height};
 }
 
+void ScoreDocument::setContinuous(bool continuous) {
+    if (continuous == continuous_) {
+        return;
+    }
+    continuous_ = continuous;
+    emit continuousChanged();
+    relayout();
+}
+
 double ScoreDocument::staffSpace() {
     return kStaffSpaceMm;
 }
@@ -530,9 +549,10 @@ void ScoreDocument::open(const QUrl& file) {
     errorMessage_.clear();
     emit statusChanged();
     setPending(+1);
-    whenDone(QtConcurrent::run([file, practice = practice_, cache = layoutCache_] {
-                 return openAndLayOut(file, practice, *cache);
-             }),
+    whenDone(QtConcurrent::run(
+                 [file, practice = practice_, continuous = continuous_, cache = layoutCache_] {
+                     return openAndLayOut(file, practice, continuous, *cache);
+                 }),
              this, [this, generation](const ScoreLayout& result) {
                  setPending(-1);
                  if (generation != generation_) {
@@ -552,9 +572,9 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    whenDone(QtConcurrent::run([song = song_, track = track_, view = view_, cache = layoutCache_] {
-                 return layOut(song, track, view, *cache);
-             }),
+    whenDone(QtConcurrent::run(
+                 [song = song_, track = track_, view = view_, continuous = continuous_,
+                  cache = layoutCache_] { return layOut(song, track, view, continuous, *cache); }),
              this, [this, generation](const ScoreLayout& result) {
                  setPending(-1);
                  if (generation != generation_) {
@@ -669,6 +689,15 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     }
     pages_ = layout.pages;
     pagesSong_ = layout.song;
+    showsStrips_ = layout.continuous;
+    pageTops_.clear();
+    pageTops_.reserve(static_cast<qsizetype>(pages_->size()) + 1);
+    double top = 0.0;
+    pageTops_.append(top);
+    for (const notation::DisplayList& page : *pages_) {
+        top += page.bottom - page.top;
+        pageTops_.append(top);
+    }
     hasTablature_ = layout.hasTablature;
     layoutMilliseconds_ = layout.milliseconds;
     emit layoutChanged();

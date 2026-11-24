@@ -3,9 +3,11 @@
 A free and open-source guitar tablature editor, score editor and (later) music
 studio for Windows, macOS and Linux.
 
-> **Status:** alpha, milestone 3. Elara opens Guitar Pro, MusicXML, MIDI and its
-> own files and shows them as notation, tablature or both, page by page; playback
-> and editing come next. See [docs/roadmap.md](docs/roadmap.md).
+> **Status:** alpha. Elara opens Guitar Pro, MusicXML, MIDI and its own files,
+> shows them as notation, tablature or both, page by page, and plays them with a
+> mixer; songs can be edited (tracks, measures, signatures, tuning, notes, effects
+> and dynamics), with keyboard entry in the app in progress. It has a tuner. See
+> [docs/roadmap.md](docs/roadmap.md).
 
 ## Highlights (planned for 1.0)
 
@@ -14,6 +16,13 @@ studio for Windows, macOS and Linux.
 - Opens Guitar Pro 3-8 files; imports and exports MusicXML and MIDI.
 - Realistic guitar articulations: bends, slides, legato, palm mute, harmonics.
 - Practice tools: metronome, A-B loop, speed trainer, tuner.
+
+## Trying it
+
+Every push to `main` builds a package for Windows (ZIP), macOS (disk image) and
+Linux (tarball), kept as artifacts of the `package` workflow's latest run on
+GitHub Actions. They are unsigned alpha builds: unpack and run `elara`, or the
+command-line `elara-cli` next to it (on macOS, inside `elara.app/Contents/MacOS`).
 
 ## Building
 
