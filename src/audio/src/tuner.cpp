@@ -88,9 +88,18 @@ void Tuner::reset() noexcept {
 }
 
 double Tuner::median() const {
+    // Insertion sort of at most kSmoothing values: on so short an array GCC's
+    // optimiser reports std::sort's unrolled steps as out of bounds.
     std::array<double, kSmoothing> sorted = recent_;
-    const auto end = sorted.begin() + static_cast<std::ptrdiff_t>(recentCount_);
-    std::sort(sorted.begin(), end);
+    const std::size_t count = std::min(recentCount_, sorted.size());
+    for (std::size_t i = 1; i < count; ++i) {
+        const double value = sorted[i];
+        std::size_t j = i;
+        for (; j > 0 && sorted[j - 1] > value; --j) {
+            sorted[j] = sorted[j - 1];
+        }
+        sorted[j] = value;
+    }
     const std::size_t middle = recentCount_ / 2;
     return recentCount_ % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0;
 }

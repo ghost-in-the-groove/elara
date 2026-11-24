@@ -26,8 +26,17 @@ endif()
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+include(GNUInstallDirs)
 include(ElaraWarnings)
 include(ElaraDependencies)
+
+# Where elara-cli and its fonts install (ADR-0048): inside the app bundle on
+# macOS, so the disk image holds one thing to drag; next to the app elsewhere.
+if(APPLE AND ELARA_BUILD_APP)
+  set(ELARA_INSTALL_TOOLS_DIR "elara.app/Contents/MacOS")
+else()
+  set(ELARA_INSTALL_TOOLS_DIR "${CMAKE_INSTALL_BINDIR}")
+endif()
 
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
@@ -44,3 +53,5 @@ if(ELARA_BUILD_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+include(ElaraPackaging)

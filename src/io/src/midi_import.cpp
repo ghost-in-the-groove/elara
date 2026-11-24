@@ -2,6 +2,7 @@
 // MIDI import (ADR-0009): Standard MIDI Files into the notation model.
 #include <elara/io/midi.hpp>
 
+#include "archive.hpp"
 #include "general_midi.hpp"
 #include "midi_shared.hpp"
 #include "parallel.hpp"
@@ -13,7 +14,6 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
-#include <fstream>
 #include <iterator>
 #include <map>
 #include <optional>
@@ -1280,13 +1280,11 @@ std::expected<ImportResult, FormatError> importMidi(std::span<const std::uint8_t
 
 std::expected<ImportResult, FormatError> importMidiFile(const std::filesystem::path& path,
                                                         const MidiOptions& options) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
+    const auto bytes = detail::readFile(path);
+    if (!bytes) {
         return std::unexpected(FormatError{std::format("cannot open {}", path.string())});
     }
-    const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(in),
-                                          std::istreambuf_iterator<char>()};
-    return importMidi(bytes, options);
+    return importMidi(*bytes, options);
 }
 
 } // namespace elara::io
