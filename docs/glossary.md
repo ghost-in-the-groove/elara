@@ -93,6 +93,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | bucle A-B | A-B loop | `Player::setLoop()` | Playback that reaches B goes on from A (ADR-0024) |
 | claqueta (cuenta previa) | count-in | `CountIn`, `Sequence::countInAt()` | One measure of beats before playback starts, at the tempo there (ADR-0024) |
 | afinador | tuner | `Tuner`, `PitchDetector`, `tunerReading()` | YIN pitch detection; the nearest note, its cents and the nearest open string (ADR-0028); smoothed readings from the audio input (ADR-0029) |
-| banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |
+| banco de sonidos | sound bank | `audio::SoundBank`, `builtinBank()`, `SoundFont` | Where the tracks get their sound: the built-in synthesizer, or a SoundFont (SF2, SF3; ADR-0043) |
+| sonido de pista | track sound | `audio::TrackSound` | One track's sound as it plays, made by a sound bank for its instrument (ADR-0043) |
+| preset (de SoundFont) | preset | `SoundFontPreset`, `SoundFont::presetFor()` | One sound of a SoundFont, by bank and program; bank 128 holds drum kits |
 | mezclador | mixer | `Mixer` | |
 | mezcla de pista | track mix | `TrackMix` | Volume (fader position 0..1), pan (-1..1), mute, solo; `Song::audible()` (ADR-0020) |

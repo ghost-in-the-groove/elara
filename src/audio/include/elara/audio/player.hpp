@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Real-time playback with the built-in synthesizer (ADR-0019).
+// Real-time playback (ADR-0019), through a sound bank (ADR-0043).
 #pragma once
 
 #include <elara/audio/audio_source.hpp>
@@ -7,7 +7,9 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
+#include <vector>
 
 namespace elara::core {
 class Song;
@@ -17,9 +19,11 @@ struct TrackMix;
 namespace elara::audio {
 
 class Sequence;
+class SoundBank;
 struct CountIn;
 
-/// Plays a sequence in real time through one built-in Synth per track.
+/// Plays a sequence in real time through one sound per track, from the
+/// built-in synthesizer or another sound bank (setSoundBank()).
 ///
 /// Two threads use a player. The control thread (the main thread) constructs
 /// it and calls load(), play(), pause(), seek() and tidy(); the audio thread
@@ -39,10 +43,17 @@ public:
 
     [[nodiscard]] double sampleRate() const noexcept { return sampleRate_; }
 
-    /// Prepares a song for playback (synths, events in frames) and hands it to
+    /// Prepares a song for playback (sounds, events in frames) and hands it to
     /// the audio thread, which takes it at its next render() and goes on from
-    /// the same position. Notes of the previous song stop at once.
+    /// the same position. Notes of the previous song stop at once. A track
+    /// whose instrument (kind and program) has not changed since the last
+    /// load keeps its sound, so reloading after an edit reads no samples.
     void load(const core::Song& song, const Sequence& sequence);
+
+    /// Where the tracks of the next load() get their sound; the built-in
+    /// synthesizer when null, as at first. The metronome and the count-in
+    /// always click on the built-in drums.
+    void setSoundBank(std::shared_ptr<const SoundBank> bank);
 
     /// Starts or resumes playback; from the start when it stopped at the end.
     void play() noexcept;
@@ -95,6 +106,7 @@ public:
     void render(std::span<float> left, std::span<float> right) noexcept override;
 
     struct Loaded;
+    struct KeptSound;
 
 private:
     void renderBlock(std::span<float> left, std::span<float> right) noexcept;
@@ -102,7 +114,9 @@ private:
 
     double sampleRate_;
     std::size_t maxBlockFrames_;
-    double duration_ = 0.0; // control thread
+    double duration_ = 0.0;                 // control thread
+    std::shared_ptr<const SoundBank> bank_; // control thread
+    std::vector<KeptSound> kept_;           // control thread: each track's sound
 
     Loaded* latest_ = nullptr;              // control thread: the song last loaded
     std::atomic<Loaded*> pending_{nullptr}; // control -> audio

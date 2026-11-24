@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-audio, play, render-tone, devices, tone, tune, listen.
+// Audio subcommands: sequence, render-audio, play, soundfont, render-tone, devices, tone,
+// tune, listen.
 #include <elara/audio/microphone_input.hpp>
 #include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/pitch_detector.hpp>
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
+#include <elara/audio/sound_font.hpp>
 #include <elara/audio/system_audio.hpp>
 #include <elara/audio/tone_generator.hpp>
 #include <elara/audio/tuner.hpp>
@@ -19,6 +21,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <format>
 #include <iostream>
 #include <memory>
@@ -300,12 +303,26 @@ int runSequence(bool json, const SequenceOptions& options) {
     return kExitOk;
 }
 
+// The sound bank of --soundfont: the built-in synthesizer when it is empty.
+std::expected<std::shared_ptr<const audio::SoundBank>, std::string>
+soundBankFrom(const std::string& soundFont) {
+    if (soundFont.empty()) {
+        return audio::builtinBank();
+    }
+    auto opened = audio::SoundFont::open(soundFont);
+    if (!opened) {
+        return std::unexpected(opened.error());
+    }
+    return std::shared_ptr<const audio::SoundBank>(*std::move(opened));
+}
+
 struct RenderAudioOptions {
     std::string file;
     std::string out;
     std::uint32_t sampleRate = 48000;
     double tail = 2.0;
     bool events = false;
+    std::string soundFont;
     PracticeOptions practice;
 };
 
@@ -314,11 +331,16 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     if (!song) {
         return fail(song.error());
     }
+    const auto bank = soundBankFrom(options.soundFont);
+    if (!bank) {
+        return fail(bank.error());
+    }
     const audio::Sequence sequence(*song, options.practice.sequence());
     audio::OfflineRenderer renderer(*song, sequence,
                                     {.sampleRate = static_cast<double>(options.sampleRate),
                                      .tail = options.tail,
-                                     .logEvents = true});
+                                     .logEvents = true,
+                                     .bank = *bank});
     std::optional<audio::WavFileWriter> writer;
     if (!options.out.empty()) {
         auto created = audio::WavFileWriter::create(
@@ -359,14 +381,17 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
 
     if (json) {
         std::string body = std::format(
-            R"({{"file":"{}","out":{},"sampleRate":{},"channels":2,"frames":{},"seconds":{},"peak":{:.4f},"rms":{:.4f},"tracks":[)",
+            R"({{"file":"{}","out":{},"soundFont":{},"sampleRate":{},"channels":2,"frames":{},"seconds":{},"peak":{:.4f},"rms":{:.4f},"tracks":[)",
             jsonEscape(options.file),
             options.out.empty() ? std::string("null") : '"' + jsonEscape(options.out) + '"',
+            options.soundFont.empty() ? std::string("null")
+                                      : '"' + jsonEscape(options.soundFont) + '"',
             options.sampleRate, frames, jsonNumber(seconds), peak, rms);
         for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
-            body += std::format(R"({}{{"track":{},"name":"{}","timbre":"{}"}})", t == 0 ? "" : ",",
-                                t, jsonEscape(song->track(t).name()),
-                                audio::timbreName(renderer.timbres()[t]));
+            body += std::format(R"({}{{"track":{},"name":"{}","timbre":"{}","sound":"{}"}})",
+                                t == 0 ? "" : ",", t, jsonEscape(song->track(t).name()),
+                                audio::timbreName(renderer.timbres()[t]),
+                                jsonEscape(renderer.sounds()[t]));
         }
         body += std::format(R"(],"eventCount":{})", log.size());
         if (options.events) {
@@ -385,9 +410,9 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     std::cout << std::format("rendered {:.3f} s ({} frames @ {} Hz, stereo), peak {:.4f}, "
                              "rms {:.4f}, {} events\n",
                              seconds, frames, options.sampleRate, peak, rms, log.size());
-    for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
+    for (std::size_t t = 0; t < renderer.sounds().size(); ++t) {
         std::cout << std::format("  track {} {}: {}\n", t + 1, song->track(t).name(),
-                                 audio::timbreName(renderer.timbres()[t]));
+                                 renderer.sounds()[t]);
     }
     if (options.practice.speed != 100) {
         std::cout << std::format("  at {} % speed\n", options.practice.speed);
@@ -415,6 +440,7 @@ struct PlayOptions {
     PracticeOptions practice;
     bool countIn = false;
     std::vector<double> loop; // from, to
+    std::string soundFont;
 };
 
 int runPlay(bool json, const PlayOptions& options) {
@@ -426,12 +452,17 @@ int runPlay(bool json, const PlayOptions& options) {
     if (!song) {
         return fail(song.error());
     }
+    const auto bank = soundBankFrom(options.soundFont);
+    if (!bank) {
+        return fail(bank.error());
+    }
     const audio::Sequence sequence(*song, options.practice.sequence());
     audio::SystemAudio system;
     if (auto opened = system.open(); !opened) {
         return fail(opened.error());
     }
     audio::Player player(system.sampleRate());
+    player.setSoundBank(*bank);
     player.load(*song, sequence);
     player.seek(options.from);
     const double from = player.position();
@@ -486,6 +517,33 @@ int runPlay(bool json, const PlayOptions& options) {
     }
     return finished ? kExitOk
                     : fail("playback did not finish; the audio callback may not be running");
+}
+
+struct SoundFontOptions {
+    std::string file;
+};
+
+int runSoundFont(bool json, const SoundFontOptions& options) {
+    const auto font = audio::SoundFont::open(options.file);
+    if (!font) {
+        return fail(font.error());
+    }
+    const auto& presets = (*font)->presets();
+    if (json) {
+        std::string body = std::format(R"({{"file":"{}","presetCount":{},"presets":[)",
+                                       jsonEscape(options.file), presets.size());
+        for (std::size_t i = 0; i < presets.size(); ++i) {
+            body += std::format(R"({}{{"bank":{},"program":{},"name":"{}"}})", i == 0 ? "" : ",",
+                                presets[i].bank, presets[i].program, jsonEscape(presets[i].name));
+        }
+        std::cout << body << "]}\n";
+        return kExitOk;
+    }
+    std::cout << std::format("{}: {} presets\n", options.file, presets.size());
+    for (const audio::SoundFontPreset& preset : presets) {
+        std::cout << std::format("  {:3}:{:3}  {}\n", preset.bank, preset.program, preset.name);
+    }
+    return kExitOk;
 }
 
 struct TuneOptions {
@@ -689,8 +747,9 @@ void addAudioCommands(CLI::App& app, Context& context) {
 
     auto rendering = std::make_shared<RenderAudioOptions>();
     auto* renderAudio = app.add_subcommand(
-        "render-audio", "Play a song through the built-in synthesizer offline, optionally into a "
-                        "16-bit stereo WAV file, and report its level and the events dispatched");
+        "render-audio", "Play a song offline through the built-in synthesizer or a SoundFont, "
+                        "optionally into a 16-bit stereo WAV file, and report its level and the "
+                        "events dispatched");
     renderAudio->add_option("file", rendering->file, "A .elara file or any file import reads")
         ->required();
     renderAudio->add_option("--out", rendering->out, "Output WAV path");
@@ -700,6 +759,8 @@ void addAudioCommands(CLI::App& app, Context& context) {
     renderAudio->add_option("--tail", rendering->tail, "Seconds rendered after the last measure")
         ->check(CLI::Range(0.0, 30.0))
         ->capture_default_str();
+    renderAudio->add_option("--soundfont", rendering->soundFont,
+                            "Play the tracks with this SoundFont (SF2 or SF3)");
     renderAudio->add_flag("--events", rendering->events,
                           "List the note events dispatched, with their sample frames");
     addPracticeOptions(*renderAudio, rendering->practice);
@@ -708,7 +769,8 @@ void addAudioCommands(CLI::App& app, Context& context) {
 
     auto playing = std::make_shared<PlayOptions>();
     auto* playCommand = app.add_subcommand(
-        "play", "Play a song through the built-in synthesizer on the default output device");
+        "play", "Play a song through the built-in synthesizer or a SoundFont on the default "
+                "output device");
     playCommand->add_option("file", playing->file, "A .elara file or any file import reads")
         ->required();
     playCommand->add_option("--from", playing->from, "Start this many seconds into the song")
@@ -719,11 +781,19 @@ void addAudioCommands(CLI::App& app, Context& context) {
     addPracticeOptions(*playCommand, playing->practice);
     playCommand->add_flag("--count-in", playing->countIn,
                           "Click one measure of beats before playback starts");
+    playCommand->add_option("--soundfont", playing->soundFont,
+                            "Play the tracks with this SoundFont (SF2 or SF3)");
     playCommand->add_option("--loop", playing->loop, "Loop from FROM to TO seconds")
         ->expected(2)
         ->type_name("FROM TO");
     playCommand->callback(
         [&context, playing] { context.exitCode = runPlay(context.json, *playing); });
+
+    auto font = std::make_shared<SoundFontOptions>();
+    auto* soundFont =
+        app.add_subcommand("soundfont", "List the presets of a SoundFont (SF2 or SF3)");
+    soundFont->add_option("file", font->file, "An .sf2 or .sf3 file")->required();
+    soundFont->callback([&context, font] { context.exitCode = runSoundFont(context.json, *font); });
 
     auto render = std::make_shared<RenderOptions>();
     auto* renderTone =

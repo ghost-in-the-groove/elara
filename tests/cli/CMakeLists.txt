@@ -927,7 +927,7 @@ add_test(NAME cli.render_audio_events
   COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/musicxml/melody.musicxml"
           --out "${_melody_wav}" --events)
 set_tests_properties(cli.render_audio_events PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"sampleRate\":48000,\"channels\":2,\"frames\":499200,\"seconds\":10\\.4,\"peak\":0\\.[0-9]*[1-9][0-9]*,\"rms\":0\\.[0-9]+,\"tracks\":\\[{\"track\":0,\"name\":\"Flute\",\"timbre\":\"wind\"}\\],\"eventCount\":20,\"events\":\\[{\"frame\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"frame\":28800,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"frame\":28800,\"kind\":\"on\",\"track\":0,\"key\":62,"
+  PASS_REGULAR_EXPRESSION "\"sampleRate\":48000,\"channels\":2,\"frames\":499200,\"seconds\":10\\.4,\"peak\":0\\.[0-9]*[1-9][0-9]*,\"rms\":0\\.[0-9]+,\"tracks\":\\[{\"track\":0,\"name\":\"Flute\",\"timbre\":\"wind\",\"sound\":\"wind\"}\\],\"eventCount\":20,\"events\":\\[{\"frame\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"frame\":28800,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"frame\":28800,\"kind\":\"on\",\"track\":0,\"key\":62,"
   FIXTURES_SETUP melody_wav)
 # 44-byte header + 499200 stereo 16-bit frames.
 add_test(NAME cli.render_audio_file
@@ -941,6 +941,32 @@ set_tests_properties(cli.render_audio_band PROPERTIES
 add_test(NAME cli.render_audio_rejects_missing_file
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# SoundFonts (ADR-0043), with a test font of six presets that all play one sine
+# wave: band.gp's bass, piano and drums find their General MIDI presets; its
+# clarinet (program 71) has no reed in the font and plays its first program.
+set(_test_font "${CMAKE_CURRENT_BINARY_DIR}/test-soundfont.sf2")
+add_test(NAME cli.soundfont_write COMMAND elara_make_test_soundfont "${_test_font}")
+set_tests_properties(cli.soundfont_write PROPERTIES FIXTURES_SETUP cli_soundfont)
+add_test(NAME cli.soundfont COMMAND elara-cli --json soundfont "${_test_font}")
+set_tests_properties(cli.soundfont PROPERTIES
+  FIXTURES_REQUIRED cli_soundfont
+  PASS_REGULAR_EXPRESSION "\"presetCount\":6,\"presets\":\\[{\"bank\":0,\"program\":0,\"name\":\"Test Piano\"},{\"bank\":0,\"program\":25,\"name\":\"Test Guitar\"},.*{\"bank\":128,\"program\":0,\"name\":\"Test Kit\"}\\]}")
+add_test(NAME cli.soundfont_text COMMAND elara-cli soundfont "${_test_font}")
+set_tests_properties(cli.soundfont_text PROPERTIES
+  FIXTURES_REQUIRED cli_soundfont
+  PASS_REGULAR_EXPRESSION ": 6 presets\n    0:  0  Test Piano\n    0: 25  Test Guitar\n")
+add_test(NAME cli.soundfont_rejects_other_files
+  COMMAND elara-cli soundfont "${ELARA_CORPUS}/gp/band.gp")
+set_tests_properties(cli.soundfont_rejects_other_files PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.render_audio_soundfont
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --tail 0
+          --soundfont "${_test_font}")
+set_tests_properties(cli.render_audio_soundfont PROPERTIES
+  FIXTURES_REQUIRED cli_soundfont
+  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
+add_test(NAME cli.render_audio_rejects_missing_soundfont
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --soundfont missing.sf2)
+set_tests_properties(cli.render_audio_rejects_missing_soundfont PROPERTIES WILL_FAIL TRUE)
 # Playing needs an output device, which CI does not have; a missing file fails
 # before the device is opened.
 add_test(NAME cli.play_rejects_missing_file

@@ -18,21 +18,26 @@ INCLUDE = re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]')
 
 QT = re.compile(r"^(Q[A-Za-z]|Qt[A-Za-z]*/|qqml)")
 JUCE = re.compile(r"^juce_")
+FLUID = re.compile(r"^fluidsynth")
 
 # (path prefix relative to src/, allowed Elara modules, forbidden third-party patterns)
 # The first matching prefix wins, so list sub-directories before their parents.
 RULES: list[tuple[str, set[str], list[tuple[str, re.Pattern[str]]]]] = [
     ("audio/backend_juce/", {"core", "audio"}, [("Qt", QT)]),
+    ("audio/backend_fluid/", {"core", "audio"}, [("Qt", QT), ("JUCE", JUCE)]),
     ("core/", set(), [("Qt", QT), ("JUCE", JUCE)]),
-    ("audio/", {"core"}, [("Qt", QT), ("JUCE", JUCE)]),
+    ("audio/", {"core"}, [("Qt", QT), ("JUCE", JUCE), ("FluidSynth", FLUID)]),
     ("io/", {"core"}, [("Qt", QT), ("JUCE", JUCE)]),
     ("notation/", {"core"}, [("Qt", QT), ("JUCE", JUCE)]),
-    ("cli/", {"core", "audio", "io", "notation"}, [("Qt", QT), ("JUCE", JUCE)]),
-    ("app/", {"core", "audio", "io", "notation"}, [("JUCE", JUCE)]),
+    ("cli/", {"core", "audio", "io", "notation"}, [("Qt", QT), ("JUCE", JUCE), ("FluidSynth", FLUID)]),
+    ("app/", {"core", "audio", "io", "notation"}, [("JUCE", JUCE), ("FluidSynth", FLUID)]),
 ]
 
-# Public headers of elara_audio_juce must stay JUCE-free even though its sources use JUCE.
-PUBLIC_HEADER_EXTRA = {"audio/backend_juce/include/": [("JUCE", JUCE)]}
+# Public headers of the backends stay free of the library their sources use.
+PUBLIC_HEADER_EXTRA = {
+    "audio/backend_juce/include/": [("JUCE", JUCE)],
+    "audio/backend_fluid/include/": [("FluidSynth", FLUID)],
+}
 
 
 def module_of(include: str) -> str | None:
