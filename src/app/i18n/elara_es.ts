@@ -212,10 +212,6 @@
             <numerusform>%n compases</numerusform>
         </translation>
     </message>
-    <message>
-        <source>Laid out in %1 ms</source>
-        <translation>Maquetada en %1 ms</translation>
-    </message>
 </context>
 <context>
     <name>MeasurePopup</name>
