@@ -56,6 +56,7 @@ private:
     void queuePitches();
     void queueVoices();
     void queueDrums();
+    void queueSelection();
     void queueMix();
     void queueNavigation();
     void queueTuning();
@@ -103,6 +104,9 @@ private:
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
     bool voicing_ = false;        ///< whether the voice steps run
     bool drumming_ = false;       ///< whether the drum steps run
+    bool selecting_ = false;      ///< whether the selection steps run
+    int lengthBefore_ = 0;        ///< the song's length before pasting
+    int pasteAt_ = 0;             ///< the measure pasted at
 };
 
 } // namespace elara::app
