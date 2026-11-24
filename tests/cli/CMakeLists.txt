@@ -357,6 +357,30 @@ add_test(NAME cli.edit_rejects_unknown_tremolo
 set_tests_properties(cli.edit_rejects_unknown_strum cli.edit_rejects_unknown_tremolo
   PROPERTIES WILL_FAIL TRUE)
 
+# Kinds of note effects at the caret (ADR-0058): fret 12 gets an artificial
+# harmonic, wide vibrato, a marcato and slides in from below and out downwards;
+# fret 7 a natural harmonic, then a pinch harmonic that undo takes back.
+set(ELARA_CLI_EFFECT_KINDS "${CMAKE_CURRENT_BINARY_DIR}/cli-effect-kinds.elara")
+add_test(NAME cli.edit_sets_effect_kinds
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_EFFECT_KINDS}" "add-track electric-guitar"
+    "append-measures 1" "fret 12" "harmonic artificial" "vibrato wide" "accent marcato"
+    "slide-in from-below" "slide-out downwards" right "fret 7" "harmonic natural"
+    "harmonic pinch" undo)
+set_tests_properties(cli.edit_sets_effect_kinds PROPERTIES
+  FIXTURES_SETUP cli_effect_kinds
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":10,\"next\":\"Change harmonic\"}")
+add_test(NAME cli.dump_effect_kinds COMMAND elara-cli --json dump "${ELARA_CLI_EFFECT_KINDS}")
+set_tests_properties(cli.dump_effect_kinds PROPERTIES
+  FIXTURES_REQUIRED cli_effect_kinds
+  PASS_REGULAR_EXPRESSION "\"string\":1,\"fret\":12,\"effects\":{\"harmonic\":{\"kind\":\"artificial\",\"fret\":12},\"slideIn\":\"from-below\",\"slideOut\":\"downwards\",\"vibrato\":\"wide\",\"accent\":\"marcato\"}}.*\"string\":1,\"fret\":7,\"effects\":{\"harmonic\":{\"kind\":\"natural\",\"fret\":7}}")
+add_test(NAME cli.edit_rejects_unknown_vibrato
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "vibrato huge")
+add_test(NAME cli.edit_rejects_natural_harmonic_off_node
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 6"
+    "harmonic natural")
+set_tests_properties(cli.edit_rejects_unknown_vibrato cli.edit_rejects_natural_harmonic_off_node
+  PROPERTIES WILL_FAIL TRUE)
+
 # Dynamics at the caret (ADR-0047): f from the second note holds to the end,
 # and a note typed after it is f too.
 set(ELARA_CLI_DYNAMICS "${CMAKE_CURRENT_BINARY_DIR}/cli-dynamics.elara")

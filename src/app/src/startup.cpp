@@ -1074,7 +1074,34 @@ void Startup::queueEffects() {
         score_->setStrum(0);
         check(score_->caretStrum() == 0 && score_->caretTremolo() == 16,
               "the strum did not go on its own");
-        for (int i = 0; i < 16 && score_->modified() && score_->canUndo(); ++i) {
+        // Kinds of note effects (ADR-0058).
+        score_->setVibrato(static_cast<int>(core::Vibrato::Wide));
+        score_->setAccent(static_cast<int>(core::Accent::Marcato));
+        check(score_->undoName() == ScoreDocument::tr("Change accent"),
+              "the accent's kind is not undoable");
+        score_->setSlideIn(static_cast<int>(core::SlideIn::FromBelow));
+        score_->setSlideOut(static_cast<int>(core::SlideOut::Downwards));
+        check(score_->caretVibrato() == static_cast<int>(core::Vibrato::Wide) &&
+                  score_->caretAccent() == static_cast<int>(core::Accent::Marcato) &&
+                  score_->caretSlideIn() == static_cast<int>(core::SlideIn::FromBelow) &&
+                  score_->caretSlideOut() == static_cast<int>(core::SlideOut::Downwards),
+              "the kinds of effects did not go on");
+        check(score_->undoName() == ScoreDocument::tr("Change slide"),
+              "the slides are not undoable");
+        const QString status = score_->caretStatus();
+        check(status.contains(ScoreDocument::tr("Wide vibrato")) &&
+                  status.contains(ScoreDocument::tr("Marcato")) &&
+                  status.contains(score_->slideInName(1)) &&
+                  status.contains(score_->slideOutName(3)),
+              "the status does not name the kinds of effects");
+        if (score_->caretFretted()) {
+            constexpr int kArtificial = static_cast<int>(core::HarmonicKind::Artificial);
+            score_->setHarmonic(kArtificial);
+            check(score_->caretHarmonic() == kArtificial &&
+                      score_->caretStatus().contains(score_->harmonicName(kArtificial)),
+                  "the artificial harmonic did not go on");
+        }
+        for (int i = 0; i < 24 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;
