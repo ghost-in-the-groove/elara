@@ -2,8 +2,8 @@
 // What the window shows before a score is open.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
+import Elara.App
 
 Item {
     id: root
@@ -46,19 +46,15 @@ Item {
             }
         }
 
-        MusicSymbol {
+        // The logo, with the frets on its strings.
+        Logo {
             Layout.alignment: Qt.AlignHCenter
-            Layout.bottomMargin: 8
-            symbol: "\uE050" // G clef
-            size: 96
-            color: Material.accent
-        }
-
-        Label {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Elara"
-            font.pixelSize: 44
-            font.weight: Font.DemiBold
+            Layout.preferredHeight: 170
+            Layout.preferredWidth: 170 * aspect
+            Layout.bottomMargin: 6
+            color: Theme.ink
+            stringColor: Theme.accentInk
+            ground: Theme.desk
         }
 
         Label {
@@ -111,8 +107,7 @@ Item {
                     width: chip.implicitWidth + 24
                     height: 26
                     radius: 13
-                    color: "transparent"
-                    border.color: Qt.alpha(Material.foreground, 0.2)
+                    color: Theme.hover
 
                     Label {
                         id: chip
