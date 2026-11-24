@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import os
 import platform
 import re
@@ -516,10 +517,87 @@ def _smoke_test_install(stage: Path) -> int:
     return 0
 
 
+APP_ID = "io.github.ghost_in_the_groove.Elara"
+
+
+def _write_checksum(package: Path) -> None:
+    """Writes `package`.sha256 the way CPack does for its packages."""
+    digest = hashlib.sha256(package.read_bytes()).hexdigest()
+    package.with_name(package.name + ".sha256").write_text(f"{digest}  {package.name}\n")
+
+
+def _smoke_test_msi(out: Path, required: bool) -> int:
+    """Unpacks the MSI package CPack made in `out` with an administrative
+    install (the files, nothing registered) and smoke-tests that tree
+    (ADR-0065)."""
+    packages = sorted(out.glob("Elara-*.msi"))
+    if not packages:
+        log("no MSI installer (the WiX Toolset 3 was not found)")
+        return 1 if required else 0
+    target = out / "msi"
+    shutil.rmtree(target, ignore_errors=True)
+    if (code := run(["msiexec", "/a", str(packages[-1]), "/qn", f"TARGETDIR={target}",
+                     "/l*v", str(out / "msi.log")])) != 0:
+        log(f"the MSI installer did not install (exit code {code}); see {out / 'msi.log'}")
+        return code
+    apps = list(target.rglob(f"elara{EXE}"))
+    if len(apps) != 1:
+        log(f"the MSI installer holds {len(apps)} copies of the app, not one")
+        return 1
+    return _smoke_test_install(apps[0].parent.parent)
+
+
+def _make_appimage(stage: Path, out: Path, required: bool) -> int:
+    """Makes the Linux AppImage from the install tree with appimagetool (the
+    APPIMAGETOOL variable or PATH), next to CPack's tarball, and runs the app's
+    smoke test through it (ADR-0065)."""
+    tool = os.environ.get("APPIMAGETOOL") or shutil.which("appimagetool")
+    if not tool:
+        log("no AppImage (appimagetool was not found)")
+        return 1 if required else 0
+    tarballs = sorted(out.glob("Elara-*.tar.gz"))
+    if not tarballs:
+        log("no tarball to name the AppImage after")
+        return 1
+    appimage = out / (tarballs[-1].name.removesuffix(".tar.gz") + ".AppImage")
+    appdir = out / "Elara.AppDir"
+    shutil.rmtree(appdir, ignore_errors=True)
+    shutil.copytree(stage, appdir / "usr", symlinks=True)
+    shutil.copy2(appdir / "usr" / "share" / "applications" / f"{APP_ID}.desktop", appdir)
+    shutil.copy2(appdir / "usr" / "share" / "icons" / "hicolor" / "256x256" / "apps" /
+                 f"{APP_ID}.png", appdir)
+    (appdir / ".DirIcon").symlink_to(f"{APP_ID}.png")
+    (appdir / "AppRun").symlink_to("usr/bin/elara")
+    env = dict(build_env())
+    env["ARCH"] = platform.machine()
+    # appimagetool is an AppImage itself, and CI machines have no FUSE.
+    env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+    appimage.unlink(missing_ok=True)
+    if (code := run([tool, "--no-appstream", str(appdir), str(appimage)], env=env)) != 0:
+        return code
+    _write_checksum(appimage)
+
+    log(f"smoke: {appimage.name} --smoke-test")
+    env = _without_qt_on_path(build_env())
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+    result = subprocess.run([str(appimage), "--smoke-test"], cwd=out, env=env, check=False,
+                            capture_output=True, text=True, encoding="utf-8", errors="replace",
+                            timeout=120)
+    if result.returncode != 0:
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
+        log(f"smoke test of the AppImage failed (exit code {result.returncode})")
+        return 1
+    log("smoke: the AppImage runs the app")
+    return 0
+
+
 def cmd_package(args: argparse.Namespace) -> int:
     """Builds the app and the CLI in the release preset, installs them into
     build/package/stage, smoke-tests that install and packs it with CPack
-    (ADR-0048)."""
+    (ADR-0048), then makes and smoke-tests the installers: the MSI package on
+    Windows, the AppImage on Linux (ADR-0065)."""
     preset = "release"
     if (code := ensure_configured(preset)) != 0:
         return code
@@ -532,7 +610,17 @@ def cmd_package(args: argparse.Namespace) -> int:
         return code
     if not args.no_smoke_test and (code := _smoke_test_install(stage)) != 0:
         return code
-    return run(["cpack", "--config", str(build_dir(preset) / "CPackConfig.cmake"), "-B", str(out)])
+    for old in out.glob("Elara-*"):
+        if old.is_file():
+            old.unlink()
+    if (code := run(["cpack", "--config", str(build_dir(preset) / "CPackConfig.cmake"),
+                     "-B", str(out)])) != 0:
+        return code
+    if IS_WINDOWS and not args.no_smoke_test:
+        return _smoke_test_msi(out, args.installers)
+    if not IS_WINDOWS and not IS_MAC:
+        return _make_appimage(stage, out, args.installers)
+    return 0
 
 
 def cmd_translations(args: argparse.Namespace) -> int:
@@ -608,9 +696,12 @@ def main() -> int:
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)
-    add("package", cmd_package, "build, smoke-test and pack the app (release preset)",
-        preset=False).add_argument("--no-smoke-test", action="store_true",
-                                   help="pack without running what was installed")
+    package = add("package", cmd_package, "build, smoke-test and pack the app (release preset)",
+        preset=False)
+    package.add_argument("--no-smoke-test", action="store_true",
+                         help="pack without running what was installed")
+    package.add_argument("--installers", action="store_true",
+                         help="fail when an installer cannot be made (MSI, AppImage)")
 
     args = parser.parse_args()
     return args.func(args)
