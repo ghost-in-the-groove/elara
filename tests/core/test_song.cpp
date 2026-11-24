@@ -6,6 +6,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 using elara::core::Beat;
 using elara::core::Clef;
@@ -114,6 +115,40 @@ TEST_CASE("Inserting and removing measures moves content in all staves", "[core]
     CHECK_THROWS_AS(song.insertMeasures(3), std::out_of_range);
     CHECK_THROWS_AS(song.removeMeasures(1, 2), std::out_of_range);
     CHECK_THROWS_AS(song.track(0).staff(0).measure(2), std::out_of_range);
+}
+
+TEST_CASE("A copy of a song shares its measures until either changes one", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("electric-guitar"));
+    song.appendMeasures(3);
+    const Beat marker{.duration = Duration(NoteValue::Whole), .notes = {Note{.pitch = Pitch{}}}};
+    song.track(0).staff(0).measure(1).voices[0].beats.push_back(marker);
+
+    Song copy = song;
+    const Staff& original = std::as_const(song).track(0).staff(0);
+    const Staff& copied = std::as_const(copy).track(0).staff(0);
+    // ADR-0051: copying a song copies no measure, so an edit's snapshot is cheap.
+    for (std::size_t m = 0; m < 3; ++m) {
+        CHECK(&copied.measure(m) == &original.measure(m));
+    }
+    CHECK(copy == song);
+
+    // A change to the copy leaves the song as it was, and the other way round.
+    copy.track(0).staff(0).measure(1).voices[0].beats.clear();
+    CHECK(original.measure(1).voices[0].beats.size() == 1);
+    song.track(0).staff(0).measure(2).voices[0].beats.push_back(marker);
+    CHECK(copied.measure(2).isEmpty());
+    CHECK(copy != song);
+    // What neither changed is still shared.
+    CHECK(&copied.measure(0) == &original.measure(0));
+
+    // Measures inserted together start as one empty measure, and filling one
+    // leaves the others empty.
+    song.insertMeasures(0, 3);
+    song.track(0).staff(0).measure(1).voices[0].beats.push_back(marker);
+    CHECK(original.measure(0).isEmpty());
+    CHECK_FALSE(original.measure(1).isEmpty());
+    CHECK(original.measure(2).isEmpty());
 }
 
 TEST_CASE("Removing a track keeps the others", "[core][song]") {

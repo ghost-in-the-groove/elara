@@ -78,6 +78,7 @@ void Startup::start() {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
             ++layouts_;
+            layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
     }
     clock_.start();
@@ -791,6 +792,9 @@ void Startup::tick() {
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
+        if (againSince_ < 0) {
+            ++stepsRun_;
+        }
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
@@ -965,6 +969,11 @@ void Startup::finish(bool ok, const QString& detail) {
         }
     }
     reportSmokeTest(ok, outcome);
+    // Which steps each layout followed, after the result the tests read: when
+    // the count of layouts they expect is off on one platform, this says where.
+    if (!layoutSteps_.isEmpty()) {
+        std::printf("layouts after steps:%s\n", qPrintable(layoutSteps_));
+    }
     QCoreApplication::exit(ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
