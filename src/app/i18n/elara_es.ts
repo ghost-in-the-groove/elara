@@ -272,6 +272,18 @@
         <translation>Cerrar</translation>
     </message>
     <message>
+        <source>Tempo</source>
+        <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>Beats per minute from this measure on</source>
+        <translation>Pulsos por minuto desde este compás</translation>
+    </message>
+    <message>
+        <source>Remove the tempo change</source>
+        <translation>Quitar el cambio de tempo</translation>
+    </message>
+    <message>
         <source>From this measure until the next change.</source>
         <translation>Desde este compás hasta el siguiente cambio.</translation>
     </message>

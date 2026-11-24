@@ -350,26 +350,18 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
             throw StepSyntaxError("tempo-from: the first measure plays at the song's tempo "
                                   "(\"tempo <bpm>\")");
         }
-        MeasureHeader header = song.measureHeader(measure);
-        // The tempo that starts the measure; changes later in it stay.
-        std::erase_if(header.tempoChanges, [](const core::TempoChange& change) {
-            return change.offset == core::Fraction{};
-        });
+        std::optional<double> bpm;
         if (step.word(2) != "none") {
-            const int bpm = step.number<int>(2);
-            if (static_cast<double>(bpm) < Tempo::kMinBpm ||
-                static_cast<double>(bpm) > Tempo::kMaxBpm) {
+            const int value = step.number<int>(2);
+            if (static_cast<double>(value) < Tempo::kMinBpm ||
+                static_cast<double>(value) > Tempo::kMaxBpm) {
                 throw StepSyntaxError(std::format("tempo-from: {} to {} beats per minute, not {}",
-                                                  Tempo::kMinBpm, Tempo::kMaxBpm, bpm));
+                                                  Tempo::kMinBpm, Tempo::kMaxBpm, value));
             }
-            // Counted in the beat the song counts in there: a dotted quarter
-            // in 6/8 stays one.
-            const Tempo tempo(bpm, song.tempoAt(measure, core::Fraction{}).beatUnit());
-            header.tempoChanges.insert(header.tempoChanges.begin(),
-                                       core::TempoChange{.offset = {}, .tempo = tempo});
+            bpm = value;
         }
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        if (auto change = core::changeTempo(song, measure, bpm)) {
+            doc.execute(std::move(change));
         }
     } else if (verb == "title") {
         SongInfo info = song.info();

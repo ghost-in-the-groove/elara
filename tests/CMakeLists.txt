@@ -39,6 +39,7 @@ elara_add_unit_tests(core
     core/test_performance.cpp
     core/test_retune.cpp
     core/test_transpose.cpp
+    core/test_parallel.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
@@ -78,7 +79,7 @@ elara_target_warnings(elara_benchmarks)
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
-    app/bench_score_painter.cpp)
+    app/test_when_done.cpp app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara::io Catch2::Catch2)
   target_compile_definitions(elara_app_tests PRIVATE
     ELARA_FONT_DIR="${ELARA_FONT_DIR}"
@@ -117,11 +118,11 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 37 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 39 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 47 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 49 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 43 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 45 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # A song of several pages: the notes typed on the first page leave the others

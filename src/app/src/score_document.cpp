@@ -14,6 +14,7 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
+#include "when_done.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
@@ -491,19 +492,19 @@ void ScoreDocument::open(const QUrl& file) {
     errorMessage_.clear();
     emit statusChanged();
     setPending(+1);
-    QtConcurrent::run([file, practice = practice_] {
-        return openAndLayOut(file, practice);
-    }).then(this, [this, generation](const ScoreLayout& result) {
-        setPending(-1);
-        if (generation != generation_) {
-            return;
-        }
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        apply(result);
-    });
+    whenDone(
+        QtConcurrent::run([file, practice = practice_] { return openAndLayOut(file, practice); }),
+        this, [this, generation](const ScoreLayout& result) {
+            setPending(-1);
+            if (generation != generation_) {
+                return;
+            }
+            if (!result.error.isEmpty()) {
+                fail(result.error);
+                return;
+            }
+            apply(result);
+        });
 }
 
 void ScoreDocument::relayout() {
@@ -512,19 +513,20 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    QtConcurrent::run([song = song_, track = track_, view = view_] {
-        return layOut(song, track, view);
-    }).then(this, [this, generation](const ScoreLayout& result) {
-        setPending(-1);
-        if (generation != generation_) {
-            return;
-        }
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        apply(result);
-    });
+    whenDone(QtConcurrent::run([song = song_, track = track_, view = view_] {
+                 return layOut(song, track, view);
+             }),
+             this, [this, generation](const ScoreLayout& result) {
+                 setPending(-1);
+                 if (generation != generation_) {
+                     return;
+                 }
+                 if (!result.error.isEmpty()) {
+                     fail(result.error);
+                     return;
+                 }
+                 apply(result);
+             });
     // An edit's sequence is built beside its layout, on another worker: the
     // pages show as soon as they are laid out instead of waiting for it.
     if (sequenceSong_ != song_ && sequencing_ != song_) {
@@ -539,32 +541,33 @@ void ScoreDocument::resequence() {
     const std::uint64_t generation = ++sequenceGeneration_;
     sequencing_ = song_;
     setPending(+1);
-    QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
-        SequenceResult result;
-        try {
-            result.sequence = sequenceFor(*song, heard, practice);
-        } catch (const std::exception& error) {
-            result.error = qstring(error.what());
-        }
-        return result;
-    }).then(this, [this, generation, song = song_](const SequenceResult& result) {
-        setPending(-1);
-        if (generation != sequenceGeneration_) {
-            return;
-        }
-        sequencing_.reset();
-        if (!result.error.isEmpty()) {
-            fail(result.error);
-            return;
-        }
-        // The song and its sequence change together, so whoever hears
-        // sequenceChanged sees them as a pair.
-        sequenceSong_ = song;
-        if (result.sequence != sequence_) {
-            sequence_ = result.sequence;
-            emit sequenceChanged();
-        }
-    });
+    whenDone(QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
+                 SequenceResult result;
+                 try {
+                     result.sequence = sequenceFor(*song, heard, practice);
+                 } catch (const std::exception& error) {
+                     result.error = qstring(error.what());
+                 }
+                 return result;
+             }),
+             this, [this, generation, song = song_](const SequenceResult& result) {
+                 setPending(-1);
+                 if (generation != sequenceGeneration_) {
+                     return;
+                 }
+                 sequencing_.reset();
+                 if (!result.error.isEmpty()) {
+                     fail(result.error);
+                     return;
+                 }
+                 // The song and its sequence change together, so whoever hears
+                 // sequenceChanged sees them as a pair.
+                 sequenceSong_ = song;
+                 if (result.sequence != sequence_) {
+                     sequence_ = result.sequence;
+                     emit sequenceChanged();
+                 }
+             });
 }
 
 std::shared_ptr<const notation::DisplayList> ScoreDocument::page(int index) const {
@@ -993,6 +996,60 @@ void ScoreDocument::setRepeats(int measure, const QVariantMap& repeats) {
     }
     if (header != document_->song().measureHeader(m)) {
         execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
+    }
+}
+
+namespace {
+int denominatorOf(core::NoteValue value);
+} // namespace
+
+QVariantMap ScoreDocument::tempoAt(int measure) const {
+    QVariantMap tempo;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return tempo;
+    }
+    const core::Song& song = document_->song();
+    const auto m = static_cast<std::size_t>(measure);
+    const core::Tempo inForce = song.tempoAt(m);
+    tempo.insert(QStringLiteral("bpm"), static_cast<int>(std::lround(inForce.bpm())));
+    tempo.insert(QStringLiteral("beat"), denominatorOf(inForce.beatUnit().value()));
+    tempo.insert(QStringLiteral("dotted"), inForce.beatUnit().dots() > 0);
+    tempo.insert(QStringLiteral("own"), std::ranges::any_of(song.measureHeader(m).tempoChanges,
+                                                            [](const core::TempoChange& change) {
+                                                                return change.offset ==
+                                                                       core::Fraction{};
+                                                            }));
+    tempo.insert(QStringLiteral("first"), measure == 0);
+    return tempo;
+}
+
+void ScoreDocument::setTempoFrom(int measure, int bpm) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const core::Song& song = document_->song();
+    const bool removing = bpm <= 0;
+    if (!removing && (bpm < static_cast<int>(core::Tempo::kMinBpm) ||
+                      bpm > static_cast<int>(core::Tempo::kMaxBpm))) {
+        return;
+    }
+    if (measure == 0) {
+        // The song's tempo, counted in the beat it already counts in; the
+        // first measure always has one.
+        if (removing) {
+            return;
+        }
+        const core::Tempo tempo(bpm, song.startTempo().beatUnit());
+        if (tempo != song.startTempo()) {
+            execute(std::make_unique<core::SetStartTempo>(tempo));
+        }
+        return;
+    }
+    const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
+    if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+        execute(std::move(change));
     }
 }
 
