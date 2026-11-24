@@ -65,6 +65,7 @@ private:
     void queueRepeats();
     void queueTuning();
     void queueTempo();
+    void queueSection();
     void queueEffects();
     void queueContinuous();
     void finish(bool ok, const QString& detail);
@@ -104,6 +105,7 @@ private:
     QVariantMap tuningBefore_;       ///< the first track's tuning before it changed
     QVariantMap repeatsBefore_;      ///< the first measure's repeats before queueRepeats()
     QVariantMap tempoBefore_;        ///< the second measure's tempo before it changed
+    QString sectionBefore_;          ///< the first measure's section before it changed
     QString editProblem_;            ///< the first edit check that failed
     QString failure_;                ///< set by a step that went wrong
     bool entering_ = false;          ///< whether the shown track takes frets

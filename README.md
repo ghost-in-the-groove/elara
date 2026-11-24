@@ -19,9 +19,10 @@ studio for Windows, macOS and Linux.
 
 ## Trying it
 
-Every push to `main` builds a package for Windows (ZIP), macOS (disk image) and
-Linux (tarball), kept as artifacts of the `package` workflow's latest run on
-GitHub Actions. They are unsigned alpha builds: unpack and run `elara`, or the
+Every push to `main` builds packages for Windows (an MSI installer and a ZIP
+archive), macOS (a disk image) and Linux (an AppImage and a tarball), kept as
+artifacts of the `package` workflow's latest run on GitHub Actions. They are
+unsigned alpha builds: install or unpack them and run `elara`, or the
 command-line `elara-cli` next to it (on macOS, inside `elara.app/Contents/MacOS`).
 
 ## Building
