@@ -28,6 +28,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
   - [x] Drawn in the score
+  - [x] Set from the measure popup in the app
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data
 - [x] Measure validation (voice fills its measure), rests auto-fill
@@ -84,14 +85,16 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
-  - [x] Note names at the caret on any pitched staff, chords, semitone moves
-        (ADR-0034)
+  - [x] Note names at the caret on any pitched staff, chords, semitone moves, in
+        the CLI and the app (ADR-0034)
   - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
   - [x] Dynamics at the caret, holding until the next change; new notes take
         the dynamic in force (ADR-0047)
+  - [x] Tuplets at the caret: a triplet button and menu in the entry bar,
+        Ctrl+2 to Ctrl+9 (ADR-0050)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)
@@ -101,6 +104,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
+  - [ ] Repeats and alternate endings at the caret's measure
+    - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
+          steps (ADR-0016)
 - [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools

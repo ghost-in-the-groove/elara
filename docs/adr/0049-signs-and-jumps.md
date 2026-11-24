@@ -80,6 +80,11 @@ Double Coda"), the jump last. They share one line per system; a text that
 would overlap another mark goes up to the first line where it fits, and the
 signs keep the lowest line.
 
+**In the app.** The measure popup sets them for the caret's measure: a chip for
+each sign, Fine, To Coda and To Double Coda, and two lists for the jump and how
+it ends. Each change is one undo step ("Change navigation marks"); clearing the
+jump also resets how it ends.
+
 ## Consequences
 
 - The sequencer, the playback cursor and offline rendering follow jumps without
