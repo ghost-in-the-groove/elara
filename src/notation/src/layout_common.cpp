@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "layout_common.hpp"
 
+#include <elara/core/song.hpp>
+
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -18,14 +21,20 @@ namespace elara::notation::detail {
 namespace {
 
 // Technique lanes, in staff spaces.
-constexpr double kLaneGap = 0.6;       // between the staff's ink and the first lane
-constexpr double kLaneTextSize = 0.95; // "P.M.", "let ring", harmonic labels
-constexpr double kLaneBaseline = 0.2;  // text baseline above the bottom of its lane
-constexpr double kRunDash = 0.3;       // dashes of the line after "P.M."
-constexpr double kRunHook = 0.4;       // the line's closing hook
-constexpr double kRunLineGap = 0.25;   // between the text and its line
-constexpr double kVibratoLift = 0.25;  // vibrato strokes above the bottom of their lane
-constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3};
+constexpr double kLaneGap = 0.6;        // between the staff's ink and the first lane
+constexpr double kLaneTextSize = 0.95;  // "P.M.", "let ring", harmonic labels
+constexpr double kLaneBaseline = 0.2;   // text baseline above the bottom of its lane
+constexpr double kLaneGlyphScale = 0.7; // strum arrows and tremolo slashes in their lanes
+constexpr double kRunDash = 0.3;        // dashes of the line after "P.M."
+constexpr double kRunHook = 0.4;        // the line's closing hook
+constexpr double kRunLineGap = 0.25;    // between the text and its line
+constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
+constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3, 1.9, 1.9};
+
+// Dynamics marks, in staff spaces (ADR-0044).
+constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
+constexpr double kDynamicInkGap = 0.5;   // at least between the ink above and the marks
+constexpr double kDynamicGap = 0.4;      // at least between neighbouring marks
 
 } // namespace
 
@@ -54,8 +63,8 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
     };
     for (const GlyphItem& item : list.glyphs) {
         const BoundingBox& box = font.metrics(item.glyph).box;
-        cover(item.origin.y - box.northEast.y);
-        cover(item.origin.y - box.southWest.y);
+        cover(item.origin.y - box.northEast.y * item.scale);
+        cover(item.origin.y - box.southWest.y * item.scale);
     }
     for (const LineItem& item : list.lines) {
         cover(item.from.y);
@@ -169,6 +178,193 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.polygons, from.polygons);
 }
 
+void appendShifted(DisplayList& to, const DisplayList& from, double dx, double dy) {
+    // Like shift(), nothing is added when nothing moves.
+    const bool still = dx == 0.0 && dy == 0.0;
+    const auto copy = [still](auto& into, const auto& items, auto&& move) {
+        if (still) {
+            into.insert(into.end(), items.begin(), items.end());
+            return;
+        }
+        for (const auto& item : items) {
+            move(into.emplace_back(item));
+        }
+    };
+    const auto point = [dx, dy](Point& at) {
+        at.x += dx;
+        at.y += dy;
+    };
+    copy(to.systems, from.systems, [dx, dy](SystemBox& system) {
+        system.x += dx;
+        system.y += dy;
+        system.top += dy;
+        system.bottom += dy;
+    });
+    copy(to.staves, from.staves, [dx, dy](StaffBox& staff) {
+        staff.x += dx;
+        staff.y += dy;
+    });
+    copy(to.measures, from.measures, [dx, dy](MeasureBox& measure) {
+        measure.x += dx;
+        measure.y += dy;
+        for (MeasureOnset& onset : measure.onsets) {
+            onset.x += dx;
+        }
+    });
+    copy(to.columns, from.columns, [dx](ColumnBox& column) { column.x += dx; });
+    copy(to.glyphs, from.glyphs, [&point](GlyphItem& item) { point(item.origin); });
+    copy(to.lines, from.lines, [&point](LineItem& item) {
+        point(item.from);
+        point(item.to);
+    });
+    copy(to.beams, from.beams, [&point](BeamItem& item) {
+        point(item.left);
+        point(item.right);
+    });
+    copy(to.texts, from.texts, [&point](TextItem& item) { point(item.origin); });
+    copy(to.curves, from.curves, [&point](CurveItem& item) {
+        point(item.from);
+        point(item.control1);
+        point(item.control2);
+        point(item.to);
+    });
+    copy(to.polygons, from.polygons, [&point](PolygonItem& item) {
+        for (Point& at : item.points) {
+            point(at);
+        }
+    });
+}
+
+void reserveFor(DisplayList& to, std::span<const DisplayList* const> from) {
+    const auto room = [&](auto member) {
+        std::size_t size = (to.*member).size();
+        for (const DisplayList* list : from) {
+            size += (list->*member).size();
+        }
+        (to.*member).reserve(size);
+    };
+    room(&DisplayList::systems);
+    room(&DisplayList::staves);
+    room(&DisplayList::measures);
+    room(&DisplayList::columns);
+    room(&DisplayList::glyphs);
+    room(&DisplayList::lines);
+    room(&DisplayList::beams);
+    room(&DisplayList::texts);
+    room(&DisplayList::curves);
+    room(&DisplayList::polygons);
+}
+
+Glyph dynamicGlyph(core::Dynamic dynamic) noexcept {
+    switch (dynamic) {
+    case core::Dynamic::PPP:
+        return Glyph::DynamicPPP;
+    case core::Dynamic::PP:
+        return Glyph::DynamicPP;
+    case core::Dynamic::P:
+        return Glyph::DynamicPiano;
+    case core::Dynamic::MP:
+        return Glyph::DynamicMP;
+    case core::Dynamic::MF:
+        return Glyph::DynamicMF;
+    case core::Dynamic::F:
+        return Glyph::DynamicForte;
+    case core::Dynamic::FF:
+        return Glyph::DynamicFF;
+    case core::Dynamic::FFF:
+        return Glyph::DynamicFFF;
+    }
+    return Glyph::DynamicMF;
+}
+
+void addStruck(std::optional<core::Dynamic>& loudest, const core::Beat& beat) {
+    for (const core::Note& note : beat.notes) {
+        if (!note.effects.tiedFromPrevious && (!loudest || note.effects.dynamic > *loudest)) {
+            loudest = note.effects.dynamic;
+        }
+    }
+}
+
+core::Dynamic dynamicBefore(const core::Staff& staff, std::size_t m) {
+    while (m > 0) {
+        --m;
+        // The latest start in the measure with struck notes, over every voice.
+        std::optional<core::Fraction> latest;
+        std::optional<core::Dynamic> loudest;
+        for (const core::Voice& voice : staff.measure(m).voices) {
+            core::Fraction at;
+            for (const core::Beat& beat : voice.beats) {
+                std::optional<core::Dynamic> struck;
+                addStruck(struck, beat);
+                if (struck) {
+                    if (!latest || *latest < at) {
+                        latest = at;
+                        loudest = struck;
+                    } else if (*latest == at && *struck > *loudest) {
+                        loudest = struck;
+                    }
+                }
+                at += beat.duration.length();
+            }
+        }
+        if (loudest) {
+            return *loudest;
+        }
+    }
+    return core::Dynamic::MF;
+}
+
+void DynamicMarks::strike(core::Dynamic dynamic, double centre, std::size_t measure) {
+    if (!known_) {
+        current_ = staff_ != nullptr ? dynamicBefore(*staff_, first_) : core::Dynamic::MF;
+        known_ = true;
+    }
+    if (dynamic != current_) {
+        marks_.push_back(Mark{.dynamic = dynamic, .centre = centre, .measure = measure});
+        current_ = dynamic;
+    }
+}
+
+void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, double end) {
+    if (marks_.empty()) {
+        return;
+    }
+    double ascent = 0.0;
+    for (const Mark& mark : marks_) {
+        ascent = std::max(ascent, font_.metrics(dynamicGlyph(mark.dynamic)).box.northEast.y);
+    }
+    const double baseline =
+        std::max(staffHeight + kDynamicBaseline, bottom + kDynamicInkGap + ascent);
+    // Centred by eye under their notes, moved right off the mark before...
+    origins_.clear();
+    double right = -std::numeric_limits<double>::infinity();
+    for (const Mark& mark : marks_) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(mark.dynamic)).box;
+        const double middle = font_.metrics(dynamicGlyph(mark.dynamic))
+                                  .anchor(Anchor::OpticalCenter)
+                                  .value_or(Point{.x = (box.southWest.x + box.northEast.x) / 2})
+                                  .x;
+        const double x = std::max(mark.centre - middle, right + kDynamicGap - box.southWest.x);
+        origins_.push_back(x);
+        right = x + box.northEast.x;
+    }
+    // ...and left, off the end of the line and the mark after; never off the
+    // start of the line, overlapping when there is no room at all.
+    double limit = end;
+    for (std::size_t i = marks_.size(); i-- > 0;) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(marks_[i].dynamic)).box;
+        origins_[i] = std::max(std::min(origins_[i], limit - box.northEast.x), -box.southWest.x);
+        limit = origins_[i] + box.southWest.x - kDynamicGap;
+    }
+    for (std::size_t i = 0; i < marks_.size(); ++i) {
+        list.glyphs.push_back(GlyphItem{.glyph = dynamicGlyph(marks_[i].dynamic),
+                                        .origin = {origins_[i], baseline},
+                                        .role = Role::Dynamic,
+                                        .measure = marks_[i].measure});
+    }
+    marks_.clear();
+}
+
 std::string bendLabel(int cents) {
     const int quarters = static_cast<int>(std::lround(cents / 50.0));
     if (quarters <= 0) {
@@ -188,9 +384,28 @@ std::string bendLabel(int cents) {
     return label;
 }
 
+namespace {
+
+// Slashes of tremolo picking at `speed`: one per beam of the repeated notes.
+int tremoloStrokes(core::NoteValue speed) {
+    if (speed >= core::NoteValue::ThirtySecond) {
+        return 3;
+    }
+    return speed == core::NoteValue::Sixteenth ? 2 : 1;
+}
+
+} // namespace
+
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat) {
     if (beat.effects.pickStroke != core::PickStroke::None) {
         marks.pickStroke = beat.effects.pickStroke;
+    }
+    if (beat.effects.strum != core::Strum::None) {
+        marks.strum = beat.effects.strum;
+    }
+    if (beat.effects.tremoloPicking) {
+        marks.tremoloStrokes =
+            std::max(marks.tremoloStrokes, tremoloStrokes(*beat.effects.tremoloPicking));
     }
     for (const core::Note& note : beat.notes) {
         const core::NoteEffects& effects = note.effects;
@@ -218,16 +433,22 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
     extend(Lane::Vibrato, marks.vibrato != core::Vibrato::None, centre, end, measure,
            marks.vibrato);
     if (marks.pickStroke != core::PickStroke::None) {
-        const Glyph bow = marks.pickStroke == core::PickStroke::Down ? Glyph::StringsDownBow
-                                                                     : Glyph::StringsUpBow;
-        const BoundingBox& box = font_.metrics(bow).box;
-        items(Lane::PickStroke)
-            .glyphs.push_back(GlyphItem{.glyph = bow,
-                                        .origin = {centre - (box.southWest.x + box.northEast.x) / 2,
-                                                   -kLaneBaseline + box.southWest.y},
-                                        .role = Role::Technique,
-                                        .measure = measure});
-        use(Lane::PickStroke);
+        mark(Lane::PickStroke,
+             marks.pickStroke == core::PickStroke::Down ? Glyph::StringsDownBow
+                                                        : Glyph::StringsUpBow,
+             centre, measure);
+    }
+    // A strum is an arrow the way the pick goes, as strumming patterns write it.
+    if (marks.strum != core::Strum::None) {
+        mark(Lane::Strum,
+             marks.strum == core::Strum::Down ? Glyph::ArrowBlackDown : Glyph::ArrowBlackUp, centre,
+             measure, kLaneGlyphScale);
+    }
+    if (marks.tremoloStrokes > 0) {
+        constexpr std::array kSlashes{Glyph::Tremolo1, Glyph::Tremolo2, Glyph::Tremolo3};
+        mark(Lane::Tremolo,
+             kSlashes.at(static_cast<std::size_t>(std::min(marks.tremoloStrokes, 3) - 1)), centre,
+             measure, kLaneGlyphScale);
     }
     const char* label = nullptr;
     switch (marks.harmonic) {
@@ -257,6 +478,19 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
         items(Lane::Harmonic).texts.push_back(std::move(item));
         use(Lane::Harmonic);
     }
+}
+
+void TechniqueLanes::mark(Lane lane, Glyph glyph, double centre, std::size_t measure,
+                          double scale) {
+    const BoundingBox& box = font_.metrics(glyph).box;
+    items(lane).glyphs.push_back(
+        GlyphItem{.glyph = glyph,
+                  .origin = {centre - (box.southWest.x + box.northEast.x) * scale / 2,
+                             -kLaneBaseline + box.southWest.y * scale},
+                  .role = Role::Technique,
+                  .measure = measure,
+                  .scale = scale});
+    use(lane);
 }
 
 void TechniqueLanes::extend(Lane lane, bool active, double centre, double end, std::size_t measure,
@@ -494,6 +728,10 @@ double StaffWriter::timeSignature(const core::TimeSignature& time, double x, dou
 
 double StaffWriter::inkTop() const {
     return inkExtents(list_, font_, height_).top;
+}
+
+double StaffWriter::inkBottom() const {
+    return inkExtents(list_, font_, height_).bottom;
 }
 
 StaffWriter::TupletNumber StaffWriter::tupletNumber(int count) const {

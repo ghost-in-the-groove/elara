@@ -8,6 +8,7 @@
 
 #include "archive.hpp"
 #include "general_midi.hpp"
+#include "gp_directions.hpp"
 #include "gpx_container.hpp"
 #include "guitar_pro_binary.hpp"
 #include "midi_shared.hpp"
@@ -1090,6 +1091,7 @@ private:
             song.measureHeader(m).timeSignature = time;
             song.measureHeader(m).keySignature = key;
             readRepeats(bar, song.measureHeader(m), m);
+            readDirections(bar, song.measureHeader(m), m);
             warnMasterBar(bar, m);
         }
     }
@@ -1116,15 +1118,30 @@ private:
         }
     }
 
+    // <Directions><Target>Segno</Target><Jump>DaCoda</Jump></Directions>: the
+    // signs on the bar and the jumps at its end.
+    void readDirections(pugi::xml_node bar, MeasureHeader& header, std::size_t m) {
+        for (const pugi::xml_node item : bar.child("Directions").children()) {
+            const std::string_view kind = item.name();
+            const auto found = std::ranges::find(detail::kGpDirectionNames, textOf(item));
+            const auto index = static_cast<std::size_t>(found - detail::kGpDirectionNames.begin());
+            const bool known = found != detail::kGpDirectionNames.end() &&
+                               (kind == "Target") == (index < detail::kGpSigns) &&
+                               (kind == "Target" || kind == "Jump");
+            if (!known) {
+                warnings_.add({}, "unknown signs and jumps dropped", m);
+            } else if (!detail::applyDirection(header, static_cast<detail::GpDirection>(index))) {
+                warnings_.add({}, "two jumps in one measure: the last one kept", m);
+            }
+        }
+    }
+
     void warnMasterBar(pugi::xml_node bar, std::size_t m) {
         if (bar.child("Section")) {
             warnings_.add({}, "section marks dropped", m);
         }
         if (bar.child("Fermatas")) {
             warnings_.add({}, "fermatas dropped", m);
-        }
-        if (bar.child("Directions")) {
-            warnings_.add({}, "jumps (coda, segno) dropped", m);
         }
         if (const pugi::xml_node feel = bar.child("TripletFeel");
             feel && textOf(feel) != std::string_view("NoTripletFeel")) {
@@ -1394,9 +1411,13 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
         return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
+        // Unpacked once for both files: unpacking is most of what opening a
+        // compressed container costs.
+        std::optional<detail::GpxContainer> container;
         std::optional<std::string> score;
         try {
-            score = detail::gpxEntry(bytes, "score.gpif");
+            container.emplace(bytes);
+            score = container->entry("score.gpif");
         } catch (const FormatError& error) {
             return std::unexpected(error);
         }
@@ -1405,7 +1426,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
                 "Guitar Pro: no score.gpif in the container (not a Guitar Pro 6 file)"});
         }
         const std::string parts =
-            partsOf([bytes] { return detail::gpxEntry(bytes, "PartConfiguration"); });
+            partsOf([&container] { return container->entry("PartConfiguration"); });
         return importScore(*score, parts, options);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {

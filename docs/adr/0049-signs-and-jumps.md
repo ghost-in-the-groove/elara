@@ -57,9 +57,33 @@ dal-segno-segno|none> [al-fine|al-coda|al-double-coda]`, one undo step each
 ("Change navigation marks"); `dump` and `edit` report them per measure and
 `sequence` plays them.
 
-The importers and the notation follow in their own changes: Guitar Pro and
-MusicXML read and write the marks, and the score draws the signs above the
-system and the jump texts at the end of their measure.
+**In Guitar Pro and MusicXML.** Guitar Pro 5 lists the measure of each of its
+nineteen directions after the song header, and GPIF writes them as a master
+bar's `<Directions>` (`<Target>` for a sign, `<Jump>` for the others); each sets
+one field, Guitar Pro's "Da Coda" being "To Coda". MusicXML has no single
+element for them, so the reader takes what notation programs write: the
+`<sound>` attributes (`segno`, `coda`, `tocoda`, `fine`, `dacapo`, `dalsegno`),
+the `<segno/>` and `<coda/>` glyphs of a direction or a barline, and the usual
+texts ("D.S. al Coda", "Da Capo", "Fine", "To Coda"). A jump given only by its
+`<sound>` does not say how it ends: it is read al Coda when the song has a To
+Coda, else al Fine when it has a Fine. The writer puts the glyph or text with
+its `<sound>` in the first part and names the second signs `segno-segno` and
+`double-coda`; other readers only need a jump's name to match its sign's.
+
+**In the score.** The marks are drawn above the first staff, over the
+alternate-ending brackets and under the tempo marks (`Role::Navigation`):
+segno and coda glyphs from the music font at the start of their measure (two
+side by side for segno segno and double coda), and the texts that close a
+measure in italics, ending at its barline: "Fine", "To Coda", "To Double Coda"
+and the jump ("D.C.", "D.S.", "D.S.S.", with " al Fine", " al Coda" or " al
+Double Coda"), the jump last. They share one line per system; a text that
+would overlap another mark goes up to the first line where it fits, and the
+signs keep the lowest line.
+
+**In the app.** The measure popup sets them for the caret's measure: a chip for
+each sign, Fine, To Coda and To Double Coda, and two lists for the jump and how
+it ends. Each change is one undo step ("Change navigation marks"); clearing the
+jump also resets how it ends.
 
 ## Consequences
 

@@ -1,0 +1,26 @@
+{
+  "name": "fluidsynth",
+  "version": "2.6.2",
+  "description": "FluidSynth's SoundFont synthesizer as a library, without audio or MIDI drivers, with SF3 support through libsndfile.",
+  "homepage": "https://github.com/FluidSynth/fluidsynth",
+  "license": "LGPL-2.1-or-later",
+  "supports": "!(uwp | xbox)",
+  "dependencies": [
+    "gcem",
+    {
+      "name": "libsndfile",
+      "default-features": false,
+      "features": [
+        "external-libs"
+      ]
+    },
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

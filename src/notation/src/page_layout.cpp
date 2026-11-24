@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Line breaking, justification and pages (ADR-0014).
 #include <elara/core/parallel.hpp>
+#include <elara/core/song.hpp>
+#include <elara/core/tempo.hpp>
 #include <elara/notation/page_layout.hpp>
 
 #include "layout_common.hpp"
@@ -8,6 +10,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <limits>
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -29,6 +34,9 @@ constexpr double kSystemDistance = 6.0; // at least between the lines of neighbo
 constexpr double kSystemInkGap = 2.0;   // at least between their ink
 constexpr double kMaxSpread = 8.0;      // added at most between systems to fill a page
 constexpr std::size_t kParallelMeasures = 48;
+// Items copied into pages before filling them on several threads pays: one
+// track's 21 pages (40k items) copy faster than threads start.
+constexpr std::size_t kParallelItems = 200'000;
 
 constexpr double kTitleSize = 4.0;
 constexpr double kSubtitleSize = 2.4;
@@ -269,8 +277,17 @@ PageLayoutOptions pageOptions(const Paper& paper, double staffSpace, double marg
     return options;
 }
 
-std::vector<DisplayList> layoutPages(const core::Song& song, std::span<const StaffSelection> staves,
-                                     const EngravingFont& font, const PageLayoutOptions& options) {
+namespace {
+
+// The measures a page layout lays out: [first, last), on lines `width` wide.
+struct Span {
+    std::size_t first = 0;
+    std::size_t last = 0;
+    double width = 0.0;
+};
+
+Span checkedSpan(const core::Song& song, std::span<const StaffSelection> staves,
+                 const PageLayoutOptions& options) {
     if (staves.empty()) {
         throw std::invalid_argument("layoutPages: no staves");
     }
@@ -282,59 +299,70 @@ std::vector<DisplayList> layoutPages(const core::Song& song, std::span<const Sta
         throw std::invalid_argument("layoutPages: the margins leave no room");
     }
     const std::size_t first = options.firstMeasure;
-    const std::size_t last = first + std::min(options.measureCount, song.measureCount() - first);
-    const unsigned threads =
-        core::threadsFor(options.threads, last - first, kParallelMeasures, last - first);
+    return Span{.first = first,
+                .last = first + std::min(options.measureCount, song.measureCount() - first),
+                .width = width};
+}
 
-    const std::vector<MeasureWidth> widths =
-        detail::measureWidths(song, staves, font, first, last, threads);
-    const LineBreaker breaker(widths, width, detail::nameIndent(song, staves),
+unsigned threadsFor(const PageLayoutOptions& options, const Span& span) {
+    return core::threadsFor(options.threads, span.last - span.first, kParallelMeasures,
+                            span.last - span.first);
+}
+
+std::vector<Line> breakLines(const core::Song& song, std::span<const StaffSelection> staves,
+                             std::span<const MeasureWidth> widths, const Span& span,
+                             const PageLayoutOptions& options) {
+    const LineBreaker breaker(widths, span.width, detail::nameIndent(song, staves),
                               options.lastSystemFill);
-    const std::vector<Line> lines =
-        options.measuresPerSystem > 0 ? breaker.every(options.measuresPerSystem) : breaker.best();
+    return options.measuresPerSystem > 0 ? breaker.every(options.measuresPerSystem)
+                                         : breaker.best();
+}
 
-    // Every system on its own: they share nothing but the song.
-    std::vector<DisplayList> systems(lines.size());
-    core::forEachIndex(0, lines.size(),
-                       std::min<unsigned>(threads, static_cast<unsigned>(lines.size())),
-                       [&](std::size_t s) {
-                           systems[s] = detail::layoutLine(
-                               song, staves, font, first + lines[s].first, first + lines[s].last,
-                               {.stretch = lines[s].stretch, .numbered = s > 0, .named = s == 0});
-                       });
+// One system: the first carries the track names, the others the
+// number of their first measure.
+DisplayList layOutLine(const core::Song& song, std::span<const StaffSelection> staves,
+                       const EngravingFont& font, const Span& span, const Line& line) {
+    return detail::layoutLine(
+        song, staves, font, span.first + line.first, span.first + line.last,
+        {.stretch = line.stretch, .numbered = line.first > 0, .named = line.first == 0});
+}
 
+// The systems stacked into pages, with the credits and page numbers. The
+// systems are copied, so they can be kept; the pages are filled on `threads`.
+std::vector<DisplayList> stackPages(const core::Song& song,
+                                    std::span<const DisplayList* const> systems, std::size_t first,
+                                    const PageLayoutOptions& options, unsigned threads) {
     // Systems stacked from the top margin down; a full page spreads them to its
     // bottom margin, each gap growing at most kMaxSpread.
-    std::vector<DisplayList> pages;
-    DisplayList page = blankPage(options);
-    double top = options.credits ? addCredits(page, song.info(), options, first) : options.margin;
-    const double bottom = options.height > 0.0 ? options.height - options.margin
-                                               : std::numeric_limits<double>::infinity();
     struct Placed {
         std::size_t system = 0;
         double y = 0.0;
     };
+    struct Page {
+        std::vector<Placed> placed;
+        double extra = 0.0; // added to each gap
+    };
+    std::vector<Page> layout;
+    DisplayList firstPage = blankPage(options);
+    double top =
+        options.credits ? addCredits(firstPage, song.info(), options, first) : options.margin;
+    const double bottom = options.height > 0.0 ? options.height - options.margin
+                                               : std::numeric_limits<double>::infinity();
     std::vector<Placed> placed;
     const auto flush = [&](bool full) {
         double extra = 0.0;
         if (full && placed.size() > 1) {
             const double room =
-                bottom - placed.back().y - systems[placed.back().system].systems.front().bottom;
+                bottom - placed.back().y - systems[placed.back().system]->systems.front().bottom;
             extra = std::clamp(room / static_cast<double>(placed.size() - 1), 0.0, kMaxSpread);
         }
-        for (std::size_t k = 0; k < placed.size(); ++k) {
-            DisplayList& system = systems[placed[k].system];
-            detail::shift(system, options.margin, placed[k].y + extra * static_cast<double>(k));
-            detail::append(page, std::move(system));
-        }
-        placed.clear();
-        pages.push_back(std::exchange(page, blankPage(options)));
+        layout.push_back(Page{.placed = std::exchange(placed, {}), .extra = extra});
     };
     double previousY = 0.0;
     double previousHeight = 0.0;
     double previousBottom = 0.0;
     for (std::size_t s = 0; s < systems.size(); ++s) {
-        const SystemBox& box = systems[s].systems.front();
+        const SystemBox& box = systems[s]->systems.front();
         double y = top - box.top;
         if (!placed.empty()) {
             y = std::max(previousY + previousHeight + kSystemDistance,
@@ -351,6 +379,36 @@ std::vector<DisplayList> layoutPages(const core::Song& song, std::span<const Sta
         previousBottom = y + box.bottom;
     }
     flush(false);
+
+    // Every page on its own: each copies its systems where they go.
+    std::size_t items = 0;
+    for (const DisplayList* system : systems) {
+        items += system->glyphs.size() + system->lines.size() + system->texts.size() +
+                 system->beams.size() + system->curves.size();
+    }
+    std::vector<DisplayList> pages(layout.size());
+    pages.front() = std::move(firstPage);
+    core::forEachIndex(
+        0, pages.size(),
+        items < kParallelItems ? 1U
+                               : std::min<unsigned>(threads, static_cast<unsigned>(pages.size())),
+        [&](std::size_t p) {
+            DisplayList& page = pages[p];
+            if (p > 0) {
+                page = blankPage(options);
+            }
+            std::vector<const DisplayList*> lists;
+            lists.reserve(layout[p].placed.size());
+            for (const Placed& each : layout[p].placed) {
+                lists.push_back(systems[each.system]);
+            }
+            detail::reserveFor(page, lists);
+            for (std::size_t k = 0; k < layout[p].placed.size(); ++k) {
+                const Placed& each = layout[p].placed[k];
+                detail::appendShifted(page, *systems[each.system], options.margin,
+                                      each.y + layout[p].extra * static_cast<double>(k));
+            }
+        });
     if (options.height <= 0.0) {
         pages.front().bottom = previousBottom + options.margin;
     }
@@ -369,6 +427,289 @@ std::vector<DisplayList> layoutPages(const core::Song& song, std::span<const Sta
             }
         }
     }
+    return pages;
+}
+
+} // namespace
+
+std::vector<DisplayList> layoutPages(const core::Song& song, std::span<const StaffSelection> staves,
+                                     const EngravingFont& font, const PageLayoutOptions& options) {
+    const Span span = checkedSpan(song, staves, options);
+    const unsigned threads = threadsFor(options, span);
+    const std::vector<MeasureWidth> widths =
+        detail::measureWidths(song, staves, font, span.first, span.last, threads);
+    const std::vector<Line> lines = breakLines(song, staves, widths, span, options);
+
+    // Every system on its own: they share nothing but the song.
+    std::vector<DisplayList> systems(lines.size());
+    core::forEachIndex(
+        0, lines.size(), std::min<unsigned>(threads, static_cast<unsigned>(lines.size())),
+        [&](std::size_t s) { systems[s] = layOutLine(song, staves, font, span, lines[s]); });
+    std::vector<const DisplayList*> lists;
+    lists.reserve(systems.size());
+    for (const DisplayList& system : systems) {
+        lists.push_back(&system);
+    }
+    return stackPages(song, lists, span.first, options, threads);
+}
+
+// ---- PageLayoutCache (ADR-0052) -------------------------------------------------------
+
+namespace {
+
+// The tempo in force before each measure, as a system starting there reads it:
+// the start tempo, then the last change of the measures before.
+std::vector<core::Tempo> temposBefore(const core::Song& song) {
+    std::vector<core::Tempo> tempos;
+    tempos.reserve(song.measureCount());
+    core::Tempo current = song.startTempo();
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        tempos.push_back(current);
+        for (const core::TempoChange& change : song.measureHeader(m).tempoChanges) {
+            current = change.tempo;
+        }
+    }
+    return tempos;
+}
+
+// Whether what the staves' writers read of their tracks besides the measures
+// is the same in both songs: names (the first system's, and its indent),
+// instruments, clefs, tunings and capos.
+bool sameTracks(const core::Song& before, const core::Song& now,
+                std::span<const StaffSelection> staves) {
+    for (const StaffSelection& selection : staves) {
+        if (selection.track >= before.trackCount() || selection.track >= now.trackCount()) {
+            return false;
+        }
+        const core::Track& was = before.track(selection.track);
+        const core::Track& is = now.track(selection.track);
+        if (was.name() != is.name() || was.instrument() != is.instrument() ||
+            was.staffCount() != is.staffCount()) {
+            return false;
+        }
+        for (std::size_t s = 0; s < is.staffCount(); ++s) {
+            const core::Staff& a = was.staff(s);
+            const core::Staff& b = is.staff(s);
+            if (a.clef() != b.clef() || a.tuning() != b.tuning() || a.capo() != b.capo()) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
+
+// What differs between two versions of a song with as many measures.
+struct Changes {
+    std::vector<bool> measures;       // a header or a staff's content
+    std::size_t firstHeader = kNone;  // the first measure whose header differs
+    std::vector<std::size_t> firstOn; // per staff, the first measure whose content differs
+
+    // Whether any of measures [from, to) differs, clipped to the song.
+    [[nodiscard]] bool any(std::size_t from, std::size_t to) const {
+        to = std::min(to, measures.size());
+        for (std::size_t m = from; m < to; ++m) {
+            if (measures[m]) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+// Measures the two songs share compare by address.
+Changes changesBetween(const core::Song& before, const core::Song& now,
+                       std::span<const StaffSelection> staves) {
+    Changes changes;
+    changes.measures.assign(now.measureCount(), false);
+    changes.firstOn.assign(staves.size(), kNone);
+    if (&before == &now) {
+        return changes;
+    }
+    // Measure 0 draws the start tempo, and every system after it reads it.
+    if (before.startTempo() != now.startTempo()) {
+        changes.measures.front() = true;
+        changes.firstHeader = 0;
+    }
+    for (std::size_t m = 0; m < now.measureCount(); ++m) {
+        if (before.measureHeader(m) != now.measureHeader(m)) {
+            changes.measures[m] = true;
+            changes.firstHeader = std::min(changes.firstHeader, m);
+        }
+        for (std::size_t i = 0; i < staves.size(); ++i) {
+            const StaffSelection& selection = staves[i];
+            const core::Measure& a =
+                before.track(selection.track).staff(selection.staff).measure(m);
+            const core::Measure& b = now.track(selection.track).staff(selection.staff).measure(m);
+            if (&a != &b && a != b) {
+                changes.measures[m] = true;
+                changes.firstOn[i] = std::min(changes.firstOn[i], m);
+            }
+        }
+    }
+    return changes;
+}
+
+} // namespace
+
+struct PageLayoutCache::State {
+    struct System {
+        Line line;
+        DisplayList list; // where layoutLine() put it, before stacking
+    };
+
+    std::shared_ptr<const core::Song> song;
+    std::vector<StaffSelection> staves;
+    const EngravingFont* font = nullptr;
+    PageLayoutOptions options;
+    std::vector<MeasureWidth> widths; // of the measures laid out
+    std::vector<System> systems;
+};
+
+PageLayoutCache::PageLayoutCache() = default;
+PageLayoutCache::~PageLayoutCache() = default;
+
+PageLayoutCache::Reuse PageLayoutCache::lastReuse() const {
+    const std::scoped_lock lock(mutex_);
+    return reuse_;
+}
+
+std::vector<DisplayList> PageLayoutCache::layout(std::shared_ptr<const core::Song> song,
+                                                 std::span<const StaffSelection> staves,
+                                                 const EngravingFont& font,
+                                                 const PageLayoutOptions& options) {
+    if (!song) {
+        throw std::invalid_argument("PageLayoutCache: no song");
+    }
+    const std::scoped_lock lock(mutex_);
+    // Taken out while it lays out: an exception leaves the cache empty.
+    std::unique_ptr<State> before = std::move(state_);
+    const core::Song& now = *song;
+    const Span span = checkedSpan(now, staves, options);
+    const unsigned threads = threadsFor(options, span);
+
+    const bool related = before && before->font == &font && before->options == options &&
+                         std::ranges::equal(before->staves, staves) &&
+                         before->song->measureCount() == now.measureCount() &&
+                         sameTracks(*before->song, now, staves);
+    Changes changes;
+    if (related) {
+        changes = changesBetween(*before->song, now, staves);
+    }
+
+    // Measure widths: a measure's own, and how it follows the one before.
+    auto state = std::make_unique<State>();
+    Reuse reuse{.measures = span.last - span.first};
+    if (!related) {
+        state->widths = detail::measureWidths(now, staves, font, span.first, span.last, threads);
+        reuse.measured = reuse.measures;
+    } else {
+        state->widths = std::move(before->widths);
+        const auto stale = [&changes](std::size_t m) {
+            return changes.measures[m] || (m > 0 && changes.measures[m - 1]);
+        };
+        for (std::size_t m = span.first; m < span.last;) {
+            if (!stale(m)) {
+                ++m;
+                continue;
+            }
+            std::size_t end = m + 1;
+            while (end < span.last && stale(end)) {
+                ++end;
+            }
+            const std::vector<MeasureWidth> fresh =
+                detail::measureWidths(now, staves, font, m, end, threads);
+            std::ranges::copy(fresh,
+                              state->widths.begin() + static_cast<std::ptrdiff_t>(m - span.first));
+            reuse.measured += end - m;
+            m = end;
+        }
+    }
+    const std::vector<Line> lines = breakLines(now, staves, state->widths, span, options);
+
+    // What a system reads from before its first measure: the tempo, if a
+    // header before it changed, and on each staff whose notes before it
+    // changed, the dynamic in force.
+    std::optional<std::vector<core::Tempo>> temposWere;
+    std::optional<std::vector<core::Tempo>> temposAre;
+    const auto sameContext = [&](std::size_t first) {
+        if (changes.firstHeader < first) {
+            if (!temposWere) {
+                temposWere = temposBefore(*before->song);
+                temposAre = temposBefore(now);
+            }
+            if ((*temposWere)[first] != (*temposAre)[first]) {
+                return false;
+            }
+        }
+        for (std::size_t i = 0; i < staves.size(); ++i) {
+            if (changes.firstOn[i] < first) {
+                const StaffSelection& selection = staves[i];
+                if (detail::dynamicBefore(
+                        before->song->track(selection.track).staff(selection.staff), first) !=
+                    detail::dynamicBefore(now.track(selection.track).staff(selection.staff),
+                                          first)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
+    // Systems: one reused when it starts and ends where it did, at the same
+    // stretch, and neither its measures nor their neighbours nor what it reads
+    // from before it changed.
+    state->systems.resize(lines.size());
+    std::vector<std::size_t> fresh;
+    std::size_t next = 0; // the first cached system that may still match
+    for (std::size_t s = 0; s < lines.size(); ++s) {
+        State::System& system = state->systems[s];
+        system.line = lines[s];
+        const std::size_t first = span.first + lines[s].first;
+        const std::size_t last = span.first + lines[s].last;
+        bool reused = false;
+        if (related) {
+            while (next < before->systems.size() &&
+                   before->systems[next].line.first < lines[s].first) {
+                ++next;
+            }
+            if (next < before->systems.size()) {
+                State::System& old = before->systems[next];
+                if (old.line.first == lines[s].first && old.line.last == lines[s].last &&
+                    old.line.stretch == lines[s].stretch &&
+                    !changes.any(first > 0 ? first - 1 : 0, last + 1) && sameContext(first)) {
+                    system.list = std::move(old.list);
+                    reused = true;
+                }
+            }
+        }
+        if (!reused) {
+            fresh.push_back(s);
+        }
+    }
+    core::forEachIndex(0, fresh.size(),
+                       std::min<unsigned>(threads, static_cast<unsigned>(fresh.size())),
+                       [&](std::size_t k) {
+                           State::System& system = state->systems[fresh[k]];
+                           system.list = layOutLine(now, staves, font, span, system.line);
+                       });
+    reuse.systems = lines.size();
+    reuse.laidOut = fresh.size();
+
+    std::vector<const DisplayList*> lists;
+    lists.reserve(state->systems.size());
+    for (const State::System& system : state->systems) {
+        lists.push_back(&system.list);
+    }
+    std::vector<DisplayList> pages = stackPages(now, lists, span.first, options, threads);
+
+    state->song = std::move(song);
+    state->staves.assign(staves.begin(), staves.end());
+    state->font = &font;
+    state->options = options;
+    state_ = std::move(state);
+    reuse_ = reuse;
     return pages;
 }
 

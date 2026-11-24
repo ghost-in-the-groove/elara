@@ -3,6 +3,7 @@
 // order until they are turned into seconds, so notes that meet in the score
 // meet in time.
 #include <elara/audio/sequence.hpp>
+#include <elara/core/duration.hpp>
 #include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/parallel.hpp>
@@ -16,9 +17,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <span>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -41,6 +44,7 @@ constexpr double kSlideCents = 500.0; // slides in and off the string span five 
 constexpr double kSlideIn = 0.1;      // seconds a slide into a note takes at most
 constexpr double kSlideOut = 0.2;     // seconds a slide out of a note takes at most
 constexpr double kClick = 0.05;       // seconds a metronome click is held at most
+constexpr double kStrumStep = 0.01;   // seconds between the strings of a strum
 constexpr int kAccentClick = 100;     // velocity of the first click of a measure
 constexpr int kClickVelocity = 80;
 
@@ -81,13 +85,18 @@ public:
         return segment.seconds + (offset - segment.offset) * segment.perWhole;
     }
 
-private:
     struct Segment {
         double offset = 0.0;
         double seconds = 0.0; // from the start of the measure
         double perWhole = 0.0;
     };
 
+    // The tempo segments of measure m, in order.
+    [[nodiscard]] std::span<const Segment> segments(std::size_t m) const noexcept {
+        return std::span(segments_).subspan(first_[m], first_[m + 1] - first_[m]);
+    }
+
+private:
     [[nodiscard]] double perWhole(const core::Tempo& tempo) const {
         return tempo.secondsFor(Fraction(1)) / speed_;
     }
@@ -201,14 +210,41 @@ struct Articulation {
     bool letRing = false;
     bool moves = false; // a bend, whammy bar, slide, hammer-on or vibrato (ADR-0023)
     int string = 0;     // 0 when the note has no fret position
+    int strum = 0;      // place in the order its chord is strummed (ADR-0025)
+    Fraction tremolo{}; // whole notes between tremolo-picked attacks; 0 for none
     const core::NoteEffects* effects = nullptr;
     const core::BeatEffects* beat = nullptr;
 };
+
+// The place of `note` in the order a strum strikes its beat: a downstroke
+// from the lowest string up, an upstroke from the highest down. Without fret
+// positions, pitch stands in for strings.
+int strumPlace(const core::Beat& beat, const core::Note& note, core::Strum strum) {
+    const auto lower = [](const core::Note& a, const core::Note& b) {
+        if (a.position && b.position) {
+            return a.position->string > b.position->string; // string 1 is the highest
+        }
+        return a.pitch.midiNumber() < b.pitch.midiNumber();
+    };
+    int place = 0;
+    for (const core::Note& other : beat.notes) {
+        if (strum == core::Strum::Down ? lower(other, note) : lower(note, other)) {
+            ++place;
+        }
+    }
+    return place;
+}
 
 // A point of a note's pitch line: seconds from its start, cents from its key.
 struct PitchPoint {
     double time = 0.0;
     double cents = 0.0;
+};
+
+// When a note's pitch line starts and ends, in seconds.
+struct Span {
+    double start = 0.0;
+    double end = 0.0;
 };
 
 // A bend curve at `fraction` of the note (0 to 1), interpolated.
@@ -304,6 +340,38 @@ void pitchLine(const Articulation& articulation, double length, double slideOut,
     if (!moves) {
         out.clear();
     }
+}
+
+// Keeps the part of `line` from `from` to `to` seconds, timed from `from`:
+// each attack of a tremolo-picked note takes its part of the note's line.
+void clipLine(std::vector<PitchPoint>& line, double from, double to,
+              std::vector<PitchPoint>& part) {
+    if (line.empty() || (from <= 0.0 && to >= line.back().time)) {
+        return;
+    }
+    const auto at = [&](double t) { // straight between the points
+        const auto next = std::ranges::upper_bound(line, t, {}, &PitchPoint::time);
+        if (next == line.begin()) {
+            return line.front().cents;
+        }
+        if (next == line.end()) {
+            return line.back().cents;
+        }
+        const PitchPoint& before = *(next - 1);
+        return before.cents +
+               ((next->cents - before.cents) * (t - before.time) / (next->time - before.time));
+    };
+    part.clear();
+    part.push_back({.time = 0.0, .cents = at(from)});
+    for (const PitchPoint& point : line) {
+        if (point.time > from && point.time < to) {
+            part.push_back({.time = point.time - from, .cents = point.cents});
+        }
+    }
+    if (to > from) {
+        part.push_back({.time = to - from, .cents = at(to)});
+    }
+    line.swap(part);
 }
 
 // The metronome (ADR-0024): a click on every beat of every played measure,
@@ -411,8 +479,14 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
         result.velocity -= 2 * kDynamicStep;
     }
     result.velocity = std::clamp(result.velocity, 1, 127);
+    if (beat.effects.tremoloPicking) {
+        result.tremolo = core::Duration(*beat.effects.tremoloPicking).length();
+    }
     if (track.instrument().kind == core::InstrumentKind::Percussion) {
-        return result; // keys are drums: no partials, no touches
+        return result; // keys are drums: no partials, no touches, no strings to strum
+    }
+    if (beat.effects.strum != core::Strum::None) {
+        result.strum = strumPlace(beat, note, beat.effects.strum);
     }
     result.key = harmonicKey(note, sounding.key);
     result.moves = !effects.bend.isEmpty() || !beat.effects.whammyBar.isEmpty() ||
@@ -459,6 +533,22 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     duration_ = seconds;
     if (measures_.empty()) {
         return;
+    }
+
+    // Where every played measure's tempi start and how it is counted, for
+    // count-ins.
+    pulses_.reserve(measures_.size());
+    tempi_.reserve(measures_.size());
+    for (const PlayedMeasure& measure : measures_) {
+        const core::TimeSignature& time = song.measureHeader(measure.measure).timeSignature;
+        const Fraction beats = time.measureLength() / time.pulseLength();
+        pulses_.push_back({.length = time.pulseLength().toDouble(),
+                           .count = static_cast<int>((beats.numerator() + beats.denominator() - 1) /
+                                                     beats.denominator())});
+        for (const TempoMap::Segment& segment : tempo.segments(measure.measure)) {
+            tempi_.push_back(
+                {.time = measure.start + segment.seconds, .perWhole = segment.perWhole});
+        }
     }
 
     // Every written note articulated and timed once in its measure.
@@ -512,6 +602,11 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     writtenAs.reserve(played);
     bool letRing = false;
     bool moves = false;
+    bool reorder = false; // strums and tremolo picking move attacks out of order
+    // Once a note is tremolo-picked, the span of every note's pitch line: the
+    // whole written note, over all its attacks.
+    bool tremolo = false;
+    std::vector<Span> spans;
     for (std::size_t k = 0; k < measures_.size(); ++k) {
         const std::size_t m = measures_[k].measure;
         const double base = measures_[k].start;
@@ -519,20 +614,82 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             const core::SoundingNote& note = sounding[i];
             const Timing& timing = timings[i];
             const Articulation& articulation = articulations[i];
-            notes_.push_back(PlayedNote{.track = note.track,
-                                        .staff = note.staff,
-                                        .voice = note.voice,
-                                        .pass = k,
-                                        .start = base + timing.start,
-                                        .end = timing.crosses ? endAfter(k, timing.endOffset)
-                                                              : base + timing.end,
-                                        .key = articulation.key,
-                                        .velocity = articulation.velocity,
-                                        .touch = articulation.touch});
-            writtenAs.push_back(i);
+            PlayedNote attack{.track = note.track,
+                              .staff = note.staff,
+                              .voice = note.voice,
+                              .pass = k,
+                              .start = base + timing.start,
+                              .end = timing.crosses ? endAfter(k, timing.endOffset)
+                                                    : base + timing.end,
+                              .key = articulation.key,
+                              .velocity = articulation.velocity,
+                              .touch = articulation.touch};
             letRing = letRing || articulation.letRing;
             moves = moves || articulation.moves;
+            // A strum delays each string, by at most half the note (ADR-0025).
+            if (articulation.strum > 0) {
+                attack.start +=
+                    std::min(articulation.strum * kStrumStep, (attack.end - attack.start) / 2.0);
+                reorder = true;
+            }
+            // Tremolo picking strikes the note again at its speed: as many
+            // times as that value fits in the note, rounded, evenly.
+            std::int64_t repeats = 1;
+            if (articulation.tremolo > Fraction(0)) {
+                const Fraction fits =
+                    (articulation.staccato ? note.length / Fraction(2) : note.length) /
+                    articulation.tremolo;
+                repeats = std::max<std::int64_t>(1, (2 * fits.numerator() + fits.denominator()) /
+                                                        (2 * fits.denominator()));
+                reorder = reorder || repeats > 1;
+            }
+            if (repeats > 1 && !tremolo) {
+                tremolo = true;
+                spans.reserve(notes_.capacity());
+                for (const PlayedNote& before : notes_) {
+                    spans.push_back({.start = before.start, .end = before.end});
+                }
+            }
+            const Span span{.start = attack.start, .end = attack.end};
+            const double step = (span.end - span.start) / static_cast<double>(repeats);
+            for (std::int64_t r = 0; r < repeats; ++r) {
+                if (repeats > 1) {
+                    attack.end = r + 1 == repeats ? span.end : attack.start + step;
+                }
+                notes_.push_back(attack);
+                writtenAs.push_back(i);
+                if (tremolo) {
+                    spans.push_back(span);
+                }
+                attack.start += step;
+            }
         }
+    }
+    if (reorder) { // back in order: by start, then track, staff, voice and key
+        std::vector<std::size_t> byStart(notes_.size());
+        std::iota(byStart.begin(), byStart.end(), std::size_t{0});
+        std::ranges::stable_sort(byStart, [&](std::size_t a, std::size_t b) {
+            const PlayedNote& x = notes_[a];
+            const PlayedNote& y = notes_[b];
+            return std::tie(x.start, x.track, x.staff, x.voice, x.key) <
+                   std::tie(y.start, y.track, y.staff, y.voice, y.key);
+        });
+        std::vector<PlayedNote> sortedNotes;
+        std::vector<std::size_t> sortedWrittenAs;
+        std::vector<Span> sortedSpans;
+        sortedNotes.reserve(byStart.size());
+        sortedWrittenAs.reserve(byStart.size());
+        sortedSpans.reserve(spans.size());
+        for (const std::size_t p : byStart) {
+            sortedNotes.push_back(notes_[p]);
+            sortedWrittenAs.push_back(writtenAs[p]);
+            if (tremolo) {
+                sortedSpans.push_back(spans[p]);
+            }
+        }
+        notes_ = std::move(sortedNotes);
+        writtenAs = std::move(sortedWrittenAs);
+        spans = std::move(sortedSpans);
     }
     // Each note's written end, before let ring: the span of its pitch line.
     std::vector<double> writtenEnds;
@@ -582,6 +739,9 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
         head.resize(notes_.size());
         std::iota(head.begin(), head.end(), std::size_t{0});
         slideTo.assign(notes_.size(), -1);
+        // The attack before each later attack of a tremolo-picked note.
+        constexpr std::size_t kFirst = std::numeric_limits<std::size_t>::max();
+        std::vector<std::size_t> attackBefore(tremolo ? notes_.size() : 0, kFirst);
         std::unordered_map<std::uint64_t, std::size_t> previous;
         for (std::size_t p = 0; p < notes_.size(); ++p) {
             const Articulation& articulation = articulations[writtenAs[p]];
@@ -598,6 +758,10 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             }
             const std::size_t q = found->second;
             found->second = p;
+            if (tremolo && writtenAs[q] == writtenAs[p] && notes_[q].pass == notes_[p].pass) {
+                attackBefore[p] = q; // the same note struck again: not joined, not slid to
+                continue;
+            }
             const core::SlideOut slide = articulations[writtenAs[q]].effects->slideOut;
             if (slide == core::SlideOut::Shift || slide == core::SlideOut::Legato) {
                 slideTo[q] = note.key;
@@ -607,6 +771,13 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             if (joined && notes_[q].end >= note.start) {
                 head[p] = head[q];
                 notes_[p].struck = false;
+            }
+        }
+        // A tremolo-picked note slides to the note after its last attack;
+        // every attack follows that one line.
+        for (std::size_t p = attackBefore.size(); p-- > 0;) {
+            if (attackBefore[p] != kFirst) {
+                slideTo[attackBefore[p]] = slideTo[p];
             }
         }
         ends.resize(notes_.size());
@@ -650,6 +821,7 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             const std::size_t noteEvents = events.size();
             std::vector<double> times;
             std::vector<PitchPoint> line;
+            std::vector<PitchPoint> part;
             for (const std::size_t p : mine) {
                 const PlayedNote& note = notes_[p];
                 const int key = notes_[head[p]].key;
@@ -663,7 +835,10 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                                         : slide == core::SlideOut::Upwards ? kSlideCents
                                         : slideTo[p] >= 0 ? 100.0 * (slideTo[p] - note.key)
                                                           : 0.0;
-                pitchLine(articulation, writtenEnds[p] - note.start, slideOut, times, line);
+                const Span span =
+                    tremolo ? spans[p] : Span{.start = note.start, .end = writtenEnds[p]};
+                pitchLine(articulation, span.end - span.start, slideOut, times, line);
+                clipLine(line, note.start - span.start, writtenEnds[p] - span.start, part);
                 const double base = 100.0 * (note.key - key);
                 if (!note.struck) {
                     events.push_back(pitchEvent(
@@ -714,6 +889,21 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     }
 }
 
+CountIn Sequence::countInAt(double seconds) const noexcept {
+    if (measures_.empty()) {
+        return {};
+    }
+    // The measure played at `seconds` (the last one that starts by then), and
+    // the tempo that holds from there.
+    const auto measure = std::ranges::upper_bound(measures_, seconds, {}, &PlayedMeasure::start);
+    const std::size_t k = measure == measures_.begin()
+                              ? 0
+                              : static_cast<std::size_t>(measure - measures_.begin()) - 1;
+    const auto tempo = std::ranges::upper_bound(tempi_, seconds, {}, &TempoPoint::time);
+    const TempoPoint& point = tempo == tempi_.begin() ? tempi_.front() : *(tempo - 1);
+    return {.clicks = pulses_[k].count, .interval = pulses_[k].length * point.perWhole};
+}
+
 std::size_t Sequence::eventAt(double seconds) const noexcept {
     return static_cast<std::size_t>(
         std::ranges::lower_bound(events_, seconds, {}, &NoteEvent::time) - events_.begin());
@@ -734,6 +924,27 @@ std::size_t Sequence::playedMeasureAt(double seconds) const noexcept {
     // The first measure that ends after `seconds`, or the last one.
     const auto after = std::ranges::upper_bound(measures_, seconds, {}, &PlayedMeasure::end);
     return std::min(static_cast<std::size_t>(after - measures_.begin()), measures_.size() - 1);
+}
+
+double carriedPosition(const Sequence& from, double seconds, const Sequence& to) noexcept {
+    const std::vector<PlayedMeasure>& before = from.measures();
+    const std::vector<PlayedMeasure>& after = to.measures();
+    if (before.empty() || after.empty() || before.size() != after.size() ||
+        !std::ranges::equal(before, after, {}, &PlayedMeasure::measure, &PlayedMeasure::measure)) {
+        return std::clamp(seconds, 0.0, to.duration());
+    }
+    if (seconds >= from.duration()) {
+        return to.duration();
+    }
+    const std::size_t played = from.playedMeasureAt(std::max(seconds, 0.0));
+    const PlayedMeasure& was = before[played];
+    const PlayedMeasure& is = after[played];
+    if (is.start == was.start && is.end == was.end) {
+        return seconds; // the same timing: exactly the same time
+    }
+    const double length = was.end - was.start;
+    const double share = length > 0.0 ? std::clamp((seconds - was.start) / length, 0.0, 1.0) : 0.0;
+    return is.start + share * (is.end - is.start);
 }
 
 } // namespace elara::audio

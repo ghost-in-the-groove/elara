@@ -530,8 +530,31 @@ def duet() -> bytes:
                       ("PartConfiguration", parts)]))
 
 
+# ---- double-coda.gp ---------------------------------------------------------------
+
+def double_coda() -> str:
+    """1 | 2 segno | 3 segno segno | 4 da coda, da double coda | 5 D.S.S. al Double
+    Coda | 6 coda | 7 double coda: played 1 2 3 4 5 3 4 7."""
+    guitar = Track("Guitar", set_type="electricGuitar", set_name="Electric Guitar", program=27,
+                   staves=[{"tuning": GUITAR}])
+    directions = ["", "<Target>Segno</Target>", "<Target>SegnoSegno</Target>",
+                  "<Jump>DaCoda</Jump><Jump>DaDoubleCoda</Jump>",
+                  "<Jump>DaSegnoSegnoAlDoubleCoda</Jump>", "<Target>Coda</Target>",
+                  "<Target>DoubleCoda</Target>"]
+    master_bars = []
+    for measure, direction in enumerate(directions):
+        bar = [[Beat("Whole", [Note(string=5, fret=measure, midi=GUITAR[5] + measure)])]]
+        master_bars.append({"time": "4/4", "bars": [("G2", bar)],
+                            "extra": f"<Directions>{direction}</Directions>" if direction else ""})
+    return score(
+        info={"Title": "Corpus Navigation", "Artist": "Ghost in the Groove",
+              "Copyright": "CC0 1.0", "Tabber": "Elara contributors"},
+        tempos=[(0, 0, "120 2", False)], tracks=[guitar], master_bars=master_bars)
+
+
 FILES = {
     "guitar-techniques.gp": lambda: gp_file(guitar_techniques()),
+    "double-coda.gp": lambda: gp_file(double_coda()),
         "band.gp": lambda: gp_file(band(), part_configuration(BAND_PARTS)),
     "duet.gpx": duet,
 }

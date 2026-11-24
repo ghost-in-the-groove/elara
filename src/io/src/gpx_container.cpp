@@ -185,18 +185,22 @@ std::optional<std::string> findFile(std::span<const std::uint8_t> fs, std::strin
 
 } // namespace
 
-std::optional<std::string> gpxEntry(std::span<const std::uint8_t> bytes, std::string_view name) {
+GpxContainer::GpxContainer(std::span<const std::uint8_t> bytes) {
     if (startsWith(bytes, "BCFZ")) {
-        const std::vector<std::uint8_t> unpacked = unpack(bytes.subspan(4));
-        if (!startsWith(unpacked, "BCFS")) {
+        unpacked_ = unpack(bytes.subspan(4));
+        if (!startsWith(unpacked_, "BCFS")) {
             throw damaged("the unpacked data is not a file system");
         }
-        return findFile(std::span(unpacked).subspan(4), name);
+    } else if (startsWith(bytes, "BCFS")) {
+        plain_ = bytes;
+    } else {
+        throw damaged("it is not a container");
     }
-    if (startsWith(bytes, "BCFS")) {
-        return findFile(bytes.subspan(4), name);
-    }
-    throw damaged("it is not a container");
+}
+
+std::optional<std::string> GpxContainer::entry(std::string_view name) const {
+    const std::span<const std::uint8_t> fs = unpacked_.empty() ? plain_ : std::span(unpacked_);
+    return findFile(fs.subspan(4), name);
 }
 
 } // namespace elara::io::detail

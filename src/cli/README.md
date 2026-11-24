@@ -26,9 +26,12 @@ elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml,
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
 elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metronome]
+                             [--count-in-at SECONDS]
 elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
-                                 [--events] [--speed 100] [--metronome]
+                                 [--events] [--speed 100] [--metronome] [--soundfont FILE.sf2]
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
+                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2]
+elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
@@ -90,7 +93,8 @@ list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
 `"pages"`: one display list per page. Lengths are in staff spaces, y down from
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
-credits...); `columns` say where the notes starting at each time of a measure
+credits...); a glyph drawn at another size than the staff's has a `"scale"`;
+`columns` say where the notes starting at each time of a measure
 are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
 beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
@@ -117,7 +121,8 @@ elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "tim
 Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
-pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
+pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
+(ADR-0042), `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
 `paste <m> [track <t>] [insert]`,
@@ -125,7 +130,9 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
 `tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`,
 `sign <m> <segno|segno-segno|coda|double-coda|fine|to-coda|to-double-coda>...`
 or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
-[al-fine|al-coda|al-double-coda]`, `undo`, `redo`, `save`. A malformed step exits with 2, a step the song rejects
+[al-fine|al-coda|al-double-coda]`, `repeat <m> [start] [end <times>]` or
+`repeat <m> none`, `ending <m> <time>...` or `ending <m> none`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
@@ -134,6 +141,11 @@ changes nothing adds no undo step.
 clears them) and `jump` its jump, with what ends the music after it (ADR-0049).
 The measures of `edit` and `dump` list them as `"signs":["segno","to-coda"]`,
 `"jump":"dal-segno"` and `"jumpThen":"al-coda"`; `sequence` plays them.
+`repeat` gives measure `m` exactly a start repeat, an end repeat played
+`times` times (2 to 255), both or neither, and `ending` the times through the
+repeat that play it (1 to 8); each is one undo step, "Change repeats"
+(ADR-0016). The measures list them as `"repeatStart":true`, `"repeatTimes":3`
+and `"endings":[1,2]`.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an
@@ -161,7 +173,8 @@ The output gives each track's `tuning` (its first staff's; `null` without
 strings) and `capo`.
 
 Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
-`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`caret <track> <m> <beat> [string]` places it in the first voice, `voice <1-4>`
+takes it to that voice of its measure (typing then goes there), `right`, `left`, `up`, `down`,
 `next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
 string (adding a beat of the input duration on the free slot after the last
 beat of a short measure), `pitch <C..B> [add]` types a note name in the
@@ -177,6 +190,9 @@ that General MIDI key's lane (moving the caret to it), and `delete` removes the
 lane's piece only. `effect <name>` toggles a note effect on the caret's notes
 (ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
 `dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`.
+`bend <form> [cents]` sets a bend on them (ADR-0055): `bend`, `release` (bend
+and release), `pre-bend`, `pre-release` (pre-bend and release) or `none`, up by
+`cents` (a full step, 200, by default).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.
@@ -185,7 +201,18 @@ dynamic in force at the caret. The output includes `"caret"` and `"input"`.
 `--speed` from 25 to 200 percent of the written tempo, and `--metronome` clicks
 every beat on a track after the song's last. Their JSON says `"speed"` (1 for
 the written tempo) and `"metronome"`; `sequence` puts them after
-`"duration"`, the others at the end.
+`"duration"`, the others at the end. `sequence --count-in-at SECONDS` adds
+`"countIn": {"clicks", "interval"}` after them: the count-in for playback
+from there. `play --count-in` clicks it before playing, and `--loop FROM TO`
+loops a passage; without `--seconds`, a looped `play` stops after going round
+the loop twice.
+
+`render-audio` and `play` play the tracks through the built-in synthesizer, or
+through a SoundFont (SF2 or SF3) with `--soundfont` (ADR-0043): each track
+plays its instrument's General MIDI preset. `render-audio --json` says
+`"soundFont"` (the file, or null) and each track's `"sound"`: the timbre's name,
+or the preset's. `soundfont FILE --json` lists the presets as
+`{"bank", "program", "name"}`, by bank and program.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

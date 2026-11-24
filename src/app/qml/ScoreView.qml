@@ -10,7 +10,6 @@ Item {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
     /// 1 shows pages at their paper size (96 logical pixels per inch).
     property real zoom: 1.0
@@ -104,8 +103,8 @@ Item {
         const caret = document.caretRect;
         const page = document.caretPage;
         const x = list.originX + (list.contentWidth - pageWidth) / 2 + caret.x * scale - list.contentX;
-        const y = list.originY + page * (pageHeight + gap) + (caret.y + caret.height) * scale
-                  - list.contentY;
+        const y = list.y + list.originY + page * (pageHeight + gap)
+                  + (caret.y + caret.height) * scale - list.contentY;
         return Qt.point(x, y);
     }
     /// Opens the measure popup near (x, y), inside the view.
@@ -135,9 +134,70 @@ Item {
     Keys.onPressed: event => {
         const control = (event.modifiers & Qt.ControlModifier) !== 0;
         const alt = (event.modifiers & Qt.AltModifier) !== 0;
-        if (alt || document.pageCount === 0)
-            return;
         const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+        if (document.pageCount === 0)
+            return;
+        // Alt with 1 to 4 picks the voice typing goes into.
+        if (alt && !control && event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
+            document.setCaretVoice(event.key - Qt.Key_0);
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // Alt with Up or Down moves the pitch a semitone, or transposes the
+        // selected measures; with Ctrl an octave.
+        if (alt) {
+            if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down)
+                return;
+            const semitones = (event.key === Qt.Key_Up ? 1 : -1) * (control ? 12 : 1);
+            if (document.hasSelection)
+                document.transposeSelection(semitones);
+            else
+                document.shiftPitch(semitones);
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // Measures: Shift with Left or Right selects, Ctrl+A selects all,
+        // Ctrl+C copies, Ctrl+V pastes over (with Shift, inserts), Escape lets go.
+        let measures = true;
+        if (control && !shift && event.key === Qt.Key_A)
+            document.selectAll();
+        else if (control && !shift && event.key === Qt.Key_C)
+            document.copy();
+        else if (control && event.key === Qt.Key_V)
+            document.paste(shift);
+        else if (shift && !control && event.key === Qt.Key_Right)
+            document.extendSelection(1);
+        else if (shift && !control && event.key === Qt.Key_Left)
+            document.extendSelection(-1);
+        else if (event.key === Qt.Key_Escape && document.hasSelection)
+            document.clearSelection();
+        else
+            measures = false;
+        if (measures) {
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // A to G type note names; with Shift they join the beat's chord.
+        const letter = "CDEFGAB".indexOf(event.text.toUpperCase());
+        if (!control && event.text.length === 1 && letter >= 0) {
+            document.typeNoteName(letter, shift);
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // Note effects: T tie, H hammer-on or pull-off, S slide, U bend,
+        // V vibrato, P palm mute, X dead note, L let ring, N harmonic,
+        // O ghost note, > accent, ' staccato.
+        const effect = control ? -1 : document.effectForKey(event.text);
+        if (effect >= 0) {
+            document.toggleEffect(effect);
+            event.accepted = true;
+            reveal();
+            return;
+        }
         if (control && event.key === Qt.Key_M) {
             openMeasurePopupAtCaret();
             event.accepted = true;
@@ -149,6 +209,9 @@ Item {
             document.removeMeasure();
         } else if (!control && event.key >= Qt.Key_0 && event.key <= Qt.Key_9) {
             document.typeDigit(event.key - Qt.Key_0);
+        } else if (control && event.key >= Qt.Key_2 && event.key <= Qt.Key_9 && event.key !== Qt.Key_8) {
+            // Ctrl and a digit: that tuplet, or none when the input has it (ADR-0050).
+            document.setInputTuplet(event.key - Qt.Key_0);
         } else if (event.key === Qt.Key_Right) {
             document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
         } else if (event.key === Qt.Key_Left) {
@@ -164,6 +227,8 @@ Item {
                 document.deleteAtCaret();
         } else if (event.key === Qt.Key_Insert && !control) {
             document.insertRest();
+        } else if (!control && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            document.toggleDrum();
         } else if (!control && event.key === Qt.Key_Plus) {
             document.longerDuration();
         } else if (!control && event.key === Qt.Key_Minus) {
@@ -266,7 +331,10 @@ Item {
     ListView {
         id: list
 
-        anchors.fill: parent
+        anchors.top: entryStrip.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
         model: root.document.pageCount
         spacing: root.gap
         topMargin: root.gap
@@ -308,9 +376,9 @@ Item {
                 anchors.fill: paper
                 offset.y: 3
                 radius: 2
-                blur: 16
+                blur: 18
                 spread: 0
-                color: Qt.rgba(0, 0, 0, 0.22)
+                color: Qt.rgba(0, 0, 0, Theme.dark ? 0.55 : 0.2)
             }
 
             Rectangle {
@@ -331,6 +399,41 @@ Item {
                     Behavior on opacity {
                         NumberAnimation {
                             duration: 160
+                        }
+                    }
+                }
+
+                // In the dark theme the paper is dimmed, so that it does not
+                // glare on the dark desk; the ink stays black.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    visible: Theme.dark
+                    color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
+                }
+
+                // The selected measures, tinted across their systems.
+                Repeater {
+                    model: root.document.selectionRevision >= 0
+                           ? root.document.selectionBoxes(sheet.index) : []
+
+                    delegate: Rectangle {
+                        required property rect modelData
+                        readonly property real scale: root.unit * root.shownZoom
+
+                        x: modelData.x * scale
+                        y: modelData.y * scale
+                        width: modelData.width * scale
+                        height: modelData.height * scale
+                        radius: 3
+                        color: Qt.alpha(Material.accent, 0.1)
+                        border.color: Qt.alpha(Material.accent, 0.35)
+                        border.width: 1
+
+                        NumberAnimation on opacity {
+                            from: 0
+                            to: 1
+                            duration: 120
                         }
                     }
                 }
@@ -405,35 +508,49 @@ Item {
 
     MeasurePopup {
         id: measurePopup
+        objectName: "measurePopup"
 
         document: root.document
-        dark: root.dark
         onClosed: root.forceActiveFocus()
     }
 
-    EntryBar {
-        id: entryBar
+    // The note entry bar: a strip over the top of the pages while there is a
+    // caret, so that only the transport covers the score.
+    Rectangle {
+        id: entryStrip
 
         readonly property bool shown: root.document.caretPage >= 0
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: shown ? parent.height - height - 18 : parent.height + 8
-        document: root.document
-        dark: root.dark
-        onMeasureRequested: root.openMeasurePopupAtCaret()
-        opacity: shown ? 1.0 : 0.0
-        visible: opacity > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: shown ? 46 : 0
+        visible: height > 0
+        clip: true
+        color: Theme.bar
 
-        Behavior on y {
+        Behavior on height {
             NumberAnimation {
-                duration: 220
+                duration: 180
                 easing.type: Easing.OutCubic
             }
         }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 180
-            }
+
+        EntryBar {
+            id: entryBar
+
+            objectName: "entryBar"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 1
+            document: root.document
+            onMeasureRequested: root.openMeasurePopupAtCaret()
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 1
+            color: Theme.line
         }
     }
 

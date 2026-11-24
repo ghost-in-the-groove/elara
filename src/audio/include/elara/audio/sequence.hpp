@@ -84,6 +84,14 @@ struct SequenceOptions {
     bool metronome = false;
 };
 
+/// The clicks before playback starts (ADR-0024): `clicks` of them,
+/// `interval` seconds apart, the first one higher.
+struct CountIn {
+    int clicks = 0;
+    double interval = 0.0;
+    friend bool operator==(const CountIn&, const CountIn&) = default;
+};
+
 /// A song as it is played: its measures in play order (repeats unrolled,
 /// core::Song::playOrder()), its notes and the note events for a
 /// synthesizer, all in seconds. Every measure plays at the tempo written in
@@ -116,6 +124,12 @@ public:
     /// when there is none): where playback starting there begins.
     [[nodiscard]] std::size_t eventAt(double seconds) const noexcept;
 
+    /// A count-in for playback from `seconds`: the beats of one measure of the
+    /// measure played there (its time signature's pulse), at the tempo there.
+    /// Before the start, the first measure's; after the end, the last one's.
+    /// No clicks when there is no measure.
+    [[nodiscard]] CountIn countInAt(double seconds) const noexcept;
+
     /// The index in measures() of the measure played at `seconds`: the first
     /// one for earlier times, the last one at its very end, and
     /// measures().size() after that or when there is none.
@@ -132,6 +146,19 @@ public:
     friend bool operator==(const Sequence&, const Sequence&) = default;
 
 private:
+    // A tempo in played time: from `time` on, seconds per whole note.
+    struct TempoPoint {
+        double time = 0.0;
+        double perWhole = 0.0;
+        friend bool operator==(const TempoPoint&, const TempoPoint&) = default;
+    };
+    // The beats of a played measure: `count` of `length` whole notes.
+    struct Pulse {
+        double length = 0.0;
+        int count = 0;
+        friend bool operator==(const Pulse&, const Pulse&) = default;
+    };
+
     std::vector<PlayedMeasure> measures_;
     std::vector<PlayedNote> notes_;
     std::vector<NoteEvent> events_;
@@ -139,6 +166,15 @@ private:
     double speed_ = 1.0;
     bool metronome_ = false;
     std::size_t metronomeTrack_ = 0;
+    std::vector<TempoPoint> tempi_; // ordered by time
+    std::vector<Pulse> pulses_;     // one per played measure
 };
+
+/// Where playback at `seconds` of `from` goes on in `to`: the same share of
+/// the same played measure when both play the same measures in the same order
+/// (another speed, a tempo edit), so it keeps its place in the music; the
+/// same time otherwise. Always inside `to`, at its end from the end of `from`.
+[[nodiscard]] double carriedPosition(const Sequence& from, double seconds,
+                                     const Sequence& to) noexcept;
 
 } // namespace elara::audio

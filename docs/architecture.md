@@ -10,9 +10,11 @@ flowchart TD
     app -.-> notation
     cli["cli (elara-cli, headless)"] --> core
     cli --> audio_juce
+    cli --> audio_fluid
     cli -.-> io
     cli -.-> notation
     audio_juce["audio/backend_juce (JUCE)"] --> audio
+    audio_fluid["audio/backend_fluid (FluidSynth)"] --> audio
     audio["audio (sequencer, synth, WAV)"] --> core
     io["io (importers/exporters)"] -.-> core
     notation["notation (layout engine)"] -.-> core
@@ -28,10 +30,11 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/core` | `elara_core` | Musical model, commands with undo/redo | 1 |
 | `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-8 import (ADR-0010) | 1, 2 |
 | `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of standard notation and tablature into a display list, staves aligned in systems, line breaking and pages, SVG output (ADR-0012, ADR-0013, ADR-0014); where the keyboard entry caret shows and the caret a click picks (ADR-0032) | 3 |
-| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV reading and writing; the tuner's pitch detection (ADR-0028) | 0, 4, 6 |
-| `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029); synths (FluidSynth, sfizz) | 0, 4, 6 |
+| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV reading and writing; the tuner's pitch detection (ADR-0028); sound banks (ADR-0043) | 0, 4, 6 |
+| `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029) | 0, 4, 6 |
+| `src/audio/backend_fluid` | `elara_audio_fluid` | SoundFonts (SF2, SF3) as sound banks, through FluidSynth (ADR-0043) | 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
-| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret (ADR-0031, ADR-0032, ADR-0033) | 0+ |
+| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret, toggles note effects and sets bends, selects, copies, pastes and transposes measures (ADR-0031, ADR-0032, ADR-0033, ADR-0036, ADR-0038, ADR-0055) | 0+ |
 
 ## Key decisions
 
@@ -56,7 +59,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 |---|---|---|
 | Main / GUI | Qt event loop (also JUCE's message thread) | Owns the model; all edits happen here |
 | Audio callback | JUCE device | No allocation, locks, I/O or logging; reads immutable snapshots / lock-free queues |
-| Workers (future) | Thread pool | Layout of large scores, file import, offline render |
+| Workers | `core::WorkerPool::shared()`, one thread fewer than the cores (ADR-0053) | Jobs of `forEachIndex`: layout, import, export, sequencing, offline render; the calling thread takes jobs too. Never used by the audio callback |
 
 Open question (milestone 4): on Linux, Qt's event loop does not service JUCE's
 message queue. Device-change notifications may need a dedicated JUCE message

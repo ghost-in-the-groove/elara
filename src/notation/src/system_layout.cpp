@@ -5,18 +5,23 @@
 #include <elara/core/parallel.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/song.hpp>
+#include <elara/core/tempo.hpp>
 #include <elara/notation/staff_layout.hpp>
 
 #include "layout_common.hpp"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <limits>
 #include <memory>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -41,6 +46,21 @@ constexpr double kVoltaLabelInset = 0.4;    // between its start hook and its nu
 constexpr double kVoltaSize = 1.4;          // font size of its numbers and of repeat counts
 constexpr double kVoltaTextGap = 0.3;       // between the bracket and its numbers
 constexpr double kVoltaInkGap = 0.5;        // at least between its numbers and the staff's ink
+constexpr double kTempoLowest = -1.5;       // the baseline of a tempo mark at least this high
+constexpr double kTempoInkGap = 0.6;        // at least between a tempo mark and the ink below
+constexpr double kTempoSize = 1.4;          // font size of its text
+constexpr double kTempoNoteScale = 0.65;    // of its note, from the staff's size
+constexpr double kTempoNoteLift = 0.35;     // the note's head above the text's baseline
+constexpr double kTempoDotGap = 0.15;       // between the note and its dot
+constexpr double kTempoTextGap = 0.3;       // between the note (or dot) and "= 120"
+constexpr double kNavigationLowest = -1.5;  // the line of signs and jumps at least this high
+constexpr double kNavigationInkGap = 0.6;   // at least between them and the ink below
+constexpr double kNavigationSize = 1.4;     // font size of a jump's text
+constexpr double kNavigationScale = 0.65;   // of a segno or coda, from the staff's size
+constexpr double kNavigationInset = 0.4;    // between the barline and the first sign
+constexpr double kNavigationGap = 0.25;     // between two signs
+constexpr double kNavigationTextGap = 1.0;  // between two texts closing one measure
+constexpr double kNavigationLineGap = 0.3;  // between a line of them and the one above
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -239,6 +259,259 @@ void markRepeats(DisplayList& system, const core::Song& song, std::span<const Me
         text("x" + std::to_string(header.repeatTimes), x, TextAlign::Right, Role::Repeat, m);
     }
     system.top = std::min(system.top, y - thickness / 2);
+}
+
+// "D.S. al Coda": where a jump goes and what ends the music after it.
+std::string jumpText(const core::MeasureHeader& header) {
+    constexpr std::array<std::string_view, 4> kTo{"", "D.C.", "D.S.", "D.S.S."};
+    constexpr std::array<std::string_view, 4> kThen{"", " al Fine", " al Coda", " al Double Coda"};
+    return std::string(kTo.at(static_cast<std::size_t>(header.jump))) +
+           std::string(kThen.at(static_cast<std::size_t>(header.jumpThen)));
+}
+
+// Signs and jumps above everything over the first staff of `system`, under its
+// tempo marks (ADR-0049): segno and coda signs at the start of their measure
+// (two of them for segno segno and double coda), and the texts that close a
+// measure ("Fine", "To Coda", "D.S. al Coda") ending at its barline, the jump
+// last. They share one line; a mark that would overlap one on the line goes
+// on the first line above where it fits.
+void markNavigation(DisplayList& system, const core::Song& song,
+                    std::span<const MeasureBox> measures, std::span<const double> barlineEnds,
+                    const EngravingFont& font) {
+    struct Mark {
+        double left = 0.0;
+        double right = 0.0;
+        double height = 0.0;
+        std::size_t measure = 0;
+        Glyph glyph{};    // a sign, or
+        std::string text; // a text when not empty
+    };
+    std::vector<Mark> marks;
+    for (std::size_t i = 0; i < measures.size(); ++i) {
+        const std::size_t m = measures[i].index;
+        const core::MeasureHeader& header = song.measureHeader(m);
+        // The signs, from the barline before the measure.
+        double x = (i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset;
+        const auto sign = [&](Glyph glyph, int count) {
+            const BoundingBox& box = font.metrics(glyph).box;
+            for (int c = 0; c < count; ++c) {
+                const double width = box.width() * kNavigationScale;
+                marks.push_back(Mark{.left = x,
+                                     .right = x + width,
+                                     .height = box.height() * kNavigationScale,
+                                     .measure = m,
+                                     .glyph = glyph,
+                                     .text = {}});
+                x += width + kNavigationGap;
+            }
+        };
+        if (header.segno || header.segnoSegno) {
+            sign(Glyph::Segno, header.segnoSegno ? 2 : 1);
+        }
+        if (header.coda || header.doubleCoda) {
+            sign(Glyph::Coda, header.doubleCoda ? 2 : 1);
+        }
+        // The texts, right to left from the barline after it.
+        double right = barlineEnds[i];
+        const auto text = [&](std::string content) {
+            const double width = textWidth(content, kNavigationSize);
+            marks.push_back(Mark{.left = right - width,
+                                 .right = right,
+                                 .height = (kTextAscent + kTextDescent) * kNavigationSize,
+                                 .measure = m,
+                                 .glyph = {},
+                                 .text = std::move(content)});
+            right -= width + kNavigationTextGap;
+        };
+        if (header.jump != core::JumpTo::None) {
+            text(jumpText(header));
+        }
+        if (header.toDoubleCoda) {
+            text("To Double Coda");
+        }
+        if (header.toCoda) {
+            text("To Coda");
+        }
+        if (header.fine) {
+            text("Fine");
+        }
+    }
+    if (marks.empty()) {
+        return;
+    }
+
+    // Lines from the bottom: the signs first, then the texts, each left to
+    // right on the lowest line where it overlaps no mark already there.
+    std::ranges::stable_sort(
+        marks, {}, [](const Mark& mark) { return std::pair(!mark.text.empty(), mark.left); });
+    struct Line {
+        std::vector<std::pair<double, double>> taken{}; // left and right of its marks
+        double height = 0.0;                            // of its tallest mark
+    };
+    std::vector<Line> lines;
+    std::vector<std::size_t> lineOf(marks.size());
+    for (std::size_t k = 0; k < marks.size(); ++k) {
+        const Mark& mark = marks[k];
+        const auto fits = [&mark](const Line& line) {
+            return std::ranges::none_of(line.taken, [&mark](const auto& span) {
+                return mark.left < span.second + kNavigationGap &&
+                       span.first < mark.right + kNavigationGap;
+            });
+        };
+        const auto line =
+            static_cast<std::size_t>(std::ranges::find_if(lines, fits) - lines.begin());
+        if (line == lines.size()) {
+            lines.emplace_back();
+        }
+        lines[line].taken.emplace_back(mark.left, mark.right);
+        lines[line].height = std::max(lines[line].height, mark.height);
+        lineOf[k] = line;
+    }
+    std::vector<double> baselines(lines.size());
+    baselines[0] = std::min(kNavigationLowest,
+                            system.top - kNavigationInkGap - kTextDescent * kNavigationSize);
+    for (std::size_t line = 1; line < baselines.size(); ++line) {
+        baselines[line] = baselines[line - 1] - lines[line - 1].height - kNavigationLineGap;
+    }
+    double highest = baselines.back() - lines.back().height;
+    for (std::size_t k = 0; k < marks.size(); ++k) {
+        Mark& mark = marks[k];
+        const double baseline = baselines[lineOf[k]];
+        highest = std::min(highest, baseline - mark.height);
+        if (mark.text.empty()) {
+            const BoundingBox& box = font.metrics(mark.glyph).box;
+            system.glyphs.push_back(
+                GlyphItem{.glyph = mark.glyph,
+                          .origin = {mark.left - box.southWest.x * kNavigationScale,
+                                     baseline + box.southWest.y * kNavigationScale},
+                          .role = Role::Navigation,
+                          .measure = mark.measure,
+                          .scale = kNavigationScale});
+        } else {
+            TextItem item;
+            item.text = std::move(mark.text);
+            item.origin = {mark.right, baseline};
+            item.size = kNavigationSize;
+            item.align = TextAlign::Right;
+            item.italic = true;
+            item.role = Role::Navigation;
+            item.measure = mark.measure;
+            system.texts.push_back(std::move(item));
+        }
+    }
+    system.top = std::min(system.top, highest);
+}
+
+// The metronome note of a beat unit.
+Glyph tempoNote(core::NoteValue value) {
+    switch (value) {
+    case core::NoteValue::DoubleWhole:
+    case core::NoteValue::Whole:
+        return Glyph::MetNoteWhole;
+    case core::NoteValue::Half:
+        return Glyph::MetNoteHalfUp;
+    case core::NoteValue::Quarter:
+        return Glyph::MetNoteQuarterUp;
+    case core::NoteValue::Eighth:
+        return Glyph::MetNote8thUp;
+    case core::NoteValue::Sixteenth:
+        return Glyph::MetNote16thUp;
+    default:
+        return Glyph::MetNote32ndUp;
+    }
+}
+
+// "120", "92.5": beats per minute to a tenth.
+std::string bpmText(double bpm) {
+    const double tenths = std::round(bpm * 10.0);
+    if (std::fmod(tenths, 10.0) == 0.0) {
+        return std::format("{}", static_cast<long long>(tenths / 10.0));
+    }
+    return std::format("{:.1f}", tenths / 10.0);
+}
+
+// Tempo marks ("quarter = 120") above everything over the first staff of
+// `system`: the tempo the song starts with, and every change to another tempo
+// over the column where it happens (ADR-0042).
+void markTempo(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
+               const EngravingFont& font) {
+    struct Mark {
+        std::size_t measure = 0;
+        double x = 0.0;
+        core::Tempo tempo;
+    };
+    std::vector<Mark> marks;
+    // The tempo in force before each measure, carried along the system's
+    // consecutive measures: looking it up from the start of the song for each
+    // made long lines quadratic.
+    core::Tempo current = song.startTempo();
+    std::size_t next = 0; // the measure `current` is in force before
+    for (const MeasureBox& box : measures) {
+        const std::size_t m = box.index;
+        const core::MeasureHeader& header = song.measureHeader(m);
+        const core::Fraction length = header.timeSignature.measureLength();
+        const auto xAt = [&box, &length](const core::Fraction& offset) {
+            const double at = (offset / length).toDouble();
+            const auto onset = std::ranges::find_if(
+                box.onsets, [at](const MeasureOnset& o) { return std::abs(o.at - at) < kEpsilon; });
+            return onset != box.onsets.end() ? onset->x : box.x + at * box.width;
+        };
+        if (m != next) {
+            current =
+                m == 0
+                    ? song.startTempo()
+                    : song.tempoAt(m - 1, song.measureHeader(m - 1).timeSignature.measureLength());
+        }
+        next = m + 1;
+        const bool changedAtStart =
+            !header.tempoChanges.empty() && header.tempoChanges.front().offset == core::Fraction();
+        if (m == 0 && !changedAtStart) {
+            marks.push_back(Mark{.measure = m, .x = xAt({}), .tempo = current});
+        }
+        for (const core::TempoChange& change : header.tempoChanges) {
+            if (change.tempo != current || (m == 0 && change.offset == core::Fraction())) {
+                marks.push_back(Mark{.measure = m, .x = xAt(change.offset), .tempo = change.tempo});
+            }
+            current = change.tempo;
+        }
+    }
+    if (marks.empty()) {
+        return;
+    }
+    // One baseline for the system, above the ink of everything over the staff.
+    const double baseline =
+        std::min(kTempoLowest, system.top - kTempoInkGap - kTextDescent * kTempoSize);
+    double highest = baseline - kTextAscent * kTempoSize;
+    for (const Mark& mark : marks) {
+        const Glyph note = tempoNote(mark.tempo.beatUnit().value());
+        const BoundingBox& box = font.metrics(note).box;
+        const double y = baseline - kTempoNoteLift;
+        const auto place = [&](Glyph which, double x) {
+            system.glyphs.push_back(GlyphItem{.glyph = which,
+                                              .origin = {x, y},
+                                              .role = Role::Tempo,
+                                              .measure = mark.measure,
+                                              .scale = kTempoNoteScale});
+        };
+        place(note, mark.x - box.southWest.x * kTempoNoteScale);
+        highest = std::min(highest, y - box.northEast.y * kTempoNoteScale);
+        double x = mark.x + box.width() * kTempoNoteScale;
+        for (int d = 0; d < mark.tempo.beatUnit().dots(); ++d) {
+            const BoundingBox& dot = font.metrics(Glyph::MetAugmentationDot).box;
+            x += kTempoDotGap;
+            place(Glyph::MetAugmentationDot, x - dot.southWest.x * kTempoNoteScale);
+            x += dot.width() * kTempoNoteScale;
+        }
+        TextItem text;
+        text.text = "= " + bpmText(mark.tempo.bpm());
+        text.origin = {x + kTempoTextGap, baseline};
+        text.size = kTempoSize;
+        text.align = TextAlign::Left;
+        text.role = Role::Tempo;
+        text.measure = mark.measure;
+        system.texts.push_back(std::move(text));
+    }
+    system.top = std::min(system.top, highest);
 }
 
 // Measures [first, last) with one set of writers.
@@ -443,6 +716,8 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         append(system, std::move(staff));
     }
     markRepeats(system, song, measures, barlineEnds, font);
+    markNavigation(system, song, measures, barlineEnds, font);
+    markTempo(system, song, measures, font);
     const double height = previousY + previousHeight;
     if (writers.size() > 1) {
         // The line joining the staves at the start of the system.

@@ -39,6 +39,7 @@ elara_add_unit_tests(core
     core/test_performance.cpp
     core/test_retune.cpp
     core/test_transpose.cpp
+    core/test_parallel.cpp
   LIBRARIES elara::core)
 target_compile_definitions(elara_core_tests PRIVATE ELARA_EXPECTED_VERSION="${PROJECT_VERSION}")
 
@@ -46,10 +47,14 @@ elara_add_unit_tests(audio
   SOURCES audio/test_offline_renderer.cpp audio/test_player.cpp audio/test_sequence.cpp
           audio/test_synth.cpp audio/test_tone_generator.cpp
           audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
-          audio/test_tuner.cpp
-  LIBRARIES elara::audio)
+          audio/test_tuner.cpp audio/test_sound_bank.cpp audio/test_sound_font.cpp
+  LIBRARIES elara::audio elara::audio_fluid)
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
+# Writes the test SoundFont for the elara-cli tests that play one (ADR-0043).
+add_executable(elara_make_test_soundfont audio/make_test_soundfont.cpp)
+elara_target_warnings(elara_make_test_soundfont)
+
 elara_add_unit_tests(io
   SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp io/test_midi.cpp io/test_guitar_pro.cpp
           io/test_guitar_pro_binary.cpp io/test_guitar_pro_gpx.cpp io/test_open.cpp
@@ -59,9 +64,13 @@ target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURR
 elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
   notation/test_page_layout.cpp
-  notation/test_tab_layout.cpp notation/test_repeat_layout.cpp
-  LIBRARIES elara::notation)
-target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
+  notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
+  notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
+  notation/test_incremental_layout.cpp
+  LIBRARIES elara::notation elara::io)
+# The incremental layout is checked against a full one on the corpus files.
+target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
+  ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 add_subdirectory(cli)
 
@@ -76,7 +85,8 @@ elara_target_warnings(elara_benchmarks)
 
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
-  add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/bench_score_painter.cpp)
+  add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
+    app/test_when_done.cpp app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara::io Catch2::Catch2)
   target_compile_definitions(elara_app_tests PRIVATE
     ELARA_FONT_DIR="${ELARA_FONT_DIR}"
@@ -91,6 +101,7 @@ if(TARGET elara)
   # out, paints its first page and shows it in every view and with all tracks.
   # Then it edits the song (a new one without a file): adds a track, changes
   # the time signature, undoes, redoes, and checks the song ends as it began.
+  # The bars floating over the bottom of the score must not cover each other.
   add_test(NAME app.smoke COMMAND elara --smoke-test)
   add_test(NAME app.smoke_open_tracks
     COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
@@ -101,9 +112,9 @@ if(TARGET elara)
   # The tuner opened at start. Without an audio input (as in CI) it says so
   # instead of listening; either way its QML must load without warnings.
   add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
-  # The song panel open while the song is edited.
+  # The song panel open, with the first track's tuning, while the song is edited.
   add_test(NAME app.smoke_song_pane
-    COMMAND elara --smoke-test --song-pane "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
+    COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
   # The measure popup open at the caret while the measures are edited.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
@@ -114,12 +125,27 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 45 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 25 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 55 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 22 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 51 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+
+  # A song of several pages: the notes typed on the first page leave the others
+  # as they were, so those keep their textures instead of being painted again.
+  set(ELARA_APP_LONG_SONG "${CMAKE_CURRENT_BINARY_DIR}/app-long-song.elara")
+  add_test(NAME app.make_long_song
+    COMMAND elara-cli edit --out "${ELARA_APP_LONG_SONG}" "add-track electric-guitar"
+      "append-measures 160")
+  set_tests_properties(app.make_long_song PROPERTIES FIXTURES_SETUP app_long_song)
+  add_test(NAME app.smoke_keeps_pages COMMAND elara --smoke-test "${ELARA_APP_LONG_SONG}")
+  set_tests_properties(app.smoke_keeps_pages PROPERTIES
+    FIXTURES_REQUIRED app_long_song
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "pages kept: [1-9][0-9]*[\r\n]+smoke-test: ok \\([0-9]+ pages")
 
   # The UI in Spanish: the catalog compiled into the executable loads and the
   # window loads with it. Every string has a translation in every language.
@@ -130,7 +156,7 @@ if(TARGET elara)
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
     TIMEOUT 60)
   set_tests_properties(app.smoke_spanish PROPERTIES
-    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+smoke-test: ok")
+    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
   set_tests_properties(app.language_unknown PROPERTIES
     PASS_REGULAR_EXPRESSION "no translation for language \"xx\"")
   add_test(NAME app.translations_complete

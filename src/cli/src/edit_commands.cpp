@@ -19,10 +19,12 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <format>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -170,6 +172,15 @@ constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectN
     {"staccato", core::NoteEffect::Staccato},
 }};
 
+// The forms `bend <form> [cents]` takes (ADR-0055).
+constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kBendForms{{
+    {"none", core::BendForm::None},
+    {"bend", core::BendForm::Bend},
+    {"release", core::BendForm::BendRelease},
+    {"pre-bend", core::BendForm::PreBend},
+    {"pre-release", core::BendForm::PreBendRelease},
+}};
+
 constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
     {"ppp", core::Dynamic::PPP},
     {"pp", core::Dynamic::PP},
@@ -211,6 +222,15 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         }
         entry.caret = wanted;
         return true;
+    } else if (verb == "voice") { // voice <1..4>: where typing goes from now on
+        const int voice = step.number<int>(1);
+        if (voice < 1 || voice > static_cast<int>(core::Measure::kMaxVoices)) {
+            throw StepSyntaxError(
+                std::format("voice: 1 to {}, not {}", core::Measure::kMaxVoices, voice));
+        }
+        entry.caret.voice = static_cast<std::size_t>(voice - 1);
+        entry.caret = clampCaret(song, entry.caret);
+        return true;
     } else if (verb == "fret") {
         edit = enterFret(song, entry.caret, step.number<int>(1), entry.input);
     } else if (verb == "pitch") { // pitch <C..B> [add]
@@ -249,6 +269,16 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             throw StepSyntaxError(std::format("not an effect: {}", name));
         }
         edit = toggleEffect(song, entry.caret, found->second);
+    } else if (verb == "bend") { // bend <form> [cents]: on the caret's notes, a step by default
+        constexpr int kFullStep = 200;
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kBendForms, [name](const auto& form) { return form.first == name; });
+        if (found == kBendForms.end()) {
+            throw StepSyntaxError(std::format("not a bend form: {}", name));
+        }
+        const int cents = step.has(2) ? step.number<int>(2) : kFullStep;
+        edit = setBend(song, entry.caret, bendCurve(found->second, cents));
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
         const auto found = std::ranges::find_if(
@@ -333,6 +363,25 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         doc.execute(std::make_unique<core::SetTrackMix>(step.index(1), mix));
     } else if (verb == "tempo") {
         doc.execute(std::make_unique<SetStartTempo>(Tempo(step.number<int>(1))));
+    } else if (verb == "tempo-from") { // tempo-from <m> <bpm> | none
+        const std::size_t measure = step.index(1);
+        if (measure == 0) {
+            throw StepSyntaxError("tempo-from: the first measure plays at the song's tempo "
+                                  "(\"tempo <bpm>\")");
+        }
+        std::optional<double> bpm;
+        if (step.word(2) != "none") {
+            const int value = step.number<int>(2);
+            if (static_cast<double>(value) < Tempo::kMinBpm ||
+                static_cast<double>(value) > Tempo::kMaxBpm) {
+                throw StepSyntaxError(std::format("tempo-from: {} to {} beats per minute, not {}",
+                                                  Tempo::kMinBpm, Tempo::kMaxBpm, value));
+            }
+            bpm = value;
+        }
+        if (auto change = core::changeTempo(song, measure, bpm)) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "title") {
         SongInfo info = song.info();
         info.title = step.rest(1);
@@ -456,6 +505,51 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
                     throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
                 }
                 header.*found->flag = true;
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "repeat") { // repeat <m> [start] [end <times>] | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.repeatStart = false;
+        header.repeatTimes = 0;
+        if (!step.has(2)) {
+            throw StepSyntaxError("repeat: expected start, end <times> or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                if (step.word(i) == "start") {
+                    header.repeatStart = true;
+                } else if (step.word(i) == "end") {
+                    const std::size_t times = step.index(++i);
+                    if (times < 2 || times > std::numeric_limits<std::uint8_t>::max()) {
+                        throw StepSyntaxError(
+                            std::format("repeat: a section plays 2 to 255 times, not {}", times));
+                    }
+                    header.repeatTimes = static_cast<std::uint8_t>(times);
+                } else {
+                    throw StepSyntaxError(std::format("not a repeat: {}", step.word(i)));
+                }
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "ending") { // ending <m> <time>... | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.alternateEndings = 0;
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const std::size_t time = step.index(i);
+                if (time < 1 || time > MeasureHeader::kMaxEnding) {
+                    throw StepSyntaxError(std::format("ending: times through are 1 to {}, not {}",
+                                                      MeasureHeader::kMaxEnding, time));
+                }
+                header.alternateEndings =
+                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             }
         }
         if (header != song.measureHeader(measure)) {
@@ -594,14 +688,17 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
+        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"title <text>\", "
+        "\"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
-        "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
+        "\"caret <track> <m> <beat> [string]\", \"voice <1-4>\", right, left, up, down, "
+        "next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");
+        "insert-rest, \"drum [key]\", \"effect <name>\", \"bend <form> [cents]\", undo, redo, "
+        "save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

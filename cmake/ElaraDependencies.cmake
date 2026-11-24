@@ -1,6 +1,7 @@
 # Third-party dependencies.
 #
-# - vcpkg (manifest mode, vcpkg.json): CLI11, Catch2.
+# - vcpkg (manifest mode, vcpkg.json): CLI11, Catch2, miniz, pugixml, yyjson, and
+#   FluidSynth through the overlay port in cmake/vcpkg-ports (ADR-0043).
 # - FetchContent with a pinned, hashed archive: JUCE (audio only, ADR-0002).
 # - Pinned, hashed files: the Bravura music font and its SMuFL metadata (ADR-0011).
 # - Qt is found from QT_ROOT_DIR (CMAKE_PREFIX_PATH in CMakePresets.json).
@@ -66,6 +67,8 @@ foreach(_entry IN ITEMS
 endforeach()
 
 find_package(CLI11 CONFIG REQUIRED)
+# FluidSynth (LGPL-2.1, ADR-0043): SoundFont playback.
+find_package(FluidSynth CONFIG REQUIRED)
 
 if(ELARA_BUILD_TESTS)
   find_package(Catch2 3 CONFIG REQUIRED)

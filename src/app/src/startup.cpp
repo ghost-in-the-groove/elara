@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "startup.hpp"
 
+#include <elara/audio/sequence.hpp>
+#include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
+
 #include "audio_controller.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
@@ -8,12 +12,15 @@
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QVariantList>
 #include <QVariantMap>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <optional>
 #include <utility>
 
 namespace elara::app {
@@ -25,6 +32,34 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 // How long a screenshot waits for animations once the window is ready.
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
+constexpr int kSnareKey = 38;
+
+// The drum lane (1 at the top) of the kit piece with General MIDI `key`.
+int laneOf(int key) {
+    const auto pieces = core::drumPieces();
+    const auto found = std::ranges::find(pieces, key, &core::DrumPiece::key);
+    return static_cast<int>(found - pieces.begin()) + 1;
+}
+
+// Pages brought up to date so far: painted, or kept because a relayout left
+// them as they were.
+int pagesUpdated() {
+    return ScorePage::paintCount() + ScorePage::keptCount();
+}
+
+// The first item named `name` under `item`, searching the items it shows: a
+// Repeater's delegates are there, not among its QObject children.
+QQuickItem* findItem(QQuickItem* item, const QString& name) {
+    if (item == nullptr || item->objectName() == name) {
+        return item;
+    }
+    for (QQuickItem* child : item->childItems()) {
+        if (QQuickItem* found = findItem(child, name)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
 
 } // namespace
 
@@ -45,12 +80,13 @@ void Startup::start() {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
             ++layouts_;
+            layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
     }
     clock_.start();
     // The window opens the file itself; wait for its first layout and paint.
     waiting_ = !options_.file.isEmpty();
-    paintsBefore_ = ScorePage::paintCount();
+    paintsBefore_ = pagesUpdated();
     timer_.start();
 }
 
@@ -72,8 +108,18 @@ void Startup::queueSteps() {
             });
             queueEdits();
             queueEntry();
+            queueTuplets();
             queueMeasures();
+            queuePitches();
+            queueVoices();
+            queueDrums();
+            queueSelection();
             queueMix();
+            queueNavigation();
+            queueRepeats();
+            queueTuning();
+            queueTempo();
+            queueEffects();
         }
         return;
     }
@@ -103,8 +149,18 @@ void Startup::queueSteps() {
         });
         queueEdits();
         queueEntry();
+        queueTuplets();
         queueMeasures();
+        queuePitches();
+        queueVoices();
+        queueDrums();
+        queueSelection();
         queueMix();
+        queueNavigation();
+        queueRepeats();
+        queueTuning();
+        queueTempo();
+        queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -123,6 +179,9 @@ void Startup::queueSteps() {
             clickCursor();
             return false;
         });
+        queuePractice();
+        queueLoop();
+        queueKeepPosition();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -278,6 +337,70 @@ void Startup::queueEntry() {
     });
 }
 
+// Tuplets at the caret (ADR-0050): a triplet eighth typed, which the caret's
+// beat takes and keeps when the caret comes back to it, then the input back to
+// plain eighths. Undone, the song must end as it started.
+void Startup::queueTuplets() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tuplet check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    const auto caretDuration = [this] {
+        const core::Caret caret = score_->caret();
+        const core::Voice& voice = score_->song()
+                                       ->track(caret.track)
+                                       .staff(caret.staff)
+                                       .measure(caret.measure)
+                                       .voices.at(caret.voice);
+        return caret.beat < voice.beats.size() ? std::optional(voice.beats[caret.beat].duration)
+                                               : std::nullopt;
+    };
+    steps_.emplace_back([this, check] {
+        tupleting_ = score_->caretPage() >= 0 && score_->caretFretted();
+        if (!tupleting_) {
+            return false;
+        }
+        score_->setInputValue(8);
+        score_->setInputTuplet(3);
+        check(score_->inputTuplet() == 3, "the input is not a triplet");
+        score_->typeDigit(5);
+        return true;
+    });
+    steps_.emplace_back([this, check, caretDuration] {
+        if (!tupleting_) {
+            return false;
+        }
+        const std::optional<core::Duration> typed = caretDuration();
+        check(typed && typed->tuplet() == core::Tuplet(3, 2) &&
+                  typed->value() == core::NoteValue::Eighth,
+              "the beat is not a triplet eighth");
+        score_->setInputTuplet(3);
+        check(score_->inputTuplet() == 0, "the triplet did not toggle off");
+        return true;
+    });
+    steps_.emplace_back([this, check, caretDuration] {
+        if (!tupleting_) {
+            return false;
+        }
+        const std::optional<core::Duration> plain = caretDuration();
+        check(plain && plain->tuplet().isNone(), "the beat kept its triplet");
+        check(score_->undoName() == ScoreDocument::tr("Change duration"),
+              "the tuplet is not an undo step");
+        for (int i = 0; i < 6 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tupleting_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the tuplets did not restore the song");
+        return false;
+    });
+}
+
 // Measures at the caret: one inserted after it, given its own time and key
 // signatures, deleted again; then everything is undone.
 void Startup::queueMeasures() {
@@ -336,6 +459,247 @@ void Startup::queueMeasures() {
     });
 }
 
+// Note names at the caret: a C typed, raised a semitone, both undone.
+void Startup::queuePitches() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("pitch check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        pitching_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!pitching_) {
+            return false;
+        }
+        score_->typeNoteName(0, false);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        check(pitches.size() == 1 && pitches.front().step() == core::Step::C,
+              "the note name did not type a C");
+        if (pitches.empty()) {
+            return false;
+        }
+        check(score_->caretStatus().endsWith(QStringLiteral("C%1").arg(pitches.front().octave())),
+              "the status does not name the note");
+        typedMidi_ = pitches.front().midiNumber();
+        score_->shiftPitch(1);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        check(pitches.size() == 1 && pitches.front().midiNumber() == typedMidi_ + 1,
+              "the note did not move up a semitone");
+        for (int i = 0; i < 4 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the note names did not restore the song");
+        return false;
+    });
+}
+
+// Drum entry on a new drum kit track (ADR-0035): the status names the lane,
+// the caret box goes down with the lanes, and a snare is toggled on and off
+// again. Then the track is undone and the song must end as it started.
+void Startup::queueDrums() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("drum check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        drumming_ = score_->caretPage() >= 0;
+        if (!drumming_) {
+            return false;
+        }
+        score_->addTrack(QStringLiteral("drum-kit"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(score_->caretOnDrums(), "the caret is not on the drum track");
+        const int lanes = static_cast<int>(core::drumPieces().size());
+        for (int lane = 1; lane < lanes; ++lane) {
+            score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        }
+        check(score_->caret().string == 1 &&
+                  score_->caretStatus().endsWith(ScoreDocument::laneName(1)),
+              "the status does not name the top lane");
+        const double crash = score_->caretRect().top();
+        for (int lane = 1; lane < laneOf(kSnareKey); ++lane) {
+            score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        }
+        check(score_->caretStatus().endsWith(ScoreDocument::laneName(laneOf(kSnareKey))),
+              "the status does not name the snare");
+        check(score_->caretRect().top() > crash, "the caret did not go down to the snare");
+        score_->toggleDrum();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        const std::vector<core::Pitch> hits = score_->pitchesAtCaret();
+        check(hits.size() == 1 && hits.front().midiNumber() == kSnareKey,
+              "the snare was not added");
+        score_->toggleDrum();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(score_->pitchesAtCaret().empty(), "the snare was not removed");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the drums did not restore the song");
+        if (score_->track() == 0) {
+            return false;
+        }
+        score_->setTrack(0);
+        return true;
+    });
+}
+
+// Voices: the caret goes to voice 2, which the status names, and a note typed
+// there goes into it; back in voice 1 the status no longer names a voice.
+// Undone, the song must end as it started.
+void Startup::queueVoices() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("voice check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        voicing_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!voicing_) {
+            return false;
+        }
+        score_->setCaretVoice(2);
+        check(score_->caretVoice() == 2, "the caret did not go to voice 2");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the status does not name voice 2");
+        if (score_->caretFretted()) {
+            score_->typeDigit(7);
+        } else {
+            score_->typeNoteName(2, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(score_->caretVoice() == 2 && !score_->pitchesAtCaret().empty(),
+              "the note did not go into voice 2");
+        score_->setCaretVoice(1);
+        check(score_->caretVoice() == 1 &&
+                  !score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the caret did not come back to voice 1");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the voice did not restore the song");
+        return false;
+    });
+}
+
+// Selected measures (ADR-0036): two measures selected and tinted on the page,
+// copied, let go, pasted into new measures before the caret's, which end up
+// selected, and transposed. Then everything is undone and the song must end as it started.
+void Startup::queueSelection() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("selection check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        selecting_ = score_->caretPage() >= 0 && score_->measureCount() > 1;
+        if (!selecting_) {
+            return false;
+        }
+        lengthBefore_ = score_->measureCount();
+        const bool last = score_->caretMeasure() + 1 >= lengthBefore_;
+        score_->extendSelection(last ? -1 : 1);
+        check(score_->hasSelection() && score_->selectionLast() == score_->selectionFirst() + 1,
+              "Shift+Right did not select two measures");
+        check(score_->selectionBoxes(score_->caretPage()).size() == 2,
+              "the page does not show the two measures selected");
+        check(score_->caretStatus().startsWith(ScoreDocument::tr("Measures %1-%2 selected")
+                                                   .arg(score_->selectionFirst() + 1)
+                                                   .arg(score_->selectionLast() + 1)),
+              "the status does not say what is selected");
+        score_->copy();
+        check(score_->canPaste(), "nothing was copied");
+        score_->clearSelection();
+        pasteAt_ = score_->caretMeasure();
+        score_->paste(true);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->measureCount() == lengthBefore_ + 2, "pasting did not insert two measures");
+        check(score_->hasSelection() && score_->selectionFirst() == pasteAt_ &&
+                  score_->selectionLast() == pasteAt_ + 1,
+              "the pasted measures are not selected");
+        score_->transposeSelection(2);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->undoName() == ScoreDocument::tr("Transpose"),
+              "the transposition is not undoable");
+        score_->clearSelection();
+        check(!score_->hasSelection() && score_->selectionBoxes(score_->caretPage()).isEmpty(),
+              "Escape did not let go of the selection");
+        for (int i = 0; i < 2 && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(!score_->modified() && score_->measureCount() == lengthBefore_,
+              "undoing the paste did not restore the song");
+        return false;
+    });
+}
+
 // The mixer (ADR-0039): a fader previewed without changing the song, then the
 // first track's mix set, soloed, as one undo step that keeps what playback
 // plays and silences the other tracks. Undone, the song must end as it started.
@@ -347,6 +711,10 @@ void Startup::queueMix() {
     };
     steps_.emplace_back([this, check] {
         sequenceBefore_ = score_->sequence();
+        // A row of the song panel: the mix changes below change rows, but
+        // must not make them again.
+        trackRow_ = findItem(window_->contentItem(), QStringLiteral("trackRow"));
+        check(trackRow_ != nullptr, "the song panel lists no track");
         const auto tracks = static_cast<std::size_t>(score_->tracks().size());
         score_->previewTrackMix(0, 0.25, 0.5);
         check(score_->previewMixes().size() == tracks &&
@@ -373,7 +741,278 @@ void Startup::queueMix() {
         check(!score_->modified() &&
                   !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
               "undoing the mix did not restore the song");
+        check(trackRow_ != nullptr, "a mix change made the song panel's rows again");
         sequenceBefore_.reset();
+        return false;
+    });
+}
+
+// Signs and jumps from the measure popup (ADR-0049): a segno on the first
+// measure, then a D.S. al Coda on it, each one undo step named for them; both
+// undone, the song must end as it started.
+void Startup::queueNavigation() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("navigation check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("segno"), true}});
+        check(score_->navigationAt(0).value(QStringLiteral("segno")).toBool(),
+              "the segno was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change navigation marks"),
+              "the marks are not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        score_->setNavigation(0, {{QStringLiteral("jump"), 2}, {QStringLiteral("jumpThen"), 2}});
+        const QVariantMap marks = score_->navigationAt(0);
+        check(marks.value(QStringLiteral("jump")).toInt() == 2 &&
+                  marks.value(QStringLiteral("jumpThen")).toInt() == 2 &&
+                  marks.value(QStringLiteral("segno")).toBool(),
+              "the jump was not set beside the segno");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantMap marks = score_->navigationAt(0);
+        check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
+                  marks.value(QStringLiteral("jump")).toInt() == 0,
+              "undoing the marks did not restore the song");
+        return false;
+    });
+}
+
+// Repeats from the measure popup (ADR-0016): the first measure's start
+// barline toggled with its end repeat played a different number of times,
+// then other endings, each one undo step; both undone, the song must end as it
+// started.
+void Startup::queueRepeats() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("repeats check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        repeatsBefore_ = score_->repeatsAt(0);
+        const bool start = !repeatsBefore_.value(QStringLiteral("start")).toBool();
+        const int times = repeatsBefore_.value(QStringLiteral("times")).toInt() == 3 ? 4 : 3;
+        score_->setRepeats(0, {{QStringLiteral("start"), start}, {QStringLiteral("times"), times}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("start")).toBool() == start &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the repeat was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change repeats"),
+              "the repeat is not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantList first{1, 2};
+        const QVariantList endings =
+            repeatsBefore_.value(QStringLiteral("endings")).toList() == first ? QVariantList{2, 3}
+                                                                              : first;
+        const int times = score_->repeatsAt(0).value(QStringLiteral("times")).toInt();
+        score_->setRepeats(0, {{QStringLiteral("endings"), endings}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("endings")).toList() == endings &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the endings were not set beside the repeat");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && score_->repeatsAt(0) == repeatsBefore_,
+              "undoing the repeats did not restore the song");
+        return false;
+    });
+}
+
+// A tempo change from the measure popup (ADR-0042): 90 beats per minute from
+// the second measure, one undo step named for it that leaves the first
+// measure's tempo alone, then taken away again; both undone, the song must end
+// as it started.
+void Startup::queueTempo() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tempo check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        tempoBefore_ = score_->tempoAt(1);
+        const QVariantMap first = score_->tempoAt(0);
+        score_->setTempoFrom(1, 90);
+        const QVariantMap tempo = score_->tempoAt(1);
+        check(tempo.value(QStringLiteral("bpm")).toInt() == 90 &&
+                  tempo.value(QStringLiteral("own")).toBool(),
+              "the second measure does not start at 90");
+        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
+              "the tempo is not one undo step");
+        check(score_->tempoAt(0) == first, "the first measure's tempo changed");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        score_->setTempoFrom(1, 0);
+        check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
+              "the tempo change was not taken away");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        check(!score_->modified() && score_->tempoAt(1) == tempoBefore_,
+              "undoing the tempo did not restore the song");
+        return false;
+    });
+}
+
+// The first track's tuning from the song panel (ADR-0046): a capo a fret
+// higher keeping the frets, then the capo taken off keeping the sound, each
+// one undo step; both undone, the song must end as it started.
+void Startup::queueTuning() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tuning check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        tuningBefore_ = score_->trackTuning(0);
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const int capo = tuningBefore_.value(QStringLiteral("capo")).toInt() + 1;
+        score_->setTrackTuning(0, notes, capo, true);
+        const QVariantMap tuning = score_->trackTuning(0);
+        check(tuning.value(QStringLiteral("notes")).toString() == notes &&
+                  tuning.value(QStringLiteral("capo")).toInt() == capo,
+              "the capo was not moved");
+        const bool changed = score_->undoName() == ScoreDocument::tr("Change tuning");
+        check(changed, "the tuning is not one undo step");
+        return changed;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        // By its preset when it has one, else by its notes.
+        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
+        const QString preset = tuningBefore_.value(QStringLiteral("preset")).toString();
+        score_->setTrackTuning(0, preset.isEmpty() ? notes : preset, 0, false);
+        const QVariantMap tuning = score_->trackTuning(0);
+        const bool changed = tuning.value(QStringLiteral("notes")).toString() == notes &&
+                             tuning.value(QStringLiteral("capo")).toInt() == 0;
+        check(changed, "the capo was not taken off");
+        if (!changed) {
+            return false;
+        }
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
+            return false;
+        }
+        check(!score_->modified() && score_->trackTuning(0) == tuningBefore_,
+              "undoing the tunings did not restore the song");
+        return false;
+    });
+}
+
+// Note effects at the caret (ADR-0038): a note typed, then accent and
+// staccato toggled on it, which the status names, and the accent off again.
+// The keys map to the effects. Then everything is undone and the song must end
+// as it started.
+void Startup::queueEffects() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("effect check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    constexpr int kAccent = static_cast<int>(core::NoteEffect::Accent);
+    constexpr int kStaccato = static_cast<int>(core::NoteEffect::Staccato);
+    steps_.emplace_back([this, check] {
+        effecting_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!effecting_) {
+            return false;
+        }
+        check(score_->effectForKey(QStringLiteral(">")) == kAccent &&
+                  score_->effectForKey(QStringLiteral("'")) == kStaccato &&
+                  score_->effectForKey(QStringLiteral("p")) ==
+                      static_cast<int>(core::NoteEffect::PalmMute) &&
+                  score_->effectForKey(QStringLiteral("a")) < 0,
+              "the keys do not map to the effects");
+        if (score_->caretFretted()) {
+            score_->typeDigit(5);
+        } else {
+            score_->typeNoteName(0, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        effectsBefore_ = score_->caretEffects();
+        score_->toggleEffect(kAccent);
+        check((score_->caretEffects() ^ effectsBefore_) == 1 << kAccent,
+              "the accent did not toggle");
+        check(score_->undoName() == ScoreDocument::tr("Change effect"),
+              "the effect is not undoable");
+        score_->toggleEffect(kStaccato);
+        check((score_->caretEffects() ^ effectsBefore_) == ((1 << kAccent) | (1 << kStaccato)),
+              "staccato did not toggle");
+        const int on = score_->caretEffects();
+        check(((on & (1 << kStaccato)) != 0) ==
+                  score_->caretStatus().contains(score_->effectName(kStaccato)),
+              "the status does not name the effects");
+        score_->toggleEffect(kAccent);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        check((score_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
+              "the accent did not go off again");
+        // Bends of any form (ADR-0055).
+        constexpr int kRelease = static_cast<int>(core::BendForm::BendRelease);
+        constexpr int kPreBend = static_cast<int>(core::BendForm::PreBend);
+        score_->setBend(kRelease, 100);
+        check(score_->caretBendForm() == kRelease && score_->caretBendCents() == 100,
+              "the bend and release did not go on");
+        check(score_->undoName() == ScoreDocument::tr("Change bend"), "the bend is not undoable");
+        check(score_->caretStatus().contains(score_->bendName(kRelease, 100)) &&
+                  score_->bendName(kRelease, 100).endsWith(QStringLiteral("1/2")),
+              "the status does not name the bend");
+        score_->setBend(kPreBend, 300);
+        check(score_->caretBendForm() == kPreBend && score_->caretBendCents() == 300 &&
+                  score_->bendAmount(300) == QStringLiteral("1 1/2"),
+              "the pre-bend did not replace it");
+        score_->setBend(0, 0);
+        check(score_->caretBendForm() == 0 && score_->caretBendCents() == 0, "the bend did not go");
+        for (int i = 0; i < 10 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the effects did not restore the song");
         return false;
     });
 }
@@ -387,7 +1026,7 @@ void Startup::tick() {
     if (waiting_) {
         const bool settled = score_ != nullptr && laidOut_ && !score_->busy() &&
                              score_->status() == ScoreDocument::Status::Ready &&
-                             (score_->pageCount() == 0 || ScorePage::paintCount() > paintsBefore_);
+                             (score_->pageCount() == 0 || pagesUpdated() > paintsBefore_);
         if (!settled) {
             if (clock_.elapsed() - stepStarted_ > kStepTimeoutMilliseconds) {
                 finish(false, QStringLiteral("timed out"));
@@ -395,21 +1034,43 @@ void Startup::tick() {
             return;
         }
         waiting_ = false;
+        // Playback plays the song the pages show, once its layout is done:
+        // an edit's sequence is built with it (ADR-0031).
+        if (score_ != nullptr && score_->song() && editProblem_.isEmpty() &&
+            (!score_->sequence() ||
+             *score_->sequence() != audio::Sequence(*score_->song(), score_->practice()))) {
+            editProblem_ = QStringLiteral("playback does not play the song the pages show");
+        }
     }
     if (!queued_) {
         queued_ = true;
         queueSteps();
     }
     while (!steps_.empty()) {
-        const auto step = std::move(steps_.front());
+        auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
-        paintsBefore_ = ScorePage::paintCount();
+        paintsBefore_ = pagesUpdated();
+        if (againSince_ < 0) {
+            ++stepsRun_;
+        }
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
             return;
         }
+        if (again_) {
+            again_ = false;
+            if (againSince_ < 0) {
+                againSince_ = clock_.elapsed();
+            } else if (clock_.elapsed() - againSince_ > kStepTimeoutMilliseconds) {
+                finish(false, QStringLiteral("timed out"));
+                return;
+            }
+            steps_.push_front(std::move(step));
+            return;
+        }
+        againSince_ = -1;
         if (changed) {
             waiting_ = true;
             stepStarted_ = clock_.elapsed();
@@ -433,8 +1094,13 @@ void Startup::tick() {
         finish(false, editProblem_);
         return;
     }
+    if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
+        finish(false, overlap);
+        return;
+    }
     QString detail;
     if (score_ != nullptr && score_->pageCount() > 0) {
+        std::printf("pages kept: %d\n", ScorePage::keptCount());
         detail = QStringLiteral("%1 pages, %2 painted, %3 layouts")
                      .arg(score_->pageCount())
                      .arg(ScorePage::paintCount())
@@ -452,6 +1118,14 @@ void Startup::clickCursor() {
     auto* playhead = window_->findChild<QQuickItem*>(QStringLiteral("playhead"));
     if (audio == nullptr || playhead == nullptr || !playhead->isVisible()) {
         failure_ = QStringLiteral("no playback cursor");
+        return;
+    }
+    // Nothing may cover the cursor, as the measure popup open at the caret can:
+    // it closes first, and the click waits until it is gone.
+    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
+        popup != nullptr && popup->property("visible").toBool()) {
+        QMetaObject::invokeMethod(popup, "close");
+        again_ = true;
         return;
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());
@@ -473,6 +1147,237 @@ void Startup::clickCursor() {
     }
 }
 
+// Practice (ADR-0024): half speed with the metronome, then back. Each builds
+// the sequence again without a relayout, and playback keeps its place in the
+// music: at half speed every time doubles.
+void Startup::queuePractice() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("practice check failed: %1").arg(what);
+        }
+    };
+    // Waits for a sequence other than sequenceBefore_; false while there is none.
+    const auto arrived = [this] {
+        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr || !score_->sequence()) {
+            return false;
+        }
+        sequenceBefore_ = score_->sequence();
+        positionBefore_ = audio->position();
+        score_->setSpeed(50);
+        score_->setMetronome(true);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        const auto sequence = score_->sequence();
+        const double position = window_->findChild<AudioController*>()->position();
+        check(score_->speed() == 50 && score_->metronome() && sequence->speed() == 0.5 &&
+                  sequence->metronome(),
+              QStringLiteral("half speed with the metronome was not played"));
+        check(std::abs(position - 2.0 * positionBefore_) < 1e-6,
+              QStringLiteral("half speed moved playback from %1 s to %2 s, not %3 s")
+                  .arg(positionBefore_)
+                  .arg(position)
+                  .arg(2.0 * positionBefore_));
+        sequenceBefore_ = sequence;
+        score_->setSpeed(100);
+        score_->setMetronome(false);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        const double position = window_->findChild<AudioController*>()->position();
+        check(*score_->sequence() == audio::Sequence(*score_->song()),
+              QStringLiteral("full speed did not play the song as written"));
+        check(std::abs(position - positionBefore_) < 1e-6,
+              QStringLiteral("full speed left playback at %1 s, not %2 s")
+                  .arg(position)
+                  .arg(positionBefore_));
+        sequenceBefore_.reset();
+        return false;
+    });
+}
+
+// The A-B loop is marked at playback's position, A then B; B before A marks A
+// again, and a third mark ends the loop. It keeps its place in the music when
+// the speed changes. The loop is left marked, for queueKeepPosition() to check
+// that an edit keeps it and a new song forgets it, and playback where it was.
+void Startup::queueLoop() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("loop check failed: %1").arg(what);
+        }
+    };
+    const auto arrived = [this] {
+        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    const auto near = [](double a, double b) {
+        return std::abs(a - b) < 1e-6;
+    };
+    steps_.emplace_back([this, check, near] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr || !score_->sequence()) {
+            return false;
+        }
+        positionBefore_ = audio->position();
+        const double quarter = score_->duration() / 4.0;
+        audio->seek(quarter);
+        audio->markLoop();
+        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
+              QStringLiteral("A was not marked at %1 s").arg(quarter));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        check(audio->looping() && near(audio->loopFrom(), quarter) &&
+                  near(audio->loopTo(), 2.0 * quarter),
+              QStringLiteral("A-B is %1 s to %2 s, not %3 s to %4 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo())
+                  .arg(quarter)
+                  .arg(2.0 * quarter));
+        sequenceBefore_ = score_->sequence();
+        score_->setSpeed(50);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived, near] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        auto* audio = window_->findChild<AudioController*>();
+        const double quarter = score_->duration() / 8.0; // the song lasts twice as long
+        check(audio->looping() && near(audio->loopFrom(), 2.0 * quarter) &&
+                  near(audio->loopTo(), 4.0 * quarter),
+              QStringLiteral("at half speed A-B is %1 s to %2 s, not %3 s to %4 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo())
+                  .arg(2.0 * quarter)
+                  .arg(4.0 * quarter));
+        sequenceBefore_ = score_->sequence();
+        score_->setSpeed(100);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived, near] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        sequenceBefore_.reset();
+        auto* audio = window_->findChild<AudioController*>();
+        const double quarter = score_->duration() / 4.0;
+        check(audio->looping() && near(audio->loopFrom(), quarter) &&
+                  near(audio->loopTo(), 2.0 * quarter),
+              QStringLiteral("back at full speed A-B is %1 s to %2 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo()));
+        audio->markLoop();
+        check(!audio->looping() && !audio->loopMarked(),
+              QStringLiteral("a third mark did not end the loop"));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        audio->seek(quarter);
+        audio->markLoop();
+        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
+              QStringLiteral("B before A did not mark A again"));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        check(audio->looping(), QStringLiteral("A-B was not marked again"));
+        audio->setCountIn(true);
+        check(audio->countIn(), QStringLiteral("the count-in did not turn on"));
+        audio->setCountIn(false);
+        audio->seek(positionBefore_);
+        return false;
+    });
+}
+
+// An edit keeps playback where it is: a track added, then undone, each give
+// playback a new sequence and leave it where the click on the cursor put it.
+// A new song then starts playback from its beginning. The A-B loop that
+// queueLoop() left stays through the edit and goes with the new song.
+void Startup::queueKeepPosition() {
+    const auto check = [this](const char* what) {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && audio->position() != positionBefore_ && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("%1 moved playback to %2 s, not %3 s")
+                               .arg(QLatin1StringView(what))
+                               .arg(audio->position())
+                               .arg(positionBefore_);
+        }
+    };
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr) {
+            return false;
+        }
+        positionBefore_ = audio->position();
+        score_->addTrack(QStringLiteral("electric-bass"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check("an edit");
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && !audio->looping() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("an edit ended the loop");
+        }
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check("an undo");
+        // Made while an edit's sequence is still being built, the new song
+        // must still be what playback plays once everything settles.
+        score_->addTrack(QStringLiteral("electric-bass"));
+        score_->newSong(QStringLiteral("electric-guitar"));
+        return true;
+    });
+    // Another song plays from its start.
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("a new song left playback at %1 s").arg(audio->position());
+        }
+        if (audio != nullptr && (audio->looping() || audio->loopMarked()) &&
+            editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("a new song kept the loop");
+        }
+        return false;
+    });
+}
+
+// The bars that float over the bottom of the score, the transport and the
+// note entry bar shown with the caret, must not cover each other.
+QString Startup::overlappingBars() const {
+    auto* transport = window_->findChild<QQuickItem*>(QStringLiteral("transport"));
+    auto* entry = window_->findChild<QQuickItem*>(QStringLiteral("entryBar"));
+    if (transport == nullptr || entry == nullptr) {
+        return QStringLiteral("no transport or note entry bar");
+    }
+    if (!transport->isVisible() || !entry->isVisible()) {
+        return {};
+    }
+    const auto sceneRect = [](const QQuickItem* item) {
+        return item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
+    };
+    if (sceneRect(transport).intersects(sceneRect(entry))) {
+        return QStringLiteral("the note entry bar overlaps the transport");
+    }
+    return {};
+}
+
 void Startup::finish(bool ok, const QString& detail) {
     timer_.stop();
     QString outcome = detail;
@@ -488,6 +1393,11 @@ void Startup::finish(bool ok, const QString& detail) {
         }
     }
     reportSmokeTest(ok, outcome);
+    // Which steps each layout followed, after the result the tests read: when
+    // the count of layouts they expect is off on one platform, this says where.
+    if (!layoutSteps_.isEmpty()) {
+        std::printf("layouts after steps:%s\n", qPrintable(layoutSteps_));
+    }
     QCoreApplication::exit(ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

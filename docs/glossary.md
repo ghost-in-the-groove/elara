@@ -76,11 +76,13 @@ base speaks one vocabulary. American terms follow MusicXML.
 | palm mute | palm mute | `palmMute` | `P.M.` |
 | dejar sonar | let ring | `letRing` | |
 | púa abajo / arriba | pick stroke | `PickStroke` | Down / up |
+| rasgueo | strum | `Strum` | Down strikes a chord from its lowest string, up from its highest; 0.01 s between strings in playback (ADR-0025) |
+| trémolo de púa | tremolo picking | `BeatEffects::tremoloPicking` | The note struck again and again at that note value (ADR-0025) |
 | nota muerta | dead note | `deadNote` | |
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
-| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()` | ppp ... fff; set at the caret, it holds until the next change (ADR-0047) |
+| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()`, `Role::Dynamic` | How loud a note is played, ppp ... fff (mf by default); set at the caret, it holds until the next change (ADR-0047), and a mark under the staff shows where it changes (ADR-0044) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
@@ -88,8 +90,11 @@ base speaks one vocabulary. American terms follow MusicXML.
 | pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
 | compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |
 | velocidad de reproducción | playback speed | `SequenceOptions::speed` | 0.25 to 2 times every written tempo (ADR-0024) |
-| bucle A-B | A-B loop | `LoopRange` | |
+| bucle A-B | A-B loop | `Player::setLoop()` | Playback that reaches B goes on from A (ADR-0024) |
+| claqueta (cuenta previa) | count-in | `CountIn`, `Sequence::countInAt()` | One measure of beats before playback starts, at the tempo there (ADR-0024) |
 | afinador | tuner | `Tuner`, `PitchDetector`, `tunerReading()` | YIN pitch detection; the nearest note, its cents and the nearest open string (ADR-0028); smoothed readings from the audio input (ADR-0029) |
-| banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |
+| banco de sonidos | sound bank | `audio::SoundBank`, `builtinBank()`, `SoundFont` | Where the tracks get their sound: the built-in synthesizer, or a SoundFont (SF2, SF3; ADR-0043) |
+| sonido de pista | track sound | `audio::TrackSound` | One track's sound as it plays, made by a sound bank for its instrument (ADR-0043) |
+| preset (de SoundFont) | preset | `SoundFontPreset`, `SoundFont::presetFor()` | One sound of a SoundFont, by bank and program; bank 128 holds drum kits |
 | mezclador | mixer | `Mixer` | |
 | mezcla de pista | track mix | `TrackMix` | Volume (fader position 0..1), pan (-1..1), mute, solo; `Song::audible()` (ADR-0020) |

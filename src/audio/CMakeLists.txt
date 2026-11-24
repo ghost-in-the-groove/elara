@@ -6,6 +6,7 @@ add_library(elara_audio STATIC
   src/player.cpp
   src/sample_ring.cpp
   src/sequence.cpp
+  src/sound_bank.cpp
   src/synth.cpp
   src/tone_generator.cpp
   src/tuner.cpp
@@ -46,3 +47,16 @@ target_compile_definitions(elara_audio_juce PRIVATE
 target_compile_options(elara_audio_juce PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
 # Strict warnings for our file only; JUCE's module sources compile in this target too.
 elara_source_warnings(backend_juce/src/system_audio.cpp)
+
+# elara_audio_fluid: SoundFonts as sound banks, through FluidSynth (ADR-0043).
+# Its public header is plain C++; FluidSynth stays in its source.
+add_library(elara_audio_fluid STATIC backend_fluid/src/sound_font.cpp)
+add_library(elara::audio_fluid ALIAS elara_audio_fluid)
+
+target_include_directories(elara_audio_fluid PUBLIC backend_fluid/include)
+target_link_libraries(elara_audio_fluid
+  PUBLIC
+    elara::audio
+  PRIVATE
+    FluidSynth::libfluidsynth)
+elara_target_warnings(elara_audio_fluid)
