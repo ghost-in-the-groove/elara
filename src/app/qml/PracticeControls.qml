@@ -27,8 +27,9 @@ RowLayout {
 
     IconButton {
         objectName: "countInButton"
-        // Four clicks climbing: one, two, three, four.
-        iconPath: "M5 18 L5 15.5 M9.7 18 L9.7 12.5 M14.3 18 L14.3 9.5 M19 18 L19 6.5"
+        // A stopwatch: the clicks before the start.
+        iconPath: "M12 21 A7.5 7.5 0 1 0 12 6 A7.5 7.5 0 1 0 12 21 Z M12 9.5 L12 13.5 L14.5 15 "
+                  + "M9.5 3 L14.5 3 M12 3 L12 6 M18.5 6.5 L19.8 5.2"
         tip: qsTr("Count-in: a measure of clicks before playing")
         checked: root.playback.countIn
         onClicked: root.playback.countIn = !root.playback.countIn
