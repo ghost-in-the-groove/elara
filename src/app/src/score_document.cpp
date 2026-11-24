@@ -264,6 +264,7 @@ constexpr std::array kEditNames{
     Translation{"Change navigation marks",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
     Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
+    Translation{"Change section", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change section")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
     Translation{"Change key signature",
@@ -1138,6 +1139,26 @@ void ScoreDocument::setTempoFrom(int measure, int bpm) {
     }
     const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
     if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+        execute(std::move(change));
+    }
+}
+
+QString ScoreDocument::sectionAt(int measure) const {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return {};
+    }
+    return QString::fromStdString(
+        document_->song().measureHeader(static_cast<std::size_t>(measure)).section);
+}
+
+void ScoreDocument::setSection(int measure, const QString& name) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    if (auto change = core::changeSection(document_->song(), static_cast<std::size_t>(measure),
+                                          name.trimmed().toStdString())) {
         execute(std::move(change));
     }
 }

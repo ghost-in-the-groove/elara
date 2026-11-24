@@ -116,6 +116,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
+    Q_PROPERTY(QString caretSection READ caretSection NOTIFY caretChanged)
     // Selected measures (ADR-0036).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(int selectionFirst READ selectionFirst NOTIFY selectionChanged)
@@ -299,6 +300,12 @@ public:
     /// ("Change tempo"), or with a bpm of 0 takes the measure's change away. On
     /// the first measure it sets the song's tempo.
     Q_INVOKABLE void setTempoFrom(int measure, int bpm);
+    /// The name of the section that starts at `measure` (ADR-0062), empty when
+    /// none does.
+    Q_INVOKABLE QString sectionAt(int measure) const;
+    /// Names the section that starts at `measure`, trimmed, as one undo step
+    /// ("Change section"); an empty name takes it off.
+    Q_INVOKABLE void setSection(int measure, const QString& name);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -465,6 +472,9 @@ public:
     }
     [[nodiscard]] QVariantMap caretTempo() const {
         return tempoAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] QString caretSection() const {
+        return sectionAt(static_cast<int>(caret_.measure));
     }
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.

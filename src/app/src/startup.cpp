@@ -119,6 +119,7 @@ void Startup::queueSteps() {
             queueRepeats();
             queueTuning();
             queueTempo();
+            queueSection();
             queueEffects();
             queueContinuous();
         }
@@ -162,6 +163,7 @@ void Startup::queueSteps() {
         queueRepeats();
         queueTuning();
         queueTempo();
+        queueSection();
         queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -899,6 +901,36 @@ void Startup::queueRepeats() {
     steps_.emplace_back([this, check] {
         check(!score_->modified() && score_->repeatsAt(0) == repeatsBefore_,
               "undoing the repeats did not restore the song");
+        return false;
+    });
+}
+
+// A section named from the measure popup (ADR-0062): the first measure's name
+// set, trimmed, as one undo step that the score draws; undone, the song must
+// end as it started.
+void Startup::queueSection() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("section check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        sectionBefore_ = score_->sectionAt(0);
+        const QString name = sectionBefore_ == QStringLiteral("Chorus") ? QStringLiteral("Verse")
+                                                                        : QStringLiteral("Chorus");
+        score_->setSection(0, QStringLiteral("  ") + name + QStringLiteral(" "));
+        check(score_->sectionAt(0) == name, "the section was not named, trimmed");
+        check(score_->undoName() == ScoreDocument::tr("Change section"),
+              "the section is not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && score_->sectionAt(0) == sectionBefore_,
+              "undoing the section did not restore the song");
         return false;
     });
 }

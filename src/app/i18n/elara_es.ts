@@ -400,6 +400,14 @@
         <translation>Desde este compás hasta el siguiente cambio.</translation>
     </message>
     <message>
+        <source>Section</source>
+        <translation>Sección</translation>
+    </message>
+    <message>
+        <source>Intro, Verse, Chorus…</source>
+        <translation>Intro, estrofa, estribillo…</translation>
+    </message>
+    <message>
         <source>Signs and jumps</source>
         <translation>Señales y saltos</translation>
     </message>
@@ -1138,6 +1146,10 @@
     <message>
         <source>Paste</source>
         <translation>Pegar</translation>
+    </message>
+    <message>
+        <source>Change section</source>
+        <translation>Cambiar sección</translation>
     </message>
     <message>
         <source>Transpose</source>
