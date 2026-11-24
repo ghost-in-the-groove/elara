@@ -67,6 +67,13 @@ std::string measuresJson(const core::Song& song) {
                                    kJumpThenNames.at(static_cast<std::size_t>(header.jumpThen)));
             }
         }
+        // A tempo that starts the measure (ADR-0042); changes inside it are
+        // kept but not listed here.
+        for (const core::TempoChange& change : header.tempoChanges) {
+            if (change.offset == core::Fraction{}) {
+                out += std::format(R"(,"tempo":{})", jsonNumber(change.tempo.bpm()));
+            }
+        }
         out += "}";
     }
     return out + "]";

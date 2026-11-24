@@ -333,6 +333,33 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         doc.execute(std::make_unique<core::SetTrackMix>(step.index(1), mix));
     } else if (verb == "tempo") {
         doc.execute(std::make_unique<SetStartTempo>(Tempo(step.number<int>(1))));
+    } else if (verb == "tempo-from") { // tempo-from <m> <bpm> | none
+        const std::size_t measure = step.index(1);
+        if (measure == 0) {
+            throw StepSyntaxError("tempo-from: the first measure plays at the song's tempo "
+                                  "(\"tempo <bpm>\")");
+        }
+        MeasureHeader header = song.measureHeader(measure);
+        // The tempo that starts the measure; changes later in it stay.
+        std::erase_if(header.tempoChanges, [](const core::TempoChange& change) {
+            return change.offset == core::Fraction{};
+        });
+        if (step.word(2) != "none") {
+            const int bpm = step.number<int>(2);
+            if (static_cast<double>(bpm) < Tempo::kMinBpm ||
+                static_cast<double>(bpm) > Tempo::kMaxBpm) {
+                throw StepSyntaxError(std::format("tempo-from: {} to {} beats per minute, not {}",
+                                                  Tempo::kMinBpm, Tempo::kMaxBpm, bpm));
+            }
+            // Counted in the beat the song counts in there: a dotted quarter
+            // in 6/8 stays one.
+            const Tempo tempo(bpm, song.tempoAt(measure, core::Fraction{}).beatUnit());
+            header.tempoChanges.insert(header.tempoChanges.begin(),
+                                       core::TempoChange{.offset = {}, .tempo = tempo});
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
     } else if (verb == "title") {
         SongInfo info = song.info();
         info.title = step.rest(1);
@@ -594,7 +621,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
+        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"title <text>\", "
+        "\"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
