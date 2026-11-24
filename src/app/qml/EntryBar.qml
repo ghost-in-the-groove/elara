@@ -129,6 +129,25 @@ Rectangle {
         }
     }
 
+    // A beat effect drawn as an icon (ADR-0056): lit while the caret's beat
+    // has it; a click on a lit one takes it off.
+    component BeatEffect: Pill {
+        id: beatEffect
+
+        required property string tip
+        required property string path
+
+        implicitWidth: 34
+        Accessible.role: Accessible.CheckBox
+        Accessible.name: tip
+
+        contentItem: Icon {
+            path: beatEffect.path
+            lineWidth: 1.8
+            color: beatEffect.active ? "white" : root.ink
+        }
+    }
+
     // How far a bend goes: the caret's bend, or a bend up if it has none.
     component BendAmount: Pill {
         id: bendAmount
@@ -620,6 +639,85 @@ Rectangle {
 
                                 cents: modelData
                             }
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Beat")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // The beat's strum, pick stroke and tremolo picking.
+                    Row {
+                        spacing: 4
+
+                        BeatEffect {
+                            tip: qsTr("Strum down")
+                            path: "M12 4 L12 20 M7 15 L12 20 L17 15"
+                            active: root.document.caretStrum === 1
+                            onClicked: root.document.setStrum(active ? 0 : 1)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Strum up")
+                            path: "M12 20 L12 4 M7 9 L12 4 L17 9"
+                            active: root.document.caretStrum === 2
+                            onClicked: root.document.setStrum(active ? 0 : 2)
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        BeatEffect {
+                            tip: qsTr("Down stroke")
+                            path: "M6 18 L6 7 L18 7 L18 18"
+                            active: root.document.caretPickStroke === 1
+                            onClicked: root.document.setPickStroke(active ? 0 : 1)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Up stroke")
+                            path: "M7 6 L12 18 L17 6"
+                            active: root.document.caretPickStroke === 2
+                            onClicked: root.document.setPickStroke(active ? 0 : 2)
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        BeatEffect {
+                            tip: qsTr("Tremolo picking in eighths")
+                            path: "M7 14 L17 10"
+                            active: root.document.caretTremolo === 8
+                            onClicked: root.document.setTremolo(active ? 0 : 8)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Tremolo picking in sixteenths")
+                            path: "M7 11 L17 7 M7 17 L17 13"
+                            active: root.document.caretTremolo === 16
+                            onClicked: root.document.setTremolo(active ? 0 : 16)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Tremolo picking in thirty-seconds")
+                            path: "M7 8 L17 4 M7 13 L17 9 M7 18 L17 14"
+                            active: root.document.caretTremolo === 32
+                            onClicked: root.document.setTremolo(active ? 0 : 32)
                         }
                     }
                 }
