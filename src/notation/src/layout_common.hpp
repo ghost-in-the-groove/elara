@@ -150,10 +150,12 @@ void reserveFor(DisplayList& to, std::span<const DisplayList* const> from);
 /// lanes a line of music uses take room.
 enum class Lane : std::uint8_t {
     Bend,
+    Whammy,
     Vibrato,
     PalmMute,
     LetRing,
     Harmonic,
+    Bass,
     PickStroke,
     Strum,
     Tremolo
@@ -169,11 +171,14 @@ struct ColumnTechniques {
     core::Strum strum = core::Strum::None;
     int tremoloStrokes = 0; ///< slashes of tremolo picking, 0 without it
     core::HarmonicKind harmonic = core::HarmonicKind::None;
+    core::BendCurve whammy{}; ///< the whammy bar, empty without it (ADR-0061)
+    core::BassTechnique bass = core::BassTechnique::None;
 
     [[nodiscard]] bool any() const noexcept {
         return palmMute || letRing || vibrato != core::Vibrato::None ||
                pickStroke != core::PickStroke::None || strum != core::Strum::None ||
-               tremoloStrokes > 0 || harmonic != core::HarmonicKind::None;
+               tremoloStrokes > 0 || harmonic != core::HarmonicKind::None || !whammy.isEmpty() ||
+               bass != core::BassTechnique::None;
     }
 };
 
@@ -199,7 +204,8 @@ public:
     /// Whether column() has anything to do with `marks`: marks to add or runs
     /// to end.
     [[nodiscard]] bool wants(const ColumnTechniques& marks) const noexcept {
-        return marks.any() || std::ranges::any_of(runs_, [](const Run& run) { return run.open; });
+        return marks.any() || whammyRun_ ||
+               std::ranges::any_of(runs_, [](const Run& run) { return run.open; });
     }
 
     /// Ends open runs, places the used lanes above `top` (the highest ink of
@@ -223,6 +229,8 @@ private:
     void extend(Lane lane, bool active, double centre, double end, std::size_t measure,
                 core::Vibrato vibrato = core::Vibrato::None);
     void close(Lane lane);
+    // The whammy bar of the column from `centre` to `end` (ADR-0061).
+    void whammy(const core::BendCurve& curve, double centre, double end, std::size_t measure);
     DisplayList& items(Lane lane) { return items_[static_cast<std::size_t>(lane)]; }
 
     const EngravingFont& font_;
@@ -230,10 +238,15 @@ private:
     std::array<Run, kLaneCount> runs_{};
     std::array<bool, kLaneCount> used_{};
     std::array<double, kLaneCount> bottom_{};
+    bool whammyRun_ = false; // the last column had a whammy bar
 };
 
 /// "full", "1/2", "1 1/2": a bend of `cents` in tones, to the nearest quarter.
 [[nodiscard]] std::string bendLabel(int cents);
+
+/// "-1 1/2", "+1/2": how far a whammy bar goes from the written pitch, in
+/// tones to the nearest quarter, with its direction; empty under an eighth.
+[[nodiscard]] std::string whammyLabel(int cents);
 
 // ---- Dynamics -----------------------------------------------------------------------
 
