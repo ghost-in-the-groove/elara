@@ -40,6 +40,7 @@ one that replaces them.
 | [0033](0033-editing-measures-at-the-caret.md) | Editing measures at the caret | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
+| [0036](0036-selecting-measures-in-the-app.md) | Selecting measures in the app | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
 | [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
