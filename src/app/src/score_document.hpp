@@ -96,6 +96,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
     Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
     // Selected measures (ADR-0036).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
@@ -246,6 +247,14 @@ public:
     /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
     /// gives them, as one undo step ("Change navigation marks").
     Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
+    /// The repeats of `measure` (ADR-0016): "start" (it opens a repeated
+    /// section), "times" (how often the section it closes plays, 2 to 255, or
+    /// 0 when it closes none) and "endings" (the times through the repeat that
+    /// play it, 1 to 8, in order).
+    Q_INVOKABLE QVariantMap repeatsAt(int measure) const;
+    /// Changes the repeats of `measure` named in `repeats`, keyed as
+    /// repeatsAt() gives them, as one undo step ("Change repeats").
+    Q_INVOKABLE void setRepeats(int measure, const QVariantMap& repeats);
     /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
     /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,
     /// 8 eighth...) and "dotted"; "own" when the measure starts a tempo
@@ -364,6 +373,9 @@ public:
     [[nodiscard]] bool caretKeyMinor() const;
     [[nodiscard]] QVariantMap caretNavigation() const {
         return navigationAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] QVariantMap caretRepeats() const {
+        return repeatsAt(static_cast<int>(caret_.measure));
     }
     [[nodiscard]] QVariantMap caretTempo() const {
         return tempoAt(static_cast<int>(caret_.measure));

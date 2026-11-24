@@ -70,6 +70,9 @@ goes on from the system before.
 [end <times>]` (2 to 255 plays) and `ending <m> <time>...` (times 1 to 8), each
 replacing what the measure had (`none` clears it); the measures of `edit`
 list them as `"repeatStart":true`, `"repeatTimes":3` and `"endings":[1,2]`.
+In the app, the measure popup sets the caret's measure's repeats: chips for
+the start and end barlines, a spin box for the plays (an end repeat starts at
+2) and a chip for each ending from 1 to 8; each change is one such step.
 
 **In files.**
 
