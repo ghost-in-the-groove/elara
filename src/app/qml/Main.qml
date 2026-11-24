@@ -124,6 +124,7 @@ ApplicationWindow {
                 toast.show(errorMessage);
         }
         onEditFailed: message => toast.show(message)
+        onNotice: message => toast.show(message)
     }
 
     AudioController {

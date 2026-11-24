@@ -56,8 +56,10 @@ private:
     void queuePitches();
     void queueVoices();
     void queueDrums();
+    void queueSelection();
     void queueMix();
     void queueNavigation();
+    void queueRepeats();
     void queueTuning();
     void queueTempo();
     void finish(bool ok, const QString& detail);
@@ -91,6 +93,7 @@ private:
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
     QPointer<QObject> trackRow_;  ///< a row of the song panel, which a mix change keeps
     QVariantMap tuningBefore_;    ///< the first track's tuning before it changed
+    QVariantMap repeatsBefore_;   ///< the first measure's repeats before queueRepeats()
     QVariantMap tempoBefore_;     ///< the second measure's tempo before it changed
     QString editProblem_;         ///< the first edit check that failed
     QString failure_;             ///< set by a step that went wrong
@@ -103,6 +106,9 @@ private:
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
     bool voicing_ = false;        ///< whether the voice steps run
     bool drumming_ = false;       ///< whether the drum steps run
+    bool selecting_ = false;      ///< whether the selection steps run
+    int lengthBefore_ = 0;        ///< the song's length before pasting
+    int pasteAt_ = 0;             ///< the measure pasted at
 };
 
 } // namespace elara::app

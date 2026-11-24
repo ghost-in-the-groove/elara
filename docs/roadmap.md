@@ -103,13 +103,15 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)
+  - [x] Measure selection in the app: Shift+arrows, select all, copy, paste over
+        or insert, transpose (ADR-0036)
 - [x] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
   - [x] Tuning presets and capo in the song panel
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
-  - [ ] Repeats and alternate endings at the caret's measure
+  - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)
 - [x] Spanish and English translations (Qt Linguist, ADR-0030)
