@@ -5,6 +5,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
+#include <elara/core/parallel.hpp>
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
 
@@ -14,9 +15,11 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdio>
 #include <memory>
+#include <thread>
 #include <vector>
 
 using elara::core::Duration;
@@ -67,6 +70,17 @@ TEST_CASE("core benchmarks", "[benchmark][core]") {
         auto copy = lengths;
         std::sort(copy.begin(), copy.end());
         return copy.front();
+    };
+}
+
+TEST_CASE("parallel job benchmarks", "[benchmark][core]") {
+    // What a parallel call costs before any job does work: layout, import and
+    // sequencing make several such calls per edit or file.
+    const unsigned cores = std::max(1U, std::thread::hardware_concurrency());
+    BENCHMARK("run 64 empty jobs on every core") {
+        std::atomic<std::size_t> sum{0};
+        elara::core::forEachIndex(0, 64, cores, [&](std::size_t i) { sum += i; });
+        return sum.load();
     };
 }
 

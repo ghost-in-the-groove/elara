@@ -56,7 +56,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 |---|---|---|
 | Main / GUI | Qt event loop (also JUCE's message thread) | Owns the model; all edits happen here |
 | Audio callback | JUCE device | No allocation, locks, I/O or logging; reads immutable snapshots / lock-free queues |
-| Workers (future) | Thread pool | Layout of large scores, file import, offline render |
+| Workers | `core::WorkerPool::shared()`, one thread fewer than the cores (ADR-0053) | Jobs of `forEachIndex`: layout, import, export, sequencing, offline render; the calling thread takes jobs too. Never used by the audio callback |
 
 Open question (milestone 4): on Linux, Qt's event loop does not service JUCE's
 message queue. Device-change notifications may need a dedicated JUCE message
