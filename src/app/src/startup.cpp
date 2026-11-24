@@ -2,6 +2,7 @@
 #include "startup.hpp"
 
 #include <elara/audio/sequence.hpp>
+#include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 
 #include "audio_controller.hpp"
@@ -116,6 +117,7 @@ void Startup::queueSteps() {
             queueNavigation();
             queueTuning();
             queueTempo();
+            queueEffects();
         }
         return;
     }
@@ -155,6 +157,7 @@ void Startup::queueSteps() {
         queueNavigation();
         queueTuning();
         queueTempo();
+        queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -875,6 +878,76 @@ void Startup::queueTuning() {
         }
         check(!score_->modified() && score_->trackTuning(0) == tuningBefore_,
               "undoing the tunings did not restore the song");
+        return false;
+    });
+}
+
+// Note effects at the caret (ADR-0038): a note typed, then accent and
+// staccato toggled on it, which the status names, and the accent off again.
+// The keys map to the effects. Then everything is undone and the song must end
+// as it started.
+void Startup::queueEffects() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("effect check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    constexpr int kAccent = static_cast<int>(core::NoteEffect::Accent);
+    constexpr int kStaccato = static_cast<int>(core::NoteEffect::Staccato);
+    steps_.emplace_back([this, check] {
+        effecting_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!effecting_) {
+            return false;
+        }
+        check(score_->effectForKey(QStringLiteral(">")) == kAccent &&
+                  score_->effectForKey(QStringLiteral("'")) == kStaccato &&
+                  score_->effectForKey(QStringLiteral("p")) ==
+                      static_cast<int>(core::NoteEffect::PalmMute) &&
+                  score_->effectForKey(QStringLiteral("a")) < 0,
+              "the keys do not map to the effects");
+        if (score_->caretFretted()) {
+            score_->typeDigit(5);
+        } else {
+            score_->typeNoteName(0, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        effectsBefore_ = score_->caretEffects();
+        score_->toggleEffect(kAccent);
+        check((score_->caretEffects() ^ effectsBefore_) == 1 << kAccent,
+              "the accent did not toggle");
+        check(score_->undoName() == ScoreDocument::tr("Change effect"),
+              "the effect is not undoable");
+        score_->toggleEffect(kStaccato);
+        check((score_->caretEffects() ^ effectsBefore_) == ((1 << kAccent) | (1 << kStaccato)),
+              "staccato did not toggle");
+        const int on = score_->caretEffects();
+        check(((on & (1 << kStaccato)) != 0) ==
+                  score_->caretStatus().contains(score_->effectName(kStaccato)),
+              "the status does not name the effects");
+        score_->toggleEffect(kAccent);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        check((score_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
+              "the accent did not go off again");
+        for (int i = 0; i < 5 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!effecting_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the effects did not restore the song");
         return false;
     });
 }

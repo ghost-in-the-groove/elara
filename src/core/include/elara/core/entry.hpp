@@ -171,4 +171,9 @@ enum class NoteEffect : std::uint8_t {
 /// dynamic or no note follows the caret.
 [[nodiscard]] Entry setDynamic(const Song& song, const Caret& caret, Dynamic dynamic);
 
+/// Whether the notes the caret is on (as for toggleEffect) all have `effect`,
+/// in any of its forms: what the next toggle turns off. False on a rest, the
+/// free slot or a string without a note.
+[[nodiscard]] bool hasEffectAtCaret(const Song& song, const Caret& caret, NoteEffect effect);
+
 } // namespace elara::core

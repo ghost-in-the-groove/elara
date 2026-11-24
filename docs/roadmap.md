@@ -93,7 +93,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         the CLI and the app (ADR-0034)
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
-        staccato (ADR-0037)
+        staccato, in the CLI and the app: one key each and a panel in the entry
+        bar (ADR-0037, ADR-0038)
   - [x] Dynamics at the caret, holding until the next change; new notes take
         the dynamic in force (ADR-0047)
   - [x] Tuplets at the caret: a triplet button and menu in the entry bar,
