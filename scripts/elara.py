@@ -464,6 +464,77 @@ def cmd_app(args: argparse.Namespace) -> int:
                           check=False).returncode
 
 
+def _without_qt_on_path(env: dict[str, str]) -> dict[str, str]:
+    """`env` with no Qt kit on PATH, so a run finds only the libraries a package
+    brought along."""
+    qt = env.get("QT_ROOT_DIR")
+    clean = dict(env)
+    clean.pop("QT_PLUGIN_PATH", None)
+    clean.pop("QML_IMPORT_PATH", None)
+    clean.pop("QML2_IMPORT_PATH", None)
+    if qt:
+        qt_dir = os.path.normcase(os.path.abspath(qt))
+        entries = clean.get("PATH", "").split(os.pathsep)
+        clean["PATH"] = os.pathsep.join(
+            e for e in entries if not os.path.normcase(os.path.abspath(e)).startswith(qt_dir))
+    return clean
+
+
+def _smoke_test_install(stage: Path) -> int:
+    """Runs what `stage` installed the way a user would: the app's smoke test and
+    a CLI render that needs its fonts, with no Qt kit on PATH."""
+    tools = stage / "elara.app" / "Contents" / "MacOS" if IS_MAC else stage / "bin"
+    app = tools / f"elara{EXE}"
+    cli = tools / f"elara-cli{EXE}"
+    env = _without_qt_on_path(build_env())
+    if not IS_MAC:
+        env["QT_QPA_PLATFORM"] = "offscreen"  # macOS: the cocoa plugin it ships
+    work = stage.parent / "smoke"
+    shutil.rmtree(work, ignore_errors=True)
+    work.mkdir(parents=True)
+    song = work / "song.elara"
+    steps = [
+        [str(app), "--smoke-test"],
+        [str(cli), "--json", "version"],
+        [str(cli), "edit", "--out", str(song), "add-track electric-guitar", "append-measures 1",
+         "note 0 0 6 3 1"],
+        [str(cli), "--json", "render", str(song), "--svg", str(work / "song.svg")],
+    ]
+    for step in steps:
+        log("smoke: " + " ".join(Path(step[0]).name if i == 0 else a for i, a in enumerate(step)))
+        result = subprocess.run(step, cwd=work, env=env, check=False, capture_output=True,
+                                text=True, encoding="utf-8", errors="replace", timeout=120)
+        if result.returncode != 0:
+            sys.stdout.write(result.stdout)
+            sys.stderr.write(result.stderr)
+            log(f"smoke test failed (exit code {result.returncode})")
+            return 1
+    if not (work / "song.svg").stat().st_size:
+        log("smoke test failed: the CLI wrote an empty SVG")
+        return 1
+    log("smoke: the installed app and CLI run without a Qt kit")
+    return 0
+
+
+def cmd_package(args: argparse.Namespace) -> int:
+    """Builds the app and the CLI in the release preset, installs them into
+    build/package/stage, smoke-tests that install and packs it with CPack
+    (ADR-0048)."""
+    preset = "release"
+    if (code := ensure_configured(preset)) != 0:
+        return code
+    if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara", "elara-cli"])) != 0:
+        return code
+    out = ROOT / "build" / "package"
+    stage = out / "stage"
+    shutil.rmtree(stage, ignore_errors=True)
+    if (code := run(["cmake", "--install", str(build_dir(preset)), "--prefix", str(stage)])) != 0:
+        return code
+    if not args.no_smoke_test and (code := _smoke_test_install(stage)) != 0:
+        return code
+    return run(["cpack", "--config", str(build_dir(preset) / "CPackConfig.cmake"), "-B", str(out)])
+
+
 def cmd_translations(args: argparse.Namespace) -> int:
     """Refreshes the app's .ts files from its sources (lupdate). Translate the
     new or changed strings in Qt Linguist, or by hand, afterwards."""
@@ -537,6 +608,9 @@ def main() -> int:
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)
+    add("package", cmd_package, "build, smoke-test and pack the app (release preset)",
+        preset=False).add_argument("--no-smoke-test", action="store_true",
+                                   help="pack without running what was installed")
 
     args = parser.parse_args()
     return args.func(args)
