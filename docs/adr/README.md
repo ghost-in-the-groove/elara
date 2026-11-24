@@ -64,6 +64,7 @@ one that replaces them.
 | [0056](0056-beat-effects-at-the-caret.md) | Beat effects at the caret | Accepted |
 | [0057](0057-continuous-view.md) | Continuous view | Accepted |
 | [0058](0058-kinds-of-note-effects.md) | Kinds of note effects at the caret | Accepted |
+| [0059](0059-song-credits.md) | Song credits | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
 
 ## Template

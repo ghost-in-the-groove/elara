@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The song panel, docked at the right of the score: what the whole song is
-// (title, artist, tempo, signatures, length) and its tracks. Every change is
+// (title, artist, credits, tempo, signatures, length) and its tracks. Every change is
 // one edit of the document, so Ctrl+Z takes it back.
 import QtQuick
 import QtQuick.Controls
@@ -279,6 +279,50 @@ Pane {
                         ToolTip.delay: 600
                         ToolTip.text: qsTr("Quarter notes per minute")
                     }
+                }
+
+                SectionHeader {
+                    id: creditsSection
+
+                    open: false
+                    text: qsTr("Credits")
+                }
+
+                // The other lines of the credits (ADR-0059), in the order of
+                // elara::core::Credit; the score shows the subtitle, the words
+                // and music and the copyright.
+                Repeater {
+                    model: [
+                        { line: 1, name: qsTr("Subtitle") },
+                        { line: 3, name: qsTr("Album") },
+                        { line: 4, name: qsTr("Words by") },
+                        { line: 5, name: qsTr("Music by") },
+                        { line: 6, name: qsTr("Copyright") },
+                        { line: 7, name: qsTr("Transcribed by") }
+                    ]
+
+                    delegate: TextField {
+                        required property var modelData
+
+                        Layout.fillWidth: true
+                        visible: creditsSection.open
+                        placeholderText: modelData.name
+                        text: root.document.credits[modelData.line]
+                        selectByMouse: true
+                        Accessible.name: modelData.name
+                        onEditingFinished: root.document.setCredit(modelData.line, text)
+                    }
+                }
+
+                TextArea {
+                    Layout.fillWidth: true
+                    visible: creditsSection.open
+                    placeholderText: qsTr("Notes")
+                    text: root.document.credits[8]
+                    wrapMode: TextEdit.Wrap
+                    selectByMouse: true
+                    Accessible.name: qsTr("Notes")
+                    onEditingFinished: root.document.setCredit(8, text)
                 }
 
                 SectionHeader {

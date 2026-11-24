@@ -14,6 +14,32 @@ namespace elara::core {
 
 namespace {
 
+// The field of `info` (const or not) that holds `credit`.
+template <typename Info>
+auto& creditIn(Info& info, Credit credit) {
+    switch (credit) {
+    case Credit::Title:
+        return info.title;
+    case Credit::Subtitle:
+        return info.subtitle;
+    case Credit::Artist:
+        return info.artist;
+    case Credit::Album:
+        return info.album;
+    case Credit::Words:
+        return info.words;
+    case Credit::Music:
+        return info.music;
+    case Credit::Copyright:
+        return info.copyright;
+    case Credit::Transcriber:
+        return info.transcriber;
+    case Credit::Notes:
+        return info.notes;
+    }
+    throw std::invalid_argument("creditOf: no such credit");
+}
+
 template <typename Container>
 decltype(auto) checkedAt(Container& items, std::size_t index, const char* what) {
     if (index >= items.size()) {
@@ -357,6 +383,14 @@ Tempo Song::tempoAt(std::size_t measure, const Fraction& offset) const {
         }
     }
     return tempo;
+}
+
+std::string& creditOf(SongInfo& info, Credit credit) {
+    return creditIn(info, credit);
+}
+
+const std::string& creditOf(const SongInfo& info, Credit credit) {
+    return creditIn(info, credit);
 }
 
 } // namespace elara::core
