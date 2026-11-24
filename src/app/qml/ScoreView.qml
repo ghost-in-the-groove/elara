@@ -10,7 +10,6 @@ Item {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
     /// 1 shows pages at their paper size (96 logical pixels per inch).
     property real zoom: 1.0
@@ -104,8 +103,8 @@ Item {
         const caret = document.caretRect;
         const page = document.caretPage;
         const x = list.originX + (list.contentWidth - pageWidth) / 2 + caret.x * scale - list.contentX;
-        const y = list.originY + page * (pageHeight + gap) + (caret.y + caret.height) * scale
-                  - list.contentY;
+        const y = list.y + list.originY + page * (pageHeight + gap)
+                  + (caret.y + caret.height) * scale - list.contentY;
         return Qt.point(x, y);
     }
     /// Opens the measure popup near (x, y), inside the view.
@@ -266,7 +265,10 @@ Item {
     ListView {
         id: list
 
-        anchors.fill: parent
+        anchors.top: entryStrip.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
         model: root.document.pageCount
         spacing: root.gap
         topMargin: root.gap
@@ -308,9 +310,9 @@ Item {
                 anchors.fill: paper
                 offset.y: 3
                 radius: 2
-                blur: 16
+                blur: 18
                 spread: 0
-                color: Qt.rgba(0, 0, 0, 0.22)
+                color: Qt.rgba(0, 0, 0, Theme.dark ? 0.55 : 0.2)
             }
 
             Rectangle {
@@ -333,6 +335,15 @@ Item {
                             duration: 160
                         }
                     }
+                }
+
+                // In the dark theme the paper is dimmed, so that it does not
+                // glare on the dark desk; the ink stays black.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: parent.radius
+                    visible: Theme.dark
+                    color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
                 }
 
                 // The caret: where typing goes. It glides between beats on a
@@ -405,35 +416,49 @@ Item {
 
     MeasurePopup {
         id: measurePopup
+        objectName: "measurePopup"
 
         document: root.document
-        dark: root.dark
         onClosed: root.forceActiveFocus()
     }
 
-    EntryBar {
-        id: entryBar
+    // The note entry bar: a strip over the top of the pages while there is a
+    // caret, so that only the transport covers the score.
+    Rectangle {
+        id: entryStrip
 
         readonly property bool shown: root.document.caretPage >= 0
 
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: shown ? parent.height - height - 18 : parent.height + 8
-        document: root.document
-        dark: root.dark
-        onMeasureRequested: root.openMeasurePopupAtCaret()
-        opacity: shown ? 1.0 : 0.0
-        visible: opacity > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: shown ? 46 : 0
+        visible: height > 0
+        clip: true
+        color: Theme.bar
 
-        Behavior on y {
+        Behavior on height {
             NumberAnimation {
-                duration: 220
+                duration: 180
                 easing.type: Easing.OutCubic
             }
         }
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 180
-            }
+
+        EntryBar {
+            id: entryBar
+
+            objectName: "entryBar"
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 1
+            document: root.document
+            onMeasureRequested: root.openMeasurePopupAtCaret()
+        }
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 1
+            color: Theme.line
         }
     }
 

@@ -80,7 +80,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
-| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()` | ppp ... fff; set at the caret, it holds until the next change (ADR-0047) |
+| dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()`, `Role::Dynamic` | How loud a note is played, ppp ... fff (mf by default); set at the caret, it holds until the next change (ADR-0047), and a mark under the staff shows where it changes (ADR-0044) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |

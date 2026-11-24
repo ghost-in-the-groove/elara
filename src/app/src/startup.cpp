@@ -471,7 +471,7 @@ void Startup::tick() {
         queueSteps();
     }
     while (!steps_.empty()) {
-        const auto step = std::move(steps_.front());
+        auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
@@ -480,6 +480,18 @@ void Startup::tick() {
             finish(false, failure_);
             return;
         }
+        if (again_) {
+            again_ = false;
+            if (againSince_ < 0) {
+                againSince_ = clock_.elapsed();
+            } else if (clock_.elapsed() - againSince_ > kStepTimeoutMilliseconds) {
+                finish(false, QStringLiteral("timed out"));
+                return;
+            }
+            steps_.push_front(std::move(step));
+            return;
+        }
+        againSince_ = -1;
         if (changed) {
             waiting_ = true;
             stepStarted_ = clock_.elapsed();
@@ -501,6 +513,10 @@ void Startup::tick() {
     }
     if (!editProblem_.isEmpty()) {
         finish(false, editProblem_);
+        return;
+    }
+    if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
+        finish(false, overlap);
         return;
     }
     QString detail;
@@ -525,6 +541,14 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
+    // Nothing may cover the cursor, as the measure popup open at the caret can:
+    // it closes first, and the click waits until it is gone.
+    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
+        popup != nullptr && popup->property("visible").toBool()) {
+        QMetaObject::invokeMethod(popup, "close");
+        again_ = true;
+        return;
+    }
     const QVariantMap cursor = score_->cursorAt(audio->position());
     const double expected = score_->secondsAt(
         cursor.value(QStringLiteral("page")).toInt(), cursor.value(QStringLiteral("x")).toDouble(),
@@ -542,6 +566,26 @@ void Startup::clickCursor() {
                        .arg(audio->position())
                        .arg(expected);
     }
+}
+
+// The bars that float over the bottom of the score, the transport and the
+// note entry bar shown with the caret, must not cover each other.
+QString Startup::overlappingBars() const {
+    auto* transport = window_->findChild<QQuickItem*>(QStringLiteral("transport"));
+    auto* entry = window_->findChild<QQuickItem*>(QStringLiteral("entryBar"));
+    if (transport == nullptr || entry == nullptr) {
+        return QStringLiteral("no transport or note entry bar");
+    }
+    if (!transport->isVisible() || !entry->isVisible()) {
+        return {};
+    }
+    const auto sceneRect = [](const QQuickItem* item) {
+        return item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
+    };
+    if (sceneRect(transport).intersects(sceneRect(entry))) {
+        return QStringLiteral("the note entry bar overlaps the transport");
+    }
+    return {};
 }
 
 void Startup::finish(bool ok, const QString& detail) {
