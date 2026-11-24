@@ -54,6 +54,7 @@ private:
     void queueTuplets();
     void queueMeasures();
     void queuePitches();
+    void queueVoices();
     void queueDrums();
     void queueMix();
     void queueNavigation();
@@ -97,6 +98,7 @@ private:
     double positionBefore_ = 0.0; ///< playback's position before an edit
     bool pitching_ = false;       ///< whether the caret takes note names
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
+    bool voicing_ = false;        ///< whether the voice steps run
     bool drumming_ = false;       ///< whether the drum steps run
 };
 
