@@ -77,6 +77,8 @@ private:
     bool laidOut_ = false;
     int paintsBefore_ = 0;
     int layouts_ = 0;
+    int stepsRun_ = 0;    ///< steps started so far, retries not counted
+    QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
     qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
