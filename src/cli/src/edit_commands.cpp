@@ -181,6 +181,17 @@ constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kBendForms{
     {"pre-release", core::BendForm::PreBendRelease},
 }};
 
+// Whammy-bar forms (ADR-0060), named for a dive: positive cents pull the bar
+// up instead.
+constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kWhammyForms{{
+    {"none", core::BendForm::None},
+    {"dive", core::BendForm::Bend},
+    {"dip", core::BendForm::BendRelease},
+    {"pre-dive", core::BendForm::PreBend},
+    {"return", core::BendForm::PreBendRelease},
+}};
+constexpr std::array<std::string_view, 4> kBassTechniques{"none", "tap", "slap", "pop"};
+
 // Directions `strum` and `pick` take (ADR-0056).
 constexpr std::array<std::string_view, 3> kStrokeDirections{"none", "down", "up"};
 
@@ -334,15 +345,31 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         }
         const int cents = step.has(2) ? step.number<int>(2) : kFullStep;
         edit = setBend(song, entry.caret, bendCurve(found->second, cents));
-    } else if (verb == "strum" || verb == "pick" || verb == "tremolo") {
-        // strum|pick <down|up|none>, tremolo <8|16|32|none>: the caret's beat
+    } else if (verb == "strum" || verb == "pick" || verb == "tremolo" || verb == "whammy" ||
+               verb == "bass") {
+        // strum|pick <down|up|none>, tremolo <8|16|32|none>,
+        // whammy <dive|dip|pre-dive|return|none> [cents], bass <tap|slap|pop|none>:
+        // the caret's beat
         BeatEffects effects = beatEffectsAt(song, entry.caret);
         if (verb == "strum") {
             effects.strum = static_cast<Strum>(strokeDirection(verb, step.word(1)));
         } else if (verb == "pick") {
             effects.pickStroke = static_cast<PickStroke>(strokeDirection(verb, step.word(1)));
-        } else {
+        } else if (verb == "tremolo") {
             effects.tremoloPicking = tremoloSpeed(step.word(1));
+        } else if (verb == "whammy") {
+            constexpr int kStepDown = -200;
+            const std::string_view name = step.word(1);
+            const auto found = std::ranges::find_if(
+                kWhammyForms, [name](const auto& form) { return form.first == name; });
+            if (found == kWhammyForms.end()) {
+                throw StepSyntaxError(std::format("not a whammy-bar form: {}", name));
+            }
+            effects.whammyBar =
+                whammyCurve(found->second, step.has(2) ? step.number<int>(2) : kStepDown);
+        } else {
+            effects.bassTechnique =
+                static_cast<BassTechnique>(kindOf(verb, step.word(1), kBassTechniques));
         }
         edit = setBeatEffects(song, entry.caret, effects);
     } else if (verb == "slide-in" || verb == "slide-out") {
@@ -786,7 +813,9 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"duration <d>\", delete, delete-beat, "
         "insert-rest, \"drum [key]\", \"effect <name>\", \"bend <form> [cents]\", \"strum "
         "<down|up|none>\", "
-        "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", \"slide-in "
+        "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", "
+        "\"whammy <dive|dip|pre-dive|return|none> [cents]\", \"bass <tap|slap|pop|none>\", "
+        "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
         "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", \"harmonic "
         "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "

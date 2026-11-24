@@ -201,7 +201,9 @@ the tremolo picking of the caret's beat (ADR-0056). `slide-in
 <from-below|from-above|none>`, `slide-out <shift|legato|downwards|upwards|none>`,
 `vibrato <slight|wide|none>`, `accent <accent|marcato|none>` and `harmonic
 <natural|artificial|pinch|tapped|semi|none>` set those effects of the caret's
-notes to any of their kinds (ADR-0058).
+notes to any of their kinds (ADR-0058). `whammy <dive|dip|pre-dive|return|none>
+[cents]` gives the caret's beat a whammy bar (a step down by default, up for
+positive cents) and `bass <tap|slap|pop|none>` a bass technique (ADR-0060).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.

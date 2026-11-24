@@ -101,6 +101,11 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
+    // The beat's whammy bar, as a core::BendForm and cents (negative below the
+    // written pitch), and its bass technique (ADR-0060).
+    Q_PROPERTY(int caretWhammyForm READ caretWhammyForm NOTIFY caretChanged)
+    Q_PROPERTY(int caretWhammyCents READ caretWhammyCents NOTIFY caretChanged)
+    Q_PROPERTY(int caretBassTechnique READ caretBassTechnique NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
@@ -421,6 +426,21 @@ public:
     Q_INVOKABLE void setStrum(int direction);
     Q_INVOKABLE void setPickStroke(int direction);
     Q_INVOKABLE void setTremolo(int value);
+    /// Gives the caret's beat the whammy bar of `form` (a core::BendForm, 0
+    /// takes it off) going `cents` from the written pitch, negative for a dive
+    /// (ADR-0060).
+    Q_INVOKABLE void setWhammy(int form, int cents);
+    /// Taps, slaps or pops the caret's beat (a core::BassTechnique; 0 for none).
+    Q_INVOKABLE void setBassTechnique(int technique);
+    /// "Dive -1", "Dip -1/2", "Inverted dip +1/2"...
+    Q_INVOKABLE QString whammyName(int form, int cents) const;
+    /// How far the whammy bar goes, in steps with its direction: "-1 1/2", "+1/2".
+    Q_INVOKABLE QString whammyAmount(int cents) const;
+    /// "Tapping", "Slap" or "Pop"; empty for none.
+    Q_INVOKABLE QString bassTechniqueName(int technique) const;
+    [[nodiscard]] int caretWhammyForm() const;
+    [[nodiscard]] int caretWhammyCents() const;
+    [[nodiscard]] int caretBassTechnique() const;
     [[nodiscard]] int caretStrum() const;
     [[nodiscard]] int caretPickStroke() const;
     [[nodiscard]] int caretTremolo() const;

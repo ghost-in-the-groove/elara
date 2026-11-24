@@ -161,3 +161,46 @@ TEST_CASE("A bend's form is read from the shape of its curve", "[core][effects]"
     CHECK_THROWS_AS(bendCurve(BendForm::Bend, 0), std::invalid_argument);
     CHECK_THROWS_AS(bendCurve(BendForm::Bend, BendCurve::kMaxCents + 1), std::invalid_argument);
 }
+
+TEST_CASE("A whammy bar's form and depth go down or up from the written pitch", "[core][effects]") {
+    using elara::core::BendForm;
+    using elara::core::whammyCents;
+    using elara::core::whammyCurve;
+    using elara::core::whammyForm;
+    using Points = std::vector<BendPoint>;
+    CHECK(whammyForm(BendCurve{}) == BendForm::None);
+    CHECK(whammyCents(BendCurve{}) == 0);
+
+    // A dive goes down and holds, a dip goes down and comes back, a pre-dive
+    // starts down and holds, and a pre-dive and return comes back up.
+    const BendCurve dive = whammyCurve(BendForm::Bend, -400);
+    CHECK(dive == BendCurve(Points{{.position = 0, .cents = 0},
+                                   {.position = 50, .cents = -400},
+                                   {.position = 100, .cents = -400}}));
+    CHECK(whammyForm(dive) == BendForm::Bend);
+    CHECK(whammyCents(dive) == -400);
+    CHECK(whammyForm(whammyCurve(BendForm::BendRelease, -200)) == BendForm::BendRelease);
+    CHECK(whammyForm(whammyCurve(BendForm::PreBend, -100)) == BendForm::PreBend);
+    CHECK(whammyForm(whammyCurve(BendForm::PreBendRelease, -600)) == BendForm::PreBendRelease);
+    CHECK(whammyCents(whammyCurve(BendForm::PreBendRelease, -600)) == -600);
+
+    // Pulled up, the curves are the bends'.
+    CHECK(whammyCurve(BendForm::BendRelease, 100) == BendCurve::bendRelease(100));
+    CHECK(whammyForm(BendCurve::bendRelease(100)) == BendForm::BendRelease);
+    CHECK(whammyCents(BendCurve::preBend(300)) == 300);
+
+    // Imported curves keep their own points; one that goes both ways is custom.
+    CHECK(whammyForm(BendCurve(Points{{.position = 0, .cents = 0},
+                                      {.position = 25, .cents = -250},
+                                      {.position = 75, .cents = 0}})) == BendForm::BendRelease);
+    const BendCurve wobble(Points{{.position = 0, .cents = 0},
+                                  {.position = 30, .cents = -200},
+                                  {.position = 60, .cents = 300}});
+    CHECK(whammyForm(wobble) == BendForm::Custom);
+    CHECK(whammyCents(wobble) == 300);
+
+    CHECK(whammyCurve(BendForm::None, -200).isEmpty());
+    CHECK_THROWS_AS(whammyCurve(BendForm::Custom, -200), std::invalid_argument);
+    CHECK_THROWS_AS(whammyCurve(BendForm::Bend, 0), std::invalid_argument);
+    CHECK_THROWS_AS(whammyCurve(BendForm::Bend, -BendCurve::kMaxCents - 1), std::invalid_argument);
+}

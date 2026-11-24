@@ -183,6 +183,10 @@
         <translation>Trémolo en fusas</translation>
     </message>
     <message>
+        <source>Whammy bar</source>
+        <translation>Palanca de trémolo</translation>
+    </message>
+    <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
         <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
     </message>
@@ -1420,6 +1424,54 @@
     <message>
         <source>Harmonics need strings.</source>
         <translation>Los armónicos necesitan cuerdas.</translation>
+    </message>
+    <message>
+        <source>Dive %1</source>
+        <translation>Hundimiento %1</translation>
+    </message>
+    <message>
+        <source>Pull-up %1</source>
+        <translation>Subida %1</translation>
+    </message>
+    <message>
+        <source>Dip %1</source>
+        <translation>Caída y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Inverted dip %1</source>
+        <translation>Subida y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-dive %1</source>
+        <translation>Prehundimiento %1</translation>
+    </message>
+    <message>
+        <source>Pre-pull-up %1</source>
+        <translation>Presubida %1</translation>
+    </message>
+    <message>
+        <source>Pre-dive and return %1</source>
+        <translation>Prehundimiento y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-pull-up and return %1</source>
+        <translation>Presubida y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Whammy bar (custom curve)</source>
+        <translation>Palanca de trémolo (curva propia)</translation>
+    </message>
+    <message>
+        <source>Tapping</source>
+        <translation>Tapping</translation>
+    </message>
+    <message>
+        <source>Slap</source>
+        <translation>Slap</translation>
+    </message>
+    <message>
+        <source>Pop</source>
+        <translation>Pop</translation>
     </message>
     <message>
         <source>Slide in from below</source>

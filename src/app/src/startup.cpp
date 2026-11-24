@@ -1094,6 +1094,21 @@ void Startup::queueEffects() {
                   status.contains(score_->slideInName(1)) &&
                   status.contains(score_->slideOutName(3)),
               "the status does not name the kinds of effects");
+        // The whammy bar and the bass techniques (ADR-0060).
+        constexpr int kDip = static_cast<int>(core::BendForm::BendRelease);
+        score_->setWhammy(kDip, -300);
+        score_->setBassTechnique(static_cast<int>(core::BassTechnique::Slap));
+        check(score_->caretWhammyForm() == kDip && score_->caretWhammyCents() == -300 &&
+                  score_->whammyAmount(-300) == QStringLiteral("-1 1/2") &&
+                  score_->caretBassTechnique() == static_cast<int>(core::BassTechnique::Slap) &&
+                  score_->caretTremolo() == 16,
+              "the whammy bar and the slap did not join the beat's effects");
+        check(score_->caretStatus().contains(score_->whammyName(kDip, -300)) &&
+                  score_->caretStatus().contains(ScoreDocument::tr("Slap")),
+              "the status does not name the whammy bar and the slap");
+        score_->setWhammy(0, 0);
+        check(score_->caretWhammyForm() == 0 && score_->caretBassTechnique() != 0,
+              "the whammy bar did not go on its own");
         if (score_->caretFretted()) {
             constexpr int kArtificial = static_cast<int>(core::HarmonicKind::Artificial);
             score_->setHarmonic(kArtificial);
@@ -1101,7 +1116,7 @@ void Startup::queueEffects() {
                       score_->caretStatus().contains(score_->harmonicName(kArtificial)),
                   "the artificial harmonic did not go on");
         }
-        for (int i = 0; i < 24 && score_->modified() && score_->canUndo(); ++i) {
+        for (int i = 0; i < 32 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;

@@ -340,6 +340,30 @@ add_test(NAME cli.edit_rejects_unknown_tremolo
 set_tests_properties(cli.edit_rejects_unknown_strum cli.edit_rejects_unknown_tremolo
   PROPERTIES WILL_FAIL TRUE)
 
+# Whammy bar and bass techniques (ADR-0060): fret 5 dips 300 cents and is
+# slapped; fret 7 pulls up 100 cents and returns, and is popped, and taking the
+# pop off is undone.
+set(ELARA_CLI_WHAMMY "${CMAKE_CURRENT_BINARY_DIR}/cli-whammy.elara")
+add_test(NAME cli.edit_sets_whammy_and_bass
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_WHAMMY}" "add-track electric-bass"
+    "append-measures 1" "fret 5" "whammy dip -300" "bass slap" right "fret 7" "whammy dive"
+    "bass pop" "whammy return 100" "bass none" undo)
+set_tests_properties(cli.edit_sets_whammy_and_bass PROPERTIES
+  FIXTURES_SETUP cli_whammy
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":9,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_whammy_and_bass COMMAND elara-cli --json dump "${ELARA_CLI_WHAMMY}")
+set_tests_properties(cli.dump_whammy_and_bass PROPERTIES
+  FIXTURES_REQUIRED cli_whammy
+  PASS_REGULAR_EXPRESSION "\"fret\":5}\\],\"effects\":{\"whammyBar\":\\[\\[0,0\\],\\[33,-300\\],\\[66,-300\\],\\[100,0\\]\\],\"bassTechnique\":\"slap\"}}.*\"fret\":7}\\],\"effects\":{\"whammyBar\":\\[\\[0,100\\],\\[50,100\\],\\[100,0\\]\\],\"bassTechnique\":\"pop\"}}")
+add_test(NAME cli.edit_rejects_unknown_whammy
+  COMMAND elara-cli edit "add-track electric-bass" "append-measures 1" "fret 5" "whammy wobble")
+add_test(NAME cli.edit_rejects_whammy_of_nothing
+  COMMAND elara-cli edit "add-track electric-bass" "append-measures 1" "fret 5" "whammy dive 0")
+add_test(NAME cli.edit_rejects_unknown_bass_technique
+  COMMAND elara-cli edit "add-track electric-bass" "append-measures 1" "fret 5" "bass thumb")
+set_tests_properties(cli.edit_rejects_unknown_whammy cli.edit_rejects_whammy_of_nothing
+  cli.edit_rejects_unknown_bass_technique PROPERTIES WILL_FAIL TRUE)
+
 # Kinds of note effects at the caret (ADR-0058): fret 12 gets an artificial
 # harmonic, wide vibrato, a marcato and slides in from below and out downwards;
 # fret 7 a natural harmonic, then a pinch harmonic that undo takes back.
