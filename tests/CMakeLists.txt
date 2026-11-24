@@ -86,9 +86,11 @@ elara_target_warnings(elara_benchmarks)
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
-    app/test_when_done.cpp app/bench_score_painter.cpp)
-  target_link_libraries(elara_app_tests PRIVATE elara_app_view elara::io Catch2::Catch2)
+    app/test_when_done.cpp app/test_app_icon.cpp app/bench_score_painter.cpp)
+  target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
+    Catch2::Catch2)
   target_compile_definitions(elara_app_tests PRIVATE
+    ELARA_APP_ICON_SVG="${PROJECT_SOURCE_DIR}/src/app/icons/elara.svg"
     ELARA_FONT_DIR="${ELARA_FONT_DIR}"
     ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
   elara_target_warnings(elara_app_tests)

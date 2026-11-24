@@ -13,6 +13,34 @@ target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
 elara_source_warnings(src/score_painter.cpp src/track_list.cpp)
 
+# The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
+# its own: PNG images for the window, an .ico file for the Windows executable
+# and an .icns file for the macOS bundle. Linux desktops take the SVG itself.
+add_library(elara_app_icon STATIC src/app_icon.cpp)
+target_include_directories(elara_app_icon PUBLIC src)
+target_link_libraries(elara_app_icon PUBLIC Qt6::Gui Qt6::Svg)
+elara_source_warnings(src/app_icon.cpp)
+
+add_executable(elara_icon_files tools/icon_files.cpp)
+set_target_properties(elara_icon_files PROPERTIES OUTPUT_NAME elara-icon-files)
+target_link_libraries(elara_icon_files PRIVATE elara_app_icon)
+elara_source_warnings(tools/icon_files.cpp)
+
+set(ELARA_ICON_DIR "${CMAKE_CURRENT_BINARY_DIR}/icon")
+set(_elara_icon_pngs)
+foreach(size IN ITEMS 16 24 32 48 64 128 256)
+  list(APPEND _elara_icon_pngs "${ELARA_ICON_DIR}/elara-${size}.png")
+endforeach()
+add_custom_command(
+  OUTPUT ${_elara_icon_pngs} "${ELARA_ICON_DIR}/elara.ico" "${ELARA_ICON_DIR}/elara.icns"
+  # On Windows the tool finds the Qt libraries on PATH.
+  COMMAND "${CMAKE_COMMAND}" -E env --modify "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    "$<TARGET_FILE:elara_icon_files>" "${CMAKE_CURRENT_SOURCE_DIR}/icons/elara.svg"
+    "${ELARA_ICON_DIR}"
+  DEPENDS elara_icon_files icons/elara.svg
+  COMMENT "Drawing the app icon"
+  VERBATIM)
+
 qt_add_executable(elara WIN32 MACOSX_BUNDLE
   src/main.cpp)
 
@@ -84,6 +112,26 @@ qt_add_resources(elara "fonts"
 qt_add_resources(elara "style"
   PREFIX "/"
   FILES qtquickcontrols2.conf)
+# The window's icon, at each size up to 256 pixels.
+qt_add_resources(elara "icon"
+  PREFIX "/icons"
+  BASE "${ELARA_ICON_DIR}"
+  FILES ${_elara_icon_pngs})
+
+# The icon and version of the executable on Windows, and the icon of the bundle
+# on macOS.
+if(WIN32)
+  set(_elara_icon_ico "${ELARA_ICON_DIR}/elara.ico")
+  configure_file(elara.rc.in "${CMAKE_CURRENT_BINARY_DIR}/elara.rc" @ONLY)
+  target_sources(elara PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/elara.rc")
+  set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/elara.rc" PROPERTIES
+    OBJECT_DEPENDS "${_elara_icon_ico}")
+elseif(APPLE)
+  set_source_files_properties("${ELARA_ICON_DIR}/elara.icns" PROPERTIES
+    MACOSX_PACKAGE_LOCATION Resources)
+  target_sources(elara PRIVATE "${ELARA_ICON_DIR}/elara.icns")
+  set_target_properties(elara PROPERTIES MACOSX_BUNDLE_ICON_FILE elara.icns)
+endif()
 
 # The generated QML type registration includes each QML_ELEMENT header by its
 # bare file name, so the directory holding those headers must be on the path.
@@ -121,6 +169,19 @@ if(WIN32)
 elseif(NOT APPLE AND TARGET Qt6::QOffscreenIntegrationPlugin)
   # Qt's Linux deployment brings only the default platform plugin (xcb).
   install(FILES $<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin> DESTINATION plugins/platforms)
+endif()
+if(NOT WIN32 AND NOT APPLE)
+  # The desktop entry and its icon, named after the app's id (ADR-0064).
+  set(_elara_app_id io.github.ghost_in_the_groove.Elara)
+  install(FILES elara.desktop
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+    RENAME "${_elara_app_id}.desktop")
+  install(FILES icons/elara.svg
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps"
+    RENAME "${_elara_app_id}.svg")
+  install(FILES "${ELARA_ICON_DIR}/elara-256.png"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+    RENAME "${_elara_app_id}.png")
 endif()
 qt_generate_deploy_qml_app_script(
   TARGET elara
