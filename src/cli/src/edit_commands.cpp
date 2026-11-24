@@ -19,10 +19,12 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <format>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -483,6 +485,51 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
                     throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
                 }
                 header.*found->flag = true;
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "repeat") { // repeat <m> [start] [end <times>] | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.repeatStart = false;
+        header.repeatTimes = 0;
+        if (!step.has(2)) {
+            throw StepSyntaxError("repeat: expected start, end <times> or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                if (step.word(i) == "start") {
+                    header.repeatStart = true;
+                } else if (step.word(i) == "end") {
+                    const std::size_t times = step.index(++i);
+                    if (times < 2 || times > std::numeric_limits<std::uint8_t>::max()) {
+                        throw StepSyntaxError(
+                            std::format("repeat: a section plays 2 to 255 times, not {}", times));
+                    }
+                    header.repeatTimes = static_cast<std::uint8_t>(times);
+                } else {
+                    throw StepSyntaxError(std::format("not a repeat: {}", step.word(i)));
+                }
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "ending") { // ending <m> <time>... | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.alternateEndings = 0;
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const std::size_t time = step.index(i);
+                if (time < 1 || time > MeasureHeader::kMaxEnding) {
+                    throw StepSyntaxError(std::format("ending: times through are 1 to {}, not {}",
+                                                      MeasureHeader::kMaxEnding, time));
+                }
+                header.alternateEndings =
+                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             }
         }
         if (header != song.measureHeader(measure)) {
