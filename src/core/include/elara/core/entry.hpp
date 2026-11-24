@@ -164,6 +164,27 @@ enum class NoteEffect : std::uint8_t {
 /// a rest, the free slot or a string without a note.
 [[nodiscard]] BendCurve bendAtCaret(const Song& song, const Caret& caret);
 
+/// The effects of the first note the caret is on (as for toggleEffect); the
+/// defaults on a rest, the free slot or a string without a note.
+[[nodiscard]] NoteEffects noteEffectsAt(const Song& song, const Caret& caret);
+
+/// Each of these sets one effect of the notes the caret is on (as for
+/// toggleEffect) to any of its kinds, as one undo step (ADR-0058). Nothing
+/// changes when they all have it already, on a rest, the free slot or a string
+/// without a note.
+///
+/// setSlides() sets how the notes slide in and out ("Change slide").
+[[nodiscard]] Entry setSlides(const Song& song, const Caret& caret, SlideIn in, SlideOut out);
+/// Slight, wide or no vibrato ("Change vibrato").
+[[nodiscard]] Entry setVibrato(const Song& song, const Caret& caret, Vibrato vibrato);
+/// An accent, a marcato or neither ("Change accent").
+[[nodiscard]] Entry setAccent(const Song& song, const Caret& caret, Accent accent);
+/// A harmonic of `kind`, or none ("Change harmonic"): a natural harmonic at the
+/// note's fret, the others an octave above the fretted note. Throws
+/// std::logic_error for a harmonic on a staff without strings, and
+/// std::out_of_range for a natural one at a fret near no node.
+[[nodiscard]] Entry setHarmonic(const Song& song, const Caret& caret, HarmonicKind kind);
+
 /// Sets the effects of the caret's beat (ADR-0056): strum, pick stroke,
 /// tremolo picking, whammy bar and bass technique, which apply to all its
 /// notes, as one undo step ("Change beat effects"). Nothing changes when the

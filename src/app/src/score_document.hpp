@@ -95,6 +95,11 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
     Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
     Q_PROPERTY(int caretPickStroke READ caretPickStroke NOTIFY caretChanged)
+    Q_PROPERTY(int caretSlideIn READ caretSlideIn NOTIFY caretChanged)
+    Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
+    Q_PROPERTY(int caretVibrato READ caretVibrato NOTIFY caretChanged)
+    Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
+    Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
@@ -419,6 +424,24 @@ public:
     [[nodiscard]] int caretStrum() const;
     [[nodiscard]] int caretPickStroke() const;
     [[nodiscard]] int caretTremolo() const;
+    /// The kinds of the caret's note effects (ADR-0058), numbered as their
+    /// enums in elara_core (0 none): core::SlideIn, core::SlideOut,
+    /// core::Vibrato, core::Accent and core::HarmonicKind.
+    Q_INVOKABLE void setSlideIn(int kind);
+    Q_INVOKABLE void setSlideOut(int kind);
+    Q_INVOKABLE void setVibrato(int kind);
+    Q_INVOKABLE void setAccent(int kind);
+    Q_INVOKABLE void setHarmonic(int kind);
+    [[nodiscard]] int caretSlideIn() const;
+    [[nodiscard]] int caretSlideOut() const;
+    [[nodiscard]] int caretVibrato() const;
+    [[nodiscard]] int caretAccent() const;
+    [[nodiscard]] int caretHarmonic() const;
+    /// The kinds as the status line names them, translated: "Slide in from
+    /// below", "Shift slide", "Artificial harmonic".
+    Q_INVOKABLE QString slideInName(int kind) const;
+    Q_INVOKABLE QString slideOutName(int kind) const;
+    Q_INVOKABLE QString harmonicName(int kind) const;
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
@@ -512,6 +535,13 @@ private:
     [[nodiscard]] core::BeatEffects beatEffectsAtCaret() const;
     /// Gives the caret's beat `effects`, or says why it cannot.
     void applyBeatEffects(const core::BeatEffects& effects);
+    /// The effects of the caret's first note, none without a caret.
+    [[nodiscard]] core::NoteEffects noteEffectsAtCaret() const;
+    /// Enters what `make` makes for the caret's notes, or says why it cannot;
+    /// silent when `has` says the notes have it already.
+    void
+    changeNoteEffects(const std::function<core::Entry(const core::Song&, const core::Caret&)>& make,
+                      const std::function<bool(const core::NoteEffects&)>& has);
     /// Makes an entry from the song being edited and enters it, reporting
     /// what it throws through editFailed().
     void runEntry(const std::function<core::Entry(const core::Song&)>& make);

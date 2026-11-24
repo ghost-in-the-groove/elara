@@ -309,3 +309,78 @@ TEST_CASE("Effects: strums, pick strokes and tremolo picking on the caret's beat
         CHECK(beatEffectsAt(doc.song(), nothing) == BeatEffects{});
     }
 }
+
+TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the caret's notes",
+          "[core][entry][effects]") {
+    Document doc(guitarSong());
+    const Caret caret = at(0, 1, 1); // fret 12 on string 1
+    CHECK(noteEffectsAt(doc.song(), caret) == NoteEffects{});
+
+    // Slides in and out, each kept when the other changes.
+    CHECK(run(doc, setSlides(doc.song(), caret, SlideIn::FromBelow, SlideOut::None)) == caret);
+    CHECK(doc.undoName() == "Change slide");
+    run(doc, setSlides(doc.song(), caret, SlideIn::FromBelow, SlideOut::Downwards));
+    CHECK(onString(doc.song(), 0, 1, 1).effects.slideIn == SlideIn::FromBelow);
+    CHECK(onString(doc.song(), 0, 1, 1).effects.slideOut == SlideOut::Downwards);
+    CHECK(hasEffectAtCaret(doc.song(), caret, NoteEffect::Slide));
+    CHECK(setSlides(doc.song(), caret, SlideIn::FromBelow, SlideOut::Downwards).command == nullptr);
+
+    // Vibrato and accents in either strength.
+    run(doc, setVibrato(doc.song(), caret, Vibrato::Wide));
+    CHECK(doc.undoName() == "Change vibrato");
+    run(doc, setAccent(doc.song(), caret, Accent::Marcato));
+    CHECK(doc.undoName() == "Change accent");
+    const NoteEffects fx = noteEffectsAt(doc.song(), caret);
+    CHECK(fx.vibrato == Vibrato::Wide);
+    CHECK(fx.accent == Accent::Marcato);
+    CHECK(fx.slideOut == SlideOut::Downwards);
+    CHECK(setVibrato(doc.song(), caret, Vibrato::Wide).command == nullptr);
+    CHECK(setAccent(doc.song(), caret, Accent::Marcato).command == nullptr);
+
+    // Harmonics: natural at the note's fret, the others an octave above the
+    // fretted note; none removes it.
+    run(doc, setHarmonic(doc.song(), caret, HarmonicKind::Natural));
+    CHECK(doc.undoName() == "Change harmonic");
+    CHECK(noteEffectsAt(doc.song(), caret).harmonic ==
+          Harmonic{.kind = HarmonicKind::Natural, .fretTenths = 120});
+    for (const HarmonicKind kind : {HarmonicKind::Artificial, HarmonicKind::Pinch,
+                                    HarmonicKind::Tapped, HarmonicKind::Semi}) {
+        run(doc, setHarmonic(doc.song(), caret, kind));
+        CHECK(noteEffectsAt(doc.song(), caret).harmonic ==
+              Harmonic{.kind = kind, .fretTenths = 120});
+    }
+    CHECK(setHarmonic(doc.song(), caret, HarmonicKind::Semi).command == nullptr);
+    run(doc, setHarmonic(doc.song(), caret, HarmonicKind::None));
+    CHECK(noteEffectsAt(doc.song(), caret).harmonic == Harmonic{});
+    // Fret 7 has a natural harmonic and fret 6 none; an artificial one goes anywhere.
+    run(doc, setHarmonic(doc.song(), at(0, 0, 3), HarmonicKind::Natural));
+    CHECK(onString(doc.song(), 0, 0, 3).effects.harmonic.fretTenths == 70);
+    CHECK(onString(doc.song(), 0, 0, 2).effects.harmonic == Harmonic{});
+    CHECK_THROWS_AS(setHarmonic(doc.song(), at(1, 0, 3), HarmonicKind::Natural), std::out_of_range);
+    run(doc, setHarmonic(doc.song(), at(1, 0, 3), HarmonicKind::Artificial));
+    CHECK(onString(doc.song(), 1, 0, 3).effects.harmonic.kind == HarmonicKind::Artificial);
+
+    // Undo goes back one change at a time.
+    doc.undo();
+    doc.undo();
+    doc.undo();
+    CHECK(noteEffectsAt(doc.song(), caret).harmonic ==
+          Harmonic{.kind = HarmonicKind::Semi, .fretTenths = 120});
+
+    // Nothing on a rest, a string without a note or the free slot.
+    for (const Caret& nothing : {at(0, 2, 1), at(0, 1, 3), at(1, 1, 1)}) {
+        CHECK(setVibrato(doc.song(), nothing, Vibrato::Slight).command == nullptr);
+        CHECK(setSlides(doc.song(), nothing, SlideIn::FromAbove, SlideOut::Shift).command ==
+              nullptr);
+        CHECK(noteEffectsAt(doc.song(), nothing) == NoteEffects{});
+    }
+
+    // Without strings every note of the beat, and no harmonics.
+    Document piano(
+        oneBeat("piano", {Note{.pitch = Pitch::fromMidi(60)}, Note{.pitch = Pitch::fromMidi(64)}}));
+    run(piano, setAccent(piano.song(), at(0, 0), Accent::Accent));
+    for (const Note& note : notesAt(piano.song(), 0, 0)) {
+        CHECK(note.effects.accent == Accent::Accent);
+    }
+    CHECK_THROWS_AS(setHarmonic(piano.song(), at(0, 0), HarmonicKind::Natural), std::logic_error);
+}
