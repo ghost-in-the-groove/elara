@@ -10,6 +10,7 @@ add_library(elara_core STATIC
   src/fret_placement.cpp
   src/instrument.cpp
   src/measure.cpp
+  src/parallel.cpp
   src/performance.cpp
   src/pitch.cpp
   src/retune.cpp
