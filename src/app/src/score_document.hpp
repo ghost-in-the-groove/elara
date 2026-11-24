@@ -87,6 +87,8 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
     Q_PROPERTY(int caretEffects READ caretEffects NOTIFY caretChanged)
     Q_PROPERTY(int effectCount READ effectCount CONSTANT)
+    Q_PROPERTY(int caretBendForm READ caretBendForm NOTIFY caretChanged)
+    Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
@@ -379,6 +381,17 @@ public:
     Q_INVOKABLE QString effectKey(int effect) const;
     /// The effect a typed character toggles, or -1.
     Q_INVOKABLE int effectForKey(const QString& text) const;
+    /// Sets the bend of the caret's notes (ADR-0055): `form` numbered as
+    /// core::BendForm (0 takes the bend off), going up by `cents`.
+    Q_INVOKABLE void setBend(int form, int cents);
+    /// The form of the bend of the caret's first note, as core::BendForm, and
+    /// how far it goes up in cents (0 without a bend).
+    [[nodiscard]] int caretBendForm() const;
+    [[nodiscard]] int caretBendCents() const;
+    /// A bend as the status line names it, translated: "Bend and release 1/2".
+    Q_INVOKABLE QString bendName(int form, int cents) const;
+    /// How far a bend goes, as tablature writes it: "1/4", "1/2", "full", "1 1/2".
+    Q_INVOKABLE QString bendAmount(int cents) const;
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }

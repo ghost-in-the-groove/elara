@@ -299,6 +299,26 @@ add_test(NAME cli.edit_rejects_tie_without_note
 set_tests_properties(cli.edit_rejects_unknown_effect cli.edit_rejects_tie_without_note
   PROPERTIES WILL_FAIL TRUE)
 
+# Bends of any form (ADR-0055): a half-step bend and release on fret 7, then a
+# pre-bend of a step and a half on fret 9, taken off and put back by undo.
+set(ELARA_CLI_BENDS "${CMAKE_CURRENT_BINARY_DIR}/cli-bends.elara")
+add_test(NAME cli.edit_sets_bend
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_BENDS}" "add-track electric-guitar" "append-measures 1"
+    "caret 0 0 0 3" "fret 7" "bend release 100" right "fret 9" "bend pre-bend 300" "bend none" undo)
+set_tests_properties(cli.edit_sets_bend PROPERTIES
+  FIXTURES_SETUP cli_bends
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":6,\"next\":\"Change bend\"}")
+add_test(NAME cli.dump_bends COMMAND elara-cli --json dump "${ELARA_CLI_BENDS}")
+set_tests_properties(cli.dump_bends PROPERTIES
+  FIXTURES_REQUIRED cli_bends
+  PASS_REGULAR_EXPRESSION "\"fret\":7,\"effects\":{\"bend\":\\[\\[0,0\\],\\[33,100\\],\\[66,100\\],\\[100,0\\]\\]}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"[A-G][#b]?[0-9]\",\"string\":3,\"fret\":9,\"effects\":{\"bend\":\\[\\[0,300\\],\\[100,300\\]\\]}}")
+add_test(NAME cli.edit_rejects_unknown_bend
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "bend wobble")
+add_test(NAME cli.edit_rejects_flat_bend
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "bend bend 0")
+set_tests_properties(cli.edit_rejects_unknown_bend cli.edit_rejects_flat_bend
+  PROPERTIES WILL_FAIL TRUE)
+
 # Dynamics at the caret (ADR-0047): f from the second note holds to the end,
 # and a note typed after it is f too.
 set(ELARA_CLI_DYNAMICS "${CMAKE_CURRENT_BINARY_DIR}/cli-dynamics.elara")

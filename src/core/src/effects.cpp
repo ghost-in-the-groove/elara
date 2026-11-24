@@ -77,6 +77,63 @@ int BendCurve::maxCents() const noexcept {
     return highest;
 }
 
+BendForm bendForm(const BendCurve& curve) {
+    const std::vector<BendPoint>& points = curve.points();
+    if (points.empty()) {
+        return BendForm::None;
+    }
+    const int top = curve.maxCents();
+    const bool dips = std::ranges::any_of(points, [](const BendPoint& p) { return p.cents < 0; });
+    if (top == 0 || dips) {
+        return BendForm::Custom;
+    }
+    // Rises (never falling) to its top, then falls (never rising) to its end.
+    std::size_t i = 1;
+    while (i < points.size() && points[i].cents >= points[i - 1].cents) {
+        ++i;
+    }
+    while (i < points.size() && points[i].cents <= points[i - 1].cents) {
+        ++i;
+    }
+    if (i < points.size()) {
+        return BendForm::Custom;
+    }
+    const int first = points.front().cents;
+    const int last = points.back().cents;
+    if (first == 0) {
+        return last == top ? BendForm::Bend : last == 0 ? BendForm::BendRelease : BendForm::Custom;
+    }
+    if (first == top) {
+        return last == top ? BendForm::PreBend
+               : last == 0 ? BendForm::PreBendRelease
+                           : BendForm::Custom;
+    }
+    return BendForm::Custom;
+}
+
+BendCurve bendCurve(BendForm form, int cents) {
+    if (form == BendForm::None) {
+        return {};
+    }
+    if (cents < 1 || cents > BendCurve::kMaxCents) {
+        throw std::invalid_argument("bendCurve: the bend must go up by 1 to 2400 cents");
+    }
+    switch (form) {
+    case BendForm::Bend:
+        return BendCurve::bend(cents);
+    case BendForm::BendRelease:
+        return BendCurve::bendRelease(cents);
+    case BendForm::PreBend:
+        return BendCurve::preBend(cents);
+    case BendForm::PreBendRelease:
+        return BendCurve::preBendRelease(cents);
+    case BendForm::None:
+    case BendForm::Custom:
+        break;
+    }
+    throw std::invalid_argument("bendCurve: a custom bend has no usual curve");
+}
+
 std::optional<int> naturalHarmonicSemitones(double fret) {
     // A fret sits at 1 - 2^(-fret/12) of the string length from the nut; a
     // natural harmonic needs that point near a node k/n of partial n.

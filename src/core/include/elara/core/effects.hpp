@@ -58,6 +58,22 @@ private:
     std::vector<BendPoint> points_{};
 };
 
+/// The shapes a bend is usually written in (ADR-0055); Custom is any other
+/// curve, such as a bend, release and bend again.
+enum class BendForm : std::uint8_t { None, Bend, BendRelease, PreBend, PreBendRelease, Custom };
+
+/// The form of `curve`, read from its shape rather than its points, so that
+/// curves read from other formats are recognised: Bend rises from 0 to its top
+/// and holds, BendRelease rises from 0 and falls back to 0, PreBend starts at
+/// its top and holds, PreBendRelease starts at its top and falls back to 0.
+/// None for an empty curve, Custom for one that never rises above 0, dips
+/// below 0 or changes direction more often.
+[[nodiscard]] BendForm bendForm(const BendCurve& curve);
+
+/// The curve of `form` up by `cents`; empty for None. Throws
+/// std::invalid_argument for Custom and for `cents` outside 1..kMaxCents.
+[[nodiscard]] BendCurve bendCurve(BendForm form, int cents);
+
 enum class SlideIn : std::uint8_t { None, FromBelow, FromAbove };
 
 /// Shift: slide to the next note and pick it. Legato: slide to the next note
