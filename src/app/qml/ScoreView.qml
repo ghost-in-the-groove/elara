@@ -134,9 +134,26 @@ Item {
     Keys.onPressed: event => {
         const control = (event.modifiers & Qt.ControlModifier) !== 0;
         const alt = (event.modifiers & Qt.AltModifier) !== 0;
-        if (alt || document.pageCount === 0)
-            return;
         const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+        if (document.pageCount === 0)
+            return;
+        // Alt with Up or Down moves the pitch a semitone; with Ctrl an octave.
+        if (alt) {
+            if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down)
+                return;
+            document.shiftPitch((event.key === Qt.Key_Up ? 1 : -1) * (control ? 12 : 1));
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // A to G type note names; with Shift they join the beat's chord.
+        const letter = "CDEFGAB".indexOf(event.text.toUpperCase());
+        if (!control && event.text.length === 1 && letter >= 0) {
+            document.typeNoteName(letter, shift);
+            event.accepted = true;
+            reveal();
+            return;
+        }
         if (control && event.key === Qt.Key_M) {
             openMeasurePopupAtCaret();
             event.accepted = true;

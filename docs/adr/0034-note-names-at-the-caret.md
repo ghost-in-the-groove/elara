@@ -54,6 +54,7 @@ string to choose one note.
 - Every pitched instrument can be typed on from the keyboard, with the same
   caret, durations and undo as frets.
 - The app maps letter keys, Shift with a letter (add to chord) and Alt with the
-  arrows (semitone, octave with Ctrl) onto these edits.
+  arrows (semitone, octave with Ctrl) onto these edits, and its status line
+  names the notes at the caret.
 - Accidentals outside the key come from `shiftPitch`; a spelling choice
   (sharp or flat) follows the key's own preference.
