@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The keyboard entry bar, in a strip over the top of the pages: the note value
-// typing uses, the dot, a rest, delete, and where the caret is.
+// typing uses, the dot, the tuplet, a rest, delete, and where the caret is.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -57,6 +57,15 @@ Rectangle {
         ToolTip.delay: 500
         ToolTip.text: tip
         Accessible.name: tip
+    }
+
+    // A tuplet in the tuplet menu, checked when the input has it.
+    component TupletItem: MenuItem {
+        required property int actual
+
+        checkable: true
+        checked: root.document.inputTuplet === actual
+        onTriggered: root.document.setInputTuplet(actual)
     }
 
     component Separator: Rectangle {
@@ -145,6 +154,80 @@ Rectangle {
                 symbol: "\uECB7"
                 size: 30
                 color: root.document.inputDotted ? "white" : root.ink
+            }
+        }
+
+        // The tuplet (ADR-0050): a click toggles a triplet, a right click or a
+        // long press picks another.
+        Tool {
+            id: tuplet
+
+            readonly property bool on: root.document.inputTuplet > 0
+
+            tip: qsTr("Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)")
+            onClicked: root.document.setInputTuplet(on ? 0 : 3)
+            onPressAndHold: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: tuplet.on ? Material.accent
+                                 : tuplet.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: MusicSymbol {
+                // The tuplet's number in the music font's tuplet digits.
+                symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
+                size: 30
+                color: tuplet.on ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+            }
+
+            Menu {
+                id: tupletMenu
+
+                TupletItem {
+                    actual: 2
+                    text: qsTr("Duplet (2 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 3
+                    text: qsTr("Triplet (3 in the time of 2)")
+                }
+                TupletItem {
+                    actual: 4
+                    text: qsTr("Quadruplet (4 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 5
+                    text: qsTr("Quintuplet (5 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 6
+                    text: qsTr("Sextuplet (6 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 7
+                    text: qsTr("Septuplet (7 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 9
+                    text: qsTr("Nonuplet (9 in the time of 8)")
+                }
+                MenuSeparator {}
+                MenuItem {
+                    text: qsTr("No tuplet")
+                    enabled: tuplet.on
+                    onTriggered: root.document.setInputTuplet(0)
+                }
             }
         }
 

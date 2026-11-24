@@ -51,6 +51,7 @@ private:
     void queueSteps();
     void queueEdits();
     void queueEntry();
+    void queueTuplets();
     void queueMeasures();
     void queuePitches();
     void queueDrums();
@@ -87,6 +88,7 @@ private:
     QString editProblem_;         ///< the first edit check that failed
     QString failure_;             ///< set by a step that went wrong
     bool entering_ = false;       ///< whether the shown track takes frets
+    bool tupleting_ = false;      ///< whether the tuplet steps run
     int measuresBefore_ = 0;      ///< measures when the measure edits start
     int firstNumerator_ = 0;      ///< the first time signature then
     double positionBefore_ = 0.0; ///< playback's position before an edit

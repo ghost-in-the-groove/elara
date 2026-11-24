@@ -86,6 +86,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
+    Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
     // The caret's measure.
     Q_PROPERTY(int caretMeasure READ caretMeasure NOTIFY caretChanged)
     Q_PROPERTY(int caretTimeNumerator READ caretTimeNumerator NOTIFY caretChanged)
@@ -266,6 +267,11 @@ public:
     /// The duration typing uses: 1 a whole note, 2 a half note... 64.
     [[nodiscard]] int inputValue() const;
     [[nodiscard]] bool inputDotted() const { return input_.dots() > 0; }
+    /// The actual notes of the input duration's tuplet (3 for a triplet), 0
+    /// when it has none.
+    [[nodiscard]] int inputTuplet() const {
+        return input_.tuplet().isNone() ? 0 : input_.tuplet().actual();
+    }
     /// The caret in the song being edited.
     [[nodiscard]] core::Caret caret() const { return caret_; }
     /// The fret of the note on the caret's string at its beat, if there is one.
@@ -291,6 +297,11 @@ public:
     /// The input duration (1, 2, 4... 64), also given to the caret's beat.
     Q_INVOKABLE void setInputValue(int value);
     Q_INVOKABLE void toggleDot();
+    /// Makes the input duration a tuplet of `actual` notes (ADR-0050): 2, 3,
+    /// 4, 5, 6, 7 or 9, in the time of 3, 2, 3, 4, 4, 4 and 8. It goes back to
+    /// no tuplet when it already is that one or `actual` is 0. The caret's
+    /// beat takes it, as setInputValue().
+    Q_INVOKABLE void setInputTuplet(int actual);
     /// The next longer or shorter note value, as setInputValue().
     Q_INVOKABLE void longerDuration();
     Q_INVOKABLE void shorterDuration();
