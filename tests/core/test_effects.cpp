@@ -120,3 +120,44 @@ TEST_CASE("Beat effects describe picking and bass techniques", "[core][effects]"
     harmonic.effects.slideIn = SlideIn::FromBelow;
     CHECK(harmonic.effects.harmonic.fretTenths == 120);
 }
+
+TEST_CASE("A bend's form is read from the shape of its curve", "[core][effects]") {
+    using elara::core::bendCurve;
+    using elara::core::BendForm;
+    using elara::core::bendForm;
+    using Points = std::vector<BendPoint>;
+    CHECK(bendForm(BendCurve{}) == BendForm::None);
+    CHECK(bendForm(BendCurve::bend(200)) == BendForm::Bend);
+    CHECK(bendForm(BendCurve::bendRelease(100)) == BendForm::BendRelease);
+    CHECK(bendForm(BendCurve::preBend(300)) == BendForm::PreBend);
+    CHECK(bendForm(BendCurve::preBendRelease(50)) == BendForm::PreBendRelease);
+
+    // Imported curves keep their own points: the shape decides, not the positions.
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 0},
+                                    {.position = 20, .cents = 100},
+                                    {.position = 60, .cents = 200}})) == BendForm::Bend);
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 0},
+                                    {.position = 10, .cents = 200},
+                                    {.position = 80, .cents = 200},
+                                    {.position = 90, .cents = 0}})) == BendForm::BendRelease);
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 100},
+                                    {.position = 70, .cents = 0}})) == BendForm::PreBendRelease);
+
+    // Bend, release and bend again, a dip, or a curve that stays flat at zero.
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 0},
+                                    {.position = 30, .cents = 200},
+                                    {.position = 60, .cents = 0},
+                                    {.position = 90, .cents = 200}})) == BendForm::Custom);
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 0},
+                                    {.position = 50, .cents = -100}})) == BendForm::Custom);
+    CHECK(bendForm(BendCurve(Points{{.position = 0, .cents = 0}})) == BendForm::Custom);
+
+    CHECK(bendCurve(BendForm::None, 200).isEmpty());
+    CHECK(bendCurve(BendForm::Bend, 100) == BendCurve::bend(100));
+    CHECK(bendCurve(BendForm::BendRelease, 200) == BendCurve::bendRelease(200));
+    CHECK(bendCurve(BendForm::PreBend, 50) == BendCurve::preBend(50));
+    CHECK(bendCurve(BendForm::PreBendRelease, 400) == BendCurve::preBendRelease(400));
+    CHECK_THROWS_AS(bendCurve(BendForm::Custom, 200), std::invalid_argument);
+    CHECK_THROWS_AS(bendCurve(BendForm::Bend, 0), std::invalid_argument);
+    CHECK_THROWS_AS(bendCurve(BendForm::Bend, BendCurve::kMaxCents + 1), std::invalid_argument);
+}

@@ -190,6 +190,9 @@ that General MIDI key's lane (moving the caret to it), and `delete` removes the
 lane's piece only. `effect <name>` toggles a note effect on the caret's notes
 (ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
 `dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`.
+`bend <form> [cents]` sets a bend on them (ADR-0055): `bend`, `release` (bend
+and release), `pre-bend`, `pre-release` (pre-bend and release) or `none`, up by
+`cents` (a full step, 200, by default).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.

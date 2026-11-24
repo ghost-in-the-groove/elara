@@ -58,6 +58,7 @@ one that replaces them.
 | [0051](0051-shared-measures.md) | Measures shared between copies of a song | Accepted |
 | [0053](0053-worker-pool.md) | A worker pool for parallel jobs | Accepted |
 | [0054](0054-worker-results-from-the-event-loop.md) | Worker results arrive from the event loop | Accepted |
+| [0055](0055-bend-forms.md) | Bends of any form at the caret | Accepted |
 
 ## Template
 

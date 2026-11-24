@@ -34,7 +34,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029) | 0, 4, 6 |
 | `src/audio/backend_fluid` | `elara_audio_fluid` | SoundFonts (SF2, SF3) as sound banks, through FluidSynth (ADR-0043) | 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
-| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret, toggles note effects, selects, copies, pastes and transposes measures (ADR-0031, ADR-0032, ADR-0033, ADR-0036, ADR-0038) | 0+ |
+| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret, toggles note effects and sets bends, selects, copies, pastes and transposes measures (ADR-0031, ADR-0032, ADR-0033, ADR-0036, ADR-0038, ADR-0055) | 0+ |
 
 ## Key decisions
 
