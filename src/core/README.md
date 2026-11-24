@@ -64,7 +64,7 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
-| `parallel.hpp` | `forEachIndex()`: independent jobs on several threads (or the calling one), exceptions rethrown in order; `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export and notation layout. |
+| `parallel.hpp` | `forEachIndex()`: independent jobs on the calling thread and the threads of `WorkerPool::shared()`, kept waiting so a parallel call starts no threads (ADR-0053); the first exception is rethrown and nested calls are allowed. `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export, sequencing and notation layout. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
 staves at once, and `addTrack` gives a new track as many measures as the song.
