@@ -54,6 +54,7 @@ private:
     void queueTuplets();
     void queueMeasures();
     void queuePitches();
+    void queueDrums();
     void queueMix();
     void queueNavigation();
     void queueTuning();
@@ -96,6 +97,7 @@ private:
     double positionBefore_ = 0.0; ///< playback's position before an edit
     bool pitching_ = false;       ///< whether the caret takes note names
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
+    bool drumming_ = false;       ///< whether the drum steps run
 };
 
 } // namespace elara::app

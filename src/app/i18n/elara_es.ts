@@ -900,6 +900,54 @@
         <source>Six-string bass</source>
         <translation>Bajo de seis cuerdas</translation>
     </message>
+    <message>
+        <source>Crash cymbal</source>
+        <translation>Platillo crash</translation>
+    </message>
+    <message>
+        <source>Closed hi-hat</source>
+        <translation>Charles cerrado</translation>
+    </message>
+    <message>
+        <source>Open hi-hat</source>
+        <translation>Charles abierto</translation>
+    </message>
+    <message>
+        <source>Ride cymbal</source>
+        <translation>Platillo ride</translation>
+    </message>
+    <message>
+        <source>Ride bell</source>
+        <translation>Campana del ride</translation>
+    </message>
+    <message>
+        <source>High tom</source>
+        <translation>Tom agudo</translation>
+    </message>
+    <message>
+        <source>Mid tom</source>
+        <translation>Tom medio</translation>
+    </message>
+    <message>
+        <source>Snare</source>
+        <translation>Caja</translation>
+    </message>
+    <message>
+        <source>Side stick</source>
+        <translation>Golpe de aro</translation>
+    </message>
+    <message>
+        <source>Floor tom</source>
+        <translation>Tom de suelo</translation>
+    </message>
+    <message>
+        <source>Bass drum</source>
+        <translation>Bombo</translation>
+    </message>
+    <message>
+        <source>Hi-hat pedal</source>
+        <translation>Pedal de charles</translation>
+    </message>
     <message numerus="yes">
         <source>%n strings</source>
         <translation>
@@ -1003,6 +1051,10 @@
         <translation>Traste %1</translation>
     </message>
     <message>
+        <source>On drums, Enter adds or removes the lane&apos;s hit.</source>
+        <translation>En la batería, Intro añade o quita el golpe del carril.</translation>
+    </message>
+    <message>
         <source>Frets are typed on a track with strings.</source>
         <translation>Los trastes se escriben en una pista con cuerdas.</translation>
     </message>
@@ -1021,6 +1073,10 @@
     <message>
         <source>The note would leave the neck.</source>
         <translation>La nota se saldría del mástil.</translation>
+    </message>
+    <message>
+        <source>Hits are typed on a drum track.</source>
+        <translation>Los golpes se escriben en una pista de batería.</translation>
     </message>
 </context>
 <context>
