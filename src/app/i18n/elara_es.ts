@@ -123,6 +123,38 @@
         <translation>Pre-bending y vuelta</translation>
     </message>
     <message>
+        <source>Beat</source>
+        <translation>Tiempo</translation>
+    </message>
+    <message>
+        <source>Strum down</source>
+        <translation>Rasgueo abajo</translation>
+    </message>
+    <message>
+        <source>Strum up</source>
+        <translation>Rasgueo arriba</translation>
+    </message>
+    <message>
+        <source>Down stroke</source>
+        <translation>Púa abajo</translation>
+    </message>
+    <message>
+        <source>Up stroke</source>
+        <translation>Púa arriba</translation>
+    </message>
+    <message>
+        <source>Tremolo picking in eighths</source>
+        <translation>Trémolo en corcheas</translation>
+    </message>
+    <message>
+        <source>Tremolo picking in sixteenths</source>
+        <translation>Trémolo en semicorcheas</translation>
+    </message>
+    <message>
+        <source>Tremolo picking in thirty-seconds</source>
+        <translation>Trémolo en fusas</translation>
+    </message>
+    <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
         <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
     </message>
@@ -1036,6 +1068,10 @@
         <translation>Cambiar bending</translation>
     </message>
     <message>
+        <source>Change beat effects</source>
+        <translation>Cambiar efectos del tiempo</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1244,6 +1280,26 @@
     <message>
         <source>Fret %1</source>
         <translation>Traste %1</translation>
+    </message>
+    <message>
+        <source>Strum down</source>
+        <translation>Rasgueo abajo</translation>
+    </message>
+    <message>
+        <source>Strum up</source>
+        <translation>Rasgueo arriba</translation>
+    </message>
+    <message>
+        <source>Down stroke</source>
+        <translation>Púa abajo</translation>
+    </message>
+    <message>
+        <source>Up stroke</source>
+        <translation>Púa arriba</translation>
+    </message>
+    <message>
+        <source>Tremolo picking 1/%1</source>
+        <translation>Trémolo 1/%1</translation>
     </message>
     <message>
         <source>On drums, Enter adds or removes the lane&apos;s hit.</source>

@@ -93,6 +93,9 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int effectCount READ effectCount CONSTANT)
     Q_PROPERTY(int caretBendForm READ caretBendForm NOTIFY caretChanged)
     Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
+    Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
+    Q_PROPERTY(int caretPickStroke READ caretPickStroke NOTIFY caretChanged)
+    Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
@@ -407,6 +410,15 @@ public:
     Q_INVOKABLE QString bendName(int form, int cents) const;
     /// How far a bend goes, as tablature writes it: "1/4", "1/2", "full", "1 1/2".
     Q_INVOKABLE QString bendAmount(int cents) const;
+    /// The effects of the caret's beat (ADR-0056): strum and pick stroke as
+    /// 0 none, 1 down, 2 up; tremolo picking as the repeated notes' value
+    /// (8, 16, 32), 0 without it.
+    Q_INVOKABLE void setStrum(int direction);
+    Q_INVOKABLE void setPickStroke(int direction);
+    Q_INVOKABLE void setTremolo(int value);
+    [[nodiscard]] int caretStrum() const;
+    [[nodiscard]] int caretPickStroke() const;
+    [[nodiscard]] int caretTremolo() const;
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
@@ -496,6 +508,10 @@ private:
     /// Executes an entry's command, if any, and moves the caret. Returns
     /// whether a command ran.
     bool enter(core::Entry entry);
+    /// The effects of the caret's beat, none without a caret.
+    [[nodiscard]] core::BeatEffects beatEffectsAtCaret() const;
+    /// Gives the caret's beat `effects`, or says why it cannot.
+    void applyBeatEffects(const core::BeatEffects& effects);
     /// Makes an entry from the song being edited and enters it, reporting
     /// what it throws through editFailed().
     void runEntry(const std::function<core::Entry(const core::Song&)>& make);
