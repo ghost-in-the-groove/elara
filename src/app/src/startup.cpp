@@ -517,7 +517,7 @@ void Startup::tick() {
         queueSteps();
     }
     while (!steps_.empty()) {
-        const auto step = std::move(steps_.front());
+        auto step = std::move(steps_.front());
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
@@ -526,6 +526,18 @@ void Startup::tick() {
             finish(false, failure_);
             return;
         }
+        if (again_) {
+            again_ = false;
+            if (againSince_ < 0) {
+                againSince_ = clock_.elapsed();
+            } else if (clock_.elapsed() - againSince_ > kStepTimeoutMilliseconds) {
+                finish(false, QStringLiteral("timed out"));
+                return;
+            }
+            steps_.push_front(std::move(step));
+            return;
+        }
+        againSince_ = -1;
         if (changed) {
             waiting_ = true;
             stepStarted_ = clock_.elapsed();
@@ -573,6 +585,14 @@ void Startup::clickCursor() {
     auto* playhead = window_->findChild<QQuickItem*>(QStringLiteral("playhead"));
     if (audio == nullptr || playhead == nullptr || !playhead->isVisible()) {
         failure_ = QStringLiteral("no playback cursor");
+        return;
+    }
+    // Nothing may cover the cursor, as the measure popup open at the caret can:
+    // it closes first, and the click waits until it is gone.
+    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
+        popup != nullptr && popup->property("visible").toBool()) {
+        QMetaObject::invokeMethod(popup, "close");
+        again_ = true;
         return;
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());

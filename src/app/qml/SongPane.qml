@@ -4,7 +4,6 @@
 // one edit of the document, so Ctrl+Z takes it back.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
 import Elara.App
 
@@ -12,12 +11,11 @@ Pane {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
     signal closeRequested
 
-    readonly property color cardColor: dark ? "#24242c" : "#ffffff"
-    readonly property color lineColor: dark ? "#34343e" : "#dfe2e8"
+    readonly property color cardColor: Theme.surface
+    readonly property color lineColor: Theme.line
 
     padding: 0
     background: Rectangle {
@@ -53,11 +51,62 @@ Pane {
     component SectionLabel: Label {
         Layout.fillWidth: true
         Layout.topMargin: 10
-        font.pixelSize: 12
+        font.pixelSize: Theme.fontCaption
         font.weight: Font.DemiBold
         font.capitalization: Font.AllUppercase
-        font.letterSpacing: 0.8
+        font.letterSpacing: 1.0
         opacity: 0.55
+    }
+
+    // The heading of a section that folds: a click hides or shows its fields.
+    component SectionHeader: AbstractButton {
+        id: heading
+
+        property bool open: true
+
+        Layout.fillWidth: true
+        Layout.topMargin: 10
+        implicitHeight: 24
+        focusPolicy: Qt.TabFocus
+        hoverEnabled: true
+        Accessible.name: text
+        onClicked: open = !open
+
+        background: Rectangle {
+            radius: 4
+            color: "transparent"
+            border.width: heading.visualFocus ? 2 : 0
+            border.color: Theme.accentInk
+        }
+
+        contentItem: RowLayout {
+            spacing: 4
+            opacity: heading.hovered ? 0.9 : 0.55
+
+            Label {
+                Layout.fillWidth: true
+                text: heading.text
+                font.pixelSize: Theme.fontCaption
+                font.weight: Font.DemiBold
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 1.0
+                verticalAlignment: Text.AlignVCenter
+            }
+            Icon {
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                path: "M7 10 L12 15 L17 10"
+                color: Theme.ink
+                rotation: heading.open ? 0 : -90
+
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: 140
+                        easing.type: Easing.OutCubic
+                    }
+                }
+            }
+        }
     }
 
     // Mute or solo: a round letter, lit in its colour when on.
@@ -81,8 +130,7 @@ Pane {
         background: Rectangle {
             radius: height / 2
             color: toggle.checked ? toggle.tint
-                                  : toggle.hovered ? Qt.alpha(Material.foreground, 0.12)
-                                                   : Qt.alpha(Material.foreground, 0.06)
+                                  : toggle.hovered ? Theme.pressed : Theme.hover
 
             Behavior on color {
                 ColorAnimation {
@@ -94,9 +142,9 @@ Pane {
             text: toggle.text
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            font.pixelSize: 11
+            font.pixelSize: Theme.fontCaption
             font.weight: Font.Bold
-            color: toggle.checked ? "white" : Material.foreground
+            color: toggle.checked ? "white" : Theme.ink
         }
     }
 
@@ -130,7 +178,7 @@ Pane {
             width: 2
             height: 10
             radius: 1
-            color: Qt.alpha(Material.foreground, 0.35)
+            color: Theme.faint
         }
     }
 
@@ -149,12 +197,12 @@ Pane {
             Layout.leftMargin: 20
             Layout.rightMargin: 10
             Layout.topMargin: 10
-            Layout.bottomMargin: 4
+            Layout.bottomMargin: 10
 
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Song and tracks")
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontTitle
                 font.weight: Font.DemiBold
                 elide: Text.ElideRight
             }
@@ -164,6 +212,12 @@ Pane {
                 tip: qsTr("Close (Ctrl+I)")
                 onClicked: root.closeRequested()
             }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: root.lineColor
         }
 
         ScrollView {
@@ -179,13 +233,16 @@ Pane {
                 x: 20
                 spacing: 8
 
-                SectionLabel {
-                    Layout.topMargin: 2
+                SectionHeader {
+                    id: songSection
+
+                    Layout.topMargin: 14
                     text: qsTr("Song")
                 }
 
                 TextField {
                     Layout.fillWidth: true
+                    visible: songSection.open
                     placeholderText: qsTr("Title")
                     text: root.document.songTitle
                     selectByMouse: true
@@ -194,6 +251,7 @@ Pane {
 
                 TextField {
                     Layout.fillWidth: true
+                    visible: songSection.open
                     placeholderText: qsTr("Artist")
                     text: root.document.artist
                     selectByMouse: true
@@ -202,6 +260,7 @@ Pane {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: songSection.open
 
                     FieldLabel {
                         text: qsTr("Tempo")
@@ -222,12 +281,15 @@ Pane {
                     }
                 }
 
-                SectionLabel {
+                SectionHeader {
+                    id: measuresSection
+
                     text: qsTr("Measures")
                 }
 
                 SignatureFields {
                     Layout.fillWidth: true
+                    visible: measuresSection.open
                     numerator: root.document.timeNumerator
                     denominator: root.document.timeDenominator
                     fifths: root.document.keyFifths
@@ -239,6 +301,7 @@ Pane {
 
                 Label {
                     Layout.fillWidth: true
+                    visible: measuresSection.open
                     text: qsTr("From the first measure until the next change.")
                     font.pixelSize: 12
                     opacity: 0.5
@@ -247,6 +310,7 @@ Pane {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: measuresSection.open
 
                     FieldLabel {
                         text: qsTr("Length")
@@ -281,9 +345,12 @@ Pane {
                                                            && modelData.fretted === true
 
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 94 + (tuningOpen ? tuning.implicitHeight + 14 : 0)
-                        radius: 12
+                        Layout.preferredHeight: 80 + (tuningOpen ? tuning.implicitHeight + 14 : 0)
+                        radius: Theme.radiusCard
                         clip: true
+                        // A card of its own; the track shown wears the accent.
+                        border.width: 1
+                        border.color: shown ? Qt.alpha(Theme.accentInk, 0.45) : root.lineColor
                         // The tuning stays in sight as it opens.
                         onHeightChanged: {
                             if (tuningOpen) {
@@ -297,9 +364,7 @@ Pane {
                                 easing.type: Easing.OutCubic
                             }
                         }
-                        color: shown ? Qt.alpha(Material.accent, root.dark ? 0.22 : 0.12)
-                                     : hover.hovered ? Qt.alpha(Material.foreground, 0.06)
-                                                     : "transparent"
+                        color: shown ? Theme.accentWash : hover.hovered ? Theme.hover : "transparent"
 
                         Behavior on color {
                             ColorAnimation {
@@ -321,7 +386,7 @@ Pane {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
-                            height: 56
+                            height: 46
                             anchors.leftMargin: 8
                             anchors.rightMargin: 4
                             spacing: 10
@@ -335,18 +400,18 @@ Pane {
                             }
 
                             Rectangle {
-                                Layout.preferredWidth: 40
-                                Layout.preferredHeight: 40
-                                radius: 10
-                                color: Qt.alpha(Material.accent, root.dark ? 0.25 : 0.14)
+                                Layout.preferredWidth: 32
+                                Layout.preferredHeight: 32
+                                radius: Theme.radiusSmall
+                                color: Theme.accentWash
 
                                 MusicSymbol {
                                     anchors.centerIn: parent
-                                    width: 30
-                                    height: 30
+                                    width: 24
+                                    height: 24
                                     symbol: row.modelData.symbol
-                                    size: 24
-                                    color: Material.accent
+                                    size: 20
+                                    color: Theme.accentInk
                                 }
                             }
 
@@ -363,7 +428,7 @@ Pane {
                                 Label {
                                     Layout.fillWidth: true
                                     text: row.modelData.detail
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.fontSmall
                                     opacity: 0.6
                                     elide: Text.ElideRight
                                 }
@@ -411,14 +476,14 @@ Pane {
                             anchors.top: header.bottom
                             anchors.leftMargin: 8
                             anchors.rightMargin: 10
-                            height: 34
+                            height: 30
                             spacing: 6
 
                             MixToggle {
                                 text: qsTr("M", "mute")
                                 tip: qsTr("Mute")
                                 checked: row.modelData.mute
-                                tint: "#e5484d"
+                                tint: Theme.danger
                                 onClicked: root.document.setTrackMix(row.index, volume.value, pan.value,
                                                                      !row.modelData.mute, row.modelData.solo)
                             }
@@ -426,7 +491,7 @@ Pane {
                                 text: qsTr("S", "solo")
                                 tip: qsTr("Solo")
                                 checked: row.modelData.solo
-                                tint: "#f5a524"
+                                tint: Theme.solo
                                 onClicked: root.document.setTrackMix(row.index, volume.value, pan.value,
                                                                      row.modelData.mute, !row.modelData.solo)
                             }
@@ -468,7 +533,7 @@ Pane {
                             anchors.topMargin: 8
                             anchors.leftMargin: 8
                             anchors.rightMargin: 10
-                            visible: row.tuningOpen || row.height > 95
+                            visible: row.tuningOpen || row.height > 81
                             opacity: row.tuningOpen ? 1.0 : 0.0
                             document: root.document
                             track: row.index

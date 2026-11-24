@@ -11,8 +11,6 @@ import Elara.App
 Popup {
     id: root
 
-    property bool dark: false
-
     // With a tuning, the nearest string and how far it is from its pitch;
     // chromatic, the nearest note.
     readonly property bool byString: tuner.hasReading && tuner.stringIndex >= 0
@@ -24,10 +22,10 @@ Popup {
                                                    : tuner.hasReading ? String(tuner.octave) : ""
     readonly property real offset: byString ? tuner.stringCents : tuner.cents
     readonly property bool inTune: tuner.hasReading && Math.abs(offset) < 5
-    readonly property color tuneColor: dark ? "#5fd38d" : "#1e9e57"
-    readonly property color offColor: dark ? "#ffb454" : "#d9822b"
-    readonly property color textColor: dark ? "#ececf1" : "#1d1d24"
-    readonly property color faintColor: dark ? "#4a4a55" : "#d3d6de"
+    readonly property color tuneColor: Theme.success
+    readonly property color offColor: Theme.warning
+    readonly property color textColor: Theme.ink
+    readonly property color faintColor: Theme.faint
 
     function signedCents(cents: real): string {
         const rounded = Math.round(cents * 10) / 10;
@@ -69,9 +67,13 @@ Popup {
     }
 
     background: Rectangle {
-        radius: 18
-        color: root.dark ? "#24242c" : "#ffffff"
-        border.color: root.dark ? "#34343e" : "#dfe2e8"
+        radius: Theme.radiusSheet
+        color: Theme.surface
+        border.color: Theme.line
+
+        Elevation {
+            radius: parent.radius
+        }
     }
 
     TunerController {
@@ -89,7 +91,7 @@ Popup {
 
             Label {
                 text: qsTr("Tuner")
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontTitle
                 font.weight: Font.DemiBold
             }
 
@@ -444,7 +446,7 @@ Popup {
                 width: parent.width * tuner.level
                 height: parent.height
                 radius: 2
-                color: tuner.level > 0.97 ? "#d9534f" : Material.accent
+                color: tuner.level > 0.97 ? Theme.danger : Material.accent
 
                 Behavior on width {
                     NumberAnimation {
@@ -458,7 +460,7 @@ Popup {
             Layout.fillWidth: true
             visible: text.length > 0
             text: tuner.errorMessage.length > 0 ? tuner.errorMessage : tuner.deviceDescription
-            color: tuner.errorMessage.length > 0 ? "#d9534f" : root.textColor
+            color: tuner.errorMessage.length > 0 ? Theme.danger : root.textColor
             opacity: tuner.errorMessage.length > 0 ? 1.0 : 0.5
             font.pixelSize: 11
             wrapMode: Text.Wrap

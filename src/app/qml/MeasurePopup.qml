@@ -4,7 +4,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
-import QtQuick.Effects
 import QtQuick.Layouts
 import Elara.App
 
@@ -12,9 +11,8 @@ Popup {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
-    readonly property color ink: dark ? "#e8e8ee" : "#23232b"
+    readonly property color ink: Theme.ink
 
     width: 360
     padding: 18
@@ -45,21 +43,13 @@ Popup {
         }
     }
 
-    background: Item {
-        RectangularShadow {
-            anchors.fill: card
-            offset.y: 4
-            radius: card.radius
-            blur: 20
-            color: Qt.rgba(0, 0, 0, 0.28)
-        }
-        Rectangle {
-            id: card
+    background: Rectangle {
+        radius: Theme.radiusSheet
+        color: Theme.surface
+        border.color: Theme.line
 
-            anchors.fill: parent
-            radius: 14
-            color: root.dark ? "#2a2a32" : "white"
-            border.color: Qt.alpha(root.ink, 0.12)
+        Elevation {
+            radius: parent.radius
         }
     }
 
@@ -72,7 +62,7 @@ Popup {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Measure %1").arg(root.document.caretMeasure + 1)
-                font.pixelSize: 16
+                font.pixelSize: Theme.fontTitle
                 font.weight: Font.DemiBold
                 color: root.ink
             }
@@ -99,7 +89,7 @@ Popup {
         Label {
             Layout.fillWidth: true
             text: qsTr("From this measure until the next change.")
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSmall
             opacity: 0.5
             wrapMode: Text.Wrap
             color: root.ink
@@ -109,7 +99,7 @@ Popup {
             Layout.fillWidth: true
             Layout.topMargin: 2
             height: 1
-            color: Qt.alpha(root.ink, 0.1)
+            color: Theme.line
         }
 
         RowLayout {
@@ -139,7 +129,7 @@ Popup {
                 focusPolicy: Qt.NoFocus
                 enabled: root.document.measureCount > 1
                 text: qsTr("Delete")
-                Material.foreground: "#d9534f"
+                Material.foreground: Theme.danger
                 ToolTip.visible: hovered
                 ToolTip.delay: 600
                 ToolTip.text: qsTr("Delete this measure from every track (Ctrl+Shift+Delete)")
