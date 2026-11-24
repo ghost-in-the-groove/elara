@@ -74,6 +74,21 @@ enum class BendForm : std::uint8_t { None, Bend, BendRelease, PreBend, PreBendRe
 /// std::invalid_argument for Custom and for `cents` outside 1..kMaxCents.
 [[nodiscard]] BendCurve bendCurve(BendForm form, int cents);
 
+/// The form of a whammy-bar curve (ADR-0060): the shapes of BendForm going
+/// down from the written pitch (a dive, a dip, a pre-dive, a pre-dive and
+/// return) or up from it, as a bend does. None for an empty curve, Custom for
+/// one that goes both ways or changes direction more often.
+[[nodiscard]] BendForm whammyForm(const BendCurve& curve);
+
+/// How far a whammy-bar curve goes from the written pitch: the cents of its
+/// point farthest from it, negative below it; 0 for an empty curve.
+[[nodiscard]] int whammyCents(const BendCurve& curve);
+
+/// The whammy-bar curve of `form` going `cents` from the written pitch, down
+/// for negative cents and up for positive ones; empty for None. Throws
+/// std::invalid_argument for Custom, and for 0 or more than kMaxCents either way.
+[[nodiscard]] BendCurve whammyCurve(BendForm form, int cents);
+
 enum class SlideIn : std::uint8_t { None, FromBelow, FromAbove };
 
 /// Shift: slide to the next note and pick it. Legato: slide to the next note
