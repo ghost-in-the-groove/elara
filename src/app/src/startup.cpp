@@ -8,10 +8,13 @@
 #include "audio_controller.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
+#include <QGuiApplication>
+#include <QIcon>
 #include <QImage>
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QSize>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -1541,6 +1544,13 @@ void Startup::finish(bool ok, const QString& detail) {
     if (ok && qmlWarnings_) {
         ok = false;
         outcome = QStringLiteral("QML warnings");
+    }
+    // The window carries the app icon up to the largest size a taskbar asks
+    // for (ADR-0064).
+    if (ok && options_.smokeTest &&
+        !QGuiApplication::windowIcon().availableSizes().contains(QSize(256, 256))) {
+        ok = false;
+        outcome = QStringLiteral("the window has no app icon");
     }
     if (ok && !options_.screenshot.isEmpty() && window_ != nullptr) {
         const QImage image = window_->grabWindow();
