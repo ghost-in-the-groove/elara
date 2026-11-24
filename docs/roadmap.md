@@ -153,4 +153,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Installers: MSIX/MSI (Windows), DMG (macOS), AppImage/Flatpak (Linux)
   - [x] Portable packages built and smoke-tested by CI: ZIP (Windows), disk image
         (macOS), tarball (Linux), `elara.py package` (ADR-0048)
+  - [x] The app icon on the window, `elara.exe`, the macOS bundle and a Linux
+        desktop entry, drawn from its SVG at build time (ADR-0064)
 - [ ] Release automation and 1.0

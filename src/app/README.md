@@ -37,6 +37,9 @@ Qt Quick / QML user interface.
 | `src/tuner_controller.hpp` | `TunerController` (QML): while `active`, listens to the default input through `elara::audio::MicrophoneInput` and shows what `elara::audio::Tuner` reads: note, cents, nearest string, input level. Tunings are the core presets, or chromatic. |
 | `qml/TunerPane.qml` | The tuner card (toolbar button, Ctrl+Shift+T): the note inside an arc from -50 to +50 cents with a sliding marker, which way to turn, the instrument's strings, the tuning and the reference A4. It listens only while open. |
 | `Info.plist.in` | The macOS bundle's Info.plist, with the reason the system shows when it asks for the microphone. |
+| `src/app_icon.hpp` | The app icon (ADR-0064): `renderIcon()` draws an SVG image at a size, `icoFile()` and `icnsFile()` pack images as the icon files of Windows and macOS. Built as the `elara_app_icon` library, which the build tool and the tests link. |
+| `tools/icon_files.cpp` | `elara-icon-files`: draws `icons/elara.svg` at build time as the window's PNG images (built into the app under `:/icons`), `elara.ico` (compiled into `elara.exe` by `elara.rc.in`) and `elara.icns` (the macOS bundle's icon). |
+| `elara.desktop` | The Linux desktop entry, installed with the icon as `io.github.ghost_in_the_groove.Elara`. |
 
 ## Translations (ADR-0030)
 

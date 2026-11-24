@@ -67,6 +67,7 @@ one that replaces them.
 | [0059](0059-song-credits.md) | Song credits | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
 | [0063](0063-section-marks.md) | Section marks in the score | Accepted |
+| [0064](0064-app-icon.md) | The app icon | Accepted |
 
 ## Template
 
