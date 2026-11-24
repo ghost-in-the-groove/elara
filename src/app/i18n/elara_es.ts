@@ -39,6 +39,10 @@
         <translation>Semifusa</translation>
     </message>
     <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
         <source>%1 (+ longer, - shorter)</source>
         <translation>%1 (+ más larga, - más corta)</translation>
     </message>
@@ -81,6 +85,14 @@
     <message>
         <source>No tuplet</source>
         <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
+        <source>Voice %1 (Alt+1 to Alt+4); a right click picks one</source>
+        <translation>Voz %1 (Alt+1 a Alt+4); clic derecho para elegir otra</translation>
+    </message>
+    <message>
+        <source>V%1</source>
+        <translation>V%1</translation>
     </message>
     <message>
         <source>Insert a rest (Insert)</source>
@@ -911,6 +923,54 @@
         <source>Six-string bass</source>
         <translation>Bajo de seis cuerdas</translation>
     </message>
+    <message>
+        <source>Crash cymbal</source>
+        <translation>Platillo crash</translation>
+    </message>
+    <message>
+        <source>Closed hi-hat</source>
+        <translation>Charles cerrado</translation>
+    </message>
+    <message>
+        <source>Open hi-hat</source>
+        <translation>Charles abierto</translation>
+    </message>
+    <message>
+        <source>Ride cymbal</source>
+        <translation>Platillo ride</translation>
+    </message>
+    <message>
+        <source>Ride bell</source>
+        <translation>Campana del ride</translation>
+    </message>
+    <message>
+        <source>High tom</source>
+        <translation>Tom agudo</translation>
+    </message>
+    <message>
+        <source>Mid tom</source>
+        <translation>Tom medio</translation>
+    </message>
+    <message>
+        <source>Snare</source>
+        <translation>Caja</translation>
+    </message>
+    <message>
+        <source>Side stick</source>
+        <translation>Golpe de aro</translation>
+    </message>
+    <message>
+        <source>Floor tom</source>
+        <translation>Tom de suelo</translation>
+    </message>
+    <message>
+        <source>Bass drum</source>
+        <translation>Bombo</translation>
+    </message>
+    <message>
+        <source>Hi-hat pedal</source>
+        <translation>Pedal de charles</translation>
+    </message>
     <message numerus="yes">
         <source>%n strings</source>
         <translation>
@@ -998,6 +1058,10 @@
         <translation>Compás %1</translation>
     </message>
     <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
         <source>New beat</source>
         <translation>Tiempo nuevo</translation>
     </message>
@@ -1012,6 +1076,10 @@
     <message>
         <source>Fret %1</source>
         <translation>Traste %1</translation>
+    </message>
+    <message>
+        <source>On drums, Enter adds or removes the lane&apos;s hit.</source>
+        <translation>En la batería, Intro añade o quita el golpe del carril.</translation>
     </message>
     <message>
         <source>Frets are typed on a track with strings.</source>
@@ -1032,6 +1100,10 @@
     <message>
         <source>The note would leave the neck.</source>
         <translation>La nota se saldría del mástil.</translation>
+    </message>
+    <message>
+        <source>Hits are typed on a drum track.</source>
+        <translation>Los golpes se escriben en una pista de batería.</translation>
     </message>
 </context>
 <context>

@@ -2,6 +2,7 @@
 #include "startup.hpp"
 
 #include <elara/audio/sequence.hpp>
+#include <elara/core/instrument.hpp>
 
 #include "audio_controller.hpp"
 #include "score_page.hpp"
@@ -12,6 +13,7 @@
 #include <QQuickItem>
 #include <QVariantMap>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -28,6 +30,14 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 // How long a screenshot waits for animations once the window is ready.
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
+constexpr int kSnareKey = 38;
+
+// The drum lane (1 at the top) of the kit piece with General MIDI `key`.
+int laneOf(int key) {
+    const auto pieces = core::drumPieces();
+    const auto found = std::ranges::find(pieces, key, &core::DrumPiece::key);
+    return static_cast<int>(found - pieces.begin()) + 1;
+}
 
 // Pages brought up to date so far: painted, or kept because a relayout left
 // them as they were.
@@ -68,6 +78,7 @@ void Startup::start() {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
             ++layouts_;
+            layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
     }
     clock_.start();
@@ -98,6 +109,8 @@ void Startup::queueSteps() {
             queueTuplets();
             queueMeasures();
             queuePitches();
+            queueVoices();
+            queueDrums();
             queueMix();
             queueNavigation();
             queueTuning();
@@ -133,6 +146,8 @@ void Startup::queueSteps() {
         queueTuplets();
         queueMeasures();
         queuePitches();
+        queueVoices();
+        queueDrums();
         queueMix();
         queueNavigation();
         queueTuning();
@@ -485,6 +500,127 @@ void Startup::queuePitches() {
     });
 }
 
+// Drum entry on a new drum kit track (ADR-0035): the status names the lane,
+// the caret box goes down with the lanes, and a snare is toggled on and off
+// again. Then the track is undone and the song must end as it started.
+void Startup::queueDrums() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("drum check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        drumming_ = score_->caretPage() >= 0;
+        if (!drumming_) {
+            return false;
+        }
+        score_->addTrack(QStringLiteral("drum-kit"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(score_->caretOnDrums(), "the caret is not on the drum track");
+        const int lanes = static_cast<int>(core::drumPieces().size());
+        for (int lane = 1; lane < lanes; ++lane) {
+            score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        }
+        check(score_->caret().string == 1 &&
+                  score_->caretStatus().endsWith(ScoreDocument::laneName(1)),
+              "the status does not name the top lane");
+        const double crash = score_->caretRect().top();
+        for (int lane = 1; lane < laneOf(kSnareKey); ++lane) {
+            score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        }
+        check(score_->caretStatus().endsWith(ScoreDocument::laneName(laneOf(kSnareKey))),
+              "the status does not name the snare");
+        check(score_->caretRect().top() > crash, "the caret did not go down to the snare");
+        score_->toggleDrum();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        const std::vector<core::Pitch> hits = score_->pitchesAtCaret();
+        check(hits.size() == 1 && hits.front().midiNumber() == kSnareKey,
+              "the snare was not added");
+        score_->toggleDrum();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(score_->pitchesAtCaret().empty(), "the snare was not removed");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!drumming_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the drums did not restore the song");
+        if (score_->track() == 0) {
+            return false;
+        }
+        score_->setTrack(0);
+        return true;
+    });
+}
+
+// Voices: the caret goes to voice 2, which the status names, and a note typed
+// there goes into it; back in voice 1 the status no longer names a voice.
+// Undone, the song must end as it started.
+void Startup::queueVoices() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("voice check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        voicing_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!voicing_) {
+            return false;
+        }
+        score_->setCaretVoice(2);
+        check(score_->caretVoice() == 2, "the caret did not go to voice 2");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the status does not name voice 2");
+        if (score_->caretFretted()) {
+            score_->typeDigit(7);
+        } else {
+            score_->typeNoteName(2, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(score_->caretVoice() == 2 && !score_->pitchesAtCaret().empty(),
+              "the note did not go into voice 2");
+        score_->setCaretVoice(1);
+        check(score_->caretVoice() == 1 &&
+                  !score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the caret did not come back to voice 1");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the voice did not restore the song");
+        return false;
+    });
+}
+
 // The mixer (ADR-0039): a fader previewed without changing the song, then the
 // first track's mix set, soloed, as one undo step that keeps what playback
 // plays and silences the other tracks. Undone, the song must end as it started.
@@ -658,6 +794,9 @@ void Startup::tick() {
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
+        if (againSince_ < 0) {
+            ++stepsRun_;
+        }
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
@@ -895,6 +1034,11 @@ void Startup::finish(bool ok, const QString& detail) {
         }
     }
     reportSmokeTest(ok, outcome);
+    // Which steps each layout followed, after the result the tests read: when
+    // the count of layouts they expect is off on one platform, this says where.
+    if (!layoutSteps_.isEmpty()) {
+        std::printf("layouts after steps:%s\n", qPrintable(layoutSteps_));
+    }
     QCoreApplication::exit(ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

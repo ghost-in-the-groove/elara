@@ -45,6 +45,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | edit one measure of that song and undo | 0.60 µs | the command swaps the measure in and out (ADR-0005); most of the time is building the new measure |
 | 2026-11-23 | remove 100 measures from all 20 tracks and undo | 211 µs | 2000 measures and 100 headers moved out and back, nothing copied |
 | 2026-11-23 | remove a 500-measure track and undo | 0.31 µs | the track is moved into the command and back; a copy would take about 0.5 ms |
+| 2026-11-24 | copy the 20-track song; insert a measure at its start; build it | 63 µs, 17 µs, 14.4 ms (11.6 ms, 260 µs, 13.1 ms before, same machine and run) | measures shared between copies until one changes (ADR-0051): a copy counts 10,000 references instead of copying 160k notes, and the staves shift 16-byte handles. The app takes this copy on the interface thread after every edit. Building pays an allocation per measure the first time it changes |
 | 2026-11-23 | write `song.json` of the 20-track song (7.9 MB of JSON) | 42.8 ms | yyjson document, then compact text (ADR-0006) |
 | 2026-11-23 | read that `song.json` back into a song | 35.3 ms | parsing is a small part; most is building the model and parsing pitches and durations |
 | 2026-11-23 | save the 20-track song as a `.elara` file (JSON + deflate) | 70.4 ms | 41 KB: the benchmark song repeats one pattern, real songs compress far less |

@@ -137,6 +137,13 @@ Item {
         const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
         if (document.pageCount === 0)
             return;
+        // Alt with 1 to 4 picks the voice typing goes into.
+        if (alt && !control && event.key >= Qt.Key_1 && event.key <= Qt.Key_4) {
+            document.setCaretVoice(event.key - Qt.Key_0);
+            event.accepted = true;
+            reveal();
+            return;
+        }
         // Alt with Up or Down moves the pitch a semitone; with Ctrl an octave.
         if (alt) {
             if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down)
@@ -183,6 +190,8 @@ Item {
                 document.deleteAtCaret();
         } else if (event.key === Qt.Key_Insert && !control) {
             document.insertRest();
+        } else if (!control && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            document.toggleDrum();
         } else if (!control && event.key === Qt.Key_Plus) {
             document.longerDuration();
         } else if (!control && event.key === Qt.Key_Minus) {

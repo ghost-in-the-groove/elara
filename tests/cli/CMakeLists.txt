@@ -229,6 +229,23 @@ add_test(NAME cli.dump_note_names COMMAND elara-cli --json dump "${ELARA_CLI_NAM
 set_tests_properties(cli.dump_note_names PROPERTIES
   FIXTURES_REQUIRED cli_note_names
   PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G5\"},{\"pitch\":\"E5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G#5\"}\\]}\\]\\]\\]")
+# Voices: the caret's voice picks where typing goes, the first voice keeps its
+# notes; voices are 1 to 4.
+set(ELARA_CLI_VOICES "${CMAKE_CURRENT_BINARY_DIR}/cli-voices.elara")
+add_test(NAME cli.edit_types_in_voice_two
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_VOICES}" "add-track flute" "append-measures 1"
+    "caret 0 0 0" "pitch C" "voice 2" "pitch E")
+set_tests_properties(cli.edit_types_in_voice_two PROPERTIES
+  FIXTURES_SETUP cli_voices
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":1,\"beat\":0,\"string\":1,\"freeSlot\":false}")
+add_test(NAME cli.dump_voice_two COMMAND elara-cli --json dump "${ELARA_CLI_VOICES}")
+set_tests_properties(cli.dump_voice_two PROPERTIES
+  FIXTURES_REQUIRED cli_voices
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]}\\],\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_rejects_voice_five
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "voice 5")
+set_tests_properties(cli.edit_rejects_voice_five PROPERTIES
+  PASS_REGULAR_EXPRESSION "voice: 1 to 4, not 5")
 add_test(NAME cli.edit_note_name_on_tablature
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
     "pitch A")
@@ -392,6 +409,36 @@ add_test(NAME cli.edit_rejects_unknown_sign
 add_test(NAME cli.edit_rejects_unknown_jump
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "jump 0 da-capo al-segno")
 set_tests_properties(cli.edit_rejects_unknown_sign cli.edit_rejects_unknown_jump
+  PROPERTIES WILL_FAIL TRUE)
+# Tempo changes (ADR-0042): 0 at the song's 120 | 1 from 60 | 2 from 240. Each
+# 4/4 measure of rests lasts 2 s, then 4 s, then 1 s.
+set(ELARA_CLI_TEMPO "${CMAKE_CURRENT_BINARY_DIR}/cli-tempo.elara")
+add_test(NAME cli.edit_tempo
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_TEMPO}" "add-track electric-guitar"
+    "append-measures 3" "tempo-from 1 60" "tempo-from 2 240")
+set_tests_properties(cli.edit_tempo PROPERTIES
+  FIXTURES_SETUP cli_tempo
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{[^}]*\"tempo\":60},{[^}]*\"tempo\":240}\\],.*\"undo\":{\"count\":4,\"next\":\"Change tempo\"}")
+add_test(NAME cli.sequence_tempo COMMAND elara-cli sequence "${ELARA_CLI_TEMPO}")
+set_tests_properties(cli.sequence_tempo PROPERTIES
+  FIXTURES_REQUIRED cli_tempo
+  PASS_REGULAR_EXPRESSION "3 measures, 0 notes, [0-9]+ events in 7\\.000 s")
+# Drawn above the first staff: a mark (a note and its number) at the start and
+# one at each change, in measures 1 and 2.
+add_test(NAME cli.render_tempo COMMAND elara-cli --json render "${ELARA_CLI_TEMPO}")
+set_tests_properties(cli.render_tempo PROPERTIES
+  FIXTURES_REQUIRED cli_tempo
+  PASS_REGULAR_EXPRESSION "\"tempo\":6,")
+add_test(NAME cli.edit_clears_tempo
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 60"
+    "tempo-from 1 none")
+set_tests_properties(cli.edit_clears_tempo PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":4,")
+add_test(NAME cli.edit_rejects_tempo_out_of_range
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 5")
+add_test(NAME cli.edit_rejects_tempo_from_first_measure
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90")
+set_tests_properties(cli.edit_rejects_tempo_out_of_range cli.edit_rejects_tempo_from_first_measure
   PROPERTIES WILL_FAIL TRUE)
 # Repeats and alternate endings (ADR-0016): |: 1 | 2 (1., 2.) :| 3 (3.) | 4, played
 # three times through, saved, read back and played in order.
