@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The caret's measure: its time and key signatures, which change from it until
-// the next change, its signs and jumps, its repeats, and measures inserted
-// before or after it, or it deleted.
+// the next change, its tempo, the section it starts, its signs and jumps, its
+// repeats, and measures inserted before or after it, or it deleted.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -183,6 +183,29 @@ Popup {
             opacity: 0.5
             wrapMode: Text.Wrap
             color: root.ink
+        }
+
+        // The section of the song that starts here (ADR-0062), drawn boxed
+        // above the staff; an empty name takes it off.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Section")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            TextField {
+                id: sectionField
+
+                Layout.fillWidth: true
+                text: root.document.caretSection
+                placeholderText: qsTr("Intro, Verse, Chorus…")
+                selectByMouse: true
+                onEditingFinished: root.document.setSection(root.document.caretMeasure, text)
+            }
         }
 
         Rectangle {
