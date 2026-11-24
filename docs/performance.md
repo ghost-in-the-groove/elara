@@ -67,6 +67,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | same | 125 ms | each staff read on its own thread, warnings merged in reading order (ADR-0010): the same song, warnings and errors on any number of threads. One thread: 211 ms; most of what is left is the XML parse. Parsing without end-of-line and attribute normalisation gained nothing |
 | 2026-11-23 | import 2 of those tracks from a `.gpx` container written as literal bytes only (4.4 MB) | 55 ms | the same GPIF alone: 17 ms, so unpacking took 38 ms, reading the stream bit by bit |
 | 2026-11-23 | same | 28 ms | bits taken from a 64-bit buffer with a shift and a mask; back references copied as a block |
+| 2026-11-23 | same | 28 to 31 ms (38 to 46 ms before, same machine and run) | reading the part configuration had unpacked the container a second time; it is now unpacked once for both files. The GPIF alone: 17 ms |
 | 2026-11-23 | load the Bravura SMuFL metadata | 10.5 ms | yyjson parse of a 1.2 MB file; done once per run |
 | 2026-11-23 | lay out one 500-measure staff of the large song (4000 two-note chords, 2000 beams) | 3.5 ms | first version, one thread: about 0.9 µs per chord; 12k glyphs, 15.5k lines |
 | 2026-11-23 | lay out 8 measures of that staff (a screenful) | 54 µs | relayout after an edit costs far less than a frame |
@@ -98,6 +99,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-23 | detect the pitch of one tuner window (48 kHz, 30 to 1600 Hz, 3201 samples) of a guitar's low E | 1.61 ms | first version (ADR-0028): the YIN difference function at every lag up to 1601, one multiply-add per sample and lag |
 | 2026-11-23 | the same; a high E; a window of noise | 0.39 ms, 0.10 ms, 1.07 ms | lags past the first dip under the threshold are no longer computed (YIN never looks at them), and each difference is four independent sums. Noise has no dip, so every lag is still computed: the worst case, 3 % of one core for a window every 33 ms |
 | 2026-11-23 | find the keyboard entry caret on the 21 A4 pages of one 500-measure track (last measure), and the caret a click on a page picks | 0.37 µs, 1.5 µs | first version (ADR-0032): a linear search of each page's measure boxes and columns; nothing to gain beside a 3.5 ms relayout |
+| 2026-11-23 | an edit in the app on a 20-track, 500-measure song (160k notes): time the interface thread spends on it, an edit that adds or removes a track | 41 to 60 ms, 99 to 119 ms before; 10 to 25 ms, 37 to 40 ms | the edit's sequence built and compared on the layout's worker thread instead (ADR-0031), and a track's tuning fields made only when they open. What is left is the copy of the song (10 ms) and, when the tracks change, the song panel's rows made again. Measured in a release build with timers that are not kept |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.

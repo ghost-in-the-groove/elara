@@ -17,13 +17,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace elara::core {
 class Song;
-}
+class Staff;
+} // namespace elara::core
 
 namespace elara::notation::detail {
 
@@ -210,6 +212,62 @@ private:
 /// "full", "1/2", "1 1/2": a bend of `cents` in tones, to the nearest quarter.
 [[nodiscard]] std::string bendLabel(int cents);
 
+// ---- Dynamics -----------------------------------------------------------------------
+
+/// The mark of a dynamic ("mf": dynamicMF).
+[[nodiscard]] Glyph dynamicGlyph(core::Dynamic dynamic) noexcept;
+
+/// Makes `loudest` the loudest of itself and the notes of `beat` that are
+/// struck: tied notes only sustain.
+void addStruck(std::optional<core::Dynamic>& loudest, const core::Beat& beat);
+
+/// The dynamic in force at the start of measure m of `staff`: the loudest of
+/// the last notes struck together before it, mf before the first.
+[[nodiscard]] core::Dynamic dynamicBefore(const core::Staff& staff, std::size_t m);
+
+/// Dynamics marks under a staff (ADR-0044): a mark under the notes whose
+/// dynamic differs from the one in force, all of a line on one baseline.
+class DynamicMarks {
+public:
+    explicit DynamicMarks(const EngravingFont& font) : font_(font) {}
+
+    /// Starts a line at measure m of `staff`: forgets the marks; the dynamic in
+    /// force is looked up when notes are first struck (measuring strikes none).
+    void start(const core::Staff& staff, std::size_t m) {
+        staff_ = &staff;
+        first_ = m;
+        known_ = false;
+        marks_.clear();
+    }
+
+    /// Notes struck together at `dynamic`, centred at `centre`; columns come in
+    /// time order.
+    void strike(core::Dynamic dynamic, double centre, std::size_t measure);
+
+    /// Whether the line has no marks.
+    [[nodiscard]] bool empty() const noexcept { return marks_.empty(); }
+
+    /// Places the marks under `bottom` (the lowest ink of the staff) and
+    /// `staffHeight`, left of `end` (the end of the line), and draws them into
+    /// `list`.
+    void place(DisplayList& list, double bottom, double staffHeight, double end);
+
+private:
+    struct Mark {
+        core::Dynamic dynamic = core::Dynamic::MF;
+        double centre = 0.0;
+        std::size_t measure = 0;
+    };
+
+    const EngravingFont& font_;
+    const core::Staff* staff_ = nullptr;
+    std::size_t first_ = 0;
+    bool known_ = false;
+    core::Dynamic current_ = core::Dynamic::MF;
+    std::vector<Mark> marks_;
+    std::vector<double> origins_; // of the marks being placed
+};
+
 // ---- Staff writers --------------------------------------------------------------------
 
 /// Lays out one staff measure by measure while the system layout spaces the
@@ -304,6 +362,9 @@ protected:
 
     /// The highest ink drawn so far, never below the top line.
     [[nodiscard]] double inkTop() const;
+
+    /// The lowest ink drawn so far, never above the bottom line.
+    [[nodiscard]] double inkBottom() const;
 
     /// The digits of a tuplet number with their width and extents (SMuFL y, up).
     struct TupletNumber {
