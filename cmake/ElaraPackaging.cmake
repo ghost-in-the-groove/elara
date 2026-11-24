@@ -2,8 +2,10 @@
 # they need at run time: the app with the Qt libraries, plugins and QML modules
 # Qt's deployment tools find (src/app), the CLI with the fonts it renders with,
 # and both with the licences. CPack turns the result into a package for the
-# platform: a ZIP archive on Windows, a disk image on macOS, a tarball on Linux.
-# `python scripts/elara.py package` builds one and smoke-tests what it installs.
+# platform: a ZIP archive on Windows, a disk image on macOS, a tarball on Linux,
+# and an installer where its tools are found: an MSI package on Windows (WiX
+# Toolset 3); `elara.py package` makes the Linux AppImage itself (ADR-0065).
+# `python scripts/elara.py package` builds them and smoke-tests what they install.
 
 # Licences and notices, at the top of the package (Linux: the doc directory).
 if(APPLE OR WIN32)
@@ -55,6 +57,23 @@ set(CPACK_PACKAGE_FILE_NAME "Elara-${PROJECT_VERSION}-${_elara_platform}")
 set(CPACK_PACKAGE_CHECKSUM SHA256)
 if(WIN32)
   set(CPACK_GENERATOR ZIP)
+  # The MSI installer (ADR-0065): per machine, in Program Files, with a Start
+  # menu shortcut and the app icon in Apps and features. The upgrade code names
+  # the product across versions and must never change.
+  find_program(ELARA_WIX_CANDLE candle PATHS "$ENV{WIX}/bin" NO_CACHE)
+  if(ELARA_WIX_CANDLE)
+    list(APPEND CPACK_GENERATOR WIX)
+  else()
+    message(STATUS "WiX Toolset 3 not found: no MSI installer")
+  endif()
+  configure_file(LICENSE "${PROJECT_BINARY_DIR}/LICENSE.txt" COPYONLY)
+  set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_BINARY_DIR}/LICENSE.txt")
+  set(CPACK_PACKAGE_EXECUTABLES elara Elara)
+  set(CPACK_WIX_UPGRADE_GUID "3B2C1D0B-59E3-4366-9E22-7BF1805A3DFB")
+  set(CPACK_WIX_PRODUCT_ICON "${PROJECT_BINARY_DIR}/src/app/icon/elara.ico")
+  set(CPACK_WIX_PROGRAM_MENU_FOLDER "Elara")
+  set(CPACK_WIX_PROPERTY_ARPURLINFOABOUT "${CPACK_PACKAGE_HOMEPAGE_URL}")
+  set(CPACK_WIX_PROPERTY_ARPHELPLINK "${CPACK_PACKAGE_HOMEPAGE_URL}/issues")
 elseif(APPLE)
   set(CPACK_GENERATOR DragNDrop)
   set(CPACK_DMG_VOLUME_NAME "Elara ${PROJECT_VERSION}")
