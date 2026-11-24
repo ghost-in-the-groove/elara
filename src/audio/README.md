@@ -28,8 +28,10 @@ Two targets with different rules:
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from
-  the tracks' mixes alone (a moving fader, ADR-0039). It is an
-  `AudioSource`, the interface a device plays;
+  the tracks' mixes alone (a moving fader, ADR-0039). For practice it counts
+  in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and
+  loops a passage (`setLoop()`, ADR-0024). It is an `AudioSource`, the
+  interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), and `readWav()`/`decodeWav()` for
   PCM and float WAV files;
@@ -61,7 +63,8 @@ what the sequencer would play; `elara-cli render-audio FILE --json --events
 [--out song.wav]` plays it through the built-in synthesizer and prints the
 level, each track's timbre and every event with the frame it was dispatched
 at. `elara-cli play FILE` plays it on the default device. All three take
-`--speed PERCENT` and `--metronome`. `elara-cli tune
+`--speed PERCENT` and `--metronome`; `sequence --count-in-at SECONDS` prints a
+count-in, and `play` takes `--count-in` and `--loop FROM TO`. `elara-cli tune
 FILE.wav --json [--tuning guitar]` reports the pitch a tuner would show for a
 recording. Tests in
 `tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the

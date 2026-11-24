@@ -897,6 +897,22 @@ set_tests_properties(cli.render_audio_rejects_missing_file PROPERTIES WILL_FAIL 
 add_test(NAME cli.play_rejects_missing_file
   COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# Count-in and loop (ADR-0024): the count-in is a measure of beats where
+# playback starts (melody.musicxml ends in 3/4 at quarter = 100; band.gp is
+# 4/4 at quarter = 90, here at half speed). A loop must start before it ends,
+# which play checks before it opens a device.
+add_test(NAME cli.sequence_count_in
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/musicxml/melody.musicxml" --count-in-at 7)
+set_tests_properties(cli.sequence_count_in PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"metronome\":false,\"countIn\":{\"clicks\":3,\"interval\":0\.6},\"measures\":")
+add_test(NAME cli.sequence_count_in_text
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/band.gp" --count-in-at 1 --speed 50)
+set_tests_properties(cli.sequence_count_in_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "at 50 % speed\ncount-in at 1\.000 s: 4 clicks 1\.333 s apart\n")
+add_test(NAME cli.play_rejects_reversed_loop
+  COMMAND elara-cli play "${ELARA_CORPUS}/musicxml/melody.musicxml" --loop 2 1)
+set_tests_properties(cli.play_rejects_reversed_loop PROPERTIES
+  PASS_REGULAR_EXPRESSION "error: --loop needs its start before its end")
 
 # The playback cursor: guitar-techniques.gp plays measures 1 2 1 2 1 3, about
 # 2.5 s each, so 6 s is in the third measure played, the first one written.
