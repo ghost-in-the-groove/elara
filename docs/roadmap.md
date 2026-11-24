@@ -24,7 +24,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and fret/string <-> pitch mapping, capo
 - [x] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy
 - [x] Time and key signatures, tempo map
-  - [x] A tempo change from any measure, with the CLI `tempo-from` step (ADR-0042)
+  - [x] A tempo change from any measure, with the CLI `tempo-from` step and the
+        app's measure popup (ADR-0042)
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML

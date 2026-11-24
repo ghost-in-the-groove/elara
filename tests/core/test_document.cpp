@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>
+#include <optional>
 #include <random>
 #include <stdexcept>
 #include <utility>
@@ -15,6 +16,7 @@ using elara::core::CommandGroup;
 using elara::core::Document;
 using elara::core::Duration;
 using elara::core::findInstrumentPreset;
+using elara::core::Fraction;
 using elara::core::InsertMeasures;
 using elara::core::InsertTrack;
 using elara::core::KeyMode;
@@ -32,6 +34,7 @@ using elara::core::SetTrackMix;
 using elara::core::Song;
 using elara::core::SongInfo;
 using elara::core::Tempo;
+using elara::core::TempoChange;
 using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::TrackMix;
@@ -331,6 +334,55 @@ TEST_CASE("A time signature change runs until the next change", "[core][document
     CHECK(elara::core::changeTimeSignature(original, 2, TimeSignature(3, 4)) == nullptr);
     CHECK_THROWS_AS(elara::core::changeTimeSignature(original, 4, TimeSignature(3, 4)),
                     std::out_of_range);
+}
+
+TEST_CASE("A tempo change starts a measure and holds until the next one", "[core][document]") {
+    Song original = smallSong();
+    // A change halfway through measure 1 is not the one that starts it.
+    original.measureHeader(1).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(140)});
+    Document doc(original);
+
+    doc.execute(elara::core::changeTempo(doc.song(), 1, 90));
+    REQUIRE(doc.song().measureHeader(1).tempoChanges.size() == 2);
+    CHECK(doc.song().measureHeader(1).tempoChanges.front() ==
+          TempoChange{.offset = {}, .tempo = Tempo(90)});
+    CHECK(doc.song().tempoAt(1).bpm() == 90.0);
+    CHECK(doc.song().tempoAt(1, Fraction(1, 2)).bpm() == 140.0);
+    CHECK(doc.song().tempoAt(0).bpm() == 120.0);
+    CHECK(doc.undoName() == "Change tempo");
+
+    // Another tempo replaces it, and none takes it away.
+    doc.execute(elara::core::changeTempo(doc.song(), 1, 100));
+    CHECK(doc.song().measureHeader(1).tempoChanges.size() == 2);
+    CHECK(doc.song().tempoAt(1).bpm() == 100.0);
+    doc.execute(elara::core::changeTempo(doc.song(), 1, std::nullopt));
+    CHECK(doc.song().measureHeader(1) == original.measureHeader(1));
+    CHECK(doc.undoCount() == 3);
+    doc.undo();
+    doc.undo();
+    doc.undo();
+    CHECK(doc.song() == original);
+
+    // Nothing to change: no tempo to take away, or the same one again.
+    CHECK(elara::core::changeTempo(original, 2, std::nullopt) == nullptr);
+    doc.execute(elara::core::changeTempo(doc.song(), 2, 75));
+    CHECK(elara::core::changeTempo(doc.song(), 2, 75) == nullptr);
+
+    // The first measure plays at the song's tempo; tempos out of range and
+    // measures the song does not have are refused.
+    CHECK_THROWS_AS(elara::core::changeTempo(original, 0, 90), std::invalid_argument);
+    CHECK_THROWS_AS(elara::core::changeTempo(original, 1, 5), std::invalid_argument);
+    CHECK_THROWS_AS(elara::core::changeTempo(original, 4, 90), std::out_of_range);
+}
+
+TEST_CASE("A tempo change counts in the beat the song counts in there", "[core][document]") {
+    Song original = smallSong();
+    const Duration dottedQuarter(NoteValue::Quarter, 1);
+    original.setStartTempo(Tempo(60, dottedQuarter));
+    Document doc(original);
+    doc.execute(elara::core::changeTempo(doc.song(), 3, 80));
+    CHECK(doc.song().tempoAt(3) == Tempo(80, dottedQuarter));
 }
 
 TEST_CASE("A key signature change runs until the next change", "[core][document]") {
