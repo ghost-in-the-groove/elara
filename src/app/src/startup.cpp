@@ -1266,13 +1266,16 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
-    // Nothing may cover the cursor, as the measure popup open at the caret can:
-    // it closes first, and the click waits until it is gone.
-    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
-        popup != nullptr && popup->property("visible").toBool()) {
-        QMetaObject::invokeMethod(popup, "close");
-        again_ = true;
-        return;
+    // Nothing may cover the cursor, as the measure popup or the note effects
+    // panel open at the caret can: they close first, and the click waits until
+    // they are gone.
+    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel")}) {
+        if (auto* popup = window_->findChild<QObject*>(name);
+            popup != nullptr && popup->property("visible").toBool()) {
+            QMetaObject::invokeMethod(popup, "close");
+            again_ = true;
+            return;
+        }
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());
     const double expected = score_->secondsAt(
