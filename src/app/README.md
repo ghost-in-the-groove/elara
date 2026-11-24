@@ -61,12 +61,13 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from the same place in the music (`audio::carriedPosition`: the same share of the same played measure after another speed or a tempo edit, else the same time); only another song (`songReplaced`) goes back to the start. |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from the same place in the music (`audio::carriedPosition`: the same share of the same played measure after another speed or a tempo edit, else the same time); only another song (`songReplaced`) goes back to the start. For practice (ADR-0024) it starts playback after a measure of clicks (`countIn`, `countingIn` while they sound) and loops from A to B, both marked at the playback position (`markLoop`); the loop keeps its place in the music as the position does, and another song ends it. |
 | `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. `speed` (25 to 200 %) and `metronome`: what every sequence is built with, kept from song to song; changing either builds the sequence again (ADR-0024). |
-| `qml/PracticeControls.qml` | In the transport: the metronome button, and the speed as a pill that opens a slider with 50, 75 and 100 %. The song is sequenced again once the slider is let go. |
+| `qml/PracticeControls.qml` | In the transport: the metronome button, the count-in button, the loop button (A, then A–B, then off; Ctrl+L), and the speed as a pill that opens a slider with 50, 75 and 100 %. The song is sequenced again once the slider is let go. |
 
 The transport floats over the bottom of the score: back to the start (Home),
-play and pause (Space), the time, a seek bar, the metronome and the speed. A click on a note moves
+play and pause (Space), the time, a seek bar with the A-B loop under it, the
+metronome, the count-in, the loop and the speed. A click on a note moves
 playback to it. While the cursor moves, the view scrolls to keep it a third of
 the way down.
 
@@ -84,7 +85,11 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
 - `--smoke-test` loads the window, fails on any QML warning and quits. With a
   file it also waits until the first page is painted and shows the score in
   every view and with all its tracks, moves the cursor halfway through and
-  clicks on it (playback must move to the note there), adds a track and undoes it (playback must stay there) and makes a new song (playback must go back to the start), then prints `smoke-test: ok (P pages, N painted, L layouts)`; a file that cannot be
+  clicks on it (playback must move to the note there), plays at half speed with
+  the metronome and back (playback must keep its place in the music), marks an
+  A-B loop (it must follow the speed too), adds a track and undoes it (playback
+  and the loop must stay there) and makes a new song (playback must go back to
+  the start, without the loop), then prints `smoke-test: ok (P pages, N painted, L layouts)`; a file that cannot be
   opened fails. CTest runs it with `QT_QPA_PLATFORM=offscreen` (`app.smoke`,
   `app.smoke_open_*`, `app.smoke_tuner`), so CI checks the UI without a screen.
 - `--screenshot OUT.png` saves the window once it is shown and quits.

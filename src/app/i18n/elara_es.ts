@@ -367,6 +367,34 @@
         <translation>Metrónomo</translation>
     </message>
     <message>
+        <source>Count-in: a measure of clicks before playing</source>
+        <translation>Cuenta previa: un compás de clics antes de tocar</translation>
+    </message>
+    <message>
+        <source>End the A-B loop</source>
+        <translation>Terminar el bucle A-B</translation>
+    </message>
+    <message>
+        <source>Mark B of the loop</source>
+        <translation>Marcar el punto B del bucle</translation>
+    </message>
+    <message>
+        <source>Mark A of the loop</source>
+        <translation>Marcar el punto A del bucle</translation>
+    </message>
+    <message>
+        <source>Loop: mark A, then B, at the playback position; again to end it (Ctrl+L)</source>
+        <translation>Bucle: marca A y luego B en la posición de reproducción; otra vez para terminarlo (Ctrl+L)</translation>
+    </message>
+    <message>
+        <source>A–B</source>
+        <translation>A–B</translation>
+    </message>
+    <message>
+        <source>A</source>
+        <translation>A</translation>
+    </message>
+    <message>
         <source>Playback speed: %1 %</source>
         <translation>Velocidad de reproducción: %1 %</translation>
     </message>
