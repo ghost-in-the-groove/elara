@@ -30,6 +30,7 @@ one that replaces them.
 | [0022](0022-articulations-in-playback.md) | Articulations in playback | Accepted |
 | [0023](0023-pitch-articulations.md) | Bends, slides and legato in playback | Accepted |
 | [0024](0024-practice-playback.md) | Practice playback: speed, metronome, count-in, loop | Accepted |
+| [0025](0025-strums-and-tremolo-picking.md) | Strums and tremolo picking in playback | Accepted |
 | [0026](0026-transposition.md) | Transposition | Accepted |
 | [0027](0027-copy-and-paste.md) | Copying and pasting measures | Accepted |
 | [0028](0028-pitch-detection.md) | Pitch detection for the tuner | Accepted |
@@ -40,15 +41,25 @@ one that replaces them.
 | [0033](0033-editing-measures-at-the-caret.md) | Editing measures at the caret | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
+| [0036](0036-selecting-measures-in-the-app.md) | Selecting measures in the app | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
+| [0038](0038-note-effects-in-the-app.md) | Note effects in the app | Accepted |
 | [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
 | [0042](0042-tempo-marks.md) | Tempo marks | Accepted |
+| [0043](0043-soundfont-playback.md) | SoundFont playback | Accepted |
+| [0044](0044-dynamics-marks.md) | Dynamics marks | Accepted |
 | [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
 | [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
 | [0047](0047-dynamics-at-the-caret.md) | Dynamics at the caret | Accepted |
 | [0049](0049-signs-and-jumps.md) | Signs and jumps | Accepted |
+| [0050](0050-tuplets-at-the-caret.md) | Tuplets at the caret | Accepted |
+| [0051](0051-shared-measures.md) | Measures shared between copies of a song | Accepted |
+| [0052](0052-incremental-relayout.md) | Incremental relayout | Accepted |
+| [0053](0053-worker-pool.md) | A worker pool for parallel jobs | Accepted |
+| [0054](0054-worker-results-from-the-event-loop.md) | Worker results arrive from the event loop | Accepted |
+| [0055](0055-bend-forms.md) | Bends of any form at the caret | Accepted |
 
 ## Template
 

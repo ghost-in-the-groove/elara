@@ -38,24 +38,43 @@ every track leaves the clicks.
 
 **Count-in and loop belong to the player.** Both depend on where playback
 starts, which changes with every click on the score, while a sequence is built
-once per edit. The player will:
+once per edit.
 
-- count in one measure of clicks, in the time signature and tempo of the
-  measure where playback starts, before the first pass only;
-- loop from B back to A, silencing what sounds as a seek does.
+- `Sequence::countInAt(seconds)` says what a count-in from there is: the
+  beats of one measure of the measure played there, at the tempo there (a
+  `CountIn` of so many clicks so many seconds apart). `Player::play(countIn)`
+  clicks them on its own wood-block synth before it starts, with the position
+  held still; `isCountingIn()` says when. A pause ends a count-in, and a play
+  without one starts at once.
+- `Player::setLoop(from, to)` makes playback that reaches `to` go on from
+  `from`, silencing what sounds as a seek does. Playback that starts after
+  `to` runs on to the end, and `to <= from` ends the loop. The two frames are
+  packed into one 64-bit atomic, so the audio thread never sees half a loop.
 
 The offline renderer has neither: it plays the song from its start to its
 end, as an export does.
 
 ## Consequences
 
-- Changing the speed rebuilds the sequence on the control thread (28 ms for
-  the 160k-note benchmark song) and loads it; the app keeps the place by
-  scaling the position by the ratio of the speeds.
+- Changing the speed rebuilds the sequence (28 ms for the 160k-note
+  benchmark song); the app does it on a worker, as for an edit, and loads it.
+  Playback keeps its place in the music through `audio::carriedPosition`:
+  the same share of the same played measure, which a tempo edit uses too.
+- In the app, the speed and the metronome sit in the transport and belong to
+  the document, not the song: they stay when another song is opened and are
+  not saved in it.
 - The metronome adds two events per beat. The song's own events, notes and
   measures are the same with it as without it.
 - `TimeSignature::isCompound()` and `pulseLength()` are now the one place that
   decides how a meter is counted; validation's rests and notation's beams use
   them.
 - `elara-cli sequence`, `render-audio` and `play` take `--speed PERCENT` and
-  `--metronome`, so all of this is checked without listening.
+  `--metronome`; `sequence --count-in-at SECONDS` prints a count-in, and
+  `play` takes `--count-in` and `--loop FROM TO`. The player's count-in and
+  loop are checked by unit tests that render it block by block.
+- In the app the count-in and the loop belong to the transport
+  (`AudioController`), not to the document: they are about playing, and the
+  sequence is the same with them as without them. The loop is marked A then B
+  at the playback position, and is carried with `carriedPosition` like the
+  position, so another speed or a tempo edit keeps it on the same notes;
+  another song ends it.

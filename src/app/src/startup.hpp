@@ -51,11 +51,23 @@ private:
     void queueSteps();
     void queueEdits();
     void queueEntry();
+    void queueTuplets();
     void queueMeasures();
+    void queuePitches();
+    void queueVoices();
+    void queueDrums();
+    void queueSelection();
     void queueMix();
+    void queueNavigation();
+    void queueRepeats();
     void queueTuning();
+    void queueTempo();
+    void queueEffects();
     void finish(bool ok, const QString& detail);
     void clickCursor();
+    void queueKeepPosition();
+    void queuePractice();
+    void queueLoop();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
@@ -68,21 +80,39 @@ private:
     qint64 stepStarted_ = 0;
     std::deque<std::function<bool()>> steps_; ///< each returns whether it changed the score
     bool waiting_ = false;                    ///< for a layout and a paint
+    bool again_ = false;     ///< set by a step that must run again on the next tick
+    qint64 againSince_ = -1; ///< when that step first asked to run again
     bool laidOut_ = false;
     int paintsBefore_ = 0;
     int layouts_ = 0;
+    int stepsRun_ = 0;    ///< steps started so far, retries not counted
+    QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
     qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
-    QVariantMap tuningBefore_; ///< the first track's tuning before it changed
-    QString editProblem_;      ///< the first edit check that failed
-    QString failure_;          ///< set by a step that went wrong
-    bool entering_ = false;    ///< whether the shown track takes frets
-    int measuresBefore_ = 0;   ///< measures when the measure edits start
-    int firstNumerator_ = 0;   ///< the first time signature then
+    QPointer<QObject> trackRow_;  ///< a row of the song panel, which a mix change keeps
+    QVariantMap tuningBefore_;    ///< the first track's tuning before it changed
+    QVariantMap repeatsBefore_;   ///< the first measure's repeats before queueRepeats()
+    QVariantMap tempoBefore_;     ///< the second measure's tempo before it changed
+    QString editProblem_;         ///< the first edit check that failed
+    QString failure_;             ///< set by a step that went wrong
+    bool entering_ = false;       ///< whether the shown track takes frets
+    bool tupleting_ = false;      ///< whether the tuplet steps run
+    int measuresBefore_ = 0;      ///< measures when the measure edits start
+    int firstNumerator_ = 0;      ///< the first time signature then
+    double positionBefore_ = 0.0; ///< playback's position before an edit
+    bool pitching_ = false;       ///< whether the caret takes note names
+    int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
+    bool voicing_ = false;        ///< whether the voice steps run
+    bool drumming_ = false;       ///< whether the drum steps run
+    bool selecting_ = false;      ///< whether the selection steps run
+    int lengthBefore_ = 0;        ///< the song's length before pasting
+    int pasteAt_ = 0;             ///< the measure pasted at
+    bool effecting_ = false;      ///< whether the note effect steps run
+    int effectsBefore_ = 0;       ///< the caret's effects before they were toggled
 };
 
 } // namespace elara::app

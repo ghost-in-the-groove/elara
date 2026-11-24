@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
 #include <elara/core/song.hpp>
 #include <elara/notation/caret.hpp>
 #include <elara/notation/display_list.hpp>
@@ -15,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <utility>
@@ -24,7 +26,10 @@ using Catch::Matchers::WithinAbs;
 using elara::core::Beat;
 using elara::core::Caret;
 using elara::core::Clef;
+using elara::core::DrumPiece;
+using elara::core::drumPieces;
 using elara::core::Duration;
+using elara::core::findInstrumentPreset;
 using elara::core::Fraction;
 using elara::core::FretPosition;
 using elara::core::Instrument;
@@ -86,6 +91,33 @@ Song guitar(const std::vector<std::vector<Beat>>& measures) {
         song.track(0).staff(0).measure(m).voices[0].beats = measures[m];
     }
     return song;
+}
+
+/// A drum kit (a percussion staff) over `measures`.
+Song drumKit(const std::vector<std::vector<Beat>>& measures) {
+    Song song;
+    song.appendMeasures(measures.size());
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    for (std::size_t m = 0; m < measures.size(); ++m) {
+        song.track(0).staff(0).measure(m).voices[0].beats = measures[m];
+    }
+    return song;
+}
+
+Beat hits(std::initializer_list<int> keys, NoteValue value = NoteValue::Quarter) {
+    Beat beat{.duration = Duration(value)};
+    for (const int key : keys) {
+        beat.notes.push_back(Note{.pitch = Pitch::fromMidi(key)});
+    }
+    return beat;
+}
+
+/// The drum lane (1 from the top) of the kit piece with General MIDI `key`.
+int lane(int key) {
+    const auto pieces = drumPieces();
+    const auto found = std::ranges::find(pieces, key, &DrumPiece::key);
+    REQUIRE(found != pieces.end());
+    return static_cast<int>(found - pieces.begin()) + 1;
 }
 
 DisplayList tab(const Song& song) {
@@ -333,4 +365,78 @@ TEST_CASE("A click on a page finds the system under it", "[notation][caret]") {
         REQUIRE(clicked.has_value());
         CHECK(*clicked == caret);
     }
+}
+
+TEST_CASE("On a drum staff the caret sits on its lane", "[notation][caret]") {
+    const Song song = drumKit({{hits({36, 42}), rest()}});
+    const DisplayList list = elara::notation::layoutStaff(song, 0, 0, bravura());
+    REQUIRE(list.staves.size() == 1);
+    const double top = list.staves[0].y;
+    // The default drum map (docs/instruments.md), in staff spaces below the top
+    // line: crash on the ledger line above, snare in the third space from the
+    // bottom, bass drum in the bottom space, hi-hat pedal below the staff.
+    const std::vector<std::pair<int, double>> places{{49, -1.0}, {42, -0.5}, {46, -0.5}, {51, 0.0},
+                                                     {50, 0.5},  {47, 1.0},  {38, 1.5},  {43, 2.5},
+                                                     {36, 3.5},  {44, 4.5}};
+    for (const auto& [key, below] : places) {
+        for (std::size_t beat = 0; beat < 2; ++beat) {
+            const auto box =
+                caretBox(list, song, Caret{.beat = beat, .string = lane(key)}, bravura());
+            REQUIRE(box.has_value());
+            CHECK_THAT(centreOf(*box).y, WithinAbs(top + below, kEpsilon));
+            CHECK_THAT(box->height, WithinAbs(1.0, kEpsilon));
+        }
+    }
+    const auto first = caretBox(list, song, Caret{.beat = 0, .string = lane(38)}, bravura());
+    const auto second = caretBox(list, song, Caret{.beat = 1, .string = lane(38)}, bravura());
+    REQUIRE(first.has_value());
+    REQUIRE(second.has_value());
+    CHECK(first->x < second->x);
+}
+
+TEST_CASE("A click on a drum staff picks the nearest lane", "[notation][caret]") {
+    const Song song = drumKit({{hits({36}), hits({38}), rest(NoteValue::Half)}});
+    const DisplayList list = elara::notation::layoutStaff(song, 0, 0, bravura());
+    REQUIRE(list.staves.size() == 1);
+    const double top = list.staves[0].y;
+
+    // Each lane's caret box gives that lane back from wherever the caret was on
+    // the same lane.
+    for (int string = 1; string <= static_cast<int>(drumPieces().size()); ++string) {
+        for (std::size_t beat = 0; beat < 3; ++beat) {
+            const Caret caret{.beat = beat, .string = string};
+            const auto box = caretBox(list, song, caret, bravura());
+            REQUIRE(box.has_value());
+            const auto clicked =
+                caretAt(list, song, centreOf(*box), Caret{.string = string}, bravura());
+            REQUIRE(clicked.has_value());
+            CHECK(*clicked == caret);
+        }
+    }
+
+    const auto snare = caretBox(list, song, Caret{.beat = 1, .string = lane(38)}, bravura());
+    REQUIRE(snare.has_value());
+    const double x = centreOf(*snare).x;
+
+    // Lanes that share a place: the first of them, unless the caret is on one.
+    auto clicked = caretAt(list, song, {x, top - 0.5}, Caret{}, bravura());
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->string == lane(42));
+    clicked = caretAt(list, song, {x, top - 0.5}, Caret{.string = lane(46)}, bravura());
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->string == lane(46));
+
+    // Between the snare and the floor tom, nearer the floor tom.
+    clicked = caretAt(list, song, {x, top + 2.2}, Caret{}, bravura());
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->beat == 1);
+    CHECK(clicked->string == lane(43));
+
+    // Below the staff: the hi-hat pedal; above it: the crash.
+    clicked = caretAt(list, song, {x, top + 6.0}, Caret{}, bravura());
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->string == lane(44));
+    clicked = caretAt(list, song, {x, top - 2.5}, Caret{.string = lane(36)}, bravura());
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->string == lane(49));
 }

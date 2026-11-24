@@ -17,13 +17,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace elara::core {
 class Song;
-}
+class Staff;
+} // namespace elara::core
 
 namespace elara::notation::detail {
 
@@ -133,12 +135,30 @@ void shift(DisplayList& list, double dx, double dy);
 /// Appends the items and boxes of `from` to `to`.
 void append(DisplayList& to, DisplayList&& from);
 
+/// Appends copies of the items and boxes of `from` to `to`, moved right by `dx`
+/// and down by `dy`: what shift() and append() give, in one pass and leaving
+/// `from` as it is.
+void appendShifted(DisplayList& to, const DisplayList& from, double dx, double dy);
+
+/// Makes room in `to` for the items and boxes of every list of `from` besides
+/// its own.
+void reserveFor(DisplayList& to, std::span<const DisplayList* const> from);
+
 // ---- Technique lanes ----------------------------------------------------------------
 
 /// Bands above a staff for technique marks, from the staff upwards. Only the
 /// lanes a line of music uses take room.
-enum class Lane : std::uint8_t { Bend, Vibrato, PalmMute, LetRing, Harmonic, PickStroke };
-inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(Lane::PickStroke) + 1;
+enum class Lane : std::uint8_t {
+    Bend,
+    Vibrato,
+    PalmMute,
+    LetRing,
+    Harmonic,
+    PickStroke,
+    Strum,
+    Tremolo
+};
+inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(Lane::Tremolo) + 1;
 
 /// The marks of one column of notes that go into lanes.
 struct ColumnTechniques {
@@ -146,11 +166,14 @@ struct ColumnTechniques {
     bool letRing = false;
     core::Vibrato vibrato = core::Vibrato::None;
     core::PickStroke pickStroke = core::PickStroke::None;
+    core::Strum strum = core::Strum::None;
+    int tremoloStrokes = 0; ///< slashes of tremolo picking, 0 without it
     core::HarmonicKind harmonic = core::HarmonicKind::None;
 
     [[nodiscard]] bool any() const noexcept {
         return palmMute || letRing || vibrato != core::Vibrato::None ||
-               pickStroke != core::PickStroke::None || harmonic != core::HarmonicKind::None;
+               pickStroke != core::PickStroke::None || strum != core::Strum::None ||
+               tremoloStrokes > 0 || harmonic != core::HarmonicKind::None;
     }
 };
 
@@ -195,6 +218,8 @@ private:
         core::Vibrato vibrato = core::Vibrato::None;
     };
 
+    // A glyph centred at `centre`, its ink just above the bottom of `lane`.
+    void mark(Lane lane, Glyph glyph, double centre, std::size_t measure, double scale = 1.0);
     void extend(Lane lane, bool active, double centre, double end, std::size_t measure,
                 core::Vibrato vibrato = core::Vibrato::None);
     void close(Lane lane);
@@ -209,6 +234,62 @@ private:
 
 /// "full", "1/2", "1 1/2": a bend of `cents` in tones, to the nearest quarter.
 [[nodiscard]] std::string bendLabel(int cents);
+
+// ---- Dynamics -----------------------------------------------------------------------
+
+/// The mark of a dynamic ("mf": dynamicMF).
+[[nodiscard]] Glyph dynamicGlyph(core::Dynamic dynamic) noexcept;
+
+/// Makes `loudest` the loudest of itself and the notes of `beat` that are
+/// struck: tied notes only sustain.
+void addStruck(std::optional<core::Dynamic>& loudest, const core::Beat& beat);
+
+/// The dynamic in force at the start of measure m of `staff`: the loudest of
+/// the last notes struck together before it, mf before the first.
+[[nodiscard]] core::Dynamic dynamicBefore(const core::Staff& staff, std::size_t m);
+
+/// Dynamics marks under a staff (ADR-0044): a mark under the notes whose
+/// dynamic differs from the one in force, all of a line on one baseline.
+class DynamicMarks {
+public:
+    explicit DynamicMarks(const EngravingFont& font) : font_(font) {}
+
+    /// Starts a line at measure m of `staff`: forgets the marks; the dynamic in
+    /// force is looked up when notes are first struck (measuring strikes none).
+    void start(const core::Staff& staff, std::size_t m) {
+        staff_ = &staff;
+        first_ = m;
+        known_ = false;
+        marks_.clear();
+    }
+
+    /// Notes struck together at `dynamic`, centred at `centre`; columns come in
+    /// time order.
+    void strike(core::Dynamic dynamic, double centre, std::size_t measure);
+
+    /// Whether the line has no marks.
+    [[nodiscard]] bool empty() const noexcept { return marks_.empty(); }
+
+    /// Places the marks under `bottom` (the lowest ink of the staff) and
+    /// `staffHeight`, left of `end` (the end of the line), and draws them into
+    /// `list`.
+    void place(DisplayList& list, double bottom, double staffHeight, double end);
+
+private:
+    struct Mark {
+        core::Dynamic dynamic = core::Dynamic::MF;
+        double centre = 0.0;
+        std::size_t measure = 0;
+    };
+
+    const EngravingFont& font_;
+    const core::Staff* staff_ = nullptr;
+    std::size_t first_ = 0;
+    bool known_ = false;
+    core::Dynamic current_ = core::Dynamic::MF;
+    std::vector<Mark> marks_;
+    std::vector<double> origins_; // of the marks being placed
+};
 
 // ---- Staff writers --------------------------------------------------------------------
 
@@ -304,6 +385,9 @@ protected:
 
     /// The highest ink drawn so far, never below the top line.
     [[nodiscard]] double inkTop() const;
+
+    /// The lowest ink drawn so far, never above the bottom line.
+    [[nodiscard]] double inkBottom() const;
 
     /// The digits of a tuplet number with their width and extents (SMuFL y, up).
     struct TupletNumber {

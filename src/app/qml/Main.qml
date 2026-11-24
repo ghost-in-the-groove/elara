@@ -3,7 +3,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
-import QtQuick.Effects
 import QtQuick.Layouts
 import Elara.App
 
@@ -41,7 +40,14 @@ ApplicationWindow {
     minimumHeight: 480
     visible: true
     title: hasScore ? qsTr("%1 — Elara").arg((score.modified ? "• " : "") + score.title) : "Elara"
-    color: dark ? "#17171c" : "#e9ebf0"
+    color: Theme.desk
+
+    // Every surface takes its colours from the theme.
+    Binding {
+        target: Theme
+        property: "dark"
+        value: window.dark
+    }
 
     Component.onCompleted: {
         if (initialFile.toString().length > 0)
@@ -118,6 +124,7 @@ ApplicationWindow {
                 toast.show(errorMessage);
         }
         onEditFailed: message => toast.show(message)
+        onNotice: message => toast.show(message)
     }
 
     AudioController {
@@ -219,29 +226,37 @@ ApplicationWindow {
         }
     }
 
+    // Flat, with a hairline under it: the score is what has depth.
     header: ToolBar {
-        Material.background: window.dark ? "#202027" : "#fbfbfd"
-        Material.elevation: 2
+        Material.background: Theme.bar
+        Material.foreground: Theme.ink
+        Material.elevation: 0
         height: 56
+
+        Rectangle {
+            anchors.bottom: parent.bottom
+            width: parent.width
+            height: 1
+            color: Theme.line
+        }
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: 14
-            anchors.rightMargin: 8
-            spacing: 6
+            anchors.leftMargin: 16
+            anchors.rightMargin: 10
+            spacing: 4
 
-            MusicSymbol {
-                symbol: "\uE050" // G clef
-                size: 28
-                color: Material.accent
+            Logo {
+                Layout.preferredHeight: 32
+                Layout.preferredWidth: 32 * aspect
                 Layout.alignment: Qt.AlignVCenter
-            }
-
-            Label {
-                text: "Elara"
-                font.pixelSize: 18
-                font.weight: Font.DemiBold
-                Layout.rightMargin: 8
+                Layout.rightMargin: 10
+                detailed: false
+                // Only the e in a narrow window: the song's title needs the room.
+                named: window.width >= 1000
+                color: Theme.ink
+                stringColor: Theme.accentInk
+                ground: Theme.bar
             }
 
             IconButton {
@@ -309,13 +324,13 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     visible: text.length > 0
                     text: score.artist
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fontSmall
                     opacity: 0.65
                     elide: Text.ElideRight
                 }
             }
 
-                        SegmentedControl {
+            SegmentedControl {
                 visible: window.hasScore
                 labels: [qsTr("Notation"), qsTr("Tablature"), qsTr("Both")]
                 enabledChoices: [true, score.hasTablature, score.hasTablature]
@@ -333,7 +348,7 @@ ApplicationWindow {
                 Layout.leftMargin: 6
                 visible: score.trackNames.length > 1
                 model: [qsTr("All tracks")].concat(score.trackNames)
-                                                onActivated: index => score.track = index - 1
+                onActivated: index => score.track = index - 1
                 // Set after the model has been replaced: a new model resets
                 // the index, which would undo a binding.
                 onModelChanged: Qt.callLater(showTrack)
@@ -354,43 +369,12 @@ ApplicationWindow {
                 ToolTip.text: qsTr("Track")
             }
 
-                        ToolSeparator {
-                visible: window.hasScore
-            }
-
-            IconButton {
-                visible: window.hasScore
-                enabled: scoreView.zoom > scoreView.minZoom
-                iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10"
-                tip: qsTr("Zoom out (Ctrl+-)")
-                onClicked: scoreView.zoomOut()
-            }
-
-                        ToolButton {
-                visible: window.hasScore
-                text: Math.round(scoreView.zoom * 100) + "%"
-                font.pixelSize: 13
-                Layout.preferredWidth: 64
-                ToolTip.visible: hovered
-                ToolTip.delay: 600
-                ToolTip.text: qsTr("Fit the page width (Ctrl+0)")
-                onClicked: scoreView.fitWidth()
-            }
-
-                        IconButton {
-                visible: window.hasScore
-                enabled: scoreView.zoom < scoreView.maxZoom
-                iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10 M10 7.5 L10 12.5"
-                tip: qsTr("Zoom in (Ctrl++)")
-                onClicked: scoreView.zoomIn()
-            }
-
             IconButton {
                 visible: window.hasScore
                 // Three sliders.
                 iconPath: "M4 7 L20 7 M4 12 L20 12 M4 17 L20 17 M9 5 L9 9 M15 10 L15 14 M7 15 L7 19"
                 tip: qsTr("Song and tracks (Ctrl+I)")
-                checkable: true
+                // Bound, not checkable: the panel also closes by itself.
                 checked: window.showSongPane
                 onClicked: window.showSongPane = !window.showSongPane
             }
@@ -456,10 +440,8 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: songPane.left
             document: score
-            dark: window.dark
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
-            bottomInset: window.hasScore ? transport.height + 20 : 0
             onSeekRequested: seconds => audio.seek(seconds)
             cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
@@ -486,7 +468,6 @@ ApplicationWindow {
             visible: width > 0
             clip: true
             document: score
-            dark: window.dark
             onCloseRequested: window.showSongPane = false
 
             Behavior on width {
@@ -522,9 +503,9 @@ ApplicationWindow {
         Rectangle {
             anchors.fill: parent
             anchors.margins: 16
-            radius: 16
-            color: Qt.alpha(Material.accent, 0.08)
-            border.color: Material.accent
+            radius: Theme.radiusSheet
+            color: Theme.accentWash
+            border.color: Theme.accentInk
             border.width: 2
             opacity: drop.containsDrag ? 1.0 : 0.0
             visible: opacity > 0
@@ -540,22 +521,12 @@ ApplicationWindow {
                 text: qsTr("Drop to open")
                 font.pixelSize: 22
                 font.weight: Font.DemiBold
-                color: Material.accent
+                color: Theme.accentInk
             }
         }
 
         // The transport: floats over the bottom of the score, and slides in
         // once there is one.
-        RectangularShadow {
-            anchors.fill: transport
-            offset.y: 4
-            radius: transport.radius
-            blur: 22
-            color: Qt.rgba(0, 0, 0, window.dark ? 0.5 : 0.18)
-            visible: transport.visible
-            opacity: transport.opacity
-        }
-
         Rectangle {
             id: transport
 
@@ -565,10 +536,14 @@ ApplicationWindow {
             width: transportRow.implicitWidth + 28
             height: 56
             radius: 28
-            color: window.dark ? "#26262e" : "#ffffff"
-            border.color: window.dark ? "#34343e" : "#e1e4ea"
+            color: Theme.surface
+            border.color: Theme.line
             opacity: window.hasScore ? 1.0 : 0.0
             visible: opacity > 0
+
+            Elevation {
+                radius: parent.radius
+            }
 
             Behavior on y {
                 NumberAnimation {
@@ -651,7 +626,7 @@ ApplicationWindow {
 
                 Label {
                     text: window.clock(audio.position) + " / " + window.clock(score.duration)
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontBody
                     font.features: {
                         "tnum": 1
                     }
@@ -676,6 +651,31 @@ ApplicationWindow {
                         when: !seekBar.pressed
                         restoreMode: Binding.RestoreNone
                     }
+
+                    // The A-B loop under the bar: A to B, or a mark at A while
+                    // B is still to come.
+                    Rectangle {
+                        objectName: "loopBand"
+
+                        readonly property real track: seekBar.availableWidth - seekBar.handle.width
+                        readonly property real start: seekBar.leftPadding + seekBar.handle.width / 2
+                                                      + track * Math.min(1, audio.loopFrom / seekBar.to)
+
+                        visible: audio.looping || audio.loopMarked
+                        x: audio.looping ? start : start - 1
+                        width: audio.looping ? Math.max(2, track * Math.min(1, (audio.loopTo - audio.loopFrom) / seekBar.to))
+                                             : 2
+                        y: seekBar.topPadding + seekBar.availableHeight / 2 + 6
+                        height: 3
+                        radius: 1.5
+                        color: window.Material.accent
+                        opacity: audio.looping ? 0.9 : 0.6
+                    }
+                }
+
+                PracticeControls {
+                    document: score
+                    playback: audio
                 }
             }
         }
@@ -685,7 +685,6 @@ ApplicationWindow {
 
             x: parent.width - width - 16
             y: 12
-            dark: window.dark
         }
 
         // Errors slide up from the bottom and go away by themselves.
@@ -703,15 +702,18 @@ ApplicationWindow {
             property bool shown: false
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: shown ? parent.height - height - scoreView.entryBarSpace
-                       - (window.hasScore ? transport.height + 36 : 24)
+            y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
                      : parent.height + 8
             width: Math.min(parent.width - 48, toastText.implicitWidth + 40)
             height: toastText.implicitHeight + 24
-            radius: 10
-            color: window.dark ? "#3a2328" : "#fdecee"
-            border.color: "#d9534f"
+            radius: Theme.radiusCard
+            color: Theme.dangerSurface
+            border.color: Theme.danger
             visible: y < parent.height
+
+            Elevation {
+                radius: parent.radius
+            }
 
             Behavior on y {
                 NumberAnimation {
@@ -727,7 +729,7 @@ ApplicationWindow {
                 width: Math.min(implicitWidth, toast.parent.width - 88)
                 text: toast.message
                 wrapMode: Text.Wrap
-                color: window.dark ? "#ffb4b4" : "#a12622"
+                color: Theme.dangerInk
             }
 
             Timer {
@@ -745,33 +747,115 @@ ApplicationWindow {
     }
 
     footer: ToolBar {
-        Material.background: window.dark ? "#1d1d23" : "#f4f5f8"
-        height: 30
+        Material.background: Theme.bar
+        Material.foreground: Theme.ink
+        Material.elevation: 0
+        height: 32
         visible: window.hasScore
+
+        Rectangle {
+            width: parent.width
+            height: 1
+            color: Theme.line
+        }
 
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 16
-            anchors.rightMargin: 16
-            spacing: 18
+            anchors.rightMargin: 10
+            spacing: 10
 
             Label {
                 text: qsTr("Page %1 of %2").arg(scoreView.currentPage).arg(score.pageCount)
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSmall
+                font.features: {
+                    "tnum": 1
+                }
                 opacity: 0.75
+            }
+            Rectangle {
+                implicitWidth: 3
+                implicitHeight: 3
+                radius: 1.5
+                color: Theme.ink
+                opacity: 0.35
             }
             Label {
                 text: qsTr("%n measure(s)", "", score.measureCount)
-                font.pixelSize: 12
+                font.pixelSize: Theme.fontSmall
+                font.features: {
+                    "tnum": 1
+                }
                 opacity: 0.75
             }
             Item {
                 Layout.fillWidth: true
             }
-            Label {
-                text: qsTr("Laid out in %1 ms").arg(score.layoutMilliseconds)
-                font.pixelSize: 12
-                opacity: 0.5
+
+            // Zoom, as one group: out, the level (a click fits the width), in.
+            Rectangle {
+                implicitWidth: zoomRow.implicitWidth
+                implicitHeight: 24
+                radius: height / 2
+                color: Theme.hover
+
+                Row {
+                    id: zoomRow
+
+                    anchors.centerIn: parent
+
+                    IconButton {
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        enabled: scoreView.zoom > scoreView.minZoom
+                        iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10"
+                        tip: qsTr("Zoom out (Ctrl+-)")
+                        onClicked: scoreView.zoomOut()
+                    }
+
+                    AbstractButton {
+                        id: zoomLevel
+
+                        implicitWidth: 48
+                        implicitHeight: 24
+                        hoverEnabled: true
+                        focusPolicy: Qt.TabFocus
+                        text: Math.round(scoreView.zoom * 100) + "%"
+                        ToolTip.visible: hovered
+                        ToolTip.delay: 600
+                        ToolTip.text: qsTr("Fit the page width (Ctrl+0)")
+                        onClicked: scoreView.fitWidth()
+
+                        background: Rectangle {
+                            radius: height / 2
+                            color: zoomLevel.down ? Theme.pressed
+                                                  : zoomLevel.hovered ? Theme.hover : "transparent"
+                            border.width: zoomLevel.visualFocus ? 2 : 0
+                            border.color: Theme.accentInk
+                        }
+
+                        contentItem: Label {
+                            text: zoomLevel.text
+                            font.pixelSize: Theme.fontSmall
+                            font.features: {
+                                "tnum": 1
+                            }
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    IconButton {
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        enabled: scoreView.zoom < scoreView.maxZoom
+                        iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10 M10 7.5 L10 12.5"
+                        tip: qsTr("Zoom in (Ctrl++)")
+                        onClicked: scoreView.zoomIn()
+                    }
+                }
             }
         }
     }
@@ -827,6 +911,11 @@ ApplicationWindow {
         sequence: "Space"
         enabled: window.hasScore
         onActivated: audio.togglePlayback()
+    }
+    Shortcut {
+        sequence: "Ctrl+L"
+        enabled: window.hasScore
+        onActivated: audio.markLoop()
     }
     Shortcut {
         sequence: "Home"

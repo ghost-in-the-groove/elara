@@ -208,3 +208,68 @@ TEST_CASE("Effects: on a drum staff the lane's hit only", "[core][entry][effects
         CHECK((note.effects.accent == Accent::Accent) == (note.pitch.midiNumber() == kSnare));
     }
 }
+
+TEST_CASE("Effects: the caret has an effect when all its notes have it", "[core][entry][effects]") {
+    Document doc(guitarSong());
+    const Caret string3 = at(0, 0, 3);
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), string3, NoteEffect::PalmMute));
+    run(doc, toggleEffect(doc.song(), string3, NoteEffect::PalmMute));
+    CHECK(hasEffectAtCaret(doc.song(), string3, NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 0, 2), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), string3, NoteEffect::LetRing));
+    // A rest, a string without a note and the free slot have no effects.
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 2, 3), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 1, 3), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(1, 1, 3), NoteEffect::PalmMute));
+
+    // Without strings, every note of the beat must have it.
+    Document piano(
+        oneBeat("piano", {Note{.pitch = Pitch::fromMidi(60)}, Note{.pitch = Pitch::fromMidi(64)}}));
+    const Caret caret = at(0, 0);
+    run(piano, toggleEffect(piano.song(), caret, NoteEffect::Staccato));
+    CHECK(hasEffectAtCaret(piano.song(), caret, NoteEffect::Staccato));
+    Song half = piano.song();
+    half.track(0).staff(0).measure(0).voices[0].beats[0].notes[1].effects.staccato = false;
+    CHECK_FALSE(hasEffectAtCaret(half, caret, NoteEffect::Staccato));
+}
+
+TEST_CASE("Effects: a bend of any form on the caret's notes", "[core][entry][effects]") {
+    Document doc(guitarSong());
+    const Caret caret = at(0, 1, 1); // fret 12 on string 1
+    CHECK(bendAtCaret(doc.song(), caret).isEmpty());
+
+    CHECK(run(doc, setBend(doc.song(), caret, BendCurve::bendRelease(100))) == caret);
+    CHECK(doc.undoName() == "Change bend");
+    CHECK(onString(doc.song(), 0, 1, 1).effects.bend == BendCurve::bendRelease(100));
+    CHECK(bendAtCaret(doc.song(), caret) == BendCurve::bendRelease(100));
+    CHECK(hasEffectAtCaret(doc.song(), caret, NoteEffect::Bend));
+
+    // The same bend again changes nothing; another replaces it, and none removes it.
+    CHECK(setBend(doc.song(), caret, BendCurve::bendRelease(100)).command == nullptr);
+    run(doc, setBend(doc.song(), caret, BendCurve::preBend(300)));
+    CHECK(bendAtCaret(doc.song(), caret) == BendCurve::preBend(300));
+    run(doc, setBend(doc.song(), caret, BendCurve{}));
+    CHECK(onString(doc.song(), 0, 1, 1).effects == NoteEffects{});
+    doc.undo();
+    CHECK(bendAtCaret(doc.song(), caret) == BendCurve::preBend(300));
+
+    // On a fretted staff only the caret's string; nothing on a rest, a string
+    // without a note or the free slot.
+    run(doc, setBend(doc.song(), at(0, 0, 3), BendCurve::bend(50)));
+    CHECK(onString(doc.song(), 0, 0, 3).effects.bend == BendCurve::bend(50));
+    CHECK(onString(doc.song(), 0, 0, 2).effects.bend.isEmpty());
+    CHECK(bendAtCaret(doc.song(), at(0, 0, 2)).isEmpty());
+    for (const Caret& nothing : {at(0, 2, 1), at(0, 1, 3), at(1, 1, 1)}) {
+        CHECK(setBend(doc.song(), nothing, BendCurve::bend(200)).command == nullptr);
+        CHECK(bendAtCaret(doc.song(), nothing).isEmpty());
+    }
+
+    // Without strings, every note of the beat; the caret reads the first's bend.
+    Document piano(
+        oneBeat("piano", {Note{.pitch = Pitch::fromMidi(60)}, Note{.pitch = Pitch::fromMidi(64)}}));
+    run(piano, setBend(piano.song(), at(0, 0), BendCurve::bend(100)));
+    for (const Note& note : notesAt(piano.song(), 0, 0)) {
+        CHECK(note.effects.bend == BendCurve::bend(100));
+    }
+    CHECK(bendAtCaret(piano.song(), at(0, 0)) == BendCurve::bend(100));
+}

@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -345,6 +346,41 @@ TEST_CASE("Player: control calls from another thread while the audio thread rend
     CHECK(player.position() <= player.duration());
 }
 
+// position() is read by the control thread while the audio thread takes a
+// seek: once asked for, the seek is the position, never the one before it.
+TEST_CASE("Player: after a seek, the position never reads from before it", "[audio][player]") {
+    const Song a = song(8, 60); // 16 seconds
+    const Sequence sa(a);
+    Player player(kRate, 64);
+    player.load(a, sa);
+    player.play();
+    std::atomic<bool> done{false};
+    std::thread audio([&] {
+        std::vector<float> left(64);
+        std::vector<float> right(64);
+        while (!done.load()) {
+            player.render(left, right);
+        }
+    });
+    int stale = 0;
+    for (int i = 0; i < 4000 && stale == 0; ++i) {
+        // Forward to 12 s, the position must not be below it; back to 2 s, it
+        // must not be the 12 s and more from before.
+        const bool forward = i % 2 == 0;
+        player.seek(forward ? 12.0 : 2.0);
+        for (int read = 0; read < 200; ++read) {
+            const double position = player.position();
+            if (forward ? position < 12.0 : position >= 12.0) {
+                ++stale;
+                break;
+            }
+        }
+    }
+    done.store(true);
+    audio.join();
+    CHECK(stale == 0);
+}
+
 // The metronome (ADR-0024) plays live as offline. The mix applies to the
 // song's tracks only: muting them all leaves the clicks.
 TEST_CASE("Player: plays the metronome, which the track mix leaves alone",
@@ -383,4 +419,103 @@ TEST_CASE("Player: plays the metronome, which the track mix leaves alone",
     const std::vector<float> previewed = play(player, 1.5);
     CHECK(peakLevel(between(previewed, 0.4, 0.49)) == 0.0f);
     CHECK(peakLevel(between(previewed, 1.0, 1.05)) > 0.01f);
+}
+
+// A count-in (ADR-0024): clicks first, holding the position, then the song as
+// if it had started then.
+TEST_CASE("Player: a count-in clicks before the song starts", "[audio][player][practice]") {
+    const Song s = song(1, 60);
+    const Sequence sequence(s);
+    OfflineRenderer renderer(s, sequence, {.sampleRate = kRate, .tail = 0.0});
+    const std::vector<float> stereo = renderer.renderRest();
+    std::vector<float> offline;
+    for (std::size_t i = 0; i < stereo.size(); i += 2) {
+        offline.push_back(stereo[i]);
+    }
+
+    Player player(kRate, 256);
+    player.load(s, sequence);
+    player.play({.clicks = 4, .interval = 0.25});
+    CHECK(player.isCountingIn());
+    const std::vector<float> clicks = play(player, 0.5);
+    CHECK(player.isPlaying());
+    CHECK(player.isCountingIn());
+    CHECK(player.position() == 0.0);
+    CHECK(peakLevel(between(clicks, 0.0, 0.05)) > 0.01f);  // the first click
+    CHECK(peakLevel(between(clicks, 0.2, 0.25)) < 0.001f); // over before the next
+    CHECK(peakLevel(between(clicks, 0.25, 0.3)) > 0.01f);  // the second
+
+    const std::vector<float> rest = play(player, 1.5);
+    CHECK_FALSE(player.isCountingIn());
+    CHECK_THAT(player.position(), WithinAbs(1.0, kFrame));
+    // Once the last click has died away, the song plays as without a count-in.
+    const auto live = between(rest, 0.9, 1.5); // 0.4 to 1 s into the song
+    const auto alone = between(offline, 0.4, 1.0);
+    CHECK(std::vector<float>(live.begin(), live.end()) ==
+          std::vector<float>(alone.begin(), alone.end()));
+
+    SECTION("a pause ends the count-in; play starts a new one") {
+        player.pause();
+        static_cast<void>(play(player, 0.1));
+        player.play({.clicks = 2, .interval = 0.5});
+        static_cast<void>(play(player, 0.5));
+        player.pause();
+        static_cast<void>(play(player, 0.1));
+        CHECK_FALSE(player.isCountingIn());
+        CHECK_THAT(player.position(), WithinAbs(1.0, kFrame));
+        player.play();
+        static_cast<void>(play(player, 0.5));
+        CHECK_THAT(player.position(), WithinAbs(1.5, kFrame)); // no count-in asked for
+    }
+}
+
+// An A-B loop (ADR-0024): playback that reaches B goes on from A, until the
+// loop is cleared.
+TEST_CASE("Player: an A-B loop plays its passage again and again", "[audio][player][practice]") {
+    const Song s = song(2, 60); // 4 s, the organ on every beat
+    Player player(kRate);
+    player.load(s, Sequence(s));
+    player.setLoop(1.0, 2.0);
+    player.play();
+    double latest = 0.0;
+    for (int i = 0; i < 35; ++i) { // 3.5 s: 0 to 2, 1 to 2, 1 to 1.5
+        static_cast<void>(play(player, 0.1));
+        latest = std::max(latest, player.position());
+    }
+    CHECK(player.isPlaying());
+    CHECK(latest <= 2.0 + kFrame);
+    CHECK_THAT(player.position(), WithinAbs(1.5, kFrame));
+
+    SECTION("the passage starts again with its own notes") {
+        player.seek(1.95);
+        const std::vector<float> jump = play(player, 0.1);
+        CHECK(peakLevel(between(jump, 0.05, 0.1)) > 0.02f); // the note at A, struck
+        CHECK_THAT(player.position(), WithinAbs(1.05, kFrame));
+    }
+    SECTION("from after B, playback runs to the end") {
+        player.seek(2.5);
+        static_cast<void>(play(player, 2.0));
+        CHECK_FALSE(player.isPlaying());
+        CHECK_THAT(player.position(), WithinAbs(4.0, kFrame));
+    }
+    SECTION("a B past the end loops at the end") {
+        player.setLoop(3.0, 99.0);
+        player.seek(3.5);
+        static_cast<void>(play(player, 1.0));
+        CHECK(player.isPlaying());
+        CHECK_THAT(player.position(), WithinAbs(3.5, kFrame));
+    }
+    SECTION("an empty loop is no loop") {
+        player.setLoop(2.0, 2.0);
+        static_cast<void>(play(player, 3.0));
+        CHECK_FALSE(player.isPlaying());
+        CHECK_THAT(player.position(), WithinAbs(4.0, kFrame));
+    }
+}
+
+TEST_CASE("Player: without a song there is nothing to count in to", "[audio][player][practice]") {
+    Player player(kRate);
+    player.play({.clicks = 4, .interval = 0.25});
+    CHECK(peakLevel(play(player, 0.1)) == 0.0f);
+    CHECK_FALSE(player.isCountingIn());
 }

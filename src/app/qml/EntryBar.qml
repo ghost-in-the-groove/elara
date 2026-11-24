@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The keyboard entry bar floating over the score: the note value typing uses,
-// the dot, a rest, delete, and where the caret is.
+// The keyboard entry bar, in a strip over the top of the pages: the note value
+// typing uses, the dot, the tuplet, a rest, delete, the note effects, and
+// where the caret is.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,7 +11,6 @@ Rectangle {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
     /// The measure button: the caret's measure, its signatures and length.
     signal measureRequested
@@ -26,13 +26,13 @@ Rectangle {
         { value: 64, symbol: "\uECAD", tip: qsTr("64th note") }
     ]
     readonly property int currentIndex: values.findIndex(entry => entry.value === document.inputValue)
-    readonly property color ink: dark ? "#e8e8ee" : "#23232b"
+    readonly property color ink: Theme.ink
+    /// How far the next bend goes when the caret's note has none, in cents.
+    property int bendCents: 200
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 44
-    radius: height / 2
-    color: dark ? "#2a2a32" : "white"
-    border.color: Qt.alpha(ink, 0.12)
+    color: "transparent"
 
     // A tool of the bar: never takes the keyboard from the score.
     component Tool: AbstractButton {
@@ -47,8 +47,7 @@ Rectangle {
 
         background: Rectangle {
             radius: height / 2
-            color: tool.pressed ? Qt.alpha(root.ink, 0.16)
-                                : tool.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
+            color: tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
 
             Behavior on color {
                 ColorAnimation {
@@ -63,11 +62,116 @@ Rectangle {
         Accessible.name: tip
     }
 
+    // A tuplet in the tuplet menu, checked when the input has it.
+    component TupletItem: MenuItem {
+        required property int actual
+
+        checkable: true
+        checked: root.document.inputTuplet === actual
+        onTriggered: root.document.setInputTuplet(actual)
+    }
+
+    // A pill of the effects panel: accent-filled while it is on.
+    component Pill: AbstractButton {
+        id: pill
+
+        property bool active
+
+        implicitHeight: 30
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        Accessible.checked: active
+
+        background: Rectangle {
+            radius: height / 2
+            color: pill.active ? Material.accent
+                               : pill.pressed ? Qt.alpha(root.ink, 0.16)
+                                              : pill.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 120
+                }
+            }
+        }
+
+        ToolTip.visible: hovered && Accessible.name.length > 0
+        ToolTip.delay: 500
+        ToolTip.text: Accessible.name
+    }
+
+    // A bend form (ADR-0055), numbered as core::BendForm: on the caret's notes
+    // at the bend's amount, or off again when they have it.
+    component BendForm: Pill {
+        id: bendForm
+
+        required property int form
+        required property string tip
+        required property string path
+
+        implicitWidth: 34
+        active: root.document.caretBendForm === form
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: tip
+        onClicked: {
+            if (active) {
+                root.document.setBend(0, 0)
+            } else {
+                const cents = root.document.caretBendCents
+                root.document.setBend(form, cents > 0 ? cents : root.bendCents)
+            }
+        }
+
+        contentItem: Icon {
+            path: bendForm.path
+            lineWidth: 1.8
+            color: bendForm.active ? "white" : root.ink
+        }
+    }
+
+    // How far a bend goes: the caret's bend, or a bend up if it has none.
+    component BendAmount: Pill {
+        id: bendAmount
+
+        required property int cents
+
+        implicitWidth: Math.max(34, amountLabel.implicitWidth + 16)
+        active: root.document.caretBendForm > 0 && root.document.caretBendCents === cents
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: root.document.bendAmount(cents)
+        onClicked: {
+            const form = root.document.caretBendForm
+            root.bendCents = cents
+            root.document.setBend(form > 0 && form < 5 ? form : 1, cents)
+        }
+
+        contentItem: Label {
+            id: amountLabel
+
+            text: root.document.bendAmount(bendAmount.cents)
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 12
+            font.features: { "frac": 1 }
+            color: bendAmount.active ? "white" : root.ink
+        }
+    }
+
+    // A voice in the voice menu, checked when the caret is in it.
+    component VoiceItem: MenuItem {
+        required property int voice
+
+        text: qsTr("Voice %1").arg(voice)
+        checkable: true
+        checked: root.document.caretVoice === voice
+        onTriggered: root.document.setCaretVoice(voice)
+    }
+
     component Separator: Rectangle {
         width: 1
         height: 22
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-        color: Qt.alpha(root.ink, 0.14)
+        color: Theme.line
     }
 
     Row {
@@ -137,13 +241,146 @@ Rectangle {
             background: Rectangle {
                 radius: height / 2
                 color: root.document.inputDotted ? Material.accent
-                                                 : dot.hovered ? Qt.alpha(root.ink, 0.08)
-                                                               : "transparent"
+                                                 : dot.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
             }
             contentItem: MusicSymbol {
                 symbol: "\uECB7"
                 size: 30
                 color: root.document.inputDotted ? "white" : root.ink
+            }
+        }
+
+        // The tuplet (ADR-0050): a click toggles a triplet, a right click or a
+        // long press picks another.
+        Tool {
+            id: tuplet
+
+            readonly property bool on: root.document.inputTuplet > 0
+
+            tip: qsTr("Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)")
+            onClicked: root.document.setInputTuplet(on ? 0 : 3)
+            onPressAndHold: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: tuplet.on ? Material.accent
+                                 : tuplet.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: MusicSymbol {
+                // The tuplet's number in the music font's tuplet digits.
+                symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
+                size: 30
+                color: tuplet.on ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+            }
+
+            Menu {
+                id: tupletMenu
+
+                TupletItem {
+                    actual: 2
+                    text: qsTr("Duplet (2 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 3
+                    text: qsTr("Triplet (3 in the time of 2)")
+                }
+                TupletItem {
+                    actual: 4
+                    text: qsTr("Quadruplet (4 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 5
+                    text: qsTr("Quintuplet (5 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 6
+                    text: qsTr("Sextuplet (6 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 7
+                    text: qsTr("Septuplet (7 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 9
+                    text: qsTr("Nonuplet (9 in the time of 8)")
+                }
+                MenuSeparator {}
+                MenuItem {
+                    text: qsTr("No tuplet")
+                    enabled: tuplet.on
+                    onTriggered: root.document.setInputTuplet(0)
+                }
+            }
+        }
+
+        // The voice typing goes into (Alt+1 to Alt+4): a click goes on to the
+        // next one, a right click picks one. Lit outside the first voice.
+        Tool {
+            id: voiceTool
+
+            readonly property int voice: root.document.caretVoice
+
+            tip: qsTr("Voice %1 (Alt+1 to Alt+4); a right click picks one").arg(voice)
+            onClicked: root.document.setCaretVoice(voice % 4 + 1)
+            onPressAndHold: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: voiceTool.voice > 1 ? Material.accent
+                                           : voiceTool.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: Label {
+                text: qsTr("V%1").arg(voiceTool.voice)
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+                color: voiceTool.voice > 1 ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+            }
+
+            Menu {
+                id: voiceMenu
+
+                VoiceItem {
+                    voice: 1
+                }
+                VoiceItem {
+                    voice: 2
+                }
+                VoiceItem {
+                    voice: 3
+                }
+                VoiceItem {
+                    voice: 4
+                }
             }
         }
 
@@ -177,6 +414,219 @@ Rectangle {
         }
 
         Tool {
+            id: effectsTool
+
+            tip: qsTr("Note effects")
+            onClicked: effects.opened ? effects.close() : effects.open()
+
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: "M3 12 C5 8 7 8 9 12 C11 16 13 16 15 12 C17 8 19 8 21 12"
+                    color: root.ink
+                }
+                // A dot while the caret's note has an effect.
+                Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 5
+                    color: Material.accent
+                    scale: root.document.caretEffects !== 0 ? 1 : 0
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutBack
+                        }
+                    }
+                }
+            }
+
+            // The effects of the caret's note, toggled by a click or their key;
+            // it stays open so that several can be set, and never takes the
+            // keyboard from the score.
+            Popup {
+                id: effects
+
+                x: (effectsTool.width - width) / 2
+                y: effectsTool.height + 12
+                padding: 10
+                closePolicy: Popup.CloseOnPressOutsideParent
+
+                enter: Transition {
+                    NumberAnimation {
+                        property: "opacity"
+                        from: 0
+                        to: 1
+                        duration: 140
+                    }
+                    NumberAnimation {
+                        property: "scale"
+                        from: 0.94
+                        to: 1
+                        duration: 160
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                exit: Transition {
+                    NumberAnimation {
+                        property: "opacity"
+                        to: 0
+                        duration: 100
+                    }
+                }
+
+                background: Rectangle {
+                    radius: 16
+                    color: root.color
+                    border.color: Qt.alpha(root.ink, 0.12)
+                }
+
+                contentItem: Column {
+                    spacing: 6
+
+                    Label {
+                        leftPadding: 4
+                        text: qsTr("Note effects")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    Grid {
+                        columns: 3
+                        spacing: 4
+
+                        Repeater {
+                            model: root.document.effectCount
+
+                            delegate: AbstractButton {
+                                id: chip
+
+                                required property int index
+                                readonly property bool active: (root.document.caretEffects & (1 << index)) !== 0
+
+                                implicitWidth: chipRow.implicitWidth + 16
+                                implicitHeight: 30
+                                focusPolicy: Qt.NoFocus
+                                hoverEnabled: true
+                                onClicked: root.document.toggleEffect(index)
+                                Accessible.role: Accessible.CheckBox
+                                Accessible.name: root.document.effectName(index)
+                                Accessible.checked: active
+
+                                background: Rectangle {
+                                    radius: height / 2
+                                    color: chip.active ? Material.accent
+                                                   : chip.pressed ? Qt.alpha(root.ink, 0.16)
+                                                                  : chip.hovered ? Qt.alpha(root.ink, 0.08)
+                                                                                 : "transparent"
+
+                                    Behavior on color {
+                                        ColorAnimation {
+                                            duration: 120
+                                        }
+                                    }
+                                }
+
+                                contentItem: Item {
+                                    Row {
+                                        id: chipRow
+
+                                        x: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 8
+
+                                        // The key, as on a keycap.
+                                        Rectangle {
+                                            width: 20
+                                            height: 20
+                                            radius: 5
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: chip.active ? Qt.alpha("white", 0.24) : Qt.alpha(root.ink, 0.08)
+
+                                            Label {
+                                                anchors.centerIn: parent
+                                                text: root.document.effectKey(chip.index)
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: chip.active ? "white" : root.ink
+                                            }
+                                        }
+                                        Label {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: root.document.effectName(chip.index)
+                                            font.pixelSize: 12
+                                            color: chip.active ? "white" : root.ink
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Bend")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // The bend's form, then how far it goes.
+                    Row {
+                        spacing: 4
+
+                        BendForm {
+                            form: 1
+                            tip: qsTr("Bend")
+                            path: "M3 19 L7 19 C11 19 12 15 12 6 M9 9 L12 6 L15 9"
+                        }
+                        BendForm {
+                            form: 2
+                            tip: qsTr("Bend and release")
+                            path: "M2 19 L4 19 C7 19 8 14 8 6 M5.5 8.5 L8 6 L10.5 8.5 M8 6 L12 6 C15 6 16 12 16 19 M13.5 16.5 L16 19 L18.5 16.5"
+                        }
+                        BendForm {
+                            form: 3
+                            tip: qsTr("Pre-bend")
+                            path: "M12 20 L12 5 M8.5 8.5 L12 5 L15.5 8.5"
+                        }
+                        BendForm {
+                            form: 4
+                            tip: qsTr("Pre-bend and release")
+                            path: "M7 20 L7 5 M4 8 L7 5 L10 8 M7 5 L10 5 C13 5 15 11 15 19 M12.5 16.5 L15 19 L17.5 16.5"
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        Repeater {
+                            model: [50, 100, 200, 300, 400]
+
+                            delegate: BendAmount {
+                                required property int modelData
+
+                                cents: modelData
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Tool {
             tip: qsTr("Measure: signatures, insert, delete (Ctrl+M)")
             onClicked: root.measureRequested()
 
@@ -200,7 +650,7 @@ Rectangle {
             leftPadding: 4
             rightPadding: 10
             text: root.document.caretStatus
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSmall
             font.features: { "tnum": 1 }
             color: root.ink
             opacity: 0.8

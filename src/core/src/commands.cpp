@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace elara::core {
 
@@ -109,13 +110,22 @@ void SetMeasureHeader::apply(Song& song) {
     marks.jump = header_.jump;
     marks.jumpThen = header_.jumpThen;
     const bool navigation = marks != target;
+    // The same with the new repeats and alternate endings (ADR-0016).
+    MeasureHeader repeats = target;
+    repeats.repeatStart = header_.repeatStart;
+    repeats.repeatTimes = header_.repeatTimes;
+    repeats.alternateEndings = header_.alternateEndings;
+    const bool repeated = repeats != target;
+    const bool marked = navigation || repeated;
     if (navigation && marks == header_) {
         name_ = "Change navigation marks";
-    } else if (!navigation && time && !key && !tempo) {
+    } else if (repeated && repeats == header_) {
+        name_ = "Change repeats";
+    } else if (!marked && time && !key && !tempo) {
         name_ = "Change time signature";
-    } else if (!navigation && key && !time && !tempo) {
+    } else if (!marked && key && !time && !tempo) {
         name_ = "Change key signature";
-    } else if (!navigation && tempo && !time && !key) {
+    } else if (!marked && tempo && !time && !key) {
         name_ = "Change tempo";
     }
     std::swap(target, header_);
@@ -213,6 +223,33 @@ std::unique_ptr<Command> changeTimeSignature(const Song& song, std::size_t from,
 
 std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from, KeySignature key) {
     return changeRun(song, from, key, &MeasureHeader::keySignature, "Change key signature");
+}
+
+// ---- Tempo -------------------------------------------------------------------
+
+std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
+                                     std::optional<double> bpm) {
+    if (measure >= song.measureCount()) {
+        throw std::out_of_range("Change tempo: no such measure");
+    }
+    if (measure == 0) {
+        throw std::invalid_argument("Change tempo: the first measure plays at the song's tempo");
+    }
+    MeasureHeader header = song.measureHeader(measure);
+    std::erase_if(header.tempoChanges,
+                  [](const TempoChange& change) { return change.offset == Fraction{}; });
+    if (bpm) {
+        // Tempo checks the range.
+        const Tempo tempo(*bpm, song.tempoAt(measure).beatUnit());
+        header.tempoChanges.insert(header.tempoChanges.begin(),
+                                   TempoChange{.offset = {}, .tempo = tempo});
+    }
+    if (header == song.measureHeader(measure)) {
+        return nullptr;
+    }
+    std::vector<std::unique_ptr<Command>> steps;
+    steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    return std::make_unique<CommandGroup>("Change tempo", std::move(steps));
 }
 
 } // namespace elara::core

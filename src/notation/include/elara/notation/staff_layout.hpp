@@ -47,7 +47,8 @@ selectTracks(const core::Song& song, std::span<const std::size_t> tracks, TrackV
 /// order given, with notes that start together aligned and barlines shared.
 ///
 /// Standard notation: clef, key and time signatures, notes and rests with
-/// accidentals, dots, ledger lines, stems, flags, beams, ties and articulations.
+/// accidentals, dots, ledger lines, stems, flags, beams, ties and articulations,
+/// and dynamics marks under the staff where the loudness changes.
 /// Notes are drawn at their written pitch (the sounding pitch moved by the
 /// instrument's written offset); a percussion staff places General MIDI keys with
 /// the default drum map (docs/instruments.md).
@@ -56,8 +57,8 @@ selectTracks(const core::Song& song, std::span<const std::size_t> tracks, TrackV
 /// ghost, tied and harmonic notes, hammer-ons and pull-offs, slides and bends.
 /// Palm mutes, let ring, vibrato, harmonics and pick strokes go in lanes above
 /// the tablature, or above the standard notation when the system has no
-/// tablature of that staff. Rests show in tablature only without standard
-/// notation of the same staff.
+/// tablature of that staff. Rests, rhythm and dynamics marks show in tablature
+/// only without standard notation of the same staff.
 ///
 /// Throws std::out_of_range for a missing track, staff or first measure and
 /// std::invalid_argument for no staves or tablature of a staff without tuning.

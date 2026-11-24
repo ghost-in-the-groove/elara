@@ -17,6 +17,7 @@ target_link_libraries(elara-cli PRIVATE
   elara::notation
   elara::audio
   elara::audio_juce
+  elara::audio_fluid
   CLI11::CLI11)
 elara_target_warnings(elara-cli)
 if(WIN32)

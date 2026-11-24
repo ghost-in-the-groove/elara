@@ -282,6 +282,16 @@ const Note* tiedTo(const Beat* previous, const Note& note, bool fretted) {
     return notes.size() == 1 ? &notes.front() : nullptr;
 }
 
+// Whether toggleEffect reaches `note` with the caret on `string`: the note on
+// that string on a fretted staff, the lane's hit on a percussion staff, every
+// note elsewhere.
+bool isEffectTarget(const Note& note, const Staff& staff, int string) {
+    if (staff.isFretted()) {
+        return isOnString(note, string);
+    }
+    return !isDrumStaff(staff) || note.pitch.midiNumber() == laneKey(string);
+}
+
 } // namespace
 
 Caret clampCaret(const Song& song, Caret caret) {
@@ -594,14 +604,10 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
     }
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     const bool fretted = staff.isFretted();
-    const bool drums = isDrumStaff(staff);
     Measure content = measureAt(song, caret);
     std::vector<Note*> targets;
     for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
-        const bool targeted = fretted
-                                  ? isOnString(note, caret.string)
-                                  : (!drums || note.pitch.midiNumber() == laneKey(caret.string));
-        if (targeted) {
+        if (isEffectTarget(note, staff, caret.string)) {
             targets.push_back(&note);
         }
     }
@@ -672,6 +678,40 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
         }
     }
     return replace(caret, std::move(content), "Change effect");
+}
+
+Entry setBend(const Song& song, const Caret& at, const BendCurve& curve) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    Measure content = measureAt(song, caret);
+    bool changed = false;
+    for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string) && note.effects.bend != curve) {
+            note.effects.bend = curve;
+            changed = true;
+        }
+    }
+    if (!changed) {
+        return unchanged(caret);
+    }
+    return replace(caret, std::move(content), "Change bend");
+}
+
+BendCurve bendAtCaret(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return {};
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    for (const Note& note : voiceAt(song, caret).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string)) {
+            return note.effects.bend;
+        }
+    }
+    return {};
 }
 
 Dynamic dynamicAt(const Song& song, const Caret& at) {
@@ -776,6 +816,24 @@ Entry setDynamic(const Song& song, const Caret& at, Dynamic dynamic) {
     }
     return Entry{.command = std::make_unique<CommandGroup>("Change dynamic", std::move(commands)),
                  .caret = caret};
+}
+
+bool hasEffectAtCaret(const Song& song, const Caret& at, NoteEffect effect) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return false;
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    bool any = false;
+    for (const Note& note : voiceAt(song, caret).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string)) {
+            if (!hasEffect(note.effects, effect)) {
+                return false;
+            }
+            any = true;
+        }
+    }
+    return any;
 }
 
 } // namespace elara::core

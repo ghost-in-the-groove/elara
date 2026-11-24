@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import Elara.App
 
 Rectangle {
     id: root
@@ -19,7 +20,7 @@ Rectangle {
     implicitWidth: row.implicitWidth + 6
     implicitHeight: 32
     radius: height / 2
-    color: Qt.alpha(Material.foreground, 0.07)
+    color: Theme.hover
     opacity: enabled ? 1.0 : 0.45
 
     Rectangle {
@@ -77,9 +78,9 @@ Rectangle {
 
                     anchors.centerIn: parent
                     text: choice.modelData
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fontBody
                     font.weight: choice.current ? Font.DemiBold : Font.Normal
-                    color: choice.current ? "white" : Material.foreground
+                    color: choice.current ? "white" : Theme.ink
                     opacity: choice.choosable ? 1.0 : 0.35
 
                     Behavior on color {

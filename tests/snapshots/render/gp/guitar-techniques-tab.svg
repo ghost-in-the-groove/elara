@@ -52,6 +52,9 @@
 <text class="vibrato" x="28.022" y="27.91" stroke="none">&#xEAB2;</text>
 <text class="vibrato" x="28.63" y="27.91" stroke="none">&#xEAB2;</text>
 <text class="technique" x="49.981" y="24.46" stroke="none">&#xE610;</text>
+<text class="dynamic" x="33.506" y="45.525" stroke="none">&#xE522;</text>
+<text class="dynamic" x="40.153" y="45.525" stroke="none">&#xE52F;</text>
+<text class="dynamic" x="48.809" y="45.525" stroke="none">&#xE52D;</text>
 <text class="tempo" x="17.715" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="tempo" x="38.415" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Guitar Techniques</text>

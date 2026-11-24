@@ -33,7 +33,11 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     }
     document_ = document;
     if (document_) {
+        connect(document_, &elara::app::ScoreDocument::songReplaced, this,
+                &AudioController::loadSong);
         connect(document_, &elara::app::ScoreDocument::songChanged, this,
+                &AudioController::songEdited);
+        connect(document_, &elara::app::ScoreDocument::sequenceChanged, this,
                 &AudioController::songEdited);
         connect(document_, &elara::app::ScoreDocument::mixPreviewed, this,
                 &AudioController::previewMix);
@@ -58,16 +62,37 @@ bool AudioController::openDevice() {
     return true;
 }
 
-// The song changed. When it plays as before (the document kept its
+// The song was edited. When it plays as before (the document kept its
 // sequence: the mix or the song's info changed), playback carries on with the
-// new mix (ADR-0039); otherwise the song is loaded again.
+// new mix (ADR-0039); otherwise it plays the new sequence from where it is,
+// playing or paused as it was. Only another song goes back to the start
+// (loadSong()).
 void AudioController::songEdited() {
-    if (player_ && document_ && document_->song() && document_->sequence() &&
-        document_->sequence() == loaded_) {
+    if (!document_ || !document_->song() || !document_->sequence()) {
+        return;
+    }
+    if (!player_) {
+        // The position waits for the device, at the same place in the music
+        // when only the timing changed, and inside the song.
+        const auto& sequence = document_->sequence();
+        const double position = placed_
+                                    ? elara::audio::carriedPosition(*placed_, position_, *sequence)
+                                    : std::clamp(position_, 0.0, document_->duration());
+        if (placed_) {
+            carryLoop(*placed_, *sequence);
+        }
+        placed_ = sequence;
+        if (position != position_) {
+            position_ = position;
+            emit positionChanged();
+        }
+        return;
+    }
+    if (document_->sequence() == loaded_) {
         player_->updateMix(*document_->song());
         return;
     }
-    loadSong();
+    loadSequence();
 }
 
 // A fader moves: playback hears it at once.
@@ -77,15 +102,38 @@ void AudioController::previewMix() {
     }
 }
 
+// The document's sequence with the song it was built from, which an edit
+// whose sequence is still being built has left behind; then that edit's mix.
+void AudioController::loadSequence() {
+    const auto& sequence = document_->sequence();
+    // Another speed or a tempo edit moves the time of every note: playback
+    // goes on from the same place in the music.
+    const double before = player_->position();
+    const double after =
+        loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    if (placed_) {
+        carryLoop(*placed_, *sequence); // so does the loop
+    }
+    player_->load(*document_->sequenceSong(), *sequence);
+    if (after != before) {
+        player_->seek(after);
+    }
+    loaded_ = sequence;
+    placed_ = sequence;
+    player_->updateMix(*document_->song());
+    applyLoop();
+}
+
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
+    clearLoop();
     loaded_.reset();
+    placed_ = document_ ? document_->sequence() : nullptr;
     if (player_) {
         player_->pause();
         player_->seek(0.0);
         if (document_ && document_->song() && document_->sequence()) {
-            player_->load(*document_->song(), *document_->sequence());
-            loaded_ = document_->sequence();
+            loadSequence();
         }
     }
     pollTransport();
@@ -104,14 +152,15 @@ void AudioController::togglePlayback() {
             return;
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
-        player_->load(*document_->song(), *document_->sequence());
-        loaded_ = document_->sequence();
+        loadSequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
     }
     setErrorMessage({});
     if (player_->isPlaying()) {
         player_->pause();
+    } else if (countIn_ && loaded_) {
+        player_->play(loaded_->countInAt(player_->position()));
     } else {
         player_->play();
     }
@@ -161,8 +210,79 @@ void AudioController::pollTransport() {
         playingSong_ = playing;
         emit playingSongChanged();
     }
+    if (const bool counting = playing && player_->isCountingIn(); counting != countingIn_) {
+        countingIn_ = counting;
+        emit countingInChanged();
+    }
     if (!playing) {
         transportTimer_.stop();
+    }
+}
+
+void AudioController::setCountIn(bool countIn) {
+    if (countIn_ != countIn) {
+        countIn_ = countIn;
+        emit countInChanged();
+    }
+}
+
+void AudioController::markLoop() {
+    switch (loop_) {
+    case Loop::None:
+        loop_ = Loop::Marked;
+        loopFrom_ = position_;
+        break;
+    case Loop::Marked:
+        if (position_ > loopFrom_) {
+            loop_ = Loop::Looping;
+            loopTo_ = position_;
+        } else {
+            loopFrom_ = position_; // B must come after A: this is A
+        }
+        break;
+    case Loop::Looping:
+        clearLoop();
+        return;
+    }
+    applyLoop();
+    emit loopChanged();
+}
+
+void AudioController::clearLoop() {
+    if (loop_ == Loop::None) {
+        return;
+    }
+    loop_ = Loop::None;
+    loopFrom_ = 0.0;
+    loopTo_ = 0.0;
+    applyLoop();
+    emit loopChanged();
+}
+
+// A and B keep their places in the music, as the position does.
+void AudioController::carryLoop(const elara::audio::Sequence& from,
+                                const elara::audio::Sequence& to) {
+    if (loop_ == Loop::None) {
+        return;
+    }
+    const double a = elara::audio::carriedPosition(from, loopFrom_, to);
+    const double b =
+        loop_ == Loop::Looping ? elara::audio::carriedPosition(from, loopTo_, to) : 0.0;
+    if (a != loopFrom_ || b != loopTo_) {
+        loopFrom_ = a;
+        loopTo_ = b;
+        emit loopChanged();
+    }
+}
+
+void AudioController::applyLoop() {
+    if (!player_) {
+        return;
+    }
+    if (loop_ == Loop::Looping) {
+        player_->setLoop(loopFrom_, loopTo_);
+    } else {
+        player_->setLoop(0.0, 0.0);
     }
 }
 
