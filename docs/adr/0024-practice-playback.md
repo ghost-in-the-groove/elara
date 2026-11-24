@@ -49,9 +49,13 @@ end, as an export does.
 
 ## Consequences
 
-- Changing the speed rebuilds the sequence on the control thread (28 ms for
-  the 160k-note benchmark song) and loads it; the app keeps the place by
-  scaling the position by the ratio of the speeds.
+- Changing the speed rebuilds the sequence (28 ms for the 160k-note
+  benchmark song); the app does it on a worker, as for an edit, and loads it.
+  Playback keeps its place in the music through `audio::carriedPosition`:
+  the same share of the same played measure, which a tempo edit uses too.
+- In the app, the speed and the metronome sit in the transport and belong to
+  the document, not the song: they stay when another song is opened and are
+  not saved in it.
 - The metronome adds two events per beat. The song's own events, notes and
   measures are the same with it as without it.
 - `TimeSignature::isCompound()` and `pulseLength()` are now the one place that

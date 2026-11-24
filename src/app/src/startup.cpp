@@ -171,6 +171,7 @@ void Startup::queueSteps() {
             clickCursor();
             return false;
         });
+        queuePractice();
         queueKeepPosition();
     }
     if (options_.track) {
@@ -828,7 +829,8 @@ void Startup::tick() {
         // Playback plays the song the pages show, once its layout is done:
         // an edit's sequence is built with it (ADR-0031).
         if (score_ != nullptr && score_->song() && editProblem_.isEmpty() &&
-            (!score_->sequence() || *score_->sequence() != audio::Sequence(*score_->song()))) {
+            (!score_->sequence() ||
+             *score_->sequence() != audio::Sequence(*score_->song(), score_->practice()))) {
             editProblem_ = QStringLiteral("playback does not play the song the pages show");
         }
     }
@@ -935,6 +937,69 @@ void Startup::clickCursor() {
                        .arg(audio->position())
                        .arg(expected);
     }
+}
+
+// Practice (ADR-0024): half speed with the metronome, then back. Each builds
+// the sequence again without a relayout, and playback keeps its place in the
+// music: at half speed every time doubles.
+void Startup::queuePractice() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("practice check failed: %1").arg(what);
+        }
+    };
+    // Waits for a sequence other than sequenceBefore_; false while there is none.
+    const auto arrived = [this] {
+        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr || !score_->sequence()) {
+            return false;
+        }
+        sequenceBefore_ = score_->sequence();
+        positionBefore_ = audio->position();
+        score_->setSpeed(50);
+        score_->setMetronome(true);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        const auto sequence = score_->sequence();
+        const double position = window_->findChild<AudioController*>()->position();
+        check(score_->speed() == 50 && score_->metronome() && sequence->speed() == 0.5 &&
+                  sequence->metronome(),
+              QStringLiteral("half speed with the metronome was not played"));
+        check(std::abs(position - 2.0 * positionBefore_) < 1e-6,
+              QStringLiteral("half speed moved playback from %1 s to %2 s, not %3 s")
+                  .arg(positionBefore_)
+                  .arg(position)
+                  .arg(2.0 * positionBefore_));
+        sequenceBefore_ = sequence;
+        score_->setSpeed(100);
+        score_->setMetronome(false);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        const double position = window_->findChild<AudioController*>()->position();
+        check(*score_->sequence() == audio::Sequence(*score_->song()),
+              QStringLiteral("full speed did not play the song as written"));
+        check(std::abs(position - positionBefore_) < 1e-6,
+              QStringLiteral("full speed left playback at %1 s, not %2 s")
+                  .arg(position)
+                  .arg(positionBefore_));
+        sequenceBefore_.reset();
+        return false;
+    });
 }
 
 // An edit keeps playback where it is: a track added, then undone, each give
