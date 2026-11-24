@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The keyboard entry bar floating over the score: the note value typing uses,
-// the dot, a rest, delete, and where the caret is.
+// The keyboard entry bar, in a strip over the top of the pages: the note value
+// typing uses, the dot, a rest, delete, and where the caret is.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,7 +10,6 @@ Rectangle {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
 
     /// The measure button: the caret's measure, its signatures and length.
     signal measureRequested
@@ -26,13 +25,11 @@ Rectangle {
         { value: 64, symbol: "\uECAD", tip: qsTr("64th note") }
     ]
     readonly property int currentIndex: values.findIndex(entry => entry.value === document.inputValue)
-    readonly property color ink: dark ? "#e8e8ee" : "#23232b"
+    readonly property color ink: Theme.ink
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 44
-    radius: height / 2
-    color: dark ? "#2a2a32" : "white"
-    border.color: Qt.alpha(ink, 0.12)
+    color: "transparent"
 
     // A tool of the bar: never takes the keyboard from the score.
     component Tool: AbstractButton {
@@ -47,8 +44,7 @@ Rectangle {
 
         background: Rectangle {
             radius: height / 2
-            color: tool.pressed ? Qt.alpha(root.ink, 0.16)
-                                : tool.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
+            color: tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
 
             Behavior on color {
                 ColorAnimation {
@@ -67,7 +63,7 @@ Rectangle {
         width: 1
         height: 22
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-        color: Qt.alpha(root.ink, 0.14)
+        color: Theme.line
     }
 
     Row {
@@ -137,8 +133,13 @@ Rectangle {
             background: Rectangle {
                 radius: height / 2
                 color: root.document.inputDotted ? Material.accent
-                                                 : dot.hovered ? Qt.alpha(root.ink, 0.08)
-                                                               : "transparent"
+                                                 : dot.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
             }
             contentItem: MusicSymbol {
                 symbol: "\uECB7"
@@ -200,7 +201,7 @@ Rectangle {
             leftPadding: 4
             rightPadding: 10
             text: root.document.caretStatus
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSmall
             font.features: { "tnum": 1 }
             color: root.ink
             opacity: 0.8
