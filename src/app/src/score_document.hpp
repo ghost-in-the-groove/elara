@@ -338,6 +338,7 @@ private:
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
     void setPending(int delta);
+    void resequence();
 
     QUrl source_;
     Status status_ = Status::Empty;
@@ -345,6 +346,7 @@ private:
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
     std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
+    std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
@@ -364,7 +366,8 @@ private:
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
     int pending_ = 0;
-    std::uint64_t generation_ = 0;
+    std::uint64_t generation_ = 0;         ///< of layouts: only the latest is shown
+    std::uint64_t sequenceGeneration_ = 0; ///< of sequences: only the latest is played
 };
 
 } // namespace elara::app
