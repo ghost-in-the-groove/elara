@@ -7,6 +7,10 @@
         <source>Audio device unavailable: %1</source>
         <translation>Dispositivo de audio no disponible: %1</translation>
     </message>
+    <message>
+        <source>The SoundFont did not open: %1</source>
+        <translation>No se pudo abrir la SoundFont: %1</translation>
+    </message>
 </context>
 <context>
     <name>EntryBar</name>
@@ -170,6 +174,14 @@
         <translation>Abrir una partitura</translation>
     </message>
     <message>
+        <source>Choose a SoundFont</source>
+        <translation>Elige una SoundFont</translation>
+    </message>
+    <message>
+        <source>SoundFonts (*.sf2 *.sf3)</source>
+        <translation>SoundFonts (*.sf2 *.sf3)</translation>
+    </message>
+    <message>
         <source>Save the song</source>
         <translation>Guardar la canción</translation>
     </message>
@@ -248,6 +260,22 @@
     <message>
         <source>Track</source>
         <translation>Pista</translation>
+    </message>
+    <message>
+        <source>Opening the SoundFont…</source>
+        <translation>Abriendo la SoundFont…</translation>
+    </message>
+    <message>
+        <source>SoundFont: %1</source>
+        <translation>SoundFont: %1</translation>
+    </message>
+    <message>
+        <source>Choose a SoundFont…</source>
+        <translation>Elegir una SoundFont…</translation>
+    </message>
+    <message>
+        <source>Use the built-in synthesizer</source>
+        <translation>Usar el sintetizador integrado</translation>
     </message>
     <message>
         <source>Page view</source>
@@ -1455,6 +1483,10 @@
     <message>
         <source>Show the interface in this language (en, es).</source>
         <translation>Mostrar la interfaz en este idioma (en, es).</translation>
+    </message>
+    <message>
+        <source>Play through this SoundFont (SF2 or SF3).</source>
+        <translation>Tocar con esta SoundFont (SF2 o SF3).</translation>
     </message>
 </context>
 </TS>

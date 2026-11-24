@@ -183,6 +183,9 @@ void Startup::queueSteps() {
         });
         queuePractice();
         queueLoop();
+        if (!options_.soundFont.isEmpty()) {
+            queueSoundFont();
+        }
         queueKeepPosition();
     }
     if (options_.track) {
@@ -1367,6 +1370,48 @@ void Startup::queueLoop() {
         check(audio->countIn(), QStringLiteral("the count-in did not turn on"));
         audio->setCountIn(false);
         audio->seek(positionBefore_);
+        return false;
+    });
+}
+
+// The SoundFont given with `--soundfont` opens on a worker; once it has, the
+// window plays through it and prints its name. A file that is no SoundFont
+// then fails with a message and leaves it in place, and the built-in
+// synthesizer comes back.
+void Startup::queueSoundFont() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("SoundFont check failed: %1").arg(what);
+        }
+    };
+    const auto opened = [this](AudioController* audio) {
+        if (audio == nullptr || audio->loadingSoundFont()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        std::printf("sound: %s\n", qPrintable(audio->soundFontName()));
+        check(audio->soundFont() == options_.soundFont && audio->errorMessage().isEmpty(),
+              QStringLiteral("%1 did not open: %2").arg(options_.soundFont, audio->errorMessage()));
+        audio->setSoundFont(options_.soundFont + QStringLiteral(".missing"));
+        return false;
+    });
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        check(!audio->errorMessage().isEmpty() && audio->soundFont() == options_.soundFont,
+              QStringLiteral("a missing file did not fail, or replaced the SoundFont"));
+        audio->useBuiltinSound();
+        check(audio->soundFont().isEmpty() && audio->soundFontName().isEmpty(),
+              QStringLiteral("the built-in synthesizer did not come back"));
         return false;
     });
 }

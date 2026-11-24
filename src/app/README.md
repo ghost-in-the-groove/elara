@@ -62,7 +62,7 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from the same place in the music (`audio::carriedPosition`: the same share of the same played measure after another speed or a tempo edit, else the same time); only another song (`songReplaced`) goes back to the start. For practice (ADR-0024) it starts playback after a measure of clicks (`countIn`, `countingIn` while they sound) and loops from A to B, both marked at the playback position (`markLoop`); the loop keeps its place in the music as the position does, and another song ends it. |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on a worker beside its layout; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from the same place in the music (`audio::carriedPosition`: the same share of the same played measure after another speed or a tempo edit, else the same time); only another song (`songReplaced`) goes back to the start. For practice (ADR-0024) it starts playback after a measure of clicks (`countIn`, `countingIn` while they sound) and loops from A to B, both marked at the playback position (`markLoop`); the loop keeps its place in the music as the position does, and another song ends it. The tracks play through the built-in synthesizer or a SoundFont (`setSoundFont`, opened on a worker; `useBuiltinSound`; ADR-0043), kept in the settings when `rememberSound` is on. |
 | `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. `speed` (25 to 200 %) and `metronome`: what every sequence is built with, kept from song to song; changing either builds the sequence again (ADR-0024). |
 | `qml/PracticeControls.qml` | In the transport: the metronome button, the count-in button, the loop button (A, then A–B, then off; Ctrl+L), and the speed as a pill that opens a slider with 50, 75 and 100 %. The song is sequenced again once the slider is let go. |
 
@@ -76,8 +76,8 @@ the way down.
 
 ```
 elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
-      [--continuous] [--tuner] [--song-pane] [--measure] [--language en|es] [--smoke-test]
-      [--screenshot OUT.png]
+      [--continuous] [--tuner] [--song-pane] [--measure] [--language en|es]
+      [--soundfont FILE] [--smoke-test] [--screenshot OUT.png]
 ```
 
 - `FILE` opens a score at start; `--track` (from 1) and `--view` show that track
@@ -124,6 +124,13 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
   checking the form, the amount and the status line, strums the beat down,
   adds tremolo picking and an up stroke and takes the strum off again, and
   undoes back to the start.
+- `--soundfont FILE` plays the tracks through that SoundFont (SF2 or SF3)
+  instead of the one chosen last time in the menu (More, then Choose a
+  SoundFont). With `--smoke-test` the app prints `sound: NAME` once it has
+  opened it, then checks that a file that is no SoundFont fails and leaves it
+  in place, and that the built-in synthesizer comes back (`app.smoke_soundfont`,
+  with the CLI tests' test font). Checks and screenshots never read or write
+  the remembered SoundFont.
 - `--language es` shows the UI in Spanish (`en` in English) instead of the
   system's language. With `--smoke-test` or `--screenshot` the app first prints
   `ui language: es`, which `app.smoke_spanish` checks; `app.language_unknown`

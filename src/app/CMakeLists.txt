@@ -97,7 +97,8 @@ target_link_libraries(elara PRIVATE
   elara::io
   elara::notation
   elara::core
-  elara::audio_juce)
+  elara::audio_juce
+  elara::audio_fluid)
 
 # Strict warnings for our sources only, not for moc/qmlcache output.
 elara_source_warnings(src/main.cpp src/audio_controller.cpp src/score_document.cpp
