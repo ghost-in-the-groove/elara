@@ -208,3 +208,27 @@ TEST_CASE("Effects: on a drum staff the lane's hit only", "[core][entry][effects
         CHECK((note.effects.accent == Accent::Accent) == (note.pitch.midiNumber() == kSnare));
     }
 }
+
+TEST_CASE("Effects: the caret has an effect when all its notes have it", "[core][entry][effects]") {
+    Document doc(guitarSong());
+    const Caret string3 = at(0, 0, 3);
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), string3, NoteEffect::PalmMute));
+    run(doc, toggleEffect(doc.song(), string3, NoteEffect::PalmMute));
+    CHECK(hasEffectAtCaret(doc.song(), string3, NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 0, 2), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), string3, NoteEffect::LetRing));
+    // A rest, a string without a note and the free slot have no effects.
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 2, 3), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(0, 1, 3), NoteEffect::PalmMute));
+    CHECK_FALSE(hasEffectAtCaret(doc.song(), at(1, 1, 3), NoteEffect::PalmMute));
+
+    // Without strings, every note of the beat must have it.
+    Document piano(
+        oneBeat("piano", {Note{.pitch = Pitch::fromMidi(60)}, Note{.pitch = Pitch::fromMidi(64)}}));
+    const Caret caret = at(0, 0);
+    run(piano, toggleEffect(piano.song(), caret, NoteEffect::Staccato));
+    CHECK(hasEffectAtCaret(piano.song(), caret, NoteEffect::Staccato));
+    Song half = piano.song();
+    half.track(0).staff(0).measure(0).voices[0].beats[0].notes[1].effects.staccato = false;
+    CHECK_FALSE(hasEffectAtCaret(half, caret, NoteEffect::Staccato));
+}
