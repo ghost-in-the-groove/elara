@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <span>
 #include <utility>
@@ -135,4 +136,28 @@ TEST_CASE("Notation benchmarks", "[!benchmark][notation]") {
     BENCHMARK("the same on one thread ") {
         return layoutPages(song, score, font, pages);
     };
+
+    // Incremental relayout (ADR-0052): each call lays out the other of two
+    // versions of the song a note apart (measure 250 of the first track), as
+    // the app does after an edit and its undo.
+    pages.threads = 0;
+    auto before = std::make_shared<const elara::core::Song>(song);
+    elara::core::Song changed = song;
+    auto& note = changed.track(0).staff(0).measure(250).voices[0].beats[0].notes.front();
+    note.pitch = elara::core::Pitch::fromMidi(note.pitch.midiNumber() + 1);
+    auto after = std::make_shared<const elara::core::Song>(std::move(changed));
+    const auto relayout = [&](std::span<const StaffSelection> staves, const char* what) {
+        elara::notation::PageLayoutCache cache;
+        bool flip = false;
+        (void)cache.layout(before, staves, font, pages);
+        BENCHMARK(what) {
+            flip = !flip;
+            return cache.layout(flip ? after : before, staves, font, pages);
+        };
+        const auto reuse = cache.lastReuse();
+        std::printf("%s: %zu of %zu measures measured, %zu of %zu systems laid out\n", what,
+                    reuse.measured, reuse.measures, reuse.laidOut, reuse.systems);
+    };
+    relayout(both, "lay out one track on A4 pages again after an edit");
+    relayout(score, "lay out all 20 staves on A4 pages again after an edit");
 }

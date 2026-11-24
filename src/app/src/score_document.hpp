@@ -10,6 +10,7 @@
 #include <elara/core/entry.hpp>
 #include <elara/core/song.hpp>
 #include <elara/notation/display_list.hpp>
+#include <elara/notation/page_layout.hpp>
 
 #include "score_painter.hpp"
 #include "track_list.hpp"
@@ -513,6 +514,10 @@ private:
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
+    /// What the last layout laid out, so an edit lays out only what it changed
+    /// (ADR-0052); shared with the layouts running on workers.
+    std::shared_ptr<notation::PageLayoutCache> layoutCache_ =
+        std::make_shared<notation::PageLayoutCache>();
     core::Caret caret_;
     core::Duration input_;
     int caretPage_ = -1;

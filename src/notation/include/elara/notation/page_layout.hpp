@@ -8,6 +8,8 @@
 #include <elara/notation/staff_layout.hpp>
 
 #include <cstddef>
+#include <memory>
+#include <mutex>
 #include <span>
 #include <vector>
 
@@ -28,6 +30,8 @@ struct PageLayoutOptions {
     double lastSystemFill = 0.6;
     bool credits = true;  ///< title and credits on the first page, page numbers on the others
     unsigned threads = 0; ///< 0 lays out on every core when the song is long enough
+
+    friend bool operator==(const PageLayoutOptions&, const PageLayoutOptions&) = default;
 };
 
 /// Paper sizes in millimetres.
@@ -63,5 +67,49 @@ inline constexpr Paper kLetter{.width = 215.9, .height = 279.4};
                                                    std::span<const StaffSelection> staves,
                                                    const EngravingFont& font,
                                                    const PageLayoutOptions& options = {});
+
+/// Lays out the versions of a song as it is edited, each like layoutPages(),
+/// keeping what it laid out last so that the next version lays out again only
+/// what an edit changed (ADR-0052): the measures that changed and the one after
+/// each are measured again, the line breaks are found again, and a system whose
+/// measures, neighbours and context (the tempo and dynamics in force where it
+/// starts) are as they were is reused. Other staves, options, a font, tracks
+/// whose names, instruments or tunings differ, or another number of measures
+/// start again.
+///
+/// Calls from several threads run one at a time.
+class PageLayoutCache {
+public:
+    /// What the last layout() did: measures measured of those laid out, and
+    /// systems laid out of those on its pages.
+    struct Reuse {
+        std::size_t measures = 0;
+        std::size_t measured = 0;
+        std::size_t systems = 0;
+        std::size_t laidOut = 0;
+    };
+
+    PageLayoutCache();
+    ~PageLayoutCache();
+    PageLayoutCache(const PageLayoutCache&) = delete;
+    PageLayoutCache& operator=(const PageLayoutCache&) = delete;
+    PageLayoutCache(PageLayoutCache&&) = delete;
+    PageLayoutCache& operator=(PageLayoutCache&&) = delete;
+
+    /// The pages layoutPages() gives `song`. Keeps `song` until the next call.
+    /// Throws like layoutPages(); the cache then starts again.
+    [[nodiscard]] std::vector<DisplayList> layout(std::shared_ptr<const core::Song> song,
+                                                  std::span<const StaffSelection> staves,
+                                                  const EngravingFont& font,
+                                                  const PageLayoutOptions& options = {});
+
+    [[nodiscard]] Reuse lastReuse() const;
+
+private:
+    struct State;
+    mutable std::mutex mutex_;
+    std::unique_ptr<State> state_;
+    Reuse reuse_;
+};
 
 } // namespace elara::notation

@@ -135,12 +135,30 @@ void shift(DisplayList& list, double dx, double dy);
 /// Appends the items and boxes of `from` to `to`.
 void append(DisplayList& to, DisplayList&& from);
 
+/// Appends copies of the items and boxes of `from` to `to`, moved right by `dx`
+/// and down by `dy`: what shift() and append() give, in one pass and leaving
+/// `from` as it is.
+void appendShifted(DisplayList& to, const DisplayList& from, double dx, double dy);
+
+/// Makes room in `to` for the items and boxes of every list of `from` besides
+/// its own.
+void reserveFor(DisplayList& to, std::span<const DisplayList* const> from);
+
 // ---- Technique lanes ----------------------------------------------------------------
 
 /// Bands above a staff for technique marks, from the staff upwards. Only the
 /// lanes a line of music uses take room.
-enum class Lane : std::uint8_t { Bend, Vibrato, PalmMute, LetRing, Harmonic, PickStroke };
-inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(Lane::PickStroke) + 1;
+enum class Lane : std::uint8_t {
+    Bend,
+    Vibrato,
+    PalmMute,
+    LetRing,
+    Harmonic,
+    PickStroke,
+    Strum,
+    Tremolo
+};
+inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(Lane::Tremolo) + 1;
 
 /// The marks of one column of notes that go into lanes.
 struct ColumnTechniques {
@@ -148,11 +166,14 @@ struct ColumnTechniques {
     bool letRing = false;
     core::Vibrato vibrato = core::Vibrato::None;
     core::PickStroke pickStroke = core::PickStroke::None;
+    core::Strum strum = core::Strum::None;
+    int tremoloStrokes = 0; ///< slashes of tremolo picking, 0 without it
     core::HarmonicKind harmonic = core::HarmonicKind::None;
 
     [[nodiscard]] bool any() const noexcept {
         return palmMute || letRing || vibrato != core::Vibrato::None ||
-               pickStroke != core::PickStroke::None || harmonic != core::HarmonicKind::None;
+               pickStroke != core::PickStroke::None || strum != core::Strum::None ||
+               tremoloStrokes > 0 || harmonic != core::HarmonicKind::None;
     }
 };
 
@@ -197,6 +218,8 @@ private:
         core::Vibrato vibrato = core::Vibrato::None;
     };
 
+    // A glyph centred at `centre`, its ink just above the bottom of `lane`.
+    void mark(Lane lane, Glyph glyph, double centre, std::size_t measure, double scale = 1.0);
     void extend(Lane lane, bool active, double centre, double end, std::size_t measure,
                 core::Vibrato vibrato = core::Vibrato::None);
     void close(Lane lane);
