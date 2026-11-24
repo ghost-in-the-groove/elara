@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "startup.hpp"
 
+#include <elara/audio/sequence.hpp>
+
 #include "audio_controller.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
@@ -133,6 +135,7 @@ void Startup::queueSteps() {
             clickCursor();
             return false;
         });
+        queueKeepPosition();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -511,6 +514,12 @@ void Startup::tick() {
             return;
         }
         waiting_ = false;
+        // Playback plays the song the pages show, once its layout is done:
+        // an edit's sequence is built with it (ADR-0031).
+        if (score_ != nullptr && score_->song() && editProblem_.isEmpty() &&
+            (!score_->sequence() || *score_->sequence() != audio::Sequence(*score_->song()))) {
+            editProblem_ = QStringLiteral("playback does not play the song the pages show");
+        }
     }
     if (!queued_) {
         queued_ = true;
@@ -612,6 +621,49 @@ void Startup::clickCursor() {
                        .arg(audio->position())
                        .arg(expected);
     }
+}
+
+// An edit keeps playback where it is: a track added, then undone, each give
+// playback a new sequence and leave it where the click on the cursor put it.
+// A new song then starts playback from its beginning.
+void Startup::queueKeepPosition() {
+    const auto check = [this](const char* what) {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && audio->position() != positionBefore_ && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("%1 moved playback to %2 s, not %3 s")
+                               .arg(QLatin1StringView(what))
+                               .arg(audio->position())
+                               .arg(positionBefore_);
+        }
+    };
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr) {
+            return false;
+        }
+        positionBefore_ = audio->position();
+        score_->addTrack(QStringLiteral("electric-bass"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check("an edit");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check("an undo");
+        score_->newSong(QStringLiteral("electric-guitar"));
+        return true;
+    });
+    // Another song plays from its start.
+    steps_.emplace_back([this] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("a new song left playback at %1 s").arg(audio->position());
+        }
+        return false;
+    });
 }
 
 // The bars that float over the bottom of the score, the transport and the

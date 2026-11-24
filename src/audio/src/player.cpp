@@ -163,8 +163,14 @@ void Player::render(std::span<float> left, std::span<float> right) noexcept {
             current_->seat(frame_);
         }
     }
-    if (const std::int64_t asked = seekTo_.exchange(-1, std::memory_order_acq_rel); asked >= 0) {
+    if (const std::int64_t asked = seekTo_.load(std::memory_order_acquire); asked >= 0) {
         frame_ = asked;
+        // The new position is published before the seek counts as taken, so
+        // that position() never reads the one from before it. A seek asked
+        // for meanwhile stays for the next callback.
+        position_.store(asked, std::memory_order_release);
+        std::int64_t taken = asked;
+        seekTo_.compare_exchange_strong(taken, -1, std::memory_order_acq_rel);
         if (current_ != nullptr) {
             for (Loaded::Track& track : current_->tracks) {
                 track.synth.reset();
