@@ -164,6 +164,16 @@ enum class NoteEffect : std::uint8_t {
 /// a rest, the free slot or a string without a note.
 [[nodiscard]] BendCurve bendAtCaret(const Song& song, const Caret& caret);
 
+/// Sets the effects of the caret's beat (ADR-0056): strum, pick stroke,
+/// tremolo picking, whammy bar and bass technique, which apply to all its
+/// notes, as one undo step ("Change beat effects"). Nothing changes when the
+/// beat has them already, on a rest or on the free slot.
+[[nodiscard]] Entry setBeatEffects(const Song& song, const Caret& caret,
+                                   const BeatEffects& effects);
+
+/// The effects of the caret's beat; none on a rest or the free slot.
+[[nodiscard]] BeatEffects beatEffectsAt(const Song& song, const Caret& caret);
+
 /// The dynamic in force at the caret's beat (ADR-0047): that of the notes struck
 /// at the latest start no later than the beat's, over every voice of the staff
 /// and looking back through earlier measures (the loudest when several are

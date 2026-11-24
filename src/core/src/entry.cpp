@@ -714,6 +714,29 @@ BendCurve bendAtCaret(const Song& song, const Caret& at) {
     return {};
 }
 
+Entry setBeatEffects(const Song& song, const Caret& at, const BeatEffects& effects) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    Measure content = measureAt(song, caret);
+    Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    if (beat.notes.empty() || beat.effects == effects) {
+        return unchanged(caret);
+    }
+    beat.effects = effects;
+    return replace(caret, std::move(content), "Change beat effects");
+}
+
+BeatEffects beatEffectsAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return {};
+    }
+    const Beat& beat = voiceAt(song, caret).beats[caret.beat];
+    return beat.notes.empty() ? BeatEffects{} : beat.effects;
+}
+
 Dynamic dynamicAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     const Staff& staff = song.track(caret.track).staff(caret.staff);
