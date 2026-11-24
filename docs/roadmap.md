@@ -135,6 +135,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Kinds of note effects at the caret: slides in and out, harmonics of
         every kind, wide vibrato and marcato, in the CLI and the effects panel
         (ADR-0058)
+  - [x] Whammy bar (dives, dips, pre-dives, returns) and tapping, slap and pop
+        on the caret's beat, in the CLI and the effects panel (ADR-0060)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)
@@ -153,4 +155,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Installers: MSIX/MSI (Windows), DMG (macOS), AppImage/Flatpak (Linux)
   - [x] Portable packages built and smoke-tested by CI: ZIP (Windows), disk image
         (macOS), tarball (Linux), `elara.py package` (ADR-0048)
+  - [x] The app icon on the window, `elara.exe`, the macOS bundle and a Linux
+        desktop entry, drawn from its SVG at build time (ADR-0064)
 - [ ] Release automation and 1.0

@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# The desktop entry of Elara on Linux, installed as
+# share/applications/io.github.ghost_in_the_groove.Elara.desktop (ADR-0064).
+[Desktop Entry]
+Type=Application
+Name=Elara
+GenericName=Tablature and Score Editor
+GenericName[es]=Editor de tablaturas y partituras
+Comment=Write, read and practise guitar tablature and scores
+Comment[es]=Escribe, lee y practica tablaturas y partituras de guitarra
+Exec=elara %f
+Icon=io.github.ghost_in_the_groove.Elara
+Terminal=false
+Categories=AudioVideo;Audio;Music;
+Keywords=guitar;tablature;tab;score;notation;music;
+Keywords[es]=guitarra;tablatura;partitura;notación;música;

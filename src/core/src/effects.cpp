@@ -3,8 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace elara::core {
 
@@ -132,6 +134,53 @@ BendCurve bendCurve(BendForm form, int cents) {
         break;
     }
     throw std::invalid_argument("bendCurve: a custom bend has no usual curve");
+}
+
+namespace {
+
+// `curve` turned upside down around the written pitch.
+BendCurve mirrored(const BendCurve& curve) {
+    std::vector<BendPoint> points = curve.points();
+    for (BendPoint& point : points) {
+        point.cents = -point.cents;
+    }
+    return BendCurve(std::move(points));
+}
+
+} // namespace
+
+BendForm whammyForm(const BendCurve& curve) {
+    const std::vector<BendPoint>& points = curve.points();
+    if (points.empty()) {
+        return BendForm::None;
+    }
+    const bool down = std::ranges::any_of(points, [](const BendPoint& p) { return p.cents < 0; });
+    const bool up = std::ranges::any_of(points, [](const BendPoint& p) { return p.cents > 0; });
+    if (down && up) {
+        return BendForm::Custom;
+    }
+    return bendForm(down ? mirrored(curve) : curve);
+}
+
+int whammyCents(const BendCurve& curve) {
+    int farthest = 0;
+    for (const BendPoint& point : curve.points()) {
+        if (std::abs(point.cents) > std::abs(farthest)) {
+            farthest = point.cents;
+        }
+    }
+    return farthest;
+}
+
+BendCurve whammyCurve(BendForm form, int cents) {
+    if (form == BendForm::None) {
+        return {};
+    }
+    if (cents == 0 || std::abs(cents) > BendCurve::kMaxCents) {
+        throw std::invalid_argument("whammyCurve: the bar must go 1 to 2400 cents down or up");
+    }
+    const BendCurve up = bendCurve(form, std::abs(cents));
+    return cents < 0 ? mirrored(up) : up;
 }
 
 std::optional<int> naturalHarmonicSemitones(double fret) {

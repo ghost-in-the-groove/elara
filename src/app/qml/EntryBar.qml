@@ -34,6 +34,8 @@ Rectangle {
     readonly property color ink: Theme.ink
     /// How far the next bend goes when the caret's note has none, in cents.
     property int bendCents: 200
+    /// How far the next dive goes when the caret's beat has none (ADR-0060).
+    property int whammyCents: -200
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 44
@@ -185,6 +187,66 @@ Rectangle {
                 font.bold: true
                 color: effectKind.active ? "white" : root.ink
             }
+        }
+    }
+
+    // A whammy-bar form (ADR-0060), numbered as core::BendForm and drawn going
+    // down: on the caret's beat at the dive's depth, or off when it has it.
+    component WhammyForm: Pill {
+        id: whammyForm
+
+        required property int form
+        required property string path
+
+        readonly property bool diving: root.document.caretWhammyCents < 0
+
+        implicitWidth: 34
+        active: diving && root.document.caretWhammyForm === form
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: root.document.whammyName(form, diving ? root.document.caretWhammyCents
+                                                                : root.whammyCents)
+        onClicked: {
+            if (active) {
+                root.document.setWhammy(0, 0)
+            } else {
+                root.document.setWhammy(form, diving ? root.document.caretWhammyCents
+                                                     : root.whammyCents)
+            }
+        }
+
+        contentItem: Icon {
+            path: whammyForm.path
+            lineWidth: 1.8
+            color: whammyForm.active ? "white" : root.ink
+        }
+    }
+
+    // How deep a dive goes: the caret's whammy bar, or a dive if it has none.
+    component WhammyAmount: Pill {
+        id: whammyAmount
+
+        required property int cents
+
+        readonly property int form: root.document.caretWhammyForm
+
+        implicitWidth: Math.max(34, whammyLabel.implicitWidth + 16)
+        active: form > 0 && form < 5 && root.document.caretWhammyCents === cents
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: root.document.whammyAmount(cents)
+        onClicked: {
+            root.whammyCents = cents
+            root.document.setWhammy(form > 0 && form < 5 ? form : 1, cents)
+        }
+
+        contentItem: Label {
+            id: whammyLabel
+
+            text: root.document.whammyAmount(whammyAmount.cents)
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 12
+            font.features: { "frac": 1 }
+            color: whammyAmount.active ? "white" : root.ink
         }
     }
 
@@ -903,6 +965,83 @@ Rectangle {
                             path: "M7 8 L17 4 M7 13 L17 9 M7 18 L17 14"
                             active: root.document.caretTremolo === 32
                             onClicked: root.document.setTremolo(active ? 0 : 32)
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        // Tapping, slap and pop (ADR-0060), lettered as the
+                        // score writes them.
+                        Repeater {
+                            model: ["T", "S", "P"]
+
+                            delegate: EffectKind {
+                                required property int index
+                                required property string modelData
+
+                                tip: root.document.bassTechniqueName(index + 1)
+                                label: modelData
+                                active: root.document.caretBassTechnique === index + 1
+                                onClicked: root.document.setBassTechnique(active ? 0 : index + 1)
+                            }
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Whammy bar")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // The whammy bar's form, then how deep it dives.
+                    Row {
+                        spacing: 4
+
+                        WhammyForm {
+                            form: 1
+                            path: "M3 7 L8 7 L13 17 L21 17"
+                        }
+                        WhammyForm {
+                            form: 2
+                            path: "M3 7 L8 7 L12 17 L16 7 L21 7"
+                        }
+                        WhammyForm {
+                            form: 3
+                            path: "M5 5 L5 17 L21 17"
+                        }
+                        WhammyForm {
+                            form: 4
+                            path: "M5 5 L5 17 L10 17 L16 7 L21 7"
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        Repeater {
+                            model: [-100, -200, -300, -400, -600]
+
+                            delegate: WhammyAmount {
+                                required property int modelData
+
+                                cents: modelData
+                            }
                         }
                     }
                 }
