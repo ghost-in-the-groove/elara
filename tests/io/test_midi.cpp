@@ -516,6 +516,9 @@ TEST_CASE("MIDI import gives back a song written the way the importer writes", "
     song.measureHeader(2).keySignature = KeySignature(-5, KeyMode::Minor);
     song.measureHeader(3) = song.measureHeader(2).continuation();
     song.measureHeader(3).timeSignature = TimeSignature(6, 8);
+    // Sections are markers at their measures (ADR-0062).
+    song.measureHeader(0).section = "Intro";
+    song.measureHeader(2).section = "Chorus";
     const std::size_t piano = song.addTrack(presetTrack("piano"));
     const std::size_t guitar = song.addTrack(presetTrack("electric-guitar"));
     const std::size_t drums = song.addTrack(presetTrack("drum-kit"));

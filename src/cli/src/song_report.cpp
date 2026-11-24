@@ -89,6 +89,9 @@ std::string measuresJson(const core::Song& song) {
                 out += std::format(R"(,"tempo":{})", jsonNumber(change.tempo.bpm()));
             }
         }
+        if (!header.section.empty()) {
+            out += std::format(R"(,"section":"{}")", jsonEscape(header.section));
+        }
         out += "}";
     }
     return out + "]";

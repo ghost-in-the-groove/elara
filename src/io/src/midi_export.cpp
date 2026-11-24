@@ -155,6 +155,9 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
                             std::countr_zero(static_cast<unsigned>(time.denominator())),
                             clocksPerClick(time), 8})));
         }
+        if (!header.section.empty()) { // ADR-0062
+            track.events.push_back(meta(tick, detail::kMetaMarker, header.section));
+        }
         if (previous == nullptr || previous->keySignature != header.keySignature) {
             const core::KeySignature& key = header.keySignature;
             track.events.push_back(

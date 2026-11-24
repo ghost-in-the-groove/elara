@@ -60,12 +60,14 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     const ImportResult result = load("techniques.gp5");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{"section marks dropped (measure 1)",
-                                   "Lead Guitar: chord names and diagrams dropped (measure 3)",
+          std::vector<std::string>{"Lead Guitar: chord names and diagrams dropped (measure 3)",
                                    "Lead Guitar: grace notes dropped (measure 3)",
                                    "Lead Guitar: text dropped (measure 3)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Techniques");
+    // A marker names the section that starts at its measure (ADR-0062).
+    CHECK(song.measureHeader(0).section == "Intro");
+    CHECK(song.measureHeader(1).section.empty());
     // Volume 14 and balance 10 of 16 on its channel; Guitar Pro 5 flags solo.
     CHECK(song.track(0).mix() ==
           core::TrackMix{.volume = 0.875, .pan = 0.25, .mute = false, .solo = true});

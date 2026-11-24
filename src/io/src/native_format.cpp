@@ -213,6 +213,7 @@ private:
         if (value.jump != JumpTo::None) {
             addEnumIfNot(object, "jumpThen", kJumpThenNames, value.jumpThen, JumpThen::End);
         }
+        addTextIfAny(object, "section", value.section);
         return object;
     }
 
@@ -738,6 +739,9 @@ private:
         header.jump = enumValue(object, "jump", kJumpToNames, JumpTo::None);
         if (header.jump != JumpTo::None) {
             header.jumpThen = enumValue(object, "jumpThen", kJumpThenNames, JumpThen::End);
+        }
+        if (const auto section = optionalText(object, "section")) {
+            header.section = std::string(*section);
         }
         return header;
     }

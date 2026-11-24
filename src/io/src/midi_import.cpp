@@ -69,7 +69,8 @@ struct Gathered {
     std::string copyright{};
     std::vector<Timed<TimeSignature>> times{};
     std::vector<Timed<KeySignature>> keys{};
-    std::vector<Timed<long long>> tempos{}; // microseconds per quarter note
+    std::vector<Timed<long long>> tempos{};    // microseconds per quarter note
+    std::vector<Timed<std::string>> markers{}; // sections (ADR-0062)
     std::vector<Source> sources{};
     std::int64_t end = 0;       // last tick of any track
     std::int64_t lastStart = 0; // where the last note starts
@@ -99,6 +100,9 @@ void readMeta(const MidiEvent& event, Gathered& out, std::string& trackName,
         break;
     case detail::kMetaLyric:
         warnings.add("", "lyrics dropped");
+        break;
+    case detail::kMetaMarker:
+        out.markers.push_back({event.tick, p});
         break;
     case detail::kMetaTempo:
         if (p.size() >= 3) {
@@ -259,6 +263,7 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
     std::ranges::stable_sort(out.times, byTick);
     std::ranges::stable_sort(out.keys, byTick);
     std::ranges::stable_sort(out.tempos, byTick);
+    std::ranges::stable_sort(out.markers, byTick);
     return out;
 }
 
@@ -273,6 +278,7 @@ struct MeasureInfo {
     TimeSignature time{};
     KeySignature key{};
     std::vector<core::TempoChange> tempos{};
+    std::string section{};     // the first marker in it (ADR-0062)
     std::size_t firstCell = 0; // index of its first grid cell in the song
 
     [[nodiscard]] Fraction length() const { return time.measureLength(); }
@@ -366,6 +372,23 @@ std::vector<MeasureInfo> layMeasures(const Gathered& in, int division, Warnings&
         measure.key = key;
         measure.firstCell = cells;
         cells += measure.cellCount();
+    }
+    // A marker names the section of the measure it falls in; the first wins.
+    for (const auto& marker : in.markers) {
+        const Fraction when = at(marker.tick);
+        const std::string_view text = marker.value;
+        const auto first = text.find_first_not_of(" \t\r\n");
+        std::string name(first == std::string_view::npos
+                             ? std::string_view{}
+                             : text.substr(first, text.find_last_not_of(" \t\r\n") - first + 1));
+        if (name.empty() || measures.empty() || when >= measures.back().end()) {
+            continue;
+        }
+        const auto after = std::ranges::upper_bound(measures, when, {}, &MeasureInfo::start);
+        MeasureInfo& measure = *std::prev(after);
+        if (measure.section.empty()) {
+            measure.section = std::move(name);
+        }
     }
     for (const auto& tempo : in.tempos) {
         const Fraction when = at(tempo.tick);
@@ -1242,6 +1265,7 @@ std::expected<ImportResult, FormatError> importParsed(const MidiFile& file, Warn
         header.timeSignature = measures[m].time;
         header.keySignature = measures[m].key;
         header.tempoChanges = measures[m].tempos;
+        header.section = std::move(measures[m].section);
     }
     std::size_t notes = 0;
     for (const Source& source : gathered.sources) {

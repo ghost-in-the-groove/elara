@@ -63,6 +63,7 @@ one that replaces them.
 | [0055](0055-bend-forms.md) | Bends of any form at the caret | Accepted |
 | [0056](0056-beat-effects-at-the-caret.md) | Beat effects at the caret | Accepted |
 | [0057](0057-continuous-view.md) | Continuous view | Accepted |
+| [0062](0062-sections.md) | Sections of a song | Accepted |
 
 ## Template
 
