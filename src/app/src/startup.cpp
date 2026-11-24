@@ -109,6 +109,7 @@ void Startup::queueSteps() {
             queueMeasures();
             queuePitches();
             queueDrums();
+            queueSelection();
             queueMix();
             queueNavigation();
             queueTuning();
@@ -145,6 +146,7 @@ void Startup::queueSteps() {
         queueMeasures();
         queuePitches();
         queueDrums();
+        queueSelection();
         queueMix();
         queueNavigation();
         queueTuning();
@@ -565,6 +567,74 @@ void Startup::queueDrums() {
         }
         score_->setTrack(0);
         return true;
+    });
+}
+
+// Selected measures (ADR-0036): two measures selected and tinted on the page,
+// copied, let go, pasted into new measures before the caret's, which end up
+// selected, and transposed. Then everything is undone and the song must end as it started.
+void Startup::queueSelection() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("selection check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        selecting_ = score_->caretPage() >= 0 && score_->measureCount() > 1;
+        if (!selecting_) {
+            return false;
+        }
+        lengthBefore_ = score_->measureCount();
+        const bool last = score_->caretMeasure() + 1 >= lengthBefore_;
+        score_->extendSelection(last ? -1 : 1);
+        check(score_->hasSelection() && score_->selectionLast() == score_->selectionFirst() + 1,
+              "Shift+Right did not select two measures");
+        check(score_->selectionBoxes(score_->caretPage()).size() == 2,
+              "the page does not show the two measures selected");
+        check(score_->caretStatus().startsWith(ScoreDocument::tr("Measures %1-%2 selected")
+                                                   .arg(score_->selectionFirst() + 1)
+                                                   .arg(score_->selectionLast() + 1)),
+              "the status does not say what is selected");
+        score_->copy();
+        check(score_->canPaste(), "nothing was copied");
+        score_->clearSelection();
+        pasteAt_ = score_->caretMeasure();
+        score_->paste(true);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->measureCount() == lengthBefore_ + 2, "pasting did not insert two measures");
+        check(score_->hasSelection() && score_->selectionFirst() == pasteAt_ &&
+                  score_->selectionLast() == pasteAt_ + 1,
+              "the pasted measures are not selected");
+        score_->transposeSelection(2);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->undoName() == ScoreDocument::tr("Transpose"),
+              "the transposition is not undoable");
+        score_->clearSelection();
+        check(!score_->hasSelection() && score_->selectionBoxes(score_->caretPage()).isEmpty(),
+              "Escape did not let go of the selection");
+        for (int i = 0; i < 2 && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(!score_->modified() && score_->measureCount() == lengthBefore_,
+              "undoing the paste did not restore the song");
+        return false;
     });
 }
 
