@@ -52,8 +52,12 @@ the rhythm, under the staff (ADR-0041).
   back down.
 
 Palm mute (`P.M.`), let ring, vibrato, harmonics other than natural (`A.H.`,
-`P.H.`, `T.H.`, `S.H.`) and pick strokes go into lanes above the staff, in that
-order upwards after the bend lane; only the lanes a line uses take room. Palm
+`P.H.`, `T.H.`, `S.H.`), pick strokes, strums and tremolo picking go into lanes
+above the staff, in that order upwards after the bend lane; only the lanes a
+line uses take room. A strum is an arrow the way the pick goes over the
+strings (down or up), as strumming patterns write it; tremolo picking is one
+slash per beam of the repeated notes (an eighth one, a sixteenth two, a
+thirty-second three). Palm
 mute, let ring and vibrato run on over consecutive notes, across barlines, and
 end with a dashed line and a hook (a wavy line for vibrato). The lanes go above
 the tablature, or above the standard notation when the system has no tablature
