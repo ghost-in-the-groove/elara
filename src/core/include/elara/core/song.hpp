@@ -4,6 +4,7 @@
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
 #include <elara/core/pitch.hpp>
+#include <elara/core/shared_value.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/tempo.hpp>
 #include <elara/core/tuning.hpp>
@@ -59,7 +60,8 @@ private:
     Clef clef_;
     std::optional<Tuning> tuning_;
     int capo_ = 0;
-    std::vector<Measure> measures_;
+    // Shared with the staff's copies until either changes one (ADR-0051).
+    std::vector<SharedValue<Measure>> measures_;
 };
 
 /// One instrument with one or more staves.
