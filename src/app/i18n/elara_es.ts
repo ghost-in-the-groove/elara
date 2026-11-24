@@ -352,6 +352,30 @@
         <translation>al Doble Coda</translation>
     </message>
     <message>
+        <source>Repeats</source>
+        <translation>Repeticiones</translation>
+    </message>
+    <message>
+        <source>Start</source>
+        <translation>Inicio</translation>
+    </message>
+    <message>
+        <source>End</source>
+        <translation>Fin</translation>
+    </message>
+    <message>
+        <source>%1 times</source>
+        <translation>%1 veces</translation>
+    </message>
+    <message>
+        <source>Endings</source>
+        <translation>Finales</translation>
+    </message>
+    <message>
+        <source>%1.</source>
+        <translation>%1.</translation>
+    </message>
+    <message>
         <source>Insert before</source>
         <translation>Insertar antes</translation>
     </message>
@@ -850,6 +874,10 @@
     <message>
         <source>Change navigation marks</source>
         <translation>Cambiar señales y saltos</translation>
+    </message>
+    <message>
+        <source>Change repeats</source>
+        <translation>Cambiar repeticiones</translation>
     </message>
     <message>
         <source>Change time signature</source>

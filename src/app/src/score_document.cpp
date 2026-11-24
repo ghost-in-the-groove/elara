@@ -30,10 +30,12 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <functional>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -251,6 +253,7 @@ constexpr std::array kEditNames{
     Translation{"Change mix", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change mix")},
     Translation{"Change navigation marks",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
+    Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
     Translation{"Change key signature",
@@ -947,6 +950,57 @@ void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
         choice(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen)));
     if (header.jump == core::JumpTo::None) {
         header.jumpThen = core::JumpThen::End;
+    }
+    if (header != document_->song().measureHeader(m)) {
+        execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
+    }
+}
+
+QVariantMap ScoreDocument::repeatsAt(int measure) const {
+    QVariantMap repeats;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return repeats;
+    }
+    const core::MeasureHeader& header =
+        document_->song().measureHeader(static_cast<std::size_t>(measure));
+    QVariantList endings;
+    for (int time = 1; time <= core::MeasureHeader::kMaxEnding; ++time) {
+        if (header.alternateEndings != 0 && header.playedOnTime(time)) {
+            endings.append(time);
+        }
+    }
+    repeats.insert(QStringLiteral("start"), header.repeatStart);
+    repeats.insert(QStringLiteral("times"), header.repeatEnd() ? header.repeatTimes : 0);
+    repeats.insert(QStringLiteral("endings"), endings);
+    return repeats;
+}
+
+void ScoreDocument::setRepeats(int measure, const QVariantMap& repeats) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const auto m = static_cast<std::size_t>(measure);
+    core::MeasureHeader header = document_->song().measureHeader(m);
+    if (const auto found = repeats.constFind(QStringLiteral("start")); found != repeats.cend()) {
+        header.repeatStart = found->toBool();
+    }
+    if (const auto found = repeats.constFind(QStringLiteral("times")); found != repeats.cend()) {
+        const int times = found->toInt();
+        if (times == 0 || (times >= 2 && times <= std::numeric_limits<std::uint8_t>::max())) {
+            header.repeatTimes = static_cast<std::uint8_t>(times);
+        }
+    }
+    if (const auto found = repeats.constFind(QStringLiteral("endings")); found != repeats.cend()) {
+        unsigned endings = 0;
+        for (const QVariant& time : found->toList()) {
+            const int value = time.toInt();
+            if (value >= 1 && value <= core::MeasureHeader::kMaxEnding) {
+                endings |= 1U << static_cast<unsigned>(value - 1);
+            }
+        }
+        header.alternateEndings = static_cast<std::uint8_t>(endings);
     }
     if (header != document_->song().measureHeader(m)) {
         execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
