@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "layout_common.hpp"
 
+#include <elara/core/song.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -26,6 +28,11 @@ constexpr double kRunHook = 0.4;       // the line's closing hook
 constexpr double kRunLineGap = 0.25;   // between the text and its line
 constexpr double kVibratoLift = 0.25;  // vibrato strokes above the bottom of their lane
 constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3};
+
+// Dynamics marks, in staff spaces (ADR-0044).
+constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
+constexpr double kDynamicInkGap = 0.5;   // at least between the ink above and the marks
+constexpr double kDynamicGap = 0.4;      // at least between neighbouring marks
 
 } // namespace
 
@@ -167,6 +174,116 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.texts, from.texts);
     move(to.curves, from.curves);
     move(to.polygons, from.polygons);
+}
+
+Glyph dynamicGlyph(core::Dynamic dynamic) noexcept {
+    switch (dynamic) {
+    case core::Dynamic::PPP:
+        return Glyph::DynamicPPP;
+    case core::Dynamic::PP:
+        return Glyph::DynamicPP;
+    case core::Dynamic::P:
+        return Glyph::DynamicPiano;
+    case core::Dynamic::MP:
+        return Glyph::DynamicMP;
+    case core::Dynamic::MF:
+        return Glyph::DynamicMF;
+    case core::Dynamic::F:
+        return Glyph::DynamicForte;
+    case core::Dynamic::FF:
+        return Glyph::DynamicFF;
+    case core::Dynamic::FFF:
+        return Glyph::DynamicFFF;
+    }
+    return Glyph::DynamicMF;
+}
+
+void addStruck(std::optional<core::Dynamic>& loudest, const core::Beat& beat) {
+    for (const core::Note& note : beat.notes) {
+        if (!note.effects.tiedFromPrevious && (!loudest || note.effects.dynamic > *loudest)) {
+            loudest = note.effects.dynamic;
+        }
+    }
+}
+
+core::Dynamic dynamicBefore(const core::Staff& staff, std::size_t m) {
+    while (m > 0) {
+        --m;
+        // The latest start in the measure with struck notes, over every voice.
+        std::optional<core::Fraction> latest;
+        std::optional<core::Dynamic> loudest;
+        for (const core::Voice& voice : staff.measure(m).voices) {
+            core::Fraction at;
+            for (const core::Beat& beat : voice.beats) {
+                std::optional<core::Dynamic> struck;
+                addStruck(struck, beat);
+                if (struck) {
+                    if (!latest || *latest < at) {
+                        latest = at;
+                        loudest = struck;
+                    } else if (*latest == at && *struck > *loudest) {
+                        loudest = struck;
+                    }
+                }
+                at += beat.duration.length();
+            }
+        }
+        if (loudest) {
+            return *loudest;
+        }
+    }
+    return core::Dynamic::MF;
+}
+
+void DynamicMarks::strike(core::Dynamic dynamic, double centre, std::size_t measure) {
+    if (!known_) {
+        current_ = staff_ != nullptr ? dynamicBefore(*staff_, first_) : core::Dynamic::MF;
+        known_ = true;
+    }
+    if (dynamic != current_) {
+        marks_.push_back(Mark{.dynamic = dynamic, .centre = centre, .measure = measure});
+        current_ = dynamic;
+    }
+}
+
+void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, double end) {
+    if (marks_.empty()) {
+        return;
+    }
+    double ascent = 0.0;
+    for (const Mark& mark : marks_) {
+        ascent = std::max(ascent, font_.metrics(dynamicGlyph(mark.dynamic)).box.northEast.y);
+    }
+    const double baseline =
+        std::max(staffHeight + kDynamicBaseline, bottom + kDynamicInkGap + ascent);
+    // Centred by eye under their notes, moved right off the mark before...
+    origins_.clear();
+    double right = -std::numeric_limits<double>::infinity();
+    for (const Mark& mark : marks_) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(mark.dynamic)).box;
+        const double middle = font_.metrics(dynamicGlyph(mark.dynamic))
+                                  .anchor(Anchor::OpticalCenter)
+                                  .value_or(Point{.x = (box.southWest.x + box.northEast.x) / 2})
+                                  .x;
+        const double x = std::max(mark.centre - middle, right + kDynamicGap - box.southWest.x);
+        origins_.push_back(x);
+        right = x + box.northEast.x;
+    }
+    // ...and left, off the end of the line and the mark after; never off the
+    // start of the line, overlapping when there is no room at all.
+    double limit = end;
+    for (std::size_t i = marks_.size(); i-- > 0;) {
+        const BoundingBox& box = font_.metrics(dynamicGlyph(marks_[i].dynamic)).box;
+        origins_[i] = std::max(std::min(origins_[i], limit - box.northEast.x), -box.southWest.x);
+        limit = origins_[i] + box.southWest.x - kDynamicGap;
+    }
+    for (std::size_t i = 0; i < marks_.size(); ++i) {
+        list.glyphs.push_back(GlyphItem{.glyph = dynamicGlyph(marks_[i].dynamic),
+                                        .origin = {origins_[i], baseline},
+                                        .role = Role::Dynamic,
+                                        .measure = marks_[i].measure});
+    }
+    marks_.clear();
 }
 
 std::string bendLabel(int cents) {
@@ -494,6 +611,10 @@ double StaffWriter::timeSignature(const core::TimeSignature& time, double x, dou
 
 double StaffWriter::inkTop() const {
     return inkExtents(list_, font_, height_).top;
+}
+
+double StaffWriter::inkBottom() const {
+    return inkExtents(list_, font_, height_).bottom;
 }
 
 StaffWriter::TupletNumber StaffWriter::tupletNumber(int count) const {

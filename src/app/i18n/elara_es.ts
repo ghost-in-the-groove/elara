@@ -248,10 +248,6 @@
             <numerusform>%n compases</numerusform>
         </translation>
     </message>
-    <message>
-        <source>Laid out in %1 ms</source>
-        <translation>Maquetada en %1 ms</translation>
-    </message>
 </context>
 <context>
     <name>MeasurePopup</name>
@@ -739,6 +735,10 @@
     <message>
         <source>Change mix</source>
         <translation>Cambiar la mezcla</translation>
+    </message>
+    <message>
+        <source>Change navigation marks</source>
+        <translation>Cambiar señales y saltos</translation>
     </message>
     <message>
         <source>Change time signature</source>

@@ -24,11 +24,16 @@ set_target_properties(elara PROPERTIES
   MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
   MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
 
+# The theme is one object shared by every QML file.
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(elara
   URI Elara.App
   VERSION 1.0
   QML_FILES
     qml/Main.qml
+    qml/Theme.qml
+    qml/Elevation.qml
     qml/ScoreView.qml
     qml/EntryBar.qml
     qml/MeasurePopup.qml
@@ -36,7 +41,8 @@ qt_add_qml_module(elara
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml
-        qml/Icon.qml
+    qml/Icon.qml
+    qml/Logo.qml
     qml/MusicSymbol.qml
     qml/TunerPane.qml
     qml/SongPane.qml

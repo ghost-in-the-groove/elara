@@ -16,6 +16,12 @@ option(ELARA_BUILD_APP "Build the Qt desktop application" ON)
 option(ELARA_BUILD_TESTS "Build unit and integration tests" ON)
 option(ELARA_WARNINGS_AS_ERRORS "Treat compiler warnings in Elara sources as errors" OFF)
 
+# A compiler cache such as ccache (CI sets one) can only reuse MSVC objects that
+# carry their debug information (/Z7), not the ones that share a .pdb (/Zi).
+if(MSVC AND (CMAKE_CXX_COMPILER_LAUNCHER OR DEFINED ENV{CMAKE_CXX_COMPILER_LAUNCHER}))
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+endif()
+
 # Every executable (app, CLI, tests) lands in build/<preset>/bin.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
