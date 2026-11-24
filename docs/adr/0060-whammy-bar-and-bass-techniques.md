@@ -40,5 +40,5 @@ dip +1/2") and the technique.
 
 - The panel only dives; a whammy bar pulled up comes from files or the CLI,
   and shows in the status line.
-- The score does not draw the whammy bar or the bass techniques yet, and
-  playback does not change the sound of a slap or a pop.
+- The score draws them from ADR-0061 on; playback does not change the sound
+  of a slap or a pop.
