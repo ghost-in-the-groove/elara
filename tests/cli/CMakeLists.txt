@@ -797,7 +797,7 @@ set_tests_properties(cli.sequence_repeats PROPERTIES
 add_test(NAME cli.sequence_endings
   COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5")
 set_tests_properties(cli.sequence_endings PROPERTIES
-  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 19 notes, 59 events in 13\\.950 s")
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 22 notes, 67 events in 13\\.950 s")
 # Signs and jumps read from Guitar Pro (ADR-0049): D.S. al Coda from a Guitar
 # Pro 5 file, D.S.S. al Double Coda from GPIF.
 add_test(NAME cli.sequence_dal_segno COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/dal-segno.gp5")
@@ -844,6 +844,14 @@ add_test(NAME cli.sequence_pitch
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_pitch PROPERTIES
   PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"pitch\",\"track\":0,\"key\":47,\"cents\":200,\"glide\":0},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":12\\.9625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.2}")
+# Strums and tremolo picking (ADR-0025): the upstroke strikes the chord from
+# its highest string, 0.01 s apart; the tremolo-picked quarter is struck every
+# sixteenth, and its last attack picks up its slide out where the attack
+# before it got to.
+add_test(NAME cli.sequence_strums
+  COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5" --events)
+set_tests_properties(cli.sequence_strums PROPERTIES
+  PASS_REGULAR_EXPRESSION "\n +10\\.950 on   track 0  key  68 velocity  96\n +10\\.960 on   track 0  key  64 velocity  96\n +10\\.970 on   track 0  key  59 velocity  96\n.*\n +12\\.637 off  track 0  key  71 velocity   0\n +12\\.637 on   track 0  key  71 velocity  96\n.*\n +13\\.012 pitch  track 0  key  71 cents   -31 glide 0\\.000\n")
 add_test(NAME cli.render_audio_touches
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
 set_tests_properties(cli.render_audio_touches PROPERTIES
