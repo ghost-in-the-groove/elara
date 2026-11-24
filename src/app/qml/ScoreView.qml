@@ -144,11 +144,38 @@ Item {
             reveal();
             return;
         }
-        // Alt with Up or Down moves the pitch a semitone; with Ctrl an octave.
+        // Alt with Up or Down moves the pitch a semitone, or transposes the
+        // selected measures; with Ctrl an octave.
         if (alt) {
             if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down)
                 return;
-            document.shiftPitch((event.key === Qt.Key_Up ? 1 : -1) * (control ? 12 : 1));
+            const semitones = (event.key === Qt.Key_Up ? 1 : -1) * (control ? 12 : 1);
+            if (document.hasSelection)
+                document.transposeSelection(semitones);
+            else
+                document.shiftPitch(semitones);
+            event.accepted = true;
+            reveal();
+            return;
+        }
+        // Measures: Shift with Left or Right selects, Ctrl+A selects all,
+        // Ctrl+C copies, Ctrl+V pastes over (with Shift, inserts), Escape lets go.
+        let measures = true;
+        if (control && !shift && event.key === Qt.Key_A)
+            document.selectAll();
+        else if (control && !shift && event.key === Qt.Key_C)
+            document.copy();
+        else if (control && event.key === Qt.Key_V)
+            document.paste(shift);
+        else if (shift && !control && event.key === Qt.Key_Right)
+            document.extendSelection(1);
+        else if (shift && !control && event.key === Qt.Key_Left)
+            document.extendSelection(-1);
+        else if (event.key === Qt.Key_Escape && document.hasSelection)
+            document.clearSelection();
+        else
+            measures = false;
+        if (measures) {
             event.accepted = true;
             reveal();
             return;
@@ -373,6 +400,32 @@ Item {
                     radius: parent.radius
                     visible: Theme.dark
                     color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
+                }
+
+                // The selected measures, tinted across their systems.
+                Repeater {
+                    model: root.document.selectionRevision >= 0
+                           ? root.document.selectionBoxes(sheet.index) : []
+
+                    delegate: Rectangle {
+                        required property rect modelData
+                        readonly property real scale: root.unit * root.shownZoom
+
+                        x: modelData.x * scale
+                        y: modelData.y * scale
+                        width: modelData.width * scale
+                        height: modelData.height * scale
+                        radius: 3
+                        color: Qt.alpha(Material.accent, 0.1)
+                        border.color: Qt.alpha(Material.accent, 0.35)
+                        border.width: 1
+
+                        NumberAnimation on opacity {
+                            from: 0
+                            to: 1
+                            duration: 120
+                        }
+                    }
                 }
 
                 // The caret: where typing goes. It glides between beats on a

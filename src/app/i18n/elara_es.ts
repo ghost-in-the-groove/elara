@@ -352,6 +352,30 @@
         <translation>al Doble Coda</translation>
     </message>
     <message>
+        <source>Repeats</source>
+        <translation>Repeticiones</translation>
+    </message>
+    <message>
+        <source>Start</source>
+        <translation>Inicio</translation>
+    </message>
+    <message>
+        <source>End</source>
+        <translation>Fin</translation>
+    </message>
+    <message>
+        <source>%1 times</source>
+        <translation>%1 veces</translation>
+    </message>
+    <message>
+        <source>Endings</source>
+        <translation>Finales</translation>
+    </message>
+    <message>
+        <source>%1.</source>
+        <translation>%1.</translation>
+    </message>
+    <message>
         <source>Insert before</source>
         <translation>Insertar antes</translation>
     </message>
@@ -852,6 +876,10 @@
         <translation>Cambiar señales y saltos</translation>
     </message>
     <message>
+        <source>Change repeats</source>
+        <translation>Cambiar repeticiones</translation>
+    </message>
+    <message>
         <source>Change time signature</source>
         <translation>Cambiar el compás</translation>
     </message>
@@ -934,6 +962,14 @@
     <message>
         <source>Six-string bass</source>
         <translation>Bajo de seis cuerdas</translation>
+    </message>
+    <message>
+        <source>Paste</source>
+        <translation>Pegar</translation>
+    </message>
+    <message>
+        <source>Transpose</source>
+        <translation>Transponer</translation>
     </message>
     <message>
         <source>Crash cymbal</source>
@@ -1066,6 +1102,14 @@
         <translation>Esa afinación no puede tocar todas las notas de %1.</translation>
     </message>
     <message>
+        <source>Measure %1 selected</source>
+        <translation>Compás %1 seleccionado</translation>
+    </message>
+    <message>
+        <source>Measures %1-%2 selected</source>
+        <translation>Compases %1-%2 seleccionados</translation>
+    </message>
+    <message>
         <source>Measure %1</source>
         <translation>Compás %1</translation>
     </message>
@@ -1116,6 +1160,34 @@
     <message>
         <source>Hits are typed on a drum track.</source>
         <translation>Los golpes se escriben en una pista de batería.</translation>
+    </message>
+    <message>
+        <source>Copied measure %1.</source>
+        <translation>Compás %1 copiado.</translation>
+    </message>
+    <message>
+        <source>Copied measures %1-%2.</source>
+        <translation>Compases %1-%2 copiados.</translation>
+    </message>
+    <message>
+        <source>Copy some measures first.</source>
+        <translation>Copia antes algún compás.</translation>
+    </message>
+    <message>
+        <source>The song has fewer tracks than were copied.</source>
+        <translation>La canción tiene menos pistas de las que se copiaron.</translation>
+    </message>
+    <message>
+        <source>Those measures do not fit this track.</source>
+        <translation>Esos compases no encajan en esta pista.</translation>
+    </message>
+    <message>
+        <source>A note would leave the range or the neck.</source>
+        <translation>Una nota se saldría del rango o del mástil.</translation>
+    </message>
+    <message>
+        <source>A note would leave the range.</source>
+        <translation>Una nota se saldría del rango.</translation>
     </message>
 </context>
 <context>
