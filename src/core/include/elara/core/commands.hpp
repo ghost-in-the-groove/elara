@@ -204,6 +204,11 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
                                                    std::optional<double> bpm);
 
+/// Sets one line of the song's credits to `text` (empty clears it), as one
+/// undo step, "Edit song info"; null when it reads `text` already.
+[[nodiscard]] std::unique_ptr<Command> changeCredit(const Song& song, Credit credit,
+                                                    std::string text);
+
 /// Names the section that starts at measure `measure` (ADR-0062); an empty
 /// name takes it off. One undo step, "Change section"; null when the measure
 /// has that name already. Throws std::out_of_range when the song has no
