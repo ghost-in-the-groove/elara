@@ -72,4 +72,4 @@ and `glide`, and `"struck":false` for joined notes.
   little energy and brightness there; this one does not.
 - Tremolo picking and strums are not played yet. They strike notes again or
   spread a chord's attacks, which the sequencer can add without changing the
-  synth.
+  synth (done in ADR-0025).

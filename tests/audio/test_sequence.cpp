@@ -7,9 +7,12 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <format>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -121,6 +124,21 @@ struct Event {
                a.cents == b.cents && std::abs(a.glide - b.glide) < 1e-6;
     }
 };
+
+} // namespace
+
+// Failed comparisons print the events as `kind time key cents glide`.
+template <>
+struct Catch::StringMaker<Event> {
+    static std::string convert(const Event& event) {
+        constexpr std::array<const char*, 3> kKinds{"off", "on", "pitch"};
+        return std::format("{} {:.4f} {} {} {:.4f}",
+                           kKinds.at(static_cast<std::size_t>(event.kind)), event.time, event.key,
+                           event.cents, event.glide);
+    }
+};
+
+namespace {
 
 Event on(double time, int key) {
     return {.kind = EventKind::NoteOn, .time = time, .key = key};
@@ -787,5 +805,126 @@ TEST_CASE("Sequence: playback keeps its place in the music when the timing chang
         Song shorter = pianoSong(1);
         CHECK_THAT(elara::audio::carriedPosition(full, 5.0, Sequence(shorter)),
                    WithinAbs(2.0, kEpsilon));
+    }
+}
+
+namespace {
+
+// Each note as (key, start), in the order notes() lists them.
+std::vector<std::pair<int, double>> attacks(const Sequence& sequence) {
+    std::vector<std::pair<int, double>> result;
+    for (const PlayedNote& played : sequence.notes()) {
+        result.emplace_back(played.key, std::round(played.start * 1e6) / 1e6);
+    }
+    return result;
+}
+
+} // namespace
+
+// Strums and tremolo picking (ADR-0025).
+TEST_CASE("Sequence: a strum strikes a chord string by string", "[audio][sequence][articulation]") {
+    Song song = guitarSong(1);
+    const auto chord = [&] { // E2, B2 and E3 on strings 6, 5 and 4
+        return std::vector<Note>{fretted(song, 6, 0), fretted(song, 4, 2), fretted(song, 5, 2)};
+    };
+    voice(song, 0) = {beat(NoteValue::Quarter, chord()), beat(NoteValue::Quarter, chord()),
+                      beat(NoteValue::Half, chord())};
+    voice(song, 0)[0].effects.strum = elara::core::Strum::Down;
+    voice(song, 0)[1].effects.strum = elara::core::Strum::Up;
+    const Sequence sequence(song);
+
+    // Down from the lowest string, up from the highest, 10 ms apart; listed
+    // by start. A chord without a strum is struck at once.
+    using Attack = std::pair<int, double>;
+    CHECK(attacks(sequence) == std::vector<Attack>{{40, 0.0},
+                                                   {47, 0.01},
+                                                   {52, 0.02},
+                                                   {52, 0.5},
+                                                   {47, 0.51},
+                                                   {40, 0.52},
+                                                   {40, 1.0},
+                                                   {47, 1.0},
+                                                   {52, 1.0}});
+    for (std::size_t i = 0; i < 6; ++i) {
+        CHECK_THAT(sequence.notes()[i].end, WithinAbs(i < 3 ? 0.5 : 1.0, kEpsilon)); // ends kept
+    }
+
+    SECTION("within half of a short chord") {
+        Song fast = guitarSong(1);
+        std::vector<Note> six;
+        for (int string = 6; string >= 1; --string) {
+            six.push_back(fretted(fast, string, 0));
+        }
+        voice(fast, 0) = {beat(NoteValue::ThirtySecond, six)}; // 1/16 s
+        voice(fast, 0)[0].effects.strum = elara::core::Strum::Down;
+        std::vector<double> starts;
+        const Sequence strummed(fast);
+        for (const PlayedNote& played : strummed.notes()) {
+            starts.push_back(played.start);
+        }
+        REQUIRE(starts.size() == 6);
+        CHECK_THAT(starts[3], WithinAbs(0.03, kEpsilon));
+        CHECK_THAT(starts[5], WithinAbs(1.0 / 32.0, kEpsilon)); // half of the note
+    }
+}
+
+TEST_CASE("Sequence: tremolo picking strikes a note again and again at its speed",
+          "[audio][sequence][articulation]") {
+    Song song = guitarSong(1);
+    voice(song, 0) = {beat(NoteValue::Half, {fretted(song, 3, 2)}),
+                      beat(NoteValue::Half, {fretted(song, 3, 4)})};
+    voice(song, 0)[0].effects.tremoloPicking = NoteValue::Sixteenth;
+    const Sequence sequence(song);
+
+    std::vector<Event> expected;
+    for (int i = 0; i < 8; ++i) { // sixteenths over the half note
+        if (i > 0) {
+            expected.push_back(off(0.125 * i, 57));
+        }
+        expected.push_back(on(0.125 * i, 57));
+    }
+    expected.push_back(off(1.0, 57));
+    expected.push_back(on(1.0, 59));
+    expected.push_back(off(2.0, 59));
+    CHECK(eventsOf(sequence) == expected);
+    REQUIRE(sequence.notes().size() == 9);
+    CHECK_THAT(sequence.notes()[7].start, WithinAbs(0.875, kEpsilon));
+    CHECK_THAT(sequence.notes()[7].end, WithinAbs(1.0, kEpsilon));
+
+    SECTION("the pitch moves over the whole note, each attack taking its part") {
+        // At 100 BPM the half note lasts 1.2 s, struck every 0.15 s. A slide
+        // off its end spans the last 0.2 s: the end of the seventh attack and
+        // all of the eighth, which starts where the seventh got to.
+        song.measureHeader(0).tempoChanges.push_back(TempoChange{.tempo = Tempo(100.0)});
+        voice(song, 0)[0].notes[0].effects.slideOut = SlideOut::Downwards;
+        std::vector<Event> pitches;
+        for (const Event& event : eventsOf(Sequence(song))) {
+            if (event.kind == EventKind::Pitch) {
+                pitches.push_back(event);
+            }
+        }
+        CHECK(pitches == std::vector<Event>{pitch(1.0, 57, -125, 0.05), pitch(1.05, 57, -125),
+                                            pitch(1.05, 57, -500, 0.15)});
+    }
+    SECTION("a hammer-on into the note joins its first attack only") {
+        voice(song, 0)[0].notes[0].effects.legatoFromPrevious = true;
+        voice(song, 0).insert(voice(song, 0).begin(),
+                              beat(NoteValue::Quarter, {fretted(song, 3, 0)}));
+        voice(song, 0).back() = beat(NoteValue::Quarter);
+        std::vector<bool> struck;
+        const Sequence picked(song);
+        for (const PlayedNote& played : picked.notes()) {
+            struck.push_back(played.struck);
+        }
+        CHECK(struck == std::vector<bool>{true, false, true, true, true, true, true, true, true});
+    }
+    SECTION("a drum roll") {
+        Song drums;
+        drums.addTrack(Track("Drums", Instrument{.kind = InstrumentKind::Percussion}, {Staff{}}));
+        drums.appendMeasures(1);
+        voice(drums, 0) = {beat(NoteValue::Quarter, {note(38)}), beat(NoteValue::Quarter),
+                           beat(NoteValue::Half)};
+        voice(drums, 0)[0].effects.tremoloPicking = NoteValue::ThirtySecond;
+        CHECK(Sequence(drums).notes().size() == 8);
     }
 }

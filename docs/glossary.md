@@ -76,6 +76,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | palm mute | palm mute | `palmMute` | `P.M.` |
 | dejar sonar | let ring | `letRing` | |
 | púa abajo / arriba | pick stroke | `PickStroke` | Down / up |
+| rasgueo | strum | `Strum` | Down strikes a chord from its lowest string, up from its highest; 0.01 s between strings in playback (ADR-0025) |
+| trémolo de púa | tremolo picking | `BeatEffects::tremoloPicking` | The note struck again and again at that note value (ADR-0025) |
 | nota muerta | dead note | `deadNote` | |
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
