@@ -62,8 +62,11 @@ elara_add_unit_tests(notation
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
   notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
-  LIBRARIES elara::notation)
-target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
+  notation/test_incremental_layout.cpp
+  LIBRARIES elara::notation elara::io)
+# The incremental layout is checked against a full one on the corpus files.
+target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
+  ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 add_subdirectory(cli)
 

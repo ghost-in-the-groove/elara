@@ -135,6 +135,15 @@ void shift(DisplayList& list, double dx, double dy);
 /// Appends the items and boxes of `from` to `to`.
 void append(DisplayList& to, DisplayList&& from);
 
+/// Appends copies of the items and boxes of `from` to `to`, moved right by `dx`
+/// and down by `dy`: what shift() and append() give, in one pass and leaving
+/// `from` as it is.
+void appendShifted(DisplayList& to, const DisplayList& from, double dx, double dy);
+
+/// Makes room in `to` for the items and boxes of every list of `from` besides
+/// its own.
+void reserveFor(DisplayList& to, std::span<const DisplayList* const> from);
+
 // ---- Technique lanes ----------------------------------------------------------------
 
 /// Bands above a staff for technique marks, from the staff upwards. Only the
