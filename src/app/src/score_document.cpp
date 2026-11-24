@@ -539,6 +539,9 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         newSequence = layout.sequence != sequence_;
         sequence_ = layout.sequence;
     }
+    if (layout.opened) {
+        emit songReplaced();
+    }
     if (newSong) {
         if (!layout.source.isEmpty() && layout.source != source_) {
             source_ = layout.source;
@@ -709,6 +712,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     setInput(core::Duration{});
     const std::array<std::size_t, 1> first{0};
     view_ = notation::hasTablature(*song_, first) ? View::Both : View::Standard;
+    emit songReplaced();
     emit sourceChanged();
     emit songChanged();
     emit sequenceChanged();

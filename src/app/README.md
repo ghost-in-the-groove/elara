@@ -60,7 +60,7 @@ Material style.
 
 | File | What it does |
 |---|---|
-| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on its layout thread; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). |
+| `src/audio_controller.hpp` | `AudioController` (QML): the transport. Opens the audio device on the first play, hands the open score's sequence to an `elara::audio::Player` and reports `playingSong` and `position` about once a frame. An edit that leaves the sequence as it was (a mix, the title) only passes the new mix to the player, so playback carries on; a moving fader does the same without editing the song (ADR-0039). The document builds an edit's sequence on its layout thread; until it arrives the player keeps the previous one, and it is always loaded with the song it was built from (ADR-0031). A new sequence plays on from where playback is; only another song (`songReplaced`) goes back to the start. |
 | `src/score_document.hpp` | `ScoreDocument::duration` and `cursorAt(seconds)`: where the cursor stands on the pages, through `elara::notation::cursorAt` (it steps from one column of notes to the next); `secondsAt(page, x, y)`: where a click moves playback, through `elara::notation::measurePositionAt`. |
 
 The transport floats over the bottom of the score: back to the start (Home),
@@ -82,7 +82,7 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
 - `--smoke-test` loads the window, fails on any QML warning and quits. With a
   file it also waits until the first page is painted and shows the score in
   every view and with all its tracks, moves the cursor halfway through and
-  clicks on it (playback must move to the note there), then prints `smoke-test: ok (P pages, N painted, L layouts)`; a file that cannot be
+  clicks on it (playback must move to the note there), adds a track and undoes it (playback must stay there) and makes a new song (playback must go back to the start), then prints `smoke-test: ok (P pages, N painted, L layouts)`; a file that cannot be
   opened fails. CTest runs it with `QT_QPA_PLATFORM=offscreen` (`app.smoke`,
   `app.smoke_open_*`, `app.smoke_tuner`), so CI checks the UI without a screen.
 - `--screenshot OUT.png` saves the window once it is shown and quits.
