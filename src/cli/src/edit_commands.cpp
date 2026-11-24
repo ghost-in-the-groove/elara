@@ -19,10 +19,12 @@
 #include <array>
 #include <charconv>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <format>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -342,6 +344,33 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         doc.execute(std::make_unique<core::SetTrackMix>(step.index(1), mix));
     } else if (verb == "tempo") {
         doc.execute(std::make_unique<SetStartTempo>(Tempo(step.number<int>(1))));
+    } else if (verb == "tempo-from") { // tempo-from <m> <bpm> | none
+        const std::size_t measure = step.index(1);
+        if (measure == 0) {
+            throw StepSyntaxError("tempo-from: the first measure plays at the song's tempo "
+                                  "(\"tempo <bpm>\")");
+        }
+        MeasureHeader header = song.measureHeader(measure);
+        // The tempo that starts the measure; changes later in it stay.
+        std::erase_if(header.tempoChanges, [](const core::TempoChange& change) {
+            return change.offset == core::Fraction{};
+        });
+        if (step.word(2) != "none") {
+            const int bpm = step.number<int>(2);
+            if (static_cast<double>(bpm) < Tempo::kMinBpm ||
+                static_cast<double>(bpm) > Tempo::kMaxBpm) {
+                throw StepSyntaxError(std::format("tempo-from: {} to {} beats per minute, not {}",
+                                                  Tempo::kMinBpm, Tempo::kMaxBpm, bpm));
+            }
+            // Counted in the beat the song counts in there: a dotted quarter
+            // in 6/8 stays one.
+            const Tempo tempo(bpm, song.tempoAt(measure, core::Fraction{}).beatUnit());
+            header.tempoChanges.insert(header.tempoChanges.begin(),
+                                       core::TempoChange{.offset = {}, .tempo = tempo});
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
     } else if (verb == "title") {
         SongInfo info = song.info();
         info.title = step.rest(1);
@@ -465,6 +494,51 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
                     throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
                 }
                 header.*found->flag = true;
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "repeat") { // repeat <m> [start] [end <times>] | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.repeatStart = false;
+        header.repeatTimes = 0;
+        if (!step.has(2)) {
+            throw StepSyntaxError("repeat: expected start, end <times> or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                if (step.word(i) == "start") {
+                    header.repeatStart = true;
+                } else if (step.word(i) == "end") {
+                    const std::size_t times = step.index(++i);
+                    if (times < 2 || times > std::numeric_limits<std::uint8_t>::max()) {
+                        throw StepSyntaxError(
+                            std::format("repeat: a section plays 2 to 255 times, not {}", times));
+                    }
+                    header.repeatTimes = static_cast<std::uint8_t>(times);
+                } else {
+                    throw StepSyntaxError(std::format("not a repeat: {}", step.word(i)));
+                }
+            }
+        }
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
+    } else if (verb == "ending") { // ending <m> <time>... | none
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        header.alternateEndings = 0;
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const std::size_t time = step.index(i);
+                if (time < 1 || time > MeasureHeader::kMaxEnding) {
+                    throw StepSyntaxError(std::format("ending: times through are 1 to {}, not {}",
+                                                      MeasureHeader::kMaxEnding, time));
+                }
+                header.alternateEndings =
+                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             }
         }
         if (header != song.measureHeader(measure)) {
@@ -603,7 +677,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"title <text>\", \"note <track> <m> <string> <fret> "
+        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"title <text>\", "
+        "\"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "

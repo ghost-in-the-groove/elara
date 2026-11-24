@@ -10,6 +10,7 @@
 #include <elara/notation/display_list.hpp>
 
 #include "score_painter.hpp"
+#include "track_list.hpp"
 #include <QElapsedTimer>
 #include <QObject>
 #include <QRectF>
@@ -71,6 +72,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int keyFifths READ keyFifths NOTIFY songChanged)
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY songChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY songChanged)
+    Q_PROPERTY(QAbstractItemModel* trackList READ trackList CONSTANT)
     Q_PROPERTY(QVariantList instrumentPresets READ instrumentPresets CONSTANT)
     Q_PROPERTY(QVariantList tuningPresets READ tuningPresets CONSTANT)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
@@ -186,6 +188,9 @@ public:
     /// "audible") and tuning ("fretted", "tuning", "tuningPreset", "capo", as
     /// trackTuning() names them "fretted", "notes", "preset" and "capo").
     [[nodiscard]] QVariantList tracks() const;
+    /// tracks() as a model the song panel keeps its rows in: what changes
+    /// changes only its rows. Follows songChanged.
+    [[nodiscard]] QAbstractItemModel* trackList() { return &trackList_; }
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
     [[nodiscard]] static QVariantList instrumentPresets();
@@ -260,7 +265,8 @@ public:
     /// The caret on its page, in staff spaces from the page's top-left corner.
     [[nodiscard]] QRectF caretRect() const { return caretRect_; }
     /// Where the caret is, for a status line: "Measure 3 · Beat 2 · String 4 ·
-    /// Fret 5 · A3", or the beat's notes on a staff without strings.
+    /// Fret 5 · A3", the beat's notes on a staff without strings, or the lane's
+    /// kit piece on a drum staff ("Measure 1 · Beat 1 · Snare").
     [[nodiscard]] QString caretStatus() const;
     /// Whether the caret's staff has strings, so that digits type frets.
     [[nodiscard]] bool caretFretted() const;
@@ -281,6 +287,10 @@ public:
     [[nodiscard]] std::vector<core::Pitch> pitchesAtCaret() const;
     /// Whether note names can be typed at the caret (its staff is not percussion).
     [[nodiscard]] bool caretPitched() const;
+    /// Whether the caret is on a drum staff, where its string is a lane (ADR-0035).
+    [[nodiscard]] bool caretOnDrums() const;
+    /// The translated name of drum lane `lane` (1 at the top of the staff).
+    [[nodiscard]] static QString laneName(int lane);
 
     Q_INVOKABLE void moveCaret(CaretMove move);
     /// The voice typing goes into, 1 to 4 (the core's voice plus one).
@@ -314,6 +324,9 @@ public:
     Q_INVOKABLE void typeNoteName(int step, bool addToChord);
     /// Moves the caret's note by `semitones` (12 for an octave).
     Q_INVOKABLE void shiftPitch(int semitones);
+    /// On a drum staff, adds the lane's kit piece to the caret's beat or removes
+    /// it when it is there (ADR-0035).
+    Q_INVOKABLE void toggleDrum();
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
@@ -387,6 +400,7 @@ private:
     std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
     std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
+    TrackList trackList_{this};                       ///< tracks(), kept up to date
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show

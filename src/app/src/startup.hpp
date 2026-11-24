@@ -55,6 +55,7 @@ private:
     void queueMeasures();
     void queuePitches();
     void queueVoices();
+    void queueDrums();
     void queueMix();
     void queueNavigation();
     void queueTuning();
@@ -84,6 +85,7 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
+    QPointer<QObject> trackRow_;  ///< a row of the song panel, which a mix change keeps
     QVariantMap tuningBefore_;    ///< the first track's tuning before it changed
     QString editProblem_;         ///< the first edit check that failed
     QString failure_;             ///< set by a step that went wrong
@@ -95,6 +97,7 @@ private:
     bool pitching_ = false;       ///< whether the caret takes note names
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
     bool voicing_ = false;        ///< whether the voice steps run
+    bool drumming_ = false;       ///< whether the drum steps run
 };
 
 } // namespace elara::app

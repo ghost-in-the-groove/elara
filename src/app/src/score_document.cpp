@@ -278,6 +278,22 @@ constexpr std::array kTuningNames{
     Translation{"banjo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Banjo")},
 };
 
+// The kit pieces of drum entry, by their names in elara_core.
+constexpr std::array kDrumPieceNames{
+    Translation{"Crash cymbal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Crash cymbal")},
+    Translation{"Closed hi-hat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Closed hi-hat")},
+    Translation{"Open hi-hat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Open hi-hat")},
+    Translation{"Ride cymbal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ride cymbal")},
+    Translation{"Ride bell", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ride bell")},
+    Translation{"High tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "High tom")},
+    Translation{"Mid tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Mid tom")},
+    Translation{"Snare", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Snare")},
+    Translation{"Side stick", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Side stick")},
+    Translation{"Floor tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Floor tom")},
+    Translation{"Bass drum", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bass drum")},
+    Translation{"Hi-hat pedal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Hi-hat pedal")},
+};
+
 template <std::size_t N>
 QString translated(const std::array<Translation, N>& table, std::string_view key,
                    std::string_view fallback) {
@@ -347,7 +363,10 @@ QString trackDetail(const core::Track& track) {
 
 } // namespace
 
-ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {}
+ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {
+    // Connected first, so that the list is up to date for whoever else hears it.
+    connect(this, &ScoreDocument::songChanged, this, [this] { trackList_.setTracks(tracks()); });
+}
 
 QString ScoreDocument::title() const {
     if (!song_) {
@@ -1205,6 +1224,9 @@ QString ScoreDocument::caretStatus() const {
             parts.append(tr("Fret %1").arg(*fret));
         }
     }
+    if (caretOnDrums()) {
+        parts.append(laneName(caret_.string));
+    }
     QStringList names;
     for (const core::Pitch& pitch : pitchesAtCaret()) {
         names.append(pitchName(pitch));
@@ -1276,6 +1298,24 @@ bool ScoreDocument::caretPitched() const {
            track.staff(caret_.staff).clef() != core::Clef::Percussion;
 }
 
+bool ScoreDocument::caretOnDrums() const {
+    if (!document_ || caret_.track >= document_->song().trackCount()) {
+        return false;
+    }
+    const core::Track& track = document_->song().track(caret_.track);
+    return caret_.staff < track.staffCount() &&
+           track.staff(caret_.staff).clef() == core::Clef::Percussion;
+}
+
+QString ScoreDocument::laneName(int lane) {
+    const auto pieces = core::drumPieces();
+    if (lane < 1 || lane > static_cast<int>(pieces.size())) {
+        return {};
+    }
+    const std::string_view name = pieces[static_cast<std::size_t>(lane - 1)].name;
+    return translated(kDrumPieceNames, name, name);
+}
+
 void ScoreDocument::moveCaret(CaretMove move) {
     if (!document_ || !hasCaret(document_->song())) {
         return;
@@ -1318,6 +1358,10 @@ bool ScoreDocument::placeCaret(int index, double x, double y) {
 
 void ScoreDocument::typeDigit(int digit) {
     if (!document_ || !hasCaret(document_->song()) || digit < 0 || digit > 9) {
+        return;
+    }
+    if (caretOnDrums()) {
+        emit editFailed(tr("On drums, Enter adds or removes the lane's hit."));
         return;
     }
     if (!caretFretted()) {
@@ -1446,6 +1490,17 @@ void ScoreDocument::shiftPitch(int semitones) {
         emit editFailed(caretFretted() ? tr("The note would leave the neck.")
                                        : tr("That note is out of range."));
     }
+}
+
+void ScoreDocument::toggleDrum() {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    if (!caretOnDrums()) {
+        emit editFailed(tr("Hits are typed on a drum track."));
+        return;
+    }
+    runEntry([this](const core::Song& song) { return core::toggleDrum(song, caret_, input_); });
 }
 
 bool ScoreDocument::enter(core::Entry entry) {

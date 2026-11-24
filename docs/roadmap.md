@@ -24,6 +24,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and fret/string <-> pitch mapping, capo
 - [x] Song > Track > Staff > Measure > Voice > Beat > Note hierarchy
 - [x] Time and key signatures, tempo map
+  - [x] A tempo change from any measure, with the CLI `tempo-from` step (ADR-0042)
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML
@@ -60,6 +61,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
 - [ ] Incremental relayout (only the systems an edit touches)
+  - [x] Pages an edit leaves as they were keep their textures instead of being
+        painted again
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
@@ -80,12 +83,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 5 - Editor
 
 - [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret, in the
+        CLI and the app (ADR-0035)
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
         undo step), note values and dots, rests, delete, clicks that place the
         caret (ADR-0032)
   - [x] Note names at the caret on any pitched staff, chords, semitone moves, in
         the CLI and the app (ADR-0034)
-  - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret (ADR-0035)
   - [x] Note effects toggled at the caret: ties, legato, slides, bends, vibrato,
         palm mutes, dead and ghost notes, let ring, harmonics, accents,
         staccato (ADR-0037)
@@ -96,12 +100,17 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Voices 1 to 4 at the caret: `voice` in the CLI, Alt+1 to Alt+4 and a
         voice button in the app (ADR-0032)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
-- [ ] Tuning and capo changes, keeping the pitches or the frets
+  - [x] Measures at the caret in the app: insert before or after, delete, time
+        and key signatures from that measure on (ADR-0033)
+- [x] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
-  - [ ] Tuning presets and capo in the song panel
+  - [x] Tuning presets and capo in the song panel
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
+  - [ ] Repeats and alternate endings at the caret's measure
+    - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
+          steps (ADR-0016)
 - [x] Spanish and English translations (Qt Linguist, ADR-0030)
 
 ## Milestone 6 - Practice tools
