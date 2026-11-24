@@ -81,6 +81,7 @@ void Startup::queueSteps() {
             queueEdits();
             queueEntry();
             queueMeasures();
+            queuePitches();
             queueMix();
             queueNavigation();
             queueTuning();
@@ -114,6 +115,7 @@ void Startup::queueSteps() {
         queueEdits();
         queueEntry();
         queueMeasures();
+        queuePitches();
         queueMix();
         queueNavigation();
         queueTuning();
@@ -345,6 +347,58 @@ void Startup::queueMeasures() {
         }
         check(!score_->modified() && score_->measureCount() == measuresBefore_,
               "undoing the measure edits did not restore the song");
+        return false;
+    });
+}
+
+// Note names at the caret: a C typed, raised a semitone, both undone.
+void Startup::queuePitches() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("pitch check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        pitching_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!pitching_) {
+            return false;
+        }
+        score_->typeNoteName(0, false);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        check(pitches.size() == 1 && pitches.front().step() == core::Step::C,
+              "the note name did not type a C");
+        if (pitches.empty()) {
+            return false;
+        }
+        check(score_->caretStatus().endsWith(QStringLiteral("C%1").arg(pitches.front().octave())),
+              "the status does not name the note");
+        typedMidi_ = pitches.front().midiNumber();
+        score_->shiftPitch(1);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        check(pitches.size() == 1 && pitches.front().midiNumber() == typedMidi_ + 1,
+              "the note did not move up a semitone");
+        for (int i = 0; i < 4 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!pitching_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the note names did not restore the song");
         return false;
     });
 }

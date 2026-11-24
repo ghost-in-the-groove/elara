@@ -258,7 +258,7 @@ public:
     /// The caret on its page, in staff spaces from the page's top-left corner.
     [[nodiscard]] QRectF caretRect() const { return caretRect_; }
     /// Where the caret is, for a status line: "Measure 3 · Beat 2 · String 4 ·
-    /// Fret 5".
+    /// Fret 5 · A3", or the beat's notes on a staff without strings.
     [[nodiscard]] QString caretStatus() const;
     /// Whether the caret's staff has strings, so that digits type frets.
     [[nodiscard]] bool caretFretted() const;
@@ -269,6 +269,11 @@ public:
     [[nodiscard]] core::Caret caret() const { return caret_; }
     /// The fret of the note on the caret's string at its beat, if there is one.
     [[nodiscard]] std::optional<int> fretAtCaret() const;
+    /// The notes the caret is on, low to high: the one on its string on a
+    /// fretted staff, every note of the beat elsewhere.
+    [[nodiscard]] std::vector<core::Pitch> pitchesAtCaret() const;
+    /// Whether note names can be typed at the caret (its staff is not percussion).
+    [[nodiscard]] bool caretPitched() const;
 
     Q_INVOKABLE void moveCaret(CaretMove move);
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
@@ -287,6 +292,11 @@ public:
     Q_INVOKABLE void deleteAtCaret();
     Q_INVOKABLE void deleteBeat();
     Q_INVOKABLE void insertRest();
+    /// Types a note name, 0 for C to 6 for B (ADR-0034): in the octave nearest
+    /// the previous note, replacing the beat's notes or added above them.
+    Q_INVOKABLE void typeNoteName(int step, bool addToChord);
+    /// Moves the caret's note by `semitones` (12 for an octave).
+    Q_INVOKABLE void shiftPitch(int semitones);
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }

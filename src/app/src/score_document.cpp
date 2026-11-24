@@ -248,6 +248,7 @@ constexpr std::array kEditNames{
     Translation{"Delete", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete")},
     Translation{"Delete beat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete beat")},
     Translation{"Insert rest", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Insert rest")},
+    Translation{"Change pitch", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change pitch")},
     Translation{"Change tuning", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tuning")},
 };
 
@@ -1104,6 +1105,19 @@ std::optional<std::size_t> inputIndex(core::NoteValue value) {
     return static_cast<std::size_t>(it - kInputValues.begin());
 }
 
+// A pitch with music signs and its octave: "C♯4", "B♭3".
+QString pitchName(const core::Pitch& pitch) {
+    constexpr std::string_view kLetters = "CDEFGAB";
+    QString text(QChar::fromLatin1(kLetters[static_cast<std::size_t>(pitch.step())]));
+    for (int i = 0; i < pitch.alter(); ++i) {
+        text += QChar(0x266F);
+    }
+    for (int i = 0; i > pitch.alter(); --i) {
+        text += QChar(0x266D);
+    }
+    return text + QString::number(pitch.octave());
+}
+
 core::CaretMove coreMove(ScoreDocument::CaretMove move) {
     switch (move) {
     case ScoreDocument::CaretMove::NextBeat:
@@ -1138,6 +1152,13 @@ QString ScoreDocument::caretStatus() const {
             parts.append(tr("Fret %1").arg(*fret));
         }
     }
+    QStringList names;
+    for (const core::Pitch& pitch : pitchesAtCaret()) {
+        names.append(pitchName(pitch));
+    }
+    if (!names.isEmpty() && caretPitched()) {
+        parts.append(names.join(QLatin1Char(' ')));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -1169,6 +1190,37 @@ std::optional<int> ScoreDocument::fretAtCaret() const {
         }
     }
     return std::nullopt;
+}
+
+std::vector<core::Pitch> ScoreDocument::pitchesAtCaret() const {
+    std::vector<core::Pitch> pitches;
+    if (!document_ || !hasCaret(document_->song()) || core::onFreeSlot(document_->song(), caret_)) {
+        return pitches;
+    }
+    const bool fretted = caretFretted();
+    const core::Beat& beat = document_->song()
+                                 .track(caret_.track)
+                                 .staff(caret_.staff)
+                                 .measure(caret_.measure)
+                                 .voices.at(caret_.voice)
+                                 .beats.at(caret_.beat);
+    for (const core::Note& note : beat.notes) {
+        if (!fretted || (note.position && note.position->string == caret_.string)) {
+            pitches.push_back(note.pitch);
+        }
+    }
+    std::ranges::sort(pitches, {}, &core::Pitch::midiNumber);
+    return pitches;
+}
+
+bool ScoreDocument::caretPitched() const {
+    if (!document_ || caret_.track >= document_->song().trackCount()) {
+        return false;
+    }
+    const core::Track& track = document_->song().track(caret_.track);
+    return track.instrument().kind != core::InstrumentKind::Percussion &&
+           caret_.staff < track.staffCount() &&
+           track.staff(caret_.staff).clef() != core::Clef::Percussion;
 }
 
 void ScoreDocument::moveCaret(CaretMove move) {
@@ -1283,6 +1335,38 @@ void ScoreDocument::deleteBeat() {
 
 void ScoreDocument::insertRest() {
     runEntry([this](const core::Song& song) { return core::insertRest(song, caret_, input_); });
+}
+
+void ScoreDocument::typeNoteName(int step, bool addToChord) {
+    if (!document_ || !hasCaret(document_->song()) || step < 0 || step > 6) {
+        return;
+    }
+    if (!caretPitched()) {
+        emit editFailed(tr("Drums take no note names."));
+        return;
+    }
+    pendingDigit_ = -1;
+    try {
+        enter(
+            core::enterPitch(document_->song(), caret_, static_cast<core::Step>(step), input_,
+                             addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
+    } catch (const std::out_of_range&) {
+        emit editFailed(caretFretted() ? tr("No string can play that note.")
+                                       : tr("That note is out of range."));
+    }
+}
+
+void ScoreDocument::shiftPitch(int semitones) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    pendingDigit_ = -1;
+    try {
+        enter(core::shiftPitch(document_->song(), caret_, semitones));
+    } catch (const std::out_of_range&) {
+        emit editFailed(caretFretted() ? tr("The note would leave the neck.")
+                                       : tr("That note is out of range."));
+    }
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
