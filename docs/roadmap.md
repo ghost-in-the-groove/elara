@@ -66,6 +66,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
+- [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
+      (ADR-0061)
 - [x] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being
         painted again

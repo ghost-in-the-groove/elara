@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <iterator>
 #include <limits>
 #include <optional>
@@ -29,7 +30,14 @@ constexpr double kRunDash = 0.3;        // dashes of the line after "P.M."
 constexpr double kRunHook = 0.4;        // the line's closing hook
 constexpr double kRunLineGap = 0.25;    // between the text and its line
 constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
-constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3, 1.9, 1.9};
+constexpr double kLaneHeight[kLaneCount]{1.25, 2.3, 1.2, 1.15, 1.15, 1.05, 1.05, 2.3, 1.9, 1.9};
+// The whammy-bar lane (ADR-0061): its label on top, the curve under it.
+constexpr double kWhammyLow = 0.25;      // the lowest pitch of the curve above the lane's bottom
+constexpr double kWhammyHigh = 1.25;     // its highest
+constexpr double kWhammyBaseline = 1.5;  // the label's baseline
+constexpr double kWhammyTextSize = 0.85; // "w/bar -1 1/2"
+constexpr double kWhammyMinWidth = 1.0;  // a curve is at least this wide
+constexpr double kWhammyEndGap = 0.3;    // between a curve and the next column
 
 // Dynamics marks, in staff spaces (ADR-0044).
 constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
@@ -365,6 +373,25 @@ void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, d
     marks_.clear();
 }
 
+std::string whammyLabel(int cents) {
+    const int quarters = static_cast<int>(std::lround(std::abs(cents) / 50.0));
+    if (quarters == 0) {
+        return {};
+    }
+    std::string label = cents < 0 ? "-" : "+";
+    if (quarters >= 4) {
+        label += std::to_string(quarters / 4);
+    }
+    static constexpr std::array<const char*, 4> kQuarters{"", "1/4", "1/2", "3/4"};
+    if (quarters % 4 != 0) {
+        if (quarters >= 4) {
+            label += ' ';
+        }
+        label += kQuarters.at(static_cast<std::size_t>(quarters % 4));
+    }
+    return label;
+}
+
 std::string bendLabel(int cents) {
     const int quarters = static_cast<int>(std::lround(cents / 50.0));
     if (quarters <= 0) {
@@ -397,6 +424,12 @@ int tremoloStrokes(core::NoteValue speed) {
 } // namespace
 
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat) {
+    if (marks.whammy.isEmpty()) {
+        marks.whammy = beat.effects.whammyBar;
+    }
+    if (beat.effects.bassTechnique != core::BassTechnique::None) {
+        marks.bass = beat.effects.bassTechnique;
+    }
     if (beat.effects.pickStroke != core::PickStroke::None) {
         marks.pickStroke = beat.effects.pickStroke;
     }
@@ -450,6 +483,22 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
              kSlashes.at(static_cast<std::size_t>(std::min(marks.tremoloStrokes, 3) - 1)), centre,
              measure, kLaneGlyphScale);
     }
+    if (marks.whammy.isEmpty()) {
+        whammyRun_ = false;
+    } else {
+        whammy(marks.whammy, centre, end, measure);
+    }
+    if (marks.bass != core::BassTechnique::None) {
+        static constexpr std::array<const char*, 4> kLetters{"", "T", "S", "P"};
+        TextItem item;
+        item.text = kLetters.at(static_cast<std::size_t>(marks.bass));
+        item.origin = {centre, -kLaneBaseline};
+        item.size = kLaneTextSize;
+        item.role = Role::Technique;
+        item.measure = measure;
+        items(Lane::Bass).texts.push_back(std::move(item));
+        use(Lane::Bass);
+    }
     const char* label = nullptr;
     switch (marks.harmonic) {
     case core::HarmonicKind::Artificial:
@@ -478,6 +527,67 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
         items(Lane::Harmonic).texts.push_back(std::move(item));
         use(Lane::Harmonic);
     }
+}
+
+// A whammy bar: its curve from the column's centre towards the next column,
+// as high as the lane allows whatever its depth, and over it how far it goes;
+// the first of a run of whammy-bar columns says "w/bar".
+void TechniqueLanes::whammy(const core::BendCurve& curve, double centre, double end,
+                            std::size_t measure) {
+    const std::vector<core::BendPoint>& points = curve.points();
+    int lowest = 0;
+    int highest = 0;
+    for (const core::BendPoint& point : points) {
+        lowest = std::min(lowest, point.cents);
+        highest = std::max(highest, point.cents);
+    }
+    const double range = highest > lowest ? static_cast<double>(highest - lowest) : 1.0;
+    const auto y = [&](int cents) {
+        return -kWhammyLow - (cents - lowest) / range * (kWhammyHigh - kWhammyLow);
+    };
+    const double width = std::max(kWhammyMinWidth, end - centre - kWhammyEndGap);
+    const auto x = [&](int position) {
+        return centre + width * position / 100.0;
+    };
+    const double thickness = font_.defaults().stemThickness;
+    DisplayList& out = items(Lane::Whammy);
+    const auto segment = [&](Point from, Point to) {
+        LineItem item;
+        item.from = from;
+        item.to = to;
+        item.thickness = thickness;
+        item.role = Role::Bend;
+        item.measure = measure;
+        out.lines.push_back(item);
+    };
+    // Pushed or pulled before the attack: upright from the written pitch.
+    if (points.front().cents != 0) {
+        segment({x(points.front().position), y(0)},
+                {x(points.front().position), y(points.front().cents)});
+    }
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        segment({x(points[i - 1].position), y(points[i - 1].cents)},
+                {x(points[i].position), y(points[i].cents)});
+    }
+    if (points.size() == 1) {
+        segment({x(0), y(points.front().cents)}, {x(100), y(points.front().cents)});
+    }
+    std::string label = whammyLabel(core::whammyCents(curve));
+    if (!whammyRun_) {
+        label = label.empty() ? "w/bar" : "w/bar " + label;
+    }
+    whammyRun_ = true;
+    if (!label.empty()) {
+        TextItem item;
+        item.text = std::move(label);
+        item.origin = {centre, -kWhammyBaseline};
+        item.size = kWhammyTextSize;
+        item.align = TextAlign::Left;
+        item.role = Role::Bend;
+        item.measure = measure;
+        out.texts.push_back(std::move(item));
+    }
+    use(Lane::Whammy);
 }
 
 void TechniqueLanes::mark(Lane lane, Glyph glyph, double centre, std::size_t measure,
