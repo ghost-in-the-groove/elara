@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "score_page.hpp"
 
+#include "when_done.hpp"
 #include <QFuture>
 #include <QQuickWindow>
 #include <QSGImageNode>
@@ -117,20 +118,21 @@ void ScorePage::repaint() {
     shownScale_ = scale;
     shownRatio_ = ratio;
     const std::uint64_t ticket = ++ticket_;
-    QtConcurrent::run([page = std::move(page), scale, ratio] {
-        return ScoreDocument::painter().render(*page, scale, ratio);
-    }).then(this, [this, ticket](const QImage& image) {
-        if (ticket != ticket_) {
-            return;
-        }
-        image_ = image;
-        ++paints;
-        update();
-        if (!painted_) {
-            painted_ = true;
-            emit paintedChanged();
-        }
-    });
+    whenDone(QtConcurrent::run([page = std::move(page), scale, ratio] {
+                 return ScoreDocument::painter().render(*page, scale, ratio);
+             }),
+             this, [this, ticket](const QImage& image) {
+                 if (ticket != ticket_) {
+                     return;
+                 }
+                 image_ = image;
+                 ++paints;
+                 update();
+                 if (!painted_) {
+                     painted_ = true;
+                     emit paintedChanged();
+                 }
+             });
 }
 
 QSGNode* ScorePage::updatePaintNode(QSGNode* old, UpdatePaintNodeData* /*data*/) {
