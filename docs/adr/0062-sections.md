@@ -36,7 +36,7 @@ to keep in step with the measures.
 
 - Sections come in from the files that have them and go out to MusicXML and
   MIDI, so a song keeps its form through Elara.
-- The score does not draw them yet, nor can the app edit them; both are
-  separate tasks that read the same field.
+- The score draws them (ADR-0063); the app cannot edit them yet, a separate
+  task that reads the same field.
 - A section name is free text: "Chorus 2" and "Chorus" are different sections
   to Elara, and nothing groups repeated sections.
