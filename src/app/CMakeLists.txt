@@ -103,3 +103,28 @@ target_link_libraries(elara PRIVATE
 # Strict warnings for our sources only, not for moc/qmlcache output.
 elara_source_warnings(src/main.cpp src/audio_controller.cpp src/score_document.cpp
   src/score_page.cpp src/startup.cpp src/tuner_controller.cpp)
+
+# Installing (ADR-0048): the app, then the Qt libraries, plugins and QML modules
+# it uses, found by Qt's deployment (windeployqt, macdeployqt, or Qt's own on
+# Linux). On Windows and Linux the offscreen platform plugin comes too, so a
+# package can be smoke-tested without a screen (macOS uses its cocoa plugin).
+# On Windows Qt's own translations come only for the languages the app speaks,
+# and the compiler runtime as DLLs (see ElaraPackaging.cmake), not as its 25 MB
+# installer.
+install(TARGETS elara
+  BUNDLE DESTINATION .
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+if(WIN32)
+  install(FILES $<TARGET_RUNTIME_DLLS:elara> DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  set(_elara_deploy_options INCLUDE_PLUGINS qoffscreen NO_COMPILER_RUNTIME
+    DEPLOY_TOOL_OPTIONS "--translations;en,es")
+elseif(NOT APPLE AND TARGET Qt6::QOffscreenIntegrationPlugin)
+  # Qt's Linux deployment brings only the default platform plugin (xcb).
+  install(FILES $<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin> DESTINATION plugins/platforms)
+endif()
+qt_generate_deploy_qml_app_script(
+  TARGET elara
+  OUTPUT_SCRIPT _elara_deploy_script
+  NO_UNSUPPORTED_PLATFORM_ERROR
+  ${_elara_deploy_options})
+install(SCRIPT "${_elara_deploy_script}")

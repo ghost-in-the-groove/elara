@@ -10,7 +10,6 @@
 #include <cstring>
 #include <format>
 #include <fstream>
-#include <iterator>
 #include <string_view>
 
 namespace elara::audio {
@@ -146,14 +145,17 @@ std::expected<WavAudio, std::string> decodeWav(std::span<const std::byte> bytes)
 }
 
 std::expected<WavAudio, std::string> readWav(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
+    // One sized read straight into the bytes: no per-byte iterator, no copy.
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    const std::streamoff size = file ? static_cast<std::streamoff>(file.tellg()) : -1;
+    if (size < 0) {
         return std::unexpected(std::format("cannot open {}", path.string()));
     }
-    std::vector<char> raw((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    std::vector<std::byte> bytes(raw.size());
-    if (!raw.empty()) {
-        std::memcpy(bytes.data(), raw.data(), raw.size());
+    std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!file) {
+        return std::unexpected(std::format("cannot read {}", path.string()));
     }
     return decodeWav(bytes);
 }
