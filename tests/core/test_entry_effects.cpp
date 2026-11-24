@@ -273,3 +273,39 @@ TEST_CASE("Effects: a bend of any form on the caret's notes", "[core][entry][eff
     }
     CHECK(bendAtCaret(piano.song(), at(0, 0)) == BendCurve::bend(100));
 }
+
+TEST_CASE("Effects: strums, pick strokes and tremolo picking on the caret's beat",
+          "[core][entry][effects]") {
+    Document doc(guitarSong());
+    const Caret chord = at(0, 0, 2); // frets 5 and 7
+    CHECK(beatEffectsAt(doc.song(), chord) == BeatEffects{});
+
+    BeatEffects strummed;
+    strummed.strum = Strum::Down;
+    strummed.tremoloPicking = NoteValue::Sixteenth;
+    CHECK(run(doc, setBeatEffects(doc.song(), chord, strummed)) == chord);
+    CHECK(doc.undoName() == "Change beat effects");
+    const Beat& beat = doc.song().track(0).staff(0).measure(0).voices[0].beats[0];
+    CHECK(beat.effects.strum == Strum::Down);
+    CHECK(beat.effects.tremoloPicking == NoteValue::Sixteenth);
+    CHECK(beatEffectsAt(doc.song(), chord) == strummed);
+    // The same caret on another string reads the same beat.
+    CHECK(beatEffectsAt(doc.song(), at(0, 0, 6)) == strummed);
+    // Its notes keep their own effects.
+    CHECK(onString(doc.song(), 0, 0, 2).effects == NoteEffects{});
+
+    // The same effects again change nothing; others replace them.
+    CHECK(setBeatEffects(doc.song(), chord, strummed).command == nullptr);
+    BeatEffects picked;
+    picked.pickStroke = PickStroke::Up;
+    run(doc, setBeatEffects(doc.song(), chord, picked));
+    CHECK(beatEffectsAt(doc.song(), chord) == picked);
+    doc.undo();
+    CHECK(beatEffectsAt(doc.song(), chord) == strummed);
+
+    // A rest and the free slot have no notes to strike.
+    for (const Caret& nothing : {at(0, 2, 1), at(1, 1, 1)}) {
+        CHECK(setBeatEffects(doc.song(), nothing, picked).command == nullptr);
+        CHECK(beatEffectsAt(doc.song(), nothing) == BeatEffects{});
+    }
+}

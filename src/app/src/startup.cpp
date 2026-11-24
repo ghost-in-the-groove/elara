@@ -1020,7 +1020,22 @@ void Startup::queueEffects() {
               "the pre-bend did not replace it");
         score_->setBend(0, 0);
         check(score_->caretBendForm() == 0 && score_->caretBendCents() == 0, "the bend did not go");
-        for (int i = 0; i < 10 && score_->modified() && score_->canUndo(); ++i) {
+        // The beat's own effects (ADR-0056).
+        score_->setStrum(1);
+        check(score_->caretStrum() == 1, "the strum did not go on");
+        check(score_->undoName() == ScoreDocument::tr("Change beat effects"),
+              "the beat effects are not undoable");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Strum down")),
+              "the status does not name the strum");
+        score_->setTremolo(16);
+        score_->setPickStroke(2);
+        check(score_->caretTremolo() == 16 && score_->caretPickStroke() == 2 &&
+                  score_->caretStrum() == 1,
+              "tremolo picking and the pick stroke did not join the strum");
+        score_->setStrum(0);
+        check(score_->caretStrum() == 0 && score_->caretTremolo() == 16,
+              "the strum did not go on its own");
+        for (int i = 0; i < 16 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;

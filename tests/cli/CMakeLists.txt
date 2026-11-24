@@ -337,6 +337,27 @@ add_test(NAME cli.edit_rejects_flat_bend
 set_tests_properties(cli.edit_rejects_unknown_bend cli.edit_rejects_flat_bend
   PROPERTIES WILL_FAIL TRUE)
 
+# Beat effects (ADR-0056): a chord strummed down, then fret 9 tremolo-picked
+# at sixteenths with an up stroke; the strum taken off and put back by undo.
+set(ELARA_CLI_BEAT_EFFECTS "${CMAKE_CURRENT_BINARY_DIR}/cli-beat-effects.elara")
+add_test(NAME cli.edit_sets_beat_effects
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_BEAT_EFFECTS}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 2" "fret 5" "caret 0 0 0 3" "fret 7" "strum down"
+    right "fret 9" "tremolo 16" "pick up" "caret 0 0 0 2" "strum none" undo)
+set_tests_properties(cli.edit_sets_beat_effects PROPERTIES
+  FIXTURES_SETUP cli_beat_effects
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":8,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_beat_effects COMMAND elara-cli --json dump "${ELARA_CLI_BEAT_EFFECTS}")
+set_tests_properties(cli.dump_beat_effects PROPERTIES
+  FIXTURES_REQUIRED cli_beat_effects
+  PASS_REGULAR_EXPRESSION "\"effects\":{\"strum\":\"down\"}},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"[A-G][#b]?[0-9]\",\"string\":3,\"fret\":9}\\],\"effects\":{\"pickStroke\":\"up\",\"tremoloPicking\":\"16\"}}")
+add_test(NAME cli.edit_rejects_unknown_strum
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "strum sideways")
+add_test(NAME cli.edit_rejects_unknown_tremolo
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "tremolo 12")
+set_tests_properties(cli.edit_rejects_unknown_strum cli.edit_rejects_unknown_tremolo
+  PROPERTIES WILL_FAIL TRUE)
+
 # Dynamics at the caret (ADR-0047): f from the second note holds to the end,
 # and a note typed after it is f too.
 set(ELARA_CLI_DYNAMICS "${CMAKE_CURRENT_BINARY_DIR}/cli-dynamics.elara")

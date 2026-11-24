@@ -121,6 +121,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Bends of any form at the caret: bend, bend and release, pre-bend,
         pre-bend and release, 1/4 to 2 steps, in the CLI and the effects panel
         (ADR-0055)
+  - [x] Strums, pick strokes and tremolo picking on the caret's beat, in the
+        CLI and the effects panel (ADR-0056)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)
@@ -137,4 +139,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 7 - Distribution
 
 - [ ] Installers: MSIX/MSI (Windows), DMG (macOS), AppImage/Flatpak (Linux)
+  - [x] Portable packages built and smoke-tested by CI: ZIP (Windows), disk image
+        (macOS), tarball (Linux), `elara.py package` (ADR-0048)
 - [ ] Release automation and 1.0
