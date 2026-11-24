@@ -164,9 +164,17 @@ int main(int argc, char* argv[]) {
         QStringLiteral("soundfont"),
         QCoreApplication::translate("main", "Play through this SoundFont (SF2 or SF3)."),
         QStringLiteral("file"));
+    const QCommandLineOption guitarSfzOption(
+        QStringLiteral("guitar-sfz"),
+        QCoreApplication::translate("main", "Play the guitars through this SFZ instrument."),
+        QStringLiteral("file"));
+    const QCommandLineOption bassSfzOption(
+        QStringLiteral("bass-sfz"),
+        QCoreApplication::translate("main", "Play the basses through this SFZ instrument."),
+        QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
                        songPaneOption, measureOption, tuningOption, continuousOption,
-                       languageOption, soundFontOption});
+                       languageOption, soundFontOption, guitarSfzOption, bassSfzOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -212,6 +220,12 @@ int main(int argc, char* argv[]) {
     if (parser.isSet(soundFontOption)) {
         options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
     }
+    if (parser.isSet(guitarSfzOption)) {
+        options.guitarSfz = QDir::current().absoluteFilePath(parser.value(guitarSfzOption));
+    }
+    if (parser.isSet(bassSfzOption)) {
+        options.bassSfz = QDir::current().absoluteFilePath(parser.value(bassSfzOption));
+    }
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.screenshot = parser.value(screenshot);
@@ -243,6 +257,8 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},
+                                 {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
+                                 {QStringLiteral("initialBassSfz"), options.bassSfz},
                                  // Checks leave the settings of the person using the app alone.
                                  {QStringLiteral("rememberSettings"), !checking}});
     engine.loadFromModule("Elara.App", "Main");

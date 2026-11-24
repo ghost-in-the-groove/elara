@@ -1069,7 +1069,7 @@ add_test(NAME cli.render_audio_soundfont
           --soundfont "${_test_font}")
 set_tests_properties(cli.render_audio_soundfont PROPERTIES
   FIXTURES_REQUIRED cli_soundfont
-  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sfz\":null,\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
+  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sfz\":\\[\\],\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
 add_test(NAME cli.render_audio_rejects_missing_soundfont
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --soundfont missing.sf2)
 set_tests_properties(cli.render_audio_rejects_missing_soundfont PROPERTIES WILL_FAIL TRUE)
@@ -1095,7 +1095,7 @@ add_test(NAME cli.render_audio_sfz
   COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "${_test_sfz}")
 set_tests_properties(cli.render_audio_sfz PROPERTIES
   FIXTURES_REQUIRED cli_sfz
-  PASS_REGULAR_EXPRESSION "\"soundFont\":null,\"sfz\":\"[^\"]*test-guitar\\.sfz\",\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"test-guitar\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"test-guitar\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"drums\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"test-guitar\"}\\]")
+  PASS_REGULAR_EXPRESSION "\"soundFont\":null,\"sfz\":\\[{\"file\":\"[^\"]*test-guitar\\.sfz\",\"tracks\":\"pitched\"}\\],\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"test-guitar\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"test-guitar\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"drums\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"test-guitar\"}\\]")
 add_test(NAME cli.render_audio_sfz_and_soundfont
   COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "${_test_sfz}"
           --soundfont "${_test_font}")
@@ -1119,6 +1119,23 @@ add_test(NAME cli.sfz_song_pitch COMMAND elara-cli --json tune "${_sfz_song_wav}
 set_tests_properties(cli.sfz_song_pitch PROPERTIES
   FIXTURES_REQUIRED cli_sfz_song_wav
   PASS_REGULAR_EXPRESSION "\"note\":\"D3\",\"cents\":-?0(\\.[0-9]+)?,")
+add_test(NAME cli.render_audio_sfz_basses
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "basses=${_test_sfz}")
+set_tests_properties(cli.render_audio_sfz_basses PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"sfz\":\\[{\"file\":\"[^\"]*test-guitar\\.sfz\",\"tracks\":\"basses\"}\\],.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"test-guitar\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"drums\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"wind\"}\\]")
+# A later instrument takes the tracks it is for from an earlier one.
+add_test(NAME cli.render_audio_sfz_layers
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --soundfont "${_test_font}"
+          --sfz "pitched=${_test_sfz}" --sfz "basses=${_test_sfz}")
+set_tests_properties(cli.render_audio_sfz_layers PROPERTIES
+  FIXTURES_REQUIRED "cli_sfz;cli_soundfont"
+  PASS_REGULAR_EXPRESSION "\"tracks\":\"pitched\"},{\"file\":\"[^\"]*test-guitar\\.sfz\",\"tracks\":\"basses\"}\\],.*\"sound\":\"test-guitar\"},.*\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"")
+add_test(NAME cli.render_audio_rejects_unknown_sfz_tracks
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "drums=${_test_sfz}")
+set_tests_properties(cli.render_audio_rejects_unknown_sfz_tracks PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  WILL_FAIL TRUE)
 add_test(NAME cli.render_audio_rejects_missing_sfz
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz missing.sfz)
 set_tests_properties(cli.render_audio_rejects_missing_sfz PROPERTIES WILL_FAIL TRUE)

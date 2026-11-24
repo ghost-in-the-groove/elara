@@ -191,6 +191,9 @@ void Startup::queueSteps() {
         if (!options_.soundFont.isEmpty()) {
             queueSoundFont();
         }
+        if (!options_.guitarSfz.isEmpty() || !options_.bassSfz.isEmpty()) {
+            queueSfz();
+        }
         queueKeepPosition();
     }
     if (options_.track) {
@@ -1505,6 +1508,68 @@ void Startup::queueSoundFont() {
               QStringLiteral("a missing file did not fail, or replaced the SoundFont"));
         audio->useBuiltinSound();
         check(audio->soundFont().isEmpty() && audio->soundFontName().isEmpty(),
+              QStringLiteral("the built-in synthesizer did not come back"));
+        return false;
+    });
+}
+
+// The SFZ instruments given with `--guitar-sfz` and `--bass-sfz` open on a
+// worker; once they have, the window prints the sound of each track. A file
+// that is no instrument then fails with a message and leaves the basses' in
+// place; taking that away gives the basses the sound of the other tracks
+// again, and the built-in synthesizer comes back for all.
+void Startup::queueSfz() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("SFZ check failed: %1").arg(what);
+        }
+    };
+    const auto opened = [this](AudioController* audio) {
+        if (audio == nullptr || audio->loadingSoundFont()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        QStringList sounds;
+        for (int track = 0; track < score_->trackNames().size(); ++track) {
+            sounds << audio->trackSound(track);
+        }
+        const auto orNone = [](const QString& name) {
+            return name.isEmpty() ? QStringLiteral("none") : name;
+        };
+        std::printf("sfz: guitars %s, basses %s\nsounds: %s\n",
+                    qPrintable(orNone(audio->guitarSfzName())),
+                    qPrintable(orNone(audio->bassSfzName())),
+                    qPrintable(sounds.join(QStringLiteral(", "))));
+        check(audio->guitarSfz() == options_.guitarSfz && audio->bassSfz() == options_.bassSfz &&
+                  audio->errorMessage().isEmpty(),
+              QStringLiteral("the instruments did not open: %1").arg(audio->errorMessage()));
+        if (!options_.bassSfz.isEmpty()) {
+            audio->setSfz(QStringLiteral("basses"), options_.bassSfz + QStringLiteral(".missing"));
+        }
+        return false;
+    });
+    steps_.emplace_back([this, check, opened] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (!opened(audio)) {
+            return false;
+        }
+        if (!options_.bassSfz.isEmpty()) {
+            check(!audio->errorMessage().isEmpty() && audio->bassSfz() == options_.bassSfz,
+                  QStringLiteral("a missing file did not fail, or replaced the instrument"));
+            audio->clearSfz(QStringLiteral("basses"));
+            check(audio->bassSfz().isEmpty() && audio->guitarSfz() == options_.guitarSfz,
+                  QStringLiteral("the basses' instrument did not go, or took the guitars'"));
+        }
+        audio->useBuiltinSound();
+        check(audio->guitarSfz().isEmpty() && audio->bassSfz().isEmpty() &&
+                  audio->soundFont().isEmpty(),
               QStringLiteral("the built-in synthesizer did not come back"));
         return false;
     });

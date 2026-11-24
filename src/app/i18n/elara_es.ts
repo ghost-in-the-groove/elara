@@ -11,6 +11,17 @@
         <source>The SoundFont did not open: %1</source>
         <translation>No se pudo abrir la SoundFont: %1</translation>
     </message>
+    <message>
+        <source>The SFZ instrument did not open: %1</source>
+        <translation>No se pudo abrir el instrumento SFZ: %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n sample(s) of the SFZ instrument could not be read</source>
+        <translation>
+            <numerusform>No se pudo leer %n muestra del instrumento SFZ</numerusform>
+            <numerusform>No se pudieron leer %n muestras del instrumento SFZ</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>EntryBar</name>
@@ -210,6 +221,18 @@
         <translation>SoundFonts (*.sf2 *.sf3)</translation>
     </message>
     <message>
+        <source>Choose an SFZ instrument for the guitars</source>
+        <translation>Elige un instrumento SFZ para las guitarras</translation>
+    </message>
+    <message>
+        <source>Choose an SFZ instrument for the basses</source>
+        <translation>Elige un instrumento SFZ para los bajos</translation>
+    </message>
+    <message>
+        <source>SFZ instruments (*.sfz)</source>
+        <translation>Instrumentos SFZ (*.sfz)</translation>
+    </message>
+    <message>
         <source>Save the song</source>
         <translation>Guardar la canción</translation>
     </message>
@@ -300,6 +323,22 @@
     <message>
         <source>Choose a SoundFont…</source>
         <translation>Elegir una SoundFont…</translation>
+    </message>
+    <message>
+        <source>Guitars: %1</source>
+        <translation>Guitarras: %1</translation>
+    </message>
+    <message>
+        <source>Choose an SFZ instrument for the guitars…</source>
+        <translation>Elegir un instrumento SFZ para las guitarras…</translation>
+    </message>
+    <message>
+        <source>Basses: %1</source>
+        <translation>Bajos: %1</translation>
+    </message>
+    <message>
+        <source>Choose an SFZ instrument for the basses…</source>
+        <translation>Elegir un instrumento SFZ para los bajos…</translation>
     </message>
     <message>
         <source>Use the built-in synthesizer</source>
@@ -1671,6 +1710,14 @@
     <message>
         <source>Play through this SoundFont (SF2 or SF3).</source>
         <translation>Tocar con esta SoundFont (SF2 o SF3).</translation>
+    </message>
+    <message>
+        <source>Play the guitars through this SFZ instrument.</source>
+        <translation>Tocar las guitarras con este instrumento SFZ.</translation>
+    </message>
+    <message>
+        <source>Play the basses through this SFZ instrument.</source>
+        <translation>Tocar los bajos con este instrumento SFZ.</translation>
     </message>
 </context>
 </TS>

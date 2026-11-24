@@ -22,6 +22,9 @@ ApplicationWindow {
     property bool showTuning: false
     /// A SoundFont to play through (from the command line).
     property string initialSoundFont
+    /// SFZ instruments for the guitars and the basses (from the command line).
+    property string initialGuitarSfz
+    property string initialBassSfz
     /// Whether choices such as the SoundFont are kept for the next start; off
     /// for checks and screenshots.
     property bool rememberSettings: true
@@ -60,10 +63,17 @@ ApplicationWindow {
         if (showTuner)
             tunerPane.open();
         audio.rememberSound = rememberSettings;
-        if (initialSoundFont.length > 0)
-            audio.setSoundFont(initialSoundFont);
-        else if (rememberSettings)
-            audio.restoreSoundFont();
+        if (initialSoundFont.length > 0 || initialGuitarSfz.length > 0
+                || initialBassSfz.length > 0) {
+            if (initialSoundFont.length > 0)
+                audio.setSoundFont(initialSoundFont);
+            if (initialGuitarSfz.length > 0)
+                audio.setSfz("guitars", initialGuitarSfz);
+            if (initialBassSfz.length > 0)
+                audio.setSfz("basses", initialBassSfz);
+        } else if (rememberSettings) {
+            audio.restoreSound();
+        }
     }
 
     onClosing: close => {
@@ -180,6 +190,18 @@ ApplicationWindow {
         title: qsTr("Choose a SoundFont")
         nameFilters: [qsTr("SoundFonts (*.sf2 *.sf3)")]
         onAccepted: audio.setSoundFont(selectedFile)
+    }
+
+    FileDialog {
+        id: sfzDialog
+
+        /// "guitars" or "basses": the tracks the instrument chosen plays.
+        property string tracks: "guitars"
+
+        title: tracks === "guitars" ? qsTr("Choose an SFZ instrument for the guitars")
+                                    : qsTr("Choose an SFZ instrument for the basses")
+        nameFilters: [qsTr("SFZ instruments (*.sfz)")]
+        onAccepted: audio.setSfz(tracks, selectedFile)
     }
 
     FileDialog {
@@ -425,8 +447,29 @@ ApplicationWindow {
                         onTriggered: soundFontDialog.open()
                     }
                     MenuItem {
+                        text: audio.guitarSfzName.length > 0
+                              ? qsTr("Guitars: %1").arg(audio.guitarSfzName)
+                              : qsTr("Choose an SFZ instrument for the guitars…")
+                        enabled: !audio.loadingSoundFont
+                        onTriggered: {
+                            sfzDialog.tracks = "guitars";
+                            sfzDialog.open();
+                        }
+                    }
+                    MenuItem {
+                        text: audio.bassSfzName.length > 0
+                              ? qsTr("Basses: %1").arg(audio.bassSfzName)
+                              : qsTr("Choose an SFZ instrument for the basses…")
+                        enabled: !audio.loadingSoundFont
+                        onTriggered: {
+                            sfzDialog.tracks = "basses";
+                            sfzDialog.open();
+                        }
+                    }
+                    MenuItem {
                         text: qsTr("Use the built-in synthesizer")
-                        enabled: audio.soundFont.length > 0 && !audio.loadingSoundFont
+                        enabled: (audio.soundFont.length > 0 || audio.guitarSfz.length > 0
+                                  || audio.bassSfz.length > 0) && !audio.loadingSoundFont
                         onTriggered: audio.useBuiltinSound()
                     }
                     MenuSeparator {}

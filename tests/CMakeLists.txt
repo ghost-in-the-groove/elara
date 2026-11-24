@@ -152,6 +152,20 @@ if(TARGET elara)
     TIMEOUT 60
     PASS_REGULAR_EXPRESSION "sound: test-soundfont[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
 
+  # SFZ instruments from the command line (ADR-0066), the test guitar of the
+  # CLI tests for the basses of band.gp: its bass track plays the instrument
+  # and the others keep the built-in synthesizer; a file that fails keeps it,
+  # and the basses can go back to the built-in synthesizer.
+  add_test(NAME app.smoke_sfz
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp"
+      --bass-sfz "${CMAKE_CURRENT_BINARY_DIR}/cli/test-sfz/test-guitar.sfz")
+  set_tests_properties(app.smoke_sfz PROPERTIES
+    FIXTURES_REQUIRED cli_sfz
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "sfz: guitars none, basses test-guitar[\r\n]+sounds: test-guitar, piano, drums, wind[\r\n]+(.*[\r\n]+)?smoke-test: ok")
+
   # A song of several pages: the notes typed on the first page leave the others
   # as they were, so those keep their textures instead of being painted again.
   set(ELARA_APP_LONG_SONG "${CMAKE_CURRENT_BINARY_DIR}/app-long-song.elara")

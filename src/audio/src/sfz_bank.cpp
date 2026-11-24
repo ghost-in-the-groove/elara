@@ -633,13 +633,14 @@ std::vector<float> generator(std::string_view name) {
 } // namespace
 
 std::expected<std::shared_ptr<const SfzBank>, std::string>
-SfzBank::open(const std::filesystem::path& path, std::shared_ptr<const SoundBank> percussion) {
+SfzBank::open(const std::filesystem::path& path, std::shared_ptr<const SoundBank> others,
+              SfzTracks tracks) {
     auto program = readSfz(path);
     if (!program) {
         return std::unexpected(program.error());
     }
-    auto bank =
-        load(*std::move(program), path.parent_path(), path.stem().string(), std::move(percussion));
+    auto bank = load(*std::move(program), path.parent_path(), path.stem().string(),
+                     std::move(others), tracks);
     if (!bank) {
         return std::unexpected(std::format("{}: {}", path.generic_string(), bank.error()));
     }
@@ -648,7 +649,7 @@ SfzBank::open(const std::filesystem::path& path, std::shared_ptr<const SoundBank
 
 std::expected<std::shared_ptr<const SfzBank>, std::string>
 SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::string name,
-              std::shared_ptr<const SoundBank> percussion) {
+              std::shared_ptr<const SoundBank> others, SfzTracks tracks) {
     auto data = std::make_shared<SfzData>();
     data->name = std::move(name);
 
@@ -732,11 +733,54 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
             data->samples[i] = SfzSample{};
         }
     }
-    return std::make_shared<const SfzBank>(std::move(data), std::move(percussion));
+    return std::make_shared<const SfzBank>(std::move(data), std::move(others), tracks);
 }
 
-SfzBank::SfzBank(std::shared_ptr<const SfzData> data, std::shared_ptr<const SoundBank> percussion)
-    : data_(std::move(data)), percussion_(percussion ? std::move(percussion) : builtinBank()) {}
+SfzBank::SfzBank(std::shared_ptr<const SfzData> data, std::shared_ptr<const SoundBank> others,
+                 SfzTracks tracks)
+    : data_(std::move(data)), others_(others ? std::move(others) : builtinBank()), tracks_(tracks) {
+}
+
+std::shared_ptr<const SfzBank> SfzBank::with(std::shared_ptr<const SoundBank> others,
+                                             SfzTracks tracks) const {
+    return std::make_shared<const SfzBank>(data_, std::move(others), tracks);
+}
+
+bool SfzBank::plays(const core::Instrument& instrument) const noexcept {
+    if (instrument.kind == core::InstrumentKind::Percussion) {
+        return false;
+    }
+    switch (tracks_) {
+    case SfzTracks::Pitched:
+        return true;
+    case SfzTracks::Guitars:
+        return instrument.midiProgram >= 24 && instrument.midiProgram <= 31;
+    case SfzTracks::Basses:
+        return instrument.midiProgram >= 32 && instrument.midiProgram <= 39;
+    }
+    return false;
+}
+
+std::string_view sfzTracksName(SfzTracks tracks) noexcept {
+    switch (tracks) {
+    case SfzTracks::Pitched:
+        return "pitched";
+    case SfzTracks::Guitars:
+        return "guitars";
+    case SfzTracks::Basses:
+        return "basses";
+    }
+    return "pitched";
+}
+
+std::optional<SfzTracks> sfzTracksFromName(std::string_view name) noexcept {
+    for (const SfzTracks tracks : {SfzTracks::Pitched, SfzTracks::Guitars, SfzTracks::Basses}) {
+        if (name == sfzTracksName(tracks)) {
+            return tracks;
+        }
+    }
+    return std::nullopt;
+}
 
 const std::string& SfzBank::name() const noexcept {
     return data_->name;
@@ -761,15 +805,15 @@ std::size_t SfzBank::sampleBytes() const noexcept {
 
 std::unique_ptr<TrackSound> SfzBank::sound(const core::Instrument& instrument,
                                            double sampleRate) const {
-    if (instrument.kind == core::InstrumentKind::Percussion) {
-        return percussion_->sound(instrument, sampleRate);
+    if (!plays(instrument)) {
+        return others_->sound(instrument, sampleRate);
     }
     return std::make_unique<SfzSound>(data_, sampleRate);
 }
 
 std::string SfzBank::soundName(const core::Instrument& instrument) const {
-    if (instrument.kind == core::InstrumentKind::Percussion) {
-        return percussion_->soundName(instrument);
+    if (!plays(instrument)) {
+        return others_->soundName(instrument);
     }
     return data_->name;
 }
