@@ -333,10 +333,14 @@ Pane {
                 }
 
                 Repeater {
-                    model: root.document.tracks
+                    // A model rather than the list itself: a mute or an added
+                    // track changes its rows instead of making every row again.
+                    model: root.document.trackList
 
                     delegate: Rectangle {
                         id: row
+
+                        objectName: "trackRow"
 
                         required property int index
                         required property var modelData

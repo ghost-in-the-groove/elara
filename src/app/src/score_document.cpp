@@ -341,7 +341,10 @@ QString trackDetail(const core::Track& track) {
 
 } // namespace
 
-ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {}
+ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {
+    // Connected first, so that the list is up to date for whoever else hears it.
+    connect(this, &ScoreDocument::songChanged, this, [this] { trackList_.setTracks(tracks()); });
+}
 
 QString ScoreDocument::title() const {
     if (!song_) {
