@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The pages of a score on a desk, scrolled vertically and zoomed smoothly.
+// The pages of a score on a desk, or the strips of one endless page (the
+// continuous view), scrolled vertically and zoomed smoothly.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -36,11 +37,53 @@ Item {
     property real shownZoom: zoom
     readonly property real pageWidth: document.pageSize.width * unit * shownZoom
     readonly property real pageHeight: document.pageSize.height * unit * shownZoom
-    readonly property real gap: 24
+    /// Between pages; the strips of the continuous view touch (ADR-0057).
+    readonly property real gap: document.showsStrips ? 0 : 24
     readonly property real sideMargin: 32
+    // Where each page starts, in staff spaces from the top of the first, and
+    // where the last ends.
+    readonly property var tops: document.pageTops
     // Where the middle of the view is, in pages from the top of the first.
     property real centre: 0
     property bool zooming: false
+
+    /// Where page `page` starts, in pixels from the top of the first; for
+    /// pageCount, where the last ends and a gap after it.
+    function pageY(page: int): real {
+        if (tops.length === 0)
+            return 0;
+        const at = Math.max(0, Math.min(page, tops.length - 1));
+        return tops[at] * unit * shownZoom + at * gap;
+    }
+    /// How high page `page` is in pixels.
+    function pageExtent(page: int): real {
+        if (page < 0 || page + 1 >= tops.length)
+            return 0;
+        return (tops[page + 1] - tops[page]) * unit * shownZoom;
+    }
+    /// The page `y` pixels from the top of the first is on, and how far down
+    /// it (with the gap after it), in pages.
+    function pagesAt(y: real): real {
+        const count = tops.length - 1;
+        if (count <= 0)
+            return 0;
+        let low = 0;
+        let high = count - 1;
+        while (low < high) {
+            const middle = (low + high + 1) >> 1;
+            if (pageY(middle) <= y)
+                low = middle;
+            else
+                high = middle - 1;
+        }
+        const span = pageExtent(low) + gap;
+        return low + (span > 0 ? (y - pageY(low)) / span : 0);
+    }
+    /// The inverse of pagesAt().
+    function yAt(pages: real): real {
+        const page = Math.max(0, Math.floor(pages));
+        return pageY(page) + (pages - page) * (pageExtent(page) + gap);
+    }
 
     function setZoom(value: real) {
         zoom = Math.max(minZoom, Math.min(maxZoom, value));
@@ -82,7 +125,7 @@ Item {
         const margin = 56;
         let y = scrollY.running ? scrollY.to : list.contentY;
         let x = scrollX.running ? scrollX.to : list.contentX;
-        const top = list.originY + page * (pageHeight + gap) + caret.y * scale;
+        const top = list.originY + pageY(page) + caret.y * scale;
         const bottom = top + caret.height * scale;
         if (top - margin < y)
             y = top - margin;
@@ -103,8 +146,8 @@ Item {
         const caret = document.caretRect;
         const page = document.caretPage;
         const x = list.originX + (list.contentWidth - pageWidth) / 2 + caret.x * scale - list.contentX;
-        const y = list.y + list.originY + page * (pageHeight + gap)
-                  + (caret.y + caret.height) * scale - list.contentY;
+        const y = list.y + list.originY + pageY(page) + (caret.y + caret.height) * scale
+                  - list.contentY;
         return Qt.point(x, y);
     }
     /// Opens the measure popup near (x, y), inside the view.
@@ -287,7 +330,7 @@ Item {
         if (!followCursor || !cursorShown || zooming)
             return;
         const scale = unit * shownZoom;
-        const top = cursor.page * (pageHeight + gap) + (cursor.y - 6) * scale;
+        const top = pageY(cursor.page) + (cursor.y - 6) * scale;
         const bottom = top + (cursor.height + 12) * scale;
         if (top < list.contentY || bottom > list.contentY + list.height) {
             const highest = list.originY - list.topMargin;
@@ -324,37 +367,35 @@ Item {
     // Keep the page under the middle of the view in place while zooming.
     onShownZoomChanged: {
         zooming = true;
-        list.contentY = list.originY + centre * (pageHeight + gap) - list.height / 2;
+        list.contentY = list.originY + yAt(centre) - list.height / 2;
         zooming = false;
     }
 
-    ListView {
+    // The pages, each where pageY() puts it. A page is loaded only near the
+    // view, so that only those near it hold a texture.
+    Flickable {
         id: list
+
+        // How far above and below the view pages stay loaded.
+        readonly property real buffer: Math.max(0, root.pageHeight)
 
         anchors.top: entryStrip.bottom
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        model: root.document.pageCount
-        spacing: root.gap
-        topMargin: root.gap
-        bottomMargin: root.gap
+        topMargin: 24
+        bottomMargin: 24
         clip: true
-        reuseItems: true
-        keyNavigationEnabled: false
-        cacheBuffer: Math.max(0, Math.round(root.pageHeight))
         boundsBehavior: Flickable.StopAtBounds
         flickableDirection: Flickable.AutoFlickIfNeeded
         contentWidth: Math.max(width, root.pageWidth + 2 * root.sideMargin)
+        contentHeight: Math.max(0, root.pageY(root.document.pageCount) - root.gap)
 
         onContentYChanged: {
-            if (!root.zooming && root.pageHeight > 0)
-                root.centre = (contentY - originY + height / 2) / (root.pageHeight + root.gap);
+            if (!root.zooming)
+                root.centre = root.pagesAt(contentY - originY + height / 2);
         }
-        onHeightChanged: {
-            if (root.pageHeight > 0)
-                root.centre = (contentY - originY + height / 2) / (root.pageHeight + root.gap);
-        }
+        onHeightChanged: root.centre = root.pagesAt(contentY - originY + height / 2)
 
         ScrollBar.vertical: ScrollBar {
             policy: ScrollBar.AsNeeded
@@ -363,143 +404,185 @@ Item {
             policy: ScrollBar.AsNeeded
         }
 
-        delegate: Item {
-            id: sheet
+        // The continuous view's strips lie on one sheet with one shadow, so
+        // that no seam shows between them. The sheet is as dim as the strips
+        // in the dark theme, also where a strip is not loaded yet.
+        RectangularShadow {
+            anchors.fill: scroll
+            visible: scroll.visible
+            offset.y: 3
+            radius: 2
+            blur: 18
+            spread: 0
+            color: Qt.rgba(0, 0, 0, Theme.dark ? 0.55 : 0.2)
+        }
+        Rectangle {
+            id: scroll
 
-            required property int index
+            visible: root.document.showsStrips && root.document.pageCount > 0
+            x: (list.contentWidth - root.pageWidth) / 2
+            width: root.pageWidth
+            height: list.contentHeight
+            radius: 2
+            color: Theme.dark ? Qt.rgba(0.851, 0.85, 0.845, 1) : "white"
+        }
 
-            width: list.contentWidth
-            height: root.pageHeight
+        Repeater {
+            model: root.document.pageCount
 
-            // A soft shadow under the paper, drawn analytically on the GPU.
-            RectangularShadow {
-                anchors.fill: paper
-                offset.y: 3
-                radius: 2
-                blur: 18
-                spread: 0
-                color: Qt.rgba(0, 0, 0, Theme.dark ? 0.55 : 0.2)
-            }
+            delegate: Item {
+                id: sheet
 
-            Rectangle {
-                id: paper
+                required property int index
 
-                width: root.pageWidth
-                height: root.pageHeight
-                anchors.horizontalCenter: parent.horizontalCenter
-                radius: 2
-                color: "white"
+                y: root.pageY(index)
+                width: list.contentWidth
+                height: root.pageExtent(index)
 
-                ScorePage {
+                Loader {
                     anchors.fill: parent
-                    document: root.document
-                    index: sheet.index
-                    opacity: painted ? 1.0 : 0.0
-
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 160
-                        }
-                    }
+                    active: sheet.y + sheet.height >= list.contentY - list.buffer
+                            && sheet.y <= list.contentY + list.height + list.buffer
+                    sourceComponent: sheetContent
                 }
 
-                // In the dark theme the paper is dimmed, so that it does not
-                // glare on the dark desk; the ink stays black.
-                Rectangle {
-                    anchors.fill: parent
-                    radius: parent.radius
-                    visible: Theme.dark
-                    color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
-                }
+                Component {
+                    id: sheetContent
 
-                // The selected measures, tinted across their systems.
-                Repeater {
-                    model: root.document.selectionRevision >= 0
-                           ? root.document.selectionBoxes(sheet.index) : []
-
-                    delegate: Rectangle {
-                        required property rect modelData
-                        readonly property real scale: root.unit * root.shownZoom
-
-                        x: modelData.x * scale
-                        y: modelData.y * scale
-                        width: modelData.width * scale
-                        height: modelData.height * scale
-                        radius: 3
-                        color: Qt.alpha(Material.accent, 0.1)
-                        border.color: Qt.alpha(Material.accent, 0.35)
-                        border.width: 1
-
-                        NumberAnimation on opacity {
-                            from: 0
-                            to: 1
-                            duration: 120
+                    Item {
+                        // A soft shadow under the paper, drawn analytically on the GPU.
+                        RectangularShadow {
+                            anchors.fill: paper
+                            visible: !root.document.showsStrips
+                            offset.y: 3
+                            radius: 2
+                            blur: 18
+                            spread: 0
+                            color: Qt.rgba(0, 0, 0, Theme.dark ? 0.55 : 0.2)
                         }
-                    }
-                }
 
-                // The caret: where typing goes. It glides between beats on a
-                // page, and keeps up with zooming without gliding.
-                Rectangle {
-                    readonly property real scale: root.unit * root.shownZoom
-                    readonly property rect box: root.document.caretRect
+                        Rectangle {
+                            id: paper
 
-                    visible: root.document.caretPage === sheet.index
-                    x: box.x * scale
-                    y: box.y * scale
-                    width: box.width * scale
-                    height: box.height * scale
-                    radius: Math.min(width, height) * 0.22
-                    color: Qt.alpha(Material.accent, root.activeFocus ? 0.22 : 0.1)
-                    border.color: Qt.alpha(Material.accent, root.activeFocus ? 0.9 : 0.4)
-                    border.width: 1.5
+                            width: root.pageWidth
+                            height: sheet.height
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            radius: root.document.showsStrips ? 0 : 2
+                            color: "white"
 
-                    Behavior on x {
-                        enabled: root.shownZoom === root.zoom
-                        NumberAnimation {
-                            duration: 90
-                            easing.type: Easing.OutCubic
+                            ScorePage {
+                                anchors.fill: parent
+                                document: root.document
+                                index: sheet.index
+                                opacity: painted ? 1.0 : 0.0
+
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: 160
+                                    }
+                                }
+                            }
+
+                            // In the dark theme the paper is dimmed, so that it does not
+                            // glare on the dark desk; the ink stays black.
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: parent.radius
+                                visible: Theme.dark
+                                color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
+                            }
+
+                            // The selected measures, tinted across their systems.
+                            Repeater {
+                                model: root.document.selectionRevision >= 0
+                                       ? root.document.selectionBoxes(sheet.index) : []
+
+                                delegate: Rectangle {
+                                    required property rect modelData
+                                    readonly property real scale: root.unit * root.shownZoom
+
+                                    x: modelData.x * scale
+                                    y: modelData.y * scale
+                                    width: modelData.width * scale
+                                    height: modelData.height * scale
+                                    radius: 3
+                                    color: Qt.alpha(Material.accent, 0.1)
+                                    border.color: Qt.alpha(Material.accent, 0.35)
+                                    border.width: 1
+
+                                    NumberAnimation on opacity {
+                                        from: 0
+                                        to: 1
+                                        duration: 120
+                                    }
+                                }
+                            }
+
+                            // The caret: where typing goes. It glides between beats on a
+                            // page, and keeps up with zooming without gliding.
+                            Rectangle {
+                                readonly property real scale: root.unit * root.shownZoom
+                                readonly property rect box: root.document.caretRect
+
+                                visible: root.document.caretPage === sheet.index
+                                x: box.x * scale
+                                y: box.y * scale
+                                width: box.width * scale
+                                height: box.height * scale
+                                radius: Math.min(width, height) * 0.22
+                                color: Qt.alpha(Material.accent, root.activeFocus ? 0.22 : 0.1)
+                                border.color: Qt.alpha(Material.accent, root.activeFocus ? 0.9 : 0.4)
+                                border.width: 1.5
+
+                                Behavior on x {
+                                    enabled: root.shownZoom === root.zoom
+                                    NumberAnimation {
+                                        duration: 90
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                                Behavior on y {
+                                    enabled: root.shownZoom === root.zoom
+                                    NumberAnimation {
+                                        duration: 90
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                            }
+
+                            // A right click opens the measure under it.
+                            TapHandler {
+                                acceptedButtons: Qt.RightButton
+                                onTapped: eventPoint => {
+                                    const scale = root.unit * root.shownZoom;
+                                    root.forceActiveFocus();
+                                    if (root.document.placeCaret(sheet.index, eventPoint.position.x / scale,
+                                                                 eventPoint.position.y / scale)) {
+                                        const at = paper.mapToItem(root, eventPoint.position.x,
+                                                                   eventPoint.position.y);
+                                        root.openMeasurePopup(at.x + 8, at.y + 8);
+                                    }
+                                }
+                            }
+
+                            // A click puts the caret on the beat and string under it and
+                            // moves playback to that note; a drag still scrolls. One
+                            // handler for both, so neither takes the click from the other.
+                            TapHandler {
+                                acceptedButtons: Qt.LeftButton
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
+                                onTapped: eventPoint => {
+                                    const scale = root.unit * root.shownZoom;
+                                    const x = eventPoint.position.x / scale;
+                                    const y = eventPoint.position.y / scale;
+                                    const seconds = root.document.secondsAt(sheet.index, x, y);
+                                    root.forceActiveFocus();
+                                    root.document.placeCaret(sheet.index, x, y);
+                                    if (seconds >= 0)
+                                        root.seekRequested(seconds);
+                                }
+                            }
                         }
-                    }
-                    Behavior on y {
-                        enabled: root.shownZoom === root.zoom
-                        NumberAnimation {
-                            duration: 90
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-                }
-
-                // A right click opens the measure under it.
-                TapHandler {
-                    acceptedButtons: Qt.RightButton
-                    onTapped: eventPoint => {
-                        const scale = root.unit * root.shownZoom;
-                        root.forceActiveFocus();
-                        if (root.document.placeCaret(sheet.index, eventPoint.position.x / scale,
-                                                     eventPoint.position.y / scale)) {
-                            const at = paper.mapToItem(root, eventPoint.position.x,
-                                                       eventPoint.position.y);
-                            root.openMeasurePopup(at.x + 8, at.y + 8);
-                        }
-                    }
-                }
-
-                // A click puts the caret on the beat and string under it and
-                // moves playback to that note; a drag still scrolls. One
-                // handler for both, so neither takes the click from the other.
-                TapHandler {
-                    acceptedButtons: Qt.LeftButton
-                    gesturePolicy: TapHandler.ReleaseWithinBounds
-                    onTapped: eventPoint => {
-                        const scale = root.unit * root.shownZoom;
-                        const x = eventPoint.position.x / scale;
-                        const y = eventPoint.position.y / scale;
-                        const seconds = root.document.secondsAt(sheet.index, x, y);
-                        root.forceActiveFocus();
-                        root.document.placeCaret(sheet.index, x, y);
-                        if (seconds >= 0)
-                            root.seekRequested(seconds);
                     }
                 }
             }
@@ -570,8 +653,7 @@ Item {
         opacity: 0.9
         x: root.cursorShown ? (list.contentWidth - root.pageWidth) / 2 + root.cursor.x * scale
                               - width / 2 : 0
-        y: root.cursorShown ? root.cursor.page * (root.pageHeight + root.gap)
-                              + (root.cursor.y - 2) * scale : 0
+        y: root.cursorShown ? root.pageY(root.cursor.page) + (root.cursor.y - 2) * scale : 0
         height: root.cursorShown ? (root.cursor.height + 4) * scale : 0
 
         // A soft glow either side.

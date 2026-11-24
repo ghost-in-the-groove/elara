@@ -27,6 +27,7 @@ struct StartupOptions {
     std::optional<int> track; ///< a track to show, or ScoreDocument::kAllTracks
     std::optional<ScoreDocument::View> view;
     std::optional<double> seek; ///< seconds to move the transport to, paused
+    bool continuous = false;    ///< show the continuous view (ADR-0057)
     bool smokeTest = false;     ///< check the window (and the file), then quit
     QString screenshot;         ///< save the window here once shown, then quit
 };
@@ -63,6 +64,7 @@ private:
     void queueTuning();
     void queueTempo();
     void queueEffects();
+    void queueContinuous();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     void queueKeepPosition();
@@ -113,6 +115,7 @@ private:
     int pasteAt_ = 0;             ///< the measure pasted at
     bool effecting_ = false;      ///< whether the note effect steps run
     int effectsBefore_ = 0;       ///< the caret's effects before they were toggled
+    int pagesBefore_ = 0;         ///< pages before the continuous view was shown
 };
 
 } // namespace elara::app

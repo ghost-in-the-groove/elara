@@ -70,6 +70,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)
+  - [x] Continuous view: the music as one scroll, cut into strips of whole
+        systems between them (ADR-0057)
 
 ## Milestone 4 - Playback  -> usable as a player
 

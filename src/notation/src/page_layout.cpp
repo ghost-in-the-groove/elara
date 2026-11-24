@@ -744,12 +744,14 @@ std::vector<DisplayList> cutIntoStrips(const DisplayList& page, double height) {
     };
 
     std::vector<DisplayList> strips(count);
-    const auto deal = [&]<typename Item>(std::vector<Item> DisplayList::*member, auto anchor) {
+    const auto deal = [&]<typename Item>(std::vector<Item> DisplayList::* member, auto anchor) {
         for (const Item& item : page.*member) {
             (strips[stripAt(anchor(item))].*member).push_back(item);
         }
     };
-    const auto middle = [](const SystemBox& system) { return (system.top + system.bottom) / 2; };
+    const auto middle = [](const SystemBox& system) {
+        return (system.top + system.bottom) / 2;
+    };
     deal(&DisplayList::systems, middle);
     deal(&DisplayList::staves, [](const StaffBox& staff) { return staff.y + staff.height / 2; });
     deal(&DisplayList::measures,

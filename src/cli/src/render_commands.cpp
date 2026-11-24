@@ -408,8 +408,8 @@ int runRender(bool json, const RenderOptions& options) {
         std::filesystem::path otf = metadata;
         otf.replace_extension(".otf");
         for (std::size_t p = 0; p < pages.size(); ++p) {
-            const std::filesystem::path out = split ? pagePath(options.svg, p, pages.size())
-                                                    : std::filesystem::path(options.svg);
+            const std::filesystem::path out =
+                split ? pagePath(options.svg, p, pages.size()) : std::filesystem::path(options.svg);
             notation::SvgOptions svg;
             svg.fontFamily = font->name();
             svg.fontUrl = fontUrl(otf, out);
@@ -489,12 +489,11 @@ int runRender(bool json, const RenderOptions& options) {
                                  : std::format("{} staves", selection->size());
     if (paged) {
         const bool strips = options.layout == "strips";
-        std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} {} on {} {}\n",
-                                 options.file, what, options.view, options.first,
-                                 options.first + shown - 1, song->measureCount(), systems,
-                                 systems == 1 ? "system" : "systems", pages.size(),
-                                 pages.size() == 1 ? (strips ? "strip" : "page")
-                                                   : (strips ? "strips" : "pages"));
+        std::cout << std::format(
+            "{}: {} ({}), measures {} to {} of {}: {} {} on {} {}\n", options.file, what,
+            options.view, options.first, options.first + shown - 1, song->measureCount(), systems,
+            systems == 1 ? "system" : "systems", pages.size(),
+            pages.size() == 1 ? (strips ? "strip" : "page") : (strips ? "strips" : "pages"));
     } else {
         const notation::DisplayList& list = pages.front();
         std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} x {} staff spaces\n",

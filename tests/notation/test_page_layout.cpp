@@ -504,8 +504,8 @@ TEST_CASE("Page layout: a page cut into strips between its systems", "[notation]
             next += system.measureCount;
             CHECK(system.top >= 0.0);
             CHECK(system.bottom <= strip.bottom);
-            const auto original = std::ranges::find(page.systems, system.firstMeasure,
-                                                    &SystemBox::firstMeasure);
+            const auto original =
+                std::ranges::find(page.systems, system.firstMeasure, &SystemBox::firstMeasure);
             REQUIRE(original != page.systems.end());
             CHECK_THAT(system.y + top, WithinAbs(original->y, kEpsilon));
         }
