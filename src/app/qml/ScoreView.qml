@@ -156,6 +156,10 @@ Item {
         measurePopup.y = Math.max(8, Math.min(height - measurePopup.implicitHeight - 8, y));
         measurePopup.open();
     }
+    function openEffects() {
+        entryBar.openEffects();
+    }
+
     function openMeasurePopupAtCaret() {
         if (document.caretPage < 0)
             return;

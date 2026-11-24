@@ -15,6 +15,11 @@ Rectangle {
     /// The measure button: the caret's measure, its signatures and length.
     signal measureRequested
 
+    /// Opens the note effects panel.
+    function openEffects() {
+        effects.open();
+    }
+
     // Note values from the music font's metronome marks, longest first.
     readonly property var values: [
         { value: 1, symbol: "\uECA2", tip: qsTr("Whole note") },
@@ -505,6 +510,7 @@ Rectangle {
             Popup {
                 id: effects
 
+                objectName: "effectsPanel"
                 x: (effectsTool.width - width) / 2
                 y: effectsTool.height + 12
                 padding: 10
@@ -533,10 +539,16 @@ Rectangle {
                     }
                 }
 
+                // The surface and shadow of what floats over the score, as
+                // the measure popup has: the bar itself is transparent.
                 background: Rectangle {
-                    radius: 16
-                    color: root.color
-                    border.color: Qt.alpha(root.ink, 0.12)
+                    radius: Theme.radiusSheet
+                    color: Theme.surface
+                    border.color: Theme.line
+
+                    Elevation {
+                        radius: parent.radius
+                    }
                 }
 
                 contentItem: Column {
