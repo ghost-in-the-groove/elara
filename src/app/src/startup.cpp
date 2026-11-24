@@ -11,6 +11,7 @@
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QVariantList>
 #include <QVariantMap>
 
 #include <algorithm>
@@ -111,9 +112,12 @@ void Startup::queueSteps() {
             queuePitches();
             queueVoices();
             queueDrums();
+            queueSelection();
             queueMix();
             queueNavigation();
+            queueRepeats();
             queueTuning();
+            queueTempo();
         }
         return;
     }
@@ -148,9 +152,12 @@ void Startup::queueSteps() {
         queuePitches();
         queueVoices();
         queueDrums();
+        queueSelection();
         queueMix();
         queueNavigation();
+        queueRepeats();
         queueTuning();
+        queueTempo();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -622,6 +629,74 @@ void Startup::queueVoices() {
     });
 }
 
+// Selected measures (ADR-0036): two measures selected and tinted on the page,
+// copied, let go, pasted into new measures before the caret's, which end up
+// selected, and transposed. Then everything is undone and the song must end as it started.
+void Startup::queueSelection() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("selection check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        selecting_ = score_->caretPage() >= 0 && score_->measureCount() > 1;
+        if (!selecting_) {
+            return false;
+        }
+        lengthBefore_ = score_->measureCount();
+        const bool last = score_->caretMeasure() + 1 >= lengthBefore_;
+        score_->extendSelection(last ? -1 : 1);
+        check(score_->hasSelection() && score_->selectionLast() == score_->selectionFirst() + 1,
+              "Shift+Right did not select two measures");
+        check(score_->selectionBoxes(score_->caretPage()).size() == 2,
+              "the page does not show the two measures selected");
+        check(score_->caretStatus().startsWith(ScoreDocument::tr("Measures %1-%2 selected")
+                                                   .arg(score_->selectionFirst() + 1)
+                                                   .arg(score_->selectionLast() + 1)),
+              "the status does not say what is selected");
+        score_->copy();
+        check(score_->canPaste(), "nothing was copied");
+        score_->clearSelection();
+        pasteAt_ = score_->caretMeasure();
+        score_->paste(true);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->measureCount() == lengthBefore_ + 2, "pasting did not insert two measures");
+        check(score_->hasSelection() && score_->selectionFirst() == pasteAt_ &&
+                  score_->selectionLast() == pasteAt_ + 1,
+              "the pasted measures are not selected");
+        score_->transposeSelection(2);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(score_->undoName() == ScoreDocument::tr("Transpose"),
+              "the transposition is not undoable");
+        score_->clearSelection();
+        check(!score_->hasSelection() && score_->selectionBoxes(score_->caretPage()).isEmpty(),
+              "Escape did not let go of the selection");
+        for (int i = 0; i < 2 && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!selecting_) {
+            return false;
+        }
+        check(!score_->modified() && score_->measureCount() == lengthBefore_,
+              "undoing the paste did not restore the song");
+        return false;
+    });
+}
+
 // The mixer (ADR-0039): a fader previewed without changing the song, then the
 // first track's mix set, soloed, as one undo step that keeps what playback
 // plays and silences the other tracks. Undone, the song must end as it started.
@@ -703,6 +778,98 @@ void Startup::queueNavigation() {
         check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
                   marks.value(QStringLiteral("jump")).toInt() == 0,
               "undoing the marks did not restore the song");
+        return false;
+    });
+}
+
+// Repeats from the measure popup (ADR-0016): the first measure's start
+// barline toggled with its end repeat played a different number of times,
+// then other endings, each one undo step; both undone, the song must end as it
+// started.
+void Startup::queueRepeats() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("repeats check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        repeatsBefore_ = score_->repeatsAt(0);
+        const bool start = !repeatsBefore_.value(QStringLiteral("start")).toBool();
+        const int times = repeatsBefore_.value(QStringLiteral("times")).toInt() == 3 ? 4 : 3;
+        score_->setRepeats(0, {{QStringLiteral("start"), start}, {QStringLiteral("times"), times}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("start")).toBool() == start &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the repeat was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change repeats"),
+              "the repeat is not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantList first{1, 2};
+        const QVariantList endings =
+            repeatsBefore_.value(QStringLiteral("endings")).toList() == first ? QVariantList{2, 3}
+                                                                              : first;
+        const int times = score_->repeatsAt(0).value(QStringLiteral("times")).toInt();
+        score_->setRepeats(0, {{QStringLiteral("endings"), endings}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("endings")).toList() == endings &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the endings were not set beside the repeat");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && score_->repeatsAt(0) == repeatsBefore_,
+              "undoing the repeats did not restore the song");
+        return false;
+    });
+}
+
+// A tempo change from the measure popup (ADR-0042): 90 beats per minute from
+// the second measure, one undo step named for it that leaves the first
+// measure's tempo alone, then taken away again; both undone, the song must end
+// as it started.
+void Startup::queueTempo() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tempo check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        tempoBefore_ = score_->tempoAt(1);
+        const QVariantMap first = score_->tempoAt(0);
+        score_->setTempoFrom(1, 90);
+        const QVariantMap tempo = score_->tempoAt(1);
+        check(tempo.value(QStringLiteral("bpm")).toInt() == 90 &&
+                  tempo.value(QStringLiteral("own")).toBool(),
+              "the second measure does not start at 90");
+        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
+              "the tempo is not one undo step");
+        check(score_->tempoAt(0) == first, "the first measure's tempo changed");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        score_->setTempoFrom(1, 0);
+        check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
+              "the tempo change was not taken away");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        check(!score_->modified() && score_->tempoAt(1) == tempoBefore_,
+              "undoing the tempo did not restore the song");
         return false;
     });
 }

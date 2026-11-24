@@ -40,6 +40,7 @@ one that replaces them.
 | [0033](0033-editing-measures-at-the-caret.md) | Editing measures at the caret | Accepted |
 | [0034](0034-note-names-at-the-caret.md) | Note names at the caret | Accepted |
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
+| [0036](0036-selecting-measures-in-the-app.md) | Selecting measures in the app | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
 | [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
@@ -53,6 +54,7 @@ one that replaces them.
 | [0050](0050-tuplets-at-the-caret.md) | Tuplets at the caret | Accepted |
 | [0051](0051-shared-measures.md) | Measures shared between copies of a song | Accepted |
 | [0053](0053-worker-pool.md) | A worker pool for parallel jobs | Accepted |
+| [0054](0054-worker-results-from-the-event-loop.md) | Worker results arrive from the event loop | Accepted |
 
 ## Template
 

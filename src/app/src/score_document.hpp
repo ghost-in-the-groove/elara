@@ -4,6 +4,7 @@
 #pragma once
 
 #include <elara/audio/sequence.hpp>
+#include <elara/core/clipboard.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
@@ -28,6 +29,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace elara::app {
@@ -94,6 +96,14 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
     Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
+    // Selected measures (ADR-0036).
+    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
+    Q_PROPERTY(int selectionFirst READ selectionFirst NOTIFY selectionChanged)
+    Q_PROPERTY(int selectionLast READ selectionLast NOTIFY selectionChanged)
+    Q_PROPERTY(int selectionRevision READ selectionRevision NOTIFY selectionChanged)
+    Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
     // Practice (ADR-0024): how playback plays the song, whatever song it is.
     Q_PROPERTY(int speed READ speed WRITE setSpeed NOTIFY practiceChanged)
     Q_PROPERTY(bool metronome READ metronome WRITE setMetronome NOTIFY practiceChanged)
@@ -237,6 +247,23 @@ public:
     /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
     /// gives them, as one undo step ("Change navigation marks").
     Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
+    /// The repeats of `measure` (ADR-0016): "start" (it opens a repeated
+    /// section), "times" (how often the section it closes plays, 2 to 255, or
+    /// 0 when it closes none) and "endings" (the times through the repeat that
+    /// play it, 1 to 8, in order).
+    Q_INVOKABLE QVariantMap repeatsAt(int measure) const;
+    /// Changes the repeats of `measure` named in `repeats`, keyed as
+    /// repeatsAt() gives them, as one undo step ("Change repeats").
+    Q_INVOKABLE void setRepeats(int measure, const QVariantMap& repeats);
+    /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
+    /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,
+    /// 8 eighth...) and "dotted"; "own" when the measure starts a tempo
+    /// change, and "first" for the first measure, whose tempo is the song's.
+    Q_INVOKABLE QVariantMap tempoAt(int measure) const;
+    /// Sets the tempo from `measure` until the next change as one undo step
+    /// ("Change tempo"), or with a bpm of 0 takes the measure's change away. On
+    /// the first measure it sets the song's tempo.
+    Q_INVOKABLE void setTempoFrom(int measure, int bpm);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -347,11 +374,45 @@ public:
     [[nodiscard]] QVariantMap caretNavigation() const {
         return navigationAt(static_cast<int>(caret_.measure));
     }
+    [[nodiscard]] QVariantMap caretRepeats() const {
+        return repeatsAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] QVariantMap caretTempo() const {
+        return tempoAt(static_cast<int>(caret_.measure));
+    }
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
     Q_INVOKABLE void insertMeasure(bool after);
     /// Removes the caret's measure; the last measure of a song stays.
     Q_INVOKABLE void removeMeasure();
+
+    /// Selected measures (ADR-0036): from an anchor, where the selection
+    /// started, to the caret's measure. 0-based; -1 without a selection.
+    [[nodiscard]] bool hasSelection() const { return anchor_.has_value(); }
+    [[nodiscard]] int selectionFirst() const;
+    [[nodiscard]] int selectionLast() const;
+    /// Changes whenever the selection or its place on the pages does.
+    [[nodiscard]] int selectionRevision() const { return selectionRevision_; }
+    /// Where the selected measures are on page `index`, in staff spaces from the
+    /// page's top-left corner: one rectangle per measure, across its system.
+    Q_INVOKABLE QVariantList selectionBoxes(int index) const;
+    /// Moves the caret `measures` measures on (back when negative), selecting
+    /// from where it was.
+    Q_INVOKABLE void extendSelection(int measures);
+    /// Selects every measure, with the caret on the first.
+    Q_INVOKABLE void selectAll();
+    Q_INVOKABLE void clearSelection();
+    /// Copies the selected measures, or the caret's, of the shown track (of
+    /// every track when all are shown).
+    Q_INVOKABLE void copy();
+    [[nodiscard]] bool canPaste() const { return clip_.has_value(); }
+    /// Pastes the copied measures at the first selected measure, or the
+    /// caret's, over the measures there or into new ones before it; the pasted
+    /// measures are selected.
+    Q_INVOKABLE void paste(bool insert);
+    /// Transposes the selected measures, or the caret's, of the shown track (of
+    /// every track when all are shown) by `semitones`.
+    Q_INVOKABLE void transposeSelection(int semitones);
 
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;
@@ -376,6 +437,10 @@ signals:
     void historyChanged();
     void caretChanged();
     void inputChanged();
+    void selectionChanged();
+    void clipboardChanged();
+    /// Something done that the window shows for a moment ("Copied measure 3.").
+    void notice(const QString& message);
     /// An edit or a save that failed, with the reason to show.
     void editFailed(const QString& message);
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
@@ -402,6 +467,10 @@ private:
     void fail(const QString& message);
     void setPending(int delta);
     void resequence();
+    /// The selected measures, or the caret's: first and count.
+    [[nodiscard]] std::pair<std::size_t, std::size_t> selectedRange() const;
+    /// The selection changed, or its place on the pages.
+    void selectionMoved();
 
     QUrl source_;
     Status status_ = Status::Empty;
@@ -420,10 +489,13 @@ private:
     core::Duration input_;
     int caretPage_ = -1;
     QRectF caretRect_;
-    int pendingDigit_ = -1;       ///< a digit just typed, waiting for a second
-    core::Caret digitCaret_;      ///< where it was typed
-    std::uint64_t digitEdit_ = 0; ///< edits_ after it
-    bool digitChanged_ = false;   ///< whether it changed the song (and can be undone)
+    std::optional<std::size_t> anchor_; ///< where the selection started
+    int selectionRevision_ = 0;
+    std::optional<core::MeasureClip> clip_; ///< the measures copied
+    int pendingDigit_ = -1;                 ///< a digit just typed, waiting for a second
+    core::Caret digitCaret_;                ///< where it was typed
+    std::uint64_t digitEdit_ = 0;           ///< edits_ after it
+    bool digitChanged_ = false;             ///< whether it changed the song (and can be undone)
     QElapsedTimer digitClock_;
     std::uint64_t edits_ = 0; ///< edits, undos and redos so far
     int track_ = 0;

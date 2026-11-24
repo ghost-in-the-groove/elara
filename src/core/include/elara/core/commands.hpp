@@ -194,4 +194,14 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from,
                                                           KeySignature key);
 
+/// Sets the tempo that starts measure `measure`, in beats per minute of the
+/// beat the song counts in there (a dotted quarter in 6/8 stays one), or with
+/// no `bpm` takes it away; it holds until the next tempo change. Changes later
+/// in the measure stay. One undo step; null when nothing would change. Throws
+/// std::out_of_range when the song has no measure `measure`, and
+/// std::invalid_argument for the first measure, which plays at the song's
+/// tempo (SetStartTempo), or a bpm outside the range of Tempo.
+[[nodiscard]] std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
+                                                   std::optional<double> bpm);
+
 } // namespace elara::core

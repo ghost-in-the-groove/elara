@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The caret's measure: its time and key signatures, which change from it until
-// the next change, its signs and jumps, and measures inserted before or after
-// it, or it deleted.
+// the next change, its signs and jumps, its repeats, and measures inserted
+// before or after it, or it deleted.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -15,6 +15,21 @@ Popup {
 
     readonly property color ink: Theme.ink
     readonly property var marks: document.caretNavigation
+    readonly property var repeats: document.caretRepeats
+    readonly property var endings: Array.from(repeats.endings ?? [])
+    readonly property var tempo: document.caretTempo
+    // The beat as a metronome mark of the music font, dotted when it is.
+    readonly property string beatSymbol: {
+        const notes = {
+            "1": "",
+            "2": "",
+            "4": "",
+            "8": "",
+            "16": "",
+            "32": ""
+        };
+        return (notes[tempo.beat] ?? "") + (tempo.dotted === true ? "" : "");
+    }
 
     // A mark that is on or off, as a rounded chip.
     component Chip: AbstractButton {
@@ -118,6 +133,47 @@ Popup {
                               root.document.caretMeasure, numerator, denominator)
             onKeyChosen: (fifths, minor) => root.document.setKeySignatureFrom(
                              root.document.caretMeasure, fifths, minor)
+        }
+
+        // The tempo the measure starts with (ADR-0042), in the beat the song
+        // counts in there: a new one starts a tempo change, which the cross
+        // takes away again. On the first measure it is the song's tempo.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Tempo")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            MusicSymbol {
+                symbol: root.beatSymbol
+                size: 22
+                color: root.ink
+            }
+            Label {
+                text: "="
+                opacity: 0.75
+            }
+            SpinBox {
+                Layout.fillWidth: true
+                from: 10
+                to: 999
+                editable: true
+                value: root.tempo.bpm ?? 120
+                onValueModified: root.document.setTempoFrom(root.document.caretMeasure, value)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Beats per minute from this measure on")
+            }
+            IconButton {
+                visible: root.tempo.own === true && root.tempo.first !== true
+                iconPath: "M7 7 L17 17 M17 7 L7 17"
+                tip: qsTr("Remove the tempo change")
+                onClicked: root.document.setTempoFrom(root.document.caretMeasure, 0)
+            }
         }
 
         Label {
@@ -227,6 +283,104 @@ Popup {
             Layout.topMargin: 2
             height: 1
             color: Theme.line
+        }
+
+        Label {
+            text: qsTr("Repeats")
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+            color: root.ink
+        }
+
+        // The barlines that open and close a repeated section, and how many
+        // times the section plays.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Chip {
+                text: qsTr("Start")
+                on: root.repeats.start === true
+                onClicked: root.document.setRepeats(root.document.caretMeasure, {
+                                                        start: !on
+                                                    })
+            }
+            Chip {
+                text: qsTr("End")
+                on: (root.repeats.times ?? 0) >= 2
+                onClicked: root.document.setRepeats(root.document.caretMeasure, {
+                                                        times: on ? 0 : 2
+                                                    })
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            SpinBox {
+                id: timesField
+
+                readonly property int times: Math.max(2, root.repeats.times ?? 2)
+
+                Layout.preferredWidth: 140
+                focusPolicy: Qt.NoFocus
+                enabled: (root.repeats.times ?? 0) >= 2
+                opacity: enabled ? 1 : 0.4
+                from: 2
+                to: 255
+                value: times
+                textFromValue: (value, locale) => qsTr("%1 times").arg(value)
+                onValueModified: {
+                    root.document.setRepeats(root.document.caretMeasure, {
+                                                 times: value
+                                             });
+                    value = Qt.binding(() => timesField.times);
+                }
+            }
+        }
+
+        // The times through the repeat that play this measure, as alternate
+        // endings; none lit, it plays every time.
+        Flow {
+            Layout.fillWidth: true
+            spacing: 3
+
+            Label {
+                height: 30
+                rightPadding: 5
+                verticalAlignment: Text.AlignVCenter
+                text: qsTr("Endings")
+                font.pixelSize: 13
+                color: Qt.alpha(root.ink, 0.7)
+            }
+            Repeater {
+                model: 8
+
+                delegate: Chip {
+                    required property int index
+
+                    readonly property int time: index + 1
+
+                    // Round, so that the eight fit beside their label.
+                    implicitWidth: 30
+                    text: qsTr("%1.").arg(time)
+                    on: root.endings.indexOf(time) >= 0
+                    onClicked: {
+                        const list = root.endings.filter(t => t !== time);
+                        if (!on) {
+                            list.push(time);
+                        }
+                        root.document.setRepeats(root.document.caretMeasure, {
+                                                     endings: list
+                                                 });
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.topMargin: 2
+            height: 1
+            color: Qt.alpha(root.ink, 0.1)
         }
 
         RowLayout {
