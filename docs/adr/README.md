@@ -61,6 +61,7 @@ one that replaces them.
 | [0054](0054-worker-results-from-the-event-loop.md) | Worker results arrive from the event loop | Accepted |
 | [0055](0055-bend-forms.md) | Bends of any form at the caret | Accepted |
 | [0056](0056-beat-effects-at-the-caret.md) | Beat effects at the caret | Accepted |
+| [0058](0058-kinds-of-note-effects.md) | Kinds of note effects at the caret | Accepted |
 
 ## Template
 

@@ -121,6 +121,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         (ADR-0055)
   - [x] Strums, pick strokes and tremolo picking on the caret's beat, in the
         CLI and the effects panel (ADR-0056)
+  - [x] Kinds of note effects at the caret: slides in and out, harmonics of
+        every kind, wide vibrato and marcato, in the CLI and the effects panel
+        (ADR-0058)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)

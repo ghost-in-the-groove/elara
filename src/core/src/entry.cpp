@@ -680,7 +680,12 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
     return replace(caret, std::move(content), "Change effect");
 }
 
-Entry setBend(const Song& song, const Caret& at, const BendCurve& curve) {
+namespace {
+
+// Changes the effects of the notes the caret is on (as for toggleEffect) with
+// `change`, as one undo step named `name`; unchanged when no note changes.
+template <typename Change>
+Entry changeEffects(const Song& song, const Caret& at, std::string name, Change change) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
         return unchanged(caret);
@@ -689,18 +694,30 @@ Entry setBend(const Song& song, const Caret& at, const BendCurve& curve) {
     Measure content = measureAt(song, caret);
     bool changed = false;
     for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
-        if (isEffectTarget(note, staff, caret.string) && note.effects.bend != curve) {
-            note.effects.bend = curve;
-            changed = true;
+        if (isEffectTarget(note, staff, caret.string)) {
+            const NoteEffects before = note.effects;
+            change(note);
+            changed = changed || note.effects != before;
         }
     }
     if (!changed) {
         return unchanged(caret);
     }
-    return replace(caret, std::move(content), "Change bend");
+    return replace(caret, std::move(content), std::move(name));
+}
+
+} // namespace
+
+Entry setBend(const Song& song, const Caret& at, const BendCurve& curve) {
+    return changeEffects(song, at, "Change bend",
+                         [&curve](Note& note) { note.effects.bend = curve; });
 }
 
 BendCurve bendAtCaret(const Song& song, const Caret& at) {
+    return noteEffectsAt(song, at).bend;
+}
+
+NoteEffects noteEffectsAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
         return {};
@@ -708,10 +725,49 @@ BendCurve bendAtCaret(const Song& song, const Caret& at) {
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     for (const Note& note : voiceAt(song, caret).beats[caret.beat].notes) {
         if (isEffectTarget(note, staff, caret.string)) {
-            return note.effects.bend;
+            return note.effects;
         }
     }
     return {};
+}
+
+Entry setSlides(const Song& song, const Caret& at, SlideIn in, SlideOut out) {
+    return changeEffects(song, at, "Change slide", [in, out](Note& note) {
+        note.effects.slideIn = in;
+        note.effects.slideOut = out;
+    });
+}
+
+Entry setVibrato(const Song& song, const Caret& at, Vibrato vibrato) {
+    return changeEffects(song, at, "Change vibrato",
+                         [vibrato](Note& note) { note.effects.vibrato = vibrato; });
+}
+
+Entry setAccent(const Song& song, const Caret& at, Accent accent) {
+    return changeEffects(song, at, "Change accent",
+                         [accent](Note& note) { note.effects.accent = accent; });
+}
+
+Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
+    constexpr std::int16_t kOctave = 120; // tenths of a fret above the fretted note
+    constexpr int kTenths = 10;
+    const Caret caret = clampCaret(song, at);
+    if (kind != HarmonicKind::None && !song.track(caret.track).staff(caret.staff).isFretted()) {
+        throw std::logic_error("setHarmonic: a harmonic needs strings");
+    }
+    return changeEffects(song, caret, "Change harmonic", [kind](Note& note) {
+        Harmonic harmonic{.kind = kind,
+                          .fretTenths =
+                              static_cast<std::int16_t>(kind == HarmonicKind::None ? 0 : kOctave)};
+        if (kind == HarmonicKind::Natural) {
+            const int fret = note.position ? note.position->fret : -1;
+            if (!naturalHarmonicSemitones(fret)) {
+                throw std::out_of_range("setHarmonic: no natural harmonic at that fret");
+            }
+            harmonic.fretTenths = static_cast<std::int16_t>(fret * kTenths);
+        }
+        note.effects.harmonic = harmonic;
+    });
 }
 
 Entry setBeatEffects(const Song& song, const Caret& at, const BeatEffects& effects) {

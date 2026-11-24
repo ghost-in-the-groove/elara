@@ -272,6 +272,11 @@ constexpr std::array kEditNames{
     Translation{"Change bend", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change bend")},
     Translation{"Change beat effects",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change beat effects")},
+    Translation{"Change slide", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change slide")},
+    Translation{"Change vibrato", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change vibrato")},
+    Translation{"Change accent", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change accent")},
+    Translation{"Change harmonic",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change harmonic")},
 };
 
 // The names of Tuning::presetNames().
@@ -1428,12 +1433,35 @@ QString ScoreDocument::caretStatus() const {
         parts.append(names.join(QLatin1Char(' ')));
     }
     const int effects = caretEffects();
+    const core::NoteEffects fx = noteEffectsAtCaret();
+    if (fx.slideIn != core::SlideIn::None) {
+        parts.append(slideInName(static_cast<int>(fx.slideIn)));
+    }
     for (int effect = 0; effect < kEffectCount; ++effect) {
-        if ((effects & (1 << effect)) != 0) {
-            // A bend says its form and how far it goes.
-            parts.append(effect == static_cast<int>(core::NoteEffect::Bend)
-                             ? bendName(caretBendForm(), caretBendCents())
-                             : effectName(effect));
+        if ((effects & (1 << effect)) == 0) {
+            continue;
+        }
+        // Effects of several kinds say which (ADR-0055, ADR-0058).
+        switch (static_cast<core::NoteEffect>(effect)) {
+        case core::NoteEffect::Bend:
+            parts.append(bendName(caretBendForm(), caretBendCents()));
+            break;
+        case core::NoteEffect::Slide:
+            parts.append(slideOutName(static_cast<int>(fx.slideOut)));
+            break;
+        case core::NoteEffect::Harmonic:
+            parts.append(harmonicName(static_cast<int>(fx.harmonic.kind)));
+            break;
+        case core::NoteEffect::Vibrato:
+            parts.append(fx.vibrato == core::Vibrato::Wide ? tr("Wide vibrato")
+                                                           : effectName(effect));
+            break;
+        case core::NoteEffect::Accent:
+            parts.append(fx.accent == core::Accent::Marcato ? tr("Marcato") : effectName(effect));
+            break;
+        default:
+            parts.append(effectName(effect));
+            break;
         }
     }
     // Then the beat's own effects.
@@ -1854,6 +1882,162 @@ void ScoreDocument::setTremolo(int value) {
     core::BeatEffects effects = beatEffectsAtCaret();
     effects.tremoloPicking = speed;
     applyBeatEffects(effects);
+}
+
+core::NoteEffects ScoreDocument::noteEffectsAtCaret() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return {};
+    }
+    return core::noteEffectsAt(document_->song(), caret_);
+}
+
+void ScoreDocument::changeNoteEffects(
+    const std::function<core::Entry(const core::Song&, const core::Caret&)>& make,
+    const std::function<bool(const core::NoteEffects&)>& has) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    pendingDigit_ = -1;
+    try {
+        core::Entry entry = make(document_->song(), caret_);
+        if (!entry.command) {
+            if (!has(noteEffectsAtCaret()) || pitchesAtCaret().empty()) {
+                emit editFailed(tr("Effects go on notes: put the caret on one."));
+            }
+            return;
+        }
+        enter(std::move(entry));
+    } catch (const std::out_of_range&) {
+        emit editFailed(tr("That fret has no natural harmonic."));
+    } catch (const std::logic_error&) {
+        emit editFailed(tr("Harmonics need strings."));
+    }
+}
+
+void ScoreDocument::setSlideIn(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::SlideIn::FromAbove)) {
+        return;
+    }
+    const auto in = static_cast<core::SlideIn>(kind);
+    changeNoteEffects(
+        [in](const core::Song& song, const core::Caret& caret) {
+            return core::setSlides(song, caret, in, core::noteEffectsAt(song, caret).slideOut);
+        },
+        [in](const core::NoteEffects& fx) { return fx.slideIn == in; });
+}
+
+void ScoreDocument::setSlideOut(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::SlideOut::Upwards)) {
+        return;
+    }
+    const auto out = static_cast<core::SlideOut>(kind);
+    changeNoteEffects(
+        [out](const core::Song& song, const core::Caret& caret) {
+            return core::setSlides(song, caret, core::noteEffectsAt(song, caret).slideIn, out);
+        },
+        [out](const core::NoteEffects& fx) { return fx.slideOut == out; });
+}
+
+void ScoreDocument::setVibrato(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::Vibrato::Wide)) {
+        return;
+    }
+    const auto vibrato = static_cast<core::Vibrato>(kind);
+    changeNoteEffects(
+        [vibrato](const core::Song& song, const core::Caret& caret) {
+            return core::setVibrato(song, caret, vibrato);
+        },
+        [vibrato](const core::NoteEffects& fx) { return fx.vibrato == vibrato; });
+}
+
+void ScoreDocument::setAccent(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::Accent::Marcato)) {
+        return;
+    }
+    const auto accent = static_cast<core::Accent>(kind);
+    changeNoteEffects(
+        [accent](const core::Song& song, const core::Caret& caret) {
+            return core::setAccent(song, caret, accent);
+        },
+        [accent](const core::NoteEffects& fx) { return fx.accent == accent; });
+}
+
+void ScoreDocument::setHarmonic(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::HarmonicKind::Semi)) {
+        return;
+    }
+    const auto harmonic = static_cast<core::HarmonicKind>(kind);
+    changeNoteEffects(
+        [harmonic](const core::Song& song, const core::Caret& caret) {
+            return core::setHarmonic(song, caret, harmonic);
+        },
+        [harmonic](const core::NoteEffects& fx) { return fx.harmonic.kind == harmonic; });
+}
+
+int ScoreDocument::caretSlideIn() const {
+    return static_cast<int>(noteEffectsAtCaret().slideIn);
+}
+
+int ScoreDocument::caretSlideOut() const {
+    return static_cast<int>(noteEffectsAtCaret().slideOut);
+}
+
+int ScoreDocument::caretVibrato() const {
+    return static_cast<int>(noteEffectsAtCaret().vibrato);
+}
+
+int ScoreDocument::caretAccent() const {
+    return static_cast<int>(noteEffectsAtCaret().accent);
+}
+
+int ScoreDocument::caretHarmonic() const {
+    return static_cast<int>(noteEffectsAtCaret().harmonic.kind);
+}
+
+QString ScoreDocument::slideInName(int kind) const {
+    switch (static_cast<core::SlideIn>(kind)) {
+    case core::SlideIn::FromBelow:
+        return tr("Slide in from below");
+    case core::SlideIn::FromAbove:
+        return tr("Slide in from above");
+    case core::SlideIn::None:
+        break;
+    }
+    return {};
+}
+
+QString ScoreDocument::slideOutName(int kind) const {
+    switch (static_cast<core::SlideOut>(kind)) {
+    case core::SlideOut::Shift:
+        return tr("Shift slide");
+    case core::SlideOut::Legato:
+        return tr("Legato slide");
+    case core::SlideOut::Downwards:
+        return tr("Slide out downwards");
+    case core::SlideOut::Upwards:
+        return tr("Slide out upwards");
+    case core::SlideOut::None:
+        break;
+    }
+    return {};
+}
+
+QString ScoreDocument::harmonicName(int kind) const {
+    switch (static_cast<core::HarmonicKind>(kind)) {
+    case core::HarmonicKind::Natural:
+        return tr("Natural harmonic");
+    case core::HarmonicKind::Artificial:
+        return tr("Artificial harmonic");
+    case core::HarmonicKind::Pinch:
+        return tr("Pinch harmonic");
+    case core::HarmonicKind::Tapped:
+        return tr("Tapped harmonic");
+    case core::HarmonicKind::Semi:
+        return tr("Semi-harmonic");
+    case core::HarmonicKind::None:
+        break;
+    }
+    return {};
 }
 
 int ScoreDocument::caretStrum() const {

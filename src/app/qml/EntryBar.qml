@@ -148,6 +148,41 @@ Rectangle {
         }
     }
 
+    // A kind of note effect (ADR-0058), drawn as an icon or a short label:
+    // lit while the caret's notes have it; a click on a lit one takes it off.
+    component EffectKind: Pill {
+        id: effectKind
+
+        required property string tip
+        property string path
+        property string label
+
+        implicitWidth: label.length > 0 ? Math.max(34, kindLabel.implicitWidth + 14) : 34
+        opacity: enabled ? 1.0 : 0.35
+        Accessible.role: Accessible.CheckBox
+        Accessible.name: tip
+
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                visible: effectKind.label.length === 0
+                path: effectKind.path
+                lineWidth: 1.8
+                color: effectKind.active ? "white" : root.ink
+            }
+            Label {
+                id: kindLabel
+
+                anchors.centerIn: parent
+                visible: effectKind.label.length > 0
+                text: effectKind.label
+                font.pixelSize: 11
+                font.bold: true
+                color: effectKind.active ? "white" : root.ink
+            }
+        }
+    }
+
     // How far a bend goes: the caret's bend, or a bend up if it has none.
     component BendAmount: Pill {
         id: bendAmount
@@ -639,6 +674,144 @@ Rectangle {
 
                                 cents: modelData
                             }
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Slide")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // How the caret's notes slide in, then out (ADR-0058).
+                    Row {
+                        spacing: 4
+
+                        EffectKind {
+                            tip: root.document.slideInName(1)
+                            path: "M3 19 L11 12 M13 12 A2.5 2.5 0 1 0 18 12 A2.5 2.5 0 1 0 13 12"
+                            active: root.document.caretSlideIn === 1
+                            onClicked: root.document.setSlideIn(active ? 0 : 1)
+                        }
+                        EffectKind {
+                            tip: root.document.slideInName(2)
+                            path: "M3 5 L11 12 M13 12 A2.5 2.5 0 1 0 18 12 A2.5 2.5 0 1 0 13 12"
+                            active: root.document.caretSlideIn === 2
+                            onClicked: root.document.setSlideIn(active ? 0 : 2)
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        EffectKind {
+                            tip: root.document.slideOutName(1)
+                            path: "M2 16 A2.5 2.5 0 1 0 7 16 A2.5 2.5 0 1 0 2 16 M8.5 14.5 L15.5 9.5 M17 8 A2.5 2.5 0 1 0 22 8 A2.5 2.5 0 1 0 17 8"
+                            active: root.document.caretSlideOut === 1
+                            onClicked: root.document.setSlideOut(active ? 0 : 1)
+                        }
+                        EffectKind {
+                            tip: root.document.slideOutName(2)
+                            path: "M2 18 A2.5 2.5 0 1 0 7 18 A2.5 2.5 0 1 0 2 18 M8.5 16.5 L15.5 11.5 M17 10 A2.5 2.5 0 1 0 22 10 A2.5 2.5 0 1 0 17 10 M4.5 13 Q11 3 19.5 5.5"
+                            active: root.document.caretSlideOut === 2
+                            onClicked: root.document.setSlideOut(active ? 0 : 2)
+                        }
+                        EffectKind {
+                            tip: root.document.slideOutName(3)
+                            path: "M6 12 A2.5 2.5 0 1 0 11 12 A2.5 2.5 0 1 0 6 12 M13 12 L21 19"
+                            active: root.document.caretSlideOut === 3
+                            onClicked: root.document.setSlideOut(active ? 0 : 3)
+                        }
+                        EffectKind {
+                            tip: root.document.slideOutName(4)
+                            path: "M6 12 A2.5 2.5 0 1 0 11 12 A2.5 2.5 0 1 0 6 12 M13 12 L21 5"
+                            active: root.document.caretSlideOut === 4
+                            onClicked: root.document.setSlideOut(active ? 0 : 4)
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Harmonic, vibrato and accent")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // The harmonic's kind (only with strings), the vibrato's
+                    // width and the accent's strength.
+                    Row {
+                        spacing: 4
+
+                        Repeater {
+                            model: ["N.H.", "A.H.", "P.H.", "T.H.", "S.H."]
+
+                            delegate: EffectKind {
+                                required property int index
+                                required property string modelData
+
+                                tip: root.document.harmonicName(index + 1)
+                                label: modelData
+                                enabled: root.document.caretFretted
+                                active: root.document.caretHarmonic === index + 1
+                                onClicked: root.document.setHarmonic(active ? 0 : index + 1)
+                            }
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        EffectKind {
+                            tip: qsTr("Slight vibrato")
+                            path: "M3 12 C5 9 7 9 9 12 C11 15 13 15 15 12 C17 9 19 9 21 12"
+                            active: root.document.caretVibrato === 1
+                            onClicked: root.document.setVibrato(active ? 0 : 1)
+                        }
+                        EffectKind {
+                            tip: qsTr("Wide vibrato")
+                            path: "M3 12 C5 5 7 5 9 12 C11 19 13 19 15 12 C17 5 19 5 21 12"
+                            active: root.document.caretVibrato === 2
+                            onClicked: root.document.setVibrato(active ? 0 : 2)
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        EffectKind {
+                            tip: qsTr("Accent")
+                            path: "M7 7 L17 12 L7 17"
+                            active: root.document.caretAccent === 1
+                            onClicked: root.document.setAccent(active ? 0 : 1)
+                        }
+                        EffectKind {
+                            tip: qsTr("Marcato")
+                            path: "M7 17 L12 7 L17 17"
+                            active: root.document.caretAccent === 2
+                            onClicked: root.document.setAccent(active ? 0 : 2)
                         }
                     }
 
