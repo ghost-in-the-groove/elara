@@ -1,11 +1,12 @@
-# elara_audio / elara_audio_juce
+# elara_audio / elara_audio_juce / elara_audio_fluid
 
-Two targets with different rules:
+Three targets with different rules:
 
 | Target | Files | May depend on | Must not include |
 |---|---|---|---|
 | `elara_audio` | `include/`, `src/` | std, `elara_core` | Qt, JUCE |
 | `elara_audio_juce` | `backend_juce/` | std, `elara_core`, `elara_audio`, JUCE | Qt; JUCE types in its public header |
+| `elara_audio_fluid` | `backend_fluid/` | std, `elara_core`, `elara_audio`, FluidSynth | Qt, JUCE; FluidSynth types in its public header |
 
 `elara_audio` holds code that is easy to test without a sound card:
 
@@ -23,9 +24,14 @@ Two targets with different rules:
   instrument by `timbreFor()`; plucked timbres also play each note's `Touch`:
   palm mute, dead note or harmonic, ADR-0022; `glide()` moves a sounding
   voice's pitch, ADR-0023) and `OfflineRenderer`, which plays a sequence
-  through one synth per track into stereo, with an event log (ADR-0018). Each
+  through one sound per track into stereo, with an event log (ADR-0018). Each
   track sits in the stereo mix at its volume and pan, and mute and solo
   silence tracks (ADR-0020);
+- sound banks (ADR-0043): a `SoundBank` gives each track a `TrackSound`, the
+  real-time-safe interface the renderer and the player strike notes on.
+  `builtinBank()` wraps the built-in `Synth`; `RenderOptions::bank` and
+  `Player::setSoundBank()` choose another, such as a SoundFont. The player
+  keeps a track's sound across loads while its instrument stays the same;
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from
@@ -48,10 +54,20 @@ plays an `AudioSource` such as a `Player`. `MicrophoneInput` (and
 `listInputDevices()`) listens to the default input on a device of its own and
 queues the loudest channel's samples in a `SampleRing` (ADR-0029).
 
+`elara_audio_fluid` reads SoundFonts (SF2, and SF3 with compressed samples)
+through FluidSynth (ADR-0043): `SoundFont::open()` lists the presets and
+`presetFor()` picks each instrument's General MIDI preset. A track's sound is
+a FluidSynth synth of its own with the track's presets only, sixteen MIDI
+channels so each note takes one (a glide bends only its key), and a guitar's
+muted and harmonics presets for palm mutes, dead notes and harmonics.
+FluidSynth comes from the overlay port in `cmake/vcpkg-ports/fluidsynth`,
+built without audio drivers.
+
 ## Real-time rule
 
 Code that runs inside the audio callback (`ToneGenerator`, `fadeGain`,
-`Synth` after construction, `Player::render()`, `PitchDetector::detect()`,
+`Synth` and every `TrackSound` after construction, `Player::render()`,
+`PitchDetector::detect()`,
 `SampleRing::write()`, the callbacks in
 `system_audio.cpp` and `microphone_input.cpp`) must not allocate, lock, log, throw or do I/O.
 Exchange data with the audio thread through atomics or lock-free queues only.
@@ -61,13 +77,17 @@ Exchange data with the audio thread through atomics or lock-free queues only.
 `elara-cli render-tone --json --out tone.wav` renders the same DSP offline and
 reports frames and peak level; `elara-cli sequence FILE --json --events` prints
 what the sequencer would play; `elara-cli render-audio FILE --json --events
-[--out song.wav]` plays it through the built-in synthesizer and prints the
-level, each track's timbre and every event with the frame it was dispatched
-at. `elara-cli play FILE` plays it on the default device. All three take
+[--out song.wav]` plays it through the built-in synthesizer (or a SoundFont
+with `--soundfont FILE.sf2`) and prints the level, each track's timbre and
+sound and every event with the frame it was dispatched at. `elara-cli
+soundfont FILE.sf2 --json` lists a SoundFont's presets. `elara-cli play FILE` plays it on the default device. All three take
 `--speed PERCENT` and `--metronome`; `sequence --count-in-at SECONDS` prints a
 count-in, and `play` takes `--count-in` and `--loop FROM TO`. `elara-cli tune
 FILE.wav --json [--tuning guitar]` reports the pitch a tuner would show for a
 recording. Tests in
 `tests/audio/` check pitch, glides, envelopes, touches, voice stealing, event frames and the
 player's transport by calling `render()` as an audio callback would; tests in
-`tests/cli/` run the commands on corpus files.
+`tests/cli/` run the commands on corpus files. SoundFont tests write a tiny
+SoundFont of their own (`tests/audio/test_soundfont.hpp`): one sine wave
+that each preset plays from a different root key, so the pitch shows which
+preset sounded.

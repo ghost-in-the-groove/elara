@@ -28,9 +28,10 @@ elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation fon
 elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metronome]
                              [--count-in-at SECONDS]
 elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
-                                 [--events] [--speed 100] [--metronome]
+                                 [--events] [--speed 100] [--metronome] [--soundfont FILE.sf2]
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
-                         [--count-in] [--loop FROM TO]
+                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2]
+elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
@@ -205,6 +206,13 @@ the written tempo) and `"metronome"`; `sequence` puts them after
 from there. `play --count-in` clicks it before playing, and `--loop FROM TO`
 loops a passage; without `--seconds`, a looped `play` stops after going round
 the loop twice.
+
+`render-audio` and `play` play the tracks through the built-in synthesizer, or
+through a SoundFont (SF2 or SF3) with `--soundfont` (ADR-0043): each track
+plays its instrument's General MIDI preset. `render-audio --json` says
+`"soundFont"` (the file, or null) and each track's `"sound"`: the timbre's name,
+or the preset's. `soundfont FILE --json` lists the presets as
+`{"bank", "program", "name"}`, by bank and program.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
