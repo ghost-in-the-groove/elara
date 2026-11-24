@@ -127,6 +127,30 @@
         <translation>Pre-bending y vuelta</translation>
     </message>
     <message>
+        <source>Slide</source>
+        <translation>Deslizamiento</translation>
+    </message>
+    <message>
+        <source>Harmonic, vibrato and accent</source>
+        <translation>Armónico, vibrato y acento</translation>
+    </message>
+    <message>
+        <source>Slight vibrato</source>
+        <translation>Vibrato ligero</translation>
+    </message>
+    <message>
+        <source>Wide vibrato</source>
+        <translation>Vibrato amplio</translation>
+    </message>
+    <message>
+        <source>Accent</source>
+        <translation>Acento</translation>
+    </message>
+    <message>
+        <source>Marcato</source>
+        <translation>Marcato</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1132,6 +1156,22 @@
         <translation>Cambiar efectos del tiempo</translation>
     </message>
     <message>
+        <source>Change slide</source>
+        <translation>Cambiar deslizamiento</translation>
+    </message>
+    <message>
+        <source>Change vibrato</source>
+        <translation>Cambiar vibrato</translation>
+    </message>
+    <message>
+        <source>Change accent</source>
+        <translation>Cambiar acento</translation>
+    </message>
+    <message>
+        <source>Change harmonic</source>
+        <translation>Cambiar armónico</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1342,6 +1382,14 @@
         <translation>Traste %1</translation>
     </message>
     <message>
+        <source>Wide vibrato</source>
+        <translation>Vibrato amplio</translation>
+    </message>
+    <message>
+        <source>Marcato</source>
+        <translation>Marcato</translation>
+    </message>
+    <message>
         <source>Strum down</source>
         <translation>Rasgueo abajo</translation>
     </message>
@@ -1404,6 +1452,46 @@
     <message>
         <source>Harmonics need strings.</source>
         <translation>Los armónicos necesitan cuerdas.</translation>
+    </message>
+    <message>
+        <source>Slide in from below</source>
+        <translation>Deslizamiento de entrada desde abajo</translation>
+    </message>
+    <message>
+        <source>Slide in from above</source>
+        <translation>Deslizamiento de entrada desde arriba</translation>
+    </message>
+    <message>
+        <source>Shift slide</source>
+        <translation>Deslizamiento con ataque</translation>
+    </message>
+    <message>
+        <source>Legato slide</source>
+        <translation>Deslizamiento ligado</translation>
+    </message>
+    <message>
+        <source>Slide out downwards</source>
+        <translation>Deslizamiento de salida hacia abajo</translation>
+    </message>
+    <message>
+        <source>Slide out upwards</source>
+        <translation>Deslizamiento de salida hacia arriba</translation>
+    </message>
+    <message>
+        <source>Artificial harmonic</source>
+        <translation>Armónico artificial</translation>
+    </message>
+    <message>
+        <source>Pinch harmonic</source>
+        <translation>Armónico pellizcado</translation>
+    </message>
+    <message>
+        <source>Tapped harmonic</source>
+        <translation>Armónico con tapping</translation>
+    </message>
+    <message>
+        <source>Semi-harmonic</source>
+        <translation>Semiarmónico</translation>
     </message>
     <message>
         <source>full</source>

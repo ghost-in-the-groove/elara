@@ -215,6 +215,31 @@ std::uint8_t strokeDirection(std::string_view verb, std::string_view word) {
     return static_cast<std::uint8_t>(found - kStrokeDirections.begin());
 }
 
+// The kinds of note effects their steps take, in the order of their enums
+// (ADR-0058): slide-in, slide-out, vibrato, accent and harmonic.
+constexpr std::array<std::string_view, 3> kSlideInKinds{"none", "from-below", "from-above"};
+constexpr std::array<std::string_view, 5> kSlideOutKinds{"none", "shift", "legato", "downwards",
+                                                         "upwards"};
+constexpr std::array<std::string_view, 3> kVibratoKinds{"none", "slight", "wide"};
+constexpr std::array<std::string_view, 3> kAccentKinds{"none", "accent", "marcato"};
+constexpr std::array<std::string_view, 6> kHarmonicKinds{"none",  "natural", "artificial",
+                                                         "pinch", "tapped",  "semi"};
+
+// The index of `word` among the kinds `verb` takes.
+template <std::size_t N>
+std::uint8_t kindOf(std::string_view verb, std::string_view word,
+                    const std::array<std::string_view, N>& kinds) {
+    const auto found = std::ranges::find(kinds, word);
+    if (found == kinds.end()) {
+        std::string all;
+        for (const std::string_view kind : kinds) {
+            all += std::format("{}{}", all.empty() ? "" : ", ", kind);
+        }
+        throw StepSyntaxError(std::format("{}: {}, not {}", verb, all, word));
+    }
+    return static_cast<std::uint8_t>(found - kinds.begin());
+}
+
 constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
     {"ppp", core::Dynamic::PPP},
     {"pp", core::Dynamic::PP},
@@ -324,6 +349,27 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             effects.tremoloPicking = tremoloSpeed(step.word(1));
         }
         edit = setBeatEffects(song, entry.caret, effects);
+    } else if (verb == "slide-in" || verb == "slide-out") {
+        // slide-in <from-below|from-above|none>,
+        // slide-out <shift|legato|downwards|upwards|none>: the caret's notes
+        const NoteEffects now = noteEffectsAt(song, entry.caret);
+        SlideIn in = now.slideIn;
+        SlideOut out = now.slideOut;
+        if (verb == "slide-in") {
+            in = static_cast<SlideIn>(kindOf(verb, step.word(1), kSlideInKinds));
+        } else {
+            out = static_cast<SlideOut>(kindOf(verb, step.word(1), kSlideOutKinds));
+        }
+        edit = setSlides(song, entry.caret, in, out);
+    } else if (verb == "vibrato") { // vibrato <slight|wide|none>
+        edit = setVibrato(song, entry.caret,
+                          static_cast<Vibrato>(kindOf(verb, step.word(1), kVibratoKinds)));
+    } else if (verb == "accent") { // accent <accent|marcato|none>
+        edit = setAccent(song, entry.caret,
+                         static_cast<Accent>(kindOf(verb, step.word(1), kAccentKinds)));
+    } else if (verb == "harmonic") { // harmonic <natural|artificial|pinch|tapped|semi|none>
+        edit = setHarmonic(song, entry.caret,
+                           static_cast<HarmonicKind>(kindOf(verb, step.word(1), kHarmonicKinds)));
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
         const auto found = std::ranges::find_if(
@@ -759,7 +805,10 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"duration <d>\", delete, delete-beat, "
         "insert-rest, \"drum [key]\", \"effect <name>\", \"bend <form> [cents]\", \"strum "
         "<down|up|none>\", "
-        "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", undo, redo, "
+        "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", \"slide-in "
+        "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
+        "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", \"harmonic "
+        "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "
         "save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
