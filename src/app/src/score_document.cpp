@@ -248,6 +248,7 @@ constexpr std::array kEditNames{
     Translation{"Delete", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete")},
     Translation{"Delete beat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Delete beat")},
     Translation{"Insert rest", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Insert rest")},
+    Translation{"Change pitch", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change pitch")},
     Translation{"Change tuning", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tuning")},
 };
 
@@ -780,6 +781,70 @@ void ScoreDocument::setKeySignatureFrom(int measure, int fifths, bool minor) {
         core::KeySignature(fifths, minor ? core::KeyMode::Minor : core::KeyMode::Major)));
 }
 
+namespace {
+
+// The flags navigationAt() and setNavigation() name.
+struct NavigationFlag {
+    const char* key;
+    bool core::MeasureHeader::* flag;
+};
+constexpr std::array kNavigationFlags{
+    NavigationFlag{"segno", &core::MeasureHeader::segno},
+    NavigationFlag{"segnoSegno", &core::MeasureHeader::segnoSegno},
+    NavigationFlag{"coda", &core::MeasureHeader::coda},
+    NavigationFlag{"doubleCoda", &core::MeasureHeader::doubleCoda},
+    NavigationFlag{"fine", &core::MeasureHeader::fine},
+    NavigationFlag{"toCoda", &core::MeasureHeader::toCoda},
+    NavigationFlag{"toDoubleCoda", &core::MeasureHeader::toDoubleCoda},
+};
+
+} // namespace
+
+QVariantMap ScoreDocument::navigationAt(int measure) const {
+    QVariantMap marks;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return marks;
+    }
+    const core::MeasureHeader& header =
+        document_->song().measureHeader(static_cast<std::size_t>(measure));
+    for (const NavigationFlag& item : kNavigationFlags) {
+        marks.insert(QLatin1StringView(item.key), header.*item.flag);
+    }
+    marks.insert(QStringLiteral("jump"), static_cast<int>(header.jump));
+    marks.insert(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen));
+    return marks;
+}
+
+void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const auto m = static_cast<std::size_t>(measure);
+    core::MeasureHeader header = document_->song().measureHeader(m);
+    for (const NavigationFlag& item : kNavigationFlags) {
+        if (const auto found = marks.constFind(QLatin1StringView(item.key));
+            found != marks.cend()) {
+            header.*item.flag = found->toBool();
+        }
+    }
+    const auto choice = [&marks](const QString& key, int current) {
+        const int value = marks.value(key, current).toInt();
+        return value >= 0 && value <= 3 ? value : current;
+    };
+    header.jump =
+        static_cast<core::JumpTo>(choice(QStringLiteral("jump"), static_cast<int>(header.jump)));
+    header.jumpThen = static_cast<core::JumpThen>(
+        choice(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen)));
+    if (header.jump == core::JumpTo::None) {
+        header.jumpThen = core::JumpThen::End;
+    }
+    if (header != document_->song().measureHeader(m)) {
+        execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
+    }
+}
+
 int ScoreDocument::caretTimeNumerator() const {
     return document_ && caret_.measure < document_->song().measureCount()
                ? document_->song().measureHeader(caret_.measure).timeSignature.numerator()
@@ -1026,6 +1091,16 @@ constexpr std::array kInputValues{core::NoteValue::Whole,      core::NoteValue::
                                   core::NoteValue::Sixteenth,  core::NoteValue::ThirtySecond,
                                   core::NoteValue::SixtyFourth};
 
+// The tuplets the input offers (ADR-0050): actual notes in the time of normal
+// ones.
+struct InputTuplet {
+    int actual;
+    int normal;
+};
+constexpr std::array kInputTuplets{InputTuplet{2, 3}, InputTuplet{3, 2}, InputTuplet{4, 3},
+                                   InputTuplet{5, 4}, InputTuplet{6, 4}, InputTuplet{7, 4},
+                                   InputTuplet{9, 8}};
+
 // 1 for a whole note, 2 for a half note... 64.
 int denominatorOf(core::NoteValue value) {
     const auto steps = static_cast<int>(value) - static_cast<int>(core::NoteValue::Whole);
@@ -1038,6 +1113,19 @@ std::optional<std::size_t> inputIndex(core::NoteValue value) {
         return std::nullopt;
     }
     return static_cast<std::size_t>(it - kInputValues.begin());
+}
+
+// A pitch with music signs and its octave: "C♯4", "B♭3".
+QString pitchName(const core::Pitch& pitch) {
+    constexpr std::string_view kLetters = "CDEFGAB";
+    QString text(QChar::fromLatin1(kLetters[static_cast<std::size_t>(pitch.step())]));
+    for (int i = 0; i < pitch.alter(); ++i) {
+        text += QChar(0x266F);
+    }
+    for (int i = 0; i > pitch.alter(); --i) {
+        text += QChar(0x266D);
+    }
+    return text + QString::number(pitch.octave());
 }
 
 core::CaretMove coreMove(ScoreDocument::CaretMove move) {
@@ -1074,6 +1162,13 @@ QString ScoreDocument::caretStatus() const {
             parts.append(tr("Fret %1").arg(*fret));
         }
     }
+    QStringList names;
+    for (const core::Pitch& pitch : pitchesAtCaret()) {
+        names.append(pitchName(pitch));
+    }
+    if (!names.isEmpty() && caretPitched()) {
+        parts.append(names.join(QLatin1Char(' ')));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -1105,6 +1200,37 @@ std::optional<int> ScoreDocument::fretAtCaret() const {
         }
     }
     return std::nullopt;
+}
+
+std::vector<core::Pitch> ScoreDocument::pitchesAtCaret() const {
+    std::vector<core::Pitch> pitches;
+    if (!document_ || !hasCaret(document_->song()) || core::onFreeSlot(document_->song(), caret_)) {
+        return pitches;
+    }
+    const bool fretted = caretFretted();
+    const core::Beat& beat = document_->song()
+                                 .track(caret_.track)
+                                 .staff(caret_.staff)
+                                 .measure(caret_.measure)
+                                 .voices.at(caret_.voice)
+                                 .beats.at(caret_.beat);
+    for (const core::Note& note : beat.notes) {
+        if (!fretted || (note.position && note.position->string == caret_.string)) {
+            pitches.push_back(note.pitch);
+        }
+    }
+    std::ranges::sort(pitches, {}, &core::Pitch::midiNumber);
+    return pitches;
+}
+
+bool ScoreDocument::caretPitched() const {
+    if (!document_ || caret_.track >= document_->song().trackCount()) {
+        return false;
+    }
+    const core::Track& track = document_->song().track(caret_.track);
+    return track.instrument().kind != core::InstrumentKind::Percussion &&
+           caret_.staff < track.staffCount() &&
+           track.staff(caret_.staff).clef() != core::Clef::Percussion;
 }
 
 void ScoreDocument::moveCaret(CaretMove move) {
@@ -1184,13 +1310,27 @@ void ScoreDocument::setInputValue(int value) {
     if (it == kInputValues.end()) {
         return;
     }
-    setInput(core::Duration(*it, input_.dots()));
+    setInput(core::Duration(*it, input_.dots(), input_.tuplet()));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
 
 void ScoreDocument::toggleDot() {
-    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1));
+    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1, input_.tuplet()));
+    runEntry(
+        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+}
+
+void ScoreDocument::setInputTuplet(int actual) {
+    core::Tuplet tuplet;
+    if (actual != 0 && actual != inputTuplet()) {
+        const auto found = std::ranges::find(kInputTuplets, actual, &InputTuplet::actual);
+        if (found == kInputTuplets.end()) {
+            return;
+        }
+        tuplet = core::Tuplet(found->actual, found->normal);
+    }
+    setInput(core::Duration(input_.value(), input_.dots(), tuplet));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
@@ -1219,6 +1359,38 @@ void ScoreDocument::deleteBeat() {
 
 void ScoreDocument::insertRest() {
     runEntry([this](const core::Song& song) { return core::insertRest(song, caret_, input_); });
+}
+
+void ScoreDocument::typeNoteName(int step, bool addToChord) {
+    if (!document_ || !hasCaret(document_->song()) || step < 0 || step > 6) {
+        return;
+    }
+    if (!caretPitched()) {
+        emit editFailed(tr("Drums take no note names."));
+        return;
+    }
+    pendingDigit_ = -1;
+    try {
+        enter(
+            core::enterPitch(document_->song(), caret_, static_cast<core::Step>(step), input_,
+                             addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
+    } catch (const std::out_of_range&) {
+        emit editFailed(caretFretted() ? tr("No string can play that note.")
+                                       : tr("That note is out of range."));
+    }
+}
+
+void ScoreDocument::shiftPitch(int semitones) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    pendingDigit_ = -1;
+    try {
+        enter(core::shiftPitch(document_->song(), caret_, semitones));
+    } catch (const std::out_of_range&) {
+        emit editFailed(caretFretted() ? tr("The note would leave the neck.")
+                                       : tr("That note is out of range."));
+    }
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
@@ -1256,7 +1428,12 @@ void ScoreDocument::followBeat() {
                                         .voices.at(caret_.voice)
                                         .beats.at(caret_.beat)
                                         .duration;
-    if (duration.tuplet().isNone() && duration.dots() <= 1 && inputIndex(duration.value())) {
+    const core::Tuplet tuplet = duration.tuplet();
+    const bool offered =
+        tuplet.isNone() || std::ranges::any_of(kInputTuplets, [&tuplet](const InputTuplet& item) {
+            return item.actual == tuplet.actual() && item.normal == tuplet.normal();
+        });
+    if (offered && duration.dots() <= 1 && inputIndex(duration.value())) {
         setInput(duration);
     }
 }
