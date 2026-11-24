@@ -176,6 +176,83 @@ void append(DisplayList& to, DisplayList&& from) {
     move(to.polygons, from.polygons);
 }
 
+void appendShifted(DisplayList& to, const DisplayList& from, double dx, double dy) {
+    // Like shift(), nothing is added when nothing moves.
+    const bool still = dx == 0.0 && dy == 0.0;
+    const auto copy = [still](auto& into, const auto& items, auto&& move) {
+        if (still) {
+            into.insert(into.end(), items.begin(), items.end());
+            return;
+        }
+        for (const auto& item : items) {
+            move(into.emplace_back(item));
+        }
+    };
+    const auto point = [dx, dy](Point& at) {
+        at.x += dx;
+        at.y += dy;
+    };
+    copy(to.systems, from.systems, [dx, dy](SystemBox& system) {
+        system.x += dx;
+        system.y += dy;
+        system.top += dy;
+        system.bottom += dy;
+    });
+    copy(to.staves, from.staves, [dx, dy](StaffBox& staff) {
+        staff.x += dx;
+        staff.y += dy;
+    });
+    copy(to.measures, from.measures, [dx, dy](MeasureBox& measure) {
+        measure.x += dx;
+        measure.y += dy;
+        for (MeasureOnset& onset : measure.onsets) {
+            onset.x += dx;
+        }
+    });
+    copy(to.columns, from.columns, [dx](ColumnBox& column) { column.x += dx; });
+    copy(to.glyphs, from.glyphs, [&point](GlyphItem& item) { point(item.origin); });
+    copy(to.lines, from.lines, [&point](LineItem& item) {
+        point(item.from);
+        point(item.to);
+    });
+    copy(to.beams, from.beams, [&point](BeamItem& item) {
+        point(item.left);
+        point(item.right);
+    });
+    copy(to.texts, from.texts, [&point](TextItem& item) { point(item.origin); });
+    copy(to.curves, from.curves, [&point](CurveItem& item) {
+        point(item.from);
+        point(item.control1);
+        point(item.control2);
+        point(item.to);
+    });
+    copy(to.polygons, from.polygons, [&point](PolygonItem& item) {
+        for (Point& at : item.points) {
+            point(at);
+        }
+    });
+}
+
+void reserveFor(DisplayList& to, std::span<const DisplayList* const> from) {
+    const auto room = [&](auto member) {
+        std::size_t size = (to.*member).size();
+        for (const DisplayList* list : from) {
+            size += (list->*member).size();
+        }
+        (to.*member).reserve(size);
+    };
+    room(&DisplayList::systems);
+    room(&DisplayList::staves);
+    room(&DisplayList::measures);
+    room(&DisplayList::columns);
+    room(&DisplayList::glyphs);
+    room(&DisplayList::lines);
+    room(&DisplayList::beams);
+    room(&DisplayList::texts);
+    room(&DisplayList::curves);
+    room(&DisplayList::polygons);
+}
+
 Glyph dynamicGlyph(core::Dynamic dynamic) noexcept {
     switch (dynamic) {
     case core::Dynamic::PPP:

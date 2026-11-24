@@ -134,9 +134,11 @@ struct SequenceResult {
     QString error;
 };
 
-// Lays out `track` (or every track) of `song` as `view` on A4 pages. Runs on a
-// worker thread and never throws.
-ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view) {
+// Lays out `track` (or every track) of `song` as `view` on A4 pages, through
+// `cache` so that only what changed since its last layout is laid out again.
+// Runs on a worker thread and never throws.
+ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view,
+                   notation::PageLayoutCache& cache) {
     ScoreLayout result;
     result.song = song;
     result.track = track;
@@ -151,7 +153,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.hasTablature = notation::hasTablature(*song, tracks);
         const auto staves = notation::selectTracks(*song, tracks, trackView(view));
         const auto start = std::chrono::steady_clock::now();
-        auto pages = notation::layoutPages(*song, staves, *font, pageOptions());
+        auto pages = cache.layout(song, staves, *font, pageOptions());
         const auto elapsed = std::chrono::steady_clock::now() - start;
         result.milliseconds = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
@@ -165,7 +167,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
-ScoreLayout openAndLayOut(const QUrl& file) {
+ScoreLayout openAndLayOut(const QUrl& file, notation::PageLayoutCache& cache) {
     ScoreLayout result;
     result.source = file;
     try {
@@ -184,7 +186,7 @@ ScoreLayout openAndLayOut(const QUrl& file) {
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
         auto sequence = std::make_shared<const audio::Sequence>(*song);
-        result = layOut(std::move(song), 0, view);
+        result = layOut(std::move(song), 0, view, cache);
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
@@ -468,8 +470,8 @@ void ScoreDocument::open(const QUrl& file) {
     errorMessage_.clear();
     emit statusChanged();
     setPending(+1);
-    QtConcurrent::run([file] {
-        return openAndLayOut(file);
+    QtConcurrent::run([file, cache = layoutCache_] {
+        return openAndLayOut(file, *cache);
     }).then(this, [this, generation](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
@@ -489,8 +491,8 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    QtConcurrent::run([song = song_, track = track_, view = view_] {
-        return layOut(song, track, view);
+    QtConcurrent::run([song = song_, track = track_, view = view_, cache = layoutCache_] {
+        return layOut(song, track, view, *cache);
     }).then(this, [this, generation](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
