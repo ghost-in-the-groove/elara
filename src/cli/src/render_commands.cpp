@@ -50,7 +50,8 @@ struct RenderOptions {
     std::string paper = "a4";
     double staffSpace = 1.75; // mm
     double margin = 15.0;     // mm
-    double width = 0.0;       // staff spaces, for the scroll layout; 0: the paper's
+    double width = 0.0;       // staff spaces, for the scroll and strips layouts; 0: the paper's
+    double stripHeight = 0.0; // staff spaces, for the strips layout; 0: the paper's height
     std::size_t measuresPerSystem = 0;
     bool noCredits = false;
     std::string svg;
@@ -344,8 +345,8 @@ notation::PageLayoutOptions pageLayoutOptions(const RenderOptions& options) {
     page.measureCount = options.count;
     page.measuresPerSystem = options.measuresPerSystem;
     page.credits = !options.noCredits;
-    if (options.layout == "scroll") {
-        page.height = 0.0;
+    if (options.layout == "scroll" || options.layout == "strips") {
+        page.height = 0.0; // strips are cut from that one page
         if (options.width > 0.0) {
             page.width = options.width;
         }
@@ -382,20 +383,33 @@ int runRender(bool json, const RenderOptions& options) {
         if (page.width <= 2 * page.margin) {
             return usageError("the margins leave no room on the page");
         }
-        pages = notation::layoutPages(*song, *selection, *font, page);
+        if (options.layout == "strips") {
+            const double height =
+                options.stripHeight > 0.0
+                    ? options.stripHeight
+                    : notation::pageOptions(options.paper == "letter" ? notation::kLetter
+                                                                      : notation::kA4,
+                                            options.staffSpace, options.margin)
+                          .height;
+            pages = notation::cutIntoStrips(
+                notation::layoutPages(*song, *selection, *font, page).front(), height);
+        } else {
+            pages = notation::layoutPages(*song, *selection, *font, page);
+        }
     } else {
         pages.push_back(
             notation::layoutSystem(*song, *selection, *font,
                                    {.firstMeasure = options.first, .measureCount = options.count}));
     }
+    // Pages and strips are written one file each.
+    const bool split = options.layout == "page" || options.layout == "strips";
     std::vector<std::string> written;
     if (!options.svg.empty()) {
         std::filesystem::path otf = metadata;
         otf.replace_extension(".otf");
         for (std::size_t p = 0; p < pages.size(); ++p) {
-            const std::filesystem::path out = options.layout == "page"
-                                                  ? pagePath(options.svg, p, pages.size())
-                                                  : std::filesystem::path(options.svg);
+            const std::filesystem::path out = split ? pagePath(options.svg, p, pages.size())
+                                                    : std::filesystem::path(options.svg);
             notation::SvgOptions svg;
             svg.fontFamily = font->name();
             svg.fontUrl = fontUrl(otf, out);
@@ -435,7 +449,7 @@ int runRender(bool json, const RenderOptions& options) {
     if (json) {
         std::string svg = "null";
         if (!written.empty()) {
-            if (options.layout == "page") {
+            if (split) {
                 svg = "[";
                 for (std::size_t i = 0; i < written.size(); ++i) {
                     svg += std::format(R"({}"{}")", i == 0 ? "" : ",", jsonEscape(written[i]));
@@ -474,11 +488,13 @@ int runRender(bool json, const RenderOptions& options) {
                                  ? std::format("track {}, staff {}", options.track, options.staff)
                                  : std::format("{} staves", selection->size());
     if (paged) {
+        const bool strips = options.layout == "strips";
         std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} {} on {} {}\n",
                                  options.file, what, options.view, options.first,
                                  options.first + shown - 1, song->measureCount(), systems,
                                  systems == 1 ? "system" : "systems", pages.size(),
-                                 pages.size() == 1 ? "page" : "pages");
+                                 pages.size() == 1 ? (strips ? "strip" : "page")
+                                                   : (strips ? "strips" : "pages"));
     } else {
         const notation::DisplayList& list = pages.front();
         std::cout << std::format("{}: {} ({}), measures {} to {} of {}: {} x {} staff spaces\n",
@@ -538,9 +554,9 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     render
         ->add_option("--layout", options->layout,
-                     "line (one line, natural spacing), page (systems on pages) or scroll (systems "
-                     "on one endless page)")
-        ->check(CLI::IsMember({"line", "page", "scroll"}))
+                     "line (one line, natural spacing), page (systems on pages), scroll (systems "
+                     "on one endless page) or strips (that page cut between systems)")
+        ->check(CLI::IsMember({"line", "page", "scroll", "strips"}))
         ->capture_default_str();
     render->add_option("--paper", options->paper, "Page size: a4 or letter")
         ->check(CLI::IsMember({"a4", "letter"}))
@@ -553,7 +569,12 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     render
         ->add_option("--width", options->width,
-                     "Width of the scroll layout in staff spaces (default: the paper's)")
+                     "Width of the scroll and strips layouts in staff spaces (default: the "
+                     "paper's)")
+        ->check(CLI::PositiveNumber);
+    render
+        ->add_option("--strip-height", options->stripHeight,
+                     "Height of the strips layout's strips in staff spaces (default: the paper's)")
         ->check(CLI::PositiveNumber);
     render->add_option("--measures-per-system", options->measuresPerSystem,
                        "Measures in every system (default: as many as space evenly)");
@@ -569,8 +590,8 @@ void addRenderCommands(CLI::App& app, Context& context) {
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");
     render->add_option("--svg", options->svg,
-                       "Also write SVG; with --layout page and several pages, one file per page "
-                       "(name-1.svg, ...)");
+                       "Also write SVG; with --layout page or strips and several pages or "
+                       "strips, one file each (name-1.svg, ...)");
     render->add_option("--metadata", options->metadata,
                        "SMuFL metadata file (default: fonts/Bravura.json next to elara-cli)");
     render->callback([&context, options] { context.exitCode = runRender(context.json, *options); });

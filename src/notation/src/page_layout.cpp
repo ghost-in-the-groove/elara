@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <mutex>
@@ -711,6 +712,74 @@ std::vector<DisplayList> PageLayoutCache::layout(std::shared_ptr<const core::Son
     state_ = std::move(state);
     reuse_ = reuse;
     return pages;
+}
+
+std::vector<DisplayList> cutIntoStrips(const DisplayList& page, double height) {
+    if (!(height > 0.0)) {
+        throw std::invalid_argument("strips need a positive height");
+    }
+    const std::vector<SystemBox>& systems = page.systems;
+    if (systems.size() < 2) {
+        return {page};
+    }
+    // Halfway between the ink of system s and the next.
+    const auto cutBelow = [&systems](std::size_t s) {
+        return (systems[s].bottom + systems[s + 1].top) / 2;
+    };
+    // Strip k runs from bounds[k] to bounds[k + 1] on the page.
+    std::vector<double> bounds{0.0};
+    std::size_t opening = 0; // the first system of the strip being filled
+    for (std::size_t s = 0; s < systems.size(); ++s) {
+        const double end = s + 1 < systems.size() ? cutBelow(s) : page.bottom;
+        if (s > opening && end - bounds.back() > height) {
+            bounds.push_back(cutBelow(s - 1));
+            opening = s;
+        }
+    }
+    bounds.push_back(page.bottom);
+    const std::size_t count = bounds.size() - 1;
+    const auto inner = std::span(bounds).subspan(1, count - 1);
+    const auto stripAt = [inner](double y) {
+        return static_cast<std::size_t>(std::ranges::upper_bound(inner, y) - inner.begin());
+    };
+
+    std::vector<DisplayList> strips(count);
+    const auto deal = [&]<typename Item>(std::vector<Item> DisplayList::*member, auto anchor) {
+        for (const Item& item : page.*member) {
+            (strips[stripAt(anchor(item))].*member).push_back(item);
+        }
+    };
+    const auto middle = [](const SystemBox& system) { return (system.top + system.bottom) / 2; };
+    deal(&DisplayList::systems, middle);
+    deal(&DisplayList::staves, [](const StaffBox& staff) { return staff.y + staff.height / 2; });
+    deal(&DisplayList::measures,
+         [](const MeasureBox& measure) { return measure.y + measure.height / 2; });
+    deal(&DisplayList::glyphs, [](const GlyphItem& glyph) { return glyph.origin.y; });
+    deal(&DisplayList::lines, [](const LineItem& line) { return (line.from.y + line.to.y) / 2; });
+    deal(&DisplayList::beams,
+         [](const BeamItem& beam) { return (beam.left.y + beam.right.y) / 2; });
+    deal(&DisplayList::texts, [](const TextItem& text) { return text.origin.y; });
+    deal(&DisplayList::curves,
+         [](const CurveItem& curve) { return (curve.from.y + curve.to.y) / 2; });
+    deal(&DisplayList::polygons, [](const PolygonItem& polygon) {
+        return polygon.points.empty() ? 0.0 : polygon.points.front().y;
+    });
+    // A column has no height: it goes with the system of its measure.
+    for (const ColumnBox& column : page.columns) {
+        const auto after =
+            std::ranges::upper_bound(systems, column.measure, {}, &SystemBox::firstMeasure);
+        const double y = after == systems.begin() ? 0.0 : middle(*std::prev(after));
+        strips[stripAt(y)].columns.push_back(column);
+    }
+
+    for (std::size_t k = 0; k < count; ++k) {
+        DisplayList& strip = strips[k];
+        detail::shift(strip, 0.0, -bounds[k]);
+        strip.width = page.width;
+        strip.top = 0.0;
+        strip.bottom = bounds[k + 1] - bounds[k];
+    }
+    return strips;
 }
 
 } // namespace elara::notation

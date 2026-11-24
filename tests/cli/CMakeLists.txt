@@ -749,6 +749,24 @@ add_test(NAME cli.render_scroll
 set_tests_properties(cli.render_scroll PROPERTIES
   PASS_REGULAR_EXPRESSION "\"layout\":\"scroll\",\"pages\":\\[{\"width\":40,\"top\":0,.*\"measureNumber\":[1-9][0-9]*,\"credit\":0,.*\"systems\":\\[{\"firstMeasure\":0,.*{\"firstMeasure\":[1-9]")
 
+# The endless page cut into strips between systems (ADR-0057): the first strip
+# holds two whole systems, the second the third; one SVG per strip.
+add_test(NAME cli.render_strips
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
+          --width 40 --strip-height 50 --no-credits)
+set_tests_properties(cli.render_strips PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*{\"firstMeasure\":1,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
+add_test(NAME cli.render_strips_svg
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
+          --width 40 --strip-height 50 --no-credits
+          --svg "${CMAKE_CURRENT_BINARY_DIR}/strips.svg")
+set_tests_properties(cli.render_strips_svg PROPERTIES
+  PASS_REGULAR_EXPRESSION "measures 0 to 2 of 3: 3 systems on 2 strips.*saved .*strips-1\\.svg.*saved .*strips-2\\.svg")
+add_test(NAME cli.render_rejects_flat_strips
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
+          --strip-height 0)
+set_tests_properties(cli.render_rejects_flat_strips PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.render_tracks_pages
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks all --layout page
           --staff-space 6 --svg "${CMAKE_CURRENT_BINARY_DIR}/band-pages.svg")

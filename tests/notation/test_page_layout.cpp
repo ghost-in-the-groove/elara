@@ -469,3 +469,77 @@ TEST_CASE("Page layout: paper sizes in staff spaces", "[notation]") {
     CHECK_THAT(a4.height, WithinAbs(148.5, kEpsilon));
     CHECK_THAT(a4.margin, WithinAbs(5.0, kEpsilon));
 }
+
+TEST_CASE("Page layout: a page cut into strips between its systems", "[notation]") {
+    using elara::notation::cutIntoStrips;
+    Song song = quarters(64);
+    song.info().title = "Strips";
+    song.info().copyright = "Nobody";
+    PageLayoutOptions options = narrow();
+    options.credits = true;
+    const auto tall = pages(song, options);
+    REQUIRE(tall.size() == 1);
+    const DisplayList& page = tall.front();
+    constexpr double kHeight = 40.0;
+    const auto strips = cutIntoStrips(page, kHeight);
+    REQUIRE(strips.size() >= 3);
+
+    double top = 0.0; // of each strip on the page
+    std::size_t next = 0;
+    std::size_t glyphs = 0;
+    std::size_t lines = 0;
+    std::size_t texts = 0;
+    std::size_t measures = 0;
+    std::size_t columns = 0;
+    for (std::size_t s = 0; s < strips.size(); ++s) {
+        INFO("strip " << s);
+        const DisplayList& strip = strips[s];
+        CHECK(strip.width == page.width);
+        CHECK(strip.top == 0.0);
+        CHECK(strip.bottom <= kHeight + kEpsilon);
+        REQUIRE_FALSE(strip.systems.empty());
+        for (const SystemBox& system : strip.systems) {
+            // Whole systems, in order, where they were on the page.
+            CHECK(system.firstMeasure == next);
+            next += system.measureCount;
+            CHECK(system.top >= 0.0);
+            CHECK(system.bottom <= strip.bottom);
+            const auto original = std::ranges::find(page.systems, system.firstMeasure,
+                                                    &SystemBox::firstMeasure);
+            REQUIRE(original != page.systems.end());
+            CHECK_THAT(system.y + top, WithinAbs(original->y, kEpsilon));
+        }
+        for (const GlyphItem& glyph : strip.glyphs) {
+            CHECK(glyph.origin.y > 0.0);
+            CHECK(glyph.origin.y < strip.bottom);
+        }
+        glyphs += strip.glyphs.size();
+        lines += strip.lines.size();
+        texts += strip.texts.size();
+        measures += strip.measures.size();
+        columns += strip.columns.size();
+        top += strip.bottom;
+    }
+    // Stacked without gaps, the strips are the page: nothing lost or doubled.
+    CHECK(next == 64);
+    CHECK_THAT(top, WithinAbs(page.bottom, kEpsilon));
+    CHECK(glyphs == page.glyphs.size());
+    CHECK(lines == page.lines.size());
+    CHECK(texts == page.texts.size());
+    CHECK(measures == page.measures.size());
+    CHECK(columns == page.columns.size());
+    // The title stays at the top of the first strip, the copyright at the
+    // bottom of the last.
+    const auto first = textsWithRole(strips.front(), Role::Credit);
+    REQUIRE_FALSE(first.empty());
+    CHECK(first.front().text == "Strips");
+    const auto last = textsWithRole(strips.back(), Role::Credit);
+    REQUIRE(last.size() == 1);
+    CHECK(last.front().text == "Nobody");
+
+    // A strip lower than a system holds that system alone; one as high as the
+    // page is the page.
+    CHECK(cutIntoStrips(page, 1.0).size() == page.systems.size());
+    CHECK(cutIntoStrips(page, page.bottom) == tall);
+    CHECK_THROWS_AS(cutIntoStrips(page, 0.0), std::invalid_argument);
+}
