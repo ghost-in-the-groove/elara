@@ -24,8 +24,8 @@ std::vector<float> pluck(double frequency, double seconds, std::uint32_t rate) {
         const double t = static_cast<double>(i) / rate;
         double value = 0.0;
         for (int h = 1; h <= 8; ++h) {
-            value += std::sin(2.0 * std::numbers::pi * h * frequency * t) *
-                     std::exp(-t * (1.0 + h)) / h;
+            value +=
+                std::sin(2.0 * std::numbers::pi * h * frequency * t) * std::exp(-t * (1.0 + h)) / h;
         }
         out[i] = static_cast<float>(0.4 * value);
     }

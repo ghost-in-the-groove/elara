@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Audio subcommands: sequence, render-audio, play, soundfont, render-tone, devices, tone,
+// Audio subcommands: sequence, render-audio, play, soundfont, sfz, render-tone, devices, tone,
 // tune, listen.
 #include <elara/audio/microphone_input.hpp>
 #include <elara/audio/offline_renderer.hpp>

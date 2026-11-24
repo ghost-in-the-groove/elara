@@ -86,7 +86,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         player, `elara-cli soundfont`, `render-audio`/`play --soundfont` (ADR-0043)
   - [x] A SoundFont chosen in the app (any SF2 or SF3, such as MuseScore
         General), kept for the next start, `--soundfont FILE`
-- [ ] sfizz integration and guitar SFZ library selection
+- [ ] SFZ instruments and a guitar SFZ library
+  - [x] SFZ instruments through Elara's own sampler, each note bent on its own:
+        `elara-cli sfz`, `render-audio`/`play --sfz` (ADR-0066)
+  - [ ] An SFZ instrument chosen in the app, and FLAC samples
+  - [ ] Guitar techniques mapped to a library's keyswitches and controllers
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics, strums, tremolo picking; ADR-0022, ADR-0023, ADR-0025)
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)

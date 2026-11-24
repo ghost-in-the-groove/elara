@@ -105,7 +105,8 @@ std::string kindOf(std::string_view name) {
             if (kind.empty() || kind.back() != 'N') {
                 kind += 'N';
             }
-            while (i + 1 < name.size() && std::isdigit(static_cast<unsigned char>(name[i + 1])) != 0) {
+            while (i + 1 < name.size() &&
+                   std::isdigit(static_cast<unsigned char>(name[i + 1])) != 0) {
                 ++i;
             }
         } else {
@@ -122,7 +123,8 @@ std::optional<int> suffixNumber(std::string_view name, std::string_view prefix) 
         return std::nullopt;
     }
     const std::string_view digits = name.substr(prefix.size());
-    if (!std::ranges::all_of(digits, [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
+    if (!std::ranges::all_of(
+            digits, [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
         return std::nullopt;
     }
     return number<int>(digits);
@@ -206,7 +208,8 @@ private:
         if (space == std::string_view::npos || !rest.starts_with('$')) {
             return;
         }
-        defines_.emplace_back(std::string(rest.substr(0, space)), std::string(trim(rest.substr(space))));
+        defines_.emplace_back(std::string(rest.substr(0, space)),
+                              std::string(trim(rest.substr(space))));
         // Longer names first, so "$VEL" never eats the start of "$VELOCITY".
         std::ranges::stable_sort(defines_, [](const Opcode& a, const Opcode& b) {
             return a.first.size() > b.first.size();
@@ -281,7 +284,8 @@ private:
                 continue;
             }
             std::size_t name = i;
-            while (name < line.size() && std::isspace(static_cast<unsigned char>(line[name])) != 0) {
+            while (name < line.size() &&
+                   std::isspace(static_cast<unsigned char>(line[name])) != 0) {
                 ++name;
             }
             std::size_t after = name;
@@ -380,9 +384,15 @@ private:
 
     // Sets one opcode on a region. False for one Elara does not play.
     static bool apply(SfzRegion& region, const std::string& name, const std::string& value) {
-        const auto key = [&value] { return sfzKey(value); };
-        const auto real = [&value] { return number<double>(value); };
-        const auto whole = [&value] { return number<std::int64_t>(value); };
+        const auto key = [&value] {
+            return sfzKey(value);
+        };
+        const auto real = [&value] {
+            return number<double>(value);
+        };
+        const auto whole = [&value] {
+            return number<std::int64_t>(value);
+        };
         const auto setKey = [&](int& field) {
             if (const auto k = key(); k) {
                 field = *k;
@@ -405,13 +415,14 @@ private:
         };
 
         if (const auto modulation = ccModulation(name); modulation) {
-            if (const auto depth = real(); depth && modulation->second >= 0 &&
-                                           modulation->second < 128) {
+            if (const auto depth = real();
+                depth && modulation->second >= 0 && modulation->second < 128) {
                 auto& list = region.ccModulations;
                 std::erase_if(list, [&](const SfzCcModulation& m) {
                     return m.target == modulation->first && m.cc == modulation->second;
                 });
-                list.push_back({.target = modulation->first, .cc = modulation->second, .depth = *depth});
+                list.push_back(
+                    {.target = modulation->first, .cc = modulation->second, .depth = *depth});
             }
         } else if (name == "sample") {
             region.sample = value;
@@ -451,7 +462,8 @@ private:
             if (!gain || *velocity < 0 || *velocity > 127) {
                 return true;
             }
-            std::erase_if(region.ampVelcurve, [&](const auto& point) { return point.first == *velocity; });
+            std::erase_if(region.ampVelcurve,
+                          [&](const auto& point) { return point.first == *velocity; });
             region.ampVelcurve.emplace_back(*velocity, std::clamp(*gain, 0.0, 1.0));
             std::ranges::sort(region.ampVelcurve);
         } else if (name == "ampeg_delay") {
@@ -473,9 +485,9 @@ private:
         } else if (name == "trigger") {
             const std::string kind = lower(value);
             region.trigger = kind == "release" || kind == "release_key" ? SfzTrigger::Release
-                             : kind == "first"                         ? SfzTrigger::First
-                             : kind == "legato"                        ? SfzTrigger::Legato
-                                                                       : SfzTrigger::Attack;
+                             : kind == "first"                          ? SfzTrigger::First
+                             : kind == "legato"                         ? SfzTrigger::Legato
+                                                                        : SfzTrigger::Attack;
         } else if (const auto lo = suffixNumber(name, "locc"); lo) {
             ccRange(region, *lo).lo = std::clamp(number<int>(value).value_or(0), 0, 127);
         } else if (const auto hi = suffixNumber(name, "hicc"); hi) {
@@ -632,7 +644,8 @@ std::expected<SfzProgram, std::string> parseSfz(std::string_view text,
 }
 
 std::expected<SfzProgram, std::string> readSfz(const std::filesystem::path& path) {
-    const auto read = [](const std::filesystem::path& file) -> std::expected<std::string, std::string> {
+    const auto read =
+        [](const std::filesystem::path& file) -> std::expected<std::string, std::string> {
         std::ifstream in(file, std::ios::binary);
         if (!in) {
             return std::unexpected(std::format("cannot open {}", file.generic_string()));

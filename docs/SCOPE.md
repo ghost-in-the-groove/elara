@@ -26,10 +26,11 @@ guitar tablature and scores, on Windows, macOS and Linux.
 
 **Sound**
 - FluidSynth with MuseScore General SF3 for every instrument.
-- Guitar articulations through sfizz: bends and vibrato (curves to pitch bend),
-  slides, legato (hammer-on/pull-off), palm mute, dead notes, harmonics.
-  Requires a free SFZ guitar library with a compatible licence (milestone 4
-  task); fallback: articulations simulated on SF2.
+- Guitar articulations on SFZ instruments, through Elara's own sampler
+  (ADR-0066): bends and vibrato (each note bent on its own), slides, legato
+  (hammer-on/pull-off), palm mute, dead notes, harmonics. Requires a free SFZ
+  guitar library with a compatible licence (milestone 4 task); fallback:
+  articulations simulated on SF2.
 - Basic mixer: volume, pan, mute, solo per track.
 
 **Practice tools**

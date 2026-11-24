@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/audio/sfz_bank.hpp>
-
 #include <elara/audio/wav_reader.hpp>
 #include <elara/core/instrument.hpp>
 
@@ -32,7 +31,7 @@ struct SfzData {
     std::string name;
     SfzProgram program;
     std::vector<SfzSample> samples;
-    std::vector<std::uint32_t> regionSample;           ///< per region
+    std::vector<std::uint32_t> regionSample;            ///< per region
     std::array<std::vector<std::uint32_t>, 128> onKey;  ///< regions struck by a key going down
     std::array<std::vector<std::uint32_t>, 128> offKey; ///< regions struck by a key coming up
     std::array<bool, 128> switches{};                   ///< keys in a keyswitch range
@@ -45,8 +44,8 @@ namespace {
 
 constexpr std::size_t kVoices = 64;
 constexpr std::size_t kGeneratorFrames = 2048;
-constexpr double kSilent = 1e-4;     // -80 dB: a release ends here
-constexpr double kFastOff = 0.006;   // seconds a voice silenced by its group takes
+constexpr double kSilent = 1e-4;   // -80 dB: a release ends here
+constexpr double kFastOff = 0.006; // seconds a voice silenced by its group takes
 constexpr double kMinRelease = 0.001;
 
 double keyFrequency(double key) noexcept {
@@ -96,22 +95,22 @@ enum class Stage : std::uint8_t { Off, Delay, Attack, Hold, Decay, Sustain, Rele
 struct Voice {
     Stage stage = Stage::Off;
     int key = -1;
-    bool held = false;       ///< its key is down and it follows the key
-    bool loops = false;      ///< it wraps from loopEnd to loopStart...
-    bool loopsHeld = false;  ///< ...only while its key is held (loop_sustain)
-    bool oneShot = false;    ///< it ignores its key coming up
+    bool held = false;      ///< its key is down and it follows the key
+    bool loops = false;     ///< it wraps from loopEnd to loopStart...
+    bool loopsHeld = false; ///< ...only while its key is held (loop_sustain)
+    bool oneShot = false;   ///< it ignores its key coming up
     std::uint32_t region = 0;
     std::int64_t offBy = 0;
     bool offFast = true;
     std::uint64_t order = 0; ///< when it started, for taking the oldest
     const float* frames = nullptr;
-    double end = 0.0;        ///< one past the last frame it plays
+    double end = 0.0; ///< one past the last frame it plays
     double loopStart = 0.0;
-    double loopEnd = 0.0;    ///< one past the last frame of the loop
+    double loopEnd = 0.0; ///< one past the last frame of the loop
     double position = 0.0;
-    double step = 0.0;       ///< frames per output frame at its pitch now
-    double baseStep = 0.0;   ///< ...with no glide
-    bool periodic = false;   ///< a generator: its frames repeat both ways
+    double step = 0.0;     ///< frames per output frame at its pitch now
+    double baseStep = 0.0; ///< ...with no glide
+    bool periodic = false; ///< a generator: its frames repeat both ways
     double centsTarget = 0.0;
     double stepFactor = 1.0; ///< a glide multiplies the step by this each frame
     std::int64_t glide = 0;  ///< frames of glide left
@@ -135,8 +134,8 @@ struct Voice {
 class SfzSound final : public TrackSound {
 public:
     SfzSound(std::shared_ptr<const SfzData> data, double sampleRate)
-        : data_(std::move(data)), rate_(sampleRate),
-          sequence_(data_->program.regions.size(), 0), switch_(data_->defaultSwitch) {
+        : data_(std::move(data)), rate_(sampleRate), sequence_(data_->program.regions.size(), 0),
+          switch_(data_->defaultSwitch) {
         for (std::size_t cc = 0; cc < cc_.size(); ++cc) {
             cc_[cc] = data_->program.ccDefaults[cc];
         }
@@ -325,17 +324,19 @@ private:
             voice.loopStart = 0.0;
             voice.loopEnd = frames;
         } else {
-            voice.end = region.end >= 0 ? std::min(frames, static_cast<double>(region.end) + 1.0)
-                                        : frames;
+            voice.end =
+                region.end >= 0 ? std::min(frames, static_cast<double>(region.end) + 1.0) : frames;
             voice.position = std::clamp(static_cast<double>(region.offset), 0.0, voice.end);
             const bool looping = region.loopMode == SfzLoopMode::Continuous ||
                                  region.loopMode == SfzLoopMode::Sustain;
-            voice.loopStart = region.loopStart >= 0
-                                  ? std::clamp(static_cast<double>(region.loopStart), 0.0, voice.end)
-                                  : 0.0;
-            voice.loopEnd = region.loopEnd >= 0
-                                ? std::clamp(static_cast<double>(region.loopEnd) + 1.0, 0.0, voice.end)
-                                : voice.end;
+            voice.loopStart =
+                region.loopStart >= 0
+                    ? std::clamp(static_cast<double>(region.loopStart), 0.0, voice.end)
+                    : 0.0;
+            voice.loopEnd =
+                region.loopEnd >= 0
+                    ? std::clamp(static_cast<double>(region.loopEnd) + 1.0, 0.0, voice.end)
+                    : voice.end;
             voice.loops = looping && voice.loopEnd - voice.loopStart >= 2.0;
             voice.loopsHeld = region.loopMode == SfzLoopMode::Sustain;
             voice.oneShot = region.loopMode == SfzLoopMode::OneShot;
@@ -617,8 +618,9 @@ std::vector<float> generator(std::string_view name) {
     if (name == "*sine") {
         std::vector<float> frames(kGeneratorFrames);
         for (std::size_t i = 0; i < frames.size(); ++i) {
-            frames[i] = static_cast<float>(std::sin(2.0 * std::numbers::pi * static_cast<double>(i) /
-                                                    static_cast<double>(kGeneratorFrames)));
+            frames[i] =
+                static_cast<float>(std::sin(2.0 * std::numbers::pi * static_cast<double>(i) /
+                                            static_cast<double>(kGeneratorFrames)));
         }
         return frames;
     }
@@ -636,8 +638,8 @@ SfzBank::open(const std::filesystem::path& path, std::shared_ptr<const SoundBank
     if (!program) {
         return std::unexpected(program.error());
     }
-    auto bank = load(*std::move(program), path.parent_path(), path.stem().string(),
-                     std::move(percussion));
+    auto bank =
+        load(*std::move(program), path.parent_path(), path.stem().string(), std::move(percussion));
     if (!bank) {
         return std::unexpected(std::format("{}: {}", path.generic_string(), bank.error()));
     }
@@ -666,7 +668,7 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
             files.push_back(folder / std::filesystem::path(names[i]));
         }
     }
-    auto read = readSamples(files);
+    auto decoded = readSamples(files);
     data->samples.resize(names.size());
     std::set<std::string> missing;
     std::vector<bool> usable(names.size(), true);
@@ -675,7 +677,7 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
         if (names[i].starts_with('*')) {
             sample.frames = generator(names[i]);
             sample.generator = true;
-        } else if (auto& wav = read[fileOf[i]]; wav && wav->frames() > 0) {
+        } else if (auto& wav = decoded[fileOf[i]]; wav && wav->frames() > 0) {
             sample.frames = wav->format.channels == 1 ? std::move(wav->samples) : wav->mono();
             sample.rate = wav->format.sampleRate;
             data->bytes += sample.frames.size() * sizeof(float);
@@ -719,10 +721,9 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
     }
     data->missing.assign(missing.begin(), missing.end());
     if (kept.regions.empty()) {
-        return std::unexpected(
-            data->missing.empty()
-                ? std::string("no region with a sample")
-                : std::format("no sample could be read: {}", data->missing.front()));
+        return std::unexpected(data->missing.empty() ? std::string("no region with a sample")
+                                                     : std::format("no sample could be read: {}",
+                                                                   data->missing.front()));
     }
     data->program = std::move(kept);
     // Samples no kept region plays are dropped from memory.
@@ -750,9 +751,8 @@ const std::vector<std::string>& SfzBank::missingSamples() const noexcept {
 }
 
 std::size_t SfzBank::sampleCount() const noexcept {
-    return static_cast<std::size_t>(std::ranges::count_if(data_->samples, [](const SfzSample& s) {
-        return !s.generator && !s.frames.empty();
-    }));
+    return static_cast<std::size_t>(std::ranges::count_if(
+        data_->samples, [](const SfzSample& s) { return !s.generator && !s.frames.empty(); }));
 }
 
 std::size_t SfzBank::sampleBytes() const noexcept {

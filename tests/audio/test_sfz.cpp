@@ -25,7 +25,8 @@ namespace {
 
 // Includes from a map of file names to their text.
 SfzIncludeReader files(std::map<std::string, std::string> texts) {
-    return [texts = std::move(texts)](std::string_view path) -> std::expected<std::string, std::string> {
+    return [texts = std::move(texts)](
+               std::string_view path) -> std::expected<std::string, std::string> {
         const auto found = texts.find(std::string(path));
         if (found == texts.end()) {
             return std::unexpected(std::string("no file ") + std::string(path));

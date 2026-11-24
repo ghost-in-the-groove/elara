@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // SFZ instruments played by Elara's sampler (ADR-0066).
-#include "pitch_detection.hpp"
-
 #include <elara/audio/sfz.hpp>
 #include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/sound_bank.hpp>
 #include <elara/audio/wav_writer.hpp>
 #include <elara/core/instrument.hpp>
 
+#include "pitch_detection.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
@@ -206,9 +205,9 @@ TEST_CASE("SFZ sampler: the envelope attacks, holds and decays to the sustain", 
         return rms(std::span(out).subspan(static_cast<std::size_t>(at * kRate), 960));
     };
     const double peak = std::sqrt(0.5);
-    CHECK(window(0.0) < 0.15 * peak);                     // rising from silence
-    CHECK_THAT(window(0.12), WithinRel(peak, 0.02));        // held at the top
-    CHECK_THAT(window(0.4), WithinRel(0.25 * peak, 0.02));  // settled at the sustain
+    CHECK(window(0.0) < 0.15 * peak);                      // rising from silence
+    CHECK_THAT(window(0.12), WithinRel(peak, 0.02));       // held at the top
+    CHECK_THAT(window(0.4), WithinRel(0.25 * peak, 0.02)); // settled at the sustain
 }
 
 TEST_CASE("SFZ sampler: a keyswitch picks which regions play", "[audio][sfz]") {
@@ -349,7 +348,8 @@ TEST_CASE("SFZ sampler: controllers at their set values move a region", "[audio]
     };
     // A unison layer: silent, and no voice taken, until its switch is up.
     CHECK(level("<region> sample=*sine amplitude_oncc100=100\n") == 0.0);
-    const double full = level("<control> set_cc100=127\n<region> sample=*sine amplitude_oncc100=100\n");
+    const double full =
+        level("<control> set_cc100=127\n<region> sample=*sine amplitude_oncc100=100\n");
     CHECK_THAT(full, WithinRel(std::sqrt(0.5), 0.01));
     CHECK_THAT(level("<control> set_cc27=64\n<region> sample=*sine amplitude_cc27=100\n") / full,
                WithinRel(64.0 / 127.0, 0.001));

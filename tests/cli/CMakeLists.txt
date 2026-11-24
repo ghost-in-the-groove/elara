@@ -1069,7 +1069,7 @@ add_test(NAME cli.render_audio_soundfont
           --soundfont "${_test_font}")
 set_tests_properties(cli.render_audio_soundfont PROPERTIES
   FIXTURES_REQUIRED cli_soundfont
-  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
+  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sfz\":null,\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
 add_test(NAME cli.render_audio_rejects_missing_soundfont
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --soundfont missing.sf2)
 set_tests_properties(cli.render_audio_rejects_missing_soundfont PROPERTIES WILL_FAIL TRUE)

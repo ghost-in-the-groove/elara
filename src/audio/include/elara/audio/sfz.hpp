@@ -43,10 +43,10 @@ struct SfzCcRange {
 
 /// What a controller moves (`amplitude_oncc64`, `ampeg_release_oncc1`...).
 enum class SfzTarget : std::uint8_t {
-    Amplitude,   ///< multiplies the amplitude by depth % of the controller's value
-    Volume,      ///< adds depth dB at the controller's top
-    Tune,        ///< adds depth cents
-    AmpegDelay,  ///< adds depth seconds
+    Amplitude,  ///< multiplies the amplitude by depth % of the controller's value
+    Volume,     ///< adds depth dB at the controller's top
+    Tune,       ///< adds depth cents
+    AmpegDelay, ///< adds depth seconds
     AmpegAttack,
     AmpegHold,
     AmpegDecay,
@@ -86,25 +86,25 @@ struct SfzRegion {
     int ampKeycenter = 60;
     /// amp_velcurve_N: the gain (0-1) at velocity N, straight lines between.
     std::vector<std::pair<int, double>> ampVelcurve;
-    double ampegDelay = 0.0;    ///< seconds
-    double ampegAttack = 0.0;   ///< seconds
-    double ampegHold = 0.0;     ///< seconds
-    double ampegDecay = 0.0;    ///< seconds
+    double ampegDelay = 0.0;     ///< seconds
+    double ampegAttack = 0.0;    ///< seconds
+    double ampegHold = 0.0;      ///< seconds
+    double ampegDecay = 0.0;     ///< seconds
     double ampegSustain = 100.0; ///< percent
     double ampegRelease = 0.001; ///< seconds
-    int seqLength = 1;   ///< round robin: the region plays one note in seqLength...
-    int seqPosition = 1; ///< ...the seqPosition-th
+    int seqLength = 1;           ///< round robin: the region plays one note in seqLength...
+    int seqPosition = 1;         ///< ...the seqPosition-th
     SfzTrigger trigger = SfzTrigger::Attack;
     std::vector<SfzCcRange> ccRanges;
-    int swLoKey = -1;    ///< keyswitch range: keys that only switch...
-    int swHiKey = -1;    ///< ...(-1: none)
-    int swLast = -1;     ///< plays only after this keyswitch (-1: always)
-    int swDefault = -1;  ///< the keyswitch before any is struck
+    int swLoKey = -1;       ///< keyswitch range: keys that only switch...
+    int swHiKey = -1;       ///< ...(-1: none)
+    int swLast = -1;        ///< plays only after this keyswitch (-1: always)
+    int swDefault = -1;     ///< the keyswitch before any is struck
     std::int64_t group = 0; ///< exclusive group...
     std::int64_t offBy = 0; ///< ...whose notes silence this one (0: none)
     bool offFast = true;    ///< silenced at once, or else through its release
     SfzLoopMode loopMode = SfzLoopMode::NoLoop;
-    bool loopModeSet = false;   ///< loop_mode was written (else the sample's own loop decides)
+    bool loopModeSet = false;    ///< loop_mode was written (else the sample's own loop decides)
     std::int64_t loopStart = -1; ///< frames (-1: the sample's own loop or start)
     std::int64_t loopEnd = -1;   ///< frames (-1: the sample's own loop or end)
     std::int64_t offset = 0;     ///< frames skipped at the start
