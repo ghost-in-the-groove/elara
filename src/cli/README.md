@@ -92,7 +92,8 @@ list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
 `"pages"`: one display list per page. Lengths are in staff spaces, y down from
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
-credits...); `columns` say where the notes starting at each time of a measure
+credits...); a glyph drawn at another size than the staff's has a `"scale"`;
+`columns` say where the notes starting at each time of a measure
 are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
 beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`
 next to `elara-cli`; pages go to `OUT-1.svg`, `OUT-2.svg`... when there are
@@ -119,16 +120,31 @@ elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "tim
 Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
-pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `title <text>`,
+pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
+(ADR-0042), `title <text>`,
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
 `fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
 `paste <m> [track <t>] [insert]`,
 `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
-`tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`, `undo`,
-`redo`, `save`. A malformed step exits with 2, a step the song rejects
+`tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`,
+`sign <m> <segno|segno-segno|coda|double-coda|fine|to-coda|to-double-coda>...`
+or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
+[al-fine|al-coda|al-double-coda]`, `repeat <m> [start] [end <times>]` or
+`repeat <m> none`, `ending <m> <time>...` or `ending <m> none`, `undo`, `redo`,
+`save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
+
+`sign` gives measure `m` exactly the signs and closing marks it lists (`none`
+clears them) and `jump` its jump, with what ends the music after it (ADR-0049).
+The measures of `edit` and `dump` list them as `"signs":["segno","to-coda"]`,
+`"jump":"dal-segno"` and `"jumpThen":"al-coda"`; `sequence` plays them.
+`repeat` gives measure `m` exactly a start repeat, an end repeat played
+`times` times (2 to 255), both or neither, and `ending` the times through the
+repeat that play it (1 to 8); each is one undo step, "Change repeats"
+(ADR-0016). The measures list them as `"repeatStart":true`, `"repeatTimes":3`
+and `"endings":[1,2]`.
 
 `copy` keeps `n` measures from `m` of every track, or of `count` tracks from
 `t` (one when `count` is left out), for later `paste` steps; it is not an
@@ -156,7 +172,8 @@ The output gives each track's `tuning` (its first staff's; `null` without
 strings) and `capo`.
 
 Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
-`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`caret <track> <m> <beat> [string]` places it in the first voice, `voice <1-4>`
+takes it to that voice of its measure (typing then goes there), `right`, `left`, `up`, `down`,
 `next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
 string (adding a beat of the input duration on the free slot after the last
 beat of a short measure), `pitch <C..B> [add]` types a note name in the

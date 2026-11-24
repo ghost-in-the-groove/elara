@@ -31,7 +31,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV reading and writing; the tuner's pitch detection (ADR-0028) | 0, 4, 6 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029); synths (FluidSynth, sfizz) | 0, 4, 6 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
-| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song and enters notes at a caret (ADR-0031, ADR-0032) | 0+ |
+| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret (ADR-0031, ADR-0032, ADR-0033) | 0+ |
 
 ## Key decisions
 
@@ -56,7 +56,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 |---|---|---|
 | Main / GUI | Qt event loop (also JUCE's message thread) | Owns the model; all edits happen here |
 | Audio callback | JUCE device | No allocation, locks, I/O or logging; reads immutable snapshots / lock-free queues |
-| Workers (future) | Thread pool | Layout of large scores, file import, offline render |
+| Workers | `core::WorkerPool::shared()`, one thread fewer than the cores (ADR-0053) | Jobs of `forEachIndex`: layout, import, export, sequencing, offline render; the calling thread takes jobs too. Never used by the audio callback |
 
 Open question (milestone 4): on Linux, Qt's event loop does not service JUCE's
 message queue. Device-change notifications may need a dedicated JUCE message

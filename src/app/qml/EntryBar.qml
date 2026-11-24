@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The keyboard entry bar floating over the score: the note value typing uses,
-// the dot, a rest, delete, and where the caret is.
+// The keyboard entry bar, in a strip over the top of the pages: the note value
+// typing uses, the dot, the tuplet, a rest, delete, and where the caret is.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -10,7 +10,9 @@ Rectangle {
     id: root
 
     required property ScoreDocument document
-    property bool dark: false
+
+    /// The measure button: the caret's measure, its signatures and length.
+    signal measureRequested
 
     // Note values from the music font's metronome marks, longest first.
     readonly property var values: [
@@ -23,13 +25,11 @@ Rectangle {
         { value: 64, symbol: "\uECAD", tip: qsTr("64th note") }
     ]
     readonly property int currentIndex: values.findIndex(entry => entry.value === document.inputValue)
-    readonly property color ink: dark ? "#e8e8ee" : "#23232b"
+    readonly property color ink: Theme.ink
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 44
-    radius: height / 2
-    color: dark ? "#2a2a32" : "white"
-    border.color: Qt.alpha(ink, 0.12)
+    color: "transparent"
 
     // A tool of the bar: never takes the keyboard from the score.
     component Tool: AbstractButton {
@@ -44,8 +44,7 @@ Rectangle {
 
         background: Rectangle {
             radius: height / 2
-            color: tool.pressed ? Qt.alpha(root.ink, 0.16)
-                                : tool.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
+            color: tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
 
             Behavior on color {
                 ColorAnimation {
@@ -60,11 +59,30 @@ Rectangle {
         Accessible.name: tip
     }
 
+    // A tuplet in the tuplet menu, checked when the input has it.
+    component TupletItem: MenuItem {
+        required property int actual
+
+        checkable: true
+        checked: root.document.inputTuplet === actual
+        onTriggered: root.document.setInputTuplet(actual)
+    }
+
+    // A voice in the voice menu, checked when the caret is in it.
+    component VoiceItem: MenuItem {
+        required property int voice
+
+        text: qsTr("Voice %1").arg(voice)
+        checkable: true
+        checked: root.document.caretVoice === voice
+        onTriggered: root.document.setCaretVoice(voice)
+    }
+
     component Separator: Rectangle {
         width: 1
         height: 22
         anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-        color: Qt.alpha(root.ink, 0.14)
+        color: Theme.line
     }
 
     Row {
@@ -134,13 +152,146 @@ Rectangle {
             background: Rectangle {
                 radius: height / 2
                 color: root.document.inputDotted ? Material.accent
-                                                 : dot.hovered ? Qt.alpha(root.ink, 0.08)
-                                                               : "transparent"
+                                                 : dot.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
             }
             contentItem: MusicSymbol {
                 symbol: "\uECB7"
                 size: 30
                 color: root.document.inputDotted ? "white" : root.ink
+            }
+        }
+
+        // The tuplet (ADR-0050): a click toggles a triplet, a right click or a
+        // long press picks another.
+        Tool {
+            id: tuplet
+
+            readonly property bool on: root.document.inputTuplet > 0
+
+            tip: qsTr("Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)")
+            onClicked: root.document.setInputTuplet(on ? 0 : 3)
+            onPressAndHold: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: tuplet.on ? Material.accent
+                                 : tuplet.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: MusicSymbol {
+                // The tuplet's number in the music font's tuplet digits.
+                symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
+                size: 30
+                color: tuplet.on ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
+            }
+
+            Menu {
+                id: tupletMenu
+
+                TupletItem {
+                    actual: 2
+                    text: qsTr("Duplet (2 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 3
+                    text: qsTr("Triplet (3 in the time of 2)")
+                }
+                TupletItem {
+                    actual: 4
+                    text: qsTr("Quadruplet (4 in the time of 3)")
+                }
+                TupletItem {
+                    actual: 5
+                    text: qsTr("Quintuplet (5 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 6
+                    text: qsTr("Sextuplet (6 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 7
+                    text: qsTr("Septuplet (7 in the time of 4)")
+                }
+                TupletItem {
+                    actual: 9
+                    text: qsTr("Nonuplet (9 in the time of 8)")
+                }
+                MenuSeparator {}
+                MenuItem {
+                    text: qsTr("No tuplet")
+                    enabled: tuplet.on
+                    onTriggered: root.document.setInputTuplet(0)
+                }
+            }
+        }
+
+        // The voice typing goes into (Alt+1 to Alt+4): a click goes on to the
+        // next one, a right click picks one. Lit outside the first voice.
+        Tool {
+            id: voiceTool
+
+            readonly property int voice: root.document.caretVoice
+
+            tip: qsTr("Voice %1 (Alt+1 to Alt+4); a right click picks one").arg(voice)
+            onClicked: root.document.setCaretVoice(voice % 4 + 1)
+            onPressAndHold: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: voiceTool.voice > 1 ? Material.accent
+                                           : voiceTool.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: Label {
+                text: qsTr("V%1").arg(voiceTool.voice)
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+                color: voiceTool.voice > 1 ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+            }
+
+            Menu {
+                id: voiceMenu
+
+                VoiceItem {
+                    voice: 1
+                }
+                VoiceItem {
+                    voice: 2
+                }
+                VoiceItem {
+                    voice: 3
+                }
+                VoiceItem {
+                    voice: 4
+                }
             }
         }
 
@@ -173,6 +324,16 @@ Rectangle {
             }
         }
 
+        Tool {
+            tip: qsTr("Measure: signatures, insert, delete (Ctrl+M)")
+            onClicked: root.measureRequested()
+
+            contentItem: Icon {
+                path: "M4 7 L4 17 M20 7 L20 17 M4 9 L20 9 M4 12 L20 12 M4 15 L20 15 M12 7 L12 17"
+                color: root.ink
+            }
+        }
+
         Item {
             width: 8
             height: 34
@@ -187,7 +348,7 @@ Rectangle {
             leftPadding: 4
             rightPadding: 10
             text: root.document.caretStatus
-            font.pixelSize: 12
+            font.pixelSize: Theme.fontSmall
             font.features: { "tnum": 1 }
             color: root.ink
             opacity: 0.8

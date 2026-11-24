@@ -22,19 +22,23 @@ struct Rect {
 };
 
 /// Where `caret` shows on `list`, laid out from `song`: on its string, centred
-/// over the fret number, on a tablature staff; across the staff on standard
-/// notation. When the list shows both views of the staff, the caret goes on the
-/// tablature. A beat sits at its column; the free slot after the last beat sits
-/// where its time falls between the columns around it, and in a measure without
-/// notes near the start. Empty when the list does not show the caret's measure
-/// on its staff, or the song has no such track, staff or measure.
+/// over the fret number, on a tablature staff; on its lane, where the drum map
+/// places the lane's kit piece, on a percussion staff (ADR-0035); across the
+/// staff on other standard notation. When the list shows both views of the
+/// staff, the caret goes on the tablature. A beat sits at its column; the free
+/// slot after the last beat sits where its time falls between the columns
+/// around it, and in a measure without notes near the start. Empty when the
+/// list does not show the caret's measure on its staff, or the song has no such
+/// track, staff or measure.
 [[nodiscard]] std::optional<Rect> caretBox(const DisplayList& list, const core::Song& song,
                                            const core::Caret& caret, const EngravingFont& font);
 
 /// The caret a click at `point` on `list` picks: in the measure under the point,
-/// the staff nearest to it, on tablature the nearest string, and the beat (or
-/// free slot) whose caret box is nearest. The voice comes from `current`, and on
-/// standard notation the string too. Empty when no measure is under the point.
+/// the staff nearest to it, on tablature the nearest string, on a percussion
+/// staff the nearest lane (of lanes in the same place, the current one when the
+/// caret is on it, otherwise the first), and the beat (or free slot) whose caret
+/// box is nearest. The voice comes from `current`, and on other standard
+/// notation the string too. Empty when no measure is under the point.
 [[nodiscard]] std::optional<core::Caret> caretAt(const DisplayList& list, const core::Song& song,
                                                  Point point, const core::Caret& current,
                                                  const EngravingFont& font);

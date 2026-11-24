@@ -15,7 +15,9 @@ Two targets with different rules:
   vibrato sent as pitch events (ADR-0023). For practice it plays at 25 % to
   200 % of the written tempo and adds a metronome on a track after the song's
   (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
-  wood blocks at a fixed level;
+  wood blocks at a fixed level. `carriedPosition()` finds where playback
+  goes on in a new sequence: the same place in the music after another speed
+  or a tempo edit;
 - the built-in synthesizer (`Synth`: one track in one `Timbre`, picked from the
   instrument by `timbreFor()`; plucked timbres also play each note's `Touch`:
   palm mute, dead note or harmonic, ADR-0022; `glide()` moves a sounding

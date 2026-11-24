@@ -10,13 +10,16 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
+#include <memory>
 
 namespace elara::app {
 
 /// Shows page `index` of `document` as a texture. The page is painted on a
 /// worker thread at the item's size in device pixels; while the item is
 /// resized (zooming) the last texture is stretched and painted again once the
-/// size settles, so zooming stays smooth.
+/// size settles, so zooming stays smooth. A relayout that leaves the page as
+/// it was (an edit on another page) keeps the texture instead of painting it
+/// again.
 class ScorePage : public QQuickItem {
     Q_OBJECT
     QML_ELEMENT
@@ -37,6 +40,9 @@ public:
 
     /// Pages painted since the program started (for `elara --smoke-test`).
     [[nodiscard]] static int paintCount();
+    /// Relayouts that left a page as it was, so that its texture was kept
+    /// instead of painted again (for `elara --smoke-test`).
+    [[nodiscard]] static int keptCount();
 
 signals:
     void documentChanged();
@@ -56,6 +62,11 @@ private:
     int index_ = -1;
     QTimer settle_;
     std::uint64_t ticket_ = 0;
+    /// The page last sent to the painter, and the scale and pixel ratio it was
+    /// painted at: what the texture shows, or soon will.
+    std::shared_ptr<const notation::DisplayList> shown_;
+    double shownScale_ = 0.0;
+    double shownRatio_ = 0.0;
     QImage image_; ///< painted, waiting to become a texture
     bool painted_ = false;
 };

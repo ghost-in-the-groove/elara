@@ -2,7 +2,10 @@
 #include <elara/core/song.hpp>
 
 #include <algorithm>
+#include <bit>
+#include <cstddef>
 #include <iterator>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -39,11 +42,11 @@ void Staff::setTuning(std::optional<Tuning> tuning, int capo) {
 }
 
 Measure& Staff::measure(std::size_t index) {
-    return checkedAt(measures_, index, "Staff: no such measure");
+    return checkedAt(measures_, index, "Staff: no such measure").edit();
 }
 
 const Measure& Staff::measure(std::size_t index) const {
-    return checkedAt(measures_, index, "Staff: no such measure");
+    return checkedAt(measures_, index, "Staff: no such measure").get();
 }
 
 Note Staff::frettedNote(int string, int fret, SpellingPreference preference) const {
@@ -101,7 +104,8 @@ std::size_t Song::insertTrack(std::size_t at, Track track) {
     }
     for (auto& staff : track.staves_) {
         if (staff.measures_.empty()) {
-            staff.measures_.resize(headers_.size());
+            // One empty measure for all: each gets its own once it changes.
+            staff.measures_.assign(headers_.size(), SharedValue<Measure>{});
         } else if (staff.measures_.size() != headers_.size()) {
             throw std::invalid_argument("Song: track has a different number of measures");
         }
@@ -149,9 +153,10 @@ void Song::insertMeasures(std::size_t at, std::size_t count) {
                                  : at > 0         ? headers_[at - 1].continuation()
                                                   : headers_.front().continuation();
     headers_.insert(headers_.begin() + offset, count, header);
+    const SharedValue<Measure> empty;
     for (auto& track : tracks_) {
         for (auto& staff : track.staves_) {
-            staff.measures_.insert(staff.measures_.begin() + offset, count, Measure{});
+            staff.measures_.insert(staff.measures_.begin() + offset, count, empty);
         }
     }
 }
@@ -200,6 +205,57 @@ Fraction Song::measureStart(std::size_t measure) const {
     return start;
 }
 
+namespace {
+
+// The highest time through that each measure's run of alternate endings plays:
+// the one a run plays after a jump. 0 for a measure played every time.
+std::vector<int> lastEndings(const std::vector<MeasureHeader>& headers) {
+    std::vector<int> last(headers.size(), 0);
+    std::size_t m = 0;
+    while (m < headers.size()) {
+        if (headers[m].alternateEndings == 0) {
+            ++m;
+            continue;
+        }
+        const std::size_t first = m;
+        unsigned endings = 0;
+        for (; m < headers.size() && headers[m].alternateEndings != 0; ++m) {
+            endings |= headers[m].alternateEndings;
+        }
+        const int highest = static_cast<int>(std::bit_width(endings));
+        std::fill(last.begin() + static_cast<std::ptrdiff_t>(first),
+                  last.begin() + static_cast<std::ptrdiff_t>(m), highest);
+    }
+    return last;
+}
+
+// The measure a jump from `from` goes to, or nullopt when its sign is missing.
+std::optional<std::size_t> jumpTarget(const std::vector<MeasureHeader>& headers, std::size_t from,
+                                      JumpTo to) {
+    if (to == JumpTo::Start) {
+        return 0;
+    }
+    for (std::size_t m = from + 1; m-- > 0;) {
+        if (to == JumpTo::Segno ? headers[m].segno : headers[m].segnoSegno) {
+            return m;
+        }
+    }
+    return std::nullopt;
+}
+
+// The first coda (or double coda) sign after `from`, or nullopt.
+std::optional<std::size_t> codaAfter(const std::vector<MeasureHeader>& headers, std::size_t from,
+                                     bool doubleCoda) {
+    for (std::size_t m = from + 1; m < headers.size(); ++m) {
+        if (doubleCoda ? headers[m].doubleCoda : headers[m].coda) {
+            return m;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 std::vector<std::size_t> Song::playOrder() const {
     const std::size_t count = headers_.size();
     const std::size_t limit = count * 256; // a guard: valid repeats stay far below it
@@ -208,6 +264,10 @@ std::vector<std::size_t> Song::playOrder() const {
     std::size_t start = 0; // first measure of the section being repeated
     int time = 1;          // time through that section
     bool jumped = false;   // the current measure was reached by repeating
+    // Once a jump was taken: what ends the music, and the endings played.
+    std::optional<JumpThen> after;
+    std::vector<int> lastEnding;
+    std::vector<bool> taken(count, false);
     std::size_t measure = 0;
     while (measure < count && order.size() < limit) {
         const MeasureHeader& header = headers_[measure];
@@ -216,14 +276,38 @@ std::vector<std::size_t> Song::playOrder() const {
             time = 1;
         }
         jumped = false;
-        const bool played = header.playedOnTime(time);
+        const bool played = header.playedOnTime(after ? lastEnding[measure] : time);
         if (played) {
             order.push_back(measure);
-            if (header.repeatEnd() && time < header.repeatTimes) {
+            if (!after && header.repeatEnd() && time < header.repeatTimes) {
                 ++time;
                 measure = start;
                 jumped = true;
                 continue;
+            }
+            if (after == JumpThen::Fine && header.fine) {
+                break;
+            }
+            if ((after == JumpThen::Coda && header.toCoda) ||
+                (after == JumpThen::DoubleCoda && header.toDoubleCoda)) {
+                if (const auto coda = codaAfter(headers_, measure, after == JumpThen::DoubleCoda)) {
+                    after = JumpThen::End;
+                    measure = *coda;
+                    start = *coda;
+                    continue;
+                }
+            }
+            if (header.jump != JumpTo::None && !taken[measure]) {
+                if (const auto target = jumpTarget(headers_, measure, header.jump)) {
+                    taken[measure] = true;
+                    if (!after) {
+                        lastEnding = lastEndings(headers_);
+                    }
+                    after = header.jumpThen;
+                    measure = *target;
+                    start = *target;
+                    continue;
+                }
             }
         }
         // A new section starts after the last alternate ending, or after a

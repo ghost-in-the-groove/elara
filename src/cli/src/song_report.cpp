@@ -48,8 +48,48 @@ std::string measuresJson(const core::Song& song) {
     std::string out = "[";
     for (std::size_t m = 0; m < song.measureCount(); ++m) {
         const auto& header = song.measureHeader(m);
-        out += std::format(R"({}{{"time":"{}","key":"{}"}})", m == 0 ? "" : ",",
+        out += std::format(R"({}{{"time":"{}","key":"{}")", m == 0 ? "" : ",",
                            header.timeSignature.toString(), header.keySignature.toString());
+        if (header.repeatStart) {
+            out += R"(,"repeatStart":true)";
+        }
+        if (header.repeatEnd()) {
+            out += std::format(R"(,"repeatTimes":{})", header.repeatTimes);
+        }
+        if (header.alternateEndings != 0) {
+            std::string endings;
+            for (int time = 1; time <= core::MeasureHeader::kMaxEnding; ++time) {
+                if (((header.alternateEndings >> (time - 1)) & 1U) != 0) {
+                    endings += std::format("{}{}", endings.empty() ? "" : ",", time);
+                }
+            }
+            out += std::format(R"(,"endings":[{}])", endings);
+        }
+        std::string signs;
+        for (const SignName& sign : kSignNames) {
+            if (header.*sign.flag) {
+                signs += std::format(R"({}"{}")", signs.empty() ? "" : ",", sign.name);
+            }
+        }
+        if (!signs.empty()) {
+            out += std::format(R"(,"signs":[{}])", signs);
+        }
+        if (header.jump != core::JumpTo::None) {
+            out += std::format(R"(,"jump":"{}")",
+                               kJumpToNames.at(static_cast<std::size_t>(header.jump)));
+            if (header.jumpThen != core::JumpThen::End) {
+                out += std::format(R"(,"jumpThen":"{}")",
+                                   kJumpThenNames.at(static_cast<std::size_t>(header.jumpThen)));
+            }
+        }
+        // A tempo that starts the measure (ADR-0042); changes inside it are
+        // kept but not listed here.
+        for (const core::TempoChange& change : header.tempoChanges) {
+            if (change.offset == core::Fraction{}) {
+                out += std::format(R"(,"tempo":{})", jsonNumber(change.tempo.bpm()));
+            }
+        }
+        out += "}";
     }
     return out + "]";
 }

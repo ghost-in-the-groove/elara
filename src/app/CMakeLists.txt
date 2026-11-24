@@ -4,13 +4,14 @@ qt_standard_project_setup(REQUIRES 6.12
   I18N_SOURCE_LANGUAGE en
   I18N_TRANSLATED_LANGUAGES es)
 
-# Painting of display lists, in a library of its own so that tests link it
-# without the QML application.
+# Painting of display lists and the list models the views show, in a library
+# of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
-  src/score_painter.cpp)
+  src/score_painter.cpp
+  src/track_list.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
-elara_source_warnings(src/score_painter.cpp)
+elara_source_warnings(src/score_painter.cpp src/track_list.cpp)
 
 qt_add_executable(elara WIN32 MACOSX_BUNDLE
   src/main.cpp)
@@ -24,20 +25,30 @@ set_target_properties(elara PROPERTIES
   MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
   MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
 
+# The theme is one object shared by every QML file.
+set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
 qt_add_qml_module(elara
   URI Elara.App
   VERSION 1.0
   QML_FILES
     qml/Main.qml
+    qml/Theme.qml
+    qml/Elevation.qml
     qml/ScoreView.qml
     qml/EntryBar.qml
+    qml/MeasurePopup.qml
+    qml/SignatureFields.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml
-        qml/Icon.qml
+    qml/Icon.qml
+    qml/Logo.qml
     qml/MusicSymbol.qml
     qml/TunerPane.qml
     qml/SongPane.qml
+    qml/TuningFields.qml
+    qml/PracticeControls.qml
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp

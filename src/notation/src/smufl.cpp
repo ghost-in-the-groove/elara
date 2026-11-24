@@ -99,6 +99,12 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"dynamicPiano", 0xE520},
     {"dynamicMezzo", 0xE521},
     {"dynamicForte", 0xE522},
+    {"dynamicPPP", 0xE52A},
+    {"dynamicPP", 0xE52B},
+    {"dynamicMP", 0xE52C},
+    {"dynamicMF", 0xE52D},
+    {"dynamicFF", 0xE52F},
+    {"dynamicFFF", 0xE530},
     {"stringsDownBow", 0xE610},
     {"stringsUpBow", 0xE612},
     {"guitarVibratoStroke", 0xEAB2},
@@ -107,6 +113,13 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"repeatDot", 0xE044},
     {"segno", 0xE047},
     {"coda", 0xE048},
+    {"metNoteWhole", 0xECA2},
+    {"metNoteHalfUp", 0xECA3},
+    {"metNoteQuarterUp", 0xECA5},
+    {"metNote8thUp", 0xECA7},
+    {"metNote16thUp", 0xECA9},
+    {"metNote32ndUp", 0xECAB},
+    {"metAugmentationDot", 0xECB7},
 }};
 
 constexpr std::array<std::string_view, kAnchorCount> kAnchorNames{

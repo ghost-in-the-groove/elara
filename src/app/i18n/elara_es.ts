@@ -39,6 +39,10 @@
         <translation>Semifusa</translation>
     </message>
     <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
         <source>%1 (+ longer, - shorter)</source>
         <translation>%1 (+ más larga, - más corta)</translation>
     </message>
@@ -47,12 +51,60 @@
         <translation>Con puntillo (.)</translation>
     </message>
     <message>
+        <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
+        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
+    </message>
+    <message>
+        <source>Duplet (2 in the time of 3)</source>
+        <translation>Dosillo (2 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Triplet (3 in the time of 2)</source>
+        <translation>Tresillo (3 en el tiempo de 2)</translation>
+    </message>
+    <message>
+        <source>Quadruplet (4 in the time of 3)</source>
+        <translation>Cuatrillo (4 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Quintuplet (5 in the time of 4)</source>
+        <translation>Quintillo (5 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Sextuplet (6 in the time of 4)</source>
+        <translation>Seisillo (6 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Septuplet (7 in the time of 4)</source>
+        <translation>Septillo (7 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Nonuplet (9 in the time of 8)</source>
+        <translation>Nonillo (9 en el tiempo de 8)</translation>
+    </message>
+    <message>
+        <source>No tuplet</source>
+        <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
+        <source>Voice %1 (Alt+1 to Alt+4); a right click picks one</source>
+        <translation>Voz %1 (Alt+1 a Alt+4); clic derecho para elegir otra</translation>
+    </message>
+    <message>
+        <source>V%1</source>
+        <translation>V%1</translation>
+    </message>
+    <message>
         <source>Insert a rest (Insert)</source>
         <translation>Insertar un silencio (Insert)</translation>
     </message>
     <message>
         <source>Delete the note (Delete); the beat with Ctrl+Delete</source>
         <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
+    </message>
+    <message>
+        <source>Measure: signatures, insert, delete (Ctrl+M)</source>
+        <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
     </message>
 </context>
 <context>
@@ -208,9 +260,127 @@
             <numerusform>%n compases</numerusform>
         </translation>
     </message>
+</context>
+<context>
+    <name>MeasurePopup</name>
     <message>
-        <source>Laid out in %1 ms</source>
-        <translation>Maquetada en %1 ms</translation>
+        <source>Measure %1</source>
+        <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+    <message>
+        <source>From this measure until the next change.</source>
+        <translation>Desde este compás hasta el siguiente cambio.</translation>
+    </message>
+    <message>
+        <source>Signs and jumps</source>
+        <translation>Señales y saltos</translation>
+    </message>
+    <message>
+        <source>Segno</source>
+        <translation>Segno</translation>
+    </message>
+    <message>
+        <source>Segno segno</source>
+        <translation>Doble segno</translation>
+    </message>
+    <message>
+        <source>Coda</source>
+        <translation>Coda</translation>
+    </message>
+    <message>
+        <source>Double coda</source>
+        <translation>Doble coda</translation>
+    </message>
+    <message>
+        <source>Fine</source>
+        <translation>Fine</translation>
+    </message>
+    <message>
+        <source>To coda</source>
+        <translation>A la coda</translation>
+    </message>
+    <message>
+        <source>To double coda</source>
+        <translation>A la doble coda</translation>
+    </message>
+    <message>
+        <source>No jump</source>
+        <translation>Sin salto</translation>
+    </message>
+    <message>
+        <source>D.C.</source>
+        <translation>D.C.</translation>
+    </message>
+    <message>
+        <source>D.S.</source>
+        <translation>D.S.</translation>
+    </message>
+    <message>
+        <source>D.S.S.</source>
+        <translation>D.S.S.</translation>
+    </message>
+    <message>
+        <source>to the end</source>
+        <translation>hasta el final</translation>
+    </message>
+    <message>
+        <source>al Fine</source>
+        <translation>al Fine</translation>
+    </message>
+    <message>
+        <source>al Coda</source>
+        <translation>al Coda</translation>
+    </message>
+    <message>
+        <source>al Double Coda</source>
+        <translation>al Doble Coda</translation>
+    </message>
+    <message>
+        <source>Insert before</source>
+        <translation>Insertar antes</translation>
+    </message>
+    <message>
+        <source>An empty measure before this one (Ctrl+Insert)</source>
+        <translation>Un compás vacío antes de este (Ctrl+Insert)</translation>
+    </message>
+    <message>
+        <source>Insert after</source>
+        <translation>Insertar después</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation>Borrar</translation>
+    </message>
+    <message>
+        <source>Delete this measure from every track (Ctrl+Shift+Delete)</source>
+        <translation>Borrar este compás de todas las pistas (Ctrl+Mayús+Supr)</translation>
+    </message>
+</context>
+<context>
+    <name>PracticeControls</name>
+    <message>
+        <source>Metronome</source>
+        <translation>Metrónomo</translation>
+    </message>
+    <message>
+        <source>Playback speed: %1 %</source>
+        <translation>Velocidad de reproducción: %1 %</translation>
+    </message>
+    <message>
+        <source>Playback speed</source>
+        <translation>Velocidad de reproducción</translation>
+    </message>
+    <message>
+        <source>%1 %</source>
+        <translation>%1 %</translation>
+    </message>
+    <message>
+        <source>Speed</source>
+        <translation>Velocidad</translation>
     </message>
 </context>
 <context>
@@ -226,6 +396,25 @@
     <message>
         <source>The file has no music.</source>
         <translation>El archivo no contiene música.</translation>
+    </message>
+</context>
+<context>
+    <name>SignatureFields</name>
+    <message>
+        <source>Time signature</source>
+        <translation>Compás</translation>
+    </message>
+    <message>
+        <source>Key signature</source>
+        <translation>Armadura</translation>
+    </message>
+    <message>
+        <source>Major</source>
+        <translation>Mayor</translation>
+    </message>
+    <message>
+        <source>Minor</source>
+        <translation>Menor</translation>
     </message>
 </context>
 <context>
@@ -267,22 +456,6 @@
         <translation>Compases</translation>
     </message>
     <message>
-        <source>Time signature</source>
-        <translation>Compás</translation>
-    </message>
-    <message>
-        <source>Key signature</source>
-        <translation>Armadura</translation>
-    </message>
-    <message>
-        <source>Major</source>
-        <translation>Mayor</translation>
-    </message>
-    <message>
-        <source>Minor</source>
-        <translation>Menor</translation>
-    </message>
-    <message>
         <source>From the first measure until the next change.</source>
         <translation>Desde el primer compás hasta el siguiente cambio.</translation>
     </message>
@@ -300,6 +473,10 @@
     <message>
         <source>Tracks</source>
         <translation>Pistas</translation>
+    </message>
+    <message>
+        <source>Tuning and capo</source>
+        <translation>Afinación y cejilla</translation>
     </message>
     <message>
         <source>Remove track</source>
@@ -483,6 +660,53 @@
     </message>
 </context>
 <context>
+    <name>TuningFields</name>
+    <message>
+        <source>Custom</source>
+        <translation>Personalizada</translation>
+    </message>
+    <message>
+        <source>Strings</source>
+        <translation>Cuerdas</translation>
+    </message>
+    <message>
+        <source>Open strings from the lowest; Enter applies them</source>
+        <translation>Cuerdas al aire desde la más grave; Intro las aplica</translation>
+    </message>
+    <message>
+        <source>Capo</source>
+        <translation>Cejilla</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Sin cejilla</translation>
+    </message>
+    <message>
+        <source>Fret %1</source>
+        <translation>Traste %1</translation>
+    </message>
+    <message>
+        <source>Keep</source>
+        <translation>Mantener</translation>
+    </message>
+    <message>
+        <source>the sound</source>
+        <translation>el sonido</translation>
+    </message>
+    <message>
+        <source>the frets</source>
+        <translation>los trastes</translation>
+    </message>
+    <message>
+        <source>The tablature stays; each note sounds what its fret plays now.</source>
+        <translation>La tablatura se queda igual; cada nota suena lo que ahora da su traste.</translation>
+    </message>
+    <message>
+        <source>The music sounds the same; its notes move to other frets.</source>
+        <translation>La música suena igual; sus notas pasan a otros trastes.</translation>
+    </message>
+</context>
+<context>
     <name>WelcomePane</name>
     <message>
         <source>Tablature, score and music studio</source>
@@ -612,6 +836,10 @@
         <translation>Cambiar la mezcla</translation>
     </message>
     <message>
+        <source>Change navigation marks</source>
+        <translation>Cambiar señales y saltos</translation>
+    </message>
+    <message>
         <source>Change time signature</source>
         <translation>Cambiar el compás</translation>
     </message>
@@ -638,6 +866,110 @@
     <message>
         <source>Insert rest</source>
         <translation>Insertar silencio</translation>
+    </message>
+    <message>
+        <source>Change pitch</source>
+        <translation>Cambiar altura</translation>
+    </message>
+    <message>
+        <source>Change tuning</source>
+        <translation>Cambiar afinación</translation>
+    </message>
+    <message>
+        <source>Guitar, standard</source>
+        <translation>Guitarra, estándar</translation>
+    </message>
+    <message>
+        <source>Guitar, drop D</source>
+        <translation>Guitarra, drop D</translation>
+    </message>
+    <message>
+        <source>Guitar, half a step down</source>
+        <translation>Guitarra, medio tono abajo</translation>
+    </message>
+    <message>
+        <source>Guitar, DADGAD</source>
+        <translation>Guitarra, DADGAD</translation>
+    </message>
+    <message>
+        <source>Guitar, open G</source>
+        <translation>Guitarra, Sol abierto</translation>
+    </message>
+    <message>
+        <source>Guitar, open D</source>
+        <translation>Guitarra, Re abierto</translation>
+    </message>
+    <message>
+        <source>Seven-string guitar</source>
+        <translation>Guitarra de siete cuerdas</translation>
+    </message>
+    <message>
+        <source>Eight-string guitar</source>
+        <translation>Guitarra de ocho cuerdas</translation>
+    </message>
+    <message>
+        <source>Bass, standard</source>
+        <translation>Bajo, estándar</translation>
+    </message>
+    <message>
+        <source>Bass, drop D</source>
+        <translation>Bajo, drop D</translation>
+    </message>
+    <message>
+        <source>Five-string bass</source>
+        <translation>Bajo de cinco cuerdas</translation>
+    </message>
+    <message>
+        <source>Six-string bass</source>
+        <translation>Bajo de seis cuerdas</translation>
+    </message>
+    <message>
+        <source>Crash cymbal</source>
+        <translation>Platillo crash</translation>
+    </message>
+    <message>
+        <source>Closed hi-hat</source>
+        <translation>Charles cerrado</translation>
+    </message>
+    <message>
+        <source>Open hi-hat</source>
+        <translation>Charles abierto</translation>
+    </message>
+    <message>
+        <source>Ride cymbal</source>
+        <translation>Platillo ride</translation>
+    </message>
+    <message>
+        <source>Ride bell</source>
+        <translation>Campana del ride</translation>
+    </message>
+    <message>
+        <source>High tom</source>
+        <translation>Tom agudo</translation>
+    </message>
+    <message>
+        <source>Mid tom</source>
+        <translation>Tom medio</translation>
+    </message>
+    <message>
+        <source>Snare</source>
+        <translation>Caja</translation>
+    </message>
+    <message>
+        <source>Side stick</source>
+        <translation>Golpe de aro</translation>
+    </message>
+    <message>
+        <source>Floor tom</source>
+        <translation>Tom de suelo</translation>
+    </message>
+    <message>
+        <source>Bass drum</source>
+        <translation>Bombo</translation>
+    </message>
+    <message>
+        <source>Hi-hat pedal</source>
+        <translation>Pedal de charles</translation>
     </message>
     <message numerus="yes">
         <source>%n strings</source>
@@ -706,8 +1038,28 @@
         <translation>No se pudo guardar %1: %2</translation>
     </message>
     <message>
+        <source>Only a track with strings has a tuning.</source>
+        <translation>Solo una pista con cuerdas tiene afinación.</translation>
+    </message>
+    <message>
+        <source>%1 is not a tuning: give open strings from the lowest, such as D2 A2 D3 G3 B3 E4.</source>
+        <translation>%1 no es una afinación: escribe las cuerdas al aire desde la más grave, como D2 A2 D3 G3 B3 E4.</translation>
+    </message>
+    <message>
+        <source>Some frets of %1 do not fit that tuning and capo.</source>
+        <translation>Algunos trastes de %1 no caben con esa afinación y cejilla.</translation>
+    </message>
+    <message>
+        <source>That tuning cannot play every note of %1.</source>
+        <translation>Esa afinación no puede tocar todas las notas de %1.</translation>
+    </message>
+    <message>
         <source>Measure %1</source>
         <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
     </message>
     <message>
         <source>New beat</source>
@@ -726,8 +1078,32 @@
         <translation>Traste %1</translation>
     </message>
     <message>
+        <source>On drums, Enter adds or removes the lane&apos;s hit.</source>
+        <translation>En la batería, Intro añade o quita el golpe del carril.</translation>
+    </message>
+    <message>
         <source>Frets are typed on a track with strings.</source>
         <translation>Los trastes se escriben en una pista con cuerdas.</translation>
+    </message>
+    <message>
+        <source>Drums take no note names.</source>
+        <translation>La batería no admite nombres de nota.</translation>
+    </message>
+    <message>
+        <source>No string can play that note.</source>
+        <translation>Ninguna cuerda puede tocar esa nota.</translation>
+    </message>
+    <message>
+        <source>That note is out of range.</source>
+        <translation>Esa nota está fuera de rango.</translation>
+    </message>
+    <message>
+        <source>The note would leave the neck.</source>
+        <translation>La nota se saldría del mástil.</translation>
+    </message>
+    <message>
+        <source>Hits are typed on a drum track.</source>
+        <translation>Los golpes se escriben en una pista de batería.</translation>
     </message>
 </context>
 <context>
@@ -767,6 +1143,14 @@
     <message>
         <source>Open the song and tracks panel at start.</source>
         <translation>Abrir el panel de canción y pistas al iniciar.</translation>
+    </message>
+    <message>
+        <source>Open the caret&apos;s measure at start.</source>
+        <translation>Abrir el compás del cursor al iniciar.</translation>
+    </message>
+    <message>
+        <source>Open the first track&apos;s tuning in the song panel at start.</source>
+        <translation>Abrir al inicio la afinación de la primera pista en el panel de canción.</translation>
     </message>
     <message>
         <source>Show the interface in this language (en, es).</source>

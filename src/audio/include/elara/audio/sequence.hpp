@@ -170,4 +170,11 @@ private:
     std::vector<Pulse> pulses_;     // one per played measure
 };
 
+/// Where playback at `seconds` of `from` goes on in `to`: the same share of
+/// the same played measure when both play the same measures in the same order
+/// (another speed, a tempo edit), so it keeps its place in the music; the
+/// same time otherwise. Always inside `to`, at its end from the end of `from`.
+[[nodiscard]] double carriedPosition(const Sequence& from, double seconds,
+                                     const Sequence& to) noexcept;
+
 } // namespace elara::audio

@@ -67,15 +67,24 @@ public:
 
     [[nodiscard]] const QRawFont& font() const { return font_; }
 
-    // Fills glyph `index` with its origin at `origin`.
-    void fill(QPainter& painter, quint32 index, const QPointF& origin, const QColor& ink) {
+    // Fills glyph `index` with its origin at `origin`, `size` times as large.
+    void fill(QPainter& painter, quint32 index, const QPointF& origin, const QColor& ink,
+              double size = 1.0) {
         auto found = outlines_.find(index);
         if (found == outlines_.end()) {
             found = outlines_.insert(index, font_.pathForGlyph(index));
         }
-        if (!found->isEmpty()) {
-            painter.fillPath(found->translated(origin), ink);
+        if (found->isEmpty()) {
+            return;
         }
+        if (size == 1.0) {
+            painter.fillPath(found->translated(origin), ink);
+            return;
+        }
+        QTransform transform;
+        transform.translate(origin.x(), origin.y());
+        transform.scale(size, size);
+        painter.fillPath(transform.map(*found), ink);
     }
 
 private:
@@ -134,7 +143,7 @@ void paintGlyphs(QPainter& painter, const DisplayList& list, double scale,
     }
     for (std::size_t i = 0; i < list.glyphs.size(); ++i) {
         outlines.fill(painter, indexes[static_cast<qsizetype>(i)], at(list.glyphs[i].origin, scale),
-                      ink);
+                      ink, list.glyphs[i].scale);
     }
 }
 

@@ -33,7 +33,11 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     }
     document_ = document;
     if (document_) {
+        connect(document_, &elara::app::ScoreDocument::songReplaced, this,
+                &AudioController::loadSong);
         connect(document_, &elara::app::ScoreDocument::songChanged, this,
+                &AudioController::songEdited);
+        connect(document_, &elara::app::ScoreDocument::sequenceChanged, this,
                 &AudioController::songEdited);
         connect(document_, &elara::app::ScoreDocument::mixPreviewed, this,
                 &AudioController::previewMix);
@@ -58,16 +62,34 @@ bool AudioController::openDevice() {
     return true;
 }
 
-// The song changed. When it plays as before (the document kept its
+// The song was edited. When it plays as before (the document kept its
 // sequence: the mix or the song's info changed), playback carries on with the
-// new mix (ADR-0039); otherwise the song is loaded again.
+// new mix (ADR-0039); otherwise it plays the new sequence from where it is,
+// playing or paused as it was. Only another song goes back to the start
+// (loadSong()).
 void AudioController::songEdited() {
-    if (player_ && document_ && document_->song() && document_->sequence() &&
-        document_->sequence() == loaded_) {
+    if (!document_ || !document_->song() || !document_->sequence()) {
+        return;
+    }
+    if (!player_) {
+        // The position waits for the device, at the same place in the music
+        // when only the timing changed, and inside the song.
+        const auto& sequence = document_->sequence();
+        const double position = placed_
+                                    ? elara::audio::carriedPosition(*placed_, position_, *sequence)
+                                    : std::clamp(position_, 0.0, document_->duration());
+        placed_ = sequence;
+        if (position != position_) {
+            position_ = position;
+            emit positionChanged();
+        }
+        return;
+    }
+    if (document_->sequence() == loaded_) {
         player_->updateMix(*document_->song());
         return;
     }
-    loadSong();
+    loadSequence();
 }
 
 // A fader moves: playback hears it at once.
@@ -77,15 +99,33 @@ void AudioController::previewMix() {
     }
 }
 
+// The document's sequence with the song it was built from, which an edit
+// whose sequence is still being built has left behind; then that edit's mix.
+void AudioController::loadSequence() {
+    const auto& sequence = document_->sequence();
+    // Another speed or a tempo edit moves the time of every note: playback
+    // goes on from the same place in the music.
+    const double before = player_->position();
+    const double after =
+        loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    player_->load(*document_->sequenceSong(), *sequence);
+    if (after != before) {
+        player_->seek(after);
+    }
+    loaded_ = sequence;
+    placed_ = sequence;
+    player_->updateMix(*document_->song());
+}
+
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
     loaded_.reset();
+    placed_ = document_ ? document_->sequence() : nullptr;
     if (player_) {
         player_->pause();
         player_->seek(0.0);
         if (document_ && document_->song() && document_->sequence()) {
-            player_->load(*document_->song(), *document_->sequence());
-            loaded_ = document_->sequence();
+            loadSequence();
         }
     }
     pollTransport();
@@ -104,8 +144,7 @@ void AudioController::togglePlayback() {
             return;
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
-        player_->load(*document_->song(), *document_->sequence());
-        loaded_ = document_->sequence();
+        loadSequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
     }

@@ -73,6 +73,7 @@ signals:
 private:
     bool openDevice();
     void loadSong();
+    void loadSequence();
     void songEdited();
     void previewMix();
     void setPlaying(bool playing);
@@ -84,6 +85,7 @@ private:
     std::unique_ptr<elara::audio::SystemAudio> audio_;
     std::unique_ptr<elara::audio::Player> player_;
     std::shared_ptr<const elara::audio::Sequence> loaded_; // what player_ plays
+    std::shared_ptr<const elara::audio::Sequence> placed_; // what position_ counts in
     QTimer pollTimer_;
     QTimer transportTimer_;
     bool playing_ = false;

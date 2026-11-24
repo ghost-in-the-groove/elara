@@ -3,6 +3,7 @@
 // (ADR-0015).
 #pragma once
 
+#include <elara/audio/sequence.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
@@ -10,6 +11,7 @@
 #include <elara/notation/display_list.hpp>
 
 #include "score_painter.hpp"
+#include "track_list.hpp"
 #include <QElapsedTimer>
 #include <QObject>
 #include <QRectF>
@@ -27,10 +29,6 @@
 #include <optional>
 #include <span>
 #include <vector>
-
-namespace elara::audio {
-class Sequence;
-}
 
 namespace elara::app {
 
@@ -54,7 +52,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString artist READ artist NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
-    Q_PROPERTY(double duration READ duration NOTIFY songChanged)
+    Q_PROPERTY(double duration READ duration NOTIFY sequenceChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
@@ -71,7 +69,9 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int keyFifths READ keyFifths NOTIFY songChanged)
     Q_PROPERTY(bool keyMinor READ keyMinor NOTIFY songChanged)
     Q_PROPERTY(QVariantList tracks READ tracks NOTIFY songChanged)
+    Q_PROPERTY(QAbstractItemModel* trackList READ trackList CONSTANT)
     Q_PROPERTY(QVariantList instrumentPresets READ instrumentPresets CONSTANT)
+    Q_PROPERTY(QVariantList tuningPresets READ tuningPresets CONSTANT)
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY historyChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY historyChanged)
     Q_PROPERTY(QString undoName READ undoName NOTIFY historyChanged)
@@ -85,6 +85,18 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
+    Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
+    // The caret's measure.
+    Q_PROPERTY(int caretMeasure READ caretMeasure NOTIFY caretChanged)
+    Q_PROPERTY(int caretVoice READ caretVoice NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeNumerator READ caretTimeNumerator NOTIFY caretChanged)
+    Q_PROPERTY(int caretTimeDenominator READ caretTimeDenominator NOTIFY caretChanged)
+    Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
+    Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
+    // Practice (ADR-0024): how playback plays the song, whatever song it is.
+    Q_PROPERTY(int speed READ speed WRITE setSpeed NOTIFY practiceChanged)
+    Q_PROPERTY(bool metronome READ metronome WRITE setMetronome NOTIFY practiceChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -149,10 +161,23 @@ public:
     /// plays; negative away from every measure.
     Q_INVOKABLE double secondsAt(int page, double x, double y) const;
 
-    /// The song and the sequence it plays as, built when it is opened; null
-    /// before.
+    /// The song and the sequence it plays as; null before a song is open.
+    /// After an edit the sequence follows when the edit's layout is done: it
+    /// is built on the same worker thread, so typing never waits for it.
     [[nodiscard]] std::shared_ptr<const core::Song> song() const { return song_; }
     [[nodiscard]] std::shared_ptr<const audio::Sequence> sequence() const { return sequence_; }
+    /// The song sequence() was built from: what playback loads with it.
+    [[nodiscard]] std::shared_ptr<const core::Song> sequenceSong() const { return sequenceSong_; }
+
+    /// Playback speed, in percent of the written tempo (25 to 200), and the
+    /// metronome. Kept when another song is opened; changing either builds the
+    /// sequence again, and playback keeps its place in the music.
+    [[nodiscard]] int speed() const noexcept;
+    void setSpeed(int percent);
+    [[nodiscard]] bool metronome() const noexcept { return practice_.metronome; }
+    void setMetronome(bool on);
+    /// What every sequence is built with.
+    [[nodiscard]] audio::SequenceOptions practice() const noexcept { return practice_; }
 
     // ---- Editing ------------------------------------------------------------
 
@@ -169,10 +194,19 @@ public:
     /// kind of instrument), symbol (a clef of the music font) and its mix:
     /// volume (0 to 1), pan (-1 to 1), mute, solo, and audible when it sounds
     /// (ADR-0039).
+    /// The tracks: name, detail, symbol, mix ("volume", "pan", "mute", "solo",
+    /// "audible") and tuning ("fretted", "tuning", "tuningPreset", "capo", as
+    /// trackTuning() names them "fretted", "notes", "preset" and "capo").
     [[nodiscard]] QVariantList tracks() const;
+    /// tracks() as a model the song panel keeps its rows in: what changes
+    /// changes only its rows. Follows songChanged.
+    [[nodiscard]] QAbstractItemModel* trackList() { return &trackList_; }
     /// The instruments a track can be added for: id, name and group (guitar,
     /// bass or other), in a menu's order.
     [[nodiscard]] static QVariantList instrumentPresets();
+    /// The tuning presets (ADR-0046): id, name and notes, the open strings
+    /// from the lowest ("E2 A2 D3 G3 B3 E4").
+    [[nodiscard]] static QVariantList tuningPresets();
     [[nodiscard]] bool canUndo() const { return document_ && document_->canUndo(); }
     [[nodiscard]] bool canRedo() const { return document_ && document_->canRedo(); }
     /// What undo() or redo() would change, e.g. "Add track"; empty when nothing.
@@ -192,6 +226,17 @@ public:
     /// Change the signature from the first measure until its next change.
     Q_INVOKABLE void setTimeSignature(int numerator, int denominator);
     Q_INVOKABLE void setKeySignature(int fifths, bool minor);
+    /// Change the signature from `measure` (0-based) until its next change.
+    Q_INVOKABLE void setTimeSignatureFrom(int measure, int numerator, int denominator);
+    Q_INVOKABLE void setKeySignatureFrom(int measure, int fifths, bool minor);
+    /// The signs and jumps of `measure` (ADR-0049): the flags "segno",
+    /// "segnoSegno", "coda", "doubleCoda", "fine", "toCoda" and "toDoubleCoda",
+    /// "jump" (0 none, 1 da capo, 2 dal segno, 3 dal segno segno) and
+    /// "jumpThen" (0 to the end, 1 al Fine, 2 al Coda, 3 al Double Coda).
+    Q_INVOKABLE QVariantMap navigationAt(int measure) const;
+    /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
+    /// gives them, as one undo step ("Change navigation marks").
+    Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -204,6 +249,16 @@ public:
     /// Lets playback hear a track's volume and pan while a fader moves, without
     /// changing the song: setTrackMix() keeps it when the fader is let go.
     Q_INVOKABLE void previewTrackMix(int track, double volume, double pan);
+    /// The tuning of a track's first staff: "fretted" (false without strings),
+    /// "notes" (its open strings from the lowest), "preset" (the id of the
+    /// preset it matches, else empty) and "capo".
+    Q_INVOKABLE [[nodiscard]] QVariantMap trackTuning(int track) const;
+    /// Retunes a track's first staff (ADR-0046) to `tuning`, a preset id or open
+    /// strings from the lowest ("D2 A2 D3 G3 B3 E4"), with a capo at `capo`,
+    /// keeping its pitches or, with `keepFrets`, its frets: one undo step,
+    /// "Change tuning". A tuning that cannot play every note is refused through
+    /// editFailed().
+    Q_INVOKABLE void setTrackTuning(int track, const QString& tuning, int capo, bool keepFrets);
     /// The mixes previewTrackMix() last made, one per track.
     [[nodiscard]] std::span<const core::TrackMix> previewMixes() const { return previewMixes_; }
     Q_INVOKABLE void undo();
@@ -220,19 +275,39 @@ public:
     /// The caret on its page, in staff spaces from the page's top-left corner.
     [[nodiscard]] QRectF caretRect() const { return caretRect_; }
     /// Where the caret is, for a status line: "Measure 3 · Beat 2 · String 4 ·
-    /// Fret 5".
+    /// Fret 5 · A3", the beat's notes on a staff without strings, or the lane's
+    /// kit piece on a drum staff ("Measure 1 · Beat 1 · Snare").
     [[nodiscard]] QString caretStatus() const;
     /// Whether the caret's staff has strings, so that digits type frets.
     [[nodiscard]] bool caretFretted() const;
     /// The duration typing uses: 1 a whole note, 2 a half note... 64.
     [[nodiscard]] int inputValue() const;
     [[nodiscard]] bool inputDotted() const { return input_.dots() > 0; }
+    /// The actual notes of the input duration's tuplet (3 for a triplet), 0
+    /// when it has none.
+    [[nodiscard]] int inputTuplet() const {
+        return input_.tuplet().isNone() ? 0 : input_.tuplet().actual();
+    }
     /// The caret in the song being edited.
     [[nodiscard]] core::Caret caret() const { return caret_; }
     /// The fret of the note on the caret's string at its beat, if there is one.
     [[nodiscard]] std::optional<int> fretAtCaret() const;
+    /// The notes the caret is on, low to high: the one on its string on a
+    /// fretted staff, every note of the beat elsewhere.
+    [[nodiscard]] std::vector<core::Pitch> pitchesAtCaret() const;
+    /// Whether note names can be typed at the caret (its staff is not percussion).
+    [[nodiscard]] bool caretPitched() const;
+    /// Whether the caret is on a drum staff, where its string is a lane (ADR-0035).
+    [[nodiscard]] bool caretOnDrums() const;
+    /// The translated name of drum lane `lane` (1 at the top of the staff).
+    [[nodiscard]] static QString laneName(int lane);
 
     Q_INVOKABLE void moveCaret(CaretMove move);
+    /// The voice typing goes into, 1 to 4 (the core's voice plus one).
+    [[nodiscard]] int caretVoice() const { return static_cast<int>(caret_.voice) + 1; }
+    /// Moves the caret to voice `voice` (1 to 4) of its measure, at its beat or
+    /// the nearest one that voice has; typing then goes there.
+    Q_INVOKABLE void setCaretVoice(int voice);
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
     /// spaces from the page's top-left corner. Returns whether it moved there.
     Q_INVOKABLE bool placeCaret(int index, double x, double y);
@@ -243,12 +318,40 @@ public:
     /// The input duration (1, 2, 4... 64), also given to the caret's beat.
     Q_INVOKABLE void setInputValue(int value);
     Q_INVOKABLE void toggleDot();
+    /// Makes the input duration a tuplet of `actual` notes (ADR-0050): 2, 3,
+    /// 4, 5, 6, 7 or 9, in the time of 3, 2, 3, 4, 4, 4 and 8. It goes back to
+    /// no tuplet when it already is that one or `actual` is 0. The caret's
+    /// beat takes it, as setInputValue().
+    Q_INVOKABLE void setInputTuplet(int actual);
     /// The next longer or shorter note value, as setInputValue().
     Q_INVOKABLE void longerDuration();
     Q_INVOKABLE void shorterDuration();
     Q_INVOKABLE void deleteAtCaret();
     Q_INVOKABLE void deleteBeat();
     Q_INVOKABLE void insertRest();
+    /// Types a note name, 0 for C to 6 for B (ADR-0034): in the octave nearest
+    /// the previous note, replacing the beat's notes or added above them.
+    Q_INVOKABLE void typeNoteName(int step, bool addToChord);
+    /// Moves the caret's note by `semitones` (12 for an octave).
+    Q_INVOKABLE void shiftPitch(int semitones);
+    /// On a drum staff, adds the lane's kit piece to the caret's beat or removes
+    /// it when it is there (ADR-0035).
+    Q_INVOKABLE void toggleDrum();
+
+    /// The caret's measure, 0-based, and its signatures.
+    [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
+    [[nodiscard]] int caretTimeNumerator() const;
+    [[nodiscard]] int caretTimeDenominator() const;
+    [[nodiscard]] int caretKeyFifths() const;
+    [[nodiscard]] bool caretKeyMinor() const;
+    [[nodiscard]] QVariantMap caretNavigation() const {
+        return navigationAt(static_cast<int>(caret_.measure));
+    }
+    /// Inserts an empty measure before the caret's measure, or after it, with
+    /// the signatures of the measure before it; the caret goes to it.
+    Q_INVOKABLE void insertMeasure(bool after);
+    /// Removes the caret's measure; the last measure of a song stays.
+    Q_INVOKABLE void removeMeasure();
 
     /// Page `index`, shared with the painting threads; null when out of range.
     [[nodiscard]] std::shared_ptr<const notation::DisplayList> page(int index) const;
@@ -260,6 +363,13 @@ signals:
     void statusChanged();
     void busyChanged();
     void songChanged();
+    /// Another song replaced the one being edited: a file was opened, or a new
+    /// song made. Emitted before songChanged() and sequenceChanged(), with the
+    /// new song and sequence in place; playback goes back to the start.
+    void songReplaced();
+    /// The sequence playback plays changed: a song was opened, or an edit
+    /// sounds different and its layout is done.
+    void sequenceChanged();
     void trackChanged();
     void viewChanged();
     void layoutChanged();
@@ -270,6 +380,7 @@ signals:
     void editFailed(const QString& message);
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
     void mixPreviewed();
+    void practiceChanged();
 
 private:
     bool execute(std::unique_ptr<core::Command> command);
@@ -290,13 +401,18 @@ private:
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
     void setPending(int delta);
+    void resequence();
 
     QUrl source_;
     Status status_ = Status::Empty;
     QString errorMessage_;
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
+    std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
+    std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
+    audio::SequenceOptions practice_;                 ///< speed() and metronome()
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
+    TrackList trackList_{this};                       ///< tracks(), kept up to date
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
@@ -315,7 +431,8 @@ private:
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
     int pending_ = 0;
-    std::uint64_t generation_ = 0;
+    std::uint64_t generation_ = 0;         ///< of layouts: only the latest is shown
+    std::uint64_t sequenceGeneration_ = 0; ///< of sequences: only the latest is played
 };
 
 } // namespace elara::app

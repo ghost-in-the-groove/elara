@@ -1,0 +1,163 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Navigation",
+   "artist": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {
+    "segno": true
+   },
+   {
+    "segnoSegno": true
+   },
+   {
+    "toCoda": true,
+    "toDoubleCoda": true
+   },
+   {
+    "jump": "dal-segno-segno",
+    "jumpThen": "al-double-coda"
+   },
+   {
+    "coda": true
+   },
+   {
+    "doubleCoda": true
+   }
+  ],
+  "tracks": [
+   {
+    "name": "Guitar",
+    "instrument": {
+     "name": "Electric Guitar",
+     "kind": "fretted",
+     "midiProgram": 27
+    },
+    "mix": {
+     "volume": 0.795
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "tuning": "E2 A2 D3 G3 B3 E4",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "E4",
+            "string": 1,
+            "fret": 0
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F4",
+            "string": 1,
+            "fret": 1
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F#4",
+            "string": 1,
+            "fret": 2
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G4",
+            "string": 1,
+            "fret": 3
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G#4",
+            "string": 1,
+            "fret": 4
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "A4",
+            "string": 1,
+            "fret": 5
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "A#4",
+            "string": 1,
+            "fret": 6
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 14.0,
+ "issues": []
+}

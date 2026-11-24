@@ -750,3 +750,42 @@ TEST_CASE("Sequence: a count-in is a measure of beats at the tempo where playbac
     CHECK(countIn(Sequence(song, {.speed = 0.5}), 0.0) == Expected{4, 1.0});
     CHECK(countIn(Sequence(Song{}), 0.0) == Expected{0, 0.0});
 }
+
+TEST_CASE("Sequence: playback keeps its place in the music when the timing changes",
+          "[audio][sequence][practice]") {
+    // Two seconds per measure at full speed, four at half speed.
+    Song song = pianoSong(3);
+    const Sequence full(song);
+    const Sequence half(song, {.speed = 0.5});
+
+    SECTION("another speed: the same point of the same measure") {
+        CHECK_THAT(elara::audio::carriedPosition(full, 3.0, half), WithinAbs(6.0, kEpsilon));
+        CHECK_THAT(elara::audio::carriedPosition(half, 6.0, full), WithinAbs(3.0, kEpsilon));
+        CHECK_THAT(elara::audio::carriedPosition(full, 0.0, half), WithinAbs(0.0, kEpsilon));
+        CHECK_THAT(elara::audio::carriedPosition(full, 4.0, half), WithinAbs(8.0, kEpsilon));
+    }
+    SECTION("the same timing: exactly the same time") {
+        Song edited = song;
+        voice(edited, 1) = {beat(NoteValue::Whole, {note(64)})};
+        CHECK(elara::audio::carriedPosition(full, 2.7, Sequence(edited)) == 2.7);
+    }
+    SECTION("a tempo edit: the same point of the same measure") {
+        Song faster = song;
+        faster.measureHeader(1).tempoChanges.push_back(TempoChange{.tempo = Tempo(240.0)});
+        const Sequence edited(faster);
+        CHECK_THAT(elara::audio::carriedPosition(full, 3.0, edited), WithinAbs(2.5, kEpsilon));
+    }
+    SECTION("at or past the end: the end") {
+        CHECK_THAT(elara::audio::carriedPosition(full, 6.0, half), WithinAbs(12.0, kEpsilon));
+        CHECK_THAT(elara::audio::carriedPosition(full, 99.0, half), WithinAbs(12.0, kEpsilon));
+    }
+    SECTION("other measures: the same time, inside the new song") {
+        Song longer = song;
+        longer.appendMeasures(1);
+        CHECK_THAT(elara::audio::carriedPosition(full, 3.0, Sequence(longer)),
+                   WithinAbs(3.0, kEpsilon));
+        Song shorter = pianoSong(1);
+        CHECK_THAT(elara::audio::carriedPosition(full, 5.0, Sequence(shorter)),
+                   WithinAbs(2.0, kEpsilon));
+    }
+}

@@ -96,11 +96,35 @@ void SetMeasureHeader::apply(Song& song) {
     const bool time = target.timeSignature != header_.timeSignature;
     const bool key = target.keySignature != header_.keySignature;
     const bool tempo = target.tempoChanges != header_.tempoChanges;
-    if (time && !key && !tempo) {
+    // The target with the new signs and jumps: equal to the new header when
+    // nothing else changes.
+    MeasureHeader marks = target;
+    marks.segno = header_.segno;
+    marks.segnoSegno = header_.segnoSegno;
+    marks.coda = header_.coda;
+    marks.doubleCoda = header_.doubleCoda;
+    marks.fine = header_.fine;
+    marks.toCoda = header_.toCoda;
+    marks.toDoubleCoda = header_.toDoubleCoda;
+    marks.jump = header_.jump;
+    marks.jumpThen = header_.jumpThen;
+    const bool navigation = marks != target;
+    // The same with the new repeats and alternate endings (ADR-0016).
+    MeasureHeader repeats = target;
+    repeats.repeatStart = header_.repeatStart;
+    repeats.repeatTimes = header_.repeatTimes;
+    repeats.alternateEndings = header_.alternateEndings;
+    const bool repeated = repeats != target;
+    const bool marked = navigation || repeated;
+    if (navigation && marks == header_) {
+        name_ = "Change navigation marks";
+    } else if (repeated && repeats == header_) {
+        name_ = "Change repeats";
+    } else if (!marked && time && !key && !tempo) {
         name_ = "Change time signature";
-    } else if (key && !time && !tempo) {
+    } else if (!marked && key && !time && !tempo) {
         name_ = "Change key signature";
-    } else if (tempo && !time && !key) {
+    } else if (!marked && tempo && !time && !key) {
         name_ = "Change tempo";
     }
     std::swap(target, header_);

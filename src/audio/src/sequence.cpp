@@ -772,4 +772,25 @@ std::size_t Sequence::playedMeasureAt(double seconds) const noexcept {
     return std::min(static_cast<std::size_t>(after - measures_.begin()), measures_.size() - 1);
 }
 
+double carriedPosition(const Sequence& from, double seconds, const Sequence& to) noexcept {
+    const std::vector<PlayedMeasure>& before = from.measures();
+    const std::vector<PlayedMeasure>& after = to.measures();
+    if (before.empty() || after.empty() || before.size() != after.size() ||
+        !std::ranges::equal(before, after, {}, &PlayedMeasure::measure, &PlayedMeasure::measure)) {
+        return std::clamp(seconds, 0.0, to.duration());
+    }
+    if (seconds >= from.duration()) {
+        return to.duration();
+    }
+    const std::size_t played = from.playedMeasureAt(std::max(seconds, 0.0));
+    const PlayedMeasure& was = before[played];
+    const PlayedMeasure& is = after[played];
+    if (is.start == was.start && is.end == was.end) {
+        return seconds; // the same timing: exactly the same time
+    }
+    const double length = was.end - was.start;
+    const double share = length > 0.0 ? std::clamp((seconds - was.start) / length, 0.0, 1.0) : 0.0;
+    return is.start + share * (is.end - is.start);
+}
+
 } // namespace elara::audio
