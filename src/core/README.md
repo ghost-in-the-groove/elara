@@ -50,7 +50,7 @@ sixth string of a guitar sounds F#2.
 | `effects.hpp` | `NoteEffects` (tie and hammer-on/pull-off from the previous note, slides in/out, `BendCurve` in cents, `Harmonic`, vibrato, palm mute, dead and ghost notes, let ring, staccato, accent, `Dynamic`) and `BeatEffects` (pick stroke, strum, tremolo picking, whammy bar, bass tap/slap/pop); `naturalHarmonicSemitones()`, `dynamicVelocity()`. |
 | `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes; no notes = rest), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. `drumPieces()`: the kit pieces of drum entry, top of the staff first (ADR-0035). |
-| `song.hpp` | `Staff` (clef, tuning, capo, measures; `frettedNote()`, `setTuning()`), `Track` (instrument + staves, `fromPreset()`, its `TrackMix`: volume, pan, mute, solo, ADR-0020), `MeasureHeader`, `SongInfo`, `Song` (`audible()`: whether mute and solo let a track sound, as `TrackMix::audible()` decides). |
+| `song.hpp` | `Staff` (clef, tuning, capo, measures shared with the staff's copies until one changes, ADR-0051; `frettedNote()`, `setTuning()`), `Track` (instrument + staves, `fromPreset()`, its `TrackMix`: volume, pan, mute, solo, ADR-0020), `MeasureHeader`, `SongInfo`, `Song` (`audible()`: whether mute and solo let a track sound, as `TrackMix::audible()` decides). |
 | `document.hpp` | `Document` (a song being edited: undo/redo history with a limit, save point, `isModified()`) and the `Command` interface (ADR-0005). |
 | `commands.hpp` | The edits: `InsertMeasures`, `RemoveMeasures`, `InsertTrack`, `RemoveTrack`, `ReplaceMeasure` (any note-level edit, named after it), `SetMeasureHeader`, `SetSongInfo`, `SetStartTempo`, `SetTrackMix`, `SetStaffTuning` and `CommandGroup` (one undo step). |
 | `clipboard.hpp` | `MeasureClip` (copied headers and, per track and staff, measures with their tuning and capo), `copyMeasures()` and `makePaste()`: one undo step that pastes over measures or into new ones (`PasteMode`), placing fretted notes on the target's strings (ADR-0027). |
@@ -64,6 +64,7 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
+| `shared_value.hpp` | `SharedValue<T>`: a value its copies share until one of them changes it (`edit()` copies it first when shared), safe to copy and read on other threads (ADR-0051) |
 | `parallel.hpp` | `forEachIndex()`: independent jobs on several threads (or the calling one), exceptions rethrown in order; `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export and notation layout. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
