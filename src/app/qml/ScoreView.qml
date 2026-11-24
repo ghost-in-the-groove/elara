@@ -180,6 +180,8 @@ Item {
                 document.deleteAtCaret();
         } else if (event.key === Qt.Key_Insert && !control) {
             document.insertRest();
+        } else if (!control && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            document.toggleDrum();
         } else if (!control && event.key === Qt.Key_Plus) {
             document.longerDuration();
         } else if (!control && event.key === Qt.Key_Minus) {
