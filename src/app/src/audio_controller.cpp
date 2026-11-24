@@ -33,6 +33,8 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     }
     document_ = document;
     if (document_) {
+        connect(document_, &elara::app::ScoreDocument::songReplaced, this,
+                &AudioController::loadSong);
         connect(document_, &elara::app::ScoreDocument::songChanged, this,
                 &AudioController::songEdited);
         connect(document_, &elara::app::ScoreDocument::sequenceChanged, this,
@@ -60,16 +62,28 @@ bool AudioController::openDevice() {
     return true;
 }
 
-// The song changed. When it plays as before (the document kept its
+// The song was edited. When it plays as before (the document kept its
 // sequence: the mix or the song's info changed), playback carries on with the
-// new mix (ADR-0039); otherwise the song is loaded again.
+// new mix (ADR-0039); otherwise it plays the new sequence from where it is,
+// playing or paused as it was. Only another song goes back to the start
+// (loadSong()).
 void AudioController::songEdited() {
-    if (player_ && document_ && document_->song() && document_->sequence() &&
-        document_->sequence() == loaded_) {
+    if (!document_ || !document_->song() || !document_->sequence()) {
+        return;
+    }
+    if (!player_) {
+        // The position waits for the device; it stays inside the song.
+        if (const double end = document_->duration(); position_ > end) {
+            position_ = end;
+            emit positionChanged();
+        }
+        return;
+    }
+    if (document_->sequence() == loaded_) {
         player_->updateMix(*document_->song());
         return;
     }
-    loadSong();
+    loadSequence();
 }
 
 // A fader moves: playback hears it at once.
