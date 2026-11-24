@@ -73,6 +73,7 @@ signals:
 private:
     bool openDevice();
     void loadSong();
+    void loadSequence();
     void songEdited();
     void previewMix();
     void setPlaying(bool playing);

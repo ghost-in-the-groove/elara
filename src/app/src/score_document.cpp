@@ -43,7 +43,8 @@ namespace elara::app {
 struct ScoreLayout {
     QUrl source;
     std::shared_ptr<const core::Song> song;
-    std::shared_ptr<const audio::Sequence> sequence; // only when opened
+    /// Built on the worker when the song's sequence was out of date.
+    std::shared_ptr<const audio::Sequence> sequence;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     int track = 0;
     ScoreDocument::View view = ScoreDocument::View::Both;
@@ -113,6 +114,18 @@ std::vector<std::size_t> shownTracks(const core::Song& song, int track) {
         tracks.push_back(static_cast<std::size_t>(track));
     }
     return tracks;
+}
+
+// The sequence playback plays for `song`: `heard` when the song sounds the
+// same with it (the mix or the song's info changed), so playback carries on
+// (ADR-0039); a new one otherwise. Runs on a worker thread.
+std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
+                                                   std::shared_ptr<const audio::Sequence> heard) {
+    auto sequence = std::make_shared<const audio::Sequence>(song);
+    if (heard && *sequence == *heard) {
+        return heard;
+    }
+    return sequence;
 }
 
 // Lays out `track` (or every track) of `song` as `view` on A4 pages. Runs on a
@@ -469,8 +482,19 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    QtConcurrent::run([song = song_, track = track_, view = view_] {
-        return layOut(song, track, view);
+    // An edit's sequence is built here too, off the interface thread: copying
+    // the song is all an edit costs it.
+    const bool sequenced = sequenceSong_ != song_;
+    QtConcurrent::run([song = song_, track = track_, view = view_, sequenced, heard = sequence_] {
+        ScoreLayout result = layOut(song, track, view);
+        if (sequenced && result.error.isEmpty()) {
+            try {
+                result.sequence = sequenceFor(*song, heard);
+            } catch (const std::exception& error) {
+                result.error = qstring(error.what());
+            }
+        }
+        return result;
     }).then(this, [this, generation](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
@@ -505,15 +529,25 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         setInput(core::Duration{});
         emit historyChanged();
     }
-    if (layout.song != song_) {
-        song_ = layout.song;
-        sequence_ =
-            layout.sequence ? layout.sequence : std::make_shared<const audio::Sequence>(*song_);
+    // The song and its sequence change together, so whoever hears songChanged
+    // sees them as a pair.
+    const bool newSong = layout.song != song_;
+    song_ = layout.song;
+    bool newSequence = false;
+    if (layout.sequence) {
+        sequenceSong_ = layout.song;
+        newSequence = layout.sequence != sequence_;
+        sequence_ = layout.sequence;
+    }
+    if (newSong) {
         if (!layout.source.isEmpty() && layout.source != source_) {
             source_ = layout.source;
             emit sourceChanged();
         }
         emit songChanged();
+    }
+    if (newSequence) {
+        emit sequenceChanged();
     }
     if (layout.track != track_) {
         track_ = layout.track;
@@ -667,6 +701,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     document_.emplace(std::move(song));
     song_ = std::make_shared<const core::Song>(document_->song());
     sequence_ = std::make_shared<const audio::Sequence>(*song_);
+    sequenceSong_ = song_;
     source_.clear();
     track_ = 0;
     caret_ = core::Caret{};
@@ -676,6 +711,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     view_ = notation::hasTablature(*song_, first) ? View::Both : View::Standard;
     emit sourceChanged();
     emit songChanged();
+    emit sequenceChanged();
     emit trackChanged();
     emit viewChanged();
     emit historyChanged();
@@ -874,13 +910,9 @@ bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {
 // it is still there.
 void ScoreDocument::edited() {
     ++edits_;
+    // Playback hears the edit once its layout is done (relayout()); until then
+    // it plays on as before, with the new mix.
     song_ = std::make_shared<const core::Song>(document_->song());
-    // Playback hears the edit. A sequence that plays as before (the mix or the
-    // song's info changed) stays the one playback has, so it carries on.
-    auto sequence = std::make_shared<const audio::Sequence>(*song_);
-    if (!sequence_ || *sequence != *sequence_) {
-        sequence_ = std::move(sequence);
-    }
     const auto tracks = static_cast<int>(song_->trackCount());
     if (track_ >= tracks) {
         track_ = std::max(0, tracks - 1);
