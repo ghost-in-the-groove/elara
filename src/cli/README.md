@@ -26,9 +26,11 @@ elara-cli [--json] export <FILE.elara> <OUT> [--force]        # .musicxml, .xml,
 elara-cli [--json] edit [--in FILE] [--out FILE] <STEP>...   # undoable edits
 elara-cli [--json] font [--metadata FILE] [--glyph NAME]      # the notation font
 elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metronome]
+                             [--count-in-at SECONDS]
 elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
                                  [--events] [--speed 100] [--metronome]
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
+                         [--count-in] [--loop FROM TO]
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
@@ -195,7 +197,11 @@ dynamic in force at the caret. The output includes `"caret"` and `"input"`.
 `--speed` from 25 to 200 percent of the written tempo, and `--metronome` clicks
 every beat on a track after the song's last. Their JSON says `"speed"` (1 for
 the written tempo) and `"metronome"`; `sequence` puts them after
-`"duration"`, the others at the end.
+`"duration"`, the others at the end. `sequence --count-in-at SECONDS` adds
+`"countIn": {"clicks", "interval"}` after them: the count-in for playback
+from there. `play --count-in` clicks it before playing, and `--loop FROM TO`
+loops a passage; without `--seconds`, a looped `play` stops after going round
+the loop twice.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

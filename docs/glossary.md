@@ -88,7 +88,8 @@ base speaks one vocabulary. American terms follow MusicXML.
 | pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
 | compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |
 | velocidad de reproducción | playback speed | `SequenceOptions::speed` | 0.25 to 2 times every written tempo (ADR-0024) |
-| bucle A-B | A-B loop | `LoopRange` | |
+| bucle A-B | A-B loop | `Player::setLoop()` | Playback that reaches B goes on from A (ADR-0024) |
+| claqueta (cuenta previa) | count-in | `CountIn`, `Sequence::countInAt()` | One measure of beats before playback starts, at the tempo there (ADR-0024) |
 | afinador | tuner | `Tuner`, `PitchDetector`, `tunerReading()` | YIN pitch detection; the nearest note, its cents and the nearest open string (ADR-0028); smoothed readings from the audio input (ADR-0029) |
 | banco de sonidos | sound bank | `SoundBank` | SF2/SF3/SFZ |
 | mezclador | mixer | `Mixer` | |
