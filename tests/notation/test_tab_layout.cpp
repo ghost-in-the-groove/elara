@@ -413,6 +413,42 @@ TEST_CASE("Tablature layout: vibrato and pick strokes above the staff", "[notati
     CHECK(strokes[0].origin.y < waves[0].origin.y);
 }
 
+TEST_CASE("Tablature layout: strums and tremolo picking above the staff", "[notation][tab]") {
+    Beat downStrum = beatOf({fretted(3, 0), fretted(2, 1), fretted(1, 0)});
+    downStrum.effects.strum = elara::core::Strum::Down;
+    Beat upStrum = downStrum;
+    upStrum.effects.strum = elara::core::Strum::Up;
+    upStrum.effects.pickStroke = elara::core::PickStroke::Up;
+    Beat fast = play(1, 5);
+    fast.effects.tremoloPicking = NoteValue::Sixteenth;
+    Beat faster = play(1, 5);
+    faster.effects.tremoloPicking = NoteValue::ThirtySecond;
+    const Song song = guitar({{downStrum, upStrum, fast, faster}});
+    const DisplayList list = tab(song);
+    auto marks = byRole(list.glyphs, Role::Technique);
+    std::ranges::stable_sort(marks, {}, [](const GlyphItem& item) { return item.origin.x; });
+    REQUIRE(marks.size() == 5);
+    // Arrows the way the pick goes over the strings, as strumming patterns write them.
+    CHECK(marks[0].glyph == Glyph::ArrowBlackDown);
+    const auto upArrow = std::ranges::find(marks, Glyph::ArrowBlackUp, &GlyphItem::glyph);
+    const auto upBow = std::ranges::find(marks, Glyph::StringsUpBow, &GlyphItem::glyph);
+    REQUIRE(upArrow != marks.end());
+    REQUIRE(upBow != marks.end());
+    // A pick stroke and a strum on one beat each have a lane.
+    CHECK(upArrow->origin.y != upBow->origin.y);
+    // Tremolo picking: one slash per beam of the repeated notes' value.
+    CHECK(marks[3].glyph == Glyph::Tremolo2);
+    CHECK(marks[4].glyph == Glyph::Tremolo3);
+    // In one lane: the slashes' ink starts at the same height.
+    const auto inkBottom = [](const GlyphItem& mark) {
+        return mark.origin.y - bravura().metrics(mark.glyph).box.southWest.y * mark.scale;
+    };
+    CHECK_THAT(inkBottom(marks[3]), WithinAbs(inkBottom(marks[4]), 1e-9));
+    for (const GlyphItem& mark : marks) {
+        CHECK(mark.origin.y < 0.0); // above the staff
+    }
+}
+
 TEST_CASE("Tablature layout: standard notation shows ties and articulations", "[notation][tab]") {
     Note held = fretted(1, 0); // E4, written E5: stem down
     held.effects.staccato = true;

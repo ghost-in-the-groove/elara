@@ -6,8 +6,9 @@
 ## Context
 
 A beat can be strummed down or up, and tremolo-picked at an eighth, a
-sixteenth or a thirty-second. Both were imported and drawn, but played as
-plain notes (ADR-0023 left them out). Neither changes how a string sounds,
+sixteenth or a thirty-second. Both were imported, but played as plain notes
+(ADR-0023 left them out); the score draws them in lanes above the staff
+(ADR-0013). Neither changes how a string sounds,
 only when it is struck, so both belong in the sequencer (ADR-0017), which
 already turns every written note into played notes and events.
 
