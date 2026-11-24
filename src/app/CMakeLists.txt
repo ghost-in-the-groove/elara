@@ -4,13 +4,14 @@ qt_standard_project_setup(REQUIRES 6.12
   I18N_SOURCE_LANGUAGE en
   I18N_TRANSLATED_LANGUAGES es)
 
-# Painting of display lists, in a library of its own so that tests link it
-# without the QML application.
+# Painting of display lists and the list models the views show, in a library
+# of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
-  src/score_painter.cpp)
+  src/score_painter.cpp
+  src/track_list.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
-elara_source_warnings(src/score_painter.cpp)
+elara_source_warnings(src/score_painter.cpp src/track_list.cpp)
 
 qt_add_executable(elara WIN32 MACOSX_BUNDLE
   src/main.cpp)
