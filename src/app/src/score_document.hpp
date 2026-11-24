@@ -85,6 +85,8 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QRectF caretRect READ caretRect NOTIFY caretChanged)
     Q_PROPERTY(QString caretStatus READ caretStatus NOTIFY caretChanged)
     Q_PROPERTY(bool caretFretted READ caretFretted NOTIFY caretChanged)
+    Q_PROPERTY(int caretEffects READ caretEffects NOTIFY caretChanged)
+    Q_PROPERTY(int effectCount READ effectCount CONSTANT)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
@@ -364,6 +366,19 @@ public:
     /// On a drum staff, adds the lane's kit piece to the caret's beat or removes
     /// it when it is there (ADR-0035).
     Q_INVOKABLE void toggleDrum();
+    /// The note effects typing toggles, numbered as core::NoteEffect
+    /// (ADR-0037, ADR-0038).
+    static constexpr int kEffectCount = 12;
+    /// Toggles note effect `effect` on the caret's notes.
+    Q_INVOKABLE void toggleEffect(int effect);
+    /// The effects the caret's notes all have: bit `effect` for each.
+    [[nodiscard]] int caretEffects() const;
+    [[nodiscard]] int effectCount() const { return kEffectCount; }
+    /// An effect's name, translated, and the key that toggles it.
+    Q_INVOKABLE QString effectName(int effect) const;
+    Q_INVOKABLE QString effectKey(int effect) const;
+    /// The effect a typed character toggles, or -1.
+    Q_INVOKABLE int effectForKey(const QString& text) const;
 
     /// The caret's measure, 0-based, and its signatures.
     [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }

@@ -265,6 +265,7 @@ constexpr std::array kEditNames{
     Translation{"Change tuning", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tuning")},
     Translation{"Paste", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Paste")},
     Translation{"Transpose", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Transpose")},
+    Translation{"Change effect", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change effect")},
 };
 
 // The names of Tuning::presetNames().
@@ -286,6 +287,28 @@ constexpr std::array kTuningNames{
     Translation{"mandolin", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Mandolin")},
     Translation{"banjo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Banjo")},
 };
+
+// The note effects, in core::NoteEffect order, and their keys (ADR-0038):
+// letters A to G type note names, so the effects take others.
+struct EffectKey {
+    const char* name;
+    char16_t key;
+};
+constexpr std::array<EffectKey, ScoreDocument::kEffectCount> kEffects{{
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tie"), u'T'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Hammer-on or pull-off"), u'H'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Slide"), u'S'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bend"), u'U'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Vibrato"), u'V'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Palm mute"), u'P'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Dead note"), u'X'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Let ring"), u'L'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Natural harmonic"), u'N'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ghost note"), u'O'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Accent"), u'>'},
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccato"), u'\''},
+}};
+static_assert(static_cast<int>(core::NoteEffect::Staccato) + 1 == ScoreDocument::kEffectCount);
 
 // The kit pieces of drum entry, by their names in elara_core.
 constexpr std::array kDrumPieceNames{
@@ -1397,6 +1420,12 @@ QString ScoreDocument::caretStatus() const {
     if (!names.isEmpty() && caretPitched()) {
         parts.append(names.join(QLatin1Char(' ')));
     }
+    const int effects = caretEffects();
+    for (int effect = 0; effect < kEffectCount; ++effect) {
+        if ((effects & (1 << effect)) != 0) {
+            parts.append(effectName(effect));
+        }
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -1666,6 +1695,65 @@ void ScoreDocument::toggleDrum() {
         return;
     }
     runEntry([this](const core::Song& song) { return core::toggleDrum(song, caret_, input_); });
+}
+
+void ScoreDocument::toggleEffect(int effect) {
+    if (!document_ || !hasCaret(document_->song()) || effect < 0 || effect >= kEffectCount) {
+        return;
+    }
+    pendingDigit_ = -1;
+    const auto which = static_cast<core::NoteEffect>(effect);
+    try {
+        core::Entry entry = core::toggleEffect(document_->song(), caret_, which);
+        if (!entry.command) {
+            emit editFailed(tr("Effects go on notes: put the caret on one."));
+            return;
+        }
+        enter(std::move(entry));
+    } catch (const std::out_of_range&) {
+        emit editFailed(tr("That fret has no natural harmonic."));
+    } catch (const std::logic_error&) {
+        emit editFailed(which == core::NoteEffect::Tie ? tr("There is no note to tie to.")
+                                                       : tr("Harmonics need strings."));
+    }
+}
+
+int ScoreDocument::caretEffects() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    int effects = 0;
+    for (int effect = 0; effect < kEffectCount; ++effect) {
+        if (core::hasEffectAtCaret(document_->song(), caret_,
+                                   static_cast<core::NoteEffect>(effect))) {
+            effects |= 1 << effect;
+        }
+    }
+    return effects;
+}
+
+QString ScoreDocument::effectName(int effect) const {
+    if (effect < 0 || effect >= kEffectCount) {
+        return {};
+    }
+    return tr(kEffects.at(static_cast<std::size_t>(effect)).name);
+}
+
+QString ScoreDocument::effectKey(int effect) const {
+    if (effect < 0 || effect >= kEffectCount) {
+        return {};
+    }
+    return QString(QChar(kEffects.at(static_cast<std::size_t>(effect)).key));
+}
+
+int ScoreDocument::effectForKey(const QString& text) const {
+    if (text.size() != 1) {
+        return -1;
+    }
+    const char16_t key = text.front().toUpper().unicode();
+    const auto found =
+        std::ranges::find_if(kEffects, [key](const EffectKey& entry) { return entry.key == key; });
+    return found == kEffects.end() ? -1 : static_cast<int>(found - kEffects.begin());
 }
 
 bool ScoreDocument::enter(core::Entry entry) {

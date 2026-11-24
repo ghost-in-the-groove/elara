@@ -103,6 +103,10 @@
         <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
     </message>
     <message>
+        <source>Note effects</source>
+        <translation>Efectos de nota</translation>
+    </message>
+    <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
         <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
     </message>
@@ -972,6 +976,58 @@
         <translation>Transponer</translation>
     </message>
     <message>
+        <source>Change effect</source>
+        <translation>Cambiar efecto</translation>
+    </message>
+    <message>
+        <source>Tie</source>
+        <translation>Ligadura</translation>
+    </message>
+    <message>
+        <source>Hammer-on or pull-off</source>
+        <translation>Hammer-on o pull-off</translation>
+    </message>
+    <message>
+        <source>Slide</source>
+        <translation>Deslizamiento</translation>
+    </message>
+    <message>
+        <source>Bend</source>
+        <translation>Bending</translation>
+    </message>
+    <message>
+        <source>Vibrato</source>
+        <translation>Vibrato</translation>
+    </message>
+    <message>
+        <source>Palm mute</source>
+        <translation>Apagado con la palma</translation>
+    </message>
+    <message>
+        <source>Dead note</source>
+        <translation>Nota muerta</translation>
+    </message>
+    <message>
+        <source>Let ring</source>
+        <translation>Dejar sonar</translation>
+    </message>
+    <message>
+        <source>Natural harmonic</source>
+        <translation>Armónico natural</translation>
+    </message>
+    <message>
+        <source>Ghost note</source>
+        <translation>Nota fantasma</translation>
+    </message>
+    <message>
+        <source>Accent</source>
+        <translation>Acento</translation>
+    </message>
+    <message>
+        <source>Staccato</source>
+        <translation>Staccato</translation>
+    </message>
+    <message>
         <source>Crash cymbal</source>
         <translation>Platillo crash</translation>
     </message>
@@ -1160,6 +1216,22 @@
     <message>
         <source>Hits are typed on a drum track.</source>
         <translation>Los golpes se escriben en una pista de batería.</translation>
+    </message>
+    <message>
+        <source>Effects go on notes: put the caret on one.</source>
+        <translation>Los efectos van sobre notas: pon el cursor en una.</translation>
+    </message>
+    <message>
+        <source>That fret has no natural harmonic.</source>
+        <translation>Ese traste no tiene armónico natural.</translation>
+    </message>
+    <message>
+        <source>There is no note to tie to.</source>
+        <translation>No hay ninguna nota a la que ligar.</translation>
+    </message>
+    <message>
+        <source>Harmonics need strings.</source>
+        <translation>Los armónicos necesitan cuerdas.</translation>
     </message>
     <message>
         <source>Copied measure %1.</source>

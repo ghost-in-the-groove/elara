@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The keyboard entry bar, in a strip over the top of the pages: the note value
-// typing uses, the dot, the tuplet, a rest, delete, and where the caret is.
+// typing uses, the dot, the tuplet, a rest, delete, the note effects, and
+// where the caret is.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -321,6 +322,164 @@ Rectangle {
             contentItem: Icon {
                 path: "M5 7 L19 7 M10 7 L10 4.5 L14 4.5 L14 7 M7 7 L8 20 L16 20 L17 7"
                 color: root.ink
+            }
+        }
+
+        Tool {
+            id: effectsTool
+
+            tip: qsTr("Note effects")
+            onClicked: effects.opened ? effects.close() : effects.open()
+
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: "M3 12 C5 8 7 8 9 12 C11 16 13 16 15 12 C17 8 19 8 21 12"
+                    color: root.ink
+                }
+                // A dot while the caret's note has an effect.
+                Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 5
+                    color: Material.accent
+                    scale: root.document.caretEffects !== 0 ? 1 : 0
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutBack
+                        }
+                    }
+                }
+            }
+
+            // The effects of the caret's note, toggled by a click or their key;
+            // it stays open so that several can be set, and never takes the
+            // keyboard from the score.
+            Popup {
+                id: effects
+
+                x: (effectsTool.width - width) / 2
+                y: effectsTool.height + 12
+                padding: 10
+                closePolicy: Popup.CloseOnPressOutsideParent
+
+                enter: Transition {
+                    NumberAnimation {
+                        property: "opacity"
+                        from: 0
+                        to: 1
+                        duration: 140
+                    }
+                    NumberAnimation {
+                        property: "scale"
+                        from: 0.94
+                        to: 1
+                        duration: 160
+                        easing.type: Easing.OutCubic
+                    }
+                }
+                exit: Transition {
+                    NumberAnimation {
+                        property: "opacity"
+                        to: 0
+                        duration: 100
+                    }
+                }
+
+                background: Rectangle {
+                    radius: 16
+                    color: root.color
+                    border.color: Qt.alpha(root.ink, 0.12)
+                }
+
+                contentItem: Column {
+                    spacing: 6
+
+                    Label {
+                        leftPadding: 4
+                        text: qsTr("Note effects")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    Grid {
+                        columns: 3
+                        spacing: 4
+
+                        Repeater {
+                            model: root.document.effectCount
+
+                            delegate: AbstractButton {
+                                id: chip
+
+                                required property int index
+                                readonly property bool active: (root.document.caretEffects & (1 << index)) !== 0
+
+                                implicitWidth: chipRow.implicitWidth + 16
+                                implicitHeight: 30
+                                focusPolicy: Qt.NoFocus
+                                hoverEnabled: true
+                                onClicked: root.document.toggleEffect(index)
+                                Accessible.role: Accessible.CheckBox
+                                Accessible.name: root.document.effectName(index)
+                                Accessible.checked: active
+
+                                background: Rectangle {
+                                    radius: height / 2
+                                    color: chip.active ? Material.accent
+                                                   : chip.pressed ? Qt.alpha(root.ink, 0.16)
+                                                                  : chip.hovered ? Qt.alpha(root.ink, 0.08)
+                                                                                 : "transparent"
+
+                                    Behavior on color {
+                                        ColorAnimation {
+                                            duration: 120
+                                        }
+                                    }
+                                }
+
+                                contentItem: Item {
+                                    Row {
+                                        id: chipRow
+
+                                        x: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 8
+
+                                        // The key, as on a keycap.
+                                        Rectangle {
+                                            width: 20
+                                            height: 20
+                                            radius: 5
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            color: chip.active ? Qt.alpha("white", 0.24) : Qt.alpha(root.ink, 0.08)
+
+                                            Label {
+                                                anchors.centerIn: parent
+                                                text: root.document.effectKey(chip.index)
+                                                font.pixelSize: 11
+                                                font.bold: true
+                                                color: chip.active ? "white" : root.ink
+                                            }
+                                        }
+                                        Label {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: root.document.effectName(chip.index)
+                                            font.pixelSize: 12
+                                            color: chip.active ? "white" : root.ink
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
