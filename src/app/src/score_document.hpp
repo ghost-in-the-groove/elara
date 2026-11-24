@@ -61,6 +61,9 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY layoutChanged)
     Q_PROPERTY(QSizeF pageSize READ pageSize NOTIFY layoutChanged)
+    Q_PROPERTY(bool continuous READ continuous WRITE setContinuous NOTIFY continuousChanged)
+    Q_PROPERTY(bool showsStrips READ showsStrips NOTIFY layoutChanged)
+    Q_PROPERTY(QList<qreal> pageTops READ pageTops NOTIFY layoutChanged)
     Q_PROPERTY(double staffSpace READ staffSpace CONSTANT)
     Q_PROPERTY(int layoutMilliseconds READ layoutMilliseconds NOTIFY layoutChanged)
     Q_PROPERTY(QStringList nameFilters READ nameFilters CONSTANT)
@@ -159,6 +162,17 @@ public:
     [[nodiscard]] int pageCount() const;
     /// The page size in staff spaces.
     [[nodiscard]] QSizeF pageSize() const;
+    /// Whether the music is laid out on one endless page cut into strips
+    /// between systems, shown one under the other, instead of on pages
+    /// (ADR-0057).
+    [[nodiscard]] bool continuous() const { return continuous_; }
+    void setContinuous(bool continuous);
+    /// Whether the pages shown are such strips: the layout asked for by
+    /// setContinuous() once it is done.
+    [[nodiscard]] bool showsStrips() const { return showsStrips_; }
+    /// Where each page (or strip) starts, in staff spaces from the top of the
+    /// first, stacked without gaps, and where the last one ends.
+    [[nodiscard]] QList<qreal> pageTops() const { return pageTops_; }
     /// Millimetres per staff space on paper.
     [[nodiscard]] static double staffSpace();
     [[nodiscard]] int layoutMilliseconds() const { return layoutMilliseconds_; }
@@ -474,6 +488,7 @@ signals:
     void sequenceChanged();
     void trackChanged();
     void viewChanged();
+    void continuousChanged();
     void layoutChanged();
     void historyChanged();
     void caretChanged();
@@ -549,6 +564,9 @@ private:
     std::uint64_t edits_ = 0; ///< edits, undos and redos so far
     int track_ = 0;
     View view_ = View::Both;
+    bool continuous_ = false;
+    bool showsStrips_ = false;
+    QList<qreal> pageTops_;
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
     int pending_ = 0;
