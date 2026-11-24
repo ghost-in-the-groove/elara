@@ -31,7 +31,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV reading and writing; the tuner's pitch detection (ADR-0028) | 0, 4, 6 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029); synths (FluidSynth, sfizz) | 0, 4, 6 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |
-| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret, selects, copies, pastes and transposes measures (ADR-0031, ADR-0032, ADR-0033, ADR-0036) | 0+ |
+| `src/app` | `elara` | Qt Quick UI; paints the notation display list into page textures for the Qt scene graph, opens and lays out scores on worker threads (ADR-0015); edits the song, enters notes and edits measures at a caret, toggles note effects, selects, copies, pastes and transposes measures (ADR-0031, ADR-0032, ADR-0033, ADR-0036, ADR-0038) | 0+ |
 
 ## Key decisions
 

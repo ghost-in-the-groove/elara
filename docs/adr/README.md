@@ -42,6 +42,7 @@ one that replaces them.
 | [0035](0035-drum-entry.md) | Drum entry | Accepted |
 | [0036](0036-selecting-measures-in-the-app.md) | Selecting measures in the app | Accepted |
 | [0037](0037-note-effects-at-the-caret.md) | Note effects at the caret | Accepted |
+| [0038](0038-note-effects-in-the-app.md) | Note effects in the app | Accepted |
 | [0039](0039-mixer-in-the-song-panel.md) | The mixer in the song panel | Accepted |
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
