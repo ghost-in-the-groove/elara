@@ -1213,6 +1213,9 @@ QString ScoreDocument::caretStatus() const {
     }
     const core::Song& song = document_->song();
     QStringList parts{tr("Measure %1").arg(caret_.measure + 1)};
+    if (caret_.voice > 0) {
+        parts.append(tr("Voice %1").arg(caret_.voice + 1));
+    }
     parts.append(core::onFreeSlot(song, caret_) ? tr("New beat")
                                                 : tr("Beat %1").arg(caret_.beat + 1));
     if (caretFretted()) {
@@ -1319,6 +1322,18 @@ void ScoreDocument::moveCaret(CaretMove move) {
     }
     pendingDigit_ = -1;
     caret_ = core::moveCaret(document_->song(), caret_, coreMove(move));
+    followBeat();
+    placeCaretBox();
+}
+
+void ScoreDocument::setCaretVoice(int voice) {
+    if (!document_ || !hasCaret(document_->song()) || voice < 1 ||
+        voice > static_cast<int>(core::Measure::kMaxVoices) || voice == caretVoice()) {
+        return;
+    }
+    pendingDigit_ = -1;
+    caret_.voice = static_cast<std::size_t>(voice - 1);
+    caret_ = core::clampCaret(document_->song(), caret_);
     followBeat();
     placeCaretBox();
 }
