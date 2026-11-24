@@ -43,22 +43,24 @@
 <line class="stem" x1="105.427" y1="33.2" x2="105.427" y2="37.032" stroke-width="0.12"/>
 <line class="barline" x1="110.449" y1="35.032" x2="110.449" y2="39.032" stroke-width="0.16"/>
 <line class="barline" x1="111.179" y1="35.032" x2="111.179" y2="39.032" stroke-width="0.5"/>
-<line class="staffLine" x1="8.571" y1="61.77" x2="111.429" y2="61.77" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="63.27" x2="111.429" y2="63.27" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="64.77" x2="111.429" y2="64.77" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="66.27" x2="111.429" y2="66.27" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="67.77" x2="111.429" y2="67.77" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="69.27" x2="111.429" y2="69.27" stroke-width="0.13"/>
-<line class="barline" x1="44.866" y1="61.77" x2="44.866" y2="69.27" stroke-width="0.16"/>
-<line class="barline" x1="45.036" y1="61.77" x2="45.036" y2="69.27" stroke-width="0.5"/>
-<line class="barline" x1="45.766" y1="61.77" x2="45.766" y2="69.27" stroke-width="0.16"/>
-<line class="barline" x1="64.762" y1="61.77" x2="64.762" y2="69.27" stroke-width="0.16"/>
-<line class="slide" x1="72.935" y1="63.57" x2="78.038" y2="62.97" stroke-width="0.12"/>
-<line class="barline" x1="87.137" y1="61.77" x2="87.137" y2="69.27" stroke-width="0.16"/>
-<line class="barline" x1="87.867" y1="61.77" x2="87.867" y2="69.27" stroke-width="0.5"/>
-<line class="slide" x1="101.467" y1="61.47" x2="102.467" y2="62.07" stroke-width="0.12"/>
-<line class="barline" x1="110.449" y1="61.77" x2="110.449" y2="69.27" stroke-width="0.16"/>
-<line class="barline" x1="111.179" y1="61.77" x2="111.179" y2="69.27" stroke-width="0.5"/>
+<line class="staffLine" x1="8.571" y1="64.07" x2="111.429" y2="64.07" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="65.57" x2="111.429" y2="65.57" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="67.07" x2="111.429" y2="67.07" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="68.57" x2="111.429" y2="68.57" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="70.07" x2="111.429" y2="70.07" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="71.57" x2="111.429" y2="71.57" stroke-width="0.13"/>
+<line class="barline" x1="44.866" y1="64.07" x2="44.866" y2="71.57" stroke-width="0.16"/>
+<line class="barline" x1="45.036" y1="64.07" x2="45.036" y2="71.57" stroke-width="0.5"/>
+<line class="barline" x1="45.766" y1="64.07" x2="45.766" y2="71.57" stroke-width="0.16"/>
+<line class="barline" x1="64.762" y1="64.07" x2="64.762" y2="71.57" stroke-width="0.16"/>
+<line class="slide" x1="72.935" y1="65.87" x2="78.038" y2="65.27" stroke-width="0.12"/>
+<line class="barline" x1="87.137" y1="64.07" x2="87.137" y2="71.57" stroke-width="0.16"/>
+<line class="barline" x1="87.867" y1="64.07" x2="87.867" y2="71.57" stroke-width="0.5"/>
+<line class="slide" x1="101.467" y1="63.77" x2="102.467" y2="64.37" stroke-width="0.12"/>
+<line class="barline" x1="110.449" y1="64.07" x2="110.449" y2="71.57" stroke-width="0.16"/>
+<line class="barline" x1="111.179" y1="64.07" x2="111.179" y2="71.57" stroke-width="0.5"/>
+<line class="bend" x1="105.957" y1="60.463" x2="107.863" y2="61.463" stroke-width="0.12"/>
+<line class="bend" x1="107.863" y1="61.463" x2="109.769" y2="60.463" stroke-width="0.12"/>
 <line class="technique" x1="20.625" y1="57.671" x2="22.833" y2="57.671" stroke-width="0.12" stroke-dasharray="0.3"/>
 <line class="technique" x1="22.833" y1="57.671" x2="22.833" y2="58.071" stroke-width="0.12"/>
 <line class="technique" x1="43.143" y1="56.521" x2="44.486" y2="56.521" stroke-width="0.12" stroke-dasharray="0.3"/>
@@ -72,7 +74,7 @@
 <line class="section" x1="16.851" y1="25.095" x2="20.795" y2="25.095" stroke-width="0.16"/>
 <line class="section" x1="16.931" y1="22.955" x2="16.931" y2="25.095" stroke-width="0.16"/>
 <line class="section" x1="20.715" y1="22.955" x2="20.715" y2="25.095" stroke-width="0.16"/>
-<line class="barline" x1="8.651" y1="35.032" x2="8.651" y2="69.27" stroke-width="0.16"/>
+<line class="barline" x1="8.651" y1="35.032" x2="8.651" y2="71.57" stroke-width="0.16"/>
 <polygon class="beam" stroke="none" points="24.193,35.789 31.132,35.026 31.132,35.526 24.193,36.289"/>
 <text class="clef" x="9.171" y="38.032" stroke="none">&#xE052;</text>
 <text class="keySignature" x="12.755" y="35.032" stroke="none">&#xE262;</text>
@@ -119,17 +121,17 @@
 <text class="dynamic" x="17.465" y="47.808" stroke="none">&#xE522;</text>
 <text class="dynamic" x="58.419" y="47.808" stroke="none">&#xE52F;</text>
 <text class="dynamic" x="71.168" y="47.808" stroke="none">&#xE522;</text>
-<text class="clef" x="9.183" y="65.552" stroke="none">&#xE06D;</text>
-<text class="timeSignature" x="11.715" y="64.52" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="11.715" y="66.52" stroke="none">&#xE084;</text>
-<text class="repeat" x="46.006" y="64.02" stroke="none">&#xE044;</text>
-<text class="repeat" x="46.006" y="67.02" stroke="none">&#xE044;</text>
-<text class="timeSignature" x="65.84" y="64.52" stroke="none">&#xE083;</text>
-<text class="timeSignature" x="65.742" y="66.52" stroke="none">&#xE084;</text>
-<text class="repeat" x="86.497" y="64.02" stroke="none">&#xE044;</text>
-<text class="repeat" x="86.497" y="67.02" stroke="none">&#xE044;</text>
-<text class="timeSignature" x="89.017" y="64.52" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="89.017" y="66.52" stroke="none">&#xE084;</text>
+<text class="clef" x="9.183" y="67.852" stroke="none">&#xE06D;</text>
+<text class="timeSignature" x="11.715" y="66.82" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="11.715" y="68.82" stroke="none">&#xE084;</text>
+<text class="repeat" x="46.006" y="66.32" stroke="none">&#xE044;</text>
+<text class="repeat" x="46.006" y="69.32" stroke="none">&#xE044;</text>
+<text class="timeSignature" x="65.84" y="66.82" stroke="none">&#xE083;</text>
+<text class="timeSignature" x="65.742" y="68.82" stroke="none">&#xE084;</text>
+<text class="repeat" x="86.497" y="66.32" stroke="none">&#xE044;</text>
+<text class="repeat" x="86.497" y="69.32" stroke="none">&#xE044;</text>
+<text class="timeSignature" x="89.017" y="66.82" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="89.017" y="68.82" stroke="none">&#xE084;</text>
 <text class="vibrato" x="34.169" y="59.163" stroke="none">&#xEAB2;</text>
 <text class="vibrato" x="34.777" y="59.163" stroke="none">&#xEAB2;</text>
 <text class="vibrato" x="35.385" y="59.163" stroke="none">&#xEAB2;</text>
@@ -147,46 +149,47 @@
 <text class="t credit" x="60" y="14.811" style="font-size:2.4px" text-anchor="middle" stroke="none">Guitar Pro 5</text>
 <text class="t credit" x="60" y="17.415" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
 <text class="t credit" x="111.429" y="19.56" style="font-size:1.5px" text-anchor="end" stroke="none">Music by Ghost in the Groove</text>
-<rect class="knockout" x="18.256" y="68.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="18.721" y="69.738" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
-<rect class="knockout" x="23.257" y="67.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="23.723" y="68.238" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="27.189" y="67.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="27.654" y="68.238" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
-<rect class="knockout" x="25.337" y="65.902" width="0.703" height="0.748" fill="white" stroke="none"/>
-<text class="t technique" x="25.688" y="66.582" style="font-size:0.85px" text-anchor="middle" stroke="none">H</text>
-<rect class="knockout" x="30.076" y="65.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="30.542" y="66.738" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="34.008" y="64.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="34.473" y="65.238" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
-<rect class="knockout" x="38.597" y="61.198" width="3.172" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="40.183" y="62.238" style="font-size:1.3px" text-anchor="middle" stroke="none">&lt;12&gt;</text>
-<rect class="knockout" x="47.731" y="64.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="48.196" y="65.238" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="47.731" y="68.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="48.196" y="69.738" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
-<rect class="knockout" x="54.371" y="64.198" width="1.797" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="55.269" y="65.238" style="font-size:1.3px" text-anchor="middle" stroke="none">(5)</text>
-<rect class="knockout" x="59.733" y="65.698" width="1.075" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="60.271" y="66.738" style="font-size:1.3px" text-anchor="middle" stroke="none">X</text>
-<rect class="knockout" x="71.958" y="62.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="72.424" y="63.738" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="78.084" y="62.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="78.549" y="63.738" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="93.418" y="61.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="93.883" y="62.238" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="93.418" y="62.698" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="93.883" y="63.738" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="93.418" y="64.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="93.883" y="65.238" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="100.491" y="61.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="100.956" y="62.238" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="105.492" y="61.198" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="105.957" y="62.238" style="font-size:1.3px" text-anchor="middle" stroke="none">7</text>
+<rect class="knockout" x="18.256" y="70.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="18.721" y="72.038" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="23.257" y="69.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="23.723" y="70.538" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="27.189" y="69.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="27.654" y="70.538" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
+<rect class="knockout" x="25.337" y="68.202" width="0.703" height="0.748" fill="white" stroke="none"/>
+<text class="t technique" x="25.688" y="68.882" style="font-size:0.85px" text-anchor="middle" stroke="none">H</text>
+<rect class="knockout" x="30.076" y="67.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="30.542" y="69.038" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="34.008" y="66.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="34.473" y="67.538" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
+<rect class="knockout" x="38.597" y="63.498" width="3.172" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="40.183" y="64.538" style="font-size:1.3px" text-anchor="middle" stroke="none">&lt;12&gt;</text>
+<rect class="knockout" x="47.731" y="66.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="48.196" y="67.538" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="47.731" y="70.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="48.196" y="72.038" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="54.371" y="66.498" width="1.797" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="55.269" y="67.538" style="font-size:1.3px" text-anchor="middle" stroke="none">(5)</text>
+<rect class="knockout" x="59.733" y="67.998" width="1.075" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="60.271" y="69.038" style="font-size:1.3px" text-anchor="middle" stroke="none">X</text>
+<rect class="knockout" x="71.958" y="64.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="72.424" y="66.038" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="78.084" y="64.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="78.549" y="66.038" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="93.418" y="63.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="93.883" y="64.538" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="93.418" y="64.998" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="93.883" y="66.038" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="93.418" y="66.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="93.883" y="67.538" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="100.491" y="63.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="100.956" y="64.538" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="105.492" y="63.498" width="0.931" height="1.144" fill="white" stroke="none"/>
+<text class="t fretNumber" x="105.957" y="64.538" style="font-size:1.3px" text-anchor="middle" stroke="none">7</text>
+<text class="t bend" x="105.957" y="60.213" style="font-size:0.85px" text-anchor="start" stroke="none">w/bar -1/2</text>
 <text class="t technique" x="18.421" y="58.013" style="font-size:0.95px" text-anchor="start" stroke="none">P.M.</text>
 <text class="t technique" x="39.883" y="56.863" style="font-size:0.95px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
 <text class="t technique" x="105.957" y="55.713" style="font-size:0.95px" text-anchor="middle" stroke="none">T.H.</text>
-<text class="t bend" x="35.835" y="60.463" style="font-size:0.95px" text-anchor="middle" stroke="none">full</text>
+<text class="t bend" x="35.835" y="62.763" style="font-size:0.95px" text-anchor="middle" stroke="none">full</text>
 <text class="t volta" x="65.442" y="30.238" style="font-size:1.4px" text-anchor="start" stroke="none">1.</text>
 <text class="t volta" x="88.717" y="30.238" style="font-size:1.4px" text-anchor="start" stroke="none">2.</text>
 <text class="t tempo" x="19.295" y="27.914" style="font-size:1.4px" text-anchor="start" stroke="none">= 100</text>
@@ -194,8 +197,8 @@
 <text class="t section" x="17.281" y="24.43" style="font-size:1.5px" text-anchor="start" stroke="none">Intro</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M48.906,36.382 C50.319,37.096 53.146,37.096 54.559,36.382 C53.146,37.176 50.319,37.176 48.906,36.382Z"/>
-<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.813,67.152 C24.751,66.512 26.626,66.512 27.564,67.152 C26.626,66.592 24.751,66.592 23.813,67.152Z"/>
-<path class="bend" fill="none" stroke-width="0.12" d="M34.935,64.77 C35.475,64.77 35.835,63.328 35.835,61.163"/>
-<polygon class="bend" stroke="none" points="35.835,60.663 35.61,61.163 36.06,61.163"/>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.813,69.452 C24.751,68.812 26.626,68.812 27.564,69.452 C26.626,68.892 24.751,68.892 23.813,69.452Z"/>
+<path class="bend" fill="none" stroke-width="0.12" d="M34.935,67.07 C35.475,67.07 35.835,65.628 35.835,63.463"/>
+<polygon class="bend" stroke="none" points="35.835,62.963 35.61,63.463 36.06,63.463"/>
 </g>
 </svg>
