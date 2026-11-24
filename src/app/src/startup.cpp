@@ -78,6 +78,7 @@ void Startup::start() {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
             ++layouts_;
+            layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
     }
     clock_.start();
@@ -108,6 +109,7 @@ void Startup::queueSteps() {
             queueTuplets();
             queueMeasures();
             queuePitches();
+            queueVoices();
             queueDrums();
             queueMix();
             queueNavigation();
@@ -145,6 +147,7 @@ void Startup::queueSteps() {
         queueTuplets();
         queueMeasures();
         queuePitches();
+        queueVoices();
         queueDrums();
         queueMix();
         queueNavigation();
@@ -570,6 +573,55 @@ void Startup::queueDrums() {
     });
 }
 
+// Voices: the caret goes to voice 2, which the status names, and a note typed
+// there goes into it; back in voice 1 the status no longer names a voice.
+// Undone, the song must end as it started.
+void Startup::queueVoices() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("voice check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        voicing_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!voicing_) {
+            return false;
+        }
+        score_->setCaretVoice(2);
+        check(score_->caretVoice() == 2, "the caret did not go to voice 2");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the status does not name voice 2");
+        if (score_->caretFretted()) {
+            score_->typeDigit(7);
+        } else {
+            score_->typeNoteName(2, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(score_->caretVoice() == 2 && !score_->pitchesAtCaret().empty(),
+              "the note did not go into voice 2");
+        score_->setCaretVoice(1);
+        check(score_->caretVoice() == 1 &&
+                  !score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the caret did not come back to voice 1");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the voice did not restore the song");
+        return false;
+    });
+}
+
 // The mixer (ADR-0039): a fader previewed without changing the song, then the
 // first track's mix set, soloed, as one undo step that keeps what playback
 // plays and silences the other tracks. Undone, the song must end as it started.
@@ -789,6 +841,9 @@ void Startup::tick() {
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
+        if (againSince_ < 0) {
+            ++stepsRun_;
+        }
         const bool changed = step();
         if (!failure_.isEmpty()) {
             finish(false, failure_);
@@ -963,6 +1018,11 @@ void Startup::finish(bool ok, const QString& detail) {
         }
     }
     reportSmokeTest(ok, outcome);
+    // Which steps each layout followed, after the result the tests read: when
+    // the count of layouts they expect is off on one platform, this says where.
+    if (!layoutSteps_.isEmpty()) {
+        std::printf("layouts after steps:%s\n", qPrintable(layoutSteps_));
+    }
     QCoreApplication::exit(ok ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 

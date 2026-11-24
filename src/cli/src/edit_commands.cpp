@@ -213,6 +213,15 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         }
         entry.caret = wanted;
         return true;
+    } else if (verb == "voice") { // voice <1..4>: where typing goes from now on
+        const int voice = step.number<int>(1);
+        if (voice < 1 || voice > static_cast<int>(core::Measure::kMaxVoices)) {
+            throw StepSyntaxError(
+                std::format("voice: 1 to {}, not {}", core::Measure::kMaxVoices, voice));
+        }
+        entry.caret.voice = static_cast<std::size_t>(voice - 1);
+        entry.caret = clampCaret(song, entry.caret);
+        return true;
     } else if (verb == "fret") {
         edit = enterFret(song, entry.caret, step.number<int>(1), entry.input);
     } else if (verb == "pitch") { // pitch <C..B> [add]
@@ -665,7 +674,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
-        "\"caret <track> <m> <beat> [string]\", right, left, up, down, next-measure, "
+        "\"caret <track> <m> <beat> [string]\", \"voice <1-4>\", right, left, up, down, "
+        "next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
         "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");

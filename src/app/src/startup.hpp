@@ -54,6 +54,7 @@ private:
     void queueTuplets();
     void queueMeasures();
     void queuePitches();
+    void queueVoices();
     void queueDrums();
     void queueMix();
     void queueNavigation();
@@ -79,6 +80,8 @@ private:
     bool laidOut_ = false;
     int paintsBefore_ = 0;
     int layouts_ = 0;
+    int stepsRun_ = 0;    ///< steps started so far, retries not counted
+    QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
     qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
@@ -97,6 +100,7 @@ private:
     double positionBefore_ = 0.0; ///< playback's position before an edit
     bool pitching_ = false;       ///< whether the caret takes note names
     int typedMidi_ = -1;          ///< the note name typed, as a MIDI number
+    bool voicing_ = false;        ///< whether the voice steps run
     bool drumming_ = false;       ///< whether the drum steps run
 };
 
