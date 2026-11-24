@@ -54,3 +54,8 @@ not 1. Grace and cue notes will use it too.
   own tempo (`tempo <bpm>`) starts it. It is one "Change tempo" undo step, and
   `edit --json` lists it as the measure's `"tempo"` (`cli.edit_tempo`,
   `cli.sequence_tempo`, `cli.render_tempo`).
+  `core::changeTempo()` makes that edit, for the CLI and the app
+  (`core.A tempo change ...`). In the app the measure popup shows the tempo
+  the caret's measure starts with, in its beat unit; a new value starts a
+  change there and a cross takes it away again. On the first measure the
+  field sets the song's tempo, keeping its beat unit.
