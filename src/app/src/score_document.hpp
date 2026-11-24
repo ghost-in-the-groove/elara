@@ -92,6 +92,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretTimeDenominator READ caretTimeDenominator NOTIFY caretChanged)
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
     Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -211,6 +212,14 @@ public:
     /// Change the signature from `measure` (0-based) until its next change.
     Q_INVOKABLE void setTimeSignatureFrom(int measure, int numerator, int denominator);
     Q_INVOKABLE void setKeySignatureFrom(int measure, int fifths, bool minor);
+    /// The signs and jumps of `measure` (ADR-0049): the flags "segno",
+    /// "segnoSegno", "coda", "doubleCoda", "fine", "toCoda" and "toDoubleCoda",
+    /// "jump" (0 none, 1 da capo, 2 dal segno, 3 dal segno segno) and
+    /// "jumpThen" (0 to the end, 1 al Fine, 2 al Coda, 3 al Double Coda).
+    Q_INVOKABLE QVariantMap navigationAt(int measure) const;
+    /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
+    /// gives them, as one undo step ("Change navigation marks").
+    Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -295,6 +304,9 @@ public:
     [[nodiscard]] int caretTimeDenominator() const;
     [[nodiscard]] int caretKeyFifths() const;
     [[nodiscard]] bool caretKeyMinor() const;
+    [[nodiscard]] QVariantMap caretNavigation() const {
+        return navigationAt(static_cast<int>(caret_.measure));
+    }
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
     Q_INVOKABLE void insertMeasure(bool after);
