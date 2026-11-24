@@ -3,6 +3,7 @@
 // (ADR-0015).
 #pragma once
 
+#include <elara/audio/sequence.hpp>
 #include <elara/core/clipboard.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
@@ -30,10 +31,6 @@
 #include <span>
 #include <utility>
 #include <vector>
-
-namespace elara::audio {
-class Sequence;
-}
 
 namespace elara::app {
 
@@ -105,6 +102,9 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int selectionLast READ selectionLast NOTIFY selectionChanged)
     Q_PROPERTY(int selectionRevision READ selectionRevision NOTIFY selectionChanged)
     Q_PROPERTY(bool canPaste READ canPaste NOTIFY clipboardChanged)
+    // Practice (ADR-0024): how playback plays the song, whatever song it is.
+    Q_PROPERTY(int speed READ speed WRITE setSpeed NOTIFY practiceChanged)
+    Q_PROPERTY(bool metronome READ metronome WRITE setMetronome NOTIFY practiceChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -176,6 +176,16 @@ public:
     [[nodiscard]] std::shared_ptr<const audio::Sequence> sequence() const { return sequence_; }
     /// The song sequence() was built from: what playback loads with it.
     [[nodiscard]] std::shared_ptr<const core::Song> sequenceSong() const { return sequenceSong_; }
+
+    /// Playback speed, in percent of the written tempo (25 to 200), and the
+    /// metronome. Kept when another song is opened; changing either builds the
+    /// sequence again, and playback keeps its place in the music.
+    [[nodiscard]] int speed() const noexcept;
+    void setSpeed(int percent);
+    [[nodiscard]] bool metronome() const noexcept { return practice_.metronome; }
+    void setMetronome(bool on);
+    /// What every sequence is built with.
+    [[nodiscard]] audio::SequenceOptions practice() const noexcept { return practice_; }
 
     // ---- Editing ------------------------------------------------------------
 
@@ -410,6 +420,7 @@ signals:
     void editFailed(const QString& message);
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
     void mixPreviewed();
+    void practiceChanged();
 
 private:
     bool execute(std::unique_ptr<core::Command> command);
@@ -443,6 +454,7 @@ private:
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
     std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
     std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
+    audio::SequenceOptions practice_;                 ///< speed() and metronome()
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()
     TrackList trackList_{this};                       ///< tracks(), kept up to date
     std::optional<core::Document> document_;          ///< the song being edited
