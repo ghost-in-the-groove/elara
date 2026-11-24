@@ -59,6 +59,11 @@ and checks that the song ends as it began, laying out and painting each step.
   copy (about 30 ms for that song). Until it arrives, playback plays the
   previous sequence with the new mix, and the audio side always loads a
   sequence with the song it was built from.
+- An edit's new sequence is loaded where playback is, playing or paused as it
+  was: the player takes it at its current frame. Only another song (a file
+  opened, a new song: `ScoreDocument::songReplaced`) sends playback back to
+  the start. Before, every edit that changed the music paused playback and
+  rewound it, so typing a note lost the place in the song.
 - Names of edits come from the core in English and are translated in the app
   by a table; an edit missing from it is shown in English.
 - Track names given by the app are the instrument's name in the interface

@@ -313,6 +313,10 @@ signals:
     void statusChanged();
     void busyChanged();
     void songChanged();
+    /// Another song replaced the one being edited: a file was opened, or a new
+    /// song made. Emitted before songChanged() and sequenceChanged(), with the
+    /// new song and sequence in place; playback goes back to the start.
+    void songReplaced();
     /// The sequence playback plays changed: a song was opened, or an edit
     /// sounds different and its layout is done.
     void sequenceChanged();
