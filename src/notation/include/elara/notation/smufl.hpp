@@ -116,6 +116,11 @@ enum class Glyph : std::uint8_t {
     GuitarVibratoStroke,
     GuitarWideVibratoStroke,
     WiggleTrill,
+    ArrowBlackUp,
+    ArrowBlackDown,
+    Tremolo1,
+    Tremolo2,
+    Tremolo3,
     // Repeats
     RepeatDot,
     Segno,

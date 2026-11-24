@@ -4,6 +4,7 @@
 #include <elara/core/song.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -20,14 +21,15 @@ namespace elara::notation::detail {
 namespace {
 
 // Technique lanes, in staff spaces.
-constexpr double kLaneGap = 0.6;       // between the staff's ink and the first lane
-constexpr double kLaneTextSize = 0.95; // "P.M.", "let ring", harmonic labels
-constexpr double kLaneBaseline = 0.2;  // text baseline above the bottom of its lane
-constexpr double kRunDash = 0.3;       // dashes of the line after "P.M."
-constexpr double kRunHook = 0.4;       // the line's closing hook
-constexpr double kRunLineGap = 0.25;   // between the text and its line
-constexpr double kVibratoLift = 0.25;  // vibrato strokes above the bottom of their lane
-constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3};
+constexpr double kLaneGap = 0.6;        // between the staff's ink and the first lane
+constexpr double kLaneTextSize = 0.95;  // "P.M.", "let ring", harmonic labels
+constexpr double kLaneBaseline = 0.2;   // text baseline above the bottom of its lane
+constexpr double kLaneGlyphScale = 0.7; // strum arrows and tremolo slashes in their lanes
+constexpr double kRunDash = 0.3;        // dashes of the line after "P.M."
+constexpr double kRunHook = 0.4;        // the line's closing hook
+constexpr double kRunLineGap = 0.25;    // between the text and its line
+constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
+constexpr double kLaneHeight[kLaneCount]{1.25, 1.2, 1.15, 1.15, 1.05, 2.3, 1.9, 1.9};
 
 // Dynamics marks, in staff spaces (ADR-0044).
 constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
@@ -382,9 +384,28 @@ std::string bendLabel(int cents) {
     return label;
 }
 
+namespace {
+
+// Slashes of tremolo picking at `speed`: one per beam of the repeated notes.
+int tremoloStrokes(core::NoteValue speed) {
+    if (speed >= core::NoteValue::ThirtySecond) {
+        return 3;
+    }
+    return speed == core::NoteValue::Sixteenth ? 2 : 1;
+}
+
+} // namespace
+
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat) {
     if (beat.effects.pickStroke != core::PickStroke::None) {
         marks.pickStroke = beat.effects.pickStroke;
+    }
+    if (beat.effects.strum != core::Strum::None) {
+        marks.strum = beat.effects.strum;
+    }
+    if (beat.effects.tremoloPicking) {
+        marks.tremoloStrokes =
+            std::max(marks.tremoloStrokes, tremoloStrokes(*beat.effects.tremoloPicking));
     }
     for (const core::Note& note : beat.notes) {
         const core::NoteEffects& effects = note.effects;
@@ -412,16 +433,22 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
     extend(Lane::Vibrato, marks.vibrato != core::Vibrato::None, centre, end, measure,
            marks.vibrato);
     if (marks.pickStroke != core::PickStroke::None) {
-        const Glyph bow = marks.pickStroke == core::PickStroke::Down ? Glyph::StringsDownBow
-                                                                     : Glyph::StringsUpBow;
-        const BoundingBox& box = font_.metrics(bow).box;
-        items(Lane::PickStroke)
-            .glyphs.push_back(GlyphItem{.glyph = bow,
-                                        .origin = {centre - (box.southWest.x + box.northEast.x) / 2,
-                                                   -kLaneBaseline + box.southWest.y},
-                                        .role = Role::Technique,
-                                        .measure = measure});
-        use(Lane::PickStroke);
+        mark(Lane::PickStroke,
+             marks.pickStroke == core::PickStroke::Down ? Glyph::StringsDownBow
+                                                        : Glyph::StringsUpBow,
+             centre, measure);
+    }
+    // A strum is an arrow the way the pick goes, as strumming patterns write it.
+    if (marks.strum != core::Strum::None) {
+        mark(Lane::Strum,
+             marks.strum == core::Strum::Down ? Glyph::ArrowBlackDown : Glyph::ArrowBlackUp, centre,
+             measure, kLaneGlyphScale);
+    }
+    if (marks.tremoloStrokes > 0) {
+        constexpr std::array kSlashes{Glyph::Tremolo1, Glyph::Tremolo2, Glyph::Tremolo3};
+        mark(Lane::Tremolo,
+             kSlashes.at(static_cast<std::size_t>(std::min(marks.tremoloStrokes, 3) - 1)), centre,
+             measure, kLaneGlyphScale);
     }
     const char* label = nullptr;
     switch (marks.harmonic) {
@@ -451,6 +478,19 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
         items(Lane::Harmonic).texts.push_back(std::move(item));
         use(Lane::Harmonic);
     }
+}
+
+void TechniqueLanes::mark(Lane lane, Glyph glyph, double centre, std::size_t measure,
+                          double scale) {
+    const BoundingBox& box = font_.metrics(glyph).box;
+    items(lane).glyphs.push_back(
+        GlyphItem{.glyph = glyph,
+                  .origin = {centre - (box.southWest.x + box.northEast.x) * scale / 2,
+                             -kLaneBaseline + box.southWest.y * scale},
+                  .role = Role::Technique,
+                  .measure = measure,
+                  .scale = scale});
+    use(lane);
 }
 
 void TechniqueLanes::extend(Lane lane, bool active, double centre, double end, std::size_t measure,
