@@ -42,11 +42,11 @@ void Staff::setTuning(std::optional<Tuning> tuning, int capo) {
 }
 
 Measure& Staff::measure(std::size_t index) {
-    return checkedAt(measures_, index, "Staff: no such measure");
+    return checkedAt(measures_, index, "Staff: no such measure").edit();
 }
 
 const Measure& Staff::measure(std::size_t index) const {
-    return checkedAt(measures_, index, "Staff: no such measure");
+    return checkedAt(measures_, index, "Staff: no such measure").get();
 }
 
 Note Staff::frettedNote(int string, int fret, SpellingPreference preference) const {
@@ -104,7 +104,8 @@ std::size_t Song::insertTrack(std::size_t at, Track track) {
     }
     for (auto& staff : track.staves_) {
         if (staff.measures_.empty()) {
-            staff.measures_.resize(headers_.size());
+            // One empty measure for all: each gets its own once it changes.
+            staff.measures_.assign(headers_.size(), SharedValue<Measure>{});
         } else if (staff.measures_.size() != headers_.size()) {
             throw std::invalid_argument("Song: track has a different number of measures");
         }
@@ -152,9 +153,10 @@ void Song::insertMeasures(std::size_t at, std::size_t count) {
                                  : at > 0         ? headers_[at - 1].continuation()
                                                   : headers_.front().continuation();
     headers_.insert(headers_.begin() + offset, count, header);
+    const SharedValue<Measure> empty;
     for (auto& track : tracks_) {
         for (auto& staff : track.staves_) {
-            staff.measures_.insert(staff.measures_.begin() + offset, count, Measure{});
+            staff.measures_.insert(staff.measures_.begin() + offset, count, empty);
         }
     }
 }

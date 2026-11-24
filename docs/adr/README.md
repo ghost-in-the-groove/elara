@@ -51,6 +51,7 @@ one that replaces them.
 | [0047](0047-dynamics-at-the-caret.md) | Dynamics at the caret | Accepted |
 | [0049](0049-signs-and-jumps.md) | Signs and jumps | Accepted |
 | [0050](0050-tuplets-at-the-caret.md) | Tuplets at the caret | Accepted |
+| [0051](0051-shared-measures.md) | Measures shared between copies of a song | Accepted |
 | [0053](0053-worker-pool.md) | A worker pool for parallel jobs | Accepted |
 
 ## Template
