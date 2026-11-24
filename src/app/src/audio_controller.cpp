@@ -78,6 +78,9 @@ void AudioController::songEdited() {
         const double position = placed_
                                     ? elara::audio::carriedPosition(*placed_, position_, *sequence)
                                     : std::clamp(position_, 0.0, document_->duration());
+        if (placed_) {
+            carryLoop(*placed_, *sequence);
+        }
         placed_ = sequence;
         if (position != position_) {
             position_ = position;
@@ -108,6 +111,9 @@ void AudioController::loadSequence() {
     const double before = player_->position();
     const double after =
         loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    if (placed_) {
+        carryLoop(*placed_, *sequence); // so does the loop
+    }
     player_->load(*document_->sequenceSong(), *sequence);
     if (after != before) {
         player_->seek(after);
@@ -115,10 +121,12 @@ void AudioController::loadSequence() {
     loaded_ = sequence;
     placed_ = sequence;
     player_->updateMix(*document_->song());
+    applyLoop();
 }
 
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
+    clearLoop();
     loaded_.reset();
     placed_ = document_ ? document_->sequence() : nullptr;
     if (player_) {
@@ -151,6 +159,8 @@ void AudioController::togglePlayback() {
     setErrorMessage({});
     if (player_->isPlaying()) {
         player_->pause();
+    } else if (countIn_ && loaded_) {
+        player_->play(loaded_->countInAt(player_->position()));
     } else {
         player_->play();
     }
@@ -200,8 +210,79 @@ void AudioController::pollTransport() {
         playingSong_ = playing;
         emit playingSongChanged();
     }
+    if (const bool counting = playing && player_->isCountingIn(); counting != countingIn_) {
+        countingIn_ = counting;
+        emit countingInChanged();
+    }
     if (!playing) {
         transportTimer_.stop();
+    }
+}
+
+void AudioController::setCountIn(bool countIn) {
+    if (countIn_ != countIn) {
+        countIn_ = countIn;
+        emit countInChanged();
+    }
+}
+
+void AudioController::markLoop() {
+    switch (loop_) {
+    case Loop::None:
+        loop_ = Loop::Marked;
+        loopFrom_ = position_;
+        break;
+    case Loop::Marked:
+        if (position_ > loopFrom_) {
+            loop_ = Loop::Looping;
+            loopTo_ = position_;
+        } else {
+            loopFrom_ = position_; // B must come after A: this is A
+        }
+        break;
+    case Loop::Looping:
+        clearLoop();
+        return;
+    }
+    applyLoop();
+    emit loopChanged();
+}
+
+void AudioController::clearLoop() {
+    if (loop_ == Loop::None) {
+        return;
+    }
+    loop_ = Loop::None;
+    loopFrom_ = 0.0;
+    loopTo_ = 0.0;
+    applyLoop();
+    emit loopChanged();
+}
+
+// A and B keep their places in the music, as the position does.
+void AudioController::carryLoop(const elara::audio::Sequence& from,
+                                const elara::audio::Sequence& to) {
+    if (loop_ == Loop::None) {
+        return;
+    }
+    const double a = elara::audio::carriedPosition(from, loopFrom_, to);
+    const double b =
+        loop_ == Loop::Looping ? elara::audio::carriedPosition(from, loopTo_, to) : 0.0;
+    if (a != loopFrom_ || b != loopTo_) {
+        loopFrom_ = a;
+        loopTo_ = b;
+        emit loopChanged();
+    }
+}
+
+void AudioController::applyLoop() {
+    if (!player_) {
+        return;
+    }
+    if (loop_ == Loop::Looping) {
+        player_->setLoop(loopFrom_, loopTo_);
+    } else {
+        player_->setLoop(0.0, 0.0);
     }
 }
 
