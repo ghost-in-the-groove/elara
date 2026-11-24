@@ -211,6 +211,23 @@ set_tests_properties(cli.dump_credits PROPERTIES
 add_test(NAME cli.edit_rejects_unknown_credit COMMAND elara-cli edit "credit composer Someone")
 set_tests_properties(cli.edit_rejects_unknown_credit PROPERTIES WILL_FAIL TRUE)
 
+# Sections (ADR-0062): named where they start; no name takes one off.
+set(ELARA_CLI_SECTIONS "${CMAKE_CURRENT_BINARY_DIR}/cli-sections.elara")
+add_test(NAME cli.edit_names_sections
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_SECTIONS}" "add-track electric-guitar"
+    "append-measures 4" "section 0 Intro" "section 2 First chorus" "section 3 Bridge"
+    "section 3")
+set_tests_properties(cli.edit_names_sections PROPERTIES
+  FIXTURES_SETUP cli_sections
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":6,\"next\":\"Change section\"}")
+add_test(NAME cli.dump_sections COMMAND elara-cli --json dump "${ELARA_CLI_SECTIONS}")
+set_tests_properties(cli.dump_sections PROPERTIES
+  FIXTURES_REQUIRED cli_sections
+  PASS_REGULAR_EXPRESSION "\"section\":\"Intro\"},{[^}]*},{[^}]*\"section\":\"First chorus\"},{[^}]*}\\]")
+add_test(NAME cli.edit_rejects_section_past_the_end
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "section 5 Outro")
+set_tests_properties(cli.edit_rejects_section_past_the_end PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_sets_track_mix
   COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
 set_tests_properties(cli.edit_sets_track_mix PROPERTIES

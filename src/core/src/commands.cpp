@@ -261,4 +261,18 @@ std::unique_ptr<Command> changeCredit(const Song& song, Credit credit, std::stri
     return std::make_unique<SetSongInfo>(std::move(info));
 }
 
+std::unique_ptr<Command> changeSection(const Song& song, std::size_t measure, std::string name) {
+    if (measure >= song.measureCount()) {
+        throw std::out_of_range("Change section: no such measure");
+    }
+    if (song.measureHeader(measure).section == name) {
+        return nullptr;
+    }
+    MeasureHeader header = song.measureHeader(measure);
+    header.section = std::move(name);
+    std::vector<std::unique_ptr<Command>> steps;
+    steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    return std::make_unique<CommandGroup>("Change section", std::move(steps));
+}
+
 } // namespace elara::core

@@ -25,6 +25,7 @@ inline constexpr std::uint8_t kMetaCopyright = 0x02;
 inline constexpr std::uint8_t kMetaTrackName = 0x03;
 inline constexpr std::uint8_t kMetaInstrumentName = 0x04;
 inline constexpr std::uint8_t kMetaLyric = 0x05;
+inline constexpr std::uint8_t kMetaMarker = 0x06;
 inline constexpr std::uint8_t kMetaEndOfTrack = 0x2F;
 inline constexpr std::uint8_t kMetaTempo = 0x51;
 inline constexpr std::uint8_t kMetaTimeSignature = 0x58;

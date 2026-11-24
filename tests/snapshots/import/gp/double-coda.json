@@ -16,7 +16,9 @@
    "bpm": 120
   },
   "measures": [
-   {},
+   {
+    "section": "Intro"
+   },
    {
     "segno": true
    },
@@ -32,7 +34,8 @@
     "jumpThen": "al-double-coda"
    },
    {
-    "coda": true
+    "coda": true,
+    "section": "B"
    },
    {
     "doubleCoda": true

@@ -165,6 +165,10 @@ struct MeasureHeader {
     JumpTo jump = JumpTo::None;
     JumpThen jumpThen = JumpThen::End;
 
+    /// The name of the section of the song that starts here ("Intro",
+    /// "Chorus"; ADR-0062), empty when none does.
+    std::string section{};
+
     /// True when an end repeat barline closes the measure.
     [[nodiscard]] bool repeatEnd() const noexcept { return repeatTimes >= 2; }
     /// True when the measure is played the `time`-th time through its repeat.

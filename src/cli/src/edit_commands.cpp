@@ -473,6 +473,14 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (auto change = core::changeTempo(song, measure, bpm)) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "section") { // section <m> [name]: no name takes it off
+        const std::size_t measure = step.index(1);
+        if (measure >= song.measureCount()) {
+            throw std::out_of_range(std::format("section: no measure {}", measure));
+        }
+        if (auto change = core::changeSection(song, measure, step.has(2) ? step.rest(2) : "")) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "title") {
         SongInfo info = song.info();
         info.title = step.rest(1);
@@ -792,7 +800,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"title <text>\", "
+        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"section <m> [name]\", "
+        "\"title <text>\", "
         "\"credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> "
         "[text]\", "
         "\"note <track> <m> <string> <fret> "

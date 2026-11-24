@@ -209,4 +209,11 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeCredit(const Song& song, Credit credit,
                                                     std::string text);
 
+/// Names the section that starts at measure `measure` (ADR-0062); an empty
+/// name takes it off. One undo step, "Change section"; null when the measure
+/// has that name already. Throws std::out_of_range when the song has no
+/// measure `measure`.
+[[nodiscard]] std::unique_ptr<Command> changeSection(const Song& song, std::size_t measure,
+                                                     std::string name);
+
 } // namespace elara::core
