@@ -154,6 +154,16 @@ enum class NoteEffect : std::uint8_t {
 /// fret without a node.
 [[nodiscard]] Entry toggleEffect(const Song& song, const Caret& caret, NoteEffect effect);
 
+/// Sets the bend of the notes the caret is on (as for toggleEffect) to `curve`,
+/// any form or an empty curve to remove it (ADR-0055), as one undo step
+/// ("Change bend"). Nothing changes when they all have it already, on a rest,
+/// the free slot or a string without a note.
+[[nodiscard]] Entry setBend(const Song& song, const Caret& caret, const BendCurve& curve);
+
+/// The bend of the first note the caret is on (as for toggleEffect); empty on
+/// a rest, the free slot or a string without a note.
+[[nodiscard]] BendCurve bendAtCaret(const Song& song, const Caret& caret);
+
 /// The dynamic in force at the caret's beat (ADR-0047): that of the notes struck
 /// at the latest start no later than the beat's, over every voice of the staff
 /// and looking back through earlier measures (the loudest when several are

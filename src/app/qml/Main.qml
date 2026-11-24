@@ -651,10 +651,31 @@ ApplicationWindow {
                         when: !seekBar.pressed
                         restoreMode: Binding.RestoreNone
                     }
+
+                    // The A-B loop under the bar: A to B, or a mark at A while
+                    // B is still to come.
+                    Rectangle {
+                        objectName: "loopBand"
+
+                        readonly property real track: seekBar.availableWidth - seekBar.handle.width
+                        readonly property real start: seekBar.leftPadding + seekBar.handle.width / 2
+                                                      + track * Math.min(1, audio.loopFrom / seekBar.to)
+
+                        visible: audio.looping || audio.loopMarked
+                        x: audio.looping ? start : start - 1
+                        width: audio.looping ? Math.max(2, track * Math.min(1, (audio.loopTo - audio.loopFrom) / seekBar.to))
+                                             : 2
+                        y: seekBar.topPadding + seekBar.availableHeight / 2 + 6
+                        height: 3
+                        radius: 1.5
+                        color: window.Material.accent
+                        opacity: audio.looping ? 0.9 : 0.6
+                    }
                 }
 
                 PracticeControls {
                     document: score
+                    playback: audio
                 }
             }
         }
@@ -890,6 +911,11 @@ ApplicationWindow {
         sequence: "Space"
         enabled: window.hasScore
         onActivated: audio.togglePlayback()
+    }
+    Shortcut {
+        sequence: "Ctrl+L"
+        enabled: window.hasScore
+        onActivated: audio.markLoop()
     }
     Shortcut {
         sequence: "Home"

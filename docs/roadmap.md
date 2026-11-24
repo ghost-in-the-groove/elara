@@ -83,7 +83,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 5 - Editor
 
-- [ ] Selection model and keyboard-driven entry (fret numbers, durations)
+- [x] Selection model and keyboard-driven entry (fret numbers, durations)
   - [x] Drum entry: lanes for the kit pieces, hits toggled at the caret, in the
         CLI and the app (ADR-0035)
   - [x] Keyboard entry in the app: a caret on the score, frets (two digits as one
@@ -112,6 +112,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
+  - [x] Bends of any form at the caret: bend, bend and release, pre-bend,
+        pre-bend and release, 1/4 to 2 steps, in the CLI and the effects panel
+        (ADR-0055)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)
@@ -119,9 +122,10 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 ## Milestone 6 - Practice tools
 
-- [ ] Metronome with count-in, A-B loop, speed 25-200 %
+- [x] Metronome with count-in, A-B loop, speed 25-200 %
   - [x] Speed and metronome in the sequencer, the CLI and the app's transport; playback keeps its place in the music when the speed changes (ADR-0024)
-  - [x] Count-in and A-B loop in the player and the CLI (ADR-0024); app controls to do
+  - [x] Count-in and A-B loop in the player and the CLI (ADR-0024)
+  - [x] Count-in and A-B loop in the app's transport; the loop keeps its place in the music when the speed changes
 - [x] Tuner: pitch detection, microphone input, the app panel, `elara-cli tune` and `listen` (ADR-0028, ADR-0029)
 
 ## Milestone 7 - Distribution

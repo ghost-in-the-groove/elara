@@ -172,6 +172,15 @@ constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 12> kEffectN
     {"staccato", core::NoteEffect::Staccato},
 }};
 
+// The forms `bend <form> [cents]` takes (ADR-0055).
+constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kBendForms{{
+    {"none", core::BendForm::None},
+    {"bend", core::BendForm::Bend},
+    {"release", core::BendForm::BendRelease},
+    {"pre-bend", core::BendForm::PreBend},
+    {"pre-release", core::BendForm::PreBendRelease},
+}};
+
 constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
     {"ppp", core::Dynamic::PPP},
     {"pp", core::Dynamic::PP},
@@ -260,6 +269,16 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             throw StepSyntaxError(std::format("not an effect: {}", name));
         }
         edit = toggleEffect(song, entry.caret, found->second);
+    } else if (verb == "bend") { // bend <form> [cents]: on the caret's notes, a step by default
+        constexpr int kFullStep = 200;
+        const std::string_view name = step.word(1);
+        const auto found = std::ranges::find_if(
+            kBendForms, [name](const auto& form) { return form.first == name; });
+        if (found == kBendForms.end()) {
+            throw StepSyntaxError(std::format("not a bend form: {}", name));
+        }
+        const int cents = step.has(2) ? step.number<int>(2) : kFullStep;
+        edit = setBend(song, entry.caret, bendCurve(found->second, cents));
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
         const auto found = std::ranges::find_if(
@@ -678,7 +697,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "next-measure, "
         "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
         "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", \"effect <name>\", undo, redo, save");
+        "insert-rest, \"drum [key]\", \"effect <name>\", \"bend <form> [cents]\", undo, redo, "
+        "save");
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }

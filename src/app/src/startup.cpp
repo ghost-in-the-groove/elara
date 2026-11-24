@@ -180,6 +180,7 @@ void Startup::queueSteps() {
             return false;
         });
         queuePractice();
+        queueLoop();
         queueKeepPosition();
     }
     if (options_.track) {
@@ -986,7 +987,23 @@ void Startup::queueEffects() {
         }
         check((score_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
               "the accent did not go off again");
-        for (int i = 0; i < 5 && score_->modified() && score_->canUndo(); ++i) {
+        // Bends of any form (ADR-0055).
+        constexpr int kRelease = static_cast<int>(core::BendForm::BendRelease);
+        constexpr int kPreBend = static_cast<int>(core::BendForm::PreBend);
+        score_->setBend(kRelease, 100);
+        check(score_->caretBendForm() == kRelease && score_->caretBendCents() == 100,
+              "the bend and release did not go on");
+        check(score_->undoName() == ScoreDocument::tr("Change bend"), "the bend is not undoable");
+        check(score_->caretStatus().contains(score_->bendName(kRelease, 100)) &&
+                  score_->bendName(kRelease, 100).endsWith(QStringLiteral("1/2")),
+              "the status does not name the bend");
+        score_->setBend(kPreBend, 300);
+        check(score_->caretBendForm() == kPreBend && score_->caretBendCents() == 300 &&
+                  score_->bendAmount(300) == QStringLiteral("1 1/2"),
+              "the pre-bend did not replace it");
+        score_->setBend(0, 0);
+        check(score_->caretBendForm() == 0 && score_->caretBendCents() == 0, "the bend did not go");
+        for (int i = 0; i < 10 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;
@@ -1193,9 +1210,103 @@ void Startup::queuePractice() {
     });
 }
 
+// The A-B loop is marked at playback's position, A then B; B before A marks A
+// again, and a third mark ends the loop. It keeps its place in the music when
+// the speed changes. The loop is left marked, for queueKeepPosition() to check
+// that an edit keeps it and a new song forgets it, and playback where it was.
+void Startup::queueLoop() {
+    const auto check = [this](bool ok, const QString& what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("loop check failed: %1").arg(what);
+        }
+    };
+    const auto arrived = [this] {
+        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        return true;
+    };
+    const auto near = [](double a, double b) {
+        return std::abs(a - b) < 1e-6;
+    };
+    steps_.emplace_back([this, check, near] {
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio == nullptr || !score_->sequence()) {
+            return false;
+        }
+        positionBefore_ = audio->position();
+        const double quarter = score_->duration() / 4.0;
+        audio->seek(quarter);
+        audio->markLoop();
+        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
+              QStringLiteral("A was not marked at %1 s").arg(quarter));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        check(audio->looping() && near(audio->loopFrom(), quarter) &&
+                  near(audio->loopTo(), 2.0 * quarter),
+              QStringLiteral("A-B is %1 s to %2 s, not %3 s to %4 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo())
+                  .arg(quarter)
+                  .arg(2.0 * quarter));
+        sequenceBefore_ = score_->sequence();
+        score_->setSpeed(50);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived, near] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        auto* audio = window_->findChild<AudioController*>();
+        const double quarter = score_->duration() / 8.0; // the song lasts twice as long
+        check(audio->looping() && near(audio->loopFrom(), 2.0 * quarter) &&
+                  near(audio->loopTo(), 4.0 * quarter),
+              QStringLiteral("at half speed A-B is %1 s to %2 s, not %3 s to %4 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo())
+                  .arg(2.0 * quarter)
+                  .arg(4.0 * quarter));
+        sequenceBefore_ = score_->sequence();
+        score_->setSpeed(100);
+        return false;
+    });
+    steps_.emplace_back([this, check, arrived, near] {
+        if (!sequenceBefore_ || !arrived()) {
+            return false;
+        }
+        sequenceBefore_.reset();
+        auto* audio = window_->findChild<AudioController*>();
+        const double quarter = score_->duration() / 4.0;
+        check(audio->looping() && near(audio->loopFrom(), quarter) &&
+                  near(audio->loopTo(), 2.0 * quarter),
+              QStringLiteral("back at full speed A-B is %1 s to %2 s")
+                  .arg(audio->loopFrom())
+                  .arg(audio->loopTo()));
+        audio->markLoop();
+        check(!audio->looping() && !audio->loopMarked(),
+              QStringLiteral("a third mark did not end the loop"));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        audio->seek(quarter);
+        audio->markLoop();
+        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
+              QStringLiteral("B before A did not mark A again"));
+        audio->seek(2.0 * quarter);
+        audio->markLoop();
+        check(audio->looping(), QStringLiteral("A-B was not marked again"));
+        audio->setCountIn(true);
+        check(audio->countIn(), QStringLiteral("the count-in did not turn on"));
+        audio->setCountIn(false);
+        audio->seek(positionBefore_);
+        return false;
+    });
+}
+
 // An edit keeps playback where it is: a track added, then undone, each give
 // playback a new sequence and leave it where the click on the cursor put it.
-// A new song then starts playback from its beginning.
+// A new song then starts playback from its beginning. The A-B loop that
+// queueLoop() left stays through the edit and goes with the new song.
 void Startup::queueKeepPosition() {
     const auto check = [this](const char* what) {
         auto* audio = window_->findChild<AudioController*>();
@@ -1217,6 +1328,10 @@ void Startup::queueKeepPosition() {
     });
     steps_.emplace_back([this, check] {
         check("an edit");
+        auto* audio = window_->findChild<AudioController*>();
+        if (audio != nullptr && !audio->looping() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("an edit ended the loop");
+        }
         score_->undo();
         return true;
     });
@@ -1234,6 +1349,10 @@ void Startup::queueKeepPosition() {
         if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
             editProblem_ =
                 QStringLiteral("a new song left playback at %1 s").arg(audio->position());
+        }
+        if (audio != nullptr && (audio->looping() || audio->loopMarked()) &&
+            editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("a new song kept the loop");
         }
         return false;
     });

@@ -27,6 +27,8 @@ Rectangle {
     ]
     readonly property int currentIndex: values.findIndex(entry => entry.value === document.inputValue)
     readonly property color ink: Theme.ink
+    /// How far the next bend goes when the caret's note has none, in cents.
+    property int bendCents: 200
 
     implicitWidth: row.implicitWidth + 16
     implicitHeight: 44
@@ -67,6 +69,92 @@ Rectangle {
         checkable: true
         checked: root.document.inputTuplet === actual
         onTriggered: root.document.setInputTuplet(actual)
+    }
+
+    // A pill of the effects panel: accent-filled while it is on.
+    component Pill: AbstractButton {
+        id: pill
+
+        property bool active
+
+        implicitHeight: 30
+        focusPolicy: Qt.NoFocus
+        hoverEnabled: true
+        Accessible.checked: active
+
+        background: Rectangle {
+            radius: height / 2
+            color: pill.active ? Material.accent
+                               : pill.pressed ? Qt.alpha(root.ink, 0.16)
+                                              : pill.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: 120
+                }
+            }
+        }
+
+        ToolTip.visible: hovered && Accessible.name.length > 0
+        ToolTip.delay: 500
+        ToolTip.text: Accessible.name
+    }
+
+    // A bend form (ADR-0055), numbered as core::BendForm: on the caret's notes
+    // at the bend's amount, or off again when they have it.
+    component BendForm: Pill {
+        id: bendForm
+
+        required property int form
+        required property string tip
+        required property string path
+
+        implicitWidth: 34
+        active: root.document.caretBendForm === form
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: tip
+        onClicked: {
+            if (active) {
+                root.document.setBend(0, 0)
+            } else {
+                const cents = root.document.caretBendCents
+                root.document.setBend(form, cents > 0 ? cents : root.bendCents)
+            }
+        }
+
+        contentItem: Icon {
+            path: bendForm.path
+            lineWidth: 1.8
+            color: bendForm.active ? "white" : root.ink
+        }
+    }
+
+    // How far a bend goes: the caret's bend, or a bend up if it has none.
+    component BendAmount: Pill {
+        id: bendAmount
+
+        required property int cents
+
+        implicitWidth: Math.max(34, amountLabel.implicitWidth + 16)
+        active: root.document.caretBendForm > 0 && root.document.caretBendCents === cents
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: root.document.bendAmount(cents)
+        onClicked: {
+            const form = root.document.caretBendForm
+            root.bendCents = cents
+            root.document.setBend(form > 0 && form < 5 ? form : 1, cents)
+        }
+
+        contentItem: Label {
+            id: amountLabel
+
+            text: root.document.bendAmount(bendAmount.cents)
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            font.pixelSize: 12
+            font.features: { "frac": 1 }
+            color: bendAmount.active ? "white" : root.ink
+        }
     }
 
     // A voice in the voice menu, checked when the caret is in it.
@@ -476,6 +564,61 @@ Rectangle {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Bend")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // The bend's form, then how far it goes.
+                    Row {
+                        spacing: 4
+
+                        BendForm {
+                            form: 1
+                            tip: qsTr("Bend")
+                            path: "M3 19 L7 19 C11 19 12 15 12 6 M9 9 L12 6 L15 9"
+                        }
+                        BendForm {
+                            form: 2
+                            tip: qsTr("Bend and release")
+                            path: "M2 19 L4 19 C7 19 8 14 8 6 M5.5 8.5 L8 6 L10.5 8.5 M8 6 L12 6 C15 6 16 12 16 19 M13.5 16.5 L16 19 L18.5 16.5"
+                        }
+                        BendForm {
+                            form: 3
+                            tip: qsTr("Pre-bend")
+                            path: "M12 20 L12 5 M8.5 8.5 L12 5 L15.5 8.5"
+                        }
+                        BendForm {
+                            form: 4
+                            tip: qsTr("Pre-bend and release")
+                            path: "M7 20 L7 5 M4 8 L7 5 L10 8 M7 5 L10 5 C13 5 15 11 15 19 M12.5 16.5 L15 19 L17.5 16.5"
+                        }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        Repeater {
+                            model: [50, 100, 200, 300, 400]
+
+                            delegate: BendAmount {
+                                required property int modelData
+
+                                cents: modelData
                             }
                         }
                     }

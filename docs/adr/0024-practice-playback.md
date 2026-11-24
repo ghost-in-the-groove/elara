@@ -72,3 +72,9 @@ end, as an export does.
   `--metronome`; `sequence --count-in-at SECONDS` prints a count-in, and
   `play` takes `--count-in` and `--loop FROM TO`. The player's count-in and
   loop are checked by unit tests that render it block by block.
+- In the app the count-in and the loop belong to the transport
+  (`AudioController`), not to the document: they are about playing, and the
+  sequence is the same with them as without them. The loop is marked A then B
+  at the playback position, and is carried with `carriedPosition` like the
+  position, so another speed or a tempo edit keeps it on the same notes;
+  another song ends it.
