@@ -24,6 +24,19 @@ if(WIN32)
   include(InstallRequiredSystemLibraries)
 endif()
 
+# vcpkg builds its libraries as DLLs on Windows, and $<TARGET_RUNTIME_DLLS>
+# names only the ones Elara links to, not what they load in turn (FluidSynth
+# loads libsndfile, which loads its codecs). Every DLL vcpkg built goes next to
+# the executables instead; other platforms link vcpkg's libraries statically.
+if(WIN32 AND DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+  set(_elara_vcpkg_dir "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    string(APPEND _elara_vcpkg_dir "/debug")
+  endif()
+  file(GLOB _elara_vcpkg_dlls "${_elara_vcpkg_dir}/bin/*.dll")
+  install(FILES ${_elara_vcpkg_dlls} DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
+
 if(WIN32)
   set(_elara_platform "windows-x64")
 elseif(APPLE)

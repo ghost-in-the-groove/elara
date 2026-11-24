@@ -150,9 +150,13 @@ int main(int argc, char* argv[]) {
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
         QStringLiteral("language"));
+    const QCommandLineOption soundFontOption(
+        QStringLiteral("soundfont"),
+        QCoreApplication::translate("main", "Play through this SoundFont (SF2 or SF3)."),
+        QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
                        songPaneOption, measureOption, tuningOption, continuousOption,
-                       languageOption});
+                       languageOption, soundFontOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -195,6 +199,9 @@ int main(int argc, char* argv[]) {
         }
         options.seek = seconds;
     }
+    if (parser.isSet(soundFontOption)) {
+        options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
+    }
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.screenshot = parser.value(screenshot);
@@ -224,7 +231,10 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
                                  {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
-                                 {QStringLiteral("showTuning"), parser.isSet(tuningOption)}});
+                                 {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
+                                 {QStringLiteral("initialSoundFont"), options.soundFont},
+                                 // Checks leave the settings of the person using the app alone.
+                                 {QStringLiteral("rememberSettings"), !checking}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()

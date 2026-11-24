@@ -132,6 +132,19 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 53 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
+  # A SoundFont from the command line (ADR-0043), the test font of the CLI
+  # tests: the window plays through it, keeps it when another file fails to
+  # open, and goes back to the built-in synthesizer.
+  add_test(NAME app.smoke_soundfont
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp"
+      --soundfont "${CMAKE_CURRENT_BINARY_DIR}/cli/test-soundfont.sf2")
+  set_tests_properties(app.smoke_soundfont PROPERTIES
+    FIXTURES_REQUIRED cli_soundfont
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "sound: test-soundfont[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
+
   # A song of several pages: the notes typed on the first page leave the others
   # as they were, so those keep their textures instead of being painted again.
   set(ELARA_APP_LONG_SONG "${CMAKE_CURRENT_BINARY_DIR}/app-long-song.elara")

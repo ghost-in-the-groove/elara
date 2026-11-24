@@ -3,7 +3,14 @@
 
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
+#include <elara/audio/sound_font.hpp>
 #include <elara/audio/system_audio.hpp>
+
+#include "when_done.hpp"
+#include <QFileInfo>
+#include <QSettings>
+#include <QUrl>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
 #include <chrono>
@@ -152,6 +159,7 @@ void AudioController::togglePlayback() {
             return;
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
+        player_->setSoundBank(bank_);
         loadSequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
@@ -283,6 +291,85 @@ void AudioController::applyLoop() {
         player_->setLoop(loopFrom_, loopTo_);
     } else {
         player_->setLoop(0.0, 0.0);
+    }
+}
+
+namespace {
+
+const QString kSoundFontKey = QStringLiteral("audio/soundFont");
+
+// A local path from a path or a file URL, as file dialogs give them.
+QString localPath(const QString& file) {
+    const QUrl url(file);
+    return url.isLocalFile() ? url.toLocalFile() : file;
+}
+
+} // namespace
+
+QString AudioController::soundFontName() const {
+    return soundFont_.isEmpty() ? QString() : QFileInfo(soundFont_).completeBaseName();
+}
+
+void AudioController::setSoundFont(const QString& file) {
+    const QString path = localPath(file);
+    const int request = ++soundRequest_;
+    if (loading_++ == 0) {
+        emit loadingSoundFontChanged();
+    }
+    // Reading the presets of a large font takes a moment: away from the
+    // interface thread.
+    elara::app::whenDone(
+        QtConcurrent::run(
+            [path] { return elara::audio::SoundFont::open(QFileInfo(path).filesystemFilePath()); }),
+        this, [this, path, request](const auto& opened) {
+            if (--loading_ == 0) {
+                emit loadingSoundFontChanged();
+            }
+            if (request != soundRequest_) {
+                return; // another sound was asked for since
+            }
+            if (!opened) {
+                setErrorMessage(tr("The SoundFont did not open: %1")
+                                    .arg(QString::fromStdString(opened.error())));
+                return;
+            }
+            setErrorMessage({});
+            useSoundBank(*opened, path);
+        });
+}
+
+void AudioController::useBuiltinSound() {
+    ++soundRequest_; // a SoundFont still opening is no longer wanted
+    useSoundBank(nullptr, {});
+}
+
+void AudioController::restoreSoundFont() {
+    if (!rememberSound_) {
+        return;
+    }
+    const QString file = QSettings().value(kSoundFontKey).toString();
+    if (!file.isEmpty() && QFileInfo::exists(file)) {
+        setSoundFont(file);
+    }
+}
+
+// The tracks play through `bank` from now on, playing or not, at the same
+// place: the player makes their sounds again as it loads the sequence.
+void AudioController::useSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank,
+                                   const QString& file) {
+    bank_ = std::move(bank);
+    if (soundFont_ != file) {
+        soundFont_ = file;
+        emit soundFontChanged();
+    }
+    if (rememberSound_) {
+        QSettings().setValue(kSoundFontKey, file);
+    }
+    if (player_) {
+        player_->setSoundBank(bank_);
+        if (document_ && document_->song() && document_->sequence()) {
+            loadSequence();
+        }
     }
 }
 

@@ -30,6 +30,7 @@ struct StartupOptions {
     bool continuous = false;    ///< show the continuous view (ADR-0057)
     bool smokeTest = false;     ///< check the window (and the file), then quit
     QString screenshot;         ///< save the window here once shown, then quit
+    QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`)
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -70,6 +71,7 @@ private:
     void queueKeepPosition();
     void queuePractice();
     void queueLoop();
+    void queueSoundFont();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
