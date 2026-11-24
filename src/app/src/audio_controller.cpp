@@ -35,6 +35,8 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     if (document_) {
         connect(document_, &elara::app::ScoreDocument::songChanged, this,
                 &AudioController::songEdited);
+        connect(document_, &elara::app::ScoreDocument::sequenceChanged, this,
+                &AudioController::songEdited);
         connect(document_, &elara::app::ScoreDocument::mixPreviewed, this,
                 &AudioController::previewMix);
     }
@@ -77,6 +79,14 @@ void AudioController::previewMix() {
     }
 }
 
+// The document's sequence with the song it was built from, which an edit
+// whose sequence is still being built has left behind; then that edit's mix.
+void AudioController::loadSequence() {
+    player_->load(*document_->sequenceSong(), *document_->sequence());
+    loaded_ = document_->sequence();
+    player_->updateMix(*document_->song());
+}
+
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
     loaded_.reset();
@@ -84,8 +94,7 @@ void AudioController::loadSong() {
         player_->pause();
         player_->seek(0.0);
         if (document_ && document_->song() && document_->sequence()) {
-            player_->load(*document_->song(), *document_->sequence());
-            loaded_ = document_->sequence();
+            loadSequence();
         }
     }
     pollTransport();
@@ -104,8 +113,7 @@ void AudioController::togglePlayback() {
             return;
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
-        player_->load(*document_->song(), *document_->sequence());
-        loaded_ = document_->sequence();
+        loadSequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
     }

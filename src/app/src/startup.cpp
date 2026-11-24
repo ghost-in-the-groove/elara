@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "startup.hpp"
 
+#include <elara/audio/sequence.hpp>
+
 #include "audio_controller.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
@@ -497,6 +499,12 @@ void Startup::tick() {
             return;
         }
         waiting_ = false;
+        // Playback plays the song the pages show, once its layout is done:
+        // an edit's sequence is built with it (ADR-0031).
+        if (score_ != nullptr && score_->song() && editProblem_.isEmpty() &&
+            (!score_->sequence() || *score_->sequence() != audio::Sequence(*score_->song()))) {
+            editProblem_ = QStringLiteral("playback does not play the song the pages show");
+        }
     }
     if (!queued_) {
         queued_ = true;
