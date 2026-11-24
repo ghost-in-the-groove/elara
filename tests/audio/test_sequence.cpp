@@ -832,7 +832,8 @@ TEST_CASE("Sequence: a strum strikes a chord string by string", "[audio][sequenc
         voice(fast, 0) = {beat(NoteValue::ThirtySecond, six)}; // 1/16 s
         voice(fast, 0)[0].effects.strum = elara::core::Strum::Down;
         std::vector<double> starts;
-        for (const PlayedNote& played : Sequence(fast).notes()) {
+        const Sequence strummed(fast);
+        for (const PlayedNote& played : strummed.notes()) {
             starts.push_back(played.start);
         }
         REQUIRE(starts.size() == 6);
@@ -885,7 +886,8 @@ TEST_CASE("Sequence: tremolo picking strikes a note again and again at its speed
                               beat(NoteValue::Quarter, {fretted(song, 3, 0)}));
         voice(song, 0).back() = beat(NoteValue::Quarter);
         std::vector<bool> struck;
-        for (const PlayedNote& played : Sequence(song).notes()) {
+        const Sequence picked(song);
+        for (const PlayedNote& played : picked.notes()) {
             struck.push_back(played.struck);
         }
         CHECK(struck == std::vector<bool>{true, false, true, true, true, true, true, true, true});
