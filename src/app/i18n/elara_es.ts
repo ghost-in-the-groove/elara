@@ -278,6 +278,14 @@
         <translation>Usar el sintetizador integrado</translation>
     </message>
     <message>
+        <source>Page view</source>
+        <translation>Vista de página</translation>
+    </message>
+    <message>
+        <source>Continuous view</source>
+        <translation>Vista continua</translation>
+    </message>
+    <message>
         <source>Zoom out (Ctrl+-)</source>
         <translation>Alejar (Ctrl+-)</translation>
     </message>
@@ -1467,6 +1475,10 @@
     <message>
         <source>Open the first track&apos;s tuning in the song panel at start.</source>
         <translation>Abrir al inicio la afinación de la primera pista en el panel de canción.</translation>
+    </message>
+    <message>
+        <source>Show the score as one continuous scroll.</source>
+        <translation>Mostrar la partitura como un desplazamiento continuo.</translation>
     </message>
     <message>
         <source>Show the interface in this language (en, es).</source>

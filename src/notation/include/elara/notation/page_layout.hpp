@@ -112,4 +112,17 @@ private:
     Reuse reuse_;
 };
 
+/// Cuts a page into strips at most `height` tall between its systems (ADR-0057):
+/// how a view shows the music as one continuous scroll without one texture as
+/// long as the song. Each strip holds whole systems, cut halfway between the
+/// ink of one system and the next, and as many as fit; a system taller than
+/// `height` gets a strip of its own. Every item goes to the strip that holds
+/// its anchor (a glyph's or text's origin, the middle of a line, beam or curve)
+/// and keeps its place: stacked without gaps, the strips are the page. Each
+/// strip has the page's width, its origin at its own top and `bottom` at its
+/// height.
+///
+/// Throws std::invalid_argument unless `height` is positive.
+[[nodiscard]] std::vector<DisplayList> cutIntoStrips(const DisplayList& page, double height);
+
 } // namespace elara::notation

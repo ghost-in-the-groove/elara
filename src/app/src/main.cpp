@@ -143,6 +143,9 @@ int main(int argc, char* argv[]) {
         QStringLiteral("tuning"),
         QCoreApplication::translate("main",
                                     "Open the first track's tuning in the song panel at start."));
+    const QCommandLineOption continuousOption(
+        QStringLiteral("continuous"),
+        QCoreApplication::translate("main", "Show the score as one continuous scroll."));
     const QCommandLineOption languageOption(
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
@@ -152,8 +155,8 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main", "Play through this SoundFont (SF2 or SF3)."),
         QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       songPaneOption, measureOption, tuningOption, languageOption,
-                       soundFontOption});
+                       songPaneOption, measureOption, tuningOption, continuousOption,
+                       languageOption, soundFontOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -199,6 +202,7 @@ int main(int argc, char* argv[]) {
     if (parser.isSet(soundFontOption)) {
         options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
     }
+    options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.screenshot = parser.value(screenshot);
     const bool checking = options.smokeTest || !options.screenshot.isEmpty();
@@ -243,7 +247,7 @@ int main(int argc, char* argv[]) {
         }
         return EXIT_FAILURE;
     }
-    if (checking || options.track || options.view || options.seek) {
+    if (checking || options.track || options.view || options.seek || options.continuous) {
         auto* startup = new elara::app::Startup(window, options, qmlWarnings);
         startup->start();
     }

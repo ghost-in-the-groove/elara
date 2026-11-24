@@ -797,7 +797,9 @@ ApplicationWindow {
             anchors.rightMargin: 10
             spacing: 10
 
+            // Strips have no page numbers.
             Label {
+                visible: !score.showsStrips
                 text: qsTr("Page %1 of %2").arg(scoreView.currentPage).arg(score.pageCount)
                 font.pixelSize: Theme.fontSmall
                 font.features: {
@@ -806,6 +808,7 @@ ApplicationWindow {
                 opacity: 0.75
             }
             Rectangle {
+                visible: !score.showsStrips
                 implicitWidth: 3
                 implicitHeight: 3
                 radius: 1.5
@@ -822,6 +825,43 @@ ApplicationWindow {
             }
             Item {
                 Layout.fillWidth: true
+            }
+
+            // Pages or one continuous scroll (ADR-0057), as one group.
+            Rectangle {
+                implicitWidth: layoutRow.implicitWidth
+                implicitHeight: 24
+                radius: height / 2
+                color: Theme.hover
+
+                Row {
+                    id: layoutRow
+
+                    anchors.centerIn: parent
+
+                    IconButton {
+                        objectName: "pageViewButton"
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        // Two pages, one under the other.
+                        iconPath: "M7 3 L17 3 L17 10.5 L7 10.5 Z M7 13.5 L17 13.5 L17 21 L7 21 Z"
+                        tip: qsTr("Page view")
+                        checked: !score.continuous
+                        onClicked: score.continuous = false
+                    }
+                    IconButton {
+                        objectName: "continuousViewButton"
+                        implicitWidth: 24
+                        implicitHeight: 24
+                        padding: 4
+                        // One long sheet with systems on it.
+                        iconPath: "M7 3 L17 3 L17 21 L7 21 Z M10 7.5 L14 7.5 M10 12 L14 12 M10 16.5 L14 16.5"
+                        tip: qsTr("Continuous view")
+                        checked: score.continuous
+                        onClicked: score.continuous = true
+                    }
+                }
             }
 
             // Zoom, as one group: out, the level (a click fits the width), in.
