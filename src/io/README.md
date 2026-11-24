@@ -24,7 +24,9 @@ volume and pan back (ADR-0020).
 Signs and jumps (ADR-0049) come from Guitar Pro's directions (`src/gp_directions.hpp`
 maps all nineteen for both Guitar Pro readers) and from MusicXML's `<sound>`
 attributes, `<segno/>` and `<coda/>` glyphs and navigation texts; MusicXML export
-writes them back.
+writes them back. Sections (ADR-0062) come from Guitar Pro's markers and
+section marks, MusicXML's rehearsal marks and MIDI markers; both exports write
+them back.
 
 Importers are implemented from public documentation only (CONTRIBUTING.md,
 golden rule 6) and tested against the self-made corpus in `tests/corpus/`

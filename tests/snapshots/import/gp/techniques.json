@@ -2,7 +2,6 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
-  "section marks dropped (measure 1)",
   "Lead Guitar: chord names and diagrams dropped (measure 3)",
   "Lead Guitar: grace notes dropped (measure 3)",
   "Lead Guitar: text dropped (measure 3)"
@@ -31,7 +30,8 @@
       "bpm": 80,
       "offset": "1/2"
      }
-    ]
+    ],
+    "section": "Intro"
    },
    {
     "keySignature": "G major",

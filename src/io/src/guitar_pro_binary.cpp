@@ -279,6 +279,7 @@ struct HeaderData {
     bool repeatStart = false;
     std::uint8_t repeatTimes = 0;
     std::uint8_t alternateEndings = 0;
+    std::string section; // the marker's name (ADR-0062)
 };
 
 struct TempoMark {
@@ -466,7 +467,7 @@ private:
                     header.alternateEndings = endingUpTo(in_.u8(), header.repeatStart);
                 }
                 if ((flags & 0x20U) != 0) {
-                    readMarker(m);
+                    header.section = readMarker();
                 }
                 if ((flags & 0x40U) != 0) {
                     key = readKey(key, m);
@@ -478,7 +479,7 @@ private:
                     header.repeatTimes = repeatTimes(in_.u8());
                 }
                 if ((flags & 0x20U) != 0) {
-                    readMarker(m);
+                    header.section = readMarker();
                 }
                 if ((flags & 0x40U) != 0) {
                     key = readKey(key, m);
@@ -530,10 +531,11 @@ private:
         return static_cast<std::uint8_t>(upTo & ~taken);
     }
 
-    void readMarker(std::size_t m) {
-        (void)in_.intByteString();
+    // A marker names the section that starts at the measure (ADR-0062).
+    std::string readMarker() {
+        std::string name = trimmed(in_.intByteString());
         in_.skip(4); // colour
-        warnings_.add({}, "section marks dropped", m);
+        return name;
     }
 
     KeySignature readKey(const KeySignature& previous, std::size_t m) {
@@ -1134,6 +1136,7 @@ private:
             header.repeatStart = headers_[m].repeatStart;
             header.repeatTimes = headers_[m].repeatTimes;
             header.alternateEndings = headers_[m].alternateEndings;
+            header.section = headers_[m].section;
         }
         addDirections(song);
         if (startBpm_ >= core::Tempo::kMinBpm && startBpm_ <= core::Tempo::kMaxBpm) {

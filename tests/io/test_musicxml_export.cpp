@@ -133,6 +133,8 @@ core::Song everythingSong() {
     song.measureHeader(2).keySignature = KeySignature(-1, KeyMode::Minor);
     song.measureHeader(3).timeSignature = TimeSignature(6, 8);
     song.measureHeader(3).keySignature = KeySignature(4, KeyMode::Major);
+    song.measureHeader(0).section = "Intro";
+    song.measureHeader(2).section = "Verse & <Chorus>";
     // |: 0 |1.2. 1 :|3. 2 |: 3 :|, the first repeat played three times
     song.measureHeader(0).repeatStart = true;
     song.measureHeader(1).repeatTimes = 3;
@@ -538,6 +540,21 @@ TEST_CASE("MusicXML export: signs and jumps come back unchanged", "[musicxml][ex
     CHECK(xml.contains(R"(<sound segno="segno-segno"/>)"));
     CHECK(xml.contains("<words>D.S.S. al Double Coda</words>"));
     CHECK(xml.contains(R"(<sound dalsegno="segno-segno"/>)"));
+}
+
+TEST_CASE("MusicXML export: sections are rehearsal marks", "[musicxml][export]") {
+    using namespace elara::core;
+    Song song;
+    song.appendMeasures(2);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-bass")));
+    song.measureHeader(1).section = "Chorus";
+    fillVoices(song);
+    const std::string xml = exportMusicXml(song).data;
+    // Once, in the first part, as the signs are (ADR-0062).
+    CHECK(xml.contains("<rehearsal>Chorus</rehearsal>"));
+    CHECK(xml.find("<rehearsal>") == xml.rfind("<rehearsal>"));
+    requireSame(song, roundTrip(song));
 }
 
 TEST_CASE("MusicXML export: the document follows the MusicXML mapping", "[musicxml][export]") {

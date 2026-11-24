@@ -1112,7 +1112,11 @@ private:
                 } else if (name == "words") {
                     words += textView(mark);
                 } else if (name == "rehearsal") {
-                    warn("rehearsal marks dropped", index);
+                    // The section that starts here (ADR-0062); the first part's
+                    // marks name them, as they hold the signs.
+                    if (header != nullptr && header->section.empty()) {
+                        header->section = textOf(mark);
+                    }
                 } else if (name == "segno") {
                     segnoGlyph = true;
                 } else if (name == "coda") {
