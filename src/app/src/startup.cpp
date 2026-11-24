@@ -987,7 +987,23 @@ void Startup::queueEffects() {
         }
         check((score_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
               "the accent did not go off again");
-        for (int i = 0; i < 5 && score_->modified() && score_->canUndo(); ++i) {
+        // Bends of any form (ADR-0055).
+        constexpr int kRelease = static_cast<int>(core::BendForm::BendRelease);
+        constexpr int kPreBend = static_cast<int>(core::BendForm::PreBend);
+        score_->setBend(kRelease, 100);
+        check(score_->caretBendForm() == kRelease && score_->caretBendCents() == 100,
+              "the bend and release did not go on");
+        check(score_->undoName() == ScoreDocument::tr("Change bend"), "the bend is not undoable");
+        check(score_->caretStatus().contains(score_->bendName(kRelease, 100)) &&
+                  score_->bendName(kRelease, 100).endsWith(QStringLiteral("1/2")),
+              "the status does not name the bend");
+        score_->setBend(kPreBend, 300);
+        check(score_->caretBendForm() == kPreBend && score_->caretBendCents() == 300 &&
+                  score_->bendAmount(300) == QStringLiteral("1 1/2"),
+              "the pre-bend did not replace it");
+        score_->setBend(0, 0);
+        check(score_->caretBendForm() == 0 && score_->caretBendCents() == 0, "the bend did not go");
+        for (int i = 0; i < 10 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;

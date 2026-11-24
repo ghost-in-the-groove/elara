@@ -269,6 +269,7 @@ constexpr std::array kEditNames{
     Translation{"Paste", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Paste")},
     Translation{"Transpose", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Transpose")},
     Translation{"Change effect", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change effect")},
+    Translation{"Change bend", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change bend")},
 };
 
 // The names of Tuning::presetNames().
@@ -1427,7 +1428,10 @@ QString ScoreDocument::caretStatus() const {
     const int effects = caretEffects();
     for (int effect = 0; effect < kEffectCount; ++effect) {
         if ((effects & (1 << effect)) != 0) {
-            parts.append(effectName(effect));
+            // A bend says its form and how far it goes.
+            parts.append(effect == static_cast<int>(core::NoteEffect::Bend)
+                             ? bendName(caretBendForm(), caretBendCents())
+                             : effectName(effect));
         }
     }
     return parts.join(QStringLiteral(" · "));
@@ -1758,6 +1762,80 @@ int ScoreDocument::effectForKey(const QString& text) const {
     const auto found =
         std::ranges::find_if(kEffects, [key](const EffectKey& entry) { return entry.key == key; });
     return found == kEffects.end() ? -1 : static_cast<int>(found - kEffects.begin());
+}
+
+void ScoreDocument::setBend(int form, int cents) {
+    if (!document_ || !hasCaret(document_->song()) || form < 0 ||
+        form >= static_cast<int>(core::BendForm::Custom)) {
+        return;
+    }
+    pendingDigit_ = -1;
+    core::BendCurve curve;
+    try {
+        curve = core::bendCurve(static_cast<core::BendForm>(form), cents);
+    } catch (const std::invalid_argument&) {
+        return;
+    }
+    core::Entry entry = core::setBend(document_->song(), caret_, curve);
+    if (!entry.command) {
+        // Silent when the notes have that bend already.
+        if (core::bendAtCaret(document_->song(), caret_) != curve) {
+            emit editFailed(tr("Effects go on notes: put the caret on one."));
+        }
+        return;
+    }
+    enter(std::move(entry));
+}
+
+int ScoreDocument::caretBendForm() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    return static_cast<int>(core::bendForm(core::bendAtCaret(document_->song(), caret_)));
+}
+
+int ScoreDocument::caretBendCents() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    return core::bendAtCaret(document_->song(), caret_).maxCents();
+}
+
+QString ScoreDocument::bendAmount(int cents) const {
+    constexpr int kStep = 200;   // cents in a full step
+    constexpr int kQuarter = 50; // cents in a quarter step
+    if (cents == kStep) {
+        return tr("full");
+    }
+    if (cents <= 0 || cents % kQuarter != 0) {
+        return tr("%1 cents").arg(cents);
+    }
+    static constexpr std::array<const char*, 4> kQuarters{"", "1/4", "1/2", "3/4"};
+    const int steps = cents / kStep;
+    const QString part =
+        QLatin1StringView(kQuarters.at(static_cast<std::size_t>((cents % kStep) / kQuarter)));
+    if (steps == 0) {
+        return part;
+    }
+    return part.isEmpty() ? QString::number(steps) : QStringLiteral("%1 %2").arg(steps).arg(part);
+}
+
+QString ScoreDocument::bendName(int form, int cents) const {
+    switch (static_cast<core::BendForm>(form)) {
+    case core::BendForm::None:
+        return {};
+    case core::BendForm::Bend:
+        return tr("Bend %1").arg(bendAmount(cents));
+    case core::BendForm::BendRelease:
+        return tr("Bend and release %1").arg(bendAmount(cents));
+    case core::BendForm::PreBend:
+        return tr("Pre-bend %1").arg(bendAmount(cents));
+    case core::BendForm::PreBendRelease:
+        return tr("Pre-bend and release %1").arg(bendAmount(cents));
+    case core::BendForm::Custom:
+        break;
+    }
+    return tr("Bend (custom curve)");
 }
 
 bool ScoreDocument::enter(core::Entry entry) {

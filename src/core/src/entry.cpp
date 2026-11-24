@@ -680,6 +680,40 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
     return replace(caret, std::move(content), "Change effect");
 }
 
+Entry setBend(const Song& song, const Caret& at, const BendCurve& curve) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    Measure content = measureAt(song, caret);
+    bool changed = false;
+    for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string) && note.effects.bend != curve) {
+            note.effects.bend = curve;
+            changed = true;
+        }
+    }
+    if (!changed) {
+        return unchanged(caret);
+    }
+    return replace(caret, std::move(content), "Change bend");
+}
+
+BendCurve bendAtCaret(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return {};
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    for (const Note& note : voiceAt(song, caret).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string)) {
+            return note.effects.bend;
+        }
+    }
+    return {};
+}
+
 Dynamic dynamicAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     const Staff& staff = song.track(caret.track).staff(caret.staff);

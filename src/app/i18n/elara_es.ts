@@ -107,6 +107,22 @@
         <translation>Efectos de nota</translation>
     </message>
     <message>
+        <source>Bend</source>
+        <translation>Bending</translation>
+    </message>
+    <message>
+        <source>Bend and release</source>
+        <translation>Bending y vuelta</translation>
+    </message>
+    <message>
+        <source>Pre-bend</source>
+        <translation>Pre-bending</translation>
+    </message>
+    <message>
+        <source>Pre-bend and release</source>
+        <translation>Pre-bending y vuelta</translation>
+    </message>
+    <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
         <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
     </message>
@@ -1008,6 +1024,10 @@
         <translation>Cambiar efecto</translation>
     </message>
     <message>
+        <source>Change bend</source>
+        <translation>Cambiar bending</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1260,6 +1280,34 @@
     <message>
         <source>Harmonics need strings.</source>
         <translation>Los armónicos necesitan cuerdas.</translation>
+    </message>
+    <message>
+        <source>full</source>
+        <translation>completo</translation>
+    </message>
+    <message>
+        <source>%1 cents</source>
+        <translation>%1 cents</translation>
+    </message>
+    <message>
+        <source>Bend %1</source>
+        <translation>Bending %1</translation>
+    </message>
+    <message>
+        <source>Bend and release %1</source>
+        <translation>Bending y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-bend %1</source>
+        <translation>Pre-bending %1</translation>
+    </message>
+    <message>
+        <source>Pre-bend and release %1</source>
+        <translation>Pre-bending y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Bend (custom curve)</source>
+        <translation>Bending (curva propia)</translation>
     </message>
     <message>
         <source>Copied measure %1.</source>
