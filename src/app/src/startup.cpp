@@ -86,6 +86,9 @@ void Startup::start() {
             layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
     }
+    if (options_.effects && window_ != nullptr) {
+        effectsPanel_ = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
+    }
     clock_.start();
     // The window opens the file itself; wait for its first layout and paint.
     waiting_ = !options_.file.isEmpty();
@@ -1183,6 +1186,11 @@ void Startup::queueEffects() {
 }
 
 void Startup::tick() {
+    // The panel closes again once the smoke test clicks the score; it must
+    // have opened at some point.
+    if (effectsPanel_ != nullptr && effectsPanel_->property("opened").toBool()) {
+        effectsOpened_ = true;
+    }
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
         finish(false, score_->errorMessage());
@@ -1247,7 +1255,12 @@ void Startup::tick() {
         return;
     }
     if (!options_.screenshot.isEmpty()) {
-        // Let animations settle first.
+        // Let animations settle first, the note effects panel's too once
+        // `--effects` opened it.
+        if (effectsPanel_ != nullptr && !effectsOpened_ &&
+            clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
+            return;
+        }
         if (settledAt_ < 0) {
             settledAt_ = clock_.elapsed();
         }
@@ -1285,13 +1298,16 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
-    // Nothing may cover the cursor, as the measure popup open at the caret can:
-    // it closes first, and the click waits until it is gone.
-    if (auto* popup = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
-        popup != nullptr && popup->property("visible").toBool()) {
-        QMetaObject::invokeMethod(popup, "close");
-        again_ = true;
-        return;
+    // Nothing may cover the cursor, as the measure popup or the note effects
+    // panel open at the caret can: they close first, and the click waits until
+    // they are gone.
+    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel")}) {
+        if (auto* popup = window_->findChild<QObject*>(name);
+            popup != nullptr && popup->property("visible").toBool()) {
+            QMetaObject::invokeMethod(popup, "close");
+            again_ = true;
+            return;
+        }
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());
     const double expected = score_->secondsAt(
@@ -1591,6 +1607,11 @@ void Startup::finish(bool ok, const QString& detail) {
     if (ok && qmlWarnings_) {
         ok = false;
         outcome = QStringLiteral("QML warnings");
+    }
+    // `--effects` opened the note effects panel at the caret.
+    if (ok && options_.smokeTest && options_.effects && !effectsOpened_) {
+        ok = false;
+        outcome = QStringLiteral("the note effects panel did not open");
     }
     // The window carries the app icon up to the largest size a taskbar asks
     // for (ADR-0064).

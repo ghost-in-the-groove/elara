@@ -1661,6 +1661,10 @@
         <translation>Abrir al inicio la afinación de la primera pista en el panel de canción.</translation>
     </message>
     <message>
+        <source>Open the note effects panel at the caret at start.</source>
+        <translation>Abrir el panel de efectos de nota en el cursor al iniciar.</translation>
+    </message>
+    <message>
         <source>Show the score as one continuous scroll.</source>
         <translation>Mostrar la partitura como un desplazamiento continuo.</translation>
     </message>

@@ -120,8 +120,11 @@ if(TARGET elara)
   # The measure popup open at the caret while the measures are edited.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # The note effects panel open at the caret while effects are set.
+  add_test(NAME app.smoke_effects
+    COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner app.smoke_song_pane app.smoke_measure
+    app.smoke_tuner app.smoke_song_pane app.smoke_measure app.smoke_effects
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
@@ -130,7 +133,7 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 51 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
-  set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
+  set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
