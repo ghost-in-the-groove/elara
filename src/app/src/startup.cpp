@@ -110,6 +110,7 @@ void Startup::queueSteps() {
             queueTuplets();
             queueMeasures();
             queuePitches();
+            queueVoices();
             queueDrums();
             queueMix();
             queueNavigation();
@@ -147,6 +148,7 @@ void Startup::queueSteps() {
         queueTuplets();
         queueMeasures();
         queuePitches();
+        queueVoices();
         queueDrums();
         queueMix();
         queueNavigation();
@@ -569,6 +571,55 @@ void Startup::queueDrums() {
         }
         score_->setTrack(0);
         return true;
+    });
+}
+
+// Voices: the caret goes to voice 2, which the status names, and a note typed
+// there goes into it; back in voice 1 the status no longer names a voice.
+// Undone, the song must end as it started.
+void Startup::queueVoices() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("voice check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        voicing_ = score_->caretPage() >= 0 && score_->caretPitched();
+        if (!voicing_) {
+            return false;
+        }
+        score_->setCaretVoice(2);
+        check(score_->caretVoice() == 2, "the caret did not go to voice 2");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the status does not name voice 2");
+        if (score_->caretFretted()) {
+            score_->typeDigit(7);
+        } else {
+            score_->typeNoteName(2, false);
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(score_->caretVoice() == 2 && !score_->pitchesAtCaret().empty(),
+              "the note did not go into voice 2");
+        score_->setCaretVoice(1);
+        check(score_->caretVoice() == 1 &&
+                  !score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+              "the caret did not come back to voice 1");
+        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!voicing_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing the voice did not restore the song");
+        return false;
     });
 }
 

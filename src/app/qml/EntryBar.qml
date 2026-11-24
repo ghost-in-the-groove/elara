@@ -68,6 +68,16 @@ Rectangle {
         onTriggered: root.document.setInputTuplet(actual)
     }
 
+    // A voice in the voice menu, checked when the caret is in it.
+    component VoiceItem: MenuItem {
+        required property int voice
+
+        text: qsTr("Voice %1").arg(voice)
+        checkable: true
+        checked: root.document.caretVoice === voice
+        onTriggered: root.document.setCaretVoice(voice)
+    }
+
     component Separator: Rectangle {
         width: 1
         height: 22
@@ -227,6 +237,60 @@ Rectangle {
                     text: qsTr("No tuplet")
                     enabled: tuplet.on
                     onTriggered: root.document.setInputTuplet(0)
+                }
+            }
+        }
+
+        // The voice typing goes into (Alt+1 to Alt+4): a click goes on to the
+        // next one, a right click picks one. Lit outside the first voice.
+        Tool {
+            id: voiceTool
+
+            readonly property int voice: root.document.caretVoice
+
+            tip: qsTr("Voice %1 (Alt+1 to Alt+4); a right click picks one").arg(voice)
+            onClicked: root.document.setCaretVoice(voice % 4 + 1)
+            onPressAndHold: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+
+            background: Rectangle {
+                radius: height / 2
+                color: voiceTool.voice > 1 ? Material.accent
+                                           : voiceTool.hovered ? Theme.hover : "transparent"
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 120
+                    }
+                }
+            }
+            contentItem: Label {
+                text: qsTr("V%1").arg(voiceTool.voice)
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+                color: voiceTool.voice > 1 ? "white" : root.ink
+            }
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
+            }
+
+            Menu {
+                id: voiceMenu
+
+                VoiceItem {
+                    voice: 1
+                }
+                VoiceItem {
+                    voice: 2
+                }
+                VoiceItem {
+                    voice: 3
+                }
+                VoiceItem {
+                    voice: 4
                 }
             }
         }

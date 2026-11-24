@@ -91,6 +91,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
     // The caret's measure.
     Q_PROPERTY(int caretMeasure READ caretMeasure NOTIFY caretChanged)
+    Q_PROPERTY(int caretVoice READ caretVoice NOTIFY caretChanged)
     Q_PROPERTY(int caretTimeNumerator READ caretTimeNumerator NOTIFY caretChanged)
     Q_PROPERTY(int caretTimeDenominator READ caretTimeDenominator NOTIFY caretChanged)
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
@@ -301,6 +302,11 @@ public:
     [[nodiscard]] static QString laneName(int lane);
 
     Q_INVOKABLE void moveCaret(CaretMove move);
+    /// The voice typing goes into, 1 to 4 (the core's voice plus one).
+    [[nodiscard]] int caretVoice() const { return static_cast<int>(caret_.voice) + 1; }
+    /// Moves the caret to voice `voice` (1 to 4) of its measure, at its beat or
+    /// the nearest one that voice has; typing then goes there.
+    Q_INVOKABLE void setCaretVoice(int voice);
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
     /// spaces from the page's top-left corner. Returns whether it moved there.
     Q_INVOKABLE bool placeCaret(int index, double x, double y);
