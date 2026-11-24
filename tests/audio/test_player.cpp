@@ -345,6 +345,41 @@ TEST_CASE("Player: control calls from another thread while the audio thread rend
     CHECK(player.position() <= player.duration());
 }
 
+// position() is read by the control thread while the audio thread takes a
+// seek: once asked for, the seek is the position, never the one before it.
+TEST_CASE("Player: after a seek, the position never reads from before it", "[audio][player]") {
+    const Song a = song(8, 60); // 16 seconds
+    const Sequence sa(a);
+    Player player(kRate, 64);
+    player.load(a, sa);
+    player.play();
+    std::atomic<bool> done{false};
+    std::thread audio([&] {
+        std::vector<float> left(64);
+        std::vector<float> right(64);
+        while (!done.load()) {
+            player.render(left, right);
+        }
+    });
+    int stale = 0;
+    for (int i = 0; i < 4000 && stale == 0; ++i) {
+        // Forward to 12 s, the position must not be below it; back to 2 s, it
+        // must not be the 12 s and more from before.
+        const bool forward = i % 2 == 0;
+        player.seek(forward ? 12.0 : 2.0);
+        for (int read = 0; read < 200; ++read) {
+            const double position = player.position();
+            if (forward ? position < 12.0 : position >= 12.0) {
+                ++stale;
+                break;
+            }
+        }
+    }
+    done.store(true);
+    audio.join();
+    CHECK(stale == 0);
+}
+
 // The metronome (ADR-0024) plays live as offline. The mix applies to the
 // song's tracks only: muting them all leaves the clicks.
 TEST_CASE("Player: plays the metronome, which the track mix leaves alone",
