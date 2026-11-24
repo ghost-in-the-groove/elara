@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/instrument.hpp>
 #include <elara/notation/caret.hpp>
+
+#include "drum_map.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -47,6 +50,42 @@ const StaffBox* staffBox(const DisplayList& list, const MeasureBox& measure, std
 
 double lineSpace(const StaffBox& staff) {
     return staff.lines > 1 ? staff.height / static_cast<double>(staff.lines - 1) : 1.0;
+}
+
+// Drum entry (ADR-0035): on a percussion staff the caret's string is a lane,
+// one per kit piece, which sits where the drum map places that piece.
+bool drumStaff(const core::Song& song, std::size_t track, std::size_t staff) {
+    return song.track(track).staff(staff).clef() == core::Clef::Percussion;
+}
+
+int laneCount() {
+    return static_cast<int>(core::drumPieces().size());
+}
+
+// A lane's place, in staff spaces below the top line.
+double laneDepth(int lane) {
+    const auto pieces = core::drumPieces();
+    const auto index = static_cast<std::size_t>(std::clamp(lane, 1, laneCount()) - 1);
+    return detail::drumNote(pieces[index].key).step / 2.0;
+}
+
+// The lane nearest to `depth` staff spaces below the top line. Of lanes that
+// share a place, `current` when it is one of them, otherwise the first.
+int nearestLane(double depth, int current) {
+    int nearest = 1;
+    double best = std::numeric_limits<double>::max();
+    for (int lane = 1; lane <= laneCount(); ++lane) {
+        const double away = std::abs(laneDepth(lane) - depth);
+        if (away < best - kTolerance) {
+            nearest = lane;
+            best = away;
+        }
+    }
+    if (current >= 1 && current <= laneCount() &&
+        std::abs(laneDepth(current) - depth) <= best + kTolerance) {
+        return current;
+    }
+    return nearest;
 }
 
 // From a column's x to the centre of the notehead the beat draws (where its
@@ -168,6 +207,14 @@ std::optional<Rect> caretBox(const DisplayList& list, const core::Song& song,
                     .width = kCaretWidth,
                     .height = space};
     }
+    if (drumStaff(song, caret.track, caret.staff)) {
+        const double space = lineSpace(*staff);
+        const double y = staff->y + space * laneDepth(caret.string);
+        return Rect{.x = centre - kCaretWidth / 2,
+                    .y = y - space / 2,
+                    .width = kCaretWidth,
+                    .height = space};
+    }
     return Rect{.x = centre - kCaretWidth / 2,
                 .y = staff->y - kStaffOverhang,
                 .width = kCaretWidth,
@@ -219,6 +266,10 @@ std::optional<core::Caret> caretAt(const DisplayList& list, const core::Song& so
         const double lines = static_cast<double>(staff->lines);
         const double string = std::round((point.y - staff->y) / lineSpace(*staff)) + 1.0;
         caret.string = static_cast<int>(std::clamp(string, 1.0, lines));
+    } else if (drumStaff(song, caret.track, caret.staff)) {
+        const bool sameStaff = current.track == caret.track && current.staff == caret.staff;
+        caret.string =
+            nearestLane((point.y - staff->y) / lineSpace(*staff), sameStaff ? current.string : 0);
     }
     const core::Voice& voice =
         song.track(caret.track).staff(caret.staff).measure(caret.measure).voices[caret.voice];

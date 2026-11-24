@@ -47,3 +47,10 @@ not 1. Grace and cue notes will use it too.
   a change over its column and on the system's line, the same tempo again, a
   change at the very start, dotted and half-note units, a fractional tempo),
   and `cli.render_both` counts the corpus file's mark.
+- **Editing.** `elara-cli edit "tempo-from <m> <bpm>"` sets the tempo that
+  starts measure `m` (`none` removes it); changes later inside the measure, as
+  Guitar Pro writes them, stay. The new tempo counts in the beat unit in force
+  there, so a dotted quarter in 6/8 stays one. Measure 0 is refused: the song's
+  own tempo (`tempo <bpm>`) starts it. It is one "Change tempo" undo step, and
+  `edit --json` lists it as the measure's `"tempo"` (`cli.edit_tempo`,
+  `cli.sequence_tempo`, `cli.render_tempo`).
