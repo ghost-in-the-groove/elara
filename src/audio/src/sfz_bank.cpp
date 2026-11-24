@@ -2,17 +2,16 @@
 #include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/wav_reader.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/parallel.hpp>
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <format>
 #include <map>
 #include <numbers>
 #include <set>
-#include <thread>
 #include <utility>
 
 namespace elara::audio {
@@ -590,27 +589,14 @@ private:
     std::uint64_t order_ = 0;
 };
 
-// The samples a program names, read on every core. The result holds them in
-// the order of `paths`; a failed read leaves its sample empty.
+// The samples a program names, read on every core (the program's worker
+// pool). The result holds them in the order of `paths`.
 std::vector<std::expected<WavAudio, std::string>>
 readSamples(const std::vector<std::filesystem::path>& paths) {
     std::vector<std::expected<WavAudio, std::string>> results(
         paths.size(), std::unexpected(std::string("not read")));
-    std::atomic<std::size_t> next{0};
-    const auto work = [&] {
-        for (std::size_t i = next++; i < paths.size(); i = next++) {
-            results[i] = readWav(paths[i]);
-        }
-    };
-    const std::size_t threads =
-        std::min<std::size_t>(paths.size(), std::max(1U, std::thread::hardware_concurrency()));
-    {
-        std::vector<std::jthread> workers;
-        for (std::size_t t = 1; t < threads; ++t) {
-            workers.emplace_back(work);
-        }
-        work();
-    }
+    core::forEachIndex(0, paths.size(), core::threadsFor(0, paths.size(), 2, paths.size()),
+                       [&](std::size_t i) { results[i] = readWav(paths[i]); });
     return results;
 }
 
