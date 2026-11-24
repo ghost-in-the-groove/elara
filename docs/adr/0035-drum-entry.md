@@ -42,5 +42,8 @@ lane, which the caret moves to).
 - Percussion keys outside the lanes (cowbell, congas) are kept, shown and
   played, but can only be removed with the whole beat until the lanes can be
   configured.
-- The app draws the drum caret on the lane's staff position and maps a key to
-  `toggleDrum` (a later change on top of the caret in the app).
+- In the app the caret sits on the lane's place on the staff, as the drum map
+  draws its kit piece, and a click picks the nearest lane; lanes that share a
+  place (closed and open hi-hat, ride and ride bell, snare and side stick) keep
+  the caret's lane when it is one of them, otherwise the first. Enter toggles
+  the lane's hit and the status line names the lane's kit piece.
