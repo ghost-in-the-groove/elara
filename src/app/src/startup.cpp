@@ -269,6 +269,23 @@ void Startup::queueEdits() {
             editProblem_ = QStringLiteral("edit check failed: %1").arg(QLatin1StringView(what));
         }
     };
+    // A line of the credits (ADR-0059) is one edit, and undo takes it back.
+    steps_.emplace_back([this] {
+        score_->setCredit(static_cast<int>(core::Credit::Subtitle),
+                          QStringLiteral("Smoke credits"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QStringList credits = score_->credits();
+        check(credits.size() == static_cast<int>(core::Credit::Notes) + 1 &&
+                  credits.at(static_cast<int>(core::Credit::Subtitle)) ==
+                      QStringLiteral("Smoke credits"),
+              "the subtitle did not change");
+        check(score_->undoName() == ScoreDocument::tr("Edit song info"),
+              "the credit is not one edit");
+        score_->undo();
+        return true;
+    });
     steps_.emplace_back([this] {
         tracksBefore_ = score_->trackNames().size();
         score_->addTrack(QStringLiteral("electric-bass"));
