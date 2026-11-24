@@ -769,6 +769,10 @@
         <translation>Insertar silencio</translation>
     </message>
     <message>
+        <source>Change pitch</source>
+        <translation>Cambiar altura</translation>
+    </message>
+    <message>
         <source>Change tuning</source>
         <translation>Cambiar afinación</translation>
     </message>
@@ -925,6 +929,22 @@
     <message>
         <source>Frets are typed on a track with strings.</source>
         <translation>Los trastes se escriben en una pista con cuerdas.</translation>
+    </message>
+    <message>
+        <source>Drums take no note names.</source>
+        <translation>La batería no admite nombres de nota.</translation>
+    </message>
+    <message>
+        <source>No string can play that note.</source>
+        <translation>Ninguna cuerda puede tocar esa nota.</translation>
+    </message>
+    <message>
+        <source>That note is out of range.</source>
+        <translation>Esa nota está fuera de rango.</translation>
+    </message>
+    <message>
+        <source>The note would leave the neck.</source>
+        <translation>La nota se saldría del mástil.</translation>
     </message>
 </context>
 <context>
