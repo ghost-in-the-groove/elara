@@ -45,10 +45,12 @@ one that replaces them.
 | [0040](0040-tuplet-numbers-and-brackets.md) | Tuplet numbers and brackets | Accepted |
 | [0041](0041-rhythm-under-tablature.md) | Rhythm under tablature | Accepted |
 | [0042](0042-tempo-marks.md) | Tempo marks | Accepted |
+| [0044](0044-dynamics-marks.md) | Dynamics marks | Accepted |
 | [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
 | [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
 | [0047](0047-dynamics-at-the-caret.md) | Dynamics at the caret | Accepted |
 | [0049](0049-signs-and-jumps.md) | Signs and jumps | Accepted |
+| [0050](0050-tuplets-at-the-caret.md) | Tuplets at the caret | Accepted |
 
 ## Template
 

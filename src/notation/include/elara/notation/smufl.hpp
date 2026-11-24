@@ -104,6 +104,12 @@ enum class Glyph : std::uint8_t {
     DynamicPiano,
     DynamicMezzo,
     DynamicForte,
+    DynamicPPP,
+    DynamicPP,
+    DynamicMP,
+    DynamicMF,
+    DynamicFF,
+    DynamicFFF,
     // Strings and guitar
     StringsDownBow,
     StringsUpBow,

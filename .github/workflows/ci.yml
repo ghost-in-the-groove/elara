@@ -11,7 +11,15 @@ concurrency:
 
 env:
   QT_VERSION: 6.12.1
+  CCACHE_VERSION: 4.14.2
   VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+  # Every compile goes through ccache; main's last cache is restored, so a pull
+  # request only compiles the files it changes (see "Save ccache").
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_MAXSIZE: 500M
 
 jobs:
   build:
@@ -57,10 +65,16 @@ jobs:
           kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" 2>/dev/null | tail -n 1)
           echo "QT_ROOT_DIR=$kit" >> "$GITHUB_ENV"
 
+      # vcpkg at the manifest's baseline: package ABIs hash vcpkg's own scripts,
+      # so a newer checkout misses every package in the binary cache.
       - name: vcpkg
+        id: vcpkg
         shell: bash
         run: |
           git clone https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          baseline=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+          git -C "$RUNNER_TEMP/vcpkg" checkout -q "$baseline"
+          echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
           if [ "$RUNNER_OS" = "Windows" ]; then "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics; else "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics; fi
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
@@ -69,7 +83,51 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json') }}
+          # The runner image fixes the compiler, which the ABIs hash too.
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: ccache
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux)   platform=linux-x86_64-glibc; ext=tar.xz; sha=bd1313f5316f594443dcb4113a4191c666ac6450e0cf016ff8cb8b080f46c160 ;;
+            macOS)   platform=darwin;             ext=tar.gz; sha=cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc ;;
+            Windows) platform=windows-x86_64;     ext=zip;    sha=6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84 ;;
+          esac
+          name="ccache-$CCACHE_VERSION-$platform"
+          curl -fsSL -o "$RUNNER_TEMP/$name.$ext" "https://github.com/ccache/ccache/releases/download/v$CCACHE_VERSION/$name.$ext"
+          python - "$RUNNER_TEMP/$name.$ext" "$sha" "$RUNNER_TEMP" <<'EOF'
+          import hashlib, shutil, sys
+          archive, sha, outdir = sys.argv[1:]
+          with open(archive, "rb") as f:
+              if hashlib.sha256(f.read()).hexdigest() != sha:
+                  sys.exit(f"{archive}: unexpected SHA-256")
+          shutil.unpack_archive(archive, outdir)
+          EOF
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-
+
+      - name: Reset ccache statistics
+        run: ccache --zero-stats
 
       - name: Check, build and test
         run: python scripts/elara.py ci
+
+      - name: ccache statistics
+        if: always()
+        run: ccache --show-stats
+
+      # Only main saves a cache, which pull requests restore: caches saved by a
+      # pull request would serve no other branch and evict main's.
+      - name: Save ccache
+        if: always() && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-${{ github.sha }}

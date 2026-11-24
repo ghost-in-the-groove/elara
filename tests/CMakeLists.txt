@@ -60,6 +60,7 @@ elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
+  notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
   LIBRARIES elara::notation)
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 
@@ -115,11 +116,11 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 21 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 29 layouts\\)")
   set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 27 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 38 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 24 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 35 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
 
   # A song of several pages: the notes typed on the first page leave the others
