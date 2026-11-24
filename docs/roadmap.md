@@ -120,6 +120,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 
 - [ ] Metronome with count-in, A-B loop, speed 25-200 %
   - [x] Speed and metronome in the sequencer, the CLI and the app's transport; playback keeps its place in the music when the speed changes (ADR-0024)
+  - [x] Count-in and A-B loop in the player and the CLI (ADR-0024); app controls to do
 - [x] Tuner: pitch detection, microphone input, the app panel, `elara-cli tune` and `listen` (ADR-0028, ADR-0029)
 
 ## Milestone 7 - Distribution

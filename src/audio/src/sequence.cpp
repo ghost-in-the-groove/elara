@@ -85,13 +85,18 @@ public:
         return segment.seconds + (offset - segment.offset) * segment.perWhole;
     }
 
-private:
     struct Segment {
         double offset = 0.0;
         double seconds = 0.0; // from the start of the measure
         double perWhole = 0.0;
     };
 
+    // The tempo segments of measure m, in order.
+    [[nodiscard]] std::span<const Segment> segments(std::size_t m) const noexcept {
+        return std::span(segments_).subspan(first_[m], first_[m + 1] - first_[m]);
+    }
+
+private:
     [[nodiscard]] double perWhole(const core::Tempo& tempo) const {
         return tempo.secondsFor(Fraction(1)) / speed_;
     }
@@ -530,6 +535,22 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
         return;
     }
 
+    // Where every played measure's tempi start and how it is counted, for
+    // count-ins.
+    pulses_.reserve(measures_.size());
+    tempi_.reserve(measures_.size());
+    for (const PlayedMeasure& measure : measures_) {
+        const core::TimeSignature& time = song.measureHeader(measure.measure).timeSignature;
+        const Fraction beats = time.measureLength() / time.pulseLength();
+        pulses_.push_back({.length = time.pulseLength().toDouble(),
+                           .count = static_cast<int>((beats.numerator() + beats.denominator() - 1) /
+                                                     beats.denominator())});
+        for (const TempoMap::Segment& segment : tempo.segments(measure.measure)) {
+            tempi_.push_back(
+                {.time = measure.start + segment.seconds, .perWhole = segment.perWhole});
+        }
+    }
+
     // Every written note articulated and timed once in its measure.
     const std::vector<core::SoundingNote> sounding = core::soundingNotes(song);
     std::vector<Timing> timings(sounding.size());
@@ -866,6 +887,21 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     if (!tracks.empty()) {
         events_ = std::move(tracks.front());
     }
+}
+
+CountIn Sequence::countInAt(double seconds) const noexcept {
+    if (measures_.empty()) {
+        return {};
+    }
+    // The measure played at `seconds` (the last one that starts by then), and
+    // the tempo that holds from there.
+    const auto measure = std::ranges::upper_bound(measures_, seconds, {}, &PlayedMeasure::start);
+    const std::size_t k = measure == measures_.begin()
+                              ? 0
+                              : static_cast<std::size_t>(measure - measures_.begin()) - 1;
+    const auto tempo = std::ranges::upper_bound(tempi_, seconds, {}, &TempoPoint::time);
+    const TempoPoint& point = tempo == tempi_.begin() ? tempi_.front() : *(tempo - 1);
+    return {.clicks = pulses_[k].count, .interval = pulses_[k].length * point.perWhole};
 }
 
 std::size_t Sequence::eventAt(double seconds) const noexcept {

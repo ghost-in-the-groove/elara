@@ -743,6 +743,32 @@ TEST_CASE("Sequence: the metronome clicks every beat, higher on the first of a m
     }
 }
 
+TEST_CASE("Sequence: a count-in is a measure of beats at the tempo where playback starts",
+          "[audio][sequence][practice]") {
+    // 4/4 (0 to 2 s), 6/8 (2 to 3.5 s), then 4/4 slowing to quarter = 60
+    // halfway (3.5 to 4.5 s, then to 6.5 s).
+    Song song = pianoSong(3);
+    song.measureHeader(1).timeSignature = TimeSignature(6, 8);
+    song.measureHeader(2).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(60.0)});
+    const Sequence sequence(song);
+    const auto countIn = [](const Sequence& played, double seconds) {
+        const elara::audio::CountIn result = played.countInAt(seconds);
+        return std::pair(result.clicks, result.interval);
+    };
+    using Expected = std::pair<int, double>;
+
+    CHECK(countIn(sequence, 0.0) == Expected{4, 0.5});
+    CHECK(countIn(sequence, 1.9) == Expected{4, 0.5});
+    CHECK(countIn(sequence, 2.5) == Expected{2, 0.75}); // dotted quarters
+    CHECK(countIn(sequence, 4.0) == Expected{4, 0.5});
+    CHECK(countIn(sequence, 5.0) == Expected{4, 1.0}); // after the tempo change
+    CHECK(countIn(sequence, -1.0) == Expected{4, 0.5});
+    CHECK(countIn(sequence, 99.0) == Expected{4, 1.0});
+    CHECK(countIn(Sequence(song, {.speed = 0.5}), 0.0) == Expected{4, 1.0});
+    CHECK(countIn(Sequence(Song{}), 0.0) == Expected{0, 0.0});
+}
+
 TEST_CASE("Sequence: playback keeps its place in the music when the timing changes",
           "[audio][sequence][practice]") {
     // Two seconds per measure at full speed, four at half speed.
