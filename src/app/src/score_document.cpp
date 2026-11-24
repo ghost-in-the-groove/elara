@@ -43,7 +43,7 @@ namespace elara::app {
 struct ScoreLayout {
     QUrl source;
     std::shared_ptr<const core::Song> song;
-    /// Built on the worker when the song's sequence was out of date.
+    /// Built on the worker for a song just opened.
     std::shared_ptr<const audio::Sequence> sequence;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     int track = 0;
@@ -127,6 +127,12 @@ std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
     }
     return sequence;
 }
+
+// An edited song's sequence, or why it could not be built.
+struct SequenceResult {
+    std::shared_ptr<const audio::Sequence> sequence;
+    QString error;
+};
 
 // Lays out `track` (or every track) of `song` as `view` on A4 pages. Runs on a
 // worker thread and never throws.
@@ -486,19 +492,8 @@ void ScoreDocument::relayout() {
     }
     const std::uint64_t generation = ++generation_;
     setPending(+1);
-    // An edit's sequence is built here too, off the interface thread: copying
-    // the song is all an edit costs it.
-    const bool sequenced = sequenceSong_ != song_;
-    QtConcurrent::run([song = song_, track = track_, view = view_, sequenced, heard = sequence_] {
-        ScoreLayout result = layOut(song, track, view);
-        if (sequenced && result.error.isEmpty()) {
-            try {
-                result.sequence = sequenceFor(*song, heard);
-            } catch (const std::exception& error) {
-                result.error = qstring(error.what());
-            }
-        }
-        return result;
+    QtConcurrent::run([song = song_, track = track_, view = view_] {
+        return layOut(song, track, view);
     }).then(this, [this, generation](const ScoreLayout& result) {
         setPending(-1);
         if (generation != generation_) {
@@ -509,6 +504,46 @@ void ScoreDocument::relayout() {
             return;
         }
         apply(result);
+    });
+    // An edit's sequence is built beside its layout, on another worker: the
+    // pages show as soon as they are laid out instead of waiting for it.
+    if (sequenceSong_ != song_ && sequencing_ != song_) {
+        resequence();
+    }
+}
+
+// Builds the edited song's sequence off the interface thread: copying the song
+// is all an edit costs it. Until it arrives, playback plays the previous one
+// with the new mix (ADR-0031).
+void ScoreDocument::resequence() {
+    const std::uint64_t generation = ++sequenceGeneration_;
+    sequencing_ = song_;
+    setPending(+1);
+    QtConcurrent::run([song = song_, heard = sequence_] {
+        SequenceResult result;
+        try {
+            result.sequence = sequenceFor(*song, heard);
+        } catch (const std::exception& error) {
+            result.error = qstring(error.what());
+        }
+        return result;
+    }).then(this, [this, generation, song = song_](const SequenceResult& result) {
+        setPending(-1);
+        if (generation != sequenceGeneration_) {
+            return;
+        }
+        sequencing_.reset();
+        if (!result.error.isEmpty()) {
+            fail(result.error);
+            return;
+        }
+        // The song and its sequence change together, so whoever hears
+        // sequenceChanged sees them as a pair.
+        sequenceSong_ = song;
+        if (result.sequence != sequence_) {
+            sequence_ = result.sequence;
+            emit sequenceChanged();
+        }
     });
 }
 
@@ -527,6 +562,9 @@ const ScorePainter& ScoreDocument::painter() {
 
 void ScoreDocument::apply(const ScoreLayout& layout) {
     if (layout.opened) {
+        // An edit's sequence still being built belongs to the song before.
+        ++sequenceGeneration_;
+        sequencing_.reset();
         document_.emplace(*layout.song);
         caret_ = core::Caret{.track = static_cast<std::size_t>(std::max(0, layout.track))};
         pendingDigit_ = -1;
@@ -704,7 +742,9 @@ void ScoreDocument::newSong(const QString& presetId) {
     track.setName(translated(kPresetNames, preset->id, preset->name).toStdString());
     song.addTrack(std::move(track));
     song.appendMeasures(8);
-    ++generation_; // a file still opening must not replace the new song
+    ++generation_;         // a file still opening must not replace the new song
+    ++sequenceGeneration_; // nor an edit's sequence still being built
+    sequencing_.reset();
     document_.emplace(std::move(song));
     song_ = std::make_shared<const core::Song>(document_->song());
     sequence_ = std::make_shared<const audio::Sequence>(*song_);
@@ -782,6 +822,70 @@ void ScoreDocument::setKeySignatureFrom(int measure, int fifths, bool minor) {
     execute(core::changeKeySignature(
         document_->song(), static_cast<std::size_t>(measure),
         core::KeySignature(fifths, minor ? core::KeyMode::Minor : core::KeyMode::Major)));
+}
+
+namespace {
+
+// The flags navigationAt() and setNavigation() name.
+struct NavigationFlag {
+    const char* key;
+    bool core::MeasureHeader::* flag;
+};
+constexpr std::array kNavigationFlags{
+    NavigationFlag{"segno", &core::MeasureHeader::segno},
+    NavigationFlag{"segnoSegno", &core::MeasureHeader::segnoSegno},
+    NavigationFlag{"coda", &core::MeasureHeader::coda},
+    NavigationFlag{"doubleCoda", &core::MeasureHeader::doubleCoda},
+    NavigationFlag{"fine", &core::MeasureHeader::fine},
+    NavigationFlag{"toCoda", &core::MeasureHeader::toCoda},
+    NavigationFlag{"toDoubleCoda", &core::MeasureHeader::toDoubleCoda},
+};
+
+} // namespace
+
+QVariantMap ScoreDocument::navigationAt(int measure) const {
+    QVariantMap marks;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return marks;
+    }
+    const core::MeasureHeader& header =
+        document_->song().measureHeader(static_cast<std::size_t>(measure));
+    for (const NavigationFlag& item : kNavigationFlags) {
+        marks.insert(QLatin1StringView(item.key), header.*item.flag);
+    }
+    marks.insert(QStringLiteral("jump"), static_cast<int>(header.jump));
+    marks.insert(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen));
+    return marks;
+}
+
+void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const auto m = static_cast<std::size_t>(measure);
+    core::MeasureHeader header = document_->song().measureHeader(m);
+    for (const NavigationFlag& item : kNavigationFlags) {
+        if (const auto found = marks.constFind(QLatin1StringView(item.key));
+            found != marks.cend()) {
+            header.*item.flag = found->toBool();
+        }
+    }
+    const auto choice = [&marks](const QString& key, int current) {
+        const int value = marks.value(key, current).toInt();
+        return value >= 0 && value <= 3 ? value : current;
+    };
+    header.jump =
+        static_cast<core::JumpTo>(choice(QStringLiteral("jump"), static_cast<int>(header.jump)));
+    header.jumpThen = static_cast<core::JumpThen>(
+        choice(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen)));
+    if (header.jump == core::JumpTo::None) {
+        header.jumpThen = core::JumpThen::End;
+    }
+    if (header != document_->song().measureHeader(m)) {
+        execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
+    }
 }
 
 int ScoreDocument::caretTimeNumerator() const {
@@ -1030,6 +1134,16 @@ constexpr std::array kInputValues{core::NoteValue::Whole,      core::NoteValue::
                                   core::NoteValue::Sixteenth,  core::NoteValue::ThirtySecond,
                                   core::NoteValue::SixtyFourth};
 
+// The tuplets the input offers (ADR-0050): actual notes in the time of normal
+// ones.
+struct InputTuplet {
+    int actual;
+    int normal;
+};
+constexpr std::array kInputTuplets{InputTuplet{2, 3}, InputTuplet{3, 2}, InputTuplet{4, 3},
+                                   InputTuplet{5, 4}, InputTuplet{6, 4}, InputTuplet{7, 4},
+                                   InputTuplet{9, 8}};
+
 // 1 for a whole note, 2 for a half note... 64.
 int denominatorOf(core::NoteValue value) {
     const auto steps = static_cast<int>(value) - static_cast<int>(core::NoteValue::Whole);
@@ -1239,13 +1353,27 @@ void ScoreDocument::setInputValue(int value) {
     if (it == kInputValues.end()) {
         return;
     }
-    setInput(core::Duration(*it, input_.dots()));
+    setInput(core::Duration(*it, input_.dots(), input_.tuplet()));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
 
 void ScoreDocument::toggleDot() {
-    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1));
+    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1, input_.tuplet()));
+    runEntry(
+        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+}
+
+void ScoreDocument::setInputTuplet(int actual) {
+    core::Tuplet tuplet;
+    if (actual != 0 && actual != inputTuplet()) {
+        const auto found = std::ranges::find(kInputTuplets, actual, &InputTuplet::actual);
+        if (found == kInputTuplets.end()) {
+            return;
+        }
+        tuplet = core::Tuplet(found->actual, found->normal);
+    }
+    setInput(core::Duration(input_.value(), input_.dots(), tuplet));
     runEntry(
         [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
 }
@@ -1343,7 +1471,12 @@ void ScoreDocument::followBeat() {
                                         .voices.at(caret_.voice)
                                         .beats.at(caret_.beat)
                                         .duration;
-    if (duration.tuplet().isNone() && duration.dots() <= 1 && inputIndex(duration.value())) {
+    const core::Tuplet tuplet = duration.tuplet();
+    const bool offered =
+        tuplet.isNone() || std::ranges::any_of(kInputTuplets, [&tuplet](const InputTuplet& item) {
+            return item.actual == tuplet.actual() && item.normal == tuplet.normal();
+        });
+    if (offered && duration.dots() <= 1 && inputIndex(duration.value())) {
         setInput(duration);
     }
 }

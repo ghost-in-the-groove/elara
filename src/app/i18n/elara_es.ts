@@ -47,6 +47,42 @@
         <translation>Con puntillo (.)</translation>
     </message>
     <message>
+        <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
+        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
+    </message>
+    <message>
+        <source>Duplet (2 in the time of 3)</source>
+        <translation>Dosillo (2 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Triplet (3 in the time of 2)</source>
+        <translation>Tresillo (3 en el tiempo de 2)</translation>
+    </message>
+    <message>
+        <source>Quadruplet (4 in the time of 3)</source>
+        <translation>Cuatrillo (4 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Quintuplet (5 in the time of 4)</source>
+        <translation>Quintillo (5 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Sextuplet (6 in the time of 4)</source>
+        <translation>Seisillo (6 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Septuplet (7 in the time of 4)</source>
+        <translation>Septillo (7 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Nonuplet (9 in the time of 8)</source>
+        <translation>Nonillo (9 en el tiempo de 8)</translation>
+    </message>
+    <message>
+        <source>No tuplet</source>
+        <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
         <source>Insert a rest (Insert)</source>
         <translation>Insertar un silencio (Insert)</translation>
     </message>
@@ -226,6 +262,70 @@
     <message>
         <source>From this measure until the next change.</source>
         <translation>Desde este compás hasta el siguiente cambio.</translation>
+    </message>
+    <message>
+        <source>Signs and jumps</source>
+        <translation>Señales y saltos</translation>
+    </message>
+    <message>
+        <source>Segno</source>
+        <translation>Segno</translation>
+    </message>
+    <message>
+        <source>Segno segno</source>
+        <translation>Doble segno</translation>
+    </message>
+    <message>
+        <source>Coda</source>
+        <translation>Coda</translation>
+    </message>
+    <message>
+        <source>Double coda</source>
+        <translation>Doble coda</translation>
+    </message>
+    <message>
+        <source>Fine</source>
+        <translation>Fine</translation>
+    </message>
+    <message>
+        <source>To coda</source>
+        <translation>A la coda</translation>
+    </message>
+    <message>
+        <source>To double coda</source>
+        <translation>A la doble coda</translation>
+    </message>
+    <message>
+        <source>No jump</source>
+        <translation>Sin salto</translation>
+    </message>
+    <message>
+        <source>D.C.</source>
+        <translation>D.C.</translation>
+    </message>
+    <message>
+        <source>D.S.</source>
+        <translation>D.S.</translation>
+    </message>
+    <message>
+        <source>D.S.S.</source>
+        <translation>D.S.S.</translation>
+    </message>
+    <message>
+        <source>to the end</source>
+        <translation>hasta el final</translation>
+    </message>
+    <message>
+        <source>al Fine</source>
+        <translation>al Fine</translation>
+    </message>
+    <message>
+        <source>al Coda</source>
+        <translation>al Coda</translation>
+    </message>
+    <message>
+        <source>al Double Coda</source>
+        <translation>al Doble Coda</translation>
     </message>
     <message>
         <source>Insert before</source>
