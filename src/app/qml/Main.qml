@@ -20,6 +20,11 @@ ApplicationWindow {
     /// Open the first track's tuning in the song panel once there is a score
     /// (from the command line).
     property bool showTuning: false
+    /// A SoundFont to play through (from the command line).
+    property string initialSoundFont
+    /// Whether choices such as the SoundFont are kept for the next start; off
+    /// for checks and screenshots.
+    property bool rememberSettings: true
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
 
@@ -54,6 +59,11 @@ ApplicationWindow {
             score.open(initialFile);
         if (showTuner)
             tunerPane.open();
+        audio.rememberSound = rememberSettings;
+        if (initialSoundFont.length > 0)
+            audio.setSoundFont(initialSoundFont);
+        else if (rememberSettings)
+            audio.restoreSoundFont();
     }
 
     onClosing: close => {
@@ -162,6 +172,14 @@ ApplicationWindow {
         title: qsTr("Open a score")
         nameFilters: score.nameFilters
         onAccepted: score.open(selectedFile)
+    }
+
+    FileDialog {
+        id: soundFontDialog
+
+        title: qsTr("Choose a SoundFont")
+        nameFilters: [qsTr("SoundFonts (*.sf2 *.sf3)")]
+        onAccepted: audio.setSoundFont(selectedFile)
     }
 
     FileDialog {
@@ -398,6 +416,20 @@ ApplicationWindow {
 
                     y: moreButton.height
 
+                    MenuItem {
+                        text: audio.loadingSoundFont ? qsTr("Opening the SoundFont…")
+                                                     : audio.soundFontName.length > 0
+                                                       ? qsTr("SoundFont: %1").arg(audio.soundFontName)
+                                                       : qsTr("Choose a SoundFont…")
+                        enabled: !audio.loadingSoundFont
+                        onTriggered: soundFontDialog.open()
+                    }
+                    MenuItem {
+                        text: qsTr("Use the built-in synthesizer")
+                        enabled: audio.soundFont.length > 0 && !audio.loadingSoundFont
+                        onTriggered: audio.useBuiltinSound()
+                    }
+                    MenuSeparator {}
                     MenuItem {
                         text: audio.playing ? qsTr("Playing…") : qsTr("Play a test tone")
                         enabled: !audio.playing

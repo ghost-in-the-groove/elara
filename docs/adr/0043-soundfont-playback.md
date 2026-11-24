@@ -70,8 +70,11 @@ which preset sounded.
   1.3 ms late at 48 kHz, the same in every render.
 - FluidSynth and libsndfile are LGPL; Elara's source lets anyone relink them
   (THIRD_PARTY_NOTICES.md).
-- Not yet: choosing a SoundFont in the app, a default font to download, SFZ
-  (sfizz) and a master reverb.
+- The app opens the SoundFont chosen in its menu (or given with
+  `--soundfont`) on a worker, plays the tracks through it from then on,
+  playing or not, and keeps the choice for the next start; checks and
+  screenshots leave that setting alone.
+- Not yet: a default font to download, SFZ (sfizz) and a master reverb.
 - Tests: `audio.Sound banks: ...`, `audio.Offline rendering: tracks play
   through the render's sound bank`, `audio.Playback: tracks play through the
   player's sound bank`, `audio.SoundFont: ...` (presets, errors, General MIDI
