@@ -114,6 +114,7 @@ void Startup::queueSteps() {
             queueMix();
             queueNavigation();
             queueTuning();
+            queueTempo();
         }
         return;
     }
@@ -151,6 +152,7 @@ void Startup::queueSteps() {
         queueMix();
         queueNavigation();
         queueTuning();
+        queueTempo();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
     // stays closed while paused.
@@ -702,6 +704,53 @@ void Startup::queueNavigation() {
         check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
                   marks.value(QStringLiteral("jump")).toInt() == 0,
               "undoing the marks did not restore the song");
+        return false;
+    });
+}
+
+// A tempo change from the measure popup (ADR-0042): 90 beats per minute from
+// the second measure, one undo step named for it that leaves the first
+// measure's tempo alone, then taken away again; both undone, the song must end
+// as it started.
+void Startup::queueTempo() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tempo check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        tempoBefore_ = score_->tempoAt(1);
+        const QVariantMap first = score_->tempoAt(0);
+        score_->setTempoFrom(1, 90);
+        const QVariantMap tempo = score_->tempoAt(1);
+        check(tempo.value(QStringLiteral("bpm")).toInt() == 90 &&
+                  tempo.value(QStringLiteral("own")).toBool(),
+              "the second measure does not start at 90");
+        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
+              "the tempo is not one undo step");
+        check(score_->tempoAt(0) == first, "the first measure's tempo changed");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        score_->setTempoFrom(1, 0);
+        check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
+              "the tempo change was not taken away");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (score_->measureCount() < 2) {
+            return false;
+        }
+        check(!score_->modified() && score_->tempoAt(1) == tempoBefore_,
+              "undoing the tempo did not restore the song");
         return false;
     });
 }

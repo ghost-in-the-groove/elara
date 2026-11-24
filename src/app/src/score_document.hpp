@@ -94,6 +94,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
     Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
     // Practice (ADR-0024): how playback plays the song, whatever song it is.
     Q_PROPERTY(int speed READ speed WRITE setSpeed NOTIFY practiceChanged)
     Q_PROPERTY(bool metronome READ metronome WRITE setMetronome NOTIFY practiceChanged)
@@ -237,6 +238,15 @@ public:
     /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
     /// gives them, as one undo step ("Change navigation marks").
     Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
+    /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
+    /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,
+    /// 8 eighth...) and "dotted"; "own" when the measure starts a tempo
+    /// change, and "first" for the first measure, whose tempo is the song's.
+    Q_INVOKABLE QVariantMap tempoAt(int measure) const;
+    /// Sets the tempo from `measure` until the next change as one undo step
+    /// ("Change tempo"), or with a bpm of 0 takes the measure's change away. On
+    /// the first measure it sets the song's tempo.
+    Q_INVOKABLE void setTempoFrom(int measure, int bpm);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -346,6 +356,9 @@ public:
     [[nodiscard]] bool caretKeyMinor() const;
     [[nodiscard]] QVariantMap caretNavigation() const {
         return navigationAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] QVariantMap caretTempo() const {
+        return tempoAt(static_cast<int>(caret_.measure));
     }
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
