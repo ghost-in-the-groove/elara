@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Real-time playback with the built-in synthesizer (ADR-0019).
+// Real-time playback (ADR-0019), through a sound bank (ADR-0043).
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
+#include <elara/audio/sound_bank.hpp>
 #include <elara/audio/synth.hpp>
+#include <elara/core/instrument.hpp>
 #include <elara/core/song.hpp>
 
 #include "playback.hpp"
@@ -19,9 +21,21 @@ namespace elara::audio {
 
 /// A song ready for the audio thread: everything render() needs, allocated on
 /// the control thread.
+/// A track's sound and the instrument it was made for, kept across loads.
+struct Player::KeptSound {
+    core::Instrument instrument;
+    std::shared_ptr<TrackSound> sound;
+
+    /// Whether a track of `other` sounds as this one: the same kind and
+    /// program, whatever its name.
+    [[nodiscard]] bool fits(const core::Instrument& other) const noexcept {
+        return other.kind == instrument.kind && other.midiProgram == instrument.midiProgram;
+    }
+};
+
 struct Player::Loaded {
     struct Track {
-        Synth synth;
+        std::shared_ptr<TrackSound> sound; // shared with the next load when kept
         std::vector<detail::FrameEvent> events{};
         std::size_t next = 0;
         std::vector<float> buffer{};
@@ -64,7 +78,18 @@ struct Player::Loaded {
 };
 
 Player::Player(double sampleRate, std::size_t maxBlockFrames)
-    : sampleRate_(sampleRate), maxBlockFrames_(std::max<std::size_t>(maxBlockFrames, 1)) {}
+    : sampleRate_(sampleRate), maxBlockFrames_(std::max<std::size_t>(maxBlockFrames, 1)),
+      bank_(builtinBank()) {}
+
+void Player::setSoundBank(std::shared_ptr<const SoundBank> bank) {
+    if (!bank) {
+        bank = builtinBank();
+    }
+    if (bank != bank_) {
+        bank_ = std::move(bank);
+        kept_.clear();
+    }
+}
 
 Player::~Player() {
     delete current_;
@@ -83,22 +108,32 @@ void Player::load(const core::Song& song, const Sequence& sequence) {
     loaded->left.assign(maxBlockFrames_, 0.0f);
     loaded->right.assign(maxBlockFrames_, 0.0f);
     loaded->tracks.reserve(tracks);
+    std::vector<KeptSound> kept;
+    kept.reserve(tracks);
     for (std::size_t t = 0; t < tracks; ++t) {
+        const core::Instrument& instrument = song.track(t).instrument();
+        if (t < kept_.size() && kept_[t].fits(instrument)) {
+            kept.push_back(std::move(kept_[t]));
+        } else {
+            kept.push_back(
+                {.instrument = instrument, .sound = bank_->sound(instrument, sampleRate_)});
+        }
         const detail::TrackLevel level = detail::levelOf(song, t, loaded->headroom);
         loaded->setLevel(t, level);
-        loaded->tracks.push_back(
-            {.synth = Synth(timbreFor(song.track(t).instrument()), sampleRate_),
-             .events = std::move(events[t]),
-             .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
-             .applied = level});
+        loaded->tracks.push_back({.sound = kept.back().sound,
+                                  .events = std::move(events[t]),
+                                  .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+                                  .applied = level});
     }
     if (clicks) {
         loaded->setLevel(tracks, detail::kMetronomeLevel);
-        loaded->tracks.push_back({.synth = Synth(Timbre::Drums, sampleRate_),
-                                  .events = std::move(events[tracks]),
-                                  .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
-                                  .applied = detail::kMetronomeLevel});
+        loaded->tracks.push_back(
+            {.sound = builtinBank()->sound({.kind = core::InstrumentKind::Percussion}, sampleRate_),
+             .events = std::move(events[tracks]),
+             .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+             .applied = detail::kMetronomeLevel});
     }
+    kept_ = std::move(kept);
     duration_ = sequence.duration();
     tidy();
     latest_ = loaded.get();
@@ -196,6 +231,10 @@ void Player::render(std::span<float> left, std::span<float> right) noexcept {
         if (Loaded* next = pending_.exchange(nullptr, std::memory_order_acq_rel)) {
             retired_.store(current_, std::memory_order_release);
             current_ = next;
+            // Kept sounds still hold the notes of the song let go of.
+            for (Loaded::Track& track : current_->tracks) {
+                track.sound->reset();
+            }
             current_->seat(frame_);
         }
     }
@@ -209,7 +248,7 @@ void Player::render(std::span<float> left, std::span<float> right) noexcept {
         seekTo_.compare_exchange_strong(taken, -1, std::memory_order_acq_rel);
         if (current_ != nullptr) {
             for (Loaded::Track& track : current_->tracks) {
-                track.synth.reset();
+                track.sound->reset();
             }
             current_->seat(frame_);
         }
@@ -217,7 +256,7 @@ void Player::render(std::span<float> left, std::span<float> right) noexcept {
     const bool playing = playing_.load(std::memory_order_acquire);
     if (current_ != nullptr && wasPlaying_ && !playing) {
         for (Loaded::Track& track : current_->tracks) {
-            track.synth.releaseAll();
+            track.sound->releaseAll();
         }
     }
     if (playing && !wasPlaying_) {
@@ -280,7 +319,7 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
     };
     const auto ring = [&](std::size_t at, std::size_t count) {
         for (Loaded::Track& track : current_->tracks) {
-            track.synth.render(slice(track.buffer, at, count)); // released notes ringing out
+            track.sound->render(slice(track.buffer, at, count)); // released notes ringing out
         }
     };
 
@@ -308,7 +347,7 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
             looping ? std::min<std::int64_t>(static_cast<std::int64_t>(rest), loopTo - frame_)
                     : static_cast<std::int64_t>(rest));
         for (Loaded::Track& track : current_->tracks) {
-            detail::playTrack(track.synth, track.events, track.next, frame_,
+            detail::playTrack(*track.sound, track.events, track.next, frame_,
                               slice(track.buffer, done, count),
                               [](const detail::FrameEvent&) noexcept {});
         }
@@ -318,7 +357,7 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
         if (looping && frame_ >= loopTo) {
             frame_ = loopFrom;
             for (Loaded::Track& track : current_->tracks) {
-                track.synth.reset();
+                track.sound->reset();
             }
             current_->seat(frame_);
         } else if (frame_ >= current_->endFrame) {
@@ -327,7 +366,7 @@ void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept
             playing_.store(false, std::memory_order_release);
             wasPlaying_ = false;
             for (Loaded::Track& track : current_->tracks) {
-                track.synth.releaseAll();
+                track.sound->releaseAll();
             }
         }
     }

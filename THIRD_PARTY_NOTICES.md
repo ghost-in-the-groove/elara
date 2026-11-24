@@ -16,12 +16,20 @@ and be listed here before it is merged.
 | [pugixml](https://github.com/zeux/pugixml) | 1.16 | MIT | XML parsing for MusicXML (`elara_io`) | vcpkg |
 | [Bravura](https://github.com/steinbergmedia/bravura) | 1.482 | SIL OFL 1.1 | Music notation font and its SMuFL metadata (`elara_notation`, ADR-0011) | Three pinned files + SHA-256, downloaded at configure time into `bin/fonts/` with the licence (`OFL.txt`); the outline of its eighth rest is the r of the logo (`src/app/icons/elara-logo.svg`, `src/app/qml/Logo.qml`) |
 | [Arimo](https://github.com/googlefonts/arimo) | Google Fonts commit `903d466` | SIL OFL 1.1 | Sans-serif text of scores in the app, metric-compatible with Arial and Helvetica (`elara`, ADR-0015) | Regular and italic, pinned files + SHA-256, downloaded at configure time into `bin/fonts/` and embedded in the app, with the licence (`Arimo-OFL.txt`) |
+| [FluidSynth](https://www.fluidsynth.org) | 2.6.2 | LGPL-2.1-or-later | SoundFont playback (`elara_audio_fluid`, ADR-0043) | vcpkg, through the overlay port in `cmake/vcpkg-ports/fluidsynth` (based on vcpkg's port, MIT) that leaves out its audio drivers |
+| [libsndfile](https://github.com/libsndfile/libsndfile) | 1.2.2 | LGPL-2.1-or-later | Reading SF3 SoundFonts (through FluidSynth) | vcpkg, without its MPEG codecs |
+| [libogg](https://xiph.org/ogg/), [libvorbis](https://xiph.org/vorbis/) | 1.3.6, 1.3.7 | BSD-3-Clause | The compressed samples of SF3 SoundFonts (through libsndfile) | vcpkg |
+| [libFLAC](https://xiph.org/flac/), [Opus](https://opus-codec.org) | 1.5.0, 1.6.1 | BSD-3-Clause | Linked by libsndfile; not used by Elara | vcpkg |
+| [gcem](https://github.com/kthohr/gcem) | 1.18.0 | Apache-2.0 | Compile-time maths inside FluidSynth | vcpkg |
+
+FluidSynth and libsndfile are LGPL: Windows builds load them as DLLs, other
+builds link them statically, and Elara's complete source (AGPL) lets anyone
+relink it with a modified version, as LGPL-2.1 section 6 asks.
 
 ## Planned (licence checked, not yet integrated)
 
 | Component | Licence | Planned use |
 |---|---|---|
-| FluidSynth | LGPL-2.1-or-later | SoundFont playback (milestone 4) |
 | sfizz | BSD-2-Clause | SFZ sampler for guitar articulations (milestone 4) |
 | Steinberg VST3 SDK | MIT | Plugin hosting (after 1.0) |
 | MuseScore General SF3 | MIT | Default sound bank (milestone 4) |

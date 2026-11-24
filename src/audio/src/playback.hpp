@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // What offline rendering and real-time playback share (ADR-0018, ADR-0019,
-// ADR-0020): note events in sample frames, dispatching them into a synth, and
-// the mix.
+// ADR-0020): note events in sample frames, dispatching them into a track's
+// sound (ADR-0043), and the mix.
 #pragma once
 
 #include <elara/audio/sequence.hpp>
@@ -128,9 +128,10 @@ inline void mixInto(std::span<const float> track, TrackLevel from, TrackLevel to
 
 /// Renders frames [from, from + out.size()) of one track, adding them to
 /// `out` and dispatching each event from `next` on at its frame. Calls
-/// `dispatched(event)` for every event dispatched.
-template <typename Dispatched>
-void playTrack(Synth& synth, std::span<const FrameEvent> events, std::size_t& next,
+/// `dispatched(event)` for every event dispatched. `Sound` has the calls of
+/// Synth: a Synth or a TrackSound.
+template <typename Sound, typename Dispatched>
+void playTrack(Sound& synth, std::span<const FrameEvent> events, std::size_t& next,
                std::int64_t from, std::span<float> out, Dispatched&& dispatched) {
     const std::int64_t end = from + static_cast<std::int64_t>(out.size());
     std::size_t done = 0;
