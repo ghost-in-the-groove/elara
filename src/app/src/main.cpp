@@ -10,11 +10,13 @@
 #include <QDir>
 #include <QFontDatabase>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QLibraryInfo>
 #include <QLocale>
 #include <QQmlApplicationEngine>
 #include <QQmlError>
 #include <QQuickWindow>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 #include <QTranslator>
@@ -94,6 +96,14 @@ int main(int argc, char* argv[]) {
     QGuiApplication::setOrganizationName(QStringLiteral("Elara"));
     QGuiApplication::setApplicationVersion(QString::fromUtf8(
         elara::core::version().data(), static_cast<qsizetype>(elara::core::version().size())));
+    // The app icon, drawn from its SVG by the build (ADR-0064), and the desktop
+    // entry Linux desktops find it through.
+    QIcon icon;
+    for (const int size : {16, 24, 32, 48, 64, 128, 256}) {
+        icon.addFile(QStringLiteral(":/icons/elara-%1.png").arg(size), QSize(size, size));
+    }
+    QGuiApplication::setWindowIcon(icon);
+    QGuiApplication::setDesktopFileName(QStringLiteral("io.github.ghost_in_the_groove.Elara"));
 
     const std::optional<QString> language = argumentValue(argc, argv, "--language");
     QTranslator elaraTranslator;
