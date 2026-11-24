@@ -309,3 +309,98 @@ TEST_CASE("Navigation marks: above alternate endings, under tempo marks",
     CHECK(bottom(tempo[0]) < top(signs[0]));
     CHECK(list.top <= top(tempo[0]) + kEpsilon);
 }
+
+namespace {
+
+// The box of the section of measure `m`: its left, top, right and bottom.
+struct Box {
+    double left = 1e9;
+    double top = 1e9;
+    double right = -1e9;
+    double bottom = -1e9;
+};
+
+Box sectionBox(const DisplayList& list, std::size_t m) {
+    Box box;
+    std::size_t sides = 0;
+    for (const auto& line : list.lines) {
+        if (line.role == Role::Section && line.measure == m) {
+            box.left = std::min({box.left, line.from.x, line.to.x});
+            box.right = std::max({box.right, line.from.x, line.to.x});
+            box.top = std::min({box.top, line.from.y, line.to.y});
+            box.bottom = std::max({box.bottom, line.from.y, line.to.y});
+            ++sides;
+        }
+    }
+    CHECK(sides == 4);
+    return box;
+}
+
+} // namespace
+
+TEST_CASE("Section marks: a section's name in a box opens its measure, above everything",
+          "[notation][layout][navigation]") {
+    Song song = quarters(3);
+    song.measureHeader(0).section = "Intro";
+    song.measureHeader(2).section = "Chorus";
+    song.measureHeader(2).segno = true;
+    song.measureHeader(2).toCoda = true;
+    const DisplayList list = layout(song);
+    const auto names = texts(list, Role::Section);
+    REQUIRE(contents(names) == std::vector<std::string>{"Intro", "Chorus"});
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 12);
+
+    // Everything else above the staff: the signs, "To Coda" and the tempo mark.
+    double others = 0.0;
+    for (const GlyphItem& item : list.glyphs) {
+        if (item.role != Role::Section) {
+            others = std::min(others, top(item));
+        }
+    }
+    for (const TextItem& item : list.texts) {
+        if (item.role != Role::Section) {
+            others = std::min(others, item.origin.y - 0.75 * item.size);
+        }
+    }
+    REQUIRE(others < 0.0);
+    for (const TextItem& name : names) {
+        CHECK(name.align == TextAlign::Left);
+        CHECK_FALSE(name.italic);
+        const std::size_t first = name.measure == 0 ? 0 : 8; // the measure's first note
+        const MeasureBox& measure = measureBox(list, name.measure);
+        const Box box = sectionBox(list, name.measure);
+        // From the start of the measure, before its first note.
+        CHECK(box.left >= measure.x - kEpsilon);
+        CHECK(box.left < left(heads[first]));
+        // Around the name.
+        CHECK(box.left < name.origin.x);
+        CHECK(box.right > name.origin.x + textWidth(name.text, name.size));
+        CHECK(box.top < name.origin.y - 0.75 * name.size);
+        CHECK(box.bottom > name.origin.y);
+        // Above every other mark, inside the list's extents.
+        CHECK(box.bottom < others);
+        CHECK(list.top <= box.top + kEpsilon);
+    }
+    // One line for the system: the boxes stand on it.
+    CHECK(sectionBox(list, 0).bottom == Catch::Approx(sectionBox(list, 2).bottom));
+}
+
+TEST_CASE("Section marks: names that would overlap go on a line above",
+          "[notation][layout][navigation]") {
+    Song song = quarters(2);
+    song.measureHeader(0).section = "A section with a very long name indeed";
+    song.measureHeader(1).section = "Bridge";
+    const DisplayList list = layout(song);
+    const Box first = sectionBox(list, 0);
+    const Box second = sectionBox(list, 1);
+    CHECK(second.left < first.right); // they would overlap on one line
+    CHECK(second.bottom < first.top);
+}
+
+TEST_CASE("Section marks: a song without sections draws none", "[notation][layout][navigation]") {
+    const DisplayList list = layout(quarters(2));
+    CHECK(texts(list, Role::Section).empty());
+    CHECK(std::ranges::none_of(list.lines,
+                               [](const auto& line) { return line.role == Role::Section; }));
+}

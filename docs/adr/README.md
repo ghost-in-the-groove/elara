@@ -68,6 +68,7 @@ one that replaces them.
 | [0060](0060-whammy-bar-and-bass-techniques.md) | Whammy bar and bass techniques at the caret | Accepted |
 | [0061](0061-whammy-bar-and-bass-marks.md) | Whammy bar and bass techniques in the score | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
+| [0063](0063-section-marks.md) | Section marks in the score | Accepted |
 | [0064](0064-app-icon.md) | The app icon | Accepted |
 
 ## Template

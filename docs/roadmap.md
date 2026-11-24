@@ -34,7 +34,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Sections of a song (intro, verse, chorus) named where they start
   - [x] In the model, `.elara` and the CLI `section` step; read from Guitar
         Pro 3-8, read and written in MusicXML and MIDI (ADR-0062)
-  - [ ] Drawn in the score
+  - [x] Drawn in the score, boxed above the first staff (ADR-0063)
   - [ ] Set from the measure popup in the app
 - [x] Note articulations and effects (bend curve, slide, hammer/pull, palm mute,
       dead note, harmonics, vibrato, ties) as data

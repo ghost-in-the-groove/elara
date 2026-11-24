@@ -61,6 +61,12 @@ constexpr double kNavigationInset = 0.4;    // between the barline and the first
 constexpr double kNavigationGap = 0.25;     // between two signs
 constexpr double kNavigationTextGap = 1.0;  // between two texts closing one measure
 constexpr double kNavigationLineGap = 0.3;  // between a line of them and the one above
+constexpr double kSectionLowest = -2.0;     // the bottom of a section's box at least this high
+constexpr double kSectionInkGap = 0.6;      // at least between its box and the ink below
+constexpr double kSectionSize = 1.5;        // font size of its name
+constexpr double kSectionPad = 0.35;        // between the name and its box
+constexpr double kSectionGap = 0.5;         // between two boxes on one line
+constexpr double kSectionLineGap = 0.4;     // between a line of boxes and the one above
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -402,6 +408,61 @@ void markNavigation(DisplayList& system, const core::Song& song,
     system.top = std::min(system.top, highest);
 }
 
+// The sections of `system` (ADR-0062), above everything else over its first
+// staff: each name in a box from the start of its measure, on the lowest line
+// where the box clears the boxes already there.
+void markSections(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
+                  std::span<const double> barlineEnds, const EngravingFont& font) {
+    const double height = (kTextAscent + kTextDescent) * kSectionSize + 2 * kSectionPad;
+    const double thickness = font.defaults().thinBarlineThickness;
+    const double lowest = std::min(kSectionLowest, system.top - kSectionInkGap - thickness / 2);
+    std::vector<double> lineEnds; // the right of the last box on each line
+    double highest = 0.0;
+    for (std::size_t i = 0; i < measures.size(); ++i) {
+        const std::size_t m = measures[i].index;
+        const std::string& name = song.measureHeader(m).section;
+        if (name.empty()) {
+            continue;
+        }
+        const double left = (i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset;
+        const double right = left + textWidth(name, kSectionSize) + 2 * kSectionPad;
+        const auto line = static_cast<std::size_t>(
+            std::ranges::find_if(lineEnds,
+                                 [left](double end) { return end + kSectionGap <= left; }) -
+            lineEnds.begin());
+        if (line == lineEnds.size()) {
+            lineEnds.push_back(right);
+        } else {
+            lineEnds[line] = right;
+        }
+        const double bottom = lowest - static_cast<double>(line) * (height + kSectionLineGap);
+        const double top = bottom - height;
+        highest = std::min(highest, top - thickness / 2);
+
+        TextItem item;
+        item.text = name;
+        item.origin = {left + kSectionPad, bottom - kSectionPad - kTextDescent * kSectionSize};
+        item.size = kSectionSize;
+        item.align = TextAlign::Left;
+        item.role = Role::Section;
+        item.measure = m;
+        system.texts.push_back(std::move(item));
+        const auto side = [&](Point from, Point to) {
+            system.lines.push_back(LineItem{.from = from,
+                                            .to = to,
+                                            .thickness = thickness,
+                                            .role = Role::Section,
+                                            .measure = m});
+        };
+        const double half = thickness / 2;
+        side({left - half, top}, {right + half, top});
+        side({left - half, bottom}, {right + half, bottom});
+        side({left, top}, {left, bottom});
+        side({right, top}, {right, bottom});
+    }
+    system.top = std::min(system.top, highest);
+}
+
 // The metronome note of a beat unit.
 Glyph tempoNote(core::NoteValue value) {
     switch (value) {
@@ -718,6 +779,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
     markRepeats(system, song, measures, barlineEnds, font);
     markNavigation(system, song, measures, barlineEnds, font);
     markTempo(system, song, measures, font);
+    markSections(system, song, measures, barlineEnds, font);
     const double height = previousY + previousHeight;
     if (writers.size() > 1) {
         // The line joining the staves at the start of the system.
