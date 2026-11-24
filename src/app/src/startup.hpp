@@ -83,6 +83,7 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
+    QPointer<QObject> trackRow_;  ///< a row of the song panel, which a mix change keeps
     QVariantMap tuningBefore_;    ///< the first track's tuning before it changed
     QString editProblem_;         ///< the first edit check that failed
     QString failure_;             ///< set by a step that went wrong
