@@ -843,6 +843,9 @@ void Startup::queueKeepPosition() {
     });
     steps_.emplace_back([this, check] {
         check("an undo");
+        // Made while an edit's sequence is still being built, the new song
+        // must still be what playback plays once everything settles.
+        score_->addTrack(QStringLiteral("electric-bass"));
         score_->newSong(QStringLiteral("electric-guitar"));
         return true;
     });
