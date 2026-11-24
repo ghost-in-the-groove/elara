@@ -780,7 +780,7 @@ set_tests_properties(cli.render_tab PROPERTIES
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -911,7 +911,12 @@ set_tests_properties(cli.sequence_double_coda PROPERTIES
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")
 set_tests_properties(cli.render_navigation PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"navigation\":4}")
+  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0}")
+# Sections drawn boxed above everything (ADR-0063): two names, four sides each.
+add_test(NAME cli.render_sections
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/double-coda.gp")
+set_tests_properties(cli.render_sections PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"section\":10}")
 # ... and kept on the way to MusicXML: saved, exported, read back.
 set(ELARA_CLI_DOUBLE_CODA "${CMAKE_CURRENT_BINARY_DIR}/cli-double-coda")
 add_test(NAME cli.import_double_coda COMMAND elara-cli import "${ELARA_CORPUS}/gp/double-coda.gp"

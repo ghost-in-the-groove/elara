@@ -65,6 +65,7 @@ one that replaces them.
 | [0057](0057-continuous-view.md) | Continuous view | Accepted |
 | [0058](0058-kinds-of-note-effects.md) | Kinds of note effects at the caret | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
+| [0063](0063-section-marks.md) | Section marks in the score | Accepted |
 
 ## Template
 
