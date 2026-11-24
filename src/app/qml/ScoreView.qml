@@ -418,7 +418,6 @@ Item {
         id: measurePopup
         objectName: "measurePopup"
 
-        objectName: "measurePopup"
         document: root.document
         onClosed: root.forceActiveFocus()
     }
