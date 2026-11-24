@@ -1,8 +1,10 @@
 name: package
 
 # Packages of the app and the CLI for each platform (ADR-0048), built from main
-# and from pull requests that change how Elara installs. Each is smoke-tested
-# from its install tree and kept as a workflow artifact; nothing is published.
+# and from pull requests that change how Elara installs, with the installers:
+# the MSI package on Windows and the AppImage on Linux (ADR-0065). Each is
+# smoke-tested from what it installs and kept as a workflow artifact; nothing is
+# published.
 on:
   push:
     branches: [main]
@@ -81,16 +83,35 @@ jobs:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json') }}
 
+      # The runner image has the WiX Toolset 3 (WIX), which CPack's MSI uses.
+      - name: WiX Toolset
+        if: runner.os == 'Windows'
+        shell: bash
+        run: test -x "$WIX/bin/candle.exe" && echo "WiX Toolset at $WIX"
+
+      # appimagetool at a fixed release, checked against its published digest.
+      - name: appimagetool
+        if: runner.os == 'Linux'
+        run: |
+          tool="$RUNNER_TEMP/appimagetool"
+          curl -fsSL -o "$tool" \
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  $tool" | sha256sum -c -
+          chmod +x "$tool"
+          echo "APPIMAGETOOL=$tool" >> "$GITHUB_ENV"
+
       - name: Build, install, smoke-test and pack
-        run: python scripts/elara.py package
+        run: python scripts/elara.py package --installers
 
       - uses: actions/upload-artifact@v4
         with:
           name: elara-${{ matrix.name }}
           path: |
             build/package/Elara-*.zip
+            build/package/Elara-*.msi
             build/package/Elara-*.dmg
             build/package/Elara-*.tar.gz
+            build/package/Elara-*.AppImage
             build/package/Elara-*.sha256
           if-no-files-found: error
           retention-days: 14

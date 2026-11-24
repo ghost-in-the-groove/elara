@@ -66,6 +66,7 @@ one that replaces them.
 | [0058](0058-kinds-of-note-effects.md) | Kinds of note effects at the caret | Accepted |
 | [0062](0062-sections.md) | Sections of a song | Accepted |
 | [0064](0064-app-icon.md) | The app icon | Accepted |
+| [0065](0065-installers.md) | Installers | Accepted |
 
 ## Template
 
