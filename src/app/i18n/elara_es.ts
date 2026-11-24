@@ -39,6 +39,10 @@
         <translation>Semifusa</translation>
     </message>
     <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
         <source>%1 (+ longer, - shorter)</source>
         <translation>%1 (+ más larga, - más corta)</translation>
     </message>
@@ -81,6 +85,14 @@
     <message>
         <source>No tuplet</source>
         <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
+        <source>Voice %1 (Alt+1 to Alt+4); a right click picks one</source>
+        <translation>Voz %1 (Alt+1 a Alt+4); clic derecho para elegir otra</translation>
+    </message>
+    <message>
+        <source>V%1</source>
+        <translation>V%1</translation>
     </message>
     <message>
         <source>Insert a rest (Insert)</source>
@@ -973,6 +985,10 @@
     <message>
         <source>Measure %1</source>
         <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
     </message>
     <message>
         <source>New beat</source>

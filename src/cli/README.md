@@ -162,7 +162,8 @@ The output gives each track's `tuning` (its first staff's; `null` without
 strings) and `capo`.
 
 Keyboard entry steps work at a caret, as the editor's keys do (ADR-0021):
-`caret <track> <m> <beat> [string]` places it, `right`, `left`, `up`, `down`,
+`caret <track> <m> <beat> [string]` places it in the first voice, `voice <1-4>`
+takes it to that voice of its measure (typing then goes there), `right`, `left`, `up`, `down`,
 `next-measure` and `previous-measure` move it, `fret <n>` types a fret on its
 string (adding a beat of the input duration on the free slot after the last
 beat of a short measure), `pitch <C..B> [add]` types a note name in the

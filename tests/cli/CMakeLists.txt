@@ -229,6 +229,23 @@ add_test(NAME cli.dump_note_names COMMAND elara-cli --json dump "${ELARA_CLI_NAM
 set_tests_properties(cli.dump_note_names PROPERTIES
   FIXTURES_REQUIRED cli_note_names
   PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G5\"},{\"pitch\":\"E5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"G#5\"}\\]}\\]\\]\\]")
+# Voices: the caret's voice picks where typing goes, the first voice keeps its
+# notes; voices are 1 to 4.
+set(ELARA_CLI_VOICES "${CMAKE_CURRENT_BINARY_DIR}/cli-voices.elara")
+add_test(NAME cli.edit_types_in_voice_two
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_VOICES}" "add-track flute" "append-measures 1"
+    "caret 0 0 0" "pitch C" "voice 2" "pitch E")
+set_tests_properties(cli.edit_types_in_voice_two PROPERTIES
+  FIXTURES_SETUP cli_voices
+  PASS_REGULAR_EXPRESSION "\"caret\":{\"track\":0,\"staff\":0,\"measure\":0,\"voice\":1,\"beat\":0,\"string\":1,\"freeSlot\":false}")
+add_test(NAME cli.dump_voice_two COMMAND elara-cli --json dump "${ELARA_CLI_VOICES}")
+set_tests_properties(cli.dump_voice_two PROPERTIES
+  FIXTURES_REQUIRED cli_voices
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]}\\],\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\"}\\]}\\]\\]\\]")
+add_test(NAME cli.edit_rejects_voice_five
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "voice 5")
+set_tests_properties(cli.edit_rejects_voice_five PROPERTIES
+  PASS_REGULAR_EXPRESSION "voice: 1 to 4, not 5")
 add_test(NAME cli.edit_note_name_on_tablature
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 1"
     "pitch A")

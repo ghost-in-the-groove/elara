@@ -61,8 +61,11 @@ caret does not blink and costs no frames when nothing moves.
   songs cheaper without changing this design.
 - The caret is drawn by QML over the page texture, so moving it never repaints
   a page.
-- The caret stays in voice 1 until the app can pick voices; the core and
-  `caretAt()` already keep any voice.
+- The caret starts in voice 1. Alt+1 to Alt+4 and the entry bar's voice
+  button take it to another voice of its measure, at its beat or the nearest
+  one that voice has; the status line names any voice but the first. The
+  core and `caretAt()` keep the voice, so a click stays in it, and the CLI's
+  `voice <1-4>` step does the same (`cli.edit_types_in_voice_two`).
 - `--smoke-test` types on the first fretted track shown: a click on the caret
   keeps it, two digits make fret 12 as one undo step, a duration, a rest
   inserted and deleted, then everything undone back to the original song.

@@ -93,6 +93,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         the dynamic in force (ADR-0047)
   - [x] Tuplets at the caret: a triplet button and menu in the entry bar,
         Ctrl+2 to Ctrl+9 (ADR-0050)
+  - [x] Voices 1 to 4 at the caret: `voice` in the CLI, Alt+1 to Alt+4 and a
+        voice button in the app (ADR-0032)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
 - [ ] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
