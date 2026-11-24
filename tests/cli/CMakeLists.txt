@@ -193,6 +193,24 @@ add_test(NAME cli.edit_save_point_survives_undo_redo
 set_tests_properties(cli.edit_save_point_survives_undo_redo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"modified\":false}")
 
+# Song credits (ADR-0059): each line on its own, as one undo step; a credit
+# with no text clears the line, and one that reads the text already is no edit.
+set(ELARA_CLI_CREDITS "${CMAKE_CURRENT_BINARY_DIR}/cli-credits.elara")
+add_test(NAME cli.edit_sets_credits
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CREDITS}" "title Etude"
+    "credit subtitle for two guitars" "credit album Studies" "credit words A. Poet"
+    "credit copyright CC0" "credit transcriber Someone" "credit artist The Band"
+    "credit artist" "credit album Studies")
+set_tests_properties(cli.edit_sets_credits PROPERTIES
+  FIXTURES_SETUP cli_credits
+  PASS_REGULAR_EXPRESSION "\"title\":\"Etude\".*\"undo\":{\"count\":8,\"next\":\"Edit song info\"}")
+add_test(NAME cli.dump_credits COMMAND elara-cli --json dump "${ELARA_CLI_CREDITS}")
+set_tests_properties(cli.dump_credits PROPERTIES
+  FIXTURES_REQUIRED cli_credits
+  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\",\"subtitle\":\"for two guitars\",\"album\":\"Studies\",\"words\":\"A. Poet\",\"copyright\":\"CC0\",\"transcriber\":\"Someone\"}")
+add_test(NAME cli.edit_rejects_unknown_credit COMMAND elara-cli edit "credit composer Someone")
+set_tests_properties(cli.edit_rejects_unknown_credit PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME cli.edit_sets_track_mix
   COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
 set_tests_properties(cli.edit_sets_track_mix PROPERTIES

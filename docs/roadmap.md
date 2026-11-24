@@ -116,6 +116,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
+  - [x] Every line of the credits (subtitle, album, words, music, copyright,
+        transcriber, notes): the CLI `credit` step and the song panel (ADR-0059)
   - [x] Bends of any form at the caret: bend, bend and release, pre-bend,
         pre-bend and release, 1/4 to 2 steps, in the CLI and the effects panel
         (ADR-0055)

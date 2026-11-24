@@ -419,6 +419,17 @@ QString ScoreDocument::artist() const {
     return song_ ? qstring(song_->info().artist) : QString();
 }
 
+QStringList ScoreDocument::credits() const {
+    constexpr int kLines = static_cast<int>(core::Credit::Notes) + 1;
+    QStringList lines;
+    lines.reserve(kLines);
+    for (int line = 0; line < kLines; ++line) {
+        lines.append(song_ ? qstring(core::creditOf(song_->info(), static_cast<core::Credit>(line)))
+                           : QString());
+    }
+    return lines;
+}
+
 QStringList ScoreDocument::trackNames() const {
     QStringList names;
     if (!song_) {
@@ -874,6 +885,16 @@ void ScoreDocument::setArtist(const QString& artist) {
     core::SongInfo info = document_->song().info();
     info.artist = artist.toStdString();
     execute(std::make_unique<core::SetSongInfo>(std::move(info)));
+}
+
+void ScoreDocument::setCredit(int line, const QString& text) {
+    if (!document_ || line < 0 || line > static_cast<int>(core::Credit::Notes)) {
+        return;
+    }
+    if (auto change = core::changeCredit(document_->song(), static_cast<core::Credit>(line),
+                                         text.toStdString())) {
+        execute(std::move(change));
+    }
 }
 
 void ScoreDocument::setTempo(int bpm) {

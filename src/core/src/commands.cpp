@@ -252,4 +252,13 @@ std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
     return std::make_unique<CommandGroup>("Change tempo", std::move(steps));
 }
 
+std::unique_ptr<Command> changeCredit(const Song& song, Credit credit, std::string text) {
+    if (creditOf(song.info(), credit) == text) {
+        return nullptr;
+    }
+    SongInfo info = song.info();
+    creditOf(info, credit) = std::move(text);
+    return std::make_unique<SetSongInfo>(std::move(info));
+}
+
 } // namespace elara::core

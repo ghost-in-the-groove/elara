@@ -198,6 +198,23 @@ struct SongInfo {
     friend bool operator==(const SongInfo&, const SongInfo&) = default;
 };
 
+/// One line of a song's credits, a field of SongInfo.
+enum class Credit : std::uint8_t {
+    Title,
+    Subtitle,
+    Artist,
+    Album,
+    Words,
+    Music,
+    Copyright,
+    Transcriber,
+    Notes,
+};
+
+/// The text of `credit` in `info`.
+[[nodiscard]] const std::string& creditOf(const SongInfo& info, Credit credit);
+[[nodiscard]] std::string& creditOf(SongInfo& info, Credit credit);
+
 /// The whole document (ADR-0004). Keeps every staff of every track at exactly
 /// measureCount() measures.
 class Song {

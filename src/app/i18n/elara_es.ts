@@ -536,6 +536,38 @@
         <translation>Negras por minuto</translation>
     </message>
     <message>
+        <source>Credits</source>
+        <translation>Créditos</translation>
+    </message>
+    <message>
+        <source>Subtitle</source>
+        <translation>Subtítulo</translation>
+    </message>
+    <message>
+        <source>Album</source>
+        <translation>Álbum</translation>
+    </message>
+    <message>
+        <source>Words by</source>
+        <translation>Letra de</translation>
+    </message>
+    <message>
+        <source>Music by</source>
+        <translation>Música de</translation>
+    </message>
+    <message>
+        <source>Copyright</source>
+        <translation>Copyright</translation>
+    </message>
+    <message>
+        <source>Transcribed by</source>
+        <translation>Transcrito por</translation>
+    </message>
+    <message>
+        <source>Notes</source>
+        <translation>Notas</translation>
+    </message>
+    <message>
         <source>Measures</source>
         <translation>Compases</translation>
     </message>

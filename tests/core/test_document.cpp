@@ -424,3 +424,34 @@ TEST_CASE("A key signature change runs until the next change", "[core][document]
     CHECK(doc.song() == original);
     CHECK(elara::core::changeKeySignature(original, 0, KeySignature()) == nullptr);
 }
+
+TEST_CASE("Each line of the credits is set on its own as one undo step", "[core][document]") {
+    using elara::core::Credit;
+    Song original = smallSong();
+    original.info().title = "Etude";
+    Document doc(original);
+
+    doc.execute(elara::core::changeCredit(doc.song(), Credit::Album, "Studies"));
+    doc.execute(elara::core::changeCredit(doc.song(), Credit::Words, "A. Poet"));
+    doc.execute(
+        elara::core::changeCredit(doc.song(), Credit::Notes, "Play it slowly.\nThen faster."));
+    const SongInfo& info = doc.song().info();
+    CHECK(info.title == "Etude");
+    CHECK(info.album == "Studies");
+    CHECK(info.words == "A. Poet");
+    CHECK(info.notes == "Play it slowly.\nThen faster.");
+    CHECK(elara::core::creditOf(info, Credit::Words) == "A. Poet");
+    CHECK(elara::core::creditOf(info, Credit::Copyright).empty());
+    CHECK(doc.undoName() == "Edit song info");
+    CHECK(doc.undoCount() == 3);
+
+    // A credit that reads the text already needs no edit; an empty one clears it.
+    CHECK(elara::core::changeCredit(doc.song(), Credit::Album, "Studies") == nullptr);
+    doc.execute(elara::core::changeCredit(doc.song(), Credit::Title, ""));
+    CHECK(doc.song().info().title.empty());
+
+    while (doc.canUndo()) {
+        doc.undo();
+    }
+    CHECK(doc.song() == original);
+}

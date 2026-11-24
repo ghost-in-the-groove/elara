@@ -204,4 +204,9 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
                                                    std::optional<double> bpm);
 
+/// Sets one line of the song's credits to `text` (empty clears it), as one
+/// undo step, "Edit song info"; null when it reads `text` already.
+[[nodiscard]] std::unique_ptr<Command> changeCredit(const Song& song, Credit credit,
+                                                    std::string text);
+
 } // namespace elara::core
