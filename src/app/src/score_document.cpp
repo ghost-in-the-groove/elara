@@ -945,6 +945,60 @@ void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
     }
 }
 
+namespace {
+int denominatorOf(core::NoteValue value);
+} // namespace
+
+QVariantMap ScoreDocument::tempoAt(int measure) const {
+    QVariantMap tempo;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return tempo;
+    }
+    const core::Song& song = document_->song();
+    const auto m = static_cast<std::size_t>(measure);
+    const core::Tempo inForce = song.tempoAt(m);
+    tempo.insert(QStringLiteral("bpm"), static_cast<int>(std::lround(inForce.bpm())));
+    tempo.insert(QStringLiteral("beat"), denominatorOf(inForce.beatUnit().value()));
+    tempo.insert(QStringLiteral("dotted"), inForce.beatUnit().dots() > 0);
+    tempo.insert(QStringLiteral("own"), std::ranges::any_of(song.measureHeader(m).tempoChanges,
+                                                            [](const core::TempoChange& change) {
+                                                                return change.offset ==
+                                                                       core::Fraction{};
+                                                            }));
+    tempo.insert(QStringLiteral("first"), measure == 0);
+    return tempo;
+}
+
+void ScoreDocument::setTempoFrom(int measure, int bpm) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    const core::Song& song = document_->song();
+    const bool removing = bpm <= 0;
+    if (!removing && (bpm < static_cast<int>(core::Tempo::kMinBpm) ||
+                      bpm > static_cast<int>(core::Tempo::kMaxBpm))) {
+        return;
+    }
+    if (measure == 0) {
+        // The song's tempo, counted in the beat it already counts in; the
+        // first measure always has one.
+        if (removing) {
+            return;
+        }
+        const core::Tempo tempo(bpm, song.startTempo().beatUnit());
+        if (tempo != song.startTempo()) {
+            execute(std::make_unique<core::SetStartTempo>(tempo));
+        }
+        return;
+    }
+    const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
+    if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+        execute(std::move(change));
+    }
+}
+
 int ScoreDocument::caretTimeNumerator() const {
     return document_ && caret_.measure < document_->song().measureCount()
                ? document_->song().measureHeader(caret_.measure).timeSignature.numerator()

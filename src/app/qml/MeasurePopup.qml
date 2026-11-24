@@ -15,6 +15,19 @@ Popup {
 
     readonly property color ink: Theme.ink
     readonly property var marks: document.caretNavigation
+    readonly property var tempo: document.caretTempo
+    // The beat as a metronome mark of the music font, dotted when it is.
+    readonly property string beatSymbol: {
+        const notes = {
+            "1": "",
+            "2": "",
+            "4": "",
+            "8": "",
+            "16": "",
+            "32": ""
+        };
+        return (notes[tempo.beat] ?? "") + (tempo.dotted === true ? "" : "");
+    }
 
     // A mark that is on or off, as a rounded chip.
     component Chip: AbstractButton {
@@ -118,6 +131,47 @@ Popup {
                               root.document.caretMeasure, numerator, denominator)
             onKeyChosen: (fifths, minor) => root.document.setKeySignatureFrom(
                              root.document.caretMeasure, fifths, minor)
+        }
+
+        // The tempo the measure starts with (ADR-0042), in the beat the song
+        // counts in there: a new one starts a tempo change, which the cross
+        // takes away again. On the first measure it is the song's tempo.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Tempo")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            MusicSymbol {
+                symbol: root.beatSymbol
+                size: 22
+                color: root.ink
+            }
+            Label {
+                text: "="
+                opacity: 0.75
+            }
+            SpinBox {
+                Layout.fillWidth: true
+                from: 10
+                to: 999
+                editable: true
+                value: root.tempo.bpm ?? 120
+                onValueModified: root.document.setTempoFrom(root.document.caretMeasure, value)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Beats per minute from this measure on")
+            }
+            IconButton {
+                visible: root.tempo.own === true && root.tempo.first !== true
+                iconPath: "M7 7 L17 17 M17 7 L7 17"
+                tip: qsTr("Remove the tempo change")
+                onClicked: root.document.setTempoFrom(root.document.caretMeasure, 0)
+            }
         }
 
         Label {
