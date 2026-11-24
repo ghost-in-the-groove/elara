@@ -651,6 +651,10 @@ ApplicationWindow {
                         restoreMode: Binding.RestoreNone
                     }
                 }
+
+                PracticeControls {
+                    document: score
+                }
             }
         }
 

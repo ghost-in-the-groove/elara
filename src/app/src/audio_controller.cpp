@@ -72,9 +72,15 @@ void AudioController::songEdited() {
         return;
     }
     if (!player_) {
-        // The position waits for the device; it stays inside the song.
-        if (const double end = document_->duration(); position_ > end) {
-            position_ = end;
+        // The position waits for the device, at the same place in the music
+        // when only the timing changed, and inside the song.
+        const auto& sequence = document_->sequence();
+        const double position = placed_
+                                    ? elara::audio::carriedPosition(*placed_, position_, *sequence)
+                                    : std::clamp(position_, 0.0, document_->duration());
+        placed_ = sequence;
+        if (position != position_) {
+            position_ = position;
             emit positionChanged();
         }
         return;
@@ -96,14 +102,25 @@ void AudioController::previewMix() {
 // The document's sequence with the song it was built from, which an edit
 // whose sequence is still being built has left behind; then that edit's mix.
 void AudioController::loadSequence() {
-    player_->load(*document_->sequenceSong(), *document_->sequence());
-    loaded_ = document_->sequence();
+    const auto& sequence = document_->sequence();
+    // Another speed or a tempo edit moves the time of every note: playback
+    // goes on from the same place in the music.
+    const double before = player_->position();
+    const double after =
+        loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    player_->load(*document_->sequenceSong(), *sequence);
+    if (after != before) {
+        player_->seek(after);
+    }
+    loaded_ = sequence;
+    placed_ = sequence;
     player_->updateMix(*document_->song());
 }
 
 // A new song (or none): the transport goes back to its start.
 void AudioController::loadSong() {
     loaded_.reset();
+    placed_ = document_ ? document_->sequence() : nullptr;
     if (player_) {
         player_->pause();
         player_->seek(0.0);
