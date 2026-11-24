@@ -53,6 +53,7 @@ one that replaces them.
 | [0045](0045-played-midi-velocities.md) | Played MIDI velocities | Accepted |
 | [0046](0046-retuning.md) | Retuning a fretted staff | Accepted |
 | [0047](0047-dynamics-at-the-caret.md) | Dynamics at the caret | Accepted |
+| [0048](0048-packages.md) | Packages | Accepted |
 | [0049](0049-signs-and-jumps.md) | Signs and jumps | Accepted |
 | [0050](0050-tuplets-at-the-caret.md) | Tuplets at the caret | Accepted |
 | [0051](0051-shared-measures.md) | Measures shared between copies of a song | Accepted |

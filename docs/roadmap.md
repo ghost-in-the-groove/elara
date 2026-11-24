@@ -139,4 +139,6 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 7 - Distribution
 
 - [ ] Installers: MSIX/MSI (Windows), DMG (macOS), AppImage/Flatpak (Linux)
+  - [x] Portable packages built and smoke-tested by CI: ZIP (Windows), disk image
+        (macOS), tarball (Linux), `elara.py package` (ADR-0048)
 - [ ] Release automation and 1.0
