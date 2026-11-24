@@ -11,6 +11,7 @@
 #include "layout_common.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +21,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -51,6 +53,14 @@ constexpr double kTempoNoteScale = 0.65;    // of its note, from the staff's siz
 constexpr double kTempoNoteLift = 0.35;     // the note's head above the text's baseline
 constexpr double kTempoDotGap = 0.15;       // between the note and its dot
 constexpr double kTempoTextGap = 0.3;       // between the note (or dot) and "= 120"
+constexpr double kNavigationLowest = -1.5;  // the line of signs and jumps at least this high
+constexpr double kNavigationInkGap = 0.6;   // at least between them and the ink below
+constexpr double kNavigationSize = 1.4;     // font size of a jump's text
+constexpr double kNavigationScale = 0.65;   // of a segno or coda, from the staff's size
+constexpr double kNavigationInset = 0.4;    // between the barline and the first sign
+constexpr double kNavigationGap = 0.25;     // between two signs
+constexpr double kNavigationTextGap = 1.0;  // between two texts closing one measure
+constexpr double kNavigationLineGap = 0.3;  // between a line of them and the one above
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -249,6 +259,147 @@ void markRepeats(DisplayList& system, const core::Song& song, std::span<const Me
         text("x" + std::to_string(header.repeatTimes), x, TextAlign::Right, Role::Repeat, m);
     }
     system.top = std::min(system.top, y - thickness / 2);
+}
+
+// "D.S. al Coda": where a jump goes and what ends the music after it.
+std::string jumpText(const core::MeasureHeader& header) {
+    constexpr std::array<std::string_view, 4> kTo{"", "D.C.", "D.S.", "D.S.S."};
+    constexpr std::array<std::string_view, 4> kThen{"", " al Fine", " al Coda", " al Double Coda"};
+    return std::string(kTo.at(static_cast<std::size_t>(header.jump))) +
+           std::string(kThen.at(static_cast<std::size_t>(header.jumpThen)));
+}
+
+// Signs and jumps above everything over the first staff of `system`, under its
+// tempo marks (ADR-0049): segno and coda signs at the start of their measure
+// (two of them for segno segno and double coda), and the texts that close a
+// measure ("Fine", "To Coda", "D.S. al Coda") ending at its barline, the jump
+// last. They share one line; a mark that would overlap one on the line goes
+// on the first line above where it fits.
+void markNavigation(DisplayList& system, const core::Song& song,
+                    std::span<const MeasureBox> measures, std::span<const double> barlineEnds,
+                    const EngravingFont& font) {
+    struct Mark {
+        double left = 0.0;
+        double right = 0.0;
+        double height = 0.0;
+        std::size_t measure = 0;
+        Glyph glyph{};    // a sign, or
+        std::string text; // a text when not empty
+    };
+    std::vector<Mark> marks;
+    for (std::size_t i = 0; i < measures.size(); ++i) {
+        const std::size_t m = measures[i].index;
+        const core::MeasureHeader& header = song.measureHeader(m);
+        // The signs, from the barline before the measure.
+        double x = (i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset;
+        const auto sign = [&](Glyph glyph, int count) {
+            const BoundingBox& box = font.metrics(glyph).box;
+            for (int c = 0; c < count; ++c) {
+                const double width = box.width() * kNavigationScale;
+                marks.push_back(Mark{.left = x,
+                                     .right = x + width,
+                                     .height = box.height() * kNavigationScale,
+                                     .measure = m,
+                                     .glyph = glyph,
+                                     .text = {}});
+                x += width + kNavigationGap;
+            }
+        };
+        if (header.segno || header.segnoSegno) {
+            sign(Glyph::Segno, header.segnoSegno ? 2 : 1);
+        }
+        if (header.coda || header.doubleCoda) {
+            sign(Glyph::Coda, header.doubleCoda ? 2 : 1);
+        }
+        // The texts, right to left from the barline after it.
+        double right = barlineEnds[i];
+        const auto text = [&](std::string content) {
+            const double width = textWidth(content, kNavigationSize);
+            marks.push_back(Mark{.left = right - width,
+                                 .right = right,
+                                 .height = (kTextAscent + kTextDescent) * kNavigationSize,
+                                 .measure = m,
+                                 .glyph = {},
+                                 .text = std::move(content)});
+            right -= width + kNavigationTextGap;
+        };
+        if (header.jump != core::JumpTo::None) {
+            text(jumpText(header));
+        }
+        if (header.toDoubleCoda) {
+            text("To Double Coda");
+        }
+        if (header.toCoda) {
+            text("To Coda");
+        }
+        if (header.fine) {
+            text("Fine");
+        }
+    }
+    if (marks.empty()) {
+        return;
+    }
+
+    // Lines from the bottom: the signs first, then the texts, each left to
+    // right on the lowest line where it overlaps no mark already there.
+    std::ranges::stable_sort(
+        marks, {}, [](const Mark& mark) { return std::pair(!mark.text.empty(), mark.left); });
+    struct Line {
+        std::vector<std::pair<double, double>> taken{}; // left and right of its marks
+        double height = 0.0;                            // of its tallest mark
+    };
+    std::vector<Line> lines;
+    std::vector<std::size_t> lineOf(marks.size());
+    for (std::size_t k = 0; k < marks.size(); ++k) {
+        const Mark& mark = marks[k];
+        const auto fits = [&mark](const Line& line) {
+            return std::ranges::none_of(line.taken, [&mark](const auto& span) {
+                return mark.left < span.second + kNavigationGap &&
+                       span.first < mark.right + kNavigationGap;
+            });
+        };
+        const auto line =
+            static_cast<std::size_t>(std::ranges::find_if(lines, fits) - lines.begin());
+        if (line == lines.size()) {
+            lines.emplace_back();
+        }
+        lines[line].taken.emplace_back(mark.left, mark.right);
+        lines[line].height = std::max(lines[line].height, mark.height);
+        lineOf[k] = line;
+    }
+    std::vector<double> baselines(lines.size());
+    baselines[0] = std::min(kNavigationLowest,
+                            system.top - kNavigationInkGap - kTextDescent * kNavigationSize);
+    for (std::size_t line = 1; line < baselines.size(); ++line) {
+        baselines[line] = baselines[line - 1] - lines[line - 1].height - kNavigationLineGap;
+    }
+    double highest = baselines.back() - lines.back().height;
+    for (std::size_t k = 0; k < marks.size(); ++k) {
+        Mark& mark = marks[k];
+        const double baseline = baselines[lineOf[k]];
+        highest = std::min(highest, baseline - mark.height);
+        if (mark.text.empty()) {
+            const BoundingBox& box = font.metrics(mark.glyph).box;
+            system.glyphs.push_back(
+                GlyphItem{.glyph = mark.glyph,
+                          .origin = {mark.left - box.southWest.x * kNavigationScale,
+                                     baseline + box.southWest.y * kNavigationScale},
+                          .role = Role::Navigation,
+                          .measure = mark.measure,
+                          .scale = kNavigationScale});
+        } else {
+            TextItem item;
+            item.text = std::move(mark.text);
+            item.origin = {mark.right, baseline};
+            item.size = kNavigationSize;
+            item.align = TextAlign::Right;
+            item.italic = true;
+            item.role = Role::Navigation;
+            item.measure = mark.measure;
+            system.texts.push_back(std::move(item));
+        }
+    }
+    system.top = std::min(system.top, highest);
 }
 
 // The metronome note of a beat unit.
@@ -565,6 +716,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         append(system, std::move(staff));
     }
     markRepeats(system, song, measures, barlineEnds, font);
+    markNavigation(system, song, measures, barlineEnds, font);
     markTempo(system, song, measures, font);
     const double height = previousY + previousHeight;
     if (writers.size() > 1) {
