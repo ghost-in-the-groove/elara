@@ -267,6 +267,8 @@ constexpr std::array kEditNames{
     Translation{"Transpose", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Transpose")},
     Translation{"Change effect", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change effect")},
     Translation{"Change bend", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change bend")},
+    Translation{"Change beat effects",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change beat effects")},
 };
 
 // The names of Tuning::presetNames().
@@ -1430,6 +1432,16 @@ QString ScoreDocument::caretStatus() const {
                              : effectName(effect));
         }
     }
+    // Then the beat's own effects.
+    if (const int strum = caretStrum(); strum != 0) {
+        parts.append(strum == 1 ? tr("Strum down") : tr("Strum up"));
+    }
+    if (const int stroke = caretPickStroke(); stroke != 0) {
+        parts.append(stroke == 1 ? tr("Down stroke") : tr("Up stroke"));
+    }
+    if (const int tremolo = caretTremolo(); tremolo != 0) {
+        parts.append(tr("Tremolo picking 1/%1").arg(tremolo));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -1781,6 +1793,76 @@ void ScoreDocument::setBend(int form, int cents) {
         return;
     }
     enter(std::move(entry));
+}
+
+core::BeatEffects ScoreDocument::beatEffectsAtCaret() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return {};
+    }
+    return core::beatEffectsAt(document_->song(), caret_);
+}
+
+void ScoreDocument::applyBeatEffects(const core::BeatEffects& effects) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
+    }
+    pendingDigit_ = -1;
+    core::Entry entry = core::setBeatEffects(document_->song(), caret_, effects);
+    if (!entry.command) {
+        // Silent when the beat has them already.
+        if (core::beatEffectsAt(document_->song(), caret_) != effects) {
+            emit editFailed(tr("Effects go on notes: put the caret on one."));
+        }
+        return;
+    }
+    enter(std::move(entry));
+}
+
+void ScoreDocument::setStrum(int direction) {
+    if (direction < 0 || direction > 2) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.strum = static_cast<core::Strum>(direction);
+    applyBeatEffects(effects);
+}
+
+void ScoreDocument::setPickStroke(int direction) {
+    if (direction < 0 || direction > 2) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.pickStroke = static_cast<core::PickStroke>(direction);
+    applyBeatEffects(effects);
+}
+
+void ScoreDocument::setTremolo(int value) {
+    std::optional<core::NoteValue> speed;
+    for (const core::NoteValue candidate :
+         {core::NoteValue::Eighth, core::NoteValue::Sixteenth, core::NoteValue::ThirtySecond}) {
+        if (denominatorOf(candidate) == value) {
+            speed = candidate;
+        }
+    }
+    if (value != 0 && !speed) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.tremoloPicking = speed;
+    applyBeatEffects(effects);
+}
+
+int ScoreDocument::caretStrum() const {
+    return static_cast<int>(beatEffectsAtCaret().strum);
+}
+
+int ScoreDocument::caretPickStroke() const {
+    return static_cast<int>(beatEffectsAtCaret().pickStroke);
+}
+
+int ScoreDocument::caretTremolo() const {
+    const auto speed = beatEffectsAtCaret().tremoloPicking;
+    return speed ? denominatorOf(*speed) : 0;
 }
 
 int ScoreDocument::caretBendForm() const {
