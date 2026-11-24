@@ -85,7 +85,7 @@ private:
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
     QVariantMap tuningBefore_;    ///< the first track's tuning before it changed
-    QVariantMap repeatsBefore_; ///< the first measure's repeats before queueRepeats()
+    QVariantMap repeatsBefore_;   ///< the first measure's repeats before queueRepeats()
     QString editProblem_;         ///< the first edit check that failed
     QString failure_;             ///< set by a step that went wrong
     bool entering_ = false;       ///< whether the shown track takes frets
