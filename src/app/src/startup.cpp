@@ -10,6 +10,7 @@
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QVariantList>
 #include <QVariantMap>
 
 #include <array>
@@ -86,6 +87,7 @@ void Startup::queueSteps() {
             queuePitches();
             queueMix();
             queueNavigation();
+            queueRepeats();
             queueTuning();
         }
         return;
@@ -121,6 +123,7 @@ void Startup::queueSteps() {
         queuePitches();
         queueMix();
         queueNavigation();
+        queueRepeats();
         queueTuning();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -546,6 +549,51 @@ void Startup::queueNavigation() {
         check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
                   marks.value(QStringLiteral("jump")).toInt() == 0,
               "undoing the marks did not restore the song");
+        return false;
+    });
+}
+
+// Repeats from the measure popup (ADR-0016): the first measure's start
+// barline toggled with its end repeat played a different number of times,
+// then other endings, each one undo step; both undone, the song must end as it
+// started.
+void Startup::queueRepeats() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("repeats check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        repeatsBefore_ = score_->repeatsAt(0);
+        const bool start = !repeatsBefore_.value(QStringLiteral("start")).toBool();
+        const int times = repeatsBefore_.value(QStringLiteral("times")).toInt() == 3 ? 4 : 3;
+        score_->setRepeats(0, {{QStringLiteral("start"), start}, {QStringLiteral("times"), times}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("start")).toBool() == start &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the repeat was not set");
+        check(score_->undoName() == ScoreDocument::tr("Change repeats"),
+              "the repeat is not one undo step");
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QVariantList first{1, 2};
+        const QVariantList endings =
+            repeatsBefore_.value(QStringLiteral("endings")).toList() == first ? QVariantList{2, 3}
+                                                                              : first;
+        const int times = score_->repeatsAt(0).value(QStringLiteral("times")).toInt();
+        score_->setRepeats(0, {{QStringLiteral("endings"), endings}});
+        const QVariantMap repeats = score_->repeatsAt(0);
+        check(repeats.value(QStringLiteral("endings")).toList() == endings &&
+                  repeats.value(QStringLiteral("times")).toInt() == times,
+              "the endings were not set beside the repeat");
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && score_->repeatsAt(0) == repeatsBefore_,
+              "undoing the repeats did not restore the song");
         return false;
     });
 }

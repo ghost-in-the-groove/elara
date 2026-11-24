@@ -94,6 +94,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretKeyFifths READ caretKeyFifths NOTIFY caretChanged)
     Q_PROPERTY(bool caretKeyMinor READ caretKeyMinor NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
+    Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -221,6 +222,14 @@ public:
     /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
     /// gives them, as one undo step ("Change navigation marks").
     Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
+    /// The repeats of `measure` (ADR-0016): "start" (it opens a repeated
+    /// section), "times" (how often the section it closes plays, 2 to 255, or
+    /// 0 when it closes none) and "endings" (the times through the repeat that
+    /// play it, 1 to 8, in order).
+    Q_INVOKABLE QVariantMap repeatsAt(int measure) const;
+    /// Changes the repeats of `measure` named in `repeats`, keyed as
+    /// repeatsAt() gives them, as one undo step ("Change repeats").
+    Q_INVOKABLE void setRepeats(int measure, const QVariantMap& repeats);
     /// Adds or removes measures at the end of the song.
     Q_INVOKABLE void setMeasureCount(int count);
     /// Adds a track of an instrument preset at the end and shows it.
@@ -317,6 +326,9 @@ public:
     [[nodiscard]] bool caretKeyMinor() const;
     [[nodiscard]] QVariantMap caretNavigation() const {
         return navigationAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] QVariantMap caretRepeats() const {
+        return repeatsAt(static_cast<int>(caret_.measure));
     }
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
