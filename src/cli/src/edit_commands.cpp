@@ -62,6 +62,10 @@ std::vector<std::string_view> splitWords(std::string_view text) {
     return words;
 }
 
+// The lines of the credits, in the order of core::Credit (ADR-0059).
+constexpr std::array<std::string_view, 9> kCreditNames{
+    "title", "subtitle", "artist", "album", "words", "music", "copyright", "transcriber", "notes"};
+
 class Step {
 public:
     explicit Step(std::string_view text) : words_(splitWords(text)) {
@@ -508,6 +512,19 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         SongInfo info = song.info();
         info.title = step.rest(1);
         doc.execute(std::make_unique<SetSongInfo>(std::move(info)));
+    } else if (verb == "credit") { // credit <line> [text]: no text clears the line
+        const std::string_view line = step.word(1);
+        const auto found = std::ranges::find(kCreditNames, line);
+        if (found == kCreditNames.end()) {
+            throw StepSyntaxError(std::format(
+                "credit: title, subtitle, artist, album, words, music, copyright, transcriber "
+                "or notes, not {}",
+                line));
+        }
+        const auto credit = static_cast<core::Credit>(found - kCreditNames.begin());
+        if (auto change = core::changeCredit(song, credit, step.has(2) ? step.rest(2) : "")) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "note") { // note <track> <measure> <string> <fret> <duration>
         const std::size_t track = step.index(1);
         const Note note =
@@ -812,6 +829,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"section <m> [name]\", "
         "\"title <text>\", "
+        "\"credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> "
+        "[text]\", "
         "\"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
         "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "

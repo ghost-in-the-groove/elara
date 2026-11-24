@@ -53,6 +53,8 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString title READ title NOTIFY songChanged)
     Q_PROPERTY(QString artist READ artist NOTIFY songChanged)
+    // Every line of the credits, in the order of elara::core::Credit (ADR-0059).
+    Q_PROPERTY(QStringList credits READ credits NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
     Q_PROPERTY(double duration READ duration NOTIFY sequenceChanged)
@@ -160,6 +162,9 @@ public:
     [[nodiscard]] bool busy() const { return pending_ > 0; }
     [[nodiscard]] QString title() const;
     [[nodiscard]] QString artist() const;
+    /// The song's credits, one line per elara::core::Credit; empty lines when
+    /// no song is open.
+    [[nodiscard]] QStringList credits() const;
     [[nodiscard]] QStringList trackNames() const;
     [[nodiscard]] int measureCount() const;
     /// Seconds the song lasts when played, repeats included.
@@ -264,6 +269,9 @@ public:
     Q_INVOKABLE void newSong(const QString& presetId);
     Q_INVOKABLE void setSongTitle(const QString& title);
     Q_INVOKABLE void setArtist(const QString& artist);
+    /// Sets line `line` (an elara::core::Credit) of the credits to `text`, as
+    /// one edit; empty text clears it.
+    Q_INVOKABLE void setCredit(int line, const QString& text);
     Q_INVOKABLE void setTempo(int bpm);
     /// Change the signature from the first measure until its next change.
     Q_INVOKABLE void setTimeSignature(int numerator, int denominator);
