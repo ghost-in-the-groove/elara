@@ -70,7 +70,7 @@ add_executable(elara_make_test_soundfont audio/make_test_soundfont.cpp)
 elara_target_warnings(elara_make_test_soundfont)
 # Writes the test SFZ instrument for the elara-cli tests that play one (ADR-0066).
 add_executable(elara_make_test_sfz audio/make_test_sfz.cpp)
-target_link_libraries(elara_make_test_sfz PRIVATE elara::audio)
+target_link_libraries(elara_make_test_sfz PRIVATE elara::audio SndFile::sndfile)
 elara_target_warnings(elara_make_test_sfz)
 
 elara_add_unit_tests(io
