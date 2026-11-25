@@ -1581,6 +1581,9 @@ QString ScoreDocument::caretStatus() const {
     }
     parts.append(core::onFreeSlot(song, caret_) ? tr("New beat")
                                                 : tr("Beat %1").arg(caret_.beat + 1));
+    if (const QString chord = caretChord(); !chord.isEmpty()) {
+        parts.append(tr("Chord %1").arg(chord)); // the beat's, before its notes
+    }
     if (caretFretted()) {
         parts.append(tr("String %1").arg(caret_.string));
         if (const auto fret = fretAtCaret()) {
@@ -1651,9 +1654,6 @@ QString ScoreDocument::caretStatus() const {
     }
     if (caretGraceNotes() > 0) {
         parts.append(tr("Grace notes"));
-    }
-    if (const QString chord = caretChord(); !chord.isEmpty()) {
-        parts.append(tr("Chord %1").arg(chord));
     }
     return parts.join(QStringLiteral(" · "));
 }
