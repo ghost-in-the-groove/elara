@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 using elara::core::Beat;
@@ -69,4 +70,36 @@ TEST_CASE("A measure has four voices, all empty at first", "[core][measure]") {
     written.voices[1].beats.push_back(note(NoteValue::Whole));
     CHECK_FALSE(written.isEmpty());
     CHECK(written != measure);
+}
+
+TEST_CASE("Beats share chord symbols and compare them by value", "[core][measure]") {
+    using elara::core::ChordDiagram;
+    using elara::core::ChordSymbol;
+    using elara::core::SharedOptional;
+    constexpr std::int8_t x = ChordDiagram::kMuted;
+    const ChordSymbol am{.name = "Am",
+                         .diagram = ChordDiagram{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}}};
+
+    Beat plain = rest(NoteValue::Quarter);
+    CHECK_FALSE(plain.chord);
+    Beat named = plain;
+    named.chord = SharedOptional<ChordSymbol>(am);
+    REQUIRE(named.chord);
+    CHECK(named.chord->name == "Am");
+    CHECK(named.chord->diagram->frets[5] == x);
+    CHECK(named.isRest()); // a chord symbol does not sound
+    CHECK(named != plain);
+
+    // A copy points to the same symbol; a symbol read again compares equal.
+    const Beat copy = named;
+    CHECK(&*copy.chord == &*named.chord);
+    Beat again = plain;
+    again.chord = SharedOptional<ChordSymbol>(am);
+    CHECK(&*again.chord != &*named.chord);
+    CHECK(again == named);
+
+    again.chord = SharedOptional<ChordSymbol>(ChordSymbol{.name = "Am", .diagram = {}});
+    CHECK(again != named);
+    again.chord.reset();
+    CHECK(again == plain);
 }

@@ -45,4 +45,30 @@ private:
     std::shared_ptr<T> value_;
 };
 
+/// An optional T that its copies share (ADR-0080). It is replaced as a whole,
+/// never changed in place: copying one costs a reference count, and an empty
+/// one only a null pointer. Two compare equal when they hold equal values.
+template <typename T>
+class SharedOptional {
+public:
+    SharedOptional() = default;
+    explicit SharedOptional(T value) : value_(std::make_shared<const T>(std::move(value))) {}
+
+    [[nodiscard]] bool hasValue() const noexcept { return value_ != nullptr; }
+    explicit operator bool() const noexcept { return hasValue(); }
+
+    /// The value; only when there is one.
+    [[nodiscard]] const T& operator*() const noexcept { return *value_; }
+    [[nodiscard]] const T* operator->() const noexcept { return value_.get(); }
+
+    void reset() noexcept { value_.reset(); }
+
+    friend bool operator==(const SharedOptional& a, const SharedOptional& b) {
+        return a.value_ == b.value_ || (a.value_ && b.value_ && *a.value_ == *b.value_);
+    }
+
+private:
+    std::shared_ptr<const T> value_;
+};
+
 } // namespace elara::core

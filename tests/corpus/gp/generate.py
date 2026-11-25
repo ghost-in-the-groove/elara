@@ -31,6 +31,25 @@ def pitch_xml(midi: int, spelled: tuple[str, str] | None = None) -> str:
             f"<Octave>{midi // 12}</Octave></Pitch>")
 
 
+def diagrams(items) -> str:
+    """A DiagramCollection: (id, name, base fret, {string from the lowest: fret})."""
+    xml = []
+    for item_id, name, base, frets in items:
+        cells = "".join(f'<Fret string="{s}" fret="{f}"/>' for s, f in sorted(frets.items()))
+        xml.append(f'<Item id="{item_id}" name="{escape(name)}">'
+                   f'<Diagram stringCount="6" fretCount="5" baseFret="{base}" '
+                   f'barsStates="1 1 1 1 1">{cells}'
+                   '<Property name="ShowName" type="bool" value="true" />'
+                   '<Property name="ShowDiagram" type="bool" value="true" />'
+                   f'</Diagram><Chord><KeyNote step="{name[0]}" accidental="Natural"/></Chord>'
+                   "</Item>")
+    return prop("DiagramCollection", "<Items>" + "".join(xml) + "</Items>")
+
+
+def chord(item_id: int) -> str:
+    return f"<Chord>{cdata(str(item_id))}</Chord>"
+
+
 def prop(name: str, body: str = "<Enable />") -> str:
     return f'<Property name="{name}">{body}</Property>'
 
@@ -114,6 +133,8 @@ class Track:
                 props.append(prop("Tuning", f"<Pitches>{pitches}</Pitches><Flat></Flat>"
                                             f"<Instrument>Guitar</Instrument><Label>{cdata('')}"
                                             f"</Label><LabelVisible>true</LabelVisible>"))
+            if staff.get("diagrams"):
+                props.append(diagrams(staff["diagrams"]))
             staves.append("<Staff><Properties>" + "".join(props) + "</Properties></Staff>")
         chromatic, octave = self.transpose
         lyrics = (f'<Lyrics dispatched="true"><Line><Text>{cdata(self.lyrics)}</Text>'
@@ -256,14 +277,20 @@ CRESCENDO, DIMINUENDO = "<Hairpin>Crescendo</Hairpin>", "<Hairpin>Decrescendo</H
 
 
 def guitar_techniques() -> str:
+    # Chord symbols (ADR-0080): a power chord on the open low strings, an A
+    # shape from the 2nd fret, and one no beat names.
+    chords = [(0, "D5", 0, {0: 0, 1: 0, 2: 0}),
+              (1, "A", 1, {1: 0, 2: 2, 3: 2, 4: 2, 5: 0}),
+              (2, "Bm", 1, {1: 2, 2: 4, 3: 4, 4: 3, 5: 2})]
     guitar = Track("Lead Guitar", set_type="electricGuitar", set_name="Electric Guitar",
-                   program=27, transpose=(0, -1), staves=[{"tuning": DROP_D, "capo": CAPO}])
+                   program=27, transpose=(0, -1),
+                   staves=[{"tuning": DROP_D, "capo": CAPO, "diagrams": chords}])
     bend = (prop("Bended") + prop("BendOriginValue", "<Float>0</Float>")
             + prop("BendOriginOffset", "<Float>0</Float>")
             + prop("BendDestinationValue", "<Float>100</Float>")
             + prop("BendDestinationOffset", "<Float>60</Float>"))
     bar1 = [[
-        Beat("Quarter", [fretted(0, 0, props=[prop("PalmMuted")])]),
+        Beat("Quarter", [fretted(0, 0, props=[prop("PalmMuted")])], elements=[chord(0)]),
         Beat("Eighth", [fretted(1, 0, props=[prop("HopoOrigin")])], tuplet=(3, 2)),
         Beat("Eighth", [fretted(1, 2, props=[prop("HopoDestination")])], tuplet=(3, 2)),
         Beat("Eighth", [fretted(2, 0)], tuplet=(3, 2)),
@@ -275,16 +302,18 @@ def guitar_techniques() -> str:
                                  elements=["<LetRing />"])], elements=[CRESCENDO]),
     ]]
     bar2 = [[
-        Beat("Half", [fretted(5, 3, tie=(True, False))], dynamic="F"),
+        Beat("Half", [fretted(5, 3, tie=(True, False))], dynamic="F", elements=[chord(1)]),
         Beat("Quarter", [fretted(5, 3, tie=(False, True))], dynamic="F"),
+        # A chord the collection does not hold.
         Beat("Quarter", [fretted(0, 0, props=[prop("Muted")], elements=["<Accent>8</Accent>"])],
-             dynamic="FF"),
+             dynamic="FF", elements=[chord(7)]),
     ]]
     bar3 = [[
         Beat("Eighth", [fretted(2, 7)], elements=["<GraceNotes>BeforeBeat</GraceNotes>"]),
         Beat("Quarter", [fretted(2, 5, props=[prop("Slide", "<Flags>1</Flags>")],
                                  elements=["<Accent>1</Accent>"])], dots=1,
-             props=[prop("PickStroke", "<Direction>Down</Direction>")], elements=[DIMINUENDO]),
+             props=[prop("PickStroke", "<Direction>Down</Direction>")],
+             elements=[DIMINUENDO, chord(0)]),
         Beat("Eighth", [fretted(2, 7)], elements=[DIMINUENDO]),
         Beat("Quarter", [], dynamic="MF"),
     ]]
@@ -379,10 +408,11 @@ class Gp6Track:
     table says whether it is a drum kit, and the tuning and capo sit on the track."""
 
     def __init__(self, name, *, program, channel, percussion=False, tuning=None, capo=0,
-                 flat=False, volume=0.795, pan=0.5, state="Default"):
+                 flat=False, volume=0.795, pan=0.5, state="Default", chords=()):
         self.name, self.program, self.channel = name, program, channel
         self.percussion, self.tuning, self.capo, self.flat = percussion, tuning, capo, flat
         self.volume, self.pan, self.state = volume, pan, state
+        self.chords = list(chords)
 
     def xml(self, track_id: int) -> str:
         table = "Percussion" if self.percussion else "Instrument"
@@ -394,6 +424,8 @@ class Gp6Track:
                               + "</Pitches>"))
             if self.flat:
                 props.append(prop("TuningFlat"))
+        if self.chords:
+            props.append(diagrams(self.chords))
         properties = "<Properties>" + "".join(props) + "</Properties>" if props else ""
         return (f'<Track id="{track_id}"><Name>{cdata(self.name)}</Name>'
                 f"<ShortName>{cdata(self.name[:5])}</ShortName><Color>80 160 220</Color>"
@@ -505,8 +537,10 @@ DUET_CAPO = 2
 
 def duet() -> bytes:
     # The mixer: the guitar quieter and to the left, the drums muted.
+    # Guitar Pro 6 keeps the chord diagrams on the track (ADR-0080).
     guitar = Gp6Track("Rhythm Guitar", program=25, channel=0, tuning=EB_STANDARD,
-                      capo=DUET_CAPO, flat=True, volume=0.7, pan=0.25)
+                      capo=DUET_CAPO, flat=True, volume=0.7, pan=0.25,
+                      chords=[(4, "Eb", 0, {0: 0, 1: 2, 2: 2, 3: 1, 4: 0, 5: 0})])
     drums = Gp6Track("Drums", program=0, channel=9, percussion=True, state="Mute")
 
     def note(string, fret, **kwargs):
@@ -516,7 +550,7 @@ def duet() -> bytes:
     kick, snare, hat, crash = (Note(midi=key) for key in (36, 38, 42, 49))
     element_only = Note(props=[prop("Element", "<Element>1</Element>"),
                                prop("Variation", "<Variation>0</Variation>")])
-    bar1 = [[Beat("Quarter", [note(0, 0), note(1, 2), note(2, 2)]),
+    bar1 = [[Beat("Quarter", [note(0, 0), note(1, 2), note(2, 2)], elements=[chord(4)]),
              Beat("Quarter", [note(3, 0)]),
              Beat("Half", [note(4, 1, elements=["<LetRing />"])])]]
     bar2 = [[Beat("Whole", [note(5, 0)])]]

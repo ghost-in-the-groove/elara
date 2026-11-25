@@ -7,6 +7,7 @@
 
 #include <elara/core/validation.hpp>
 
+#include "chord_pool.hpp"
 #include "general_midi.hpp"
 #include "gp_directions.hpp"
 #include "midi_shared.hpp"
@@ -18,6 +19,7 @@
 #include <cmath>
 #include <format>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -32,6 +34,8 @@ using core::Accent;
 using core::Beat;
 using core::BendCurve;
 using core::BendPoint;
+using core::ChordDiagram;
+using core::ChordSymbol;
 using core::Clef;
 using core::Duration;
 using core::Dynamic;
@@ -696,8 +700,9 @@ private:
         }
         Beat beat{.duration = readDuration(flags, track.name, m)};
         if ((flags & 0x02U) != 0) {
-            readChord();
-            warnings_.add(track.name, "chord names and diagrams dropped", m);
+            if (auto chord = readChord(track)) {
+                beat.chord = chords_.share(std::move(*chord));
+            }
         }
         if ((flags & 0x04U) != 0) {
             (void)in_.intByteString();
@@ -763,28 +768,67 @@ private:
         return Duration(value, (flags & 0x01U) != 0 ? 1 : 0, tuplet);
     }
 
-    void readChord() {
-        if (version_ >= 500) {
-            in_.skip(107);
-            return;
-        }
-        const std::uint8_t format = in_.u8();
-        if ((format & 0x01U) == 0) {
-            (void)in_.intByteString(); // name
-            if (in_.i32() != 0) {      // first fret, then six frets
-                in_.skip(6 * 4);
+    /// A beat's chord symbol (ADR-0080): its name and, when it has frets, a
+    /// diagram over the track's strings. The chord's structure (root, kind,
+    /// extensions), barres and fingerings are skipped.
+    std::optional<ChordSymbol> readChord(const TrackData& track) {
+        std::string name;
+        std::int32_t firstFret = 0;
+        std::array<std::int32_t, 7> frets{};
+        frets.fill(ChordDiagram::kMuted);
+        const auto readFrets = [&](std::size_t count) {
+            firstFret = in_.i32();
+            for (std::size_t i = 0; i < count; ++i) {
+                frets.at(i) = in_.i32();
             }
-            return;
-        }
-        if (version_ >= 400) {
+        };
+        if (version_ >= 500) {
+            in_.skip(17); // format, sharp, root, kind, extension, bass, alteration, add
+            name = in_.byteString(21);
+            in_.skip(4);
+            readFrets(7);
+            in_.skip(32);
+        } else if (const std::uint8_t format = in_.u8(); (format & 0x01U) == 0) {
+            name = in_.intByteString();
+            firstFret = in_.i32();
+            if (firstFret != 0) { // six frets follow
+                for (std::size_t i = 0; i < 6; ++i) {
+                    frets.at(i) = in_.i32();
+                }
+            }
+        } else if (version_ >= 400) {
             in_.skip(16);
-            (void)in_.byteString(22);
-            in_.skip(3 + 4 + 7 * 4 + 32);
+            name = in_.byteString(22);
+            in_.skip(3); // fifth, ninth, eleventh
+            readFrets(7);
+            in_.skip(32);
         } else {
             in_.skip(25);
-            (void)in_.byteString(22);
-            in_.skip(76);
+            name = in_.byteString(22);
+            in_.skip(12);
+            readFrets(6);
+            in_.skip(36);
         }
+        ChordSymbol symbol{.name = trimmed(std::move(name)), .diagram = {}};
+        const std::size_t strings = std::min(track.strings.size(), frets.size());
+        const auto played = [](std::int32_t fret) {
+            return fret >= 0 && fret <= Tuning::kMaxFret;
+        };
+        const auto on = frets | std::views::take(strings);
+        if (!track.percussion && std::ranges::any_of(on, played)) {
+            ChordDiagram diagram{
+                .firstFret = static_cast<std::uint8_t>(std::clamp(firstFret, 1, Tuning::kMaxFret)),
+                .frets = {}};
+            for (const std::int32_t fret : on) {
+                diagram.frets.push_back(played(fret) ? static_cast<std::int8_t>(fret)
+                                                     : ChordDiagram::kMuted);
+            }
+            symbol.diagram = std::move(diagram);
+        }
+        if (symbol.name.empty() && !symbol.diagram) {
+            return std::nullopt;
+        }
+        return symbol;
     }
 
     BendCurve readBend() {
@@ -1421,6 +1465,7 @@ private:
     std::vector<HeaderData> headers_;
     std::vector<TrackData> tracks_;
     std::vector<TempoMark> tempos_;
+    detail::ChordPool chords_;
 };
 
 } // namespace

@@ -5,11 +5,14 @@
 #include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/pitch.hpp>
+#include <elara/core/shared_value.hpp>
 #include <elara/core/tuning.hpp>
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace elara::core {
@@ -37,13 +40,38 @@ struct Grace {
     friend bool operator==(const Grace&, const Grace&) = default;
 };
 
+/// Where a chord's strings are stopped, drawn as a small grid (ADR-0080).
+/// `frets[i]` is string i + 1, the top line of the tablature downwards, counted
+/// from the capo like notes' frets; `firstFret` is the fret at the top of the
+/// grid, 1 at the nut.
+struct ChordDiagram {
+    static constexpr std::int8_t kMuted = -1; // a string not played
+
+    std::uint8_t firstFret = 1;
+    std::vector<std::int8_t> frets{};
+
+    friend bool operator==(const ChordDiagram&, const ChordDiagram&) = default;
+};
+
+/// The harmony named above a beat, "Am7" or "C/G", with its diagram on fretted
+/// instruments (ADR-0080). It does not sound.
+struct ChordSymbol {
+    std::string name{};
+    std::optional<ChordDiagram> diagram{};
+
+    friend bool operator==(const ChordSymbol&, const ChordSymbol&) = default;
+};
+
 /// Notes that start together and share a written duration. No notes = a rest.
-/// `graces` lead into the beat, in the order they are played (ADR-0079).
+/// `graces` lead into the beat, in the order they are played (ADR-0079);
+/// `chord` names its harmony, shared by the beats that name the same one
+/// (ADR-0080).
 struct Beat {
     Duration duration{};
     std::vector<Note> notes{};
     BeatEffects effects{};
     std::vector<Grace> graces{};
+    SharedOptional<ChordSymbol> chord{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 

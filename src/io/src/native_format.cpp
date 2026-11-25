@@ -3,19 +3,23 @@
 #include <elara/io/native_format.hpp>
 
 #include "archive.hpp"
+#include "chord_pool.hpp"
 #include <yyjson.h>
 
 #include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace elara::io {
 
@@ -295,6 +299,9 @@ private:
     yyjson_mut_val* beat(const Beat& value) {
         yyjson_mut_val* object = yyjson_mut_obj(doc_);
         addText(object, "duration", value.duration.toString());
+        if (value.chord) {
+            add(object, "chord", chord(*value.chord));
+        }
         if (!value.graces.empty()) {
             yyjson_mut_val* graces = yyjson_mut_arr(doc_);
             for (const Grace& g : value.graces) {
@@ -311,6 +318,22 @@ private:
         }
         if (value.effects != BeatEffects{}) {
             add(object, "effects", beatEffects(value.effects));
+        }
+        return object;
+    }
+
+    yyjson_mut_val* chord(const ChordSymbol& value) {
+        yyjson_mut_val* object = yyjson_mut_obj(doc_);
+        addTextIfAny(object, "name", value.name);
+        if (value.diagram) {
+            yyjson_mut_val* diagram = yyjson_mut_obj(doc_);
+            addInt(diagram, "firstFret", value.diagram->firstFret);
+            yyjson_mut_val* frets = yyjson_mut_arr(doc_);
+            for (const std::int8_t fret : value.diagram->frets) {
+                yyjson_mut_arr_add_int(doc_, frets, fret);
+            }
+            add(diagram, "frets", frets);
+            add(object, "diagram", diagram);
         }
         return object;
     }
@@ -857,6 +880,10 @@ private:
             fail("expected an object");
         }
         Beat beat{.duration = duration(object, "duration"), .notes = {}};
+        if (yyjson_val* chord = optionalObject(object, "chord")) {
+            Scope scope(*this, "chord");
+            beat.chord = readChord(chord);
+        }
         if (yyjson_val* graces = optionalArray(object, "graces")) {
             Scope scope(*this, "graces");
             beat.graces.reserve(yyjson_arr_size(graces));
@@ -876,6 +903,31 @@ private:
             beat.effects = readBeatEffects(effects);
         }
         return beat;
+    }
+
+    // Beats that name the same chord share one symbol (ADR-0080).
+    SharedOptional<ChordSymbol> readChord(yyjson_val* object) {
+        ChordSymbol symbol{.name = std::string(optionalText(object, "name").value_or("")),
+                           .diagram = {}};
+        if (yyjson_val* diagram = optionalObject(object, "diagram")) {
+            Scope scope(*this, "diagram");
+            ChordDiagram grid{.firstFret = static_cast<std::uint8_t>(
+                                  integer(diagram, "firstFret", 1, Tuning::kMaxFret)),
+                              .frets = {}};
+            yyjson_val* frets = requiredArray(diagram, "frets");
+            Scope inner(*this, "frets");
+            const std::size_t count = yyjson_arr_size(frets);
+            if (count < 1 || count > static_cast<std::size_t>(Tuning::kMaxStrings)) {
+                fail(std::format("expected 1 to {} strings", Tuning::kMaxStrings));
+            }
+            grid.frets.reserve(count);
+            forEach(frets, [&](std::size_t, yyjson_val* fret) {
+                grid.frets.push_back(static_cast<std::int8_t>(
+                    integerValue(fret, ChordDiagram::kMuted, Tuning::kMaxFret)));
+            });
+            symbol.diagram = std::move(grid);
+        }
+        return chords_.share(std::move(symbol));
     }
 
     Grace readGrace(yyjson_val* object, int strings) {
@@ -984,6 +1036,7 @@ private:
     }
 
     JsonPath path_;
+    detail::ChordPool chords_;
 };
 
 } // namespace

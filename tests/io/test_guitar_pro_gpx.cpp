@@ -168,6 +168,12 @@ TEST_CASE("Guitar Pro 6: a compressed file keeps its tracks, tunings and drums",
     // The tuning (E-flat, spelled with flats) and the capo sit on the track; the
     // guitar is written an octave above its sound.
     const core::Track& guitar = song.track(0);
+    // So do its chord diagrams (ADR-0080).
+    const core::Beat& first = guitar.staff(0).measure(0).voices[0].beats[0];
+    REQUIRE(first.chord);
+    CHECK(*first.chord == core::ChordSymbol{.name = "Eb",
+                                            .diagram = core::ChordDiagram{
+                                                .firstFret = 1, .frets = {0, 0, 1, 2, 2, 0}}});
     CHECK(guitar.instrument().kind == core::InstrumentKind::Fretted);
     CHECK(guitar.instrument().name == "Acoustic Guitar (steel)");
     CHECK(guitar.instrument().writtenOffset == 12);

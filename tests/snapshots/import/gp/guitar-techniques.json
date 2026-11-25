@@ -1,7 +1,9 @@
 {
  "format": "guitarpro",
  "out": null,
- "warnings": [],
+ "warnings": [
+  "Lead Guitar: chords missing from the diagram collection dropped (measure 2)"
+ ],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -64,6 +66,20 @@
         [
          {
           "duration": "4",
+          "chord": {
+           "name": "D5",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             -1,
+             -1,
+             -1,
+             0,
+             0,
+             0
+            ]
+           }
+          },
           "notes": [
            {
             "pitch": "E2",
@@ -160,6 +176,20 @@
         [
          {
           "duration": "2",
+          "chord": {
+           "name": "A",
+           "diagram": {
+            "firstFret": 2,
+            "frets": [
+             0,
+             2,
+             2,
+             2,
+             0,
+             -1
+            ]
+           }
+          },
           "notes": [
            {
             "pitch": "A4",
@@ -206,6 +236,20 @@
         [
          {
           "duration": "4.",
+          "chord": {
+           "name": "D5",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             -1,
+             -1,
+             -1,
+             0,
+             0,
+             0
+            ]
+           }
+          },
           "graces": [
            {
             "duration": "8",

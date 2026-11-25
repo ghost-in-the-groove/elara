@@ -117,7 +117,9 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
           "[io][guitarpro]") {
     const ImportResult result = load("guitar-techniques.gp");
     const core::Song& song = result.song;
-    CHECK(result.warnings.empty());
+    CHECK(result.warnings ==
+          std::vector<std::string>{
+              "Lead Guitar: chords missing from the diagram collection dropped (measure 2)"});
     // |: 1 |1.2. 2 :|3. 3 |, played three times
     CHECK(song.measureHeader(0).repeatStart);
     CHECK(song.measureHeader(1).repeatTimes == 3);
@@ -197,6 +199,30 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
     CHECK(bar3[0].effects.hairpin == core::Hairpin::Diminuendo);
     CHECK(bar3[1].effects.hairpin == core::Hairpin::Diminuendo);
     CHECK(bar3[2].effects.hairpin == core::Hairpin::None);
+}
+
+TEST_CASE("Guitar Pro: chords come from the staff's diagram collection", "[io][guitarpro]") {
+    // ADR-0080. A diagram counts its strings from the lowest; the model from
+    // string 1, the highest.
+    constexpr std::int8_t x = core::ChordDiagram::kMuted;
+    const ImportResult result = load("guitar-techniques.gp");
+    const core::Staff& staff = result.song.track(0).staff(0);
+    const auto& bar1 = staff.measure(0).voices[0].beats;
+    const auto& bar2 = staff.measure(1).voices[0].beats;
+    const auto& bar3 = staff.measure(2).voices[0].beats;
+    REQUIRE(bar1[0].chord);
+    CHECK(*bar1[0].chord == core::ChordSymbol{.name = "D5",
+                                              .diagram = core::ChordDiagram{
+                                                  .firstFret = 1, .frets = {x, x, x, 0, 0, 0}}});
+    CHECK_FALSE(bar1[1].chord);
+    REQUIRE(bar2[0].chord);
+    CHECK(*bar2[0].chord == core::ChordSymbol{.name = "A",
+                                              .diagram = core::ChordDiagram{
+                                                  .firstFret = 2, .frets = {0, 2, 2, 2, 0, x}}});
+    CHECK_FALSE(bar2[2].chord); // its diagram is missing
+    // The beat after the grace note names the first chord again: one symbol.
+    REQUIRE(bar3[0].chord);
+    CHECK(&*bar3[0].chord == &*bar1[0].chord);
 }
 
 TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", "[io][guitarpro]") {

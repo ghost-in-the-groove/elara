@@ -2,7 +2,6 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
-  "Lead Guitar: chord names and diagrams dropped (measure 3)",
   "Lead Guitar: text dropped (measure 3)"
  ],
  "song": {
@@ -239,6 +238,20 @@
         [
          {
           "duration": "4.",
+          "chord": {
+           "name": "G",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             3,
+             0,
+             0,
+             0,
+             2,
+             3
+            ]
+           }
+          },
           "graces": [
            {
             "duration": "16",
