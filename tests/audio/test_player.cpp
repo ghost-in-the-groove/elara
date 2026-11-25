@@ -513,6 +513,59 @@ TEST_CASE("Player: an A-B loop plays its passage again and again", "[audio][play
     }
 }
 
+TEST_CASE("Player: one made at a device's new sample rate takes over the place in the music",
+          "[audio][player]") {
+    // A device that restarts at another rate (headphones plugged in, Bluetooth
+    // switching profiles) needs a player made at that rate: it goes on from
+    // where the old one was, with its loop, playing or paused as it was.
+    constexpr double kNewRate = 44100.0;
+    const auto playAtNewRate = [](Player& player, double seconds) {
+        const auto frames = static_cast<std::size_t>(std::lround(seconds * kNewRate));
+        std::vector<float> left(frames);
+        std::vector<float> right(frames);
+        for (std::size_t done = 0; done < frames; done += 441) {
+            const std::size_t n = std::min<std::size_t>(441, frames - done);
+            player.render(std::span<float>(left).subspan(done, n),
+                          std::span<float>(right).subspan(done, n));
+        }
+        return left;
+    };
+    const Song s = song(2, 60); // 4 s, the organ on every beat
+    const Sequence sequence(s);
+    Player before(kRate);
+    before.load(s, sequence);
+    before.setLoop(1.0, 2.0);
+    before.play();
+    static_cast<void>(play(before, 1.25));
+    REQUIRE_THAT(before.position(), WithinAbs(1.25, kFrame));
+
+    Player after(kNewRate);
+    after.load(s, sequence);
+    SECTION("playing") {
+        after.takeOver(before);
+        CHECK(after.isPlaying());
+        CHECK_THAT(after.position(), WithinAbs(1.25, 1.0 / kNewRate));
+        // 1 s more: on to B at 2 s, then from A at 1 s again.
+        CHECK(peakLevel(playAtNewRate(after, 1.0)) > 0.02f);
+        CHECK(after.isPlaying());
+        CHECK_THAT(after.position(), WithinAbs(1.25, 1.0 / kNewRate));
+    }
+    SECTION("paused") {
+        before.pause();
+        after.takeOver(before);
+        CHECK_FALSE(after.isPlaying());
+        CHECK(peakLevel(playAtNewRate(after, 0.5)) == 0.0f);
+        CHECK_THAT(after.position(), WithinAbs(1.25, 1.0 / kNewRate));
+    }
+    SECTION("without a loop") {
+        before.setLoop(0.0, 0.0);
+        after.setLoop(1.0, 2.0); // its own loop goes too
+        after.takeOver(before);
+        static_cast<void>(playAtNewRate(after, 1.0));
+        CHECK_THAT(after.position(), WithinAbs(2.25, 1.0 / kNewRate));
+    }
+}
+
 TEST_CASE("Player: without a song there is nothing to count in to", "[audio][player][practice]") {
     Player player(kRate);
     player.play({.clicks = 4, .interval = 0.25});

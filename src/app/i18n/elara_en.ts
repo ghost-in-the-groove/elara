@@ -20,6 +20,13 @@
             <numerusform>%n measures</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n change(s) on import</source>
+        <translation>
+            <numerusform>%n change on import</numerusform>
+            <numerusform>%n changes on import</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>SongPane</name>
@@ -45,6 +52,13 @@
         <translation>
             <numerusform>%n staff</numerusform>
             <numerusform>%n staves</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>Opened %1. %n thing(s) changed or left out.</source>
+        <translation>
+            <numerusform>Opened %1. %n thing changed or left out.</numerusform>
+            <numerusform>Opened %1. %n things changed or left out.</numerusform>
         </translation>
     </message>
     <message numerus="yes">

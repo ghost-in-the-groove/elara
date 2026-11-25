@@ -69,10 +69,17 @@ jobs:
           kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" 2>/dev/null | tail -n 1)
           echo "QT_ROOT_DIR=$kit" >> "$GITHUB_ENV"
 
+      # vcpkg at the manifest's baseline, as ci.yml checks it out: the packages
+      # are built with the vcpkg that CI tests, and package ABIs hash vcpkg's
+      # own scripts, so a newer checkout would miss the binary cache.
       - name: vcpkg
+        id: vcpkg
         shell: bash
         run: |
           git clone https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          baseline=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+          git -C "$RUNNER_TEMP/vcpkg" checkout -q "$baseline"
+          echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
           if [ "$RUNNER_OS" = "Windows" ]; then "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics; else "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics; fi
           echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
@@ -81,7 +88,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('vcpkg.json') }}
+          # The runner image fixes the compiler, which the ABIs hash too; the
+          # same key as ci.yml's, so a runner image both use shares the cache.
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-${{ hashFiles('vcpkg.json') }}
 
       # The runner image has the WiX Toolset 3 (WIX), which CPack's MSI uses.
       - name: WiX Toolset
