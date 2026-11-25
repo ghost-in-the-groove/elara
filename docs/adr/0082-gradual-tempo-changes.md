@@ -40,13 +40,22 @@ linear point at the very start is the start tempo and a gradual change there.
 The native format writes `"gradual": true`. MIDI and MusicXML exports write the
 change as a sudden one with that warning, as the importer used to.
 
+**Drawing.** After the change's mark, or at its column when it keeps the
+tempo in force (as Guitar Pro writes it), "accel." or "rit." in italics on the
+tempo line, as the next change is faster or slower, then a dashed line to that
+change, or to the end of the system; the systems the ramp crosses carry the
+line on from their first measure. A ramp to the same speed, or with no change
+after it, draws nothing more.
+
 ## Consequences
 
 - Imported accelerandos and ritardandos play as written, with no warning.
-- Drawing ("accel.", "rit."), editing (the CLI and the measure popup), MusicXML
-  words and MIDI tempo steps are follow-up work.
+- Editing (the CLI and the measure popup), MusicXML words and MIDI tempo
+  steps are follow-up work.
 - Tests: `core.A gradual tempo change moves to the next tempo along the score`
   (values from the closed form: 4 ln 2 seconds for a whole note from quarter =
   60 to 120), `audio.Sequence: a gradual tempo change speeds the notes up on the
   way`, `io.Guitar Pro: a linear tempo point moves to the next one`, the native
-  round trip, and the MIDI and MusicXML warnings.
+  round trip, the MIDI and MusicXML warnings, and the `notation.Tempo marks: a
+  gradual change ...` layout tests (which way it goes, what it leaves out, and
+  the line across systems).
