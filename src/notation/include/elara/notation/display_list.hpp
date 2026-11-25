@@ -40,7 +40,8 @@ enum class Role : std::uint8_t {
     MeasureNumber, ///< the number of the first measure of a system
     Credit,        ///< title, subtitle, artist, words, music, copyright and page numbers
     TrackName,     ///< the name of a track left of its staves in the first system
-    Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
+    Repeat,        ///< the dots of repeat barlines, the play count ("x3") above them and
+                   ///< measure repeat signs (ADR-0102)
     Volta,         ///< the bracket and numbers of an alternate ending
     Tuplet,        ///< the number of a tuplet and its bracket
     Tempo,         ///< a tempo mark: its note and "= 120"

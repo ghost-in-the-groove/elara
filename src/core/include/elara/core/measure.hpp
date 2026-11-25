@@ -115,6 +115,15 @@ struct Voice {
     friend bool operator==(const Voice&, const Voice&) = default;
 };
 
+/// A measure repeat sign (simile, ADR-0102): the measure plays the music of
+/// the measure, or the two measures, before it instead of music of its own.
+enum class MeasureRepeat : std::uint8_t {
+    None,
+    One,       ///< repeats the measure before
+    TwoFirst,  ///< with the next measure, repeats the two measures before
+    TwoSecond, ///< the second measure of a two-measure repeat
+};
+
 /// The content of one staff in one measure: up to four independent voices.
 struct Measure {
     static constexpr std::size_t kMaxVoices = 4;
@@ -123,6 +132,9 @@ struct Measure {
     /// The clef the staff changes to from the start of this measure until the
     /// next change (ADR-0087); none keeps the clef in force.
     std::optional<Clef> clef{};
+    /// The measure repeats music before it (ADR-0102); repeatSource() says
+    /// which measure is played.
+    MeasureRepeat repeat = MeasureRepeat::None;
 
     [[nodiscard]] bool isEmpty() const noexcept;
 

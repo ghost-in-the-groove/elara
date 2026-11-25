@@ -55,6 +55,7 @@ using core::KeyMode;
 using core::KeySignature;
 using core::Measure;
 using core::MeasureHeader;
+using core::MeasureRepeat;
 using core::Note;
 using core::NoteValue;
 using core::Pitch;
@@ -188,6 +189,20 @@ Clef clefFor(std::string_view name, int octave) {
         return Clef::Percussion;
     }
     return octave == -1 ? Clef::Treble8vb : Clef::Treble;
+}
+
+/// GPIF simile marks (ADR-0102); none for a name it does not know.
+MeasureRepeat repeatFor(std::string_view simile) {
+    if (simile == "Simple") {
+        return MeasureRepeat::One;
+    }
+    if (simile == "FirstOfDouble") {
+        return MeasureRepeat::TwoFirst;
+    }
+    if (simile == "SecondOfDouble") {
+        return MeasureRepeat::TwoSecond;
+    }
+    return MeasureRepeat::None;
 }
 
 // The most times a repeat can say its section is played.
@@ -736,8 +751,14 @@ public:
                 clef_ = clef;
             }
         }
-        if (bar.child("SimileMark")) {
-            warnings_.add(layout.name, "repeat signs (simile) dropped", m);
+        // A simile mark repeats the bar or two bars before (ADR-0102); the
+        // bar's own beats, a rest Guitar Pro keeps there, are not played.
+        if (const std::string simile = trimmed(textOf(bar.child("SimileMark"))); !simile.empty()) {
+            measure.repeat = repeatFor(simile);
+            if (measure.repeat != MeasureRepeat::None) {
+                return;
+            }
+            warnings_.add(layout.name, "simile marks dropped", m);
         }
         const std::vector<int> voiceIds = intsOf(textOf(bar.child("Voices")));
         for (std::size_t v = 0; v < voiceIds.size(); ++v) {

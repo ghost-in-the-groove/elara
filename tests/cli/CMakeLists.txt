@@ -1136,7 +1136,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":140,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":142,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES
@@ -1365,6 +1365,18 @@ add_test(NAME cli.sequence_double_coda
   COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/double-coda.gp")
 set_tests_properties(cli.sequence_double_coda PROPERTIES
   PASS_REGULAR_EXPRESSION "played measures: 1 2 3 4 5 3 4 7\n")
+# Measure repeats (ADR-0102): Guitar Pro's simile marks are kept, the repeated
+# measures sound (4 + 4 + 4 + 4 + 4 + 4 + 1 notes) and show their signs on the
+# notation and the tablature.
+add_test(NAME cli.sequence_simile COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/simile.gp")
+set_tests_properties(cli.sequence_simile PROPERTIES
+  PASS_REGULAR_EXPRESSION "7 measures, 25 notes, 50 events in 14\\.000 s")
+add_test(NAME cli.import_simile COMMAND elara-cli --json import "${ELARA_CORPUS}/gp/simile.gp")
+set_tests_properties(cli.import_simile PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\].*\"repeats\":\\[{\"measure\":1,\"repeat\":\"one\"},{\"measure\":4,\"repeat\":\"two-first\"},{\"measure\":5,\"repeat\":\"two-second\"}\\]")
+add_test(NAME cli.render_simile
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/simile.gp" --view both)
+set_tests_properties(cli.render_simile PROPERTIES PASS_REGULAR_EXPRESSION "\"repeat\":4,")
 # Drawn above the staff: the segno and coda signs, "To Coda" and "D.S. al Coda".
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")

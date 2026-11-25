@@ -161,6 +161,8 @@ enum class Glyph : std::uint8_t {
     Tremolo3,
     // Repeats
     RepeatDot,
+    Repeat1Bar,
+    Repeat2Bars,
     Segno,
     Coda,
     // Metronome marks

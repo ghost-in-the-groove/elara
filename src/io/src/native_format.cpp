@@ -33,6 +33,8 @@ constexpr std::string_view kFormatName = "elara";
 
 constexpr std::array kClefNames = std::to_array<std::string_view>(
     {"treble", "treble-8vb", "bass", "bass-8vb", "alto", "tenor", "percussion"});
+constexpr std::array kRepeatNames =
+    std::to_array<std::string_view>({"none", "one", "two-first", "two-second"});
 constexpr std::array kKindNames =
     std::to_array<std::string_view>({"fretted", "percussion", "keyboard", "pitched"});
 constexpr std::array kSlideInNames =
@@ -296,6 +298,23 @@ private:
         }
         if (clefs != nullptr) {
             add(object, "clefs", clefs);
+        }
+        // The measure repeats (ADR-0102), which stand on empty measures.
+        yyjson_mut_val* repeats = nullptr;
+        for (std::size_t m = 0; m < value.measureCount(); ++m) {
+            if (const MeasureRepeat repeat = value.measure(m).repeat;
+                repeat != MeasureRepeat::None) {
+                if (repeats == nullptr) {
+                    repeats = yyjson_mut_arr(doc_);
+                }
+                yyjson_mut_val* sign = yyjson_mut_obj(doc_);
+                addInt(sign, "measure", static_cast<std::int64_t>(m));
+                addText(sign, "repeat", nameOf(kRepeatNames, repeat));
+                yyjson_mut_arr_append(repeats, sign);
+            }
+        }
+        if (repeats != nullptr) {
+            add(object, "repeats", repeats);
         }
         std::size_t used = value.measureCount(); // trailing empty measures are omitted
         while (used > 0 && value.measure(used - 1).isEmpty()) {
@@ -906,6 +925,7 @@ private:
         forEach(stavesJson, [&](std::size_t s, yyjson_val* staffJson) {
             readMeasures(staffJson, track.staff(s), song.measureCount());
             readClefs(staffJson, track.staff(s), song.measureCount());
+            readRepeats(staffJson, track.staff(s), song.measureCount());
         });
     }
 
@@ -929,6 +949,29 @@ private:
                 fail(std::format("unknown value: {}", name));
             }
             staff.measure(m).clef = *clef;
+        });
+    }
+
+    // The staff's measure repeats (ADR-0102).
+    void readRepeats(yyjson_val* staffJson, Staff& staff, std::size_t measureCount) {
+        yyjson_val* repeats = optionalArray(staffJson, "repeats");
+        if (repeats == nullptr) {
+            return;
+        }
+        Scope scope(*this, "repeats");
+        forEach(repeats, [&](std::size_t, yyjson_val* sign) {
+            if (!yyjson_is_obj(sign)) {
+                fail("expected an object");
+            }
+            const auto m = static_cast<std::size_t>(
+                integer(sign, "measure", 0, static_cast<std::int64_t>(measureCount) - 1));
+            const std::string_view name = requiredText(sign, "repeat");
+            const auto repeat = enumFrom<MeasureRepeat>(kRepeatNames, name);
+            if (!repeat) {
+                Scope inner(*this, "repeat");
+                fail(std::format("unknown value: {}", name));
+            }
+            staff.measure(m).repeat = *repeat;
         });
     }
 

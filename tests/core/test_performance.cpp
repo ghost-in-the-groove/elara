@@ -8,6 +8,7 @@
 #include <vector>
 
 using elara::core::Beat;
+using elara::core::beatOf;
 using elara::core::Duration;
 using elara::core::Dynamic;
 using elara::core::Fraction;
@@ -15,7 +16,9 @@ using elara::core::FretPosition;
 using elara::core::Grace;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
+using elara::core::MeasureRepeat;
 using elara::core::Note;
+using elara::core::noteOf;
 using elara::core::NoteValue;
 using elara::core::Pitch;
 using elara::core::Song;
@@ -294,4 +297,31 @@ TEST_CASE("A hairpin ramps the velocity of the notes under it", "[core][performa
     const std::vector<std::pair<int, int>> expected{
         {60, 48}, {62, 48}, {64, 64}, {55, 64}, {65, 80}, {67, 96}, {69, 80}, {71, 72}, {72, 80}};
     CHECK(velocities == expected);
+}
+
+TEST_CASE("A measure repeat sounds the measure it repeats", "[core][performance]") {
+    Song song = pianoSong(4);
+    Staff& staff = song.track(0).staff(0);
+    // C D | % | E | %: the repeats sound C D and E in their own measures, and
+    // their notes are those written in the measures repeated.
+    staff.measure(0).voices[0].beats = {beat(NoteValue::Half, {note(60)}),
+                                        beat(NoteValue::Half, {note(62)})};
+    staff.measure(1).repeat = MeasureRepeat::One;
+    staff.measure(2).voices[0].beats = {beat(NoteValue::Whole, {note(64, false, Dynamic::F)})};
+    staff.measure(3).repeat = MeasureRepeat::One;
+
+    const std::vector<SoundingNote> notes = soundingNotes(song);
+    std::vector<std::pair<int, Fraction>> heard; // key, start
+    for (const SoundingNote& sounding : notes) {
+        heard.emplace_back(sounding.key, sounding.start);
+    }
+    const std::vector<std::pair<int, Fraction>> expected{{60, Fraction(0)}, {62, Fraction(1, 2)},
+                                                         {60, Fraction(1)}, {62, Fraction(3, 2)},
+                                                         {64, Fraction(2)}, {64, Fraction(3)}};
+    CHECK(heard == expected);
+    REQUIRE(notes.size() == 6);
+    CHECK(notes[2].measure == 1); // where it sounds
+    CHECK(&beatOf(song, notes[2]) == &staff.measure(0).voices[0].beats[0]);
+    CHECK(&noteOf(song, notes[3]) == &staff.measure(0).voices[0].beats[1].notes[0]);
+    CHECK(notes[5].velocity == notes[4].velocity); // the dynamic written in measure 2
 }
