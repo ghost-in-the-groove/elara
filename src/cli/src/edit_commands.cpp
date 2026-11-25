@@ -206,6 +206,9 @@ constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kWhammyForm
 constexpr std::array<std::string_view, 4> kBassTechniques{"none", "tap", "slap", "pop"};
 constexpr std::array<std::string_view, 3> kHairpins{"none", "crescendo", "diminuendo"};
 constexpr std::array<std::string_view, 4> kFermatas{"none", "short", "normal", "long"};
+// The clefs `clef` takes, in the order of core::Clef; drums keep theirs (ADR-0087).
+constexpr std::array<std::string_view, 6> kClefNames{"treble",   "treble-8vb", "bass",
+                                                     "bass-8vb", "alto",       "tenor"};
 constexpr std::array<std::string_view, 2> kSlurs{"none", "on"};
 
 // Directions `strum` and `pick` take (ADR-0056).
@@ -419,6 +422,9 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "chord") { // chord <name> | chord none: the caret's beat (ADR-0080)
         const std::string name = step.rest(1);
         edit = setChordSymbol(song, entry.caret, name == "none" ? std::string() : name);
+    } else if (verb == "clef") { // clef <name>: from the caret's measure on (ADR-0087)
+        edit = setClef(song, entry.caret,
+                       static_cast<core::Clef>(kindOf(verb, step.word(1), kClefNames)));
     } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
         const std::string text = step.rest(1);
         edit = setBeatText(song, entry.caret, text == "none" ? std::string() : text);

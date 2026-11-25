@@ -712,23 +712,30 @@ public:
     StaffReader(const ById& voices, const ById& beats, const ById& notes, const ById& rhythms,
                 const TrackLayout& layout, std::size_t staffIndex, Staff& staff)
         : voices_(voices), beats_(beats), notes_(notes), rhythms_(rhythms), layout_(layout),
-          staffIndex_(staffIndex), staff_(staff) {}
+          staffIndex_(staffIndex), staff_(staff), clef_(staff.clef()) {}
 
-    /// Reads `bar` into measure `m` of the staff.
+    /// Reads `bar` into measure `m` of the staff; bars come in order.
     void readBar(pugi::xml_node bar, std::size_t m, const KeySignature& key,
                  const TimeSignature& time) {
         const TrackLayout& layout = layout_;
         Staff& staff = staff_;
+        Measure& measure = staff.measure(m);
         if (m > 0 && !layout.percussion) {
-            const std::string clef = trimmed(textOf(bar.child("Clef")));
-            if (!clef.empty() && clefFor(clef, -1) != clefFor(clefNameOf(staff.clef()), -1)) {
+            // A clef unlike the bar before's changes it (ADR-0087), keeping the
+            // staff's octave: it is in the instrument's written offset.
+            const std::string name = trimmed(textOf(bar.child("Clef")));
+            const bool octave = staff.clef() == Clef::Treble8vb || staff.clef() == Clef::Bass8vb;
+            const Clef clef = name.empty() ? clef_ : clefFor(name, octave ? -1 : 0);
+            if (clef == Clef::Percussion) {
                 warnings_.add(layout.name, "clef changes dropped", m);
+            } else if (clef != clef_) {
+                measure.clef = clef;
+                clef_ = clef;
             }
         }
         if (bar.child("SimileMark")) {
             warnings_.add(layout.name, "repeat signs (simile) dropped", m);
         }
-        Measure& measure = staff.measure(m);
         const std::vector<int> voiceIds = intsOf(textOf(bar.child("Voices")));
         for (std::size_t v = 0; v < voiceIds.size(); ++v) {
             if (voiceIds[v] < 0) {
@@ -779,24 +786,6 @@ public:
     [[nodiscard]] Warnings takeWarnings() { return std::move(warnings_); }
 
 private:
-    static std::string_view clefNameOf(Clef clef) {
-        switch (clef) {
-        case Clef::Bass:
-        case Clef::Bass8vb:
-            return "F4";
-        case Clef::Alto:
-            return "C3";
-        case Clef::Tenor:
-            return "C4";
-        case Clef::Percussion:
-            return "Neutral";
-        case Clef::Treble:
-        case Clef::Treble8vb:
-            return "G2";
-        }
-        return "G2";
-    }
-
     Duration durationOf(int rhythmId, const std::string& who, std::size_t m) {
         if (const auto known = durations_.find(rhythmId); known != durations_.end()) {
             return known->second;
@@ -1103,6 +1092,7 @@ private:
     const TrackLayout& layout_;
     std::size_t staffIndex_;
     Staff& staff_;
+    Clef clef_; // in force at the bar read last
     Warnings warnings_;
     std::unordered_map<int, Duration> durations_;
 };

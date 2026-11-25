@@ -790,6 +790,66 @@ TEST_CASE("MusicXML: slurs from grace notes, between voices or without an end ar
     }
 }
 
+TEST_CASE("MusicXML: clef changes hold from the measure they start", "[musicxml][clef]") {
+    // ADR-0087: a change at a measure's start is its own; one after the
+    // measure's notes, or in the middle of them (with a warning), goes to the
+    // next measure.
+    const auto clef = [](std::string_view sign, int line) {
+        return std::format("<attributes><clef><sign>{}</sign><line>{}</line></clef></attributes>",
+                           sign, line);
+    };
+    const std::string four =
+        quarterNote("C", "") + quarterNote("D", "") + quarterNote("E", "") + quarterNote("F", "");
+    const ImportResult result = parse(
+        onePart(clef("G", 2) + four + R"(</measure><measure number="2">)" + clef("F", 4) + four +
+                R"(</measure><measure number="3">)" + four + clef("C", 3) +
+                R"(</measure><measure number="4">)" + quarterNote("G", "") + quarterNote("A", "") +
+                clef("G", 2) + quarterNote("B", "") + quarterNote("C", "") +
+                R"(</measure><measure number="5">)" + clef("G", 2) + four));
+    const core::Staff& staff = result.song.track(0).staff(0);
+    REQUIRE(result.song.measureCount() == 5);
+    CHECK(staff.clef() == core::Clef::Treble);
+    CHECK(staff.measure(0).clef == std::nullopt);
+    CHECK(staff.measure(1).clef == core::Clef::Bass);
+    CHECK(staff.measure(2).clef == std::nullopt);
+    CHECK(staff.measure(3).clef == core::Clef::Alto);
+    CHECK(staff.measure(4).clef == core::Clef::Treble);
+    CHECK(staff.clefAt(2) == core::Clef::Bass);
+    CHECK(result.warnings.size() == 1);
+    CHECK(
+        hasWarning(result, "clef changes inside a measure moved to the next measure", "measure 4"));
+}
+
+TEST_CASE("MusicXML: clef changes keep the staff's octave and its percussion", "[musicxml][clef]") {
+    const auto part = [](std::string_view first, std::string_view change) {
+        return parse(onePart(std::format("<attributes>{}</attributes>", first) +
+                             quarterNote("C", "") + R"(</measure><measure number="2">)" +
+                             std::format("<attributes>{}</attributes>", change) +
+                             quarterNote("C", "")));
+    };
+    const std::string octaveTreble =
+        "<clef><sign>G</sign><line>2</line><clef-octave-change>-1</clef-octave-change></clef>";
+    const std::string octaveBass =
+        "<clef><sign>F</sign><line>4</line><clef-octave-change>-1</clef-octave-change></clef>";
+
+    // A guitar's octave clef changes to the bass clef an octave down.
+    ImportResult result = part(octaveTreble, octaveBass);
+    CHECK(result.warnings.empty());
+    CHECK(result.song.track(0).staff(0).clef() == core::Clef::Treble8vb);
+    CHECK(result.song.track(0).staff(0).measure(1).clef == core::Clef::Bass8vb);
+
+    // Its octave is the staff's: a change without it keeps it, with a warning.
+    result = part(octaveTreble, "<clef><sign>F</sign><line>4</line></clef>");
+    CHECK(result.song.track(0).staff(0).measure(1).clef == core::Clef::Bass8vb);
+    CHECK(hasWarning(result, "clef octave changes dropped", "measure 2"));
+
+    // Percussion clefs do not change.
+    result =
+        part("<clef><sign>G</sign><line>2</line></clef>", "<clef><sign>percussion</sign></clef>");
+    CHECK(result.song.track(0).staff(0).measure(1).clef == std::nullopt);
+    CHECK(hasWarning(result, "clef changes dropped", "measure 2"));
+}
+
 TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[musicxml]") {
     // |: 1 |1.2. 2 :|3. 3 |, played three times, as notation programs write it.
     const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";

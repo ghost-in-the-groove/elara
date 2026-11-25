@@ -19,7 +19,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | créditos | credits | `Role::Credit` | Title, subtitle, artist, words and music by, copyright and page numbers |
 | lista de visualización | display list | `DisplayList` | What layout produces: glyphs, lines, beams, text and curves in staff spaces (ADR-0012) |
 | carril de técnicas | technique lane | `Lane` | Band above a staff for palm mute, let ring, vibrato... (ADR-0013) |
-| clave | clef | `Clef` | |
+| clave | clef | `Clef` | A staff's clef; a measure can change it until the next change, `Staff::clefAt()` (ADR-0087) |
 | compás (unidad) | measure | `Measure` | Not "bar"; one staff's content |
 | cabecera de compás | measure header | `MeasureHeader` | Song-wide: signatures, repeats |
 | indicación de compás | time signature | `TimeSignature` | |

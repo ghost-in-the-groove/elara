@@ -150,6 +150,9 @@ core::Song richSong() {
         beat("1", {Note{.pitch = Pitch(Step::C, 0, 5)}, Note{.pitch = Pitch(Step::E, -1, 5)}})};
     song.track(2).staff(1).measure(2).voices[0].beats = {
         beat("1", {Note{.pitch = Pitch(Step::C, 1, 3)}})};
+    // Clef changes, one on an empty measure at the end (ADR-0087).
+    song.track(2).staff(1).measure(1).clef = Clef::Treble;
+    song.track(2).staff(1).measure(4).clef = Clef::Tenor;
     song.track(3).staff(0).measure(4).voices[0].beats = {
         beat("breve", {Note{.pitch = Pitch::fromMidi(36)}, Note{.pitch = Pitch::fromMidi(42)}})};
     return song;
@@ -215,6 +218,11 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("tuning":"D2 A2 D3 G3 B3 E4","capo":2)") != std::string::npos);
     CHECK(json.find(R"({"duration":"4."})") != std::string::npos); // a rest
     CHECK(json.find(R"("clef":"treble-8vb")") != std::string::npos);
+    CHECK(
+        json.find(
+            R"("clef":"bass","clefs":[{"measure":1,"clef":"treble"},{"measure":4,"clef":"tenor"}],)") !=
+        std::string::npos);
+    CHECK(json.find(R"("clefs":[])") == std::string::npos);
     CHECK(json.find(R"("slideIn":"from-below")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"crescendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"diminuendo")") != std::string::npos);
@@ -296,6 +304,14 @@ TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     CHECK(error(R"({"format":"elara","formatVersion":1,"tracks":[{"name":"x",
         "instrument":{"kind":"pitched"},"mix":{"pan":"left"},"staves":[{"clef":"treble"}]}]})")
               .starts_with("tracks[0].mix.pan:"));
+
+    // A clef change past the song's end, or to no clef Elara knows.
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","clefs":[{"measure":1,"clef":"bass"}]}]}]})")
+              .starts_with("tracks[0].staves[0].clefs[0].measure:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","clefs":[{"measure":0,"clef":"soprano"}]}]}]})")
+              .starts_with("tracks[0].staves[0].clefs[0].clef:"));
 
     // More measures in a staff than in the song.
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",

@@ -13,12 +13,14 @@
 #include <filesystem>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
 using elara::core::Beat;
+using elara::core::Clef;
 using elara::core::Duration;
 using elara::core::Dynamic;
 using elara::core::KeyMode;
@@ -96,15 +98,15 @@ Note* firstNote(Measure& measure) {
     return nullptr;
 }
 
-// One edit of the kinds an editor makes: a measure's notes, a note's effects or
-// a measure's header, at a random place.
+// One edit of the kinds an editor makes: a measure's notes, a note's effects, a
+// measure's header or a staff's clef, at a random place.
 void edit(Song& song, std::mt19937& random) {
     const std::size_t m = pick(random, song.measureCount());
     const std::size_t t = pick(random, song.trackCount());
     Track& track = song.track(t);
     auto& staff = track.staff(pick(random, track.staffCount()));
     auto& header = song.measureHeader(m);
-    switch (pick(random, 10)) {
+    switch (pick(random, 11)) {
     case 0: // another measure's notes, as paste does
         staff.measure(m) = staff.measure(pick(random, song.measureCount()));
         break;
@@ -148,6 +150,12 @@ void edit(Song& song, std::mt19937& random) {
             header.repeatEnd() ? 0 : static_cast<std::uint8_t>(2 + pick(random, 3));
         header.alternateEndings = static_cast<std::uint8_t>(pick(random, 4));
         break;
+    case 9: { // a clef change, or none (ADR-0087)
+        constexpr Clef kClefs[] = {Clef::Treble, Clef::Bass, Clef::Alto};
+        const std::size_t which = pick(random, 4);
+        staff.measure(m).clef = which < 3 ? std::optional(kClefs[which]) : std::nullopt;
+        break;
+    }
     default:
         header.keySignature = KeySignature(static_cast<int>(pick(random, 15)) - 7, KeyMode::Major);
         break;

@@ -687,6 +687,54 @@ TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export
     requireSame(expected, roundTrip(song));
 }
 
+TEST_CASE("MusicXML export: clef changes come back on their staves", "[musicxml][export][clef]") {
+    // ADR-0087: a measure that changes a staff's clef writes it in its
+    // attributes, numbered by staff; a change to the clef in force writes none.
+    core::Song song;
+    song.appendMeasures(4);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration whole(core::NoteValue::Whole);
+    for (std::size_t s = 0; s < 2; ++s) {
+        for (std::size_t m = 0; m < 4; ++m) {
+            song.track(p).staff(s).measure(m).voices[0].beats = {
+                beatOf(whole, {core::Note{.pitch = core::Pitch::fromMidi(s == 0 ? 72 : 48)}})};
+        }
+    }
+    song.track(p).staff(1).measure(1).clef = core::Clef::Treble;
+    song.track(p).staff(1).measure(3).clef = core::Clef::Bass;
+    song.track(p).staff(0).measure(2).clef = core::Clef::Treble; // already in force
+
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const std::string& xml = exported.data;
+    const std::string treble = R"(<clef number="2"><sign>G</sign><line>2</line></clef>)";
+    const std::string bass = R"(<clef number="2"><sign>F</sign><line>4</line></clef>)";
+    // A measure's text without the indentation between its tags.
+    const auto measure = [&](int number) {
+        const auto from = xml.find(std::format(R"(<measure number="{}")", number));
+        const auto to = xml.find("</measure>", from);
+        std::string text;
+        bool between = false;
+        for (const char c : xml.substr(from, to - from)) {
+            if (between && (c == ' ' || c == '\n' || c == '\r')) {
+                continue;
+            }
+            between = c == '>' || (between && c != '<');
+            text.push_back(c);
+        }
+        return text;
+    };
+    CHECK(measure(2).find(treble) != std::string::npos);
+    CHECK(measure(3).find("<clef") == std::string::npos);
+    CHECK(measure(3).find("<attributes>") == std::string::npos);
+    CHECK(measure(4).find(bass) != std::string::npos);
+
+    core::Song expected = song;
+    expected.track(p).staff(0).measure(2).clef = std::nullopt;
+    requireSame(expected, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
           "[musicxml][export]") {
     // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the

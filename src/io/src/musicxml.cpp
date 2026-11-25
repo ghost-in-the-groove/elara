@@ -452,6 +452,33 @@ Clef clefFor(const ClefInfo& clef, const std::optional<Tuning>& tuning) {
     return clef.sign == "TAB" ? Clef::Treble8vb : Clef::Treble;
 }
 
+/// The clef a change to `clef` gives a staff whose own clef is `own`
+/// (ADR-0087), and whether the change's octave differs from the staff's: an
+/// octave clef's octave is in the instrument's written offset, the same for
+/// the whole staff, so a change keeps the staff's. Nullopt for a change
+/// Elara does not draw: to or from percussion or tablature.
+struct ClefChange {
+    std::optional<Clef> clef;
+    bool octaveDropped = false;
+};
+
+ClefChange clefChange(const ClefInfo& clef, Clef own) {
+    const bool octave = own == Clef::Treble8vb || own == Clef::Bass8vb;
+    if (own == Clef::Percussion) {
+        return {};
+    }
+    if (clef.sign == "G" || clef.sign == "F") {
+        const bool treble = clef.sign == "G";
+        return {.clef = octave ? (treble ? Clef::Treble8vb : Clef::Bass8vb)
+                               : (treble ? Clef::Treble : Clef::Bass),
+                .octaveDropped = clef.octaveChange != (octave ? -1 : 0)};
+    }
+    if (clef.sign == "C") {
+        return {.clef = clef.line == 4 ? Clef::Tenor : Clef::Alto, .octaveDropped = false};
+    }
+    return {};
+}
+
 /// Reads the staff structure of a part before its notes: how many staves, which
 /// are tablature, tunings, transposition and the kind of instrument.
 PartLayout layoutPart(pugi::xml_node part, const PartInfo& info, Warnings& warnings) {
@@ -653,6 +680,13 @@ struct TextMark {
     Fraction onset{};
     std::optional<std::size_t> staff{}; // nullopt: the first staff
     std::string text{};
+};
+
+/// A clef change read in a measure, where its <attributes> stood (ADR-0087).
+struct ClefMark {
+    std::size_t staff = 0;
+    Fraction onset{};
+    Clef clef = Clef::Treble;
 };
 
 /// The beat of `measure` that starts at `onset`, the voices looked at in
@@ -1037,7 +1071,13 @@ public:
         : info_(info), layout_(std::move(layout)), first_(first), score_(score),
           warnings_(warnings), voiceIds_(layout_.staves.size()),
           dynamics_(layout_.staves.size(), Dynamic::MF),
-          hairpins_(layout_.staves.size(), Hairpin::None), measures_(layout_.staves.size()) {}
+          hairpins_(layout_.staves.size(), Hairpin::None), measures_(layout_.staves.size()) {
+        nextClefs_.resize(layout_.staves.size());
+        clefs_.reserve(layout_.staves.size());
+        for (const Staff& staff : layout_.staves) {
+            clefs_.push_back(staff.clef());
+        }
+    }
 
     void read(pugi::xml_node part) {
         const auto measures = part.children("measure");
@@ -1107,6 +1147,7 @@ private:
         std::vector<TempoMark>& tempos = tempoMarks_;
         std::vector<ChordMark>& chords = chordMarks_;
         std::vector<TextMark>& texts = textMarks_;
+        clefMarks_.clear();
         events.clear();
         dynamics.clear();
         hairpins.clear();
@@ -1119,7 +1160,7 @@ private:
         for (pugi::xml_node child : measure.children()) {
             const std::string_view name = child.name();
             if (name == "attributes") {
-                readAttributes(child, index, first_ ? &header : nullptr);
+                readAttributes(child, index, cursor, first_ ? &header : nullptr);
             } else if (name == "note") {
                 const NoteParts parts = scanNote(child);
                 if (parts.grace) {
@@ -1256,6 +1297,33 @@ private:
         build(index, events, dynamics, hairpins, time);
         markChords(index, chords);
         markTexts(index, texts);
+        markClefs(index, events, time.measureLength());
+    }
+
+    /// The clef changes read in measure `index` (ADR-0087): one at its start
+    /// is its own; one later moves to the next measure, with a warning when
+    /// notes of its staff follow it in this one.
+    void markClefs(std::size_t index, const std::vector<Event>& events,
+                   const Fraction& measureLength) {
+        for (std::size_t s = 0; s < measures_.size(); ++s) {
+            if (nextClefs_[s] && !measures_[s].empty()) {
+                measures_[s].back().clef = std::exchange(nextClefs_[s], std::nullopt);
+            }
+        }
+        for (const ClefMark& mark : clefMarks_) {
+            if (mark.onset.isZero()) {
+                measures_[mark.staff].back().clef = mark.clef;
+                continue;
+            }
+            const bool notesAfter = std::ranges::any_of(events, [&](const Event& event) {
+                return event.staff == mark.staff && !event.tab && event.onset >= mark.onset &&
+                       event.onset < measureLength;
+            });
+            if (notesAfter) {
+                warn("clef changes inside a measure moved to the next measure", index);
+            }
+            nextClefs_[mark.staff] = mark.clef;
+        }
     }
 
     /// A chord symbol, with a diagram from its <frame> (ADR-0080).
@@ -1314,7 +1382,8 @@ private:
         }
     }
 
-    void readAttributes(pugi::xml_node attributes, std::size_t index, MeasureHeader* header) {
+    void readAttributes(pugi::xml_node attributes, std::size_t index, const Fraction& cursor,
+                        MeasureHeader* header) {
         if (const pugi::xml_node divisions = attributes.child("divisions")) {
             const int value = divisions.text().as_int(0);
             divisions_ = value > 0 ? value : 1;
@@ -1336,10 +1405,24 @@ private:
                 lastClefs_.resize(number);
             }
             const ClefInfo info = readClef(clef);
-            if (lastClefs_[number - 1] && *lastClefs_[number - 1] != info) {
-                warn("clef changes dropped", index);
+            const std::optional<ClefInfo> previous = std::exchange(lastClefs_[number - 1], info);
+            const StaffMap map = staffFor(static_cast<int>(number));
+            if (!previous || *previous == info || map.tab || info.sign == "TAB") {
+                continue; // the staff's own clef, the same again, or a view of the notes
             }
-            lastClefs_[number - 1] = info;
+            const ClefChange change = clefChange(info, layout_.staves[map.staff].clef());
+            if (!change.clef) {
+                warn("clef changes dropped", index);
+                continue;
+            }
+            if (change.octaveDropped) {
+                warn("clef octave changes dropped", index);
+            }
+            if (*change.clef != clefs_[map.staff]) {
+                clefs_[map.staff] = *change.clef;
+                clefMarks_.push_back(
+                    ClefMark{.staff = map.staff, .onset = cursor, .clef = *change.clef});
+            }
         }
         if (const pugi::xml_node transpose = attributes.child("transpose");
             transpose && readTranspose(transpose) != layout_.transposition) {
@@ -2467,7 +2550,9 @@ private:
     int divisions_ = 1;
     Fraction oneDivision_{1, 4};
     KeySignature concertKey_{};
-    std::vector<std::optional<ClefInfo>> lastClefs_{};
+    std::vector<std::optional<ClefInfo>> lastClefs_{}; // per MusicXML staff number
+    std::vector<Clef> clefs_{};                        // per staff, in force when read
+    std::vector<std::optional<Clef>> nextClefs_{};     // per staff, for the next measure
     std::vector<std::vector<std::string>> voiceIds_;   // per staff, MusicXML voice ids
     std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
     std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
@@ -2484,6 +2569,7 @@ private:
     std::vector<ChordMark> chordMarks_{};
     std::vector<TextMark> textMarks_{};
     std::vector<TempoMark> tempoMarks_{};
+    std::vector<ClefMark> clefMarks_{};
     std::vector<PendingGrace> pendingGraces_{};
     std::vector<std::string> verseNames_{}; // lyric numbers that are names, in order
     std::vector<Placed> placed_{};

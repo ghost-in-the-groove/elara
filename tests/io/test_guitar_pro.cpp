@@ -5,6 +5,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <miniz.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -378,6 +380,37 @@ TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {
         imported->song.track(0).staff(0).measure(0).voices[0].beats[0].notes[0];
     CHECK(note.position == core::FretPosition{.string = 6, .fret = 3});
     CHECK(note.pitch.midiNumber() == 40 + 5 + 3);
+}
+
+TEST_CASE("Guitar Pro: a bar whose clef differs from the bar before changes it",
+          "[io][guitarpro][clef]") {
+    // ADR-0087: the change keeps the staff's octave (the guitar's treble clef
+    // sounds an octave down, and so does its bass clef); a neutral clef on a
+    // pitched staff is dropped.
+    const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0", beat, whole);
+    const std::array clefs{"F4", "F4", "G2", "Neutral"};
+    std::string masterBars;
+    std::string bars;
+    for (std::size_t m = 1; m <= clefs.size(); ++m) {
+        masterBars += std::format("<MasterBar><Time>4/4</Time><Bars>{}</Bars></MasterBar>", m);
+        bars += std::format(R"(<Bar id="{}"><Clef>{}</Clef><Voices>-1 -1 -1 -1</Voices></Bar>)", m,
+                            clefs[m - 1]);
+    }
+    score.insert(score.find("</MasterBars>"), masterBars);
+    score.insert(score.find("</Bars><Voices>"), bars);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    const core::Staff& staff = imported->song.track(0).staff(0);
+    REQUIRE(imported->song.measureCount() == 5);
+    CHECK(staff.clef() == core::Clef::Treble8vb);
+    CHECK(staff.measure(0).clef == std::nullopt);
+    CHECK(staff.measure(1).clef == core::Clef::Bass8vb);
+    CHECK(staff.measure(2).clef == std::nullopt);
+    CHECK(staff.measure(3).clef == core::Clef::Treble8vb);
+    CHECK(staff.measure(4).clef == std::nullopt);
+    CHECK(imported->warnings == std::vector<std::string>{"Gtr: clef changes dropped (measure 5)"});
 }
 
 TEST_CASE("Guitar Pro: a tapped note taps its beat", "[io][guitarpro]") {

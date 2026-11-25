@@ -163,6 +163,37 @@ TEST_CASE("Entry: chord symbols on staves without frets have no diagram", "[core
     CHECK_FALSE(doc.song().track(1).staff(0).measure(0).voices[0].beats[0].chord->diagram);
 }
 
+TEST_CASE("Entry: the clef changes from the caret's measure", "[core][entry][clef]") {
+    // ADR-0087: one undo step, the staff's octave kept, the notes unchanged.
+    Document doc(guitarSong());
+    REQUIRE(doc.song().track(0).staff(0).clef() == Clef::Treble8vb);
+    const std::vector<Beat> beats = firstVoice(doc.song(), 1).beats;
+    run(doc, setClef(doc.song(), at(1, 0), Clef::Bass));
+    CHECK(doc.undoName() == "Change clef");
+    const Staff& staff = doc.song().track(0).staff(0);
+    CHECK(staff.measure(1).clef == Clef::Bass8vb);
+    CHECK(staff.clefAt(0) == Clef::Treble8vb);
+    CHECK(staff.clefAt(2) == Clef::Bass8vb);
+    CHECK(firstVoice(doc.song(), 1).beats == beats);
+
+    // The clef in force changes nothing; the clef of the measure before
+    // removes the change.
+    CHECK(setClef(doc.song(), at(1, 0), Clef::Bass8vb).command == nullptr);
+    CHECK(setClef(doc.song(), at(2, 0), Clef::Bass).command == nullptr);
+    run(doc, setClef(doc.song(), at(1, 0), Clef::Treble));
+    CHECK(doc.song().track(0).staff(0).measure(1).clef == std::nullopt);
+    doc.undo();
+    CHECK(doc.song().track(0).staff(0).measure(1).clef == Clef::Bass8vb);
+
+    // C clefs have no octave form; drums keep their clef.
+    run(doc, setClef(doc.song(), at(2, 0), Clef::Tenor));
+    CHECK(doc.song().track(0).staff(0).measure(2).clef == Clef::Tenor);
+    CHECK_THROWS_AS(setClef(doc.song(), at(0, 0), Clef::Percussion), std::invalid_argument);
+    Song drums = guitarSong();
+    drums.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    CHECK(setClef(drums, Caret{.track = 1, .measure = 1}, Clef::Bass).command == nullptr);
+}
+
 TEST_CASE("Entry: beat text is written above the caret's beat", "[core][entry]") {
     // ADR-0081: on a note and on a rest, trimmed, one undo step each.
     Song song = guitarSong();
@@ -544,6 +575,16 @@ TEST_CASE("Entry: a note name added to a chord goes above its highest note", "[c
     const Staff& staff = guitar.song().track(0).staff(0);
     CHECK(firstVoice(guitar.song(), 1).beats[0].notes ==
           std::vector<Note>{staff.frettedNote(1, 0), staff.frettedNote(2, 8)});
+}
+
+TEST_CASE("Entry: a first note name starts near the middle line of the clef in force",
+          "[core][entry][clef]") {
+    Document doc(fluteSong());
+    run(doc, setClef(doc.song(), at(0, 0), Clef::Bass));
+    CHECK(doc.song().track(0).staff(0).measure(0).clef == Clef::Bass);
+    // The C nearest D3, the middle line of the bass staff, not of the treble staff.
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    CHECK(firstVoice(doc.song(), 0).beats.at(0).notes.at(0).pitch == Pitch(Step::C, 0, 3));
 }
 
 TEST_CASE("Entry: note names need a pitched staff and the MIDI range", "[core][entry]") {

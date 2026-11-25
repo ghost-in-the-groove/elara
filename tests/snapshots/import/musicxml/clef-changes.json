@@ -1,0 +1,473 @@
+{
+ "format": "musicxml",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Clef Changes"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Cello",
+    "instrument": {
+     "name": "Cello",
+     "kind": "pitched"
+    },
+    "staves": [
+     {
+      "clef": "bass",
+      "clefs": [
+       {
+        "measure": 1,
+        "clef": "tenor"
+       },
+       {
+        "measure": 4,
+        "clef": "bass"
+       }
+      ],
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F3"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A4"
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "E4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B2"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A2"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G2"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C6"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "B5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "A5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G5"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "clefs": [
+       {
+        "measure": 2,
+        "clef": "treble"
+       },
+       {
+        "measure": 4,
+        "clef": "bass"
+       }
+      ],
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C3"
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G3"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "E3"
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "B3"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D4"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "F3"
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D3"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G2"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 12.0,
+ "issues": []
+}

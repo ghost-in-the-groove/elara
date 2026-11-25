@@ -117,6 +117,37 @@ TEST_CASE("Inserting and removing measures moves content in all staves", "[core]
     CHECK_THROWS_AS(song.track(0).staff(0).measure(2), std::out_of_range);
 }
 
+TEST_CASE("A staff's clef holds until a measure changes it", "[core][song][clef]") {
+    Song song;
+    song.addTrack(presetTrack("piano"));
+    song.appendMeasures(6);
+    Staff& left = song.track(0).staff(1);
+    REQUIRE(left.clef() == Clef::Bass);
+    left.measure(2).clef = Clef::Treble;
+    left.measure(4).clef = Clef::Bass;
+
+    CHECK(left.clefAt(0) == Clef::Bass);
+    CHECK(left.clefAt(1) == Clef::Bass);
+    CHECK(left.clefAt(2) == Clef::Treble);
+    CHECK(left.clefAt(3) == Clef::Treble);
+    CHECK(left.clefAt(4) == Clef::Bass);
+    CHECK(left.clefAt(5) == Clef::Bass);
+    CHECK(song.track(0).staff(0).clefAt(3) == Clef::Treble); // the other staff
+    CHECK_THROWS_AS(left.clefAt(6), std::out_of_range);
+
+    // A change on the first measure overrides the staff's own clef.
+    left.measure(0).clef = Clef::Tenor;
+    CHECK(left.clefAt(1) == Clef::Tenor);
+
+    // The change goes with its measure.
+    song.insertMeasures(1, 2);
+    CHECK(left.clefAt(3) == Clef::Tenor);
+    CHECK(left.clefAt(4) == Clef::Treble);
+    song.removeMeasures(0, 4);
+    CHECK(left.clefAt(0) == Clef::Treble);
+    CHECK(left.clefAt(2) == Clef::Bass);
+}
+
 TEST_CASE("A copy of a song shares its measures until either changes one", "[core][song]") {
     Song song;
     song.addTrack(presetTrack("electric-guitar"));

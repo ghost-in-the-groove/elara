@@ -566,6 +566,30 @@
         <translation>Cerrar</translation>
     </message>
     <message>
+        <source>Clef</source>
+        <translation>Clave</translation>
+    </message>
+    <message>
+        <source>Treble</source>
+        <translation>Sol</translation>
+    </message>
+    <message>
+        <source>Bass</source>
+        <translation>Fa</translation>
+    </message>
+    <message>
+        <source>Alto</source>
+        <translation>Do en 3.ª</translation>
+    </message>
+    <message>
+        <source>Tenor</source>
+        <translation>Do en 4.ª</translation>
+    </message>
+    <message>
+        <source>The clef of this staff from this measure on</source>
+        <translation>La clave de este pentagrama desde este compás</translation>
+    </message>
+    <message>
         <source>Tempo</source>
         <translation>Tempo</translation>
     </message>
@@ -1458,6 +1482,10 @@
     <message>
         <source>Remove lyrics</source>
         <translation>Quitar letra</translation>
+    </message>
+    <message>
+        <source>Change clef</source>
+        <translation>Cambiar clave</translation>
     </message>
     <message>
         <source>Tie</source>

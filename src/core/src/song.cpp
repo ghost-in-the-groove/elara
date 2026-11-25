@@ -104,6 +104,16 @@ const Measure& Staff::measure(std::size_t index) const {
     return checkedAt(measures_, index, "Staff: no such measure").get();
 }
 
+Clef Staff::clefAt(std::size_t m) const {
+    checkedAt(measures_, m, "Staff: no such measure");
+    for (std::size_t at = m + 1; at-- > 0;) {
+        if (const std::optional<Clef>& clef = measures_[at].get().clef) {
+            return *clef;
+        }
+    }
+    return clef_;
+}
+
 Note Staff::frettedNote(int string, int fret, SpellingPreference preference) const {
     if (!tuning_) {
         throw std::logic_error("Staff: not a fretted staff");

@@ -1278,6 +1278,16 @@ void Startup::queueEffects() {
         if (!textBefore.isEmpty()) {
             score_->setBeatText(textBefore);
         }
+        // Clef changes (ADR-0087): from the caret's measure on, then back.
+        if (const int clefBefore = score_->caretClef(); clefBefore >= 0) {
+            const int other = clefBefore == 1 ? 0 : 1;
+            score_->setClef(other);
+            check(score_->caretClef() == other &&
+                      score_->undoName() == ScoreDocument::tr("Change clef"),
+                  "the clef did not change from the caret's measure");
+            score_->setClef(clefBefore);
+            check(score_->caretClef() == clefBefore, "the clef did not change back");
+        }
         // Lyrics (ADR-0084): a new verse typed from the caret's measure, shown
         // by the lyrics popup as typed, then taken away.
         if (const int verse = score_->caretVerseCount(); verse < ScoreDocument::maxVerses()) {
