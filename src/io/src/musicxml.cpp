@@ -1301,8 +1301,8 @@ private:
         }
 
         build(index, events, dynamics, hairpins, time);
-        markChords(index, chords);
-        markTexts(index, texts);
+        markChords(index, chords, time.measureLength());
+        markTexts(index, texts, time.measureLength());
         markClefs(index, events, time.measureLength());
     }
 
@@ -1359,13 +1359,21 @@ private:
                                    .symbol = std::move(symbol)});
     }
 
-    /// Each chord symbol goes on the beat of its staff that starts where it
-    /// does, the voices looked at in order.
-    /// The beat of `staff` in measure `index`, the last read, that starts at
-    /// `onset`; where none does, the beat sounding across it splits into tied
-    /// beats, in the first voice that can (ADR-0096). Null when none can.
-    Beat* beatAt(std::size_t index, std::size_t staff, const Fraction& onset) {
+    /// The beat of `staff` in measure `index`, the last read and `length`
+    /// long, that starts at `onset`; where none does, the beat sounding across
+    /// it splits into tied beats, in the first voice that can, and a measure
+    /// rest written as one is written out as rests first (ADR-0096). Null
+    /// when none can.
+    Beat* beatAt(std::size_t index, std::size_t staff, const Fraction& onset,
+                 const Fraction& length) {
         Measure& measure = measures_[staff].back();
+        if (onset < length && std::ranges::all_of(measure.voices, &Voice::isEmpty)) {
+            if (const auto rests = splitLength(length); rests && !rests->empty()) {
+                for (const Duration& rest : *rests) {
+                    measure.voices[0].beats.push_back(Beat{.duration = rest});
+                }
+            }
+        }
         if (Beat* beat = beatStartingAt(measure, onset)) {
             return beat;
         }
@@ -1401,9 +1409,11 @@ private:
         }
     }
 
-    void markChords(std::size_t index, std::vector<ChordMark>& chords) {
+    /// Each chord symbol goes on the beat of its staff that starts where it
+    /// does, the voices looked at in order (ADR-0080, ADR-0096).
+    void markChords(std::size_t index, std::vector<ChordMark>& chords, const Fraction& length) {
         for (ChordMark& mark : chords) {
-            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset);
+            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset, length);
             if (target == nullptr) {
                 warn("chord symbols between beats dropped", index);
                 continue;
@@ -1414,9 +1424,9 @@ private:
 
     /// Each direction's words become the text of the beat of its staff that
     /// starts where it does; two on one beat join with a space (ADR-0081).
-    void markTexts(std::size_t index, std::vector<TextMark>& texts) {
+    void markTexts(std::size_t index, std::vector<TextMark>& texts, const Fraction& length) {
         for (TextMark& mark : texts) {
-            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset);
+            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset, length);
             if (target == nullptr) {
                 warn("text directions dropped", index);
                 continue;

@@ -362,3 +362,57 @@ last row: a run on a quiet machine is due before reading anything into it.
 | write a track's 21 pages as PDF; compressed; the same on one thread | 1.4 ms; 4.0 ms; 8.4 ms; 43.0 ms | 1.5 ms; 3.9 ms; 8.7 ms; 43.7 ms |
 | one tuner window: low E, high E, noise | 0.39, 0.10, 1.06 ms | 0.39, 0.10, 1.07 ms |
 | find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.36 µs; 1.5 µs |
+
+**2026-11-25, after fingerings, staccatissimo, breath marks and split
+beats.** Every benchmark ran again, on a quiet machine, once fingerings
+(ADR-0093), staccatissimo (ADR-0094), breath marks (ADR-0095) and the beats
+MusicXML import splits under chord symbols and words (ADR-0096) were in.
+Nothing moved beyond run-to-run noise, and building the 20-track song is back
+to 11.0 ms: the 16.8 ms of the last row was the busier machine. The split
+costs nothing on files without marks between beats, since the importer only
+looks for a beat to split where no beat starts at a mark.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 10.6 ms | 10.2 ms |
+| sequence it; with every four measures repeated | 31.8 ms; 45.4 ms | 29.1 ms; 44.2 ms |
+| render its first 10 s offline; on one thread | 20.4 ms; 108 ms | 20.9 ms; 111 ms |
+| build, copy (shared measures) and validate the 20-track song | 16.8 ms (± 2.1), 64 µs, 3.2 ms | 11.0 ms, 74 µs, 3.2 ms |
+| insert a measure at its start | 18 µs | 22 µs |
+| seconds at its end (tempo map walk) | 0.26 ms | 0.26 ms |
+| MusicXML import; export; export on one thread; `.mxl` | 120 ms (± 26); 55 ms; 164 ms (± 22); 351 ms | 106 ms (± 17); 54 ms; 150 ms; 339 ms |
+| MIDI export; import | 28.7 ms; 42.5 ms | 28.4 ms; 41.5 ms |
+| GPIF import; on one thread | 100 ms (± 20); 218 ms (± 36) | 98 ms (± 14); 215 ms (± 18) |
+| 2 tracks from a literal-only `.gpx` | 28.8 ms | 29.6 ms |
+| lay out one 500-measure staff; 8 of its measures | 4.1 ms; 69 µs | 4.1 ms; 70 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.4 ms; 95 µs; 43 ms | 5.5 ms; 97 µs; 42 ms |
+| one track on A4 pages; on one thread | 2.2 ms; 11.0 ms | 2.2 ms; 11.0 ms |
+| the 20 staves on A4 pages; again after an edit | 24.3 ms (± 3.5); 4.4 ms | 25.1 ms (± 2.0); 3.9 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.3, 9.0 (± 1.6), 20.9 (± 2.8), 11.0 ms | 5.4, 8.6, 19.5, 11.6 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.9, 8.7, 6.0, 4.9 ms | 5.2, 8.4, 6.0, 4.9 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 10.9 ms; 10.8 ms | 9.9 ms; 10.8 ms |
+| read an SFZ of 64 samples | 3.5 ms | 3.7 ms |
+| decode a minute of FLAC; of WAV | 40.8 ms (± 7.8); 17.7 ms | 35.7 ms; 16.2 ms |
+| read the glyph outlines of `Bravura.otf` | 0.70 ms | 0.71 ms |
+| write a track's 21 pages as PDF; compressed; the same on one thread | 1.5 ms; 3.9 ms; 8.7 ms; 43.7 ms | 1.5 ms; 4.1 ms; 8.5 ms; 44.0 ms |
+| one tuner window: low E, high E, noise | 0.39, 0.10, 1.07 ms | 0.39, 0.10, 1.10 ms |
+| find the caret; pick it from a click | 0.36 µs; 1.5 µs | 0.38 µs; 1.5 µs |
+
+The app's own memory was measured for the first time: the peak working set
+and private bytes of the release build while it opens a song and takes a
+screenshot, in a 2880 x 1935 pixel window.
+
+| Song | Working set | Private bytes |
+|---|---|---|
+| one page (a corpus file) | 221 MB | 216 MB |
+| the same, Qt Quick's software renderer instead of Direct3D | 160 MB | 119 MB |
+| 8 tracks, 177 measures, all tracks as notation and tablature | 247 MB | 278 MB |
+| the same song, its first track only | 241 MB | 273 MB |
+
+About 100 MB is the graphics driver's, and most of the rest is Qt Quick
+itself. The larger song costs the same with one track shown as with eight, so
+its extra memory follows the pages the view keeps loaded (the visible ones and
+a page's height either side), each painted into a 32-bit image of about 8 MB
+at this size before it becomes a texture, not the song. Painting pages into
+8-bit images (the ink is one colour) would save the images' share of it;
+not worth doing at these sizes.
