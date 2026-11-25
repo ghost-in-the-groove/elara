@@ -166,16 +166,18 @@ Item {
         const at = caretPoint();
         openMeasurePopup(at.x - 24, at.y + 12);
     }
-    /// Opens the chord symbol popup over the caret's beat, or under it when
-    /// there is no room above (ADR-0080).
+    /// Opens the chord symbol popup under the caret's beat, so that the
+    /// symbol above the staff shows as it changes; over it when there is no
+    /// room below (ADR-0080).
     function openChordPopupAtCaret() {
         if (document.caretPage < 0)
             return;
         const at = caretPoint();
         const top = at.y - document.caretRect.height * unit * shownZoom;
-        const above = top - chordPopup.implicitHeight - 12;
+        const below = at.y + 12;
         chordPopup.x = Math.max(8, Math.min(width - chordPopup.width - 8, at.x - 24));
-        chordPopup.y = above >= 8 ? above : Math.min(height - chordPopup.implicitHeight - 8, at.y + 12);
+        chordPopup.y = below + chordPopup.implicitHeight <= height - 8
+                ? below : Math.max(8, top - chordPopup.implicitHeight - 12);
         chordPopup.open();
     }
     function scrollTo(y: real, x: real) {
