@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Dynamics marks under the staff (ADR-0044).
+// Dynamics marks and hairpins under the staff (ADR-0044, ADR-0078).
 #include <elara/core/effects.hpp>
 #include <elara/core/song.hpp>
 #include <elara/core/tuning.hpp>
@@ -43,6 +43,7 @@ using elara::notation::Glyph;
 using elara::notation::GlyphItem;
 using elara::notation::layoutStaff;
 using elara::notation::layoutSystem;
+using elara::notation::LineItem;
 using elara::notation::Role;
 using elara::notation::StaffBox;
 using elara::notation::StaffLayoutOptions;
@@ -308,4 +309,122 @@ TEST_CASE("Dynamics: under the standard notation, or under tablature shown alone
     for (const GlyphItem& mark : tabMarks) {
         CHECK(top(mark) > stems);
     }
+}
+
+// ---- Hairpins (ADR-0078) ----------------------------------------------------------
+
+namespace {
+
+Beat under(Beat beat, elara::core::Hairpin hairpin) {
+    beat.effects.hairpin = hairpin;
+    return beat;
+}
+
+std::vector<LineItem> wedgeLines(const DisplayList& list) {
+    std::vector<LineItem> found;
+    std::ranges::copy_if(list.lines, std::back_inserter(found),
+                         [](const LineItem& item) { return item.role == Role::Hairpin; });
+    // Upper line first.
+    std::ranges::stable_sort(found, {},
+                             [](const LineItem& item) { return item.from.y + item.to.y; });
+    return found;
+}
+
+// How far apart the two lines of a wedge are at its left and right ends.
+std::pair<double, double> openings(const std::vector<LineItem>& lines) {
+    REQUIRE(lines.size() == 2);
+    return {lines[1].from.y - lines[0].from.y, lines[1].to.y - lines[0].to.y};
+}
+
+} // namespace
+
+TEST_CASE("Hairpins: a wedge under the notes it covers, clear of the dynamics",
+          "[notation][layout][dynamics]") {
+    using elara::core::Hairpin;
+    // p C <D E | F f: a crescendo over the middle two beats, up to the forte.
+    const DisplayList list =
+        layout(songOf({{play(Dynamic::P), under(play(Dynamic::P), Hairpin::Crescendo),
+                        under(play(Dynamic::P), Hairpin::Crescendo), play(Dynamic::F)}}));
+    const std::vector<LineItem> lines = wedgeLines(list);
+    REQUIRE(lines.size() == 2);
+    const auto [start, end] = openings(lines);
+    CHECK_THAT(start, WithinAbs(0.0, kEpsilon)); // closed at the left...
+    CHECK_THAT(end, WithinAbs(1.0, kEpsilon));   // ...open by a space at the right
+    for (const LineItem& line : lines) {
+        CHECK(line.measure == 0);
+        CHECK(line.thickness == bravura().defaults().hairpinThickness);
+    }
+
+    const auto marks = glyphs(list, Role::Dynamic);
+    REQUIRE(marks.size() == 2);
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 4);
+    // From the second note's column to before the forte, on the marks' middle.
+    CHECK_THAT(lines[0].from.x, WithinAbs(heads[1].origin.x, kEpsilon));
+    CHECK(lines[0].to.x <= left(marks[1]) - 0.4 + kEpsilon);
+    CHECK(lines[0].to.x > heads[2].origin.x);
+    const double middle = (lines[0].from.y + lines[1].from.y) / 2;
+    CHECK(middle > top(marks[0]));
+    CHECK(middle < bottom(marks[0]));
+    CHECK(lines[0].to.y > 4.0); // under the staff
+}
+
+TEST_CASE("Hairpins: a diminuendo closes, and a wedge runs over a barline",
+          "[notation][layout][dynamics]") {
+    using elara::core::Hairpin;
+    const Hairpin dim = Hairpin::Diminuendo;
+    // f C >D E F | G> A2.: one wedge from D to A.
+    const Song song = songOf({{play(Dynamic::F), under(play(Dynamic::F), dim),
+                               under(play(Dynamic::F), dim), under(play(Dynamic::F), dim)},
+                              {under(play(Dynamic::F), dim), play(Dynamic::F, NoteValue::Half)}});
+    const DisplayList list = layout(song);
+    const std::vector<LineItem> lines = wedgeLines(list);
+    REQUIRE(lines.size() == 2);
+    const auto [start, end] = openings(lines);
+    CHECK_THAT(start, WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(end, WithinAbs(0.0, kEpsilon));
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 6);
+    CHECK_THAT(lines[0].from.x, WithinAbs(heads[1].origin.x, kEpsilon));
+    CHECK(lines[0].to.x < heads[5].origin.x);
+    CHECK(lines[0].to.x > heads[4].origin.x);
+}
+
+TEST_CASE("Hairpins: a wedge cut by the end of a line stays partly open",
+          "[notation][layout][dynamics]") {
+    using elara::core::Hairpin;
+    const Hairpin cresc = Hairpin::Crescendo;
+    const Song song = songOf(
+        {{play(Dynamic::P), under(play(Dynamic::P), cresc), under(play(Dynamic::P), cresc),
+          under(play(Dynamic::P), cresc)},
+         {under(play(Dynamic::P), cresc), play(Dynamic::F, NoteValue::Half), play(Dynamic::F)}});
+    // The first line ends half open; the second starts half open and opens.
+    const auto first = openings(wedgeLines(layout(song, {.firstMeasure = 0, .measureCount = 1})));
+    CHECK_THAT(first.first, WithinAbs(0.0, kEpsilon));
+    CHECK_THAT(first.second, WithinAbs(0.5, kEpsilon));
+    const auto second = openings(wedgeLines(layout(song, {.firstMeasure = 1})));
+    CHECK_THAT(second.first, WithinAbs(0.5, kEpsilon));
+    CHECK_THAT(second.second, WithinAbs(1.0, kEpsilon));
+    // Laid out whole, one wedge.
+    CHECK(wedgeLines(layout(song)).size() == 2);
+}
+
+TEST_CASE("Hairpins: under tablature shown alone, and none for a song without them",
+          "[notation][layout][dynamics]") {
+    using elara::core::Hairpin;
+    Song song = guitar({fretted(1, 0, Dynamic::P), fretted(1, 2, Dynamic::P),
+                        fretted(1, 3, Dynamic::P), fretted(1, 5, Dynamic::F)});
+    auto& beats = song.track(0).staff(0).measure(0).voices[0].beats;
+    beats[1].effects.hairpin = Hairpin::Crescendo;
+    beats[2].effects.hairpin = Hairpin::Crescendo;
+    const StaffSelection tablature{.view = StaffView::Tablature};
+    CHECK(wedgeLines(layoutSystem(song, std::span(&tablature, 1), bravura())).size() == 2);
+    const std::array<StaffSelection, 2> both{StaffSelection{.view = StaffView::Standard},
+                                             StaffSelection{.view = StaffView::Tablature}};
+    // Under the standard notation only.
+    CHECK(wedgeLines(layoutSystem(song, both, bravura())).size() == 2);
+
+    beats[1].effects.hairpin = Hairpin::None;
+    beats[2].effects.hairpin = Hairpin::None;
+    CHECK(wedgeLines(layout(song)).empty());
 }

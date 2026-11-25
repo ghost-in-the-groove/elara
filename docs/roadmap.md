@@ -74,12 +74,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
-- [ ] Hairpins (crescendo, diminuendo; ADR-0078)
+- [x] Hairpins (crescendo, diminuendo; ADR-0078)
   - [x] In the model, read from Guitar Pro 6-8 and kept by the native format
-  - [ ] Read and written in MusicXML
-  - [ ] Drawn under the staff
+  - [x] Read and written in MusicXML
+  - [x] Drawn under the staff
   - [x] Played as a velocity ramp
-  - [ ] Typed at the caret
+  - [x] Typed at the caret
 - [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
       (ADR-0061)
 - [ ] Grace notes (ADR-0079)
