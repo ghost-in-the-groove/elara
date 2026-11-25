@@ -418,7 +418,8 @@ Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration
     } else {
         const Note* previous = previousNote(song, caret);
         index = stepIndex(static_cast<int>(step),
-                          previous ? written(*previous) : middleLine(staff.clef()), false);
+                          previous ? written(*previous) : middleLine(staff.clefAt(caret.measure)),
+                          false);
     }
     const int octave = floorDiv(index, 7);
     const int alter = writtenKey.alterFor(step);
@@ -965,6 +966,33 @@ Entry setBeatText(const Song& song, const Caret& at, std::string_view text) {
     }
     beat.text = SharedOptional(std::string(text));
     return replace(caret, std::move(content), "Set beat text");
+}
+
+Entry setClef(const Song& song, const Caret& at, Clef clef) {
+    if (clef == Clef::Percussion) {
+        throw std::invalid_argument("a staff changes to a pitched clef only");
+    }
+    const Caret caret = clampCaret(song, at);
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    if (isDrumStaff(staff)) {
+        return unchanged(caret);
+    }
+    // The staff's octave stays (ADR-0008): a guitar reads the treble clef an
+    // octave down whatever its clef.
+    const bool octave = staff.clef() == Clef::Treble8vb || staff.clef() == Clef::Bass8vb;
+    if (clef == Clef::Treble || clef == Clef::Treble8vb) {
+        clef = octave ? Clef::Treble8vb : Clef::Treble;
+    } else if (clef == Clef::Bass || clef == Clef::Bass8vb) {
+        clef = octave ? Clef::Bass8vb : Clef::Bass;
+    }
+    const Clef before = caret.measure == 0 ? staff.clef() : staff.clefAt(caret.measure - 1);
+    const std::optional<Clef> wanted = clef == before ? std::nullopt : std::optional(clef);
+    Measure content = measureAt(song, caret);
+    if (content.clef == wanted) {
+        return unchanged(caret);
+    }
+    content.clef = wanted;
+    return replace(caret, std::move(content), "Change clef");
 }
 
 std::string beatTextAt(const Song& song, const Caret& at) {

@@ -265,6 +265,15 @@ enum class NoteEffect : std::uint8_t {
 /// The text above the caret's beat; empty without one and on the free slot.
 [[nodiscard]] std::string beatTextAt(const Song& song, const Caret& caret);
 
+/// Changes the clef of the caret's staff from the caret's measure on, as one
+/// undo step ("Change clef") (ADR-0087). The staff keeps its octave: on a staff
+/// with an octave clef (a guitar's) the treble and bass clefs become their
+/// octave forms, elsewhere the octave forms become the plain ones. The clef in
+/// force before the measure removes the change. Nothing changes on a drum staff
+/// or when the clef is in force there already. Throws std::invalid_argument for
+/// the percussion clef.
+[[nodiscard]] Entry setClef(const Song& song, const Caret& caret, Clef clef);
+
 /// Verse `verse` (0 for the first) of the caret's staff as typed (verseText(),
 /// ADR-0084).
 [[nodiscard]] VerseText verseAt(const Song& song, const Caret& caret, std::size_t verse);
