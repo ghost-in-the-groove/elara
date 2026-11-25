@@ -117,11 +117,14 @@ public:
         : StaffWriter(font, kLineSpace * (staff.tuning()->stringCount() - 1),
                       static_cast<std::size_t>(staff.tuning()->stringCount())),
           song_(song), staff_(staff), tuning_(*staff.tuning()), alone_(alone), lanes_(font),
-          dynamics_(font), aboveRow_(font, true) {}
+          dynamics_(font), aboveRow_(font, true), lyrics_(staff) {}
 
     double header(std::size_t first) override {
         measure_ = first;
         dynamics_.start(staff_, first);
+        if (alone_) {
+            lyrics_.start(first);
+        }
         const Glyph clef = lineCount() >= 5 ? Glyph::TabClef6 : Glyph::TabClef4;
         const BoundingBox& box = metrics(clef).box;
         double x = glyphFrom(clef, kClefX, height() / 2 + (box.southWest.y + box.northEast.y) / 2,
@@ -241,6 +244,7 @@ public:
         if (alone_) {
             dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
             aboveRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
+            lyrics_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2);
         }
         if (columns_.empty()) {
             if (alone_) {
@@ -287,10 +291,11 @@ public:
 
 private:
     // Chord symbols and beat text show over the standard notation when the
-    // system has it (ADR-0080, ADR-0081).
+    // system has it, lyrics under it (ADR-0080, ADR-0081, ADR-0084).
     void collectAbove(std::size_t m, std::vector<ColumnInk>& ink) {
         if (alone_) {
             aboveRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
+            lyrics_.collect(m, ink, widthOf(Glyph::NoteheadBlack) / 2);
         }
     }
 
@@ -588,6 +593,9 @@ private:
         if (!aboveRow_.empty()) {
             aboveRow_.place(list_, inkTop());
         }
+        if (!lyrics_.empty()) {
+            lyrics_.place(list_, inkBottom(), height(), width - defaults_.thinBarlineThickness);
+        }
         if (!dynamics_.empty()) {
             dynamics_.place(list_, inkBottom(), height(), width);
         }
@@ -647,6 +655,7 @@ private:
     TechniqueLanes lanes_;
     DynamicMarks dynamics_;
     AboveRow aboveRow_; // chord symbols and beat text, when alone (ADR-0080, ADR-0081)
+    LyricsRow lyrics_;  // when alone (ADR-0084)
     std::size_t measureIndex_ = 0;
     std::vector<TabColumn> columns_;
     std::array<std::optional<LastNote>, core::Tuning::kMaxStrings + 1> last_{};

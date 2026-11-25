@@ -69,6 +69,12 @@ struct ColumnInk {
     double aboveLeft = 0.0;
     double aboveRight = 0.0;
     bool above = false;
+    // Syllables under the column (ADR-0084): what they reach with the hyphens
+    // after them, when `below`. They keep apart from each other, not from the
+    // notes over them.
+    double belowLeft = 0.0;
+    double belowRight = 0.0;
+    bool below = false;
 };
 
 struct ColumnPosition {
@@ -410,6 +416,102 @@ private:
     std::vector<Read> read_;      // of the measure read last
     std::vector<Mark> marks_;     // of the line
     std::vector<TextMark> texts_; // of the line
+};
+
+// ---- Lyrics (ADR-0084) -----------------------------------------------------------------
+
+inline constexpr double kLyricGap = 0.6;    // between neighbouring syllables
+inline constexpr double kLyricEndGap = 0.3; // between a syllable and the barline after it
+inline constexpr double kLyricBarlineReach =
+    0.6; // how far one reaches into the gap after a barline
+
+/// The lyrics under a staff. Each verse has its own line under the staff's
+/// ink, in order; a syllable is centred under its note, or starts at the
+/// notehead when it is held. A hyphen goes between the syllables of a word,
+/// and after the last syllable of a line when its word goes on in the next. A
+/// held syllable has a line under the notes it is held over, to the end of the
+/// line when they go on, and from the first note of the next.
+class LyricsRow {
+public:
+    /// The lyrics of `staff`.
+    explicit LyricsRow(const core::Staff& staff);
+
+    /// Starts a line at measure m: forgets the syllables, and finds the held
+    /// syllables of the measures before whose notes go on into it.
+    void start(std::size_t m);
+
+    /// Reads the syllables of measure m, one per verse and start, and gives
+    /// the columns of `ink` (in time order) their reach; a column with no ink is
+    /// added where a syllable starts and no notes do. `centre` is the middle of
+    /// a notehead from its column's x.
+    void collect(std::size_t m, std::vector<ColumnInk>& ink, double centre);
+
+    /// What was read last, with its columns at `positions`.
+    void draw(std::span<const ColumnPosition> positions, double centre);
+
+    [[nodiscard]] bool empty() const noexcept { return syllables_.empty() && held_.empty(); }
+
+    /// Places the verses under `bottom` (the lowest ink of the staff, at least
+    /// `staffHeight`), the line ending at `end`, draws them into `list` and
+    /// forgets them.
+    void place(DisplayList& list, double bottom, double staffHeight, double end);
+
+private:
+    /// Where a held syllable's notes end: the start of the last of them.
+    struct Spot {
+        std::size_t measure = 0;
+        core::Fraction start;
+    };
+
+    struct Read {
+        core::Fraction start;
+        core::Fraction length; // of its beat
+        std::size_t verse = 0;
+        std::size_t voice = 0;
+        std::size_t beat = 0; // in its voice
+        const core::Syllable* syllable = nullptr;
+    };
+
+    struct Sung {
+        const core::Syllable* syllable = nullptr;
+        std::size_t verse = 0;
+        double left = 0.0;
+        double width = 0.0;
+        std::size_t measure = 0;
+        std::optional<Spot> heldTo{}; // when held over notes
+    };
+
+    /// A syllable held over from the line before: its line goes from the first
+    /// note of the line to the end of the notes at `to`.
+    struct Held {
+        std::size_t verse = 0;
+        Spot to{};
+        std::size_t measure = 0;
+    };
+
+    /// The columns of a measure drawn on the line.
+    struct Drawn {
+        std::size_t measure = 0;
+        std::vector<ColumnPosition> positions{};
+    };
+
+    /// The last note a syllable on beat `beat` of `voice` in measure m is held
+    /// over, before the next syllable of `verse`, a rest or the end; nullopt
+    /// when none follows it.
+    [[nodiscard]] std::optional<Spot> heldTo(std::size_t m, std::size_t voice, std::size_t beat,
+                                             std::size_t verse) const;
+
+    /// The x of the end of the notehead at `spot`, or `end` past the line.
+    [[nodiscard]] double noteEnd(const Spot& spot, double end) const;
+
+    const core::Staff& staff_;
+    bool any_ = false; // the staff sings somewhere
+    double headWidth_ = 0.0;
+    std::vector<Read> read_{};
+    std::size_t readMeasure_ = 0;
+    std::vector<Sung> syllables_{}; // of the line
+    std::vector<Held> held_{};      // of the line
+    std::vector<Drawn> drawn_{};    // of the line
 };
 
 // ---- Staff writers --------------------------------------------------------------------

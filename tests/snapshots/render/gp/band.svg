@@ -79,6 +79,7 @@
 <line class="stem" x1="47.063" y1="65.433" x2="47.063" y2="68.765" stroke-width="0.12"/>
 <line class="barline" x1="64.092" y1="65.765" x2="64.092" y2="69.765" stroke-width="0.16"/>
 <line class="barline" x1="64.822" y1="65.765" x2="64.822" y2="69.765" stroke-width="0.5"/>
+<line class="lyric" x1="33.811" y1="72.917" x2="34.311" y2="72.917" stroke-width="0.12"/>
 <line class="barline" x1="17.143" y1="21.484" x2="17.143" y2="69.765" stroke-width="0.16"/>
 <line class="barline" x1="44.873" y1="43.765" x2="44.873" y2="47.765" stroke-width="0.16"/>
 <line class="barline" x1="64.092" y1="43.765" x2="64.092" y2="47.765" stroke-width="0.16"/>
@@ -179,6 +180,9 @@
 <rect class="knockout" x="55.612" y="31.912" width="0.931" height="1.144" fill="white" stroke="none"/>
 <text class="t fretNumber" x="56.078" y="32.952" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
 <text class="t chord" x="28.063" y="36.85" style="font-size:1.5px" text-anchor="middle" stroke="none">F</text>
+<text class="t lyric" x="28.063" y="73.322" style="font-size:1.5px" text-anchor="middle" stroke="none">Sing</text>
+<text class="t lyric" x="32.305" y="73.322" style="font-size:1.5px" text-anchor="middle" stroke="none">a</text>
+<text class="t lyric" x="36.859" y="73.322" style="font-size:1.5px" text-anchor="middle" stroke="none">long</text>
 <text class="t tempo" x="28.636" y="19.59" style="font-size:1.4px" text-anchor="start" stroke="none">= 90</text>
 <text class="t tempo" x="48.576" y="19.59" style="font-size:1.4px" text-anchor="start" stroke="none">= 60</text>
 <text class="t trackName" x="14.263" y="28.31" style="font-size:1.6px" text-anchor="end" stroke="none">Bass</text>

@@ -299,7 +299,8 @@ public:
                       track.instrument().kind == core::InstrumentKind::Percussion),
           offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
           rolls_(!percussion_ && track.instrument().kind != core::InstrumentKind::Fretted),
-          lanes_(font), dynamics_(font), aboveRow_(font, staff.isFretted() && !percussion_) {}
+          lanes_(font), dynamics_(font), aboveRow_(font, staff.isFretted() && !percussion_),
+          lyrics_(staff) {}
 
     double header(std::size_t first) override;
     double changes(std::size_t m, double x) override;
@@ -315,6 +316,10 @@ private:
         }
         if (!aboveRow_.empty()) {
             aboveRow_.place(list_, inkTop());
+        }
+        // Lyrics right under the notes, dynamics under them (ADR-0084).
+        if (!lyrics_.empty()) {
+            lyrics_.place(list_, inkBottom(), height(), width - defaults_.thinBarlineThickness);
         }
         if (!dynamics_.empty()) {
             dynamics_.place(list_, inkBottom(), height(), width);
@@ -1434,6 +1439,7 @@ private:
     TechniqueLanes lanes_;
     DynamicMarks dynamics_;
     AboveRow aboveRow_; // chord symbols and beat text (ADR-0080, ADR-0081)
+    LyricsRow lyrics_;  // ADR-0084
     std::size_t measureIndex_ = 0;
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
@@ -1450,6 +1456,7 @@ private:
 
 double StandardWriter::header(std::size_t first) {
     dynamics_.start(staff_, first);
+    lyrics_.start(first);
     return headerAt(first);
 }
 
@@ -1461,11 +1468,13 @@ void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
     read(m);
     columnInk(ink);
     aboveRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
+    lyrics_.collect(m, ink, widthOf(Glyph::NoteheadBlack) / 2);
 }
 
 void StandardWriter::draw(std::span<const ColumnPosition> positions, double start, double barline) {
     drawMeasure(positions, start, barline);
     aboveRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
+    lyrics_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2);
     strikeDynamics();
     dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
 }
