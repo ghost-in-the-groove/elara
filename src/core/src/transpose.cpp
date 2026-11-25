@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/chord_name.hpp>
 #include <elara/core/effects.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
@@ -34,11 +35,54 @@ int semitoneOf(Step step) noexcept {
     return kSemitones[static_cast<std::size_t>(step)];
 }
 
+/// A chord pitch moved by `interval`, as the interval spells it.
+Pitch moved(ChordPitch pitch, Interval interval) {
+    // Octave 4 keeps every spelling inside the MIDI range.
+    const Pitch from(pitch.step, pitch.alter, 4);
+    return transposed(from, interval).value_or(from);
+}
+
+/// A chord pitch moved by `interval`, with one sharp or flat at most.
+ChordPitch transposed(ChordPitch pitch, Interval interval) {
+    Pitch spelled = moved(pitch, interval);
+    if (spelled.alter() < -1 || spelled.alter() > 1) {
+        spelled =
+            Pitch::fromMidi(spelled.midiNumber(), spelled.alter() < 0 ? SpellingPreference::Flats
+                                                                      : SpellingPreference::Sharps);
+    }
+    return {.step = spelled.step(), .alter = spelled.alter()};
+}
+
+/// The chord symbols already moved, so that beats which shared one still do.
+using MovedChords =
+    std::vector<std::pair<SharedOptional<ChordSymbol>, SharedOptional<ChordSymbol>>>;
+
+void transposeChord(Beat& beat, Interval interval, int maxFret, MovedChords& moved) {
+    if (!beat.chord) {
+        return;
+    }
+    if (const auto done = std::ranges::find(moved, beat.chord, &MovedChords::value_type::first);
+        done != moved.end()) {
+        beat.chord = done->second;
+        return;
+    }
+    ChordSymbol symbol = *beat.chord;
+    symbol.name = transposedChordName(symbol.name, interval);
+    if (symbol.diagram) {
+        symbol.diagram = transposedDiagram(*symbol.diagram, interval.semitones, maxFret);
+    }
+    SharedOptional<ChordSymbol> result(std::move(symbol));
+    moved.emplace_back(beat.chord, result);
+    beat.chord = std::move(result);
+}
+
 // Transposes one measure of a staff.
 void transposeMeasure(Measure& content, const Staff& staff, Interval interval,
-                      detail::FollowedByVoice& followed, std::size_t measure) {
+                      detail::FollowedByVoice& followed, std::size_t measure, MovedChords& chords) {
+    const int maxFret = Tuning::kMaxFret - staff.capo();
     for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
         for (Beat& beat : content.voices[v].beats) {
+            transposeChord(beat, interval, maxFret, chords);
             const auto move = [&](std::vector<Note>& notes) {
                 for (Note& note : notes) {
                     const std::optional<Pitch> moved = transposed(note.pitch, interval);
@@ -92,6 +136,50 @@ std::optional<Pitch> transposed(const Pitch& pitch, Interval interval) {
     return Pitch(step, alter, octave);
 }
 
+std::string transposedChordName(std::string_view name, Interval interval) {
+    const std::optional<ChordNameParts> parts = splitChordName(name);
+    if (!parts) {
+        return std::string(name);
+    }
+    // A root that would need a double sharp or flat takes the step next to
+    // it, and the bass moves by that same interval: Gb/Bb up a diminished
+    // fifth is C/E, an augmented fourth, rather than C/Fb.
+    Interval spelling = interval;
+    if (const int alter = moved(parts->root, interval).alter(); alter < -1) {
+        --spelling.steps;
+    } else if (alter > 1) {
+        ++spelling.steps;
+    }
+    std::string result = transposed(parts->root, spelling).toString();
+    result += parts->suffix;
+    if (parts->bass) {
+        result += '/';
+        result += transposed(*parts->bass, spelling).toString();
+    }
+    return result;
+}
+
+std::optional<ChordDiagram> transposedDiagram(const ChordDiagram& diagram, int semitones,
+                                              int maxFret) {
+    const int rest = floorMod(semitones, 12);
+    for (const int shift : {semitones, rest, rest - 12}) {
+        const bool fits = std::ranges::all_of(diagram.frets, [&](std::int8_t fret) {
+            return fret == ChordDiagram::kMuted || (fret + shift >= 0 && fret + shift <= maxFret);
+        });
+        if (!fits) {
+            continue;
+        }
+        std::vector<std::int8_t> frets = diagram.frets;
+        for (std::int8_t& fret : frets) {
+            if (fret != ChordDiagram::kMuted) {
+                fret = static_cast<std::int8_t>(fret + shift);
+            }
+        }
+        return ChordDiagram::ofFrets(std::move(frets));
+    }
+    return std::nullopt;
+}
+
 KeySignature transposed(const KeySignature& key, Interval interval) {
     const int index = static_cast<int>(key.tonic()) + interval.steps;
     const auto step = static_cast<Step>(floorMod(index, 7));
@@ -140,9 +228,10 @@ std::unique_ptr<Command> makeTranspose(const Song& song, const Transposition& wh
         for (std::size_t s = 0; s < track.staffCount(); ++s) {
             const Staff& staff = track.staff(s);
             detail::FollowedByVoice followed{};
+            MovedChords chords;
             for (std::size_t m = what.first; m < last; ++m) {
                 Measure content = staff.measure(m);
-                transposeMeasure(content, staff, interval, followed, m);
+                transposeMeasure(content, staff, interval, followed, m, chords);
                 if (content != staff.measure(m)) {
                     commands.push_back(
                         std::make_unique<ReplaceMeasure>(t, s, m, std::move(content)));

@@ -50,6 +50,10 @@ struct ChordDiagram {
     std::uint8_t firstFret = 1;
     std::vector<std::int8_t> frets{};
 
+    /// The diagram of these frets: the grid starts at the nut unless a fret
+    /// lies past the fourth, and at the lowest stopped fret then.
+    [[nodiscard]] static ChordDiagram ofFrets(std::vector<std::int8_t> frets);
+
     friend bool operator==(const ChordDiagram&, const ChordDiagram&) = default;
 };
 
