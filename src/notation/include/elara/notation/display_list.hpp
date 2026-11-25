@@ -57,9 +57,10 @@ enum class Role : std::uint8_t {
     OctaveLine,    ///< an octave line: "8va" or "15mb" and its dashed line (ADR-0089)
     Ornament,      ///< a trill's "tr" and wavy line, a mordent or a turn over its note (ADR-0090,
                    ///< ADR-0091)
+    Pedal,         ///< the sustain pedal under a staff: "Ped.", its line and hook (ADR-0092)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Ornament) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Pedal) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

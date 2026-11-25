@@ -30,6 +30,7 @@ using elara::core::Measure;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Ottava;
+using elara::core::Pedal;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Tempo;
@@ -108,7 +109,7 @@ void edit(Song& song, std::mt19937& random) {
     Track& track = song.track(t);
     auto& staff = track.staff(pick(random, track.staffCount()));
     auto& header = song.measureHeader(m);
-    switch (pick(random, 12)) {
+    switch (pick(random, 13)) {
     case 0: // another measure's notes, as paste does
         staff.measure(m) = staff.measure(pick(random, song.measureCount()));
         break;
@@ -164,6 +165,18 @@ void edit(Song& song, std::mt19937& random) {
         for (auto& voice : staff.measure(m).voices) {
             for (auto& beat : voice.beats) {
                 beat.effects.ottava = ottava;
+            }
+        }
+        break;
+    }
+    case 11: { // the pedal over the whole measure, changed on its first beat or not
+        constexpr Pedal kPedals[] = {Pedal::None, Pedal::Down, Pedal::Change};
+        const Pedal pedal = kPedals[pick(random, 3)];
+        for (auto& voice : staff.measure(m).voices) {
+            for (auto& beat : voice.beats) {
+                beat.effects.pedal = &beat == &voice.beats.front() ? pedal
+                                     : pedal == Pedal::None        ? Pedal::None
+                                                                   : Pedal::Down;
             }
         }
         break;
@@ -280,8 +293,8 @@ TEST_CASE("An edit to the tempo a gradual change goes to lays out the ramp's sys
     (void)cache.layout(std::make_shared<const Song>(song), staves, bravura(), options);
 
     // Faster: "accel."; gone: no ramp at all; back: "rit." again.
-    for (const std::optional<double> bpm : {std::optional(180.0), std::optional<double>(),
-                                            std::optional(60.0)}) {
+    for (const std::optional<double> bpm :
+         {std::optional(180.0), std::optional<double>(), std::optional(60.0)}) {
         CAPTURE(bpm.value_or(0.0));
         song.measureHeader(40).tempoChanges.clear();
         if (bpm) {

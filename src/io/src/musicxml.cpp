@@ -2743,8 +2743,8 @@ private:
     std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
     std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
     std::vector<Ottava> ottavas_;                      // per staff, at the end of the last measure
-    std::vector<bool> pedals_;                         // per staff: down at the end of the last measure
-    std::map<int, SlurEnd> openSlurs_{};               // by number: where each open slur starts
+    std::vector<bool> pedals_;           // per staff: down at the end of the last measure
+    std::map<int, SlurEnd> openSlurs_{}; // by number: where each open slur starts
     std::vector<std::pair<SlurEnd, SlurEnd>> slurs_{}; // closed slurs, from start to stop
     std::vector<std::vector<Measure>> measures_;       // per staff
     detail::ChordPool chordPool_;                      // one symbol for equal chords

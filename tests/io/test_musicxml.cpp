@@ -422,8 +422,7 @@ TEST_CASE("MusicXML: octave shifts become the octave lines of the beats under th
     CHECK(result.warnings.empty());
 }
 
-TEST_CASE("MusicXML: pedal marks put the beats under them under the sustain pedal",
-          "[musicxml]") {
+TEST_CASE("MusicXML: pedal marks put the beats under them under the sustain pedal", "[musicxml]") {
     // ADR-0092: every voice's beats from a start to a stop take the pedal,
     // which carries on into the next measure; a change, or a stop and a start
     // together, changes it on the beat there. Sostenuto pedals warn.
@@ -438,12 +437,12 @@ TEST_CASE("MusicXML: pedal marks put the beats under them under the sustain peda
         "<voice>2</voice><type>half</type></note>"
         "<note><pitch><step>B</step><octave>3</octave></pitch><duration>8</duration>"
         "<voice>2</voice><type>half</type></note>";
-    const ImportResult result = parse(onePart(
-        quarterNote("C", "") + pedal("start") + quarterNote("D", "") + quarterNote("E", "") +
-        pedal("change") + quarterNote("F", "") + lowerVoice + R"(</measure><measure number="2">)" +
-        quarterNote("G", "") + pedal("stop") + pedal("start") + quarterNote("A", "") +
-        pedal("continue") + quarterNote("B", "") + pedal("stop") + quarterNote("C", "") +
-        pedal("sostenuto")));
+    const ImportResult result = parse(
+        onePart(quarterNote("C", "") + pedal("start") + quarterNote("D", "") +
+                quarterNote("E", "") + pedal("change") + quarterNote("F", "") + lowerVoice +
+                R"(</measure><measure number="2">)" + quarterNote("G", "") + pedal("stop") +
+                pedal("start") + quarterNote("A", "") + pedal("continue") + quarterNote("B", "") +
+                pedal("stop") + quarterNote("C", "") + pedal("sostenuto")));
     const auto pedals = [&](std::size_t measure, std::size_t voice) {
         std::vector<core::Pedal> found;
         for (const core::Beat& beat : voiceOf(result.song, 0, 0, measure, voice).beats) {

@@ -705,8 +705,7 @@ TEST_CASE("MusicXML export: octave lines come back on every voice of their staff
     CHECK(count(R"(<octave-shift type="stop")") == 3);
 }
 
-TEST_CASE("MusicXML export: the sustain pedal comes back under its staff",
-          "[musicxml][export]") {
+TEST_CASE("MusicXML export: the sustain pedal comes back under its staff", "[musicxml][export]") {
     // ADR-0092: a start where it goes down, a change, a stop after the last
     // beat under it; over a rest and on into the next measure.
     core::Song song;

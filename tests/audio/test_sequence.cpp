@@ -630,14 +630,12 @@ TEST_CASE("Sequence: the sustain pedal holds the notes of its track until it com
         pedalled(NoteValue::Quarter, {note(60)}, Pedal::Down),
         pedalled(NoteValue::Quarter, {note(62)}, Pedal::Down),
         pedalled(NoteValue::Half, {note(64)}, Pedal::Change)};
-    piano.staff(1).measure(0).voices[0].beats = {beat(NoteValue::Quarter),
-                                                 beat(NoteValue::Half, {note(57)}),
-                                                 beat(NoteValue::Quarter)};
+    piano.staff(1).measure(0).voices[0].beats = {
+        beat(NoteValue::Quarter), beat(NoteValue::Half, {note(57)}), beat(NoteValue::Quarter)};
     piano.staff(0).measure(1).voices[0].beats = {pedalled(NoteValue::Half, {}, Pedal::Down),
                                                  beat(NoteValue::Half, {note(65)})};
-    song.track(1).staff(0).measure(0).voices[0].beats = {beat(NoteValue::Quarter, {note(71)}),
-                                                         beat(NoteValue::Quarter),
-                                                         beat(NoteValue::Half)};
+    song.track(1).staff(0).measure(0).voices[0].beats = {
+        beat(NoteValue::Quarter, {note(71)}), beat(NoteValue::Quarter), beat(NoteValue::Half)};
     const Sequence sequence(song);
     REQUIRE(sequence.notes().size() == 6);
     const auto endOf = [&](int key) {

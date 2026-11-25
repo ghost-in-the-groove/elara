@@ -72,9 +72,16 @@ constexpr double kOctaveGap = 0.5;     // between an octave line and the ink it 
 constexpr double kOctaveLineGap = 0.3; // between an octave line's mark and its dashes
 constexpr double kOctaveDash = 0.4;    // dashes and gaps of an octave line
 constexpr double kOctaveMinLine = 1.0; // the dashes of a line over a single short note
-constexpr double kTrillGap = 0.5;      // between a trill and the ink it clears (ADR-0090)
-constexpr double kTrillWaveGap = 0.2;  // between a trill's "tr" and its wavy line
-constexpr double kTrillEndGap = 0.5;   // a wavy line ends before the next column
+constexpr double kPedalGap = 0.5;      // between the pedal and the ink above it (ADR-0092)
+constexpr double kPedalLineGap = 0.3;  // between "Ped." and its line
+constexpr double kPedalEndGap = 0.3;   // the line ends before the column where it comes up
+constexpr double kPedalMinLine = 0.5;  // the line of a pedalling over a single short note
+constexpr double kPedalHook = 1.0;     // the hook up at its end
+constexpr double kPedalNotch = 0.4;    // half the width of a change's notch
+constexpr double kPedalNotchHeight = 0.8;
+constexpr double kTrillGap = 0.5;     // between a trill and the ink it clears (ADR-0090)
+constexpr double kTrillWaveGap = 0.2; // between a trill's "tr" and its wavy line
+constexpr double kTrillEndGap = 0.5;  // a wavy line ends before the next column
 
 // A rolled chord's wavy line (ADR-0076): half waves kArpeggioWave long whose
 // control points stand kArpeggioSwing off the line, so that it swings about
@@ -387,6 +394,7 @@ private:
         if (!dynamics_.empty()) {
             dynamics_.place(list_, inkBottom(), height(), width);
         }
+        pedalLinesOut(width); // under the dynamics (ADR-0092)
     }
 
     // ---- Signatures ----
@@ -1912,6 +1920,99 @@ private:
         }
     }
 
+    struct PedalRun {
+        double left = 0.0;           // the column of its first beat
+        double right = 0.0;          // just before the column where it comes up
+        std::vector<double> changes; // the columns where it is changed
+        std::size_t measure = 0;     // where it starts
+        std::size_t last = 0;        // where it ends
+        Fraction end;                // where it comes up in `last`
+        bool toBarline = false;      // at the barline of `last`
+    };
+
+    // Whether measure m starts with a beat under the pedal.
+    [[nodiscard]] bool startsPedalled(std::size_t m) const {
+        if (m >= staff_.measureCount()) {
+            return false;
+        }
+        const std::vector<core::PedalSpan> spans = core::pedalSpans(staff_.measure(m));
+        return !spans.empty() && spans.front().start.isZero();
+    }
+
+    // The pedallings of the measure drawn last: the beats of the staff's
+    // voices under the pedal, a change in one notching it; one coming up at the
+    // barline goes on into the next measure when that starts under it.
+    void pedalLines(std::span<const ColumnPosition> positions, double barline) {
+        if (percussion_) {
+            return;
+        }
+        for (const core::PedalSpan& span : core::pedalSpans(staff_.measure(measureIndex_))) {
+            const double from = columnX(positions, span.start);
+            const bool toBarline =
+                std::ranges::lower_bound(positions, span.end, std::less<>{},
+                                         &ColumnPosition::start) == positions.end();
+            const double right = toBarline ? barline : columnX(positions, span.end) - kPedalEndGap;
+            if (!pedalRuns_.empty()) {
+                PedalRun& last = pedalRuns_.back();
+                const bool meets = span.start.isZero()
+                                       ? last.toBarline && last.last + 1 == measureIndex_
+                                       : last.last == measureIndex_ && last.end == span.start;
+                if (meets) {
+                    if (span.change) {
+                        last.changes.push_back(from);
+                    }
+                    last.right = right;
+                    last.last = measureIndex_;
+                    last.end = span.end;
+                    last.toBarline = toBarline;
+                    continue;
+                }
+            }
+            pedalRuns_.push_back(PedalRun{.left = from,
+                                          .right = right,
+                                          .changes = {},
+                                          .measure = measureIndex_,
+                                          .last = measureIndex_,
+                                          .end = span.end,
+                                          .toBarline = toBarline});
+        }
+    }
+
+    // Draws the pedallings of the line ending at `width` under the ink and the
+    // dynamics: "Ped." at the first beat, a line along its foot to where the
+    // pedal comes up and a hook up, a notch at each change. One going on into
+    // the next system runs to the end of this one without a hook; the next
+    // starts with "Ped." again.
+    void pedalLinesOut(double width) {
+        const double thickness = defaults_.pedalLineThickness;
+        const BoundingBox& box = metrics(Glyph::KeyboardPedalPed).box;
+        for (const PedalRun& run : pedalRuns_) {
+            const bool cut = run.toBarline && startsPedalled(run.last + 1);
+            const double from = run.left + box.width() + kPedalLineGap;
+            const double to = cut ? width : std::max(run.right, from + kPedalMinLine);
+            const Extents ink = inkBetween(run.left, to);
+            const double y = std::max(ink.bottom, height()) + kPedalGap + box.northEast.y;
+            const double level = y - box.southWest.y; // the foot of "Ped."
+            measure_ = run.measure;
+            glyph(Glyph::KeyboardPedalPed, run.left - box.southWest.x, y, Role::Pedal);
+            double x = from;
+            for (const double change : run.changes) {
+                if (change - kPedalNotch < x || change + kPedalNotch > to) {
+                    continue; // no room for it next to "Ped." or the end
+                }
+                const Point peak{change, level - kPedalNotchHeight};
+                line({x, level}, {change - kPedalNotch, level}, thickness, Role::Pedal);
+                line({change - kPedalNotch, level}, peak, thickness, Role::Pedal);
+                line(peak, {change + kPedalNotch, level}, thickness, Role::Pedal);
+                x = change + kPedalNotch;
+            }
+            line({x, level}, {to, level}, thickness, Role::Pedal);
+            if (!cut) {
+                line({to, level}, {to, level - kPedalHook}, thickness, Role::Pedal);
+            }
+        }
+    }
+
     struct TieStart {
         int step = 0;
         double right = 0.0; // after the notehead and its dots
@@ -1943,6 +2044,7 @@ private:
     double lineStart_ = 0.0;              // where the header ends
     std::vector<OctaveSpan> octaveSpans_; // of the measure being drawn
     std::vector<OctaveRun> octaveRuns_;   // of the line
+    std::vector<PedalRun> pedalRuns_;     // of the line (ADR-0092)
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
@@ -1956,6 +2058,7 @@ double StandardWriter::header(std::size_t first) {
     dynamics_.start(staff_, first);
     lyrics_.start(first);
     octaveRuns_.clear();
+    pedalRuns_.clear();
     return headerAt(first);
 }
 
@@ -1977,6 +2080,7 @@ void StandardWriter::draw(std::span<const ColumnPosition> positions, double star
     strikeDynamics();
     dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
     octaveLines(positions);
+    pedalLines(positions, barline);
 }
 
 } // namespace

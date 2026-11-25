@@ -247,6 +247,10 @@ struct PedalSpan {
     friend bool operator==(const PedalSpan&, const PedalSpan&) = default;
 };
 
+/// Where the beats of one staff's measure are under the sustain pedal
+/// (ADR-0092), its voices joined as Song::pedalSpans() joins staves.
+[[nodiscard]] std::vector<PedalSpan> pedalSpans(const Measure& measure);
+
 /// The whole document (ADR-0004). Keeps every staff of every track at exactly
 /// measureCount() measures.
 class Song {

@@ -112,6 +112,7 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"ornamentShortTrill", 0xE56C},
     {"ornamentTurn", 0xE567},
     {"ornamentTurnInverted", 0xE568},
+    {"keyboardPedalPed", 0xE650},
     {"dynamicPiano", 0xE520},
     {"dynamicMezzo", 0xE521},
     {"dynamicForte", 0xE522},
@@ -152,7 +153,7 @@ constexpr std::array<std::string_view, kAnchorCount> kAnchorNames{
     "cutOutSE", "cutOutSW",   "cutOutNW", "opticalCenter",
 };
 
-constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 19> kDefaults{{
+constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 20> kDefaults{{
     {"staffLineThickness", &EngravingDefaults::staffLineThickness},
     {"stemThickness", &EngravingDefaults::stemThickness},
     {"beamThickness", &EngravingDefaults::beamThickness},
@@ -172,6 +173,7 @@ constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 1
     {"hairpinThickness", &EngravingDefaults::hairpinThickness},
     {"repeatEndingLineThickness", &EngravingDefaults::repeatEndingLineThickness},
     {"octaveLineThickness", &EngravingDefaults::octaveLineThickness},
+    {"pedalLineThickness", &EngravingDefaults::pedalLineThickness},
 }};
 
 FontError error(std::string_view what) {

@@ -668,7 +668,8 @@ void sustain(const core::Song& song, const TempoMap& tempo, std::span<const Play
             const bool follows = before != nullptr && before->measure + 1 == measure.measure;
             for (const core::PedalSpan& span : written[measure.measure]) {
                 const Pedalling pedalling{
-                    .start = measure.start + tempo.secondsInto(measure.measure, span.start.toDouble()),
+                    .start =
+                        measure.start + tempo.secondsInto(measure.measure, span.start.toDouble()),
                     .end = measure.start + tempo.secondsInto(measure.measure, span.end.toDouble())};
                 constexpr double kMeet = 1e-9;
                 if (!span.change && !spans.empty() && spans.back().end + kMeet >= pedalling.start &&

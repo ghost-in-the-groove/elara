@@ -760,7 +760,9 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
         out.events.insert(out.events.end(), lyrics.begin(), lyrics.end());
         const auto notesFrom = static_cast<std::ptrdiff_t>(out.events.size());
         addNotes(out, channelNumber, byTrack[t], timing);
-        const auto byTick = [](const MidiEvent& a, const MidiEvent& b) { return a.tick < b.tick; };
+        const auto byTick = [](const MidiEvent& a, const MidiEvent& b) {
+            return a.tick < b.tick;
+        };
         std::inplace_merge(out.events.begin() + header, out.events.begin() + notesFrom,
                            out.events.end(), byTick);
         // The pedal after the notes struck with it.

@@ -295,8 +295,7 @@ TEST_CASE("The sustain pedal of a track goes over the beats of all its staves",
     // beat starts, also inside a beat of another staff still under it.
     Song song;
     song.addTrack(Track("Voice", Instrument{.kind = InstrumentKind::Pitched}, {Staff{}}));
-    song.addTrack(
-        Track("Piano", Instrument{.kind = InstrumentKind::Keyboard}, {Staff{}, Staff{}}));
+    song.addTrack(Track("Piano", Instrument{.kind = InstrumentKind::Keyboard}, {Staff{}, Staff{}}));
     song.appendMeasures(3);
     Track& piano = song.track(1);
     piano.staff(0).measure(0).voices[0].beats = {
@@ -319,6 +318,9 @@ TEST_CASE("The sustain pedal of a track goes over the beats of all its staves",
     CHECK(song.pedalSpans(1, 1) ==
           std::vector<PedalSpan>{{.start = Fraction(0), .end = Fraction(1, 2), .change = false}});
     CHECK(song.pedalSpans(1, 2).empty());
+    // One staff alone: the left hand's half note.
+    CHECK(pedalSpans(piano.staff(1).measure(0)) ==
+          std::vector<PedalSpan>{{.start = Fraction(0), .end = Fraction(1, 2), .change = false}});
     CHECK(song.pedalSpans(0, 0).empty());
     CHECK_THROWS_AS(song.pedalSpans(1, 3), std::out_of_range);
     CHECK_THROWS_AS(song.pedalSpans(2, 0), std::out_of_range);
