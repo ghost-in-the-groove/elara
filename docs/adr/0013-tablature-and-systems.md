@@ -57,7 +57,8 @@ above the staff, in that order upwards after the bend lane; only the lanes a
 line uses take room. A strum is an arrow the way the pick goes over the
 strings (down or up), as strumming patterns write it; tremolo picking is one
 slash per beam of the repeated notes (an eighth one, a sixteenth two, a
-thirty-second three). Palm
+thirty-second three; the standard staff draws them through the stem instead,
+ADR-0101). Palm
 mute, let ring and vibrato run on over consecutive notes, across barlines, and
 end with a dashed line and a hook (a wavy line for vibrato). The lanes go above
 the tablature, or above the standard notation when the system has no tablature

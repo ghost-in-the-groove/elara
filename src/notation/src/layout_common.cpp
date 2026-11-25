@@ -657,17 +657,16 @@ std::string bendLabel(int cents) {
     return label;
 }
 
-namespace {
-
-// Slashes of tremolo picking at `speed`: one per beam of the repeated notes.
-int tremoloStrokes(core::NoteValue speed) {
+int tremoloStrokes(core::NoteValue speed) noexcept {
     if (speed >= core::NoteValue::ThirtySecond) {
         return 3;
     }
     return speed == core::NoteValue::Sixteenth ? 2 : 1;
 }
 
-} // namespace
+Glyph tremoloGlyph(int strokes) noexcept {
+    return strokes >= 3 ? Glyph::Tremolo3 : strokes == 2 ? Glyph::Tremolo2 : Glyph::Tremolo1;
+}
 
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat) {
     if (marks.whammy.isEmpty()) {
@@ -739,10 +738,7 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
              measure, kLaneGlyphScale);
     }
     if (marks.tremoloStrokes > 0) {
-        constexpr std::array kSlashes{Glyph::Tremolo1, Glyph::Tremolo2, Glyph::Tremolo3};
-        mark(Lane::Tremolo,
-             kSlashes.at(static_cast<std::size_t>(std::min(marks.tremoloStrokes, 3) - 1)), centre,
-             measure, kLaneGlyphScale);
+        mark(Lane::Tremolo, tremoloGlyph(marks.tremoloStrokes), centre, measure, kLaneGlyphScale);
     }
     if (marks.whammy.isEmpty()) {
         whammyRun_ = false;

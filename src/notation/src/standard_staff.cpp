@@ -47,6 +47,10 @@ constexpr double kDotSeparation = 0.25;
 constexpr double kStemLength = 3.5;
 constexpr double kExtraFlagStem = 0.75; // per flag beyond the second
 constexpr double kBeamExtraStem = 0.5;  // per beam beyond the first
+// Between tremolo slashes and the notehead, tip, flag or beam (ADR-0101), and
+// the share of a flag's height the slashes keep clear of.
+constexpr double kTremoloGap = 0.4;
+constexpr double kTremoloFlagShare = 0.9;
 constexpr double kMaxBeamSlant = 1.0;
 constexpr double kVoiceRestShift = 2.0;
 constexpr double kMiddleLine = 2.0;
@@ -1217,7 +1221,69 @@ private:
                 stemAnchor(base, chord.stemUp).x - (chord.stemUp ? stemWidth : 0.0);
             chord.right = std::max(chord.right, stemLeft + metrics(flag).box.northEast.x);
         }
+        if (const auto slashes = tremoloOf(chord)) {
+            const double half = metrics(*slashes).box.width() / 2;
+            double centre = (chord.headLeft + chord.headRight) / 2;
+            if (stem) {
+                const Head& base = chord.stemUp ? heads.back() : heads.front();
+                centre = stemAnchor(base, chord.stemUp).x +
+                         (chord.stemUp ? -stemWidth / 2 : stemWidth / 2);
+            }
+            chord.left = std::min(chord.left, centre - half);
+            chord.right = std::max(chord.right, centre + half);
+        }
         makeRoomForBreath(chord);
+    }
+
+    // The slashes of a chord's tremolo picking (ADR-0101), if any.
+    [[nodiscard]] static std::optional<Glyph> tremoloOf(const Chord& chord) {
+        if (chord.rest || chord.beat == nullptr || !chord.beat->effects.tremoloPicking) {
+            return std::nullopt;
+        }
+        return tremoloGlyph(tremoloStrokes(*chord.beat->effects.tremoloPicking));
+    }
+
+    // The edge of the notehead nearest the stem's tip, or where it would be.
+    [[nodiscard]] double headEdge(const Chord& chord) const {
+        if (chord.stemUp) {
+            const Head& head = chord.heads.front();
+            return yOf(head.step) - metrics(head.glyph).box.northEast.y;
+        }
+        const Head& head = chord.heads.back();
+        return yOf(head.step) - metrics(head.glyph).box.southWest.y;
+    }
+
+    // The stem a chord needs from its notehead nearest the tip for its
+    // tremolo slashes, their gaps and `zone`, the flag or beams at the tip;
+    // 0 without tremolo picking.
+    [[nodiscard]] double tremoloStem(const Chord& chord, double zone) const {
+        const double room = tremoloRoom(chord);
+        if (room == 0.0) {
+            return 0.0;
+        }
+        const Head& head = chord.stemUp ? chord.heads.front() : chord.heads.back();
+        return std::abs(headEdge(chord) - yOf(head.step)) + room + zone;
+    }
+
+    // The height of a chord's tremolo slashes and their gaps; 0 without them.
+    [[nodiscard]] double tremoloRoom(const Chord& chord) const {
+        const auto slashes = tremoloOf(chord);
+        return slashes ? metrics(*slashes).box.height() + 2 * kTremoloGap : 0.0;
+    }
+
+    // A chord's tremolo slashes centred on `x`, midway between its notehead
+    // and `inner`, where the stem's tip or the flag or beams at it begin.
+    void tremolo(Chord& chord, double x, double inner) {
+        const auto slashes = tremoloOf(chord);
+        if (!slashes) {
+            return;
+        }
+        const BoundingBox& box = metrics(*slashes).box;
+        const double y = (headEdge(chord) + inner) / 2;
+        glyph(*slashes, x - (box.southWest.x + box.northEast.x) / 2,
+              y + (box.southWest.y + box.northEast.y) / 2, Role::Technique);
+        chord.inkTop = std::min(chord.inkTop, y - box.height() / 2);
+        chord.inkBottom = std::max(chord.inkBottom, y + box.height() / 2);
     }
 
     // The glyph of the break after a chord's beat, if any (ADR-0095).
@@ -1471,6 +1537,10 @@ private:
         dots(x + chord.headRight + chord.ghostPad, dotYs, chord.duration.dots());
         ledgerLines(chord, x);
         if (!hasStem(chord.duration.value())) {
+            // Tremolo slashes where its stem would be.
+            const double room = tremoloRoom(chord);
+            tremolo(chord, x + (chord.headLeft + chord.headRight) / 2,
+                    headEdge(chord) + (chord.stemUp ? -room : room));
             return;
         }
         const double stemWidth = defaults_.stemThickness;
@@ -1481,13 +1551,20 @@ private:
         if (chord.beamGroup >= 0) {
             return; // the beam decides where the stem ends
         }
-        const double length = stemLengthFor(chord.duration.value());
+        // Tremolo slashes lengthen the stem to stay clear of the flag.
+        const NoteValue value = chord.duration.value();
+        const double flagZone =
+            beamCount(value) > 0
+                ? metrics(flagFor(value, chord.stemUp)).box.height() * kTremoloFlagShare
+                : 0.0;
+        const double length = std::max(stemLengthFor(value), tremoloStem(chord, flagZone));
         const double tip = chord.stemUp
                                ? std::min(yOf(chord.heads.front().step) - length, kMiddleLine)
                                : std::max(yOf(chord.heads.back().step) + length, kMiddleLine);
         line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
         chord.inkTop = std::min(chord.inkTop, tip);
         chord.inkBottom = std::max(chord.inkBottom, tip);
+        tremolo(chord, chord.stemX, tip + (chord.stemUp ? flagZone : -flagZone));
         if (beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
             const Point attach = metrics(flag)
@@ -1838,13 +1915,20 @@ private:
         }
         const double slope = slant == 0.0 ? 0.0 : slant / span;
         const double minimum = kStemLength + kBeamExtraStem * (levels - 1);
+        // The beams over a chord's stem, from the outer edge of the primary one.
+        const double step = thickness + defaults_.beamSpacing;
+        const auto zone = [&](const Chord& chord) {
+            return thickness + (beamCount(chord.duration.value()) - 1) * step;
+        };
         // The outer edge of the primary beam: y = edge + slope * (x - first.stemX).
         double edge =
             up ? std::numeric_limits<double>::max() : std::numeric_limits<double>::lowest();
         for (const std::size_t c : group) {
             const Chord& chord = chords_[c];
+            // Tremolo slashes lengthen the stem to stay clear of the beams.
+            const double length = std::max(minimum, tremoloStem(chord, zone(chord)));
             const double needed =
-                end(chord) + (up ? -minimum : minimum) - slope * (chord.stemX - first.stemX);
+                end(chord) + (up ? -length : length) - slope * (chord.stemX - first.stemX);
             edge = up ? std::min(edge, needed) : std::max(edge, needed);
         }
         // Notes far outside the staff: the beam still reaches the middle line.
@@ -1864,8 +1948,8 @@ private:
             line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
             chord.inkTop = std::min(chord.inkTop, tip);
             chord.inkBottom = std::max(chord.inkBottom, tip);
+            tremolo(chord, chord.stemX, tip + (up ? zone(chord) : -zone(chord)));
         }
-        const double step = thickness + defaults_.beamSpacing;
         for (int level = 1; level <= levels; ++level) {
             const double offset = (up ? 1.0 : -1.0) * (thickness / 2 + (level - 1) * step);
             const auto add = [&](double left, double right) {
@@ -2341,6 +2425,7 @@ private:
             if (rolls_) {
                 marks.strum = core::Strum::None; // an arpeggio line instead of an arrow
             }
+            marks.tremoloStrokes = 0; // slashes through the stems instead (ADR-0101)
             if (lanes_.wants(marks)) {
                 const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
                 lanes_.column(marks, column.x + centre, end, measure_);

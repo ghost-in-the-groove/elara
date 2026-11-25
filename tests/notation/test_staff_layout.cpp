@@ -831,6 +831,76 @@ TEST_CASE("Staff layout: drums follow the drum map", "[notation][layout]") {
     }
 }
 
+TEST_CASE("Staff layout: tremolo picking slashes cross the stem", "[notation][layout]") {
+    // ADR-0101: one slash per beam of the repeated notes, on the stem between
+    // the notehead and the tip or the beams, and nothing in a lane over the staff.
+    Beat up = note("G4");
+    up.effects.tremoloPicking = NoteValue::Sixteenth;
+    Beat down = note("D5");
+    down.effects.tremoloPicking = NoteValue::Eighth;
+    Beat first = note("E4", NoteValue::Eighth);
+    first.effects.tremoloPicking = NoteValue::ThirtySecond;
+    Beat second = note("F4", NoteValue::Eighth);
+    second.effects.tremoloPicking = NoteValue::ThirtySecond;
+    Beat whole = note("C5", NoteValue::Whole);
+    whole.effects.tremoloPicking = NoteValue::Sixteenth;
+    const DisplayList list = layout(songOf({{{up, down, first, second}}, {{whole}}}));
+
+    const auto slashes = glyphs(list, Role::Technique);
+    REQUIRE(slashes.size() == 5);
+    std::vector<Glyph> kinds;
+    for (const GlyphItem& slash : slashes) {
+        kinds.push_back(slash.glyph);
+    }
+    CHECK(kinds == std::vector<Glyph>{Glyph::Tremolo2, Glyph::Tremolo1, Glyph::Tremolo3,
+                                      Glyph::Tremolo3, Glyph::Tremolo2});
+    const auto ink = [](const GlyphItem& item) {
+        const auto& box = bravura().metrics(item.glyph).box;
+        struct Ink {
+            double left, right, top, bottom;
+        };
+        return Ink{.left = item.origin.x + box.southWest.x * item.scale,
+                   .right = item.origin.x + box.northEast.x * item.scale,
+                   .top = item.origin.y - box.northEast.y * item.scale,
+                   .bottom = item.origin.y - box.southWest.y * item.scale};
+    };
+    const auto heads = glyphs(list, Role::Notehead);
+    const auto stems = lines(list, Role::Stem);
+    REQUIRE(heads.size() == 5);
+    REQUIRE(stems.size() == 4);
+    constexpr double kClear = 0.2;
+    for (std::size_t i = 0; i < stems.size(); ++i) {
+        const auto slash = ink(slashes[i]);
+        const auto head = ink(heads[i]);
+        // Centred on the stem.
+        CHECK_THAT((slash.left + slash.right) / 2, WithinAbs(stems[i].from.x, 1e-9));
+        const double tip = i == 1 ? std::max(stems[i].from.y, stems[i].to.y)
+                                  : std::min(stems[i].from.y, stems[i].to.y);
+        if (i == 1) { // stem down: under the notehead, over the tip
+            CHECK(slash.top > head.bottom + kClear);
+            CHECK(slash.bottom < tip);
+        } else {
+            CHECK(slash.bottom < head.top - kClear);
+            CHECK(slash.top > tip);
+        }
+    }
+    // The beamed eighths: the slashes stay clear of the beam, under it.
+    REQUIRE(list.beams.size() == 1);
+    const BeamItem& beam = list.beams[0];
+    for (const std::size_t i : {2U, 3U}) {
+        const auto slash = ink(slashes[i]);
+        const double x = stems[i].from.x;
+        const double centre = beam.left.y + (beam.right.y - beam.left.y) * (x - beam.left.x) /
+                                                (beam.right.x - beam.left.x);
+        CHECK(slash.top > centre + beam.thickness / 2 + kClear);
+    }
+    // The whole note: no stem, the slashes where its stem would be (under it).
+    const auto slash = ink(slashes[4]);
+    const auto head = ink(heads[4]);
+    CHECK_THAT((slash.left + slash.right) / 2, WithinAbs((head.left + head.right) / 2, 1e-9));
+    CHECK(slash.top > head.bottom + kClear);
+}
+
 TEST_CASE("Staff layout: dead notes are crosses, natural harmonics diamonds",
           "[notation][layout]") {
     Beat dead = note("C5");
