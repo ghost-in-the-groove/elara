@@ -1536,6 +1536,10 @@
         <translation>Staccato</translation>
     </message>
     <message>
+        <source>Tenuto</source>
+        <translation>Tenuto</translation>
+    </message>
+    <message>
         <source>Crash cymbal</source>
         <translation>Platillo crash</translation>
     </message>

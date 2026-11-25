@@ -194,6 +194,7 @@ core::Song everythingSong() {
         preRelease.effects.bend = BendCurve::preBendRelease(200);
         Note marked = fretted(1, 7, Dynamic::P);
         marked.effects.staccato = true;
+        marked.effects.tenuto = true; // portato (ADR-0088)
         marked.effects.accent = Accent::Accent;
         beats = {beatOf(quarter, {tied}),
                  beatOf(triplet8, {bend}),
@@ -451,6 +452,7 @@ core::Song randomSong(std::uint32_t seed) {
                                             s == 1 ? pick(36, 59) : pick(55, 84));
                                     }
                                     note.effects.staccato = pick(0, 9) == 0;
+                                    note.effects.tenuto = pick(0, 11) == 0;
                                     note.effects.ghost = pick(0, 15) == 0;
                                     beat.notes.push_back(note);
                                 }

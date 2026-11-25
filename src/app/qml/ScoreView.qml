@@ -273,7 +273,7 @@ Item {
         }
         // Note effects: T tie, H hammer-on or pull-off, S slide, U bend,
         // V vibrato, P palm mute, X dead note, L let ring, N harmonic,
-        // O ghost note, > accent, ' staccato.
+        // O ghost note, > accent, ' staccato, _ tenuto.
         const effect = control ? -1 : document.effectForKey(event.text);
         if (effect >= 0) {
             document.toggleEffect(effect);

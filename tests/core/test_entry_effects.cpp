@@ -125,7 +125,7 @@ TEST_CASE("Effects: each toggle sets the effect's usual form and clears it",
     run(doc, toggleEffect(doc.song(), caret, NoteEffect::Accent));
     CHECK(effects().accent == Accent::Accent);
     for (const NoteEffect effect : {NoteEffect::Legato, NoteEffect::DeadNote, NoteEffect::LetRing,
-                                    NoteEffect::Ghost, NoteEffect::Staccato}) {
+                                    NoteEffect::Ghost, NoteEffect::Staccato, NoteEffect::Tenuto}) {
         run(doc, toggleEffect(doc.song(), caret, effect));
     }
     const NoteEffects on = effects();
@@ -134,11 +134,12 @@ TEST_CASE("Effects: each toggle sets the effect's usual form and clears it",
     CHECK(on.letRing);
     CHECK(on.ghost);
     CHECK(on.staccato);
+    CHECK(on.tenuto); // with the staccato: portato (ADR-0088)
 
     for (const NoteEffect effect :
          {NoteEffect::Bend, NoteEffect::Slide, NoteEffect::Vibrato, NoteEffect::Harmonic,
           NoteEffect::Accent, NoteEffect::Legato, NoteEffect::DeadNote, NoteEffect::LetRing,
-          NoteEffect::Ghost, NoteEffect::Staccato}) {
+          NoteEffect::Ghost, NoteEffect::Staccato, NoteEffect::Tenuto}) {
         run(doc, toggleEffect(doc.song(), caret, effect));
     }
     CHECK(effects() == NoteEffects{});
@@ -164,7 +165,7 @@ TEST_CASE("Effects: a natural harmonic needs strings and a node", "[core][entry]
 TEST_CASE("Effects: techniques of strings go on fretted staves only", "[core][entry][effects]") {
     constexpr std::array kOfStrings{NoteEffect::Legato, NoteEffect::PalmMute, NoteEffect::DeadNote,
                                     NoteEffect::Harmonic};
-    for (int e = 0; e <= static_cast<int>(NoteEffect::Staccato); ++e) {
+    for (int e = 0; e <= static_cast<int>(NoteEffect::Tenuto); ++e) {
         const auto effect = static_cast<NoteEffect>(e);
         CHECK(needsStrings(effect) == (std::ranges::find(kOfStrings, effect) != kOfStrings.end()));
     }

@@ -133,6 +133,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Set at the caret
 - [x] Slurs: beats slurred to the next, drawn over the notes they join (ADR-0086)
 - [x] Clef changes: a measure changes its staff's clef, drawn smaller before the barline (ADR-0087)
+- [x] Tenuto and portato: held notes, drawn by the notehead, beyond the staccato dot (ADR-0088)
   - [x] In the model and kept by the native format
   - [x] Read and written in MusicXML
   - [x] Drawn on standard notation, clear of the notes, across lines

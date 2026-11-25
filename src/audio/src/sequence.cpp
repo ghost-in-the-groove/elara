@@ -300,6 +300,7 @@ struct Articulation {
     int velocity = 80;
     Touch touch = Touch::Normal;
     bool staccato = false;
+    bool tenuto = false; // with staccato, portato (ADR-0088)
     bool letRing = false;
     bool moves = false; // a bend, whammy bar, slide, hammer-on or vibrato (ADR-0023)
     int string = 0;     // 0 when the note has no fret position
@@ -308,6 +309,15 @@ struct Articulation {
     const core::NoteEffects* effects = nullptr;
     const core::BeatEffects* beat = nullptr;
 };
+
+// How long a note of written length `length` sounds: half of it staccato,
+// three quarters portato (ADR-0088), all of it otherwise.
+Fraction heldLength(const Fraction& length, const Articulation& articulation) {
+    if (!articulation.staccato) {
+        return length;
+    }
+    return articulation.tenuto ? length * Fraction(3, 4) : length / Fraction(2);
+}
 
 // The place of `note` in the order a strum strikes its beat: a downstroke
 // from the lowest string up, an upstroke from the highest down. Without fret
@@ -570,6 +580,7 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
     Articulation result{.key = sounding.key,
                         .velocity = sounding.velocity,
                         .staccato = effects.staccato,
+                        .tenuto = effects.tenuto,
                         .letRing = effects.letRing,
                         .string = note.position ? note.position->string : 0,
                         .effects = &effects,
@@ -661,26 +672,26 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     std::vector<Timing> timings(sounding.size());
     std::vector<Articulation> articulations(sounding.size());
     const std::size_t blocks = (sounding.size() + kNotesPerBlock - 1) / kNotesPerBlock;
-    core::forEachIndex(
-        0, blocks, core::threadsFor(0, sounding.size(), kParallelNotes, blocks),
-        [&](std::size_t block) {
-            const std::size_t last = std::min(sounding.size(), (block + 1) * kNotesPerBlock);
-            for (std::size_t i = block * kNotesPerBlock; i < last; ++i) {
-                const core::SoundingNote& note = sounding[i];
-                articulations[i] = articulationOf(song, note);
-                const Fraction offset = note.start - written[note.measure];
-                const Fraction end =
-                    offset + (articulations[i].staccato ? note.length / Fraction(2) : note.length);
-                Timing& timing = timings[i];
-                timing.start = tempo.secondsInto(note.measure, offset.toDouble());
-                timing.crosses = end > lengths[note.measure];
-                if (timing.crosses) {
-                    timing.endOffset = end;
-                } else {
-                    timing.end = tempo.secondsInto(note.measure, end.toDouble());
-                }
-            }
-        });
+    core::forEachIndex(0, blocks, core::threadsFor(0, sounding.size(), kParallelNotes, blocks),
+                       [&](std::size_t block) {
+                           const std::size_t last =
+                               std::min(sounding.size(), (block + 1) * kNotesPerBlock);
+                           for (std::size_t i = block * kNotesPerBlock; i < last; ++i) {
+                               const core::SoundingNote& note = sounding[i];
+                               articulations[i] = articulationOf(song, note);
+                               const Fraction offset = note.start - written[note.measure];
+                               const Fraction end =
+                                   offset + heldLength(note.length, articulations[i]);
+                               Timing& timing = timings[i];
+                               timing.start = tempo.secondsInto(note.measure, offset.toDouble());
+                               timing.crosses = end > lengths[note.measure];
+                               if (timing.crosses) {
+                                   timing.endOffset = end;
+                               } else {
+                                   timing.end = tempo.secondsInto(note.measure, end.toDouble());
+                               }
+                           }
+                       });
     // Where a note crossing out of played measure k ends: over the measures
     // played after it, the last one going on past its end.
     const auto endAfter = [&](std::size_t k, Fraction into) {
@@ -741,9 +752,7 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             // times as that value fits in the note, rounded, evenly.
             std::int64_t repeats = 1;
             if (articulation.tremolo > Fraction(0)) {
-                const Fraction fits =
-                    (articulation.staccato ? note.length / Fraction(2) : note.length) /
-                    articulation.tremolo;
+                const Fraction fits = heldLength(note.length, articulation) / articulation.tremolo;
                 repeats = std::max<std::int64_t>(1, (2 * fits.numerator() + fits.denominator()) /
                                                         (2 * fits.denominator()));
                 reorder = reorder || repeats > 1;

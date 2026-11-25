@@ -125,19 +125,21 @@ enum class Dynamic : std::uint8_t { PPP, PP, P, MP, MF, F, FF, FFF };
 /// How a note is played. "FromPrevious" flags join a note to the previous note
 /// on the same string or pitch: no new attack.
 struct NoteEffects {
-    // Largest members first to keep padding small (see the memory benchmark).
+    // Largest members first to keep padding small, the flags as bits (see the
+    // memory benchmark: a Note stays 48 bytes).
     BendCurve bend{};
     Harmonic harmonic{};
-    bool tiedFromPrevious = false;   // tie: same pitch, sustained
-    bool legatoFromPrevious = false; // hammer-on (higher) or pull-off (lower)
+    bool tiedFromPrevious : 1 = false;   // tie: same pitch, sustained
+    bool legatoFromPrevious : 1 = false; // hammer-on (higher) or pull-off (lower)
     SlideIn slideIn = SlideIn::None;
     SlideOut slideOut = SlideOut::None;
     Vibrato vibrato = Vibrato::None;
-    bool palmMute = false;
-    bool deadNote = false; // muted, percussive "x"
-    bool ghost = false;    // soft, written in parentheses
-    bool letRing = false;
-    bool staccato = false;
+    bool palmMute : 1 = false;
+    bool deadNote : 1 = false; // muted, percussive "x"
+    bool ghost : 1 = false;    // soft, written in parentheses
+    bool letRing : 1 = false;
+    bool staccato : 1 = false;
+    bool tenuto : 1 = false; // held its full length; with staccato, portato (ADR-0088)
     Accent accent = Accent::None;
     Dynamic dynamic = Dynamic::MF;
 

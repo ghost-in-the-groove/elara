@@ -1654,7 +1654,7 @@ private:
                                (note.position && !percussion_) || !fx.bend.isEmpty() ||
                                fx.harmonic.kind != HarmonicKind::None;
         const bool articulations =
-            fx.staccato || fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
+            fx.staccato || fx.tenuto || fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
             fx.slideOut == SlideOut::Downwards || fx.slideOut == SlideOut::Upwards;
         const bool arpeggiate = beatFx.strum != Strum::None;
         const bool fermata = firstNote && beatFx.fermata != Fermata::None;
@@ -1736,6 +1736,9 @@ private:
                 }
                 if (fx.staccato) {
                     xml.empty("staccato");
+                }
+                if (fx.tenuto) {
+                    xml.empty("tenuto");
                 }
                 if (fx.slideIn != SlideIn::None) {
                     xml.empty(fx.slideIn == SlideIn::FromBelow ? "scoop" : "plop");

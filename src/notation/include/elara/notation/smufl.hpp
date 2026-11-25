@@ -100,6 +100,8 @@ enum class Glyph : std::uint8_t {
     ArticStaccatoBelow,
     ArticMarcatoAbove,
     ArticMarcatoBelow,
+    ArticTenutoAbove, // ADR-0088
+    ArticTenutoBelow,
     // Fermatas (ADR-0085)
     FermataAbove,
     FermataBelow,

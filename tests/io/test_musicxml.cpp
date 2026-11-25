@@ -305,6 +305,29 @@ std::string quarterNote(std::string_view step, std::string_view rest) {
                        step, rest);
 }
 
+TEST_CASE("MusicXML: tenuto marks hold their notes, detached-legato is portato", "[musicxml]") {
+    // ADR-0088: a tenuto with a staccato, as one mark or two, is portato.
+    const auto marked = [](std::string_view step, std::string_view marks) {
+        return quarterNote(step, std::format("<notations><articulations>{}</articulations>"
+                                             "</notations>",
+                                             marks));
+    };
+    const ImportResult result =
+        parse(onePart(marked("C", "<tenuto/>") + marked("D", "<detached-legato/>") +
+                      marked("E", "<staccato/><tenuto/>") + quarterNote("F", "")));
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    const auto marks = [&](std::size_t b) {
+        const core::NoteEffects& fx = beats[b].notes.at(0).effects;
+        return std::pair(fx.tenuto, fx.staccato);
+    };
+    CHECK(marks(0) == std::pair(true, false));
+    CHECK(marks(1) == std::pair(true, true));
+    CHECK(marks(2) == std::pair(true, true));
+    CHECK(marks(3) == std::pair(false, false));
+    CHECK(result.warnings.empty());
+}
+
 TEST_CASE("MusicXML: lyrics give each beat a syllable per verse", "[musicxml]") {
     // ADR-0084: <lyric number> is the verse; begin and middle syllables join
     // the next one with a hyphen; elided syllables share the beat; <extend/>

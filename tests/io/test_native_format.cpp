@@ -94,6 +94,7 @@ core::Song richSong() {
     slid.effects.slideIn = SlideIn::FromBelow;
     slid.effects.slideOut = SlideOut::Legato;
     slid.effects.staccato = true;
+    slid.effects.tenuto = true; // portato (ADR-0088)
     slid.effects.ghost = true;
     Note muted = lead.frettedNote(6, 0);
     muted.effects.palmMute = true;

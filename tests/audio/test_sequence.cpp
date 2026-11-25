@@ -486,6 +486,24 @@ TEST_CASE("Sequence: staccato notes sound half their written length",
     CHECK_THAT(sequence.notes()[1].end, WithinAbs(2.0, kEpsilon));
 }
 
+TEST_CASE("Sequence: portato notes sound three quarters of their length, tenuto ones all of it",
+          "[audio][sequence][articulation]") {
+    // ADR-0088: a tenuto with a staccato is portato, detached but not short.
+    Song song = pianoSong(1);
+    Note portato = note(60);
+    portato.effects.staccato = true;
+    portato.effects.tenuto = true;
+    Note held = note(62);
+    held.effects.tenuto = true;
+    voice(song, 0) = {beat(NoteValue::Half, {portato}), beat(NoteValue::Quarter, {held}),
+                      beat(NoteValue::Quarter, {note(64)})};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 3);
+    CHECK_THAT(sequence.notes()[0].end, WithinAbs(0.75, kEpsilon));
+    CHECK_THAT(sequence.notes()[1].start, WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(sequence.notes()[1].end, WithinAbs(1.5, kEpsilon));
+}
+
 TEST_CASE("Sequence: let ring holds a note until its string is struck again",
           "[audio][sequence][articulation]") {
     Song song = guitarSong(2);
