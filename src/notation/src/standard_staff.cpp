@@ -299,7 +299,7 @@ public:
                       track.instrument().kind == core::InstrumentKind::Percussion),
           offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
           rolls_(!percussion_ && track.instrument().kind != core::InstrumentKind::Fretted),
-          lanes_(font), dynamics_(font), chordRow_(font, staff.isFretted() && !percussion_) {}
+          lanes_(font), dynamics_(font), aboveRow_(font, staff.isFretted() && !percussion_) {}
 
     double header(std::size_t first) override;
     double changes(std::size_t m, double x) override;
@@ -313,8 +313,8 @@ private:
         if (techniques_ && !lanes_.empty()) {
             lanes_.place(list_, inkTop());
         }
-        if (!chordRow_.empty()) {
-            chordRow_.place(list_, inkTop());
+        if (!aboveRow_.empty()) {
+            aboveRow_.place(list_, inkTop());
         }
         if (!dynamics_.empty()) {
             dynamics_.place(list_, inkBottom(), height(), width);
@@ -1433,7 +1433,7 @@ private:
     bool rolls_; // strums are arpeggio lines (ADR-0076), not arrows above the staff
     TechniqueLanes lanes_;
     DynamicMarks dynamics_;
-    ChordRow chordRow_; // chord symbols (ADR-0080)
+    AboveRow aboveRow_; // chord symbols and beat text (ADR-0080, ADR-0081)
     std::size_t measureIndex_ = 0;
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
@@ -1460,12 +1460,12 @@ double StandardWriter::changes(std::size_t m, double x) {
 void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
     read(m);
     columnInk(ink);
-    chordRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
+    aboveRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
 }
 
 void StandardWriter::draw(std::span<const ColumnPosition> positions, double start, double barline) {
     drawMeasure(positions, start, barline);
-    chordRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
+    aboveRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
     strikeDynamics();
     dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
 }
