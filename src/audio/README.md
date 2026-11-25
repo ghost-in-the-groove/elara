@@ -16,7 +16,8 @@ Three targets with different rules:
   ring and harmonics applied (ADR-0022), portato notes three quarters long (ADR-0088), bends, slides and vibrato sent as
   pitch events (ADR-0023), hammer-ons, pull-offs and legato slides as legato
   events (ADR-0070), and strums and tremolo picking
-  spreading and repeating attacks (ADR-0025). For practice it plays at 25 % to
+  spreading and repeating attacks (ADR-0025), trills repeating them on the
+  note and the other note by turns (ADR-0090). For practice it plays at 25 % to
   200 % of the written tempo and adds a metronome on a track after the song's
   (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
   wood blocks at a fixed level. `carriedPosition()` finds where playback

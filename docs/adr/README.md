@@ -95,6 +95,7 @@ one that replaces them.
 | [0087](0087-clef-changes.md) | Clef changes | Accepted |
 | [0088](0088-tenuto.md) | Tenuto and portato | Accepted |
 | [0089](0089-octave-lines.md) | Octave lines | Accepted |
+| [0090](0090-trills.md) | Trills | Accepted |
 
 ## Template
 
