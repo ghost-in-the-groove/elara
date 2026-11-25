@@ -110,6 +110,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
     Q_PROPERTY(int caretVibrato READ caretVibrato NOTIFY caretChanged)
     Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
+    Q_PROPERTY(int caretTrill READ caretTrill NOTIFY caretChanged)
     Q_PROPERTY(int caretDynamic READ caretDynamic NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
@@ -546,6 +547,11 @@ public:
     [[nodiscard]] int caretSlideOut() const;
     [[nodiscard]] int caretVibrato() const;
     [[nodiscard]] int caretAccent() const;
+    /// How many semitones the caret's notes trill to (ADR-0090), 0 without a
+    /// trill. toggleTrill() takes it off, or trills each note to the next step
+    /// up in the key at thirty-seconds.
+    [[nodiscard]] int caretTrill() const;
+    Q_INVOKABLE void toggleTrill();
     /// The dynamic at the caret (ADR-0047), numbered as core::Dynamic (0 ppp
     /// to 7 fff): the notes there, or the last ones struck before them.
     [[nodiscard]] int caretDynamic() const;

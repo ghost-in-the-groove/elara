@@ -1183,6 +1183,13 @@ void Startup::queueEffects() {
               "the kinds of effects did not go on");
         check(score_->undoName() == ScoreDocument::tr("Change slide"),
               "the slides are not undoable");
+        // A trill to the next step of the key, then off again (ADR-0090).
+        score_->toggleTrill();
+        check(score_->caretTrill() > 0 && score_->undoName() == ScoreDocument::tr("Change trill") &&
+                  score_->caretStatus().contains(ScoreDocument::tr("Trill")),
+              "the trill did not go on");
+        score_->toggleTrill();
+        check(score_->caretTrill() == 0, "the trill did not come off");
         const QString status = score_->caretStatus();
         check(status.contains(ScoreDocument::tr("Wide vibrato")) &&
                   status.contains(ScoreDocument::tr("Marcato")) &&

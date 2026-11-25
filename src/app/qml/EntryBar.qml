@@ -922,6 +922,24 @@ Rectangle {
                             active: root.document.caretAccent === 2
                             onClicked: root.document.setAccent(active ? 0 : 2)
                         }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        // To the next step of the key (ADR-0090).
+                        EffectKind {
+                            tip: qsTr("Trill")
+                            label: "tr"
+                            active: root.document.caretTrill !== 0
+                            onClicked: root.document.toggleTrill()
+                        }
                     }
 
                     Label {
