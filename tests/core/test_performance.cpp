@@ -90,6 +90,33 @@ TEST_CASE("Sounding notes start where their beat starts and last their written l
     CHECK(soundingNotes(song) == expected);
 }
 
+TEST_CASE("Sounding notes move with the triplet feel of their measures",
+          "[core][performance][feel]") {
+    // ADR-0104: a swung pair of eighths, a quarter that stays, and a note tied
+    // from the swung measure into a dotted one, ending in its first half.
+    using elara::core::TripletFeel;
+    Song song;
+    song.appendMeasures(2);
+    song.measureHeader(0).tripletFeel = TripletFeel::Eighth;
+    song.measureHeader(1).tripletFeel = TripletFeel::DottedEighth;
+    std::vector<elara::core::SoundingNote> notes{
+        {.start = Fraction(0), .length = Fraction(1, 8), .measure = 0},
+        {.start = Fraction(1, 8), .length = Fraction(1, 8), .measure = 0},
+        {.start = Fraction(1, 4), .length = Fraction(1, 4), .measure = 0},
+        {.start = Fraction(7, 8), .length = Fraction(1, 4), .measure = 0},
+    };
+    elara::core::applyTripletFeel(song, notes);
+    CHECK(notes[0].start == Fraction(0));
+    CHECK(notes[0].length == Fraction(1, 6));
+    CHECK(notes[1].start == Fraction(1, 6));
+    CHECK(notes[1].length == Fraction(1, 12));
+    CHECK(notes[2].start == Fraction(1, 4));
+    CHECK(notes[2].length == Fraction(1, 4));
+    // 7/8 swings to 3/4 + 1/6; its end, 1/8 into a dotted measure, to 3/16.
+    CHECK(notes[3].start == Fraction(11, 12));
+    CHECK(notes[3].length == Fraction(1) + Fraction(3, 16) - Fraction(11, 12));
+}
+
 TEST_CASE("Grace notes borrow their time from the beat before or their own",
           "[core][performance]") {
     Song song = pianoSong(2);

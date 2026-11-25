@@ -191,6 +191,11 @@ private:
                                                            TimeSignature time);
 
 /// The same for the key signature.
+/// Changes the triplet feel (ADR-0104) from measure `from` until the next
+/// change of it, as one undo step ("Change triplet feel"); nullptr when it is
+/// already that. Throws std::out_of_range for a missing measure.
+[[nodiscard]] std::unique_ptr<Command> changeTripletFeel(const Song& song, std::size_t from,
+                                                         TripletFeel feel);
 [[nodiscard]] std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from,
                                                           KeySignature key);
 

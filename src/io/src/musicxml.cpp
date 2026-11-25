@@ -1211,6 +1211,7 @@ private:
             } else if (name == "sound") {
                 if (first_) {
                     navigate(header, soundNavigation(child), index);
+                    readSwing(child, index, header);
                 }
                 if (auto tempo = readSound(child, index)) {
                     tempos.push_back(TempoMark{.onset = cursor, .tempo = *tempo});
@@ -1591,6 +1592,38 @@ private:
         }
     }
 
+    // <swing> (ADR-0104): straight, or the ratio of a pair of eighths or
+    // sixteenths, from its measure on (new measures continue the feel).
+    void readSwing(pugi::xml_node sound, std::size_t index, MeasureHeader& header) {
+        const pugi::xml_node swing = sound.child("swing");
+        if (!swing) {
+            return;
+        }
+        if (swing.child("straight")) {
+            header.tripletFeel = TripletFeel::None;
+            return;
+        }
+        const int first = swing.child("first").text().as_int(0);
+        const int second = swing.child("second").text().as_int(0);
+        const std::string_view type = trim(swing.child("swing-type").text().as_string());
+        const bool sixteenth = type == "16th";
+        if (first <= 0 || second <= 0 || (!sixteenth && !type.empty() && type != "eighth")) {
+            warn("unusual swing dropped", index);
+            return;
+        }
+        if (first == 2 * second) {
+            header.tripletFeel = sixteenth ? TripletFeel::Sixteenth : TripletFeel::Eighth;
+        } else if (first == 3 * second) {
+            header.tripletFeel =
+                sixteenth ? TripletFeel::DottedSixteenth : TripletFeel::DottedEighth;
+        } else if (second == 3 * first) {
+            header.tripletFeel =
+                sixteenth ? TripletFeel::ScottishSixteenth : TripletFeel::ScottishEighth;
+        } else {
+            warn("unusual swing dropped", index);
+        }
+    }
+
     std::optional<Tempo> readSound(pugi::xml_node sound, std::size_t index) {
         if (const pugi::xml_attribute tempo = sound.attribute("tempo")) {
             return makeTempo(tempo.as_double(0.0), Duration{}, index);
@@ -1729,6 +1762,9 @@ private:
         Navigation navigation = fromWords.value_or(Navigation{});
         if (const pugi::xml_node sound = direction.child("sound")) {
             navigation.merge(soundNavigation(sound));
+            if (header != nullptr) {
+                readSwing(sound, index, *header);
+            }
             const auto soundTempo = readSound(sound, index);
             if (!tempo) {
                 tempo = soundTempo;

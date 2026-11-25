@@ -2,7 +2,6 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
-  "triplet feel dropped",
   "Drums: instrument and volume changes dropped (measure 2)",
   "Melody: lyrics after the last note dropped"
  ],
@@ -29,7 +28,8 @@
     "repeatTimes": 2,
     "alternateEndings": [
      1
-    ]
+    ],
+    "tripletFeel": "eighth"
    },
    {
     "keySignature": "F major",
@@ -40,7 +40,8 @@
     ],
     "alternateEndings": [
      2
-    ]
+    ],
+    "tripletFeel": "eighth"
    }
   ],
   "tracks": [

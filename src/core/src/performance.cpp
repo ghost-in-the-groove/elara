@@ -313,6 +313,36 @@ const Note& noteOf(const Song& song, const SoundingNote& sounding) {
     return notes.at(sounding.note);
 }
 
+void applyTripletFeel(const Song& song, std::span<SoundingNote> notes) {
+    const std::size_t count = song.measureCount();
+    bool swings = false;
+    std::vector<Fraction> starts(count + 1);
+    for (std::size_t m = 0; m < count; ++m) {
+        const MeasureHeader& header = song.measureHeader(m);
+        swings = swings || header.tripletFeel != TripletFeel::None;
+        starts[m + 1] = starts[m] + header.timeSignature.measureLength();
+    }
+    if (!swings) {
+        return;
+    }
+    // Where `at` is played, in its measure from `from` on; an end on a
+    // measure's barline stays there.
+    const auto played = [&](const Fraction& at, std::size_t from) {
+        std::size_t m = std::min(from, count - 1);
+        while (m + 1 < count && at > starts[m + 1]) {
+            ++m;
+        }
+        const MeasureHeader& header = song.measureHeader(m);
+        return starts[m] +
+               swung(header.tripletFeel, at - starts[m], header.timeSignature.measureLength());
+    };
+    for (SoundingNote& note : notes) {
+        const Fraction start = played(note.start, note.measure);
+        note.length = played(note.start + note.length, note.measure) - start;
+        note.start = start;
+    }
+}
+
 std::vector<SoundingNote> soundingNotes(const Song& song) {
     std::vector<Fraction> starts(song.measureCount());
     Fraction start;

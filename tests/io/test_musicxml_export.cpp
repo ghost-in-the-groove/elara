@@ -1057,6 +1057,51 @@ TEST_CASE("MusicXML export: a guitar's measure repeat covers its TAB staff; one 
     CHECK(read.measure(2).isEmpty());
 }
 
+TEST_CASE("MusicXML export: the triplet feel comes back as swing where it changes",
+          "[musicxml][export][feel]") {
+    // ADR-0104: written once, in the first part, where the feel changes.
+    core::Song song;
+    song.appendMeasures(5);
+    for (const char* preset : {"electric-guitar", "electric-bass"}) {
+        const std::size_t t =
+            song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset(preset)));
+        for (std::size_t m = 0; m < 5; ++m) {
+            song.track(t).staff(0).measure(m).voices[0].beats = {
+                beatOf(core::Duration(core::NoteValue::Whole),
+                       {song.track(t).staff(0).frettedNote(1, 3)})};
+        }
+    }
+    using core::TripletFeel;
+    song.measureHeader(0).tripletFeel = TripletFeel::Eighth;
+    song.measureHeader(1).tripletFeel = TripletFeel::Eighth;
+    song.measureHeader(2).tripletFeel = TripletFeel::ScottishSixteenth;
+    song.measureHeader(4).tripletFeel = TripletFeel::DottedEighth;
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    std::string xml; // without the indentation between elements
+    bool between = false;
+    for (const char c : exported.data) {
+        if (between && (c == ' ' || c == '\n' || c == '\r')) {
+            continue;
+        }
+        between = c == '>';
+        xml += c;
+    }
+    const auto count = [&xml](std::string_view text) {
+        std::size_t n = 0;
+        for (auto at = xml.find(text); at != std::string::npos; at = xml.find(text, at + 1)) {
+            ++n;
+        }
+        return n;
+    };
+    CHECK(count("<swing>") == 4);
+    CHECK(count("<swing><first>2</first><second>1</second><swing-type>eighth</swing-type>") == 1);
+    CHECK(count("<swing><first>1</first><second>3</second><swing-type>16th</swing-type>") == 1);
+    CHECK(count("<swing><straight/></swing>") == 1);
+    CHECK(count("<swing><first>3</first><second>1</second><swing-type>eighth</swing-type>") == 1);
+    requireSame(song, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: double barlines come back as light-light barlines",
           "[musicxml][export][barline]") {
     // ADR-0103: one under an end repeat or at the song's end does not show,

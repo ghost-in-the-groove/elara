@@ -161,6 +161,8 @@ struct MeasureHeader {
     /// A double barline closes the measure, the end of a section (ADR-0103);
     /// an end repeat, or the song's final barline, shows instead of it.
     bool doubleBar = false;
+    /// How the measure plays the pairs of a note value (ADR-0104).
+    TripletFeel tripletFeel = TripletFeel::None;
 
     // Signs that open the measure: where jumps go.
     bool segno = false;
@@ -188,10 +190,12 @@ struct MeasureHeader {
                  1U) != 0);
     }
 
-    /// The header a new measure after this one starts with: same meter and key,
-    /// no events.
+    /// The header a new measure after this one starts with: same meter, key
+    /// and triplet feel, no events.
     [[nodiscard]] MeasureHeader continuation() const {
-        return MeasureHeader{.timeSignature = timeSignature, .keySignature = keySignature};
+        return MeasureHeader{.timeSignature = timeSignature,
+                             .keySignature = keySignature,
+                             .tripletFeel = tripletFeel};
     }
 
     friend bool operator==(const MeasureHeader&, const MeasureHeader&) = default;

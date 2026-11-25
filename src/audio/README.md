@@ -12,7 +12,8 @@ Three targets with different rules:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017; gradual tempo changes speed up or slow
-  down along the score, ADR-0082, and fermatas hold every voice, ADR-0085), with accents, ghost notes, staccato, let
+  down along the score, ADR-0082, fermatas hold every voice, ADR-0085, and a
+  triplet feel plays pairs long and short, ADR-0104), with accents, ghost notes, staccato, let
   ring and harmonics applied (ADR-0022), portato notes three quarters long (ADR-0088), staccatissimo ones a quarter (ADR-0094), a sixteenth or an eighth taken off the notes before a breath mark or a caesura (ADR-0095), bends, slides and vibrato sent as
   pitch events (ADR-0023), hammer-ons, pull-offs and legato slides as legato
   events (ADR-0070), and strums and tremolo picking

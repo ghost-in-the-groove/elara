@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 namespace elara::core {
@@ -42,6 +43,11 @@ struct SoundingNote {
 /// (staccato, bends, slides...) are not applied: that is playback's job, which
 /// finds them through each note's measure, beat and note.
 [[nodiscard]] std::vector<SoundingNote> soundingNotes(const Song& song);
+
+/// Moves the start and the end of each of `notes` as the triplet feel of the
+/// measure each falls in plays it (ADR-0104, swung()); exact, and in the same
+/// order. Nothing moves in a song without a triplet feel.
+void applyTripletFeel(const Song& song, std::span<SoundingNote> notes);
 
 /// The beat holding the note `sounding` strikes, as written: in its measure,
 /// or for a measure repeat in the measure repeated (repeatSource(), ADR-0102).

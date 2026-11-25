@@ -129,7 +129,7 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
-(ADR-0042), `tempo-gradual <m> on|off` (ADR-0082), `title <text>`, `credit <line> [text]` (any line of the credits:
+(ADR-0042), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
 `title`, `subtitle`, `artist`, `album`, `words`, `music`, `copyright`,
 `transcriber` or `notes`; no text clears it, ADR-0059),
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
@@ -146,6 +146,10 @@ or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
 changes nothing adds no undo step.
+
+`feel` changes the triplet feel from measure `m` until the next change of it,
+one undo step, "Change triplet feel" (ADR-0104); the measures list it as
+`"tripletFeel":"eighth"`, and `sequence` plays it.
 
 `sign` gives measure `m` exactly the signs and closing marks it lists (`none`
 clears them) and `jump` its jump, with what ends the music after it (ADR-0049).

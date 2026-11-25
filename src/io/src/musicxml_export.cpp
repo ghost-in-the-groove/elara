@@ -1092,6 +1092,33 @@ private:
         if (header.doubleCoda) {
             writeNavigation(xml, "coda", {}, "coda", "double-coda");
         }
+        // The triplet feel where it changes (ADR-0104).
+        const TripletFeel before =
+            m == 0 ? TripletFeel::None : song_.measureHeader(m - 1).tripletFeel;
+        if (header.tripletFeel != before) {
+            writeSwing(xml, header.tripletFeel);
+        }
+    }
+
+    static void writeSwing(XmlWriter& xml, TripletFeel feel) {
+        xml.open("sound");
+        xml.open("swing");
+        if (feel == TripletFeel::None) {
+            xml.empty("straight");
+        } else {
+            const bool sixteenth = feel == TripletFeel::Sixteenth ||
+                                   feel == TripletFeel::DottedSixteenth ||
+                                   feel == TripletFeel::ScottishSixteenth;
+            const bool dotted =
+                feel == TripletFeel::DottedEighth || feel == TripletFeel::DottedSixteenth;
+            const bool scottish =
+                feel == TripletFeel::ScottishEighth || feel == TripletFeel::ScottishSixteenth;
+            xml.number("first", scottish ? 1 : (dotted ? 3 : 2));
+            xml.number("second", scottish ? 3 : 1);
+            xml.text("swing-type", sixteenth ? "16th" : "eighth");
+        }
+        xml.close("swing");
+        xml.close("sound");
     }
 
     // Fine, To Coda and the jump close it.

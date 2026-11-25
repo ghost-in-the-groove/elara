@@ -48,6 +48,7 @@ using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::TrackMix;
 using elara::core::Trill;
+using elara::core::TripletFeel;
 using elara::core::Tuning;
 using elara::core::Vibrato;
 
@@ -487,6 +488,29 @@ TEST_CASE("Sequence: staccato notes sound half their written length",
     CHECK_THAT(sequence.notes()[0].end, WithinAbs(0.5, kEpsilon));
     CHECK_THAT(sequence.notes()[1].start, WithinAbs(1.0, kEpsilon));
     CHECK_THAT(sequence.notes()[1].end, WithinAbs(2.0, kEpsilon));
+}
+
+TEST_CASE("Sequence: a triplet feel plays pairs of eighths long and short",
+          "[audio][sequence][feel]") {
+    // ADR-0104: at quarter = 120, the first eighth of each quarter lasts a
+    // third of a second and the second a sixth; the quarter and the next
+    // measure play straight.
+    Song song = pianoSong(2);
+    song.measureHeader(0).tripletFeel = TripletFeel::Eighth;
+    const Beat eighth = beat(NoteValue::Eighth, {note(60)});
+    voice(song, 0) = {eighth, eighth, eighth, eighth, beat(NoteValue::Half, {note(64)})};
+    voice(song, 1) = {eighth, eighth};
+    const Sequence sequence(song);
+    const auto& notes = sequence.notes();
+    REQUIRE(notes.size() == 7);
+    const std::array starts{0.0, 1.0 / 3.0, 0.5, 0.5 + 1.0 / 3.0, 1.0, 2.0, 2.25};
+    const std::array ends{1.0 / 3.0, 0.5, 0.5 + 1.0 / 3.0, 1.0, 2.0, 2.25, 2.5};
+    for (std::size_t i = 0; i < notes.size(); ++i) {
+        CAPTURE(i);
+        CHECK_THAT(notes[i].start, WithinAbs(starts[i], kEpsilon));
+        CHECK_THAT(notes[i].end, WithinAbs(ends[i], kEpsilon));
+    }
+    CHECK_THAT(sequence.duration(), WithinAbs(4.0, kEpsilon));
 }
 
 TEST_CASE("Sequence: portato notes sound three quarters of their length, tenuto ones all of it",
