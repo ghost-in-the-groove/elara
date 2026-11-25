@@ -60,9 +60,10 @@ struct ZipEntry {
 /// A zip archive holding `entries`, in that order. Throws std::runtime_error.
 [[nodiscard]] std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
 
-/// Writes `content` to a temporary file next to `path`, then renames it over
-/// `path`, so a failure never leaves a half-written file. Throws
-/// std::runtime_error with the path.
+/// Writes `content` to a temporary file next to `path`, waits until the system
+/// has put it on the disk, then renames it over `path` (and on POSIX syncs the
+/// folder): a failure, or a power cut, never leaves a half-written file under
+/// that name. Throws std::runtime_error with the path.
 void writeFileAtomically(const std::filesystem::path& path, std::string_view content);
 
 /// The whole file. Errors: "cannot open the file", "cannot read the file".

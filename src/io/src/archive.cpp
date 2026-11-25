@@ -1,13 +1,107 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "archive.hpp"
 
+#include <algorithm>
+#include <cstddef>
 #include <format>
 #include <fstream>
 #include <ios>
 #include <stdexcept>
 #include <system_error>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <cerrno>
+#endif
+
 namespace elara::io::detail {
+
+namespace {
+
+// Writes `content` to `path`, replacing it, and returns once the system has
+// put the data on the disk: renaming a file whose data still sits in a cache
+// can, after a power cut, leave the new name over an empty or partial file on
+// some file systems. False on any failure.
+bool writeToDisk(const std::filesystem::path& path, std::string_view content) {
+#if defined(_WIN32)
+    const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                    FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+    bool ok = true;
+    for (std::size_t done = 0; ok && done < content.size();) {
+        const auto chunk =
+            static_cast<DWORD>(std::min<std::size_t>(content.size() - done, 1U << 30U));
+        DWORD written = 0;
+        ok = WriteFile(file, content.data() + done, chunk, &written, nullptr) != 0 && written > 0;
+        done += written;
+    }
+    ok = ok && FlushFileBuffers(file) != 0;
+    return CloseHandle(file) != 0 && ok;
+#else
+    const int file = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0666);
+    if (file < 0) {
+        return false;
+    }
+    bool ok = true;
+    for (std::size_t done = 0; ok && done < content.size();) {
+        const ssize_t written = ::write(file, content.data() + done, content.size() - done);
+        if (written < 0 && errno == EINTR) {
+            continue;
+        }
+        ok = written > 0;
+        if (ok) {
+            done += static_cast<std::size_t>(written);
+        }
+    }
+#if defined(__APPLE__)
+    // fsync() leaves the data in the drive's cache on macOS; F_FULLFSYNC
+    // flushes it, where the file system supports it.
+    ok = ok && (::fcntl(file, F_FULLFSYNC) == 0 || ::fsync(file) == 0);
+#else
+    ok = ok && ::fsync(file) == 0;
+#endif
+    return ::close(file) == 0 && ok;
+#endif
+}
+
+// Renames `from` over `to`, and on POSIX syncs the folder so that the rename
+// itself survives a power cut. Windows writes the move through to the disk.
+std::error_code replaceOnDisk(const std::filesystem::path& from, const std::filesystem::path& to) {
+#if defined(_WIN32)
+    if (MoveFileExW(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) ==
+        0) {
+        return {static_cast<int>(GetLastError()), std::system_category()};
+    }
+    return {};
+#else
+    std::error_code error;
+    std::filesystem::rename(from, to, error);
+    if (error) {
+        return error;
+    }
+    const std::filesystem::path folder =
+        to.has_parent_path() ? to.parent_path() : std::filesystem::path(".");
+    if (const int dir = ::open(folder.c_str(), O_RDONLY | O_CLOEXEC); dir >= 0) {
+        static_cast<void>(::fsync(dir)); // not every file system syncs folders
+        ::close(dir);
+    }
+    return {};
+#endif
+}
+
+} // namespace
 
 bool looksLikeZip(std::span<const std::uint8_t> bytes) noexcept {
     return bytes.size() >= 4 && bytes[0] == 'P' && bytes[1] == 'K' && bytes[2] == 3 &&
@@ -92,22 +186,12 @@ std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries) {
 void writeFileAtomically(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::path temporary = path;
     temporary += ".saving";
-    {
-        std::ofstream out(temporary, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
-        }
-        out.write(content.data(), static_cast<std::streamsize>(content.size()));
-        out.close();
-        if (!out) {
-            std::error_code ignored;
-            std::filesystem::remove(temporary, ignored);
-            throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
-        }
+    if (!writeToDisk(temporary, content)) {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        throw std::runtime_error(std::format("cannot write {}", displayPath(path)));
     }
-    std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error) {
+    if (const std::error_code error = replaceOnDisk(temporary, path)) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
         throw std::runtime_error(
