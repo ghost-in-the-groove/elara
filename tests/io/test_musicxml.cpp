@@ -328,6 +328,36 @@ TEST_CASE("MusicXML: breath marks and caesuras go after their beats", "[musicxml
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: the marks of a beat count on any note of its chord", "[musicxml]") {
+    // Tremolo picking, an arpeggio, a pick stroke, a tap and a breath mark
+    // belong to the beat, whichever note of the chord carries them.
+    const auto chordOf = [](std::string_view notations) {
+        return std::format(
+            "<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>"
+            "<voice>1</voice><type>quarter</type></note>"
+            "<note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration>"
+            "<voice>1</voice><type>quarter</type><notations>{}</notations></note>",
+            notations);
+    };
+    const ImportResult result =
+        parse(onePart(chordOf(R"(<ornaments><tremolo type="single">2</tremolo></ornaments>)") +
+                      chordOf(R"(<arpeggiate direction="down"/><technical><up-bow/></technical>)") +
+                      chordOf("<technical><tap/></technical>") +
+                      chordOf("<articulations><breath-mark/></articulations>")));
+    CHECK(result.warnings.empty());
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    for (const core::Beat& beat : beats) {
+        CHECK(beat.notes.size() == 2);
+    }
+    CHECK(beats[0].effects.tremoloPicking == core::NoteValue::Sixteenth);
+    CHECK(beats[1].effects.strum == core::Strum::Up);
+    CHECK(beats[1].effects.pickStroke == core::PickStroke::Up);
+    CHECK(beats[2].effects.bassTechnique == core::BassTechnique::Tap);
+    CHECK(beats[3].effects.breath == core::Breath::Comma);
+    CHECK_FALSE(beats[3].effects.tremoloPicking.has_value());
+}
+
 TEST_CASE("MusicXML: staccatissimo is its own mark, spiccato a staccato", "[musicxml]") {
     // ADR-0094.
     const auto marked = [](std::string_view step, std::string_view marks) {

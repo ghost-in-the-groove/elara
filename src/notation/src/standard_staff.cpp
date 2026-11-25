@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -65,17 +66,26 @@ constexpr double kSlurNaturalHeight = 1.5; // the most it rises unless notes are
 constexpr double kSlurMaxHeight = 2.5;     // beyond it the whole slur moves away instead
 constexpr double kSlurLineGap = 0.4;       // between a slur cut by a line and its edge
 constexpr double kGraceSlurHeight = 0.35;  // a slur from a grace note to its chord
-constexpr double kClefChangeScale = 0.75;  // a clef change against the line's clef (ADR-0087)
-constexpr double kClefChangeGap = 0.5;     // between a clef change and the barline after it
-constexpr double kArticulationGap = 0.3;   // between a notehead and its articulation
-constexpr double kRunEndGap = 0.3;         // a technique run ends before the next column
-constexpr double kOctaveGap = 0.5;     // between an octave line and the ink it clears (ADR-0089)
-constexpr double kOctaveLineGap = 0.3; // between an octave line's mark and its dashes
-constexpr double kOctaveDash = 0.4;    // dashes and gaps of an octave line
-constexpr double kOctaveMinLine = 1.0; // the dashes of a line over a single short note
-constexpr double kPedalGap = 0.5;      // between the pedal and the ink above it (ADR-0092)
-constexpr double kPedalMinLine = 0.5;  // the line of a pedalling over a single short note
-constexpr double kPedalHook = 1.0;     // the hook up at its end
+// Slides (ADR-0098): the gap between a line and its noteheads or accidental,
+// how far a slide into or out of a note goes across and up or down, how far a
+// line cut at a system break goes up or down, and their thickness.
+constexpr double kSlideGap = 0.2;
+constexpr double kSlideOff = 1.2;
+constexpr double kSlideDrop = 0.75;
+constexpr double kSlideBreak = 0.75;
+constexpr double kSlideThickness = 0.12;
+constexpr double kGraceSlideGap = 0.9;    // between a grace note sliding to its chord and the chord
+constexpr double kClefChangeScale = 0.75; // a clef change against the line's clef (ADR-0087)
+constexpr double kClefChangeGap = 0.5;    // between a clef change and the barline after it
+constexpr double kArticulationGap = 0.3;  // between a notehead and its articulation
+constexpr double kRunEndGap = 0.3;        // a technique run ends before the next column
+constexpr double kOctaveGap = 0.5;        // between an octave line and the ink it clears (ADR-0089)
+constexpr double kOctaveLineGap = 0.3;    // between an octave line's mark and its dashes
+constexpr double kOctaveDash = 0.4;       // dashes and gaps of an octave line
+constexpr double kOctaveMinLine = 1.0;    // the dashes of a line over a single short note
+constexpr double kPedalGap = 0.5;         // between the pedal and the ink above it (ADR-0092)
+constexpr double kPedalMinLine = 0.5;     // the line of a pedalling over a single short note
+constexpr double kPedalHook = 1.0;        // the hook up at its end
 constexpr double kPedalNotchHeight = 0.8;
 constexpr double kTrillGap = 0.5;     // between a trill and the ink it clears (ADR-0090)
 constexpr double kTrillWaveGap = 0.2; // between a trill's "tr" and its wavy line
@@ -376,6 +386,46 @@ struct SlurNote {
     return !beat.graces.empty() && legatoBetween(beat.graces.back().notes, beat.notes);
 }
 
+// Whether `note` slides on to the next note on its string (ADR-0098).
+[[nodiscard]] bool slidesOn(const core::Note& note) {
+    return note.effects.slideOut == core::SlideOut::Shift ||
+           note.effects.slideOut == core::SlideOut::Legato;
+}
+
+// Of `count` notes, `noteAt(i)` the i-th (null for none), the index of the
+// one `from` slides to (ADR-0098): the one on its string, or where strings
+// are not known the one nearest in pitch.
+[[nodiscard]] std::optional<std::size_t> slideTarget(const core::Note& from, std::size_t count,
+                                                     const auto& noteAt) {
+    std::optional<std::size_t> nearest;
+    int distance = std::numeric_limits<int>::max();
+    for (std::size_t i = 0; i < count; ++i) {
+        const core::Note* to = noteAt(i);
+        if (to == nullptr) {
+            continue;
+        }
+        if (from.position && to->position) {
+            if (from.position->string == to->position->string) {
+                return i;
+            }
+            continue;
+        }
+        const int apart = std::abs(to->pitch.midiNumber() - from.pitch.midiNumber());
+        if (apart < distance) {
+            distance = apart;
+            nearest = i;
+        }
+    }
+    return nearest;
+}
+
+// Up the page (-1), down (1) or level (0): the way a line from `from` to `to`
+// goes.
+[[nodiscard]] double slideDirection(const core::Note& from, const core::Note& to) {
+    const int rise = to.pitch.midiNumber() - from.pitch.midiNumber();
+    return rise > 0 ? -1.0 : rise < 0 ? 1.0 : 0.0;
+}
+
 // The outer edge of a beam group's primary beam: y = edge + slope * (x - x0).
 struct BeamLine {
     double edge = 0.0;
@@ -420,6 +470,7 @@ public:
 private:
     void close(double width) override {
         tiesOut(width - defaults_.thinBarlineThickness - kTieGap);
+        slidesOut(width - defaults_.thinBarlineThickness - kSlideGap);
         slursOut(width - defaults_.thinBarlineThickness - kSlurLineGap);
         octaveLinesOut(width);
         if (techniques_ && !lanes_.empty()) {
@@ -472,7 +523,12 @@ private:
         // Ties from the line before start after the header, and so do the
         // slurs its last beats were slurred into (ADR-0086).
         lineStart_ = x;
+        lineFirst_ = first;
         incoming_.fill(first > 0);
+        slideIncoming_.fill(first > 0);
+        for (auto& starts : slideStarts_) {
+            starts.clear();
+        }
         for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
             slurNotes_[v].clear();
             bool carried = false;
@@ -553,11 +609,14 @@ private:
             if (chord.measureRest) {
                 tieStarts_[chord.voice].clear();
                 incoming_[chord.voice] = false;
+                slideStarts_[chord.voice].clear();
+                slideIncoming_[chord.voice] = false;
                 continue;
             }
             draw(chord);
             drawGraces(chord);
             ties(chord);
+            slides(chord);
             articulations(chord);
             breath(chord);
         }
@@ -571,6 +630,10 @@ private:
                 starts.clear();
             }
             incoming_.fill(false);
+            for (auto& starts : slideStarts_) {
+                starts.clear();
+            }
+            slideIncoming_.fill(false);
         }
         beamLines_.clear();
         for (const std::vector<std::size_t>& group : beamGroups_) {
@@ -834,6 +897,7 @@ private:
         for (Chord& chord : chords_) {
             if (!chord.measureRest) {
                 shape(chord);
+                makeRoomForSlides(chord);
                 placeGraces(chord);
             }
         }
@@ -1450,7 +1514,10 @@ private:
             chord.graces.size() > 1 && std::ranges::all_of(chord.graces, [](const Chord& grace) {
                 return beamCount(grace.duration.value()) > 0;
             });
-        double right = chord.left - kGraceGap;
+        const bool sliding = std::ranges::any_of(chord.graces.back().heads, [](const Head& head) {
+            return head.note != nullptr && slidesOn(*head.note);
+        });
+        double right = chord.left - (sliding ? kGraceSlideGap : kGraceGap);
         for (auto grace = chord.graces.rbegin(); grace != chord.graces.rend(); ++grace) {
             grace->stemUp = up;
             grace->beamGroup = beamed ? 0 : -1;
@@ -1539,6 +1606,165 @@ private:
         }
         if (legatoFromGrace(*chord.beat)) {
             graceSlur(chord, up);
+        }
+        graceSlides(chord);
+    }
+
+    // ---- Slides (ADR-0098) ----
+
+    // A slide into a note goes left of the chord's ink and one out of it right
+    // of it, which then reach over them so that the beats around make room.
+    void makeRoomForSlides(Chord& chord) const {
+        bool in = false;
+        bool out = false;
+        for (const Head& head : chord.heads) {
+            if (head.note != nullptr) {
+                const core::NoteEffects& effects = head.note->effects;
+                in = in || effects.slideIn != core::SlideIn::None;
+                out = out || effects.slideOut == core::SlideOut::Downwards ||
+                      effects.slideOut == core::SlideOut::Upwards;
+            }
+        }
+        if (in) {
+            chord.left -= kSlideOff + kSlideGap;
+        }
+        if (out) {
+            chord.right += kSlideGap + kSlideOff;
+        }
+    }
+
+    // The left of a notehead of the chord, or of its accidental.
+    [[nodiscard]] double inkLeftOf(const Chord& chord, const Head& head) const {
+        if (head.accidental) {
+            return chord.x + head.accidentalX + metrics(*head.accidental).box.southWest.x;
+        }
+        return chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+    }
+
+    // The right of a notehead of the chord, after its dots.
+    [[nodiscard]] double inkRightOf(const Chord& chord, const Head& head) const {
+        return chord.x + head.dx + metrics(head.glyph).box.northEast.x +
+               dotsWidth(chord.duration.dots());
+    }
+
+    void slideLine(Point from, Point to) {
+        if (to.x - from.x > kEpsilon) {
+            line(from, to, kSlideThickness, Role::Slide);
+        }
+    }
+
+    // Draws the slides of a chord: the lines from the notes of its voice's
+    // chord before to the notes they slide to in it, from the start of the
+    // line when that chord ended the line before, and its notes' slides in
+    // and out; then keeps where its notes' slides to the next chord start.
+    void slides(const Chord& chord) {
+        std::vector<SlideStart>& starts = slideStarts_[chord.voice];
+        const bool incoming = std::exchange(slideIncoming_[chord.voice], false);
+        if (chord.rest || chord.heads.empty()) {
+            starts.clear();
+            return;
+        }
+        const std::vector<core::Beat>& beats =
+            staff_.measure(measureIndex_).voices[chord.voice].beats;
+        if (incoming && measureIndex_ == lineFirst_ && measureIndex_ > 0 &&
+            chord.beat == &beats.front()) {
+            const std::vector<core::Beat>& before =
+                staff_.measure(measureIndex_ - 1).voices[chord.voice].beats;
+            if (!before.empty()) {
+                for (const core::Note& note : before.back().notes) {
+                    if (slidesOn(note)) {
+                        starts.push_back(SlideStart{.at = {lineStart_ + kSlideGap, 0.0},
+                                                    .note = &note,
+                                                    .measure = measureIndex_ - 1,
+                                                    .cut = true});
+                    }
+                }
+            }
+        }
+        for (const SlideStart& start : starts) {
+            if (start.measure + 1 < measureIndex_) {
+                continue; // the voice had no beats in between
+            }
+            const auto target = slideTarget(*start.note, chord.heads.size(),
+                                            [&](std::size_t i) { return chord.heads[i].note; });
+            if (!target) {
+                continue;
+            }
+            const Head& head = chord.heads[*target];
+            const Point to{inkLeftOf(chord, head) - kSlideGap, yOf(head.step)};
+            Point from = start.at;
+            if (start.cut) {
+                from.y = to.y - slideDirection(*start.note, *head.note) * kSlideBreak;
+            }
+            slideLine(from, to);
+        }
+        starts.clear();
+        for (const Head& head : chord.heads) {
+            if (head.note == nullptr) {
+                continue;
+            }
+            const core::NoteEffects& effects = head.note->effects;
+            const double y = yOf(head.step);
+            if (effects.slideIn != core::SlideIn::None) {
+                const double end = inkLeftOf(chord, head) - kSlideGap;
+                const double below = effects.slideIn == core::SlideIn::FromBelow ? 1.0 : -1.0;
+                slideLine({end - kSlideOff, y + below * kSlideDrop}, {end, y});
+            }
+            const double begin = inkRightOf(chord, head) + kSlideGap;
+            if (effects.slideOut == core::SlideOut::Downwards ||
+                effects.slideOut == core::SlideOut::Upwards) {
+                const double down = effects.slideOut == core::SlideOut::Downwards ? 1.0 : -1.0;
+                slideLine({begin, y}, {begin + kSlideOff, y + down * kSlideDrop});
+            } else if (slidesOn(*head.note)) {
+                starts.push_back(
+                    SlideStart{.at = {begin, y}, .note = head.note, .measure = measureIndex_});
+            }
+        }
+    }
+
+    // At the end of a line: the lines from the last notes of each voice to
+    // the notes of the next measure they slide to, cut at `end`.
+    void slidesOut(double end) {
+        measure_ = measureIndex_;
+        const std::size_t next = measureIndex_ + 1;
+        for (std::size_t v = 0; v < slideStarts_.size(); ++v) {
+            std::vector<SlideStart>& starts = slideStarts_[v];
+            if (next < song_.measureCount() && !staff_.measure(next).voices[v].beats.empty()) {
+                const std::vector<core::Note>& notes =
+                    staff_.measure(next).voices[v].beats.front().notes;
+                for (const SlideStart& start : starts) {
+                    if (start.measure != measureIndex_) {
+                        continue;
+                    }
+                    const auto target = slideTarget(*start.note, notes.size(),
+                                                    [&](std::size_t i) { return &notes[i]; });
+                    if (target) {
+                        const double way = slideDirection(*start.note, notes[*target]);
+                        slideLine(start.at, {end, start.at.y + way * kSlideBreak});
+                    }
+                }
+            }
+            starts.clear();
+        }
+    }
+
+    // Lines from the last grace note of a chord to the notes it slides to.
+    void graceSlides(const Chord& chord) {
+        const Chord& grace = chord.graces.back();
+        for (const Head& from : grace.heads) {
+            if (from.note == nullptr || !slidesOn(*from.note)) {
+                continue;
+            }
+            const auto target = slideTarget(*from.note, chord.heads.size(),
+                                            [&](std::size_t i) { return chord.heads[i].note; });
+            if (!target) {
+                continue;
+            }
+            const Head& to = chord.heads[*target];
+            const double x =
+                chord.x + grace.x +
+                (from.dx + metrics(from.glyph).box.northEast.x + kSlideGap) * kGraceScale;
+            slideLine({x, yOf(from.step)}, {inkLeftOf(chord, to) - kSlideGap, yOf(to.step)});
         }
     }
 
@@ -2347,6 +2573,16 @@ private:
         bool above = false; // the side the tie leaves on
     };
 
+    // A note sliding to the next note on its string (ADR-0098): where its line
+    // starts, in which measure, and whether the line is cut, coming from the
+    // line before (its height then follows the note it goes to).
+    struct SlideStart {
+        Point at;
+        const core::Note* note = nullptr;
+        std::size_t measure = 0;
+        bool cut = false;
+    };
+
     const core::Song& song_;
     const core::Staff& staff_;
     Clef clef_;                       // in force at the measure being drawn
@@ -2366,6 +2602,11 @@ private:
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
     std::array<bool, core::Measure::kMaxVoices> incoming_{}; // ties from the line before
+    // Per voice, the slides of its last chord to the next, and whether its
+    // first chord on the line takes slides from the line before (ADR-0098).
+    std::array<std::vector<SlideStart>, core::Measure::kMaxVoices> slideStarts_{};
+    std::array<bool, core::Measure::kMaxVoices> slideIncoming_{};
+    std::size_t lineFirst_ = 0; // the line's first measure
     // Per voice, the beats of the slur going on (ADR-0086), whether one is
     // going on and whether it came from the line before.
     std::array<std::vector<SlurNote>, core::Measure::kMaxVoices> slurNotes_{};

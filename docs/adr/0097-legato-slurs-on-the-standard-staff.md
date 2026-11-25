@@ -40,7 +40,7 @@ note, so the beat before is not slurred to it.
 **Nothing else changes.** The model, the formats and playback keep legato as
 note effects; MusicXML export still writes hammer-ons and pull-offs as
 technical marks without slurs, so a file read back is the same song. Tablature
-keeps its arcs.
+keeps its arcs. The line of a slide is drawn as well (ADR-0098).
 
 ## Consequences
 
