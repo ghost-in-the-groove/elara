@@ -441,6 +441,89 @@ TEST_CASE("Page layout: the first system of several tracks names them", "[notati
     CHECK(textsWithRole(pages(song, narrow()).front(), Role::TrackName).empty());
 }
 
+namespace {
+
+// A piano: `count` measures of quarters on a treble and a bass staff.
+Song piano(std::size_t count) {
+    Song song;
+    song.appendMeasures(count);
+    song.addTrack(
+        Track("Piano", Instrument{.name = "Piano"}, {Staff(Clef::Treble), Staff(Clef::Bass)}));
+    for (std::size_t m = 0; m < count; ++m) {
+        song.track(0).staff(0).measure(m).voices[0].beats = {note("C5"), note("D5"), note("E5"),
+                                                             note("F5")};
+        song.track(0).staff(1).measure(m).voices[0].beats = {note("C3", NoteValue::Half),
+                                                             note("G2", NoteValue::Half)};
+    }
+    return song;
+}
+
+} // namespace
+
+TEST_CASE("Page layout: a brace and the barlines join a piano's staves", "[notation]") {
+    const Song song = piano(16);
+    const std::array<StaffSelection, 2> staves{StaffSelection{.track = 0, .staff = 0},
+                                               StaffSelection{.track = 0, .staff = 1}};
+    const auto all = layoutPages(song, staves, bravura(), narrow());
+    const DisplayList& page = all.front();
+    REQUIRE(page.systems.size() >= 2);
+    REQUIRE(page.staves.size() == 2 * page.systems.size());
+    const auto braces = std::ranges::count_if(
+        page.glyphs, [](const GlyphItem& item) { return item.role == Role::Brace; });
+    CHECK(static_cast<std::size_t>(braces) == page.systems.size());
+    const double braceWidth = bravura().metrics(Glyph::Brace).box.northEast.x;
+    for (std::size_t s = 0; s < page.systems.size(); ++s) {
+        const auto& upper = page.staves[2 * s];
+        const auto& lower = page.staves[2 * s + 1];
+        const double top = upper.y;
+        const double bottom = lower.y + lower.height;
+        // The brace, left of the staves inside the margin, as high as both.
+        const auto brace = std::ranges::find_if(page.glyphs, [&](const GlyphItem& item) {
+            return item.role == Role::Brace && item.origin.y > top && item.origin.y <= bottom + 0.1;
+        });
+        REQUIRE(brace != page.glyphs.end());
+        CHECK(brace->glyph == Glyph::Brace);
+        CHECK_THAT(brace->origin.y, WithinAbs(bottom, 0.05));
+        CHECK_THAT(4.0 * brace->scale, WithinAbs(bottom - top, 0.05));
+        CHECK(brace->origin.x >= 5.0);
+        CHECK(brace->origin.x + braceWidth * brace->scale < upper.x);
+        // Every barline of the treble staff goes on down to the bass staff.
+        std::size_t barlines = 0;
+        std::size_t joined = 0;
+        for (const auto& line : page.lines) {
+            if (line.role != Role::Barline || line.from.x < upper.x + 0.5) {
+                continue; // the line at the start of the system
+            }
+            if (std::abs(line.from.y - top) < kEpsilon &&
+                std::abs(line.to.y - (upper.y + upper.height)) < kEpsilon) {
+                ++barlines;
+            }
+            if (std::abs(line.from.y - (upper.y + upper.height)) < kEpsilon &&
+                std::abs(line.to.y - lower.y) < kEpsilon) {
+                ++joined;
+            }
+        }
+        CHECK(barlines >= page.systems[s].measureCount);
+        CHECK(joined == barlines);
+    }
+    // The systems still end at the right margin.
+    CHECK_THAT(page.staves[0].x + page.staves[0].width, WithinAbs(55.0, kEpsilon));
+    // Two tracks get no brace, nor a single staff.
+    Song two = quarters(4);
+    two.addTrack(Track("Bass", Instrument{.name = "Bass"}, {Staff(Clef::Bass)}));
+    const std::array<StaffSelection, 2> tracks{StaffSelection{.track = 0},
+                                               StaffSelection{.track = 1}};
+    for (const auto& list : layoutPages(two, tracks, bravura(), narrow())) {
+        CHECK(std::ranges::none_of(list.glyphs,
+                                   [](const GlyphItem& item) { return item.role == Role::Brace; }));
+    }
+    const StaffSelection upperOnly{.track = 0, .staff = 0};
+    for (const auto& list : layoutPages(song, std::span(&upperOnly, 1), bravura(), narrow())) {
+        CHECK(std::ranges::none_of(list.glyphs,
+                                   [](const GlyphItem& item) { return item.role == Role::Brace; }));
+    }
+}
+
 TEST_CASE("Page layout: one thread or many give the same pages", "[notation]") {
     PageLayoutOptions options = narrow();
     options.height = 80.0;

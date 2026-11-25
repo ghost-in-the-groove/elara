@@ -124,6 +124,7 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"metNote16thUp", 0xECA9},
     {"metNote32ndUp", 0xECAB},
     {"metAugmentationDot", 0xECB7},
+    {"brace", 0xE000},
 }};
 
 constexpr std::array<std::string_view, kAnchorCount> kAnchorNames{

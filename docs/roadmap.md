@@ -61,6 +61,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Horizontal spacing, beaming, stems, accidentals for one staff
 - [x] Tablature staff layout with effects notation
 - [x] Systems and pages: line breaking, justification, multi-track scores
+  - [x] Grand staves (a piano's treble and bass staves): a brace and barlines
+        through both (ADR-0073)
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
