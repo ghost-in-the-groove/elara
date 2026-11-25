@@ -1217,6 +1217,23 @@ void Startup::queueEffects() {
               "no grace note joined the caret's beat");
         score_->toggleGraceNote();
         check(score_->caretGraceNotes() == 0, "the grace note did not go");
+        // Chord symbols (ADR-0080): named, offered again, taken away.
+        const QString chordBefore = score_->caretChord();
+        score_->setChordSymbol(QStringLiteral("Am7"));
+        check(score_->caretChord() == QStringLiteral("Am7"), "the caret's beat was not named Am7");
+        check(score_->undoName() == ScoreDocument::tr("Set chord symbol"),
+              "naming a chord was not one undo step");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Chord %1").arg("Am7")),
+              "the status does not name the chord");
+        check(score_->songChords().contains(QStringLiteral("Am7")),
+              "the popup does not offer the chord");
+        score_->setChordSymbol(QString());
+        check(score_->caretChord().isEmpty() &&
+                  score_->undoName() == ScoreDocument::tr("Remove chord symbol"),
+              "the chord symbol did not go");
+        if (!chordBefore.isEmpty()) {
+            score_->setChordSymbol(chordBefore);
+        }
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
         const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
@@ -1361,7 +1378,8 @@ void Startup::clickCursor() {
     // Nothing may cover the cursor, as the measure popup or the note effects
     // panel open at the caret can: they close first, and the click waits until
     // they are gone.
-    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel")}) {
+    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel"),
+                                QStringLiteral("chordPopup")}) {
         if (auto* popup = window_->findChild<QObject*>(name);
             popup != nullptr && popup->property("visible").toBool()) {
             QMetaObject::invokeMethod(popup, "close");

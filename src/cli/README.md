@@ -219,6 +219,9 @@ neighbouring beats with the same one share a wedge (ADR-0078).
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says
 otherwise, and `grace none` removes the beat's grace notes (ADR-0079).
+`chord <name>` names the caret's beat with a chord symbol, its diagram from the
+beat's frets on a fretted staff when two or more notes have one, and `chord
+none` takes it away (ADR-0080).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.

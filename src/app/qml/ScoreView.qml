@@ -166,6 +166,20 @@ Item {
         const at = caretPoint();
         openMeasurePopup(at.x - 24, at.y + 12);
     }
+    /// Opens the chord symbol popup under the caret's beat, so that the
+    /// symbol above the staff shows as it changes; over it when there is no
+    /// room below (ADR-0080).
+    function openChordPopupAtCaret() {
+        if (document.caretPage < 0)
+            return;
+        const at = caretPoint();
+        const top = at.y - document.caretRect.height * unit * shownZoom;
+        const below = at.y + 12;
+        chordPopup.x = Math.max(8, Math.min(width - chordPopup.width - 8, at.x - 24));
+        chordPopup.y = below + chordPopup.implicitHeight <= height - 8
+                ? below : Math.max(8, top - chordPopup.implicitHeight - 12);
+        chordPopup.open();
+    }
     function scrollTo(y: real, x: real) {
         scrollY.stop();
         scrollX.stop();
@@ -243,6 +257,11 @@ Item {
             document.toggleEffect(effect);
             event.accepted = true;
             reveal();
+            return;
+        }
+        if (control && event.key === Qt.Key_K) {
+            openChordPopupAtCaret();
+            event.accepted = true;
             return;
         }
         if (control && event.key === Qt.Key_M) {
@@ -601,6 +620,14 @@ Item {
         onClosed: root.forceActiveFocus()
     }
 
+    ChordPopup {
+        id: chordPopup
+        objectName: "chordPopup"
+
+        document: root.document
+        onClosed: root.forceActiveFocus()
+    }
+
     // The note entry bar: a strip over the top of the pages while there is a
     // caret, so that only the transport covers the score.
     Rectangle {
@@ -631,6 +658,7 @@ Item {
             anchors.bottomMargin: 1
             document: root.document
             onMeasureRequested: root.openMeasurePopupAtCaret()
+            onChordRequested: root.openChordPopupAtCaret()
         }
 
         Rectangle {
