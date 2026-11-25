@@ -1202,6 +1202,21 @@ void Startup::queueEffects() {
               "the status does not name the diminuendo");
         score_->setHairpin(0);
         check(score_->caretHairpin() == 0, "the diminuendo did not go");
+        // Grace notes (ADR-0079): the beat may already lead in with some,
+        // which the toggle takes away first.
+        if (score_->caretGraceNotes() > 0) {
+            score_->toggleGraceNote();
+            check(score_->caretGraceNotes() == 0 &&
+                      score_->undoName() == ScoreDocument::tr("Remove grace notes"),
+                  "the beat's grace notes did not go");
+        }
+        score_->toggleGraceNote();
+        check(score_->caretGraceNotes() == 1 &&
+                  score_->undoName() == ScoreDocument::tr("Add grace note") &&
+                  score_->caretStatus().contains(ScoreDocument::tr("Grace notes")),
+              "no grace note joined the caret's beat");
+        score_->toggleGraceNote();
+        check(score_->caretGraceNotes() == 0, "the grace note did not go");
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
         const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
@@ -1216,7 +1231,7 @@ void Startup::queueEffects() {
                       score_->caretStatus().contains(score_->harmonicName(kArtificial)),
                   "the artificial harmonic did not go on");
         }
-        for (int i = 0; i < 32 && score_->modified() && score_->canUndo(); ++i) {
+        for (int i = 0; i < 64 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;

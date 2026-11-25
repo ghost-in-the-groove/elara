@@ -419,6 +419,24 @@ add_test(NAME cli.dump_hairpins COMMAND elara-cli --json dump "${ELARA_CLI_HAIRP
 set_tests_properties(cli.dump_hairpins PROPERTIES
   FIXTURES_REQUIRED cli_hairpins
   PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"D5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"E5\"}\],\"effects\":{\"hairpin\":\"diminuendo\"}}")
+# Grace notes typed at the caret (ADR-0079): two on the 7th fret of the G
+# string, then one on the next note taken off again.
+set(ELARA_CLI_GRACES "${CMAKE_CURRENT_BINARY_DIR}/cli-graces.elara")
+add_test(NAME cli.edit_adds_grace_notes
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_GRACES}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 3" "fret 7" "grace -2" "grace -1 16 on" right "fret 5"
+    "grace 2" "grace none")
+set_tests_properties(cli.edit_adds_grace_notes PROPERTIES
+  FIXTURES_SETUP cli_graces
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Remove grace notes\"}")
+add_test(NAME cli.dump_grace_notes COMMAND elara-cli --json dump "${ELARA_CLI_GRACES}")
+set_tests_properties(cli.dump_grace_notes PROPERTIES
+  FIXTURES_REQUIRED cli_graces
+  PASS_REGULAR_EXPRESSION "\"graces\":\\[{\"duration\":\"8\",\"notes\":\\[{[^}]*\"string\":3,\"fret\":5}\\]},{\"duration\":\"16\",\"notes\":\\[{[^}]*\"string\":3,\"fret\":6}\\],\"onBeat\":true}\\]")
+add_test(NAME cli.edit_rejects_grace_off_the_neck
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 3"
+    "fret 1" "grace -2")
+set_tests_properties(cli.edit_rejects_grace_off_the_neck PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_unknown_hairpin
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "hairpin swell")
 set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES WILL_FAIL TRUE)

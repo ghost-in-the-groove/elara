@@ -400,6 +400,21 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "harmonic") { // harmonic <natural|artificial|pinch|tapped|semi|none>
         edit = setHarmonic(song, entry.caret,
                            static_cast<HarmonicKind>(kindOf(verb, step.word(1), kHarmonicKinds)));
+    } else if (verb == "grace") { // grace <semitones> [duration] [on] | grace none
+        if (step.word(1) == "none") {
+            edit = removeGraceNotes(song, entry.caret);
+        } else {
+            Duration duration(NoteValue::Eighth);
+            bool onBeat = false;
+            for (std::size_t i = 2; step.has(i); ++i) {
+                if (step.word(i) == "on") {
+                    onBeat = true;
+                } else {
+                    duration = step.duration(i);
+                }
+            }
+            edit = addGraceNote(song, entry.caret, step.number<int>(1), duration, onBeat);
+        }
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
         const auto found = std::ranges::find_if(

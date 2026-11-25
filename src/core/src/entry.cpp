@@ -793,6 +793,66 @@ BeatEffects beatEffectsAt(const Song& song, const Caret& at) {
     return beat.notes.empty() ? BeatEffects{} : beat.effects;
 }
 
+Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration duration,
+                   bool onBeat) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const KeySignature& key = song.measureHeader(caret.measure).keySignature;
+    Measure content = measureAt(song, caret);
+    Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    const auto target = std::ranges::find_if(
+        beat.notes, [&](const Note& note) { return isEffectTarget(note, staff, caret.string); });
+    if (target == beat.notes.end()) {
+        return unchanged(caret);
+    }
+    Note grace;
+    if (isDrumStaff(staff)) {
+        grace.pitch = target->pitch; // a flam
+        grace.effects.dynamic = target->effects.dynamic;
+    } else if (staff.isFretted()) {
+        const int fret = target->position->fret + semitones;
+        if (fret < 0 || staff.capo() + fret > Tuning::kMaxFret) {
+            throw std::out_of_range("addGraceNote: the grace note leaves the neck");
+        }
+        grace = staff.frettedNote(caret.string, fret);
+        grace.pitch = key.spell(grace.pitch.midiNumber());
+        grace.effects.dynamic = target->effects.dynamic;
+    } else {
+        const Note& top = highest(beat.notes);
+        const int midi = top.pitch.midiNumber() + semitones;
+        if (midi < 0 || midi > 127) {
+            throw std::out_of_range("addGraceNote: the grace note leaves the MIDI range");
+        }
+        grace.pitch = key.spell(midi);
+        grace.effects.dynamic = top.effects.dynamic;
+    }
+    beat.graces.push_back(
+        Grace{.duration = duration, .notes = {std::move(grace)}, .onBeat = onBeat});
+    return replace(caret, std::move(content), "Add grace note");
+}
+
+Entry removeGraceNotes(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    Measure content = measureAt(song, caret);
+    Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    if (beat.graces.empty()) {
+        return unchanged(caret);
+    }
+    beat.graces.clear();
+    return replace(caret, std::move(content), "Remove grace notes");
+}
+
+std::size_t graceNotesAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    return onFreeSlot(song, caret) ? 0 : voiceAt(song, caret).beats[caret.beat].graces.size();
+}
+
 Dynamic dynamicAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     const Staff& staff = song.track(caret.track).staff(caret.staff);

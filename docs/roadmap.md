@@ -82,12 +82,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Typed at the caret
 - [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
       (ADR-0061)
-- [ ] Grace notes (ADR-0079)
+- [x] Grace notes (ADR-0079)
   - [x] In the model, read from Guitar Pro 3-8 and kept by the native format
   - [x] Read and written in MusicXML
   - [x] Drawn as small notes and fret numbers
   - [x] Played by borrowing time
-  - [ ] Typed at the caret
+  - [x] Typed at the caret
 - [x] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being
         painted again
