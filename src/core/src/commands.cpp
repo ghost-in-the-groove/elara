@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/commands.hpp>
 
+#include <algorithm>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -236,16 +237,45 @@ std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
         throw std::invalid_argument("Change tempo: the first measure plays at the song's tempo");
     }
     MeasureHeader header = song.measureHeader(measure);
+    // A new tempo stays gradual (ADR-0082).
+    const bool gradual = std::ranges::any_of(header.tempoChanges, [](const TempoChange& change) {
+        return change.offset == Fraction{} && change.gradual;
+    });
     std::erase_if(header.tempoChanges,
                   [](const TempoChange& change) { return change.offset == Fraction{}; });
     if (bpm) {
         // Tempo checks the range.
         const Tempo tempo(*bpm, song.tempoAt(measure).beatUnit());
         header.tempoChanges.insert(header.tempoChanges.begin(),
-                                   TempoChange{.offset = {}, .tempo = tempo});
+                                   TempoChange{.offset = {}, .tempo = tempo, .gradual = gradual});
     }
     if (header == song.measureHeader(measure)) {
         return nullptr;
+    }
+    std::vector<std::unique_ptr<Command>> steps;
+    steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    return std::make_unique<CommandGroup>("Change tempo", std::move(steps));
+}
+
+std::unique_ptr<Command> changeTempoGradual(const Song& song, std::size_t measure, bool gradual) {
+    if (measure >= song.measureCount()) {
+        throw std::out_of_range("Change tempo: no such measure");
+    }
+    if (measure == 0) {
+        throw std::invalid_argument("Change tempo: the first measure plays at the song's tempo");
+    }
+    MeasureHeader header = song.measureHeader(measure);
+    auto& changes = header.tempoChanges;
+    if (changes.empty() || changes.front().offset != Fraction{}) {
+        if (!gradual) {
+            return nullptr;
+        }
+        changes.insert(changes.begin(),
+                       TempoChange{.offset = {}, .tempo = song.tempoAt(measure), .gradual = true});
+    } else if (changes.front().gradual == gradual) {
+        return nullptr;
+    } else {
+        changes.front().gradual = gradual;
     }
     std::vector<std::unique_ptr<Command>> steps;
     steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));

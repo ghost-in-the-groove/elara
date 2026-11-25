@@ -65,10 +65,16 @@ change, or to the end of the system; the systems the ramp crosses carry the
 line on from their first measure. A ramp to the same speed, or with no change
 after it, draws nothing more.
 
+**Editing.** `changeTempoGradual()` makes the change that starts a measure
+gradual or sudden again ("Change tempo"); on a measure without one it starts
+one at the tempo in force, as Guitar Pro does, and `changeTempo()` keeps a
+change gradual when its tempo changes. The command line types `tempo-gradual
+<m> on|off`; the app's measure popup has a Gradual chip under the tempo. The
+measures of `elara-cli edit --json` show `"gradual": true`.
+
 ## Consequences
 
 - Imported accelerandos and ritardandos play as written, with no warning.
-- Editing (the CLI and the measure popup) is follow-up work.
 - Tests: `core.A gradual tempo change moves to the next tempo along the score`
   (values from the closed form: 4 ln 2 seconds for a whole note from quarter =
   60 to 120), `audio.Sequence: a gradual tempo change speeds the notes up on the
@@ -76,6 +82,9 @@ after it, draws nothing more.
   round trip, `io.MusicXML: rit. and accel. make the tempo change there
   gradual`, `io.MusicXML export: a gradual tempo change is a word with dashes
   to the next tempo` and `io.MIDI export steps a gradual tempo change along the
-  way` (read back, two quarters from quarter = 100 to 140 last 3 ln 1.4 s), and
-  the `notation.Tempo marks: a gradual change ...` layout tests (which way it
-  goes, what it leaves out, and the line across systems).
+  way` (read back, two quarters from quarter = 100 to 140 last 3 ln 1.4 s), the
+  `notation.Tempo marks: a gradual change ...` layout tests (which way it goes,
+  what it leaves out, and the line across systems), `core.A tempo change can be
+  made gradual and sudden again`, `cli.edit_gradual_tempo` with
+  `cli.sequence_gradual_tempo` (9.545 s: 8 ln 2 s for the ramp over two
+  measures) and `cli.render_gradual_tempo`, and the app's smoke test.

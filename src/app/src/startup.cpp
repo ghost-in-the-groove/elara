@@ -989,6 +989,14 @@ void Startup::queueTempo() {
         check(score_->undoName() == ScoreDocument::tr("Change tempo"),
               "the tempo is not one undo step");
         check(score_->tempoAt(0) == first, "the first measure's tempo changed");
+        // Gradual to the next change (ADR-0082), keeping its tempo.
+        score_->setTempoGradual(1, true);
+        const QVariantMap gradual = score_->tempoAt(1);
+        check(gradual.value(QStringLiteral("gradual")).toBool() &&
+                  gradual.value(QStringLiteral("bpm")).toInt() == 90,
+              "the tempo change did not become gradual");
+        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
+              "making the tempo gradual is not one undo step");
         return true;
     });
     steps_.emplace_back([this, check] {
@@ -998,6 +1006,7 @@ void Startup::queueTempo() {
         score_->setTempoFrom(1, 0);
         check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
               "the tempo change was not taken away");
+        score_->undo();
         score_->undo();
         score_->undo();
         return true;

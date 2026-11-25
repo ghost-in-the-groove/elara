@@ -221,3 +221,39 @@ next run.
 | decode a minute of FLAC; of WAV | 37.6 ms; 17.0 ms | 39.1 ms; 17.6 ms |
 | one tuner window: low E, high E, noise | 0.42, 0.10, 1.14 ms | 0.41, 0.10, 1.54 ms |
 | find the caret; pick it from a click | 0.39 µs; 1.6 µs | 0.38 µs; 1.6 µs |
+
+**2026-11-25, after beat text, tapping and gradual tempo changes.** Every
+benchmark ran again on the gradual tempo changes with their drawing and
+editing. Paths whose code did not change came out within the noise, and the
+tuner's window of noise, watched since the last run, is back at its row
+(1.08 ms). One moved with its code: the seconds at the end of the song take
+19.6 µs against 12.4 µs, as `Song::secondsAt()` now finds where the position
+lies before walking the tempo changes, and does a little more for each change
+to follow ramps (ADR-0082). It only serves the song's length in the
+command-line reports, so it was left as it is. The release build of the same
+work had stopped on MSVC's warning C4723 (a division by a constant zero slope
+the optimiser saw); `rampSeconds()` now returns before it.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 12.2 ms | 10.6 ms |
+| sequence it; with every four measures repeated | 32.1 ms; 45.5 ms | 30.8 ms; 48.1 ms |
+| render its first 10 s offline; on one thread | 21.8 ms; 114 ms | 23.1 ms; 121 ms (± 11) |
+| build, copy (shared measures) and validate the 20-track song | 10.4 ms (± 2.8), 68 µs, 4.0 ms (± 1.1) | 10.6 ms, 68 µs, 3.1 ms |
+| insert a measure at its start | 21 µs | 22 µs |
+| seconds at its end (tempo map walk) | 12.4 µs | 19.6 µs |
+| MusicXML import; export; export on one thread; `.mxl` | 103 ms; 100 ms; 165 ms; 393 ms | 106 ms; 71 ms (± 22); 148 ms; 354 ms |
+| MIDI export; import | 25.2 ms; 45.4 ms | 28.9 ms (± 5.2); 40.3 ms |
+| GPIF import; on one thread | 132 ms (± 24); 220 ms | 94 ms (± 14); 203 ms |
+| 2 tracks from a literal-only `.gpx` | 29.7 ms | 27.4 ms |
+| lay out one 500-measure staff; 8 of its measures | 4.1 ms (± 0.8); 65 µs | 3.7 ms; 63 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.3 ms; 84 µs; 48 ms | 5.1 ms; 92 µs; 43 ms |
+| one track on A4 pages; on one thread | 2.1 ms; 10.6 ms | 2.4 ms; 10.4 ms |
+| the 20 staves on A4 pages; again after an edit | 22.1 ms; 4.3 ms | 25.9 ms (± 3.0); 4.2 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.7, 11.3 (± 2.3), 19.4, 11.5 ms | 5.3, 8.5, 19.9, 11.9 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.4, 8.8, 6.3, 5.1 ms | 5.1, 8.3, 6.1, 4.8 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 10.3 ms; 11.8 ms | 10.6 ms; 11.7 ms |
+| read an SFZ of 64 samples | 4.9 ms | 4.8 ms |
+| decode a minute of FLAC; of WAV | 39.1 ms; 17.6 ms | 35.6 ms; 16.2 ms |
+| one tuner window: low E, high E, noise | 0.41, 0.10, 1.54 ms | 0.40, 0.10, 1.08 ms |
+| find the caret; pick it from a click | 0.38 µs; 1.6 µs | 0.42 µs; 1.5 µs |

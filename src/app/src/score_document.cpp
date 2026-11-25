@@ -1149,8 +1149,24 @@ QVariantMap ScoreDocument::tempoAt(int measure) const {
                                                                 return change.offset ==
                                                                        core::Fraction{};
                                                             }));
+    tempo.insert(QStringLiteral("gradual"),
+                 std::ranges::any_of(song.measureHeader(m).tempoChanges,
+                                     [](const core::TempoChange& change) {
+                                         return change.offset == core::Fraction{} && change.gradual;
+                                     }));
     tempo.insert(QStringLiteral("first"), measure == 0);
     return tempo;
+}
+
+void ScoreDocument::setTempoGradual(int measure, bool gradual) {
+    if (!document_ || measure <= 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return;
+    }
+    if (auto change = core::changeTempoGradual(document_->song(), static_cast<std::size_t>(measure),
+                                               gradual)) {
+        execute(std::move(change));
+    }
 }
 
 void ScoreDocument::setTempoFrom(int measure, int bpm) {

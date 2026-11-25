@@ -176,6 +176,29 @@ Popup {
             }
         }
 
+        // A gradual change speeds up or slows down to the next tempo
+        // (ADR-0082).
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.tempo.first !== true
+            spacing: 6
+
+            Item {
+                Layout.preferredWidth: 112
+            }
+            Chip {
+                text: qsTr("Gradual")
+                on: root.tempo.gradual === true
+                onClicked: root.document.setTempoGradual(root.document.caretMeasure, !on)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Speed up or slow down to the next tempo change")
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
         Label {
             Layout.fillWidth: true
             text: qsTr("From this measure until the next change.")

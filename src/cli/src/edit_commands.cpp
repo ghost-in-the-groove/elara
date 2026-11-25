@@ -524,6 +524,18 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (auto change = core::changeTempo(song, measure, bpm)) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "tempo-gradual") { // tempo-gradual <m> <on|off> (ADR-0082)
+        const std::size_t measure = step.index(1);
+        if (measure == 0) {
+            throw StepSyntaxError("tempo-gradual: the first measure plays at the song's tempo");
+        }
+        const std::string_view value = step.word(2);
+        if (value != "on" && value != "off") {
+            throw StepSyntaxError(std::format("tempo-gradual: on or off, not {}", value));
+        }
+        if (auto change = core::changeTempoGradual(song, measure, value == "on")) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "section") { // section <m> [name]: no name takes it off
         const std::size_t measure = step.index(1);
         if (measure >= song.measureCount()) {
@@ -851,7 +863,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"section <m> [name]\", "
+        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"tempo-gradual <m> <on|off>\", "
+        "\"section <m> [name]\", "
         "\"title <text>\", "
         "\"credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> "
         "[text]\", "

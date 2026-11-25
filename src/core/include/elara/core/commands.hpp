@@ -204,6 +204,13 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
                                                    std::optional<double> bpm);
 
+/// Makes the tempo change that starts `measure` gradual, moving to the next
+/// change's tempo, or sudden again (ADR-0082), as one undo step ("Change
+/// tempo"); a measure without one starts one at the tempo in force. Null when
+/// nothing changes. Throws like changeTempo().
+[[nodiscard]] std::unique_ptr<Command> changeTempoGradual(const Song& song, std::size_t measure,
+                                                          bool gradual);
+
 /// Sets one line of the song's credits to `text` (empty clears it), as one
 /// undo step, "Edit song info"; null when it reads `text` already.
 [[nodiscard]] std::unique_ptr<Command> changeCredit(const Song& song, Credit credit,
