@@ -405,6 +405,24 @@ add_test(NAME cli.edit_rejects_unknown_bass_technique
 set_tests_properties(cli.edit_rejects_unknown_whammy cli.edit_rejects_whammy_of_nothing
   cli.edit_rejects_unknown_bass_technique PROPERTIES WILL_FAIL TRUE)
 
+# Hairpins at the caret (ADR-0078): the first two beats get a crescendo, the
+# third a diminuendo that undo takes back.
+set(ELARA_CLI_HAIRPINS "${CMAKE_CURRENT_BINARY_DIR}/cli-hairpins.elara")
+add_test(NAME cli.edit_sets_hairpins
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_HAIRPINS}" "add-track piano"
+    "append-measures 1" "pitch C" "hairpin crescendo" right "pitch D" "hairpin crescendo"
+    right "pitch E" "hairpin diminuendo" "hairpin none" undo)
+set_tests_properties(cli.edit_sets_hairpins PROPERTIES
+  FIXTURES_SETUP cli_hairpins
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_hairpins COMMAND elara-cli --json dump "${ELARA_CLI_HAIRPINS}")
+set_tests_properties(cli.dump_hairpins PROPERTIES
+  FIXTURES_REQUIRED cli_hairpins
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"D5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"E5\"}\],\"effects\":{\"hairpin\":\"diminuendo\"}}")
+add_test(NAME cli.edit_rejects_unknown_hairpin
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "hairpin swell")
+set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES WILL_FAIL TRUE)
+
 # Kinds of note effects at the caret (ADR-0058): fret 12 gets an artificial
 # harmonic, wide vibrato, a marcato and slides in from below and out downwards;
 # fret 7 a natural harmonic, then a pinch harmonic that undo takes back.

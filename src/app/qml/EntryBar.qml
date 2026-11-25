@@ -943,6 +943,30 @@ Rectangle {
                                 symbol: modelData
                             }
                         }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        // The caret's beat under a hairpin (ADR-0078).
+                        BeatEffect {
+                            tip: qsTr("Crescendo")
+                            path: "M19 7 L5 12 L19 17"
+                            active: root.document.caretHairpin === 1
+                            onClicked: root.document.setHairpin(active ? 0 : 1)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Diminuendo")
+                            path: "M5 7 L19 12 L5 17"
+                            active: root.document.caretHairpin === 2
+                            onClicked: root.document.setHairpin(active ? 0 : 2)
+                        }
                     }
 
                     Label {

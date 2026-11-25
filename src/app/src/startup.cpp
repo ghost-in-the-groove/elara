@@ -1193,6 +1193,15 @@ void Startup::queueEffects() {
         score_->setWhammy(0, 0);
         check(score_->caretWhammyForm() == 0 && score_->caretBassTechnique() != 0,
               "the whammy bar did not go on its own");
+        // Hairpins (ADR-0078).
+        score_->setHairpin(static_cast<int>(core::Hairpin::Diminuendo));
+        check(score_->caretHairpin() == static_cast<int>(core::Hairpin::Diminuendo) &&
+                  score_->caretBassTechnique() != 0,
+              "the diminuendo did not join the beat's effects");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Diminuendo")),
+              "the status does not name the diminuendo");
+        score_->setHairpin(0);
+        check(score_->caretHairpin() == 0, "the diminuendo did not go");
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
         const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;

@@ -31,6 +31,12 @@ wedges of the same kind that touch become one.
   older file (ADR-0006).
 - MusicXML and MIDI exports report hairpins as dropped until they write them.
 
+**Editing.** A hairpin is typed like the other beat effects (ADR-0056): the
+CLI step `hairpin <crescendo|diminuendo|none>` and the entry bar's two wedge
+buttons, after the dynamics, set it on the caret's beat as one undo step
+("Change beat effects"). A longer wedge is typed beat by beat, so it needs no
+selection and no new kind of edit; the status line names it.
+
 ## Consequences
 
 - Guitar Pro hairpins survive import and saving; they are not yet drawn,
@@ -41,4 +47,6 @@ wedges of the same kind that touch become one.
 - A wedge that should stop in the middle of a long note cannot: it ends with
   the note. Guitar Pro has the same limit.
 - Tests: `io.Guitar Pro: a guitar keeps ...` (a crescendo over two beats, a
-  diminuendo written as a decrescendo), the native round trip and text forms.
+  diminuendo written as a decrescendo), the native round trip and text forms,
+  `cli.edit_sets_hairpins` with `cli.dump_hairpins` and
+  `cli.edit_rejects_unknown_hairpin`, and the app smoke test's diminuendo.

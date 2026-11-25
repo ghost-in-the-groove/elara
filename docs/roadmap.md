@@ -77,7 +77,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [ ] Read and written in MusicXML
   - [ ] Drawn under the staff
   - [ ] Played as a velocity ramp
-  - [ ] Typed at the caret
+  - [x] Typed at the caret
 - [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
       (ADR-0061)
 - [x] Incremental relayout (only the systems an edit touches)
