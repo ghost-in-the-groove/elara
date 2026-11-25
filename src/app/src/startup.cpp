@@ -1247,6 +1247,15 @@ void Startup::queueEffects() {
               "the status does not name the octave line");
         score_->setOttava(0);
         check(score_->caretOttava() == 0, "the octave line did not go");
+        // The sustain pedal (ADR-0092).
+        score_->setPedal(static_cast<int>(core::Pedal::Change));
+        check(score_->caretPedal() == static_cast<int>(core::Pedal::Change) &&
+                  score_->caretBassTechnique() != 0,
+              "the pedal did not join the beat's effects");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Pedal change")),
+              "the status does not name the pedal change");
+        score_->setPedal(0);
+        check(score_->caretPedal() == 0, "the pedal did not come up");
         // Slurs (ADR-0086).
         score_->setSlur(true);
         check(score_->caretSlur() && score_->caretBassTechnique() != 0,

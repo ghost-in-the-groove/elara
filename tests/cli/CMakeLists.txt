@@ -542,6 +542,27 @@ set_tests_properties(cli.render_ottavas PROPERTIES
 add_test(NAME cli.edit_rejects_unknown_ottava
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "ottava 22ma")
 set_tests_properties(cli.edit_rejects_unknown_ottava PROPERTIES WILL_FAIL TRUE)
+# The sustain pedal at the caret (ADR-0092): down on the C, the D and a rest,
+# changed on the E. Drawn as "Ped.", its line broken by the notch, and the hook.
+set(ELARA_CLI_PEDALS "${CMAKE_CURRENT_BINARY_DIR}/cli-pedals.elara")
+add_test(NAME cli.edit_sets_pedals
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_PEDALS}" "add-track piano"
+    "append-measures 1" "pitch C" "pedal down" right "pitch D" "pedal down" right insert-rest
+    "pedal down" right "pitch E" "pedal change")
+set_tests_properties(cli.edit_sets_pedals PROPERTIES
+  FIXTURES_SETUP cli_pedals
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_pedals COMMAND elara-cli --json dump "${ELARA_CLI_PEDALS}")
+set_tests_properties(cli.dump_pedals PROPERTIES
+  FIXTURES_REQUIRED cli_pedals
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"pedal\":\"down\"}}.*\"D5\"}\],\"effects\":{\"pedal\":\"down\"}}.*{\"duration\":\"4\",\"effects\":{\"pedal\":\"down\"}}.*\"E5\"}\],\"effects\":{\"pedal\":\"change\"}}")
+add_test(NAME cli.render_pedals COMMAND elara-cli --json render "${ELARA_CLI_PEDALS}")
+set_tests_properties(cli.render_pedals PROPERTIES
+  FIXTURES_REQUIRED cli_pedals
+  PASS_REGULAR_EXPRESSION "\"pedal\":6[,}]")
+add_test(NAME cli.edit_rejects_unknown_pedal
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "pedal half")
+set_tests_properties(cli.edit_rejects_unknown_pedal PROPERTIES WILL_FAIL TRUE)
 # Slurs at the caret (ADR-0086): the C slurred to the D, the E's slur undone.
 set(ELARA_CLI_SLURS "${CMAKE_CURRENT_BINARY_DIR}/cli-slurs.elara")
 add_test(NAME cli.edit_sets_slurs
