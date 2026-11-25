@@ -1638,6 +1638,10 @@ QString ScoreDocument::caretStatus() const {
     if (const int technique = caretBassTechnique(); technique != 0) {
         parts.append(bassTechniqueName(technique));
     }
+    if (const int hairpin = caretHairpin(); hairpin != 0) {
+        parts.append(hairpin == static_cast<int>(core::Hairpin::Crescendo) ? tr("Crescendo")
+                                                                           : tr("Diminuendo"));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -2029,6 +2033,15 @@ void ScoreDocument::setStrum(int direction) {
     applyBeatEffects(effects);
 }
 
+void ScoreDocument::setHairpin(int hairpin) {
+    if (hairpin < 0 || hairpin > static_cast<int>(core::Hairpin::Diminuendo)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.hairpin = static_cast<core::Hairpin>(hairpin);
+    applyBeatEffects(effects);
+}
+
 void ScoreDocument::setPickStroke(int direction) {
     if (direction < 0 || direction > 2) {
         return;
@@ -2307,6 +2320,10 @@ QString ScoreDocument::harmonicName(int kind) const {
 
 int ScoreDocument::caretStrum() const {
     return static_cast<int>(beatEffectsAtCaret().strum);
+}
+
+int ScoreDocument::caretHairpin() const {
+    return static_cast<int>(beatEffectsAtCaret().hairpin);
 }
 
 int ScoreDocument::caretPickStroke() const {

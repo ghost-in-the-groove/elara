@@ -21,7 +21,7 @@ struct SoundingNote {
     Fraction start{};
     Fraction length{};
     int key = 60;      // sounding MIDI key; percussion: the General MIDI percussion key
-    int velocity = 80; // from the note's dynamic (dynamicVelocity)
+    int velocity = 80; // from the note's dynamic (dynamicVelocity), ramped by hairpins
     // Where the attack is: its beat in its voice of `measure`, and its note in
     // that beat, which holds its effects. 32 bits keep the struct at 80 bytes.
     std::uint32_t beat = 0;

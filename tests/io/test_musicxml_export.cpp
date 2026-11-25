@@ -176,6 +176,9 @@ core::Song everythingSong() {
         slid.effects.vibrato = Vibrato::Wide;
         beats = {beatOf(quarter, {first}), beatOf(quarter, {hammer}), beatOf(quarter, {pull}),
                  beatOf(quarter, {slid})};
+        // A crescendo over the barline, ending on the first beat of measure 2.
+        beats[2].effects.hairpin = Hairpin::Crescendo;
+        beats[3].effects.hairpin = Hairpin::Crescendo;
     }
     {
         auto& beats = guitar.measure(1).voices[0].beats;
@@ -200,6 +203,7 @@ core::Song everythingSong() {
                  beatOf(triplet8, {marked}),
                  beatOf(quarter, {fretted(6, 0, Dynamic::P), fretted(5, 2, Dynamic::P),
                                   fretted(4, 2, Dynamic::P)})};
+        beats[0].effects.hairpin = Hairpin::Crescendo;
         beats[1].effects.pickStroke = PickStroke::Down;
         beats[6].effects.strum = Strum::Down;
     }
@@ -219,6 +223,8 @@ core::Song everythingSong() {
                  beatOf(quarter, {fall})};
         beats[3].effects.tremoloPicking = NoteValue::Sixteenth;
         beats[3].effects.pickStroke = PickStroke::Up;
+        beats[1].effects.hairpin = Hairpin::Diminuendo;
+        beats[2].effects.hairpin = Hairpin::Diminuendo;
     }
     {
         auto& beats = guitar.measure(3).voices[0].beats;
@@ -276,6 +282,9 @@ core::Song everythingSong() {
             beatOf(quarter, {pitched(Pitch(Step::D, 0, 5))}),
             beatOf(quarter, {pitched(Pitch(Step::E, 0, 5), Dynamic::F)}),
             beatOf(quarter, {pitched(Pitch(Step::F, 0, 5), Dynamic::F)})};
+        // A crescendo on the upper staff of the two, up to the forte.
+        upper.measure(1).voices[0].beats[0].effects.hairpin = Hairpin::Crescendo;
+        upper.measure(1).voices[0].beats[1].effects.hairpin = Hairpin::Crescendo;
         upper.measure(1).voices[1].beats = {
             beatOf(half, {pitched(Pitch(Step::A, 0, 4))}),
             beatOf(half, {pitched(Pitch(Step::B, 0, 4), Dynamic::F)})};
