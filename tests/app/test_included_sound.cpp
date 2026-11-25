@@ -25,8 +25,7 @@ QString touch(const QString& path) {
 
 } // namespace
 
-TEST_CASE("the included SoundFont sits in share/elara/soundfonts next to bin",
-          "[app][soundfont]") {
+TEST_CASE("the included SoundFont sits in share/elara/soundfonts next to bin", "[app][soundfont]") {
     const QTemporaryDir root;
     REQUIRE(root.isValid());
     const QString bin = root.filePath(QStringLiteral("bin"));
@@ -52,8 +51,7 @@ TEST_CASE("the included SoundFont sits in Resources/soundfonts in the macOS bund
     CHECK(includedSoundFont(macos) == font);
 }
 
-TEST_CASE("the app starts with the saved SoundFont, or else the included one",
-          "[app][soundfont]") {
+TEST_CASE("the app starts with the saved SoundFont, or else the included one", "[app][soundfont]") {
     const QTemporaryDir root;
     REQUIRE(root.isValid());
     const QString included = touch(root.filePath(QStringLiteral("included.sf3")));

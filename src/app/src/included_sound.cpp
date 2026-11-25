@@ -12,9 +12,8 @@ QString includedSoundFont(const QString& appDir) {
                               QStringLiteral("../Resources/soundfonts")};
     for (const QString& folder : folders) {
         const QDir dir(QDir(appDir).filePath(folder));
-        const QStringList fonts =
-            dir.entryList({QStringLiteral("*.sf2"), QStringLiteral("*.sf3")}, QDir::Files,
-                          QDir::Name | QDir::IgnoreCase);
+        const QStringList fonts = dir.entryList({QStringLiteral("*.sf2"), QStringLiteral("*.sf3")},
+                                                QDir::Files, QDir::Name | QDir::IgnoreCase);
         if (!fonts.isEmpty()) {
             return QDir::cleanPath(dir.absoluteFilePath(fonts.front()));
         }
