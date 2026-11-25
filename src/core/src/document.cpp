@@ -13,33 +13,29 @@ void Document::execute(std::unique_ptr<Command> command) {
     if (!command) {
         throw std::invalid_argument("Document: null command");
     }
-    const std::size_t depth = done_.size();
-    done_.push_back(nullptr); // allocate first: nothing can fail after apply()
+    done_.emplace_back(); // allocate first: nothing can fail after apply()
     try {
         command->apply(song_);
     } catch (...) {
         done_.pop_back();
         throw;
     }
-    done_.back() = std::move(command);
-    if (savedDepth_ && *savedDepth_ > depth) {
-        savedDepth_.reset(); // the saved state was on the discarded redo branch
-    }
+    // A saved state on the redo branch discarded here is out of reach for
+    // good: no state takes its revision again.
+    done_.back() = Step{.command = std::move(command), .revision = next_++};
     undone_.clear();
     while (done_.size() > undoLimit_) {
+        base_ = done_.front().revision; // what undoing every step now returns to
         done_.pop_front();
-        if (savedDepth_) {
-            savedDepth_ = *savedDepth_ == 0 ? std::nullopt : std::optional(*savedDepth_ - 1);
-        }
     }
 }
 
 std::string_view Document::undoName() const noexcept {
-    return done_.empty() ? std::string_view{} : done_.back()->name();
+    return done_.empty() ? std::string_view{} : done_.back().command->name();
 }
 
 std::string_view Document::redoName() const noexcept {
-    return undone_.empty() ? std::string_view{} : undone_.back()->name();
+    return undone_.empty() ? std::string_view{} : undone_.back().command->name();
 }
 
 void Document::undo() {
@@ -47,7 +43,7 @@ void Document::undo() {
         throw std::logic_error("Document: nothing to undo");
     }
     undone_.reserve(undone_.size() + 1);
-    done_.back()->revert(song_);
+    done_.back().command->revert(song_);
     undone_.push_back(std::move(done_.back()));
     done_.pop_back();
 }
@@ -56,9 +52,9 @@ void Document::redo() {
     if (undone_.empty()) {
         throw std::logic_error("Document: nothing to redo");
     }
-    done_.push_back(nullptr);
+    done_.emplace_back();
     try {
-        undone_.back()->apply(song_);
+        undone_.back().command->apply(song_);
     } catch (...) {
         done_.pop_back();
         throw;

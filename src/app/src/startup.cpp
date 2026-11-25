@@ -99,6 +99,10 @@ void Startup::start() {
             layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
         connect(score_, &ScoreDocument::recoveryWritten, this, [this] { recoveryWritten_ = true; });
+        connect(score_, &ScoreDocument::saveFinished, this,
+                [this](const QUrl& /*file*/, bool saved) { saved_ = saved; });
+        connect(score_, &ScoreDocument::exportFinished, this,
+                [this](const QString& /*file*/, bool written) { exported_ = written; });
     }
     if (options_.effects && window_ != nullptr) {
         effectsPanel_ = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
@@ -136,6 +140,7 @@ void Startup::queueSteps() {
             });
             queueEdits();
             queueRecoveryCopy();
+            queueSave();
             queueEntry();
             queueTuplets();
             queueMeasures();
@@ -422,6 +427,50 @@ void Startup::queueRecoveryCopy() {
     steps_.emplace_back([this, check] {
         check(!score_->modified() && !score_->recovery()->hasCopy(),
               "the copy outlived the changes");
+        return false;
+    });
+}
+
+// Saving on a worker (ADR-0107): the file holds the song as it was when the
+// save started, and an edit made while it is written stays unsaved; undoing
+// that edit returns to the state saved. The song is left there, saved.
+void Startup::queueSave() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("save check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        score_->setSongTitle(QStringLiteral("Saved"));
+        return true;
+    });
+    steps_.emplace_back([this] {
+        if (!scratch_) {
+            scratch_.emplace();
+        }
+        saved_.reset();
+        score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("saved"))));
+        // Before the save can be done: its result comes through the event loop.
+        score_->setSongTitle(QStringLiteral("Edited while saving"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!saved_) {
+            again_ = true;
+            return false;
+        }
+        const QString file = scratch_->filePath(QStringLiteral("saved.elara"));
+        check(*saved_ && !score_->saving(), "the save failed");
+        check(score_->source() == QUrl::fromLocalFile(file), "the song is not the file saved");
+        check(score_->modified(), "the edit made while saving was marked saved");
+        const auto song = io::loadNative(std::filesystem::path(file.toStdU16String()));
+        check(song && song->info().title == "Saved", "the file does not hold the song saved");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(score_->songTitle() == QStringLiteral("Saved") && !score_->modified(),
+              "undoing the edit made while saving did not return to the state saved");
         return false;
     });
 }
@@ -2044,18 +2093,30 @@ void Startup::queueSfz() {
 // document with as many pages as the score shows.
 void Startup::queuePdf() {
     steps_.emplace_back([this] {
+        if (!scratch_) {
+            scratch_.emplace();
+        }
+        exported_.reset();
+        // ".pdf" is added.
+        score_->exportPdf(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("score"))));
+        return false;
+    });
+    // Laid out and written on a worker (ADR-0107).
+    steps_.emplace_back([this] {
         const auto problem = [this](const QString& what) {
             if (editProblem_.isEmpty()) {
                 editProblem_ = QStringLiteral("PDF export: %1").arg(what);
             }
         };
-        const QTemporaryDir folder;
-        const QString file = folder.filePath(QStringLiteral("score")); // ".pdf" is added
-        if (!score_->exportPdf(QUrl::fromLocalFile(file))) {
+        if (!exported_) {
+            again_ = true;
+            return false;
+        }
+        if (!*exported_) {
             problem(QStringLiteral("it failed"));
             return false;
         }
-        QFile written(file + QStringLiteral(".pdf"));
+        QFile written(scratch_->filePath(QStringLiteral("score.pdf")));
         if (!written.open(QIODevice::ReadOnly)) {
             problem(QStringLiteral("no file was written"));
             return false;

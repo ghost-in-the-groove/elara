@@ -307,6 +307,30 @@ TEST_CASE("A document whose song no file holds is modified until it is saved", "
     CHECK_FALSE(doc.isModified());
 }
 
+TEST_CASE("A save that ends after more edits marks only the state it wrote", "[core][document]") {
+    // The song is written on a worker while editing goes on.
+    Document doc(smallSong());
+    doc.execute(std::make_unique<InsertMeasures>(0, 1));
+    const auto written = doc.revision(); // the save starts with this state
+    doc.execute(std::make_unique<InsertMeasures>(0, 1));
+    doc.markSaved(written);
+    CHECK(doc.isModified()); // the edit made meanwhile is not saved
+    doc.undo();
+    CHECK_FALSE(doc.isModified()); // back at the state written
+    // Another edit as deep in the history is another state.
+    doc.execute(std::make_unique<InsertMeasures>(0, 2));
+    CHECK(doc.undoCount() == 2);
+    CHECK(doc.isModified());
+    doc.undo();
+    CHECK_FALSE(doc.isModified());
+    // Each state has its own revision, through undo and redo.
+    const auto before = doc.revision();
+    doc.redo();
+    CHECK(doc.revision() != before);
+    doc.undo();
+    CHECK(doc.revision() == before);
+}
+
 TEST_CASE("Undoing any sequence of edits restores the original song", "[core][document]") {
     const Song original = smallSong();
     Document doc(original, 10'000);

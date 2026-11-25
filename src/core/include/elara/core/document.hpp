@@ -4,6 +4,7 @@
 #include <elara/core/song.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <memory>
 #include <optional>
@@ -65,22 +66,38 @@ public:
     void undo();
     void redo();
 
-    /// Marks the current state as saved: isModified() stays false until the song
-    /// leaves this state, and is false again whenever undo or redo returns to it.
-    void markSaved() noexcept { savedDepth_ = done_.size(); }
-    /// Marks the song as held by no file in its present state, as a song
-    /// recovered after a crash is: isModified() is true until markSaved().
-    void markUnsaved() noexcept { savedDepth_.reset(); }
-    [[nodiscard]] bool isModified() const noexcept {
-        return !savedDepth_ || *savedDepth_ != done_.size();
+    /// Names the song's present state: undo and redo return to a state and to
+    /// its revision, and no other state ever has it. A save running on a
+    /// worker reads it as it starts, and marks that state saved as it ends.
+    [[nodiscard]] std::uint64_t revision() const noexcept {
+        return done_.empty() ? base_ : done_.back().revision;
     }
 
+    /// Marks the current state as saved: isModified() stays false until the song
+    /// leaves this state, and is false again whenever undo or redo returns to it.
+    void markSaved() noexcept { saved_ = revision(); }
+    /// Marks the state that revision() named as `state` saved, though the song
+    /// may have left it since.
+    void markSaved(std::uint64_t state) noexcept { saved_ = state; }
+    /// Marks the song as held by no file in its present state, as a song
+    /// recovered after a crash is: isModified() is true until markSaved().
+    void markUnsaved() noexcept { saved_.reset(); }
+    [[nodiscard]] bool isModified() const noexcept { return !saved_ || *saved_ != revision(); }
+
 private:
+    /// A command and the revision of the state it makes.
+    struct Step {
+        std::unique_ptr<Command> command;
+        std::uint64_t revision = 0;
+    };
+
     Song song_;
-    std::deque<std::unique_ptr<Command>> done_;    // oldest first
-    std::vector<std::unique_ptr<Command>> undone_; // next to redo last
+    std::deque<Step> done_;    // oldest first
+    std::vector<Step> undone_; // next to redo last
     std::size_t undoLimit_ = kDefaultUndoLimit;
-    std::optional<std::size_t> savedDepth_ = 0; // undoCount() at the save point, if reachable
+    std::uint64_t base_ = 0;                 ///< the state before the oldest step kept
+    std::uint64_t next_ = 1;                 ///< the revision of the next command executed
+    std::optional<std::uint64_t> saved_ = 0; ///< the state saved; none when no state is
 };
 
 } // namespace elara::core

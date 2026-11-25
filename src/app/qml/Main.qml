@@ -86,7 +86,13 @@ ApplicationWindow {
     }
 
     onClosing: close => {
-        if (score.modified && !closing) {
+        if (closing)
+            return;
+        if (score.saving) {
+            // Asked again once the save being written is on the disk.
+            close.accepted = false;
+            pendingAction = () => window.close();
+        } else if (score.modified) {
             close.accepted = false;
             whenSaved(() => {
                 window.closing = true;
@@ -130,14 +136,13 @@ ApplicationWindow {
         });
     }
 
-    /// Saves to the song's own file, or asks where when it has none.
+    /// Saves to the song's own file, or asks where when it has none. What was
+    /// waiting for the save runs once it is written.
     function save() {
-        if (score.savesInPlace) {
-            if (score.save(score.source))
-                runPendingAction();
-        } else {
+        if (score.savesInPlace)
+            score.save(score.source);
+        else
             saveDialog.open();
-        }
     }
 
     /// Asks where to export the score as PDF, suggesting a file beside the song's.
@@ -176,6 +181,14 @@ ApplicationWindow {
                 toast.show(errorMessage);
         }
         onEditFailed: message => toast.show(message)
+        // What waited for the save runs, unless the song changed again while
+        // it was written; a failed save drops it.
+        onSaveFinished: (file, saved) => {
+            const action = window.pendingAction;
+            window.pendingAction = null;
+            if (saved && action)
+                window.whenSaved(action);
+        }
         onNotice: message => toast.inform(message, [])
         onReport: (message, details) => toast.inform(message, details)
     }
@@ -259,10 +272,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         nameFilters: [qsTr("Elara (*.elara)")]
         defaultSuffix: "elara"
-        onAccepted: {
-            if (score.save(selectedFile))
-                window.runPendingAction();
-        }
+        onAccepted: score.save(selectedFile)
         onRejected: window.pendingAction = null
     }
 
