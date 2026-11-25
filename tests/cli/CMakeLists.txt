@@ -1022,7 +1022,7 @@ set_tests_properties(cli.sequence_events PROPERTIES
 add_test(NAME cli.sequence_articulations
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_articulations PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":88,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
 # Pitch articulations (ADR-0023): the hammer-on in the triplet is not struck
 # but joins the voice of the note before it a whole tone up (ADR-0070), and
 # the shift slide goes up to the next note over the last 0.2 s.
@@ -1041,7 +1041,15 @@ set_tests_properties(cli.sequence_strums PROPERTIES
 add_test(NAME cli.render_audio_touches
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
 set_tests_properties(cli.render_audio_touches PROPERTIES
-  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  80  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
+  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  88  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
+# Hairpins ramp the velocity (ADR-0078): the crescendo of bar 1 leads from mf
+# (80) to the forte of bar 2 (96), so its second quarter is struck halfway at
+# 88; the diminuendo of bar 3 has no softer dynamic after it and falls one step
+# (16), so its eighth, three quarters of the way, is struck at 68.
+add_test(NAME cli.sequence_hairpins
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes)
+set_tests_properties(cli.sequence_hairpins PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":1.2,\"end\":1.8,\"key\":59,\"velocity\":80\},\{[^}]*\"start\":1.8,\"end\":6.9,\"key\":73,\"velocity\":88,.*\"pass\":5,\"start\":12.6,[^}]*\"velocity\":80\}.*\"pass\":5,\"start\":13.725,\"end\":14.1,\"key\":59,\"velocity\":68\}")
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
