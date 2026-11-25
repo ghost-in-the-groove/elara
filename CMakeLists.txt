@@ -15,6 +15,12 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 option(ELARA_BUILD_APP "Build the Qt desktop application" ON)
 option(ELARA_BUILD_TESTS "Build unit and integration tests" ON)
 option(ELARA_WARNINGS_AS_ERRORS "Treat compiler warnings in Elara sources as errors" OFF)
+# Sanitizers built into Elara's own code, such as "address,undefined" (the
+# sanitize preset, ADR-0105); see cmake/ElaraWarnings.cmake.
+set(ELARA_SANITIZE "" CACHE STRING "Sanitizers for Elara's own code with GCC or Clang")
+if(ELARA_SANITIZE AND MSVC)
+  message(FATAL_ERROR "ELARA_SANITIZE needs GCC or Clang (Linux or macOS)")
+endif()
 
 # A compiler cache such as ccache (CI sets one) can only reuse MSVC objects that
 # carry their debug information (/Z7), not the ones that share a .pdb (/Zi).

@@ -1,0 +1,107 @@
+name: sanitize
+
+# Every test but the app's, built with AddressSanitizer and UndefinedBehavior-
+# Sanitizer (ADR-0105): the importers read files from anywhere, and a read past
+# a buffer or an overflowing shift there passes the ordinary tests unseen. The
+# corpus snapshot tests import, lay out and render every corpus file, and the io
+# tests read damaged containers. Not a required check: a finding fails this job
+# and is fixed like any other test failure.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - src/core/**
+      - src/audio/**
+      - src/io/**
+      - src/notation/**
+      - src/cli/**
+      - tests/**
+      - cmake/**
+      - CMakeLists.txt
+      - CMakePresets.json
+      - vcpkg.json
+      - .github/workflows/sanitize.yml
+  workflow_dispatch:
+
+concurrency:
+  group: sanitize-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CCACHE_VERSION: 4.14.2
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_MAXSIZE: 500M
+  CTEST_PARALLEL_LEVEL: 4
+
+jobs:
+  sanitize:
+    name: sanitize-linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Python tools
+        run: python -m pip install ninja
+
+      - name: Linux packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 libasound2-dev libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev
+          echo "CXX=g++-14" >> "$GITHUB_ENV"
+          echo "CC=gcc-14" >> "$GITHUB_ENV"
+
+      # The same vcpkg and cache as ci.yml's linux job: the packages are not
+      # instrumented, only Elara's own code is.
+      - name: vcpkg
+        id: vcpkg
+        shell: bash
+        run: |
+          git clone https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+          baseline=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+          git -C "$RUNNER_TEMP/vcpkg" checkout -q "$baseline"
+          echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: ccache
+        shell: bash
+        run: |
+          name="ccache-$CCACHE_VERSION-linux-x86_64-glibc"
+          curl -fsSL -o "$RUNNER_TEMP/$name.tar.xz" "https://github.com/ccache/ccache/releases/download/v$CCACHE_VERSION/$name.tar.xz"
+          echo "bd1313f5316f594443dcb4113a4191c666ac6450e0cf016ff8cb8b080f46c160  $RUNNER_TEMP/$name.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/$name.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-sanitize-${{ github.sha }}
+          restore-keys: ccache-sanitize-
+
+      - name: Build and test with sanitizers
+        run: python scripts/elara.py test --preset sanitize
+
+      - name: Save ccache
+        if: always() && github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-sanitize-${{ github.sha }}

@@ -819,7 +819,7 @@ def main() -> int:
     def add(name: str, func, help_text: str, preset: bool = True) -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=help_text)
         if preset:
-            p.add_argument("--preset", default=DEFAULT_PRESET, help="CMake preset (dev, release)")
+            p.add_argument("--preset", default=DEFAULT_PRESET, help="CMake preset (dev, release, sanitize)")
         p.set_defaults(func=func)
         return p
 
