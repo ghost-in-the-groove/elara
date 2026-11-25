@@ -109,7 +109,7 @@ void edit(Song& song, std::mt19937& random) {
     Track& track = song.track(t);
     auto& staff = track.staff(pick(random, track.staffCount()));
     auto& header = song.measureHeader(m);
-    switch (pick(random, 14)) {
+    switch (pick(random, 15)) {
     case 0: // another measure's notes, as paste does
         staff.measure(m) = staff.measure(pick(random, song.measureCount()));
         break;
@@ -184,6 +184,13 @@ void edit(Song& song, std::mt19937& random) {
     case 12: // a hammer-on from the measure before, slurred on it (ADR-0097)
         if (Note* note = firstNote(staff.measure(m))) {
             note->effects.legatoFromPrevious = !note->effects.legatoFromPrevious;
+        }
+        break;
+    case 13: // a slide to the next note, drawn on to it (ADR-0098)
+        if (Note* note = firstNote(staff.measure(m))) {
+            note->effects.slideOut = note->effects.slideOut == elara::core::SlideOut::None
+                                         ? elara::core::SlideOut::Shift
+                                         : elara::core::SlideOut::None;
         }
         break;
     default:

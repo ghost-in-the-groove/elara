@@ -103,6 +103,7 @@ one that replaces them.
 | [0095](0095-breath-marks.md) | Breath marks and caesuras | Accepted |
 | [0096](0096-split-beats-for-marks-between-beats.md) | Split beats for marks between beats | Accepted |
 | [0097](0097-legato-slurs-on-the-standard-staff.md) | Legato slurs on the standard staff | Accepted |
+| [0098](0098-slides-on-the-standard-staff.md) | Slides on the standard staff | Accepted |
 
 ## Template
 
