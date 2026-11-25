@@ -117,7 +117,7 @@ public:
         : StaffWriter(font, kLineSpace * (staff.tuning()->stringCount() - 1),
                       static_cast<std::size_t>(staff.tuning()->stringCount())),
           song_(song), staff_(staff), tuning_(*staff.tuning()), alone_(alone), lanes_(font),
-          dynamics_(font), chordRow_(font, true) {}
+          dynamics_(font), aboveRow_(font, true) {}
 
     double header(std::size_t first) override {
         measure_ = first;
@@ -177,7 +177,7 @@ public:
         rhythm_.clear();
         if (!notes) {
             columns_.clear(); // a measure of rests: one centred rest, if any
-            collectChords(m, ink);
+            collectAbove(m, ink);
             return;
         }
         if (alone_) {
@@ -229,7 +229,7 @@ public:
             item.left = edge + kGraceGap;
             ink.push_back(item);
         }
-        collectChords(m, ink);
+        collectAbove(m, ink);
     }
 
     [[nodiscard]] double emptyWidth() const override {
@@ -240,7 +240,7 @@ public:
         measure_ = measureIndex_;
         if (alone_) {
             dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
-            chordRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
+            aboveRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
         }
         if (columns_.empty()) {
             if (alone_) {
@@ -286,11 +286,11 @@ public:
     }
 
 private:
-    // Chord symbols show over the standard notation when the system has it
-    // (ADR-0080).
-    void collectChords(std::size_t m, std::vector<ColumnInk>& ink) {
+    // Chord symbols and beat text show over the standard notation when the
+    // system has it (ADR-0080, ADR-0081).
+    void collectAbove(std::size_t m, std::vector<ColumnInk>& ink) {
         if (alone_) {
-            chordRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
+            aboveRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
         }
     }
 
@@ -585,8 +585,8 @@ private:
                 bendArrows(bend, tip);
             }
         }
-        if (!chordRow_.empty()) {
-            chordRow_.place(list_, inkTop());
+        if (!aboveRow_.empty()) {
+            aboveRow_.place(list_, inkTop());
         }
         if (!dynamics_.empty()) {
             dynamics_.place(list_, inkBottom(), height(), width);
@@ -646,7 +646,7 @@ private:
     std::vector<double> rhythmX_;    // the stems' x
     TechniqueLanes lanes_;
     DynamicMarks dynamics_;
-    ChordRow chordRow_; // chord symbols, when alone (ADR-0080)
+    AboveRow aboveRow_; // chord symbols and beat text, when alone (ADR-0080, ADR-0081)
     std::size_t measureIndex_ = 0;
     std::vector<TabColumn> columns_;
     std::array<std::optional<LastNote>, core::Tuning::kMaxStrings + 1> last_{};

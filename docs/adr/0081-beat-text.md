@@ -45,12 +45,25 @@ placement="above">` just before its note, on the beat's staff; the native
 format writes `"text": "let ring"` on the beat, left out when there is none.
 Older files without texts read as before.
 
+**Drawing.** A beat's text is written in italics above its staff, starting
+at its beat's column (the left of its notehead), over everything else of the
+staff: the chord symbols, the technique lanes and the notes. Texts take no
+room between the columns, so they never move the notes: one that would run
+into the text before it on its row (closer than a staff space) goes on the
+row above, and the next that fits goes back to the lowest row. Like chord
+symbols they are drawn once, over the standard notation of their staff when
+the system shows it, otherwise over its tablature, and a text on a beat
+where no notes start gets a column of its own. The display list's role for
+them is `beatText`.
+
 ## Consequences
 
 - The model, the native format, the Guitar Pro 3-8 importers and MusicXML
-  both ways keep beat texts, and `elara-cli dump` and `import --json` show
-  them. Drawing them above the staff and typing them at the caret come next,
-  each recorded here as it lands.
+  both ways keep beat texts, layout draws them, and `elara-cli dump` and
+  `import --json` show them. Typing them at the caret comes next.
+- A text longer than the room before the line's end runs past it, and a
+  line with texts on several rows is taller by each row (about 1.5 staff
+  spaces).
 - Copying, pasting and transposing carry a beat's text with it.
 - A text that reads like a jump ("D.C. al Fine") comes back from MusicXML as
   that jump: the format cannot tell them apart.
@@ -59,5 +72,7 @@ Older files without texts read as before.
   start on`, `io.MusicXML: signs and jumps become measure marks`,
   `io.MusicXML: what the model cannot hold yet is reported, not lost
   silently`,
-  `io.MusicXML export: beat text comes back as words`, the native round trip
-  and `io.song.json uses text forms and omits defaults`.
+  `io.MusicXML export: beat text comes back as words`, the native round trip,
+  `io.song.json uses text forms and omits defaults`, the `notation.Beat text:
+  ...` layout tests (place, above chord symbols, rows, rests and views) and
+  the render snapshots of the corpus.

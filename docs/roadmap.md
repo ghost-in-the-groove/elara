@@ -112,7 +112,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] Beat text: words above the beat, "let it ring", "ad lib." (ADR-0081)
   - [x] In the model, read from Guitar Pro 3-8, MusicXML both ways and kept by
         the native format
-  - [ ] Drawn above the staff
+  - [x] Drawn above the staff
   - [ ] Typed at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
