@@ -236,10 +236,49 @@ TEST_CASE("MusicXML: voices are renumbered per staff and late voices padded", "[
 
 TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silently", "[musicxml]") {
     const ImportResult result = load("piano-voices.musicxml");
-    CHECK(hasWarning(result, "chord symbol", "measure 1"));
+    CHECK_FALSE(hasWarning(result, "chord symbol", "measure 1"));
+    const core::Beat& first = voiceOf(result.song, 0, 0, 0).beats[0];
+    REQUIRE(first.chord);
+    CHECK(first.chord->name == "F");
 
     CHECK(hasWarning(result, "text", "measure 2"));
     CHECK(hasWarning(result, "lyric", "measure 2"));
+}
+
+TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "[musicxml]") {
+    // ADR-0080. A frame on a part without a tuning keeps its own strings.
+    const ImportResult result = parse(onePart(R"(
+<harmony><root><root-step>F</root-step><root-alter>1</root-alter></root><kind>minor-seventh</kind>
+<frame><frame-strings>6</frame-strings><frame-frets>4</frame-frets><first-fret>2</first-fret>
+<frame-note><string>1</string><fret>2</fret></frame-note><frame-note><string>2</string><fret>2</fret></frame-note>
+<frame-note><string>3</string><fret>2</fret></frame-note><frame-note><string>4</string><fret>4</fret></frame-note>
+<frame-note><string>6</string><fret>2</fret></frame-note></frame></harmony>
+<note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type></note>
+<harmony><root><root-step>B</root-step><root-alter>-1</root-alter></root><kind text="7">dominant</kind>
+<bass><bass-step>D</bass-step></bass><degree><degree-value>9</degree-value><degree-alter>-1</degree-alter>
+<degree-type>alter</degree-type></degree></harmony>
+<note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type></note>
+<harmony><root><root-step>C</root-step></root><kind>none</kind></harmony>
+<note><rest/><duration>4</duration><voice>1</voice><type>quarter</type></note>
+<harmony><root><root-step>G</root-step></root><kind>suspended-fourth</kind><offset>2</offset></harmony>
+<harmony><numeral><numeral-root>5</numeral-root></numeral><kind>dominant</kind></harmony>
+<note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type></note>)"));
+    const auto& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    REQUIRE(beats[0].chord);
+    constexpr std::int8_t x = core::ChordDiagram::kMuted;
+    CHECK(*beats[0].chord == core::ChordSymbol{.name = "F#m7",
+                                               .diagram = core::ChordDiagram{
+                                                   .firstFret = 2, .frets = {2, 2, 2, 4, x, 2}}});
+    REQUIRE(beats[1].chord);
+    CHECK(*beats[1].chord == core::ChordSymbol{.name = "Bb7b9/D", .diagram = {}});
+    REQUIRE(beats[2].chord);
+    CHECK(beats[2].chord->name == "N.C.");
+    CHECK(beats[2].isRest());
+    CHECK_FALSE(beats[3].chord);
+    CHECK(result.warnings ==
+          std::vector<std::string>{"Test: chord symbols written as functions dropped (measure 1)",
+                                   "Test: chord symbols between beats dropped (measure 1)"});
 }
 
 TEST_CASE("MusicXML: grace notes lead into the next note of their voice", "[musicxml]") {
@@ -388,7 +427,7 @@ TEST_CASE("MusicXML: parts read on several threads give the same result as on on
     // Six parts; each drops something different, so warning order is checked too.
     constexpr std::array<std::string_view, 6> kExtras{
         "",
-        "<harmony><root><root-step>C</root-step></root><kind>major</kind></harmony>",
+        "<harmony><numeral><numeral-root>5</numeral-root></numeral><kind>major</kind></harmony>",
         "<figured-bass><figure><figure-number>6</figure-number></figure></figured-bass>",
         "",
         R"(<direction><direction-type><words>dolce</words></direction-type></direction>)",

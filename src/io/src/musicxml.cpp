@@ -4,6 +4,7 @@
 #include <elara/io/musicxml.hpp>
 
 #include "archive.hpp"
+#include "chord_pool.hpp"
 #include "musicxml_shared.hpp"
 #include "parallel.hpp"
 #include "warnings.hpp"
@@ -13,6 +14,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <exception>
 #include <format>
@@ -604,6 +606,98 @@ struct TempoMark {
     Tempo tempo{};
 };
 
+/// A chord symbol and where it goes (ADR-0080).
+struct ChordMark {
+    Fraction onset{};
+    std::optional<std::size_t> staff{}; // nullopt: the first staff
+    ChordSymbol symbol{};
+};
+
+/// Sharps or flats for an alteration in semitones.
+std::string alterText(double alter) {
+    const long semitones = std::clamp(std::lround(alter), -2L, 2L);
+    return std::string(static_cast<std::size_t>(std::abs(semitones)), semitones > 0 ? '#' : 'b');
+}
+
+/// A pitch of a <root> or <bass> as a chord name spells it, or the text the
+/// file gives to print instead.
+std::string chordStep(pugi::xml_node step, pugi::xml_node alter) {
+    if (const pugi::xml_attribute text = step.attribute("text")) {
+        return text.value();
+    }
+    return textOf(step) + alterText(alter.text().as_double(0.0));
+}
+
+/// The name of a <harmony> as a chord symbol writes it: root, kind, degrees
+/// and bass, with the texts the file gives to print. None for a chord written
+/// as a Roman numeral or a function.
+std::optional<std::string> harmonyName(pugi::xml_node harmony) {
+    const pugi::xml_node kind = harmony.child("kind");
+    const std::string_view kindValue = textView(kind);
+    const pugi::xml_attribute kindText = kind.attribute("text");
+    if (kindValue == "none") {
+        return kindText ? std::string(kindText.value()) : std::string("N.C.");
+    }
+    const pugi::xml_node root = harmony.child("root");
+    if (!root) {
+        return std::nullopt;
+    }
+    std::string name = chordStep(root.child("root-step"), root.child("root-alter"));
+    if (kindText) {
+        name += kindText.value();
+    } else if (const auto known =
+                   std::ranges::find(detail::kChordKinds, kindValue, &detail::ChordKind::kind);
+               known != detail::kChordKinds.end()) {
+        name += known->suffix;
+    }
+    for (const pugi::xml_node degree : harmony.children("degree")) {
+        if (std::string_view(degree.attribute("print-object").value()) == "no") {
+            continue;
+        }
+        const pugi::xml_node type = degree.child("degree-type");
+        const std::string_view change = textView(type);
+        if (const pugi::xml_attribute text = type.attribute("text")) {
+            name += text.value();
+        } else if (change == "add") {
+            name += "add";
+        } else if (change == "subtract") {
+            name += "no";
+        }
+        name += alterText(degree.child("degree-alter").text().as_double(0.0));
+        name += textView(degree.child("degree-value"));
+    }
+    if (const pugi::xml_node bass = harmony.child("bass")) {
+        name += '/';
+        name += chordStep(bass.child("bass-step"), bass.child("bass-alter"));
+    }
+    return name;
+}
+
+/// A <frame>'s diagram: string 1 is the highest, and strings without a
+/// <frame-note> are not played. It has the staff's `strings`, or on a staff
+/// without a tuning (0) as many as the frame has.
+std::optional<ChordDiagram> frameDiagram(pugi::xml_node frame, int strings) {
+    if (!frame) {
+        return std::nullopt;
+    }
+    const int count =
+        strings > 0 ? strings : intIn(frame.child("frame-strings"), 6, 1, Tuning::kMaxStrings);
+    ChordDiagram diagram{
+        .firstFret =
+            static_cast<std::uint8_t>(intIn(frame.child("first-fret"), 1, 1, Tuning::kMaxFret)),
+        .frets = std::vector<std::int8_t>(static_cast<std::size_t>(count), ChordDiagram::kMuted)};
+    bool played = false;
+    for (const pugi::xml_node note : frame.children("frame-note")) {
+        const int string = note.child("string").text().as_int(0);
+        const int fret = note.child("fret").text().as_int(-1);
+        if (string >= 1 && string <= count && fret >= 0 && fret <= Tuning::kMaxFret) {
+            diagram.frets[static_cast<std::size_t>(string - 1)] = static_cast<std::int8_t>(fret);
+            played = true;
+        }
+    }
+    return played ? std::optional(std::move(diagram)) : std::nullopt;
+}
+
 /// Where a wedge starts (its hairpin) or stops (None).
 struct HairpinMark {
     Fraction onset{};
@@ -882,9 +976,11 @@ private:
         std::vector<DynamicMark>& dynamics = dynamicMarks_;
         std::vector<HairpinMark>& hairpins = hairpinMarks_;
         std::vector<TempoMark>& tempos = tempoMarks_;
+        std::vector<ChordMark>& chords = chordMarks_;
         events.clear();
         dynamics.clear();
         hairpins.clear();
+        chords.clear();
         tempos.clear();
         Fraction cursor;
         Fraction lastOnset;
@@ -934,7 +1030,7 @@ private:
                     tempos.push_back(TempoMark{.onset = cursor, .tempo = *tempo});
                 }
             } else if (name == "harmony") {
-                warn("chord symbols dropped", index);
+                readHarmony(child, cursor, index, chords);
             } else if (name == "figured-bass") {
                 warn("figured bass dropped", index);
             } else if (name == "barline") {
@@ -960,6 +1056,9 @@ private:
                     mark.onset += shift;
                 }
                 for (HairpinMark& mark : hairpins) {
+                    mark.onset += shift;
+                }
+                for (ChordMark& mark : chords) {
                     mark.onset += shift;
                 }
                 for (TempoMark& mark : tempos) {
@@ -1003,6 +1102,61 @@ private:
         }
 
         build(index, events, dynamics, hairpins, time);
+        markChords(index, chords);
+    }
+
+    /// A chord symbol, with a diagram from its <frame> (ADR-0080).
+    void readHarmony(pugi::xml_node harmony, const Fraction& cursor, std::size_t index,
+                     std::vector<ChordMark>& chords) {
+        const std::optional<std::string> name = harmonyName(harmony);
+        if (!name) {
+            warn("chord symbols written as functions dropped", index);
+            return;
+        }
+        std::optional<std::size_t> staff;
+        if (const pugi::xml_node number = harmony.child("staff")) {
+            staff = staffFor(number.text().as_int(1)).staff;
+        }
+        const Staff& target = layout_.staves[staff.value_or(0)];
+        ChordSymbol symbol{.name = *name, .diagram = {}};
+        if (!isPercussion()) {
+            symbol.diagram = frameDiagram(harmony.child("frame"),
+                                          target.tuning() ? target.tuning()->stringCount() : 0);
+        }
+        if (symbol.name.empty() && !symbol.diagram) {
+            return;
+        }
+        const Fraction offset = divisionsToWholes(harmony.child("offset").text().as_int(0));
+        chords.push_back(ChordMark{.onset = std::max(Fraction(0), cursor + offset),
+                                   .staff = staff,
+                                   .symbol = std::move(symbol)});
+    }
+
+    /// Each chord symbol goes on the beat of its staff that starts where it
+    /// does, the voices looked at in order.
+    void markChords(std::size_t index, std::vector<ChordMark>& chords) {
+        for (ChordMark& mark : chords) {
+            Measure& measure = measures_[mark.staff.value_or(0)].back();
+            Beat* target = nullptr;
+            for (Voice& voice : measure.voices) {
+                Fraction at;
+                for (Beat& beat : voice.beats) {
+                    if (at == mark.onset) {
+                        target = &beat;
+                        break;
+                    }
+                    at += beat.duration.length();
+                }
+                if (target != nullptr) {
+                    break;
+                }
+            }
+            if (target == nullptr) {
+                warn("chord symbols between beats dropped", index);
+                continue;
+            }
+            target->chord = chordPool_.share(std::move(mark.symbol));
+        }
     }
 
     void readAttributes(pugi::xml_node attributes, std::size_t index, MeasureHeader* header) {
@@ -1930,12 +2084,14 @@ private:
     std::vector<Dynamic> dynamics_;                  // per staff, at the end of the last measure
     std::vector<Hairpin> hairpins_;                  // per staff, at the end of the last measure
     std::vector<std::vector<Measure>> measures_;     // per staff
+    detail::ChordPool chordPool_;                    // one symbol for equal chords
 
     // Per-measure buffers, kept to reuse their storage.
     static constexpr std::size_t kNoSlot = static_cast<std::size_t>(-1);
     std::vector<Event> events_{};
     std::vector<DynamicMark> dynamicMarks_{};
     std::vector<HairpinMark> hairpinMarks_{};
+    std::vector<ChordMark> chordMarks_{};
     std::vector<TempoMark> tempoMarks_{};
     std::vector<PendingGrace> pendingGraces_{};
     std::vector<Placed> placed_{};

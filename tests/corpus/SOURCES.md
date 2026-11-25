@@ -14,7 +14,7 @@ Community Group).
 |---|---|
 | `melody.musicxml` | Title, composer and rights; tempo; accidentals; dotted note; key and meter change; whole-measure rest |
 | `guitar-tab.musicxml` | Standard staff with an octave clef plus a TAB staff (drop D, capo 2) merged into one fretted staff; string/fret only on the TAB staff; hammer-on, bend and release, natural harmonic, slide, staccato, accent, triplets, tie, dead note, dynamic |
-| `piano-voices.musicxml` | Two staves; voices numbered 1-4 and 5-8; chord; `forward` and `backup`; meter and tempo change; grace note, lyric, repeat, chord symbol and text direction (reported as warnings) |
+| `piano-voices.musicxml` | Two staves; voices numbered 1-4 and 5-8; chord; `forward` and `backup`; meter and tempo change; a grace note and a chord symbol; lyric, repeat and text direction (reported as warnings) |
 | `drums.musicxml` | Percussion clef; unpitched notes mapped to General MIDI keys through `midi-unpitched`; chord of two drums |
 | `transposing.musicxml` | Pickup measures; B-flat clarinet with `transpose` and a written key; bass with an octave clef and its own `divisions` |
 

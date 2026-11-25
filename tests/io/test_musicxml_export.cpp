@@ -536,6 +536,52 @@ TEST_CASE("MusicXML export: grace notes on a guitar keep their strings and slide
     CHECK(xml.find("<grace/>") != std::string::npos);
 }
 
+TEST_CASE("MusicXML export: chord symbols keep their names and diagrams", "[musicxml][export]") {
+    // ADR-0080: names MusicXML can spell, one it cannot ("6/9" is a suffix,
+    // not a bass), one that is no pitch, a diagram alone, on a guitar and on
+    // the second staff of a piano.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    core::Staff& staff = song.track(g).staff(0);
+    constexpr std::int8_t x = core::ChordDiagram::kMuted;
+    const auto chord = [](std::string name, std::optional<core::ChordDiagram> diagram = {}) {
+        return core::SharedOptional(core::ChordSymbol{.name = std::move(name), .diagram = diagram});
+    };
+    const core::Duration quarter(core::NoteValue::Quarter);
+    auto& beats = staff.measure(0).voices[0].beats;
+    beats = {beatOf(quarter, {staff.frettedNote(3, 2)}), beatOf(quarter, {staff.frettedNote(2, 3)}),
+             beatOf(quarter, {staff.frettedNote(1, 5)}), beatOf(quarter)};
+    beats[0].chord = chord("Am", core::ChordDiagram{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}});
+    beats[1].chord = chord("Bb7/F");
+    beats[2].chord =
+        chord("C#m7b5", core::ChordDiagram{.firstFret = 5, .frets = {x, 5, 5, 4, 5, x}});
+    beats[3].chord = chord("N.C.");
+    auto& left = song.track(p).staff(1).measure(0).voices[0].beats;
+    left = {beatOf(core::Duration(core::NoteValue::Half),
+                   {core::Note{.pitch = core::Pitch::fromMidi(48)}}),
+            beatOf(core::Duration(core::NoteValue::Half),
+                   {core::Note{.pitch = core::Pitch::fromMidi(43)}})};
+    left[0].chord = chord("G6/9");
+    left[1].chord = chord("", core::ChordDiagram{.firstFret = 1, .frets = {3, 0, 0, 0, 2, 3}});
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const std::string xml = exportMusicXml(song).data;
+    CHECK(xml.find(R"(<harmony print-frame="yes">)") != std::string::npos);
+    CHECK(xml.find(R"(<kind text="m">minor</kind>)") != std::string::npos);
+    CHECK(xml.find("<root-alter>-1</root-alter>") != std::string::npos);
+    CHECK(xml.find("<bass-step>F</bass-step>") != std::string::npos);
+    CHECK(xml.find(R"(<kind text="m7b5">half-diminished</kind>)") != std::string::npos);
+    CHECK(xml.find("<first-fret>5</first-fret>") != std::string::npos);
+    CHECK(xml.find(R"(<kind text="6/9">other</kind>)") != std::string::npos);
+    CHECK(xml.find(R"(<kind text="N.C.">none</kind>)") != std::string::npos);
+    CHECK(exportMusicXml(song).warnings.empty());
+}
+
 TEST_CASE("MusicXML export: random songs come back unchanged", "[musicxml][export]") {
     for (const std::uint32_t seed : {1U, 2U, 3U, 20261123U}) {
         INFO("seed " << seed);

@@ -90,7 +90,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Typed at the caret
 - [ ] Chord symbols: names and diagrams above the staff (ADR-0080)
   - [x] In the model, read from Guitar Pro 3-8 and kept by the native format
-  - [ ] Read and written in MusicXML
+  - [x] Read and written in MusicXML
   - [ ] Drawn above the staff, with diagrams on fretted staves
   - [ ] Typed at the caret
   - [ ] Transposed with the notes
