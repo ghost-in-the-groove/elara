@@ -47,5 +47,12 @@
             <numerusform>%n staves</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>Exported %1. %2 left out %n thing(s).</source>
+        <translation>
+            <numerusform>Exported %1. %2 left out %n thing.</numerusform>
+            <numerusform>Exported %1. %2 left out %n things.</numerusform>
+        </translation>
+    </message>
 </context>
 </TS>

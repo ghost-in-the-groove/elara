@@ -66,6 +66,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip
   - [x] Played velocities as a dynamic per measure, accents and ghost notes (ADR-0045)
 - [x] `elara-cli import <file> --json` snapshot tests per corpus file
+- [x] Export as MusicXML… and Export as MIDI… in the app, beside Export as PDF…,
+      telling what the format leaves out
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
 

@@ -10,6 +10,8 @@
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/io/compression.hpp>
+#include <elara/io/midi.hpp>
+#include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
 #include <elara/io/open.hpp>
 #include <elara/notation/caret.hpp>
@@ -1358,11 +1360,11 @@ bool ScoreDocument::save(const QUrl& file) {
     return true;
 }
 
-QUrl ScoreDocument::pdfFile() const {
+QUrl ScoreDocument::exportFile(const QString& extension) const {
+    const QString suffix = QLatin1Char('.') + extension;
     if (source_.isLocalFile()) {
         const QFileInfo file(source_.toLocalFile());
-        return QUrl::fromLocalFile(
-            file.dir().filePath(file.completeBaseName() + QStringLiteral(".pdf")));
+        return QUrl::fromLocalFile(file.dir().filePath(file.completeBaseName() + suffix));
     }
     QString name = songTitle().trimmed();
     // Characters no file name may hold on any of the three systems.
@@ -1375,7 +1377,77 @@ QUrl ScoreDocument::pdfFile() const {
         name = tr("Untitled");
     }
     const QString folder = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    return QUrl::fromLocalFile(QDir(folder).filePath(name + QStringLiteral(".pdf")));
+    return QUrl::fromLocalFile(QDir(folder).filePath(name + suffix));
+}
+
+namespace {
+
+// `file` as a local path ending in one of `extensions`, or with the first of
+// them added.
+QString exportPath(const QUrl& file, std::initializer_list<QLatin1StringView> extensions) {
+    QString local = file.isLocalFile() ? file.toLocalFile() : file.toString();
+    const bool known = std::ranges::any_of(extensions, [&local](QLatin1StringView extension) {
+        return local.endsWith(extension, Qt::CaseInsensitive);
+    });
+    if (!known) {
+        local += *extensions.begin();
+    }
+    return local;
+}
+
+} // namespace
+
+bool ScoreDocument::exportMusicXml(const QUrl& file) {
+    if (!song_) {
+        return false;
+    }
+    const QString local = exportPath(file, {QLatin1StringView(".musicxml"),
+                                            QLatin1StringView(".xml"), QLatin1StringView(".mxl")});
+    try {
+        const bool compressed = local.endsWith(QStringLiteral(".mxl"), Qt::CaseInsensitive);
+        return writeExport(local, io::exportMusicXml(*song_, {.compressed = compressed}),
+                           tr("MusicXML"));
+    } catch (const std::exception& error) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
+        return false;
+    }
+}
+
+bool ScoreDocument::exportMidi(const QUrl& file) {
+    if (!song_) {
+        return false;
+    }
+    const QString local = exportPath(file, {QLatin1StringView(".mid"), QLatin1StringView(".midi")});
+    try {
+        return writeExport(local, io::exportMidi(*song_), tr("MIDI"));
+    } catch (const std::exception& error) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
+        return false;
+    }
+}
+
+// Writes an export whole or not at all, then tells what its format left out.
+bool ScoreDocument::writeExport(const QString& local, const io::ExportResult& result,
+                                const QString& format) {
+    QSaveFile out(local);
+    const auto size = static_cast<qint64>(result.data.size());
+    if (!out.open(QIODevice::WriteOnly) || out.write(result.data.data(), size) != size ||
+        !out.commit()) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, out.errorString()));
+        return false;
+    }
+    const QString name = QFileInfo(local).fileName();
+    QStringList details;
+    details.reserve(static_cast<qsizetype>(result.warnings.size()));
+    for (const std::string& warning : result.warnings) {
+        details.append(qstring(warning));
+    }
+    emit report(details.isEmpty()
+                    ? tr("Exported %1.").arg(name)
+                    : tr("Exported %1. %2 left out %n thing(s).", "", int(details.size()))
+                          .arg(name, format),
+                details);
+    return true;
 }
 
 bool ScoreDocument::exportPdf(const QUrl& file) {

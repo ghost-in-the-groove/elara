@@ -139,8 +139,21 @@ ApplicationWindow {
 
     /// Asks where to export the score as PDF, suggesting a file beside the song's.
     function exportPdf() {
-        pdfDialog.selectedFile = score.pdfFile();
+        pdfDialog.selectedFile = score.exportFile("pdf");
         pdfDialog.open();
+    }
+
+    /// Asks where to export the song as MusicXML, to take it to another
+    /// notation program.
+    function exportMusicXml() {
+        musicXmlDialog.selectedFile = score.exportFile("musicxml");
+        musicXmlDialog.open();
+    }
+
+    /// Asks where to export the song as a MIDI file, as it plays.
+    function exportMidi() {
+        midiDialog.selectedFile = score.exportFile("mid");
+        midiDialog.open();
     }
 
     ScoreDocument {
@@ -159,7 +172,8 @@ ApplicationWindow {
                 toast.show(errorMessage);
         }
         onEditFailed: message => toast.show(message)
-        onNotice: message => toast.show(message)
+        onNotice: message => toast.inform(message, [])
+        onReport: (message, details) => toast.inform(message, details)
     }
 
     RecentScores {
@@ -256,6 +270,56 @@ ApplicationWindow {
         nameFilters: [qsTr("PDF documents (*.pdf)")]
         defaultSuffix: "pdf"
         onAccepted: score.exportPdf(selectedFile)
+    }
+
+    FileDialog {
+        id: musicXmlDialog
+
+        title: qsTr("Export the song as MusicXML")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("MusicXML (*.musicxml *.xml)"), qsTr("Compressed MusicXML (*.mxl)")]
+        defaultSuffix: "musicxml"
+        onAccepted: score.exportMusicXml(selectedFile)
+    }
+
+    FileDialog {
+        id: midiDialog
+
+        title: qsTr("Export the song as MIDI")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("MIDI files (*.mid *.midi)")]
+        defaultSuffix: "mid"
+        onAccepted: score.exportMidi(selectedFile)
+    }
+
+    // What an export left out, one line each.
+    Dialog {
+        id: detailsDialog
+
+        property var lines: []
+
+        anchors.centerIn: parent
+        width: Math.min(560, window.width - 48)
+        modal: true
+        standardButtons: Dialog.Close
+
+        ListView {
+            implicitHeight: Math.min(contentHeight, window.height * 0.5)
+            width: detailsDialog.availableWidth
+            clip: true
+            spacing: 6
+            model: detailsDialog.lines
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar {}
+            delegate: Label {
+                required property string modelData
+
+                width: ListView.view.width
+                text: "• " + modelData
+                wrapMode: Text.Wrap
+                opacity: 0.85
+            }
+        }
     }
 
     Dialog {
@@ -507,6 +571,16 @@ ApplicationWindow {
                         text: qsTr("Export as PDF…")
                         enabled: window.hasScore
                         onTriggered: window.exportPdf()
+                    }
+                    MenuItem {
+                        text: qsTr("Export as MusicXML…")
+                        enabled: window.hasScore
+                        onTriggered: window.exportMusicXml()
+                    }
+                    MenuItem {
+                        text: qsTr("Export as MIDI…")
+                        enabled: window.hasScore
+                        onTriggered: window.exportMidi()
                     }
                     MenuSeparator {}
 
@@ -858,14 +932,29 @@ ApplicationWindow {
             y: 12
         }
 
-        // Errors slide up from the bottom and go away by themselves.
+        // Errors and notices slide up from the bottom and go away by
+        // themselves; a notice with details offers them.
         Rectangle {
             id: toast
 
             property string message
+            property bool error: true
+            property var details: []
 
+            /// An error, in the danger colours.
             function show(text: string) {
                 message = text;
+                error = true;
+                details = [];
+                shown = true;
+                hideTimer.restart();
+            }
+
+            /// Something done, with `lines` to read on demand.
+            function inform(text: string, lines: var) {
+                message = text;
+                error = false;
+                details = lines;
                 shown = true;
                 hideTimer.restart();
             }
@@ -875,11 +964,11 @@ ApplicationWindow {
             anchors.horizontalCenter: parent.horizontalCenter
             y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
                      : parent.height + 8
-            width: Math.min(parent.width - 48, toastText.implicitWidth + 40)
-            height: toastText.implicitHeight + 24
+            width: Math.min(parent.width - 48, toastRow.implicitWidth + 40)
+            height: toastRow.implicitHeight + 24
             radius: Theme.radiusCard
-            color: Theme.dangerSurface
-            border.color: Theme.danger
+            color: error ? Theme.dangerSurface : Theme.surface
+            border.color: error ? Theme.danger : Theme.line
             visible: y < parent.height
 
             Elevation {
@@ -893,26 +982,47 @@ ApplicationWindow {
                 }
             }
 
-            Label {
-                id: toastText
-
-                anchors.centerIn: parent
-                width: Math.min(implicitWidth, toast.parent.width - 88)
-                text: toast.message
-                wrapMode: Text.Wrap
-                color: Theme.dangerInk
-            }
-
             Timer {
                 id: hideTimer
 
-                interval: 6000
+                interval: toast.details.length > 0 ? 10000 : 6000
                 onTriggered: toast.shown = false
             }
 
             MouseArea {
                 anchors.fill: parent
                 onClicked: toast.shown = false
+            }
+
+            RowLayout {
+                id: toastRow
+
+                anchors.centerIn: parent
+                spacing: 12
+
+                Label {
+                    id: toastText
+
+                    Layout.maximumWidth: toast.parent.width - 88 - (detailsButton.visible
+                                                                    ? detailsButton.implicitWidth + 12 : 0)
+                    text: toast.message
+                    wrapMode: Text.Wrap
+                    color: toast.error ? Theme.dangerInk : Theme.ink
+                }
+                Button {
+                    id: detailsButton
+
+                    visible: toast.details.length > 0
+                    flat: true
+                    text: qsTr("Details")
+                    Material.foreground: Theme.accentInk
+                    onClicked: {
+                        detailsDialog.title = toast.message;
+                        detailsDialog.lines = toast.details;
+                        toast.shown = false;
+                        detailsDialog.open();
+                    }
+                }
             }
         }
     }
