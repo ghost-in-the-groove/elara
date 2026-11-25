@@ -46,13 +46,17 @@ struct PlayedNote {
 
 /// NoteOff and NoteOn release and strike a key; Pitch moves the pitch of the
 /// voice struck as a key (ADR-0023).
-enum class EventKind : std::uint8_t { NoteOff, NoteOn, Pitch };
+enum class EventKind : std::uint8_t { NoteOff, NoteOn, Legato, Pitch };
 
 /// What a synthesizer is told, track by track: a key struck again while it
 /// sounds is released and struck again, and released when the last of its
 /// notes ends. A Pitch event moves the voice struck as `key` to `cents` above
-/// that key over `glide` seconds (Synth::glide()): bends, slides, vibrato and
-/// the notes joined to it by hammer-ons and pull-offs.
+/// that key over `glide` seconds (Synth::glide()): bends, slides and vibrato.
+/// A Legato event sounds the next note on the string of the voice struck as
+/// `key`, `cents` above that key, without picking it: a hammer-on, a pull-off
+/// or the end of a legato slide, with that note's `velocity` (ADR-0070). Its
+/// voice keeps answering to `key`. At one time, releases come first, then
+/// attacks, notes joined, and pitch changes.
 struct NoteEvent {
     double time = 0.0; ///< seconds from the start of the performance
     EventKind kind = EventKind::NoteOn;

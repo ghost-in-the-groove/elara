@@ -991,12 +991,12 @@ add_test(NAME cli.sequence_articulations
 set_tests_properties(cli.sequence_articulations PROPERTIES
   PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
 # Pitch articulations (ADR-0023): the hammer-on in the triplet is not struck
-# but moves the voice of the note before it up a whole tone, and the shift
-# slide goes up to the next note over the last 0.2 s.
+# but joins the voice of the note before it a whole tone up (ADR-0070), and
+# the shift slide goes up to the next note over the last 0.2 s.
 add_test(NAME cli.sequence_pitch
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_pitch PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"pitch\",\"track\":0,\"key\":47,\"cents\":200,\"glide\":0},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":12\\.9625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.2}")
+  PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"legato\",\"track\":0,\"key\":47,\"cents\":200,\"velocity\":80},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":12\\.9625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.2}")
 # Strums and tremolo picking (ADR-0025): the upstroke strikes the chord from
 # its highest string, 0.01 s apart; the tremolo-picked quarter is struck every
 # sixteenth, and its last attack picks up its slide out where the attack
@@ -1090,7 +1090,7 @@ set_tests_properties(cli.sfz_write PROPERTIES FIXTURES_SETUP cli_sfz)
 add_test(NAME cli.sfz COMMAND elara-cli --json sfz "${_test_sfz}")
 set_tests_properties(cli.sfz PROPERTIES
   FIXTURES_REQUIRED cli_sfz
-  PASS_REGULAR_EXPRESSION "\"name\":\"test-guitar\",\"regions\":3,\"samples\":2,\"sampleBytes\":176400,\"lowestKey\":0,\"highestKey\":127,\"missingSamples\":\\[\\],\"unknownOpcodes\":\\[\"lfoN_pitch_onccN\"\\],\"skippedHeaders\":\\[\\],\"techniques\":{\"palm-mute\":{\"cc\":70,\"label\":\"Muting\"},\"dead\":null,\"harmonic\":null},\"loadSeconds\":[0-9.e-]+}")
+  PASS_REGULAR_EXPRESSION "\"name\":\"test-guitar\",\"regions\":3,\"samples\":2,\"sampleBytes\":176400,\"lowestKey\":0,\"highestKey\":127,\"missingSamples\":\\[\\],\"unknownOpcodes\":\\[\"lfoN_pitch_onccN\"\\],\"skippedHeaders\":\\[\\],\"techniques\":{\"palm-mute\":{\"cc\":70,\"label\":\"Muting\"},\"dead\":null,\"harmonic\":null,\"legato\":null},\"loadSeconds\":[0-9.e-]+}")
 add_test(NAME cli.sfz_text COMMAND elara-cli sfz "${_test_sfz}")
 set_tests_properties(cli.sfz_text PROPERTIES
   FIXTURES_REQUIRED cli_sfz
@@ -1107,6 +1107,33 @@ add_test(NAME cli.render_audio_sfz_flac
 set_tests_properties(cli.render_audio_sfz_flac PROPERTIES
   FIXTURES_REQUIRED cli_sfz
   PASS_REGULAR_EXPRESSION "\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"sound\":\"test-flac\"")
+# Hammer-ons and pull-offs play the library's legato samples (ADR-0070): the
+# test library names a keyswitch for them, an octave up. A D3 picked for an
+# eighth and an E3 hammered on for a dotted half sound mostly an E4.
+set(_legato_sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz/test-legato.sfz")
+set(_legato_song "${CMAKE_CURRENT_BINARY_DIR}/sfz-legato.elara")
+set(_legato_wav "${CMAKE_CURRENT_BINARY_DIR}/sfz-legato.wav")
+add_test(NAME cli.sfz_legato COMMAND elara-cli --json sfz "${_legato_sfz}")
+set_tests_properties(cli.sfz_legato PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"legato\":{\"keyswitch\":25,\"label\":\"Hammer-ons and pull-offs\"}")
+add_test(NAME cli.sfz_legato_song
+  COMMAND elara-cli edit --out "${_legato_song}" "add-track electric-guitar" "append-measures 1"
+          "note 0 0 4 0 8" "note 0 0 4 2 2." "rest 0 0 8" "caret 0 0 1 4" "effect legato")
+set_tests_properties(cli.sfz_legato_song PROPERTIES FIXTURES_SETUP cli_sfz_legato_song)
+add_test(NAME cli.sfz_legato_events COMMAND elara-cli --json sequence "${_legato_song}" --events)
+set_tests_properties(cli.sfz_legato_events PROPERTIES
+  FIXTURES_REQUIRED cli_sfz_legato_song
+  PASS_REGULAR_EXPRESSION "{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":50,\"velocity\":80},{\"time\":0\\.25,\"kind\":\"legato\",\"track\":0,\"key\":50,\"cents\":200,\"velocity\":80},{\"time\":1\\.75,\"kind\":\"off\"")
+add_test(NAME cli.sfz_legato_render
+  COMMAND elara-cli render-audio "${_legato_song}" --sfz "${_legato_sfz}" --out "${_legato_wav}")
+set_tests_properties(cli.sfz_legato_render PROPERTIES
+  FIXTURES_REQUIRED "cli_sfz;cli_sfz_legato_song"
+  FIXTURES_SETUP cli_sfz_legato_wav)
+add_test(NAME cli.sfz_legato_pitch COMMAND elara-cli --json tune "${_legato_wav}")
+set_tests_properties(cli.sfz_legato_pitch PROPERTIES
+  FIXTURES_REQUIRED cli_sfz_legato_wav
+  PASS_REGULAR_EXPRESSION "\"note\":\"E4\",\"cents\":-?[0-9](\\.[0-9]+)?,")
 add_test(NAME cli.sfz_rejects_other_files COMMAND elara-cli sfz "${ELARA_CORPUS}/gp/band.gp")
 set_tests_properties(cli.sfz_rejects_other_files PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_audio_sfz

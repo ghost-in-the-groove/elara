@@ -243,9 +243,13 @@ and the tracks an instrument plays sound as its name. `sfz FILE --json` reads th
 samples: `{"file", "name", "regions", "samples", "sampleBytes", "lowestKey",
 "highestKey", "missingSamples", "unknownOpcodes", "skippedHeaders",
 "techniques", "loadSeconds"}`, where `techniques` gives the library's control
-for `"palm-mute"`, `"dead"` and `"harmonic"` notes, `{"keyswitch"` or
-`"cc": N, "label"}` or null when the sampler imitates the touch (ADR-0068);
-it fails when no sample can be read.
+for `"palm-mute"`, `"dead"` and `"harmonic"` notes and its `"legato"`
+keyswitch, `{"keyswitch"` or `"cc": N, "label"}` or null when the sampler
+imitates the touch (ADR-0068, ADR-0070); it fails when no sample can be read.
+`sequence --events` prints each event's `time`, `kind` (`on`, `off`,
+`legato`, `pitch`), `track` and `key`, then the `velocity` of an attack or
+release, the `cents` and `velocity` of a note joined to the key (a hammer-on
+or pull-off), or the `cents` and `glide` seconds of a pitch change.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

@@ -183,6 +183,8 @@ std::string_view kindName(audio::EventKind kind) {
         return "on";
     case audio::EventKind::NoteOff:
         return "off";
+    case audio::EventKind::Legato:
+        return "legato";
     case audio::EventKind::Pitch:
         return "pitch";
     }
@@ -201,12 +203,16 @@ std::string touchText(audio::Touch touch) {
 }
 
 // What an event does after its key: the velocity it strikes or releases
-// with, or the offset a pitch event moves to and how long it takes.
+// with, the offset a pitch event moves to and how long it takes, or the
+// offset and velocity of a note joined to the key.
 template <typename Event>
 std::string eventJson(const Event& event) {
     if (event.kind == audio::EventKind::Pitch) {
         return std::format(R"("cents":{},"glide":{})", event.cents,
                            jsonNumber(static_cast<double>(event.glide)));
+    }
+    if (event.kind == audio::EventKind::Legato) {
+        return std::format(R"("cents":{},"velocity":{})", event.cents, event.velocity);
     }
     return std::format(R"("velocity":{}{})", event.velocity, touchJson(event.touch));
 }
@@ -215,6 +221,9 @@ template <typename Event>
 std::string eventText(const Event& event) {
     if (event.kind == audio::EventKind::Pitch) {
         return std::format("cents {:5} glide {:.3f}", event.cents, event.glide);
+    }
+    if (event.kind == audio::EventKind::Legato) {
+        return std::format("cents {:5} velocity {:3}", event.cents, event.velocity);
     }
     return std::format("velocity {:3}{}", event.velocity, touchText(event.touch));
 }
@@ -637,13 +646,15 @@ std::string jsonStrings(const std::vector<std::string>& values) {
     return body + ']';
 }
 
-// The touches an SFZ library can play itself, with its control for each.
-std::array<std::pair<std::string_view, const audio::SfzTechnique*>, 3>
+// The touches an SFZ library can play itself, and its legato, with its
+// control for each.
+std::array<std::pair<std::string_view, const audio::SfzTechnique*>, 4>
 techniquesOf(const audio::SfzBank& bank) {
     const audio::SfzTechniques& techniques = bank.techniques();
     return {{{audio::touchName(audio::Touch::PalmMute), &techniques.palmMute},
              {audio::touchName(audio::Touch::Dead), &techniques.dead},
-             {audio::touchName(audio::Touch::Harmonic), &techniques.harmonic}}};
+             {audio::touchName(audio::Touch::Harmonic), &techniques.harmonic},
+             {"legato", &techniques.legato}}};
 }
 
 // {"palm-mute": {"keyswitch" or "cc": N, "label": ...} or null, ...}

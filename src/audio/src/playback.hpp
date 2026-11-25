@@ -149,6 +149,9 @@ void playTrack(Sound& synth, std::span<const FrameEvent> events, std::size_t& ne
         case EventKind::NoteOff:
             synth.noteOff(event.key);
             break;
+        case EventKind::Legato:
+            synth.legato(event.key, event.cents, event.velocity);
+            break;
         case EventKind::Pitch:
             synth.glide(event.key, event.cents, static_cast<double>(event.glide));
             break;
