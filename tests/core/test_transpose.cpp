@@ -16,6 +16,7 @@ using elara::core::Document;
 using elara::core::Duration;
 using elara::core::findInstrumentPreset;
 using elara::core::FretPosition;
+using elara::core::Grace;
 using elara::core::HarmonicKind;
 using elara::core::Interval;
 using elara::core::KeyMode;
@@ -179,6 +180,20 @@ TEST_CASE("Transposing a song moves its pitched notes and keys as one undo step"
 
     doc.undo();
     CHECK(doc.song() == song);
+}
+
+TEST_CASE("Grace notes move with the notes they lead into", "[core][transpose]") {
+    // A slide from fret 5 into G3 on the D string (ADR-0079).
+    Song song = band({{4, 5}});
+    Beat& beat = song.track(0).staff(0).measure(0).voices[0].beats[0];
+    beat.graces = {Grace{.duration = Duration(NoteValue::Eighth),
+                         .notes = {song.track(0).staff(0).frettedNote(4, 3)}}};
+    Document doc = transposedBand(song, {.semitones = 2});
+
+    const Grace& grace = doc.song().track(0).staff(0).measure(0).voices[0].beats[0].graces.at(0);
+    CHECK(grace.notes.at(0).pitch == parsed("G3"));
+    CHECK(grace.notes.at(0).position == at(4, 5));
+    CHECK(positionsOf(doc.song()) == std::vector<FretPosition>{at(4, 7)});
 }
 
 TEST_CASE("Transposing part of a song", "[core][transpose]") {

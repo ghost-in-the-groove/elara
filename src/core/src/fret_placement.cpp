@@ -114,6 +114,9 @@ void placeOnStrings(Measure& content, const Tuning& tuning, int capo, FollowedBy
                     std::size_t measure) {
     for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
         for (Beat& beat : content.voices[v].beats) {
+            for (Grace& grace : beat.graces) {
+                placeBeat(grace.notes, tuning, capo, followed[v], measure);
+            }
             placeBeat(beat.notes, tuning, capo, followed[v], measure);
         }
     }

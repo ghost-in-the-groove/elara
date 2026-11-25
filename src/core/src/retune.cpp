@@ -5,6 +5,7 @@
 
 #include "fret_placement.hpp"
 
+#include <algorithm>
 #include <format>
 #include <stdexcept>
 #include <utility>
@@ -18,31 +19,36 @@ namespace {
 // on `tuning` above `capo`, spelled in `key` when it changes.
 void soundFrets(Measure& content, const Tuning& tuning, int capo, const KeySignature& key,
                 std::size_t measure) {
+    const auto sound = [&](Note& note) {
+        if (!note.position) {
+            return;
+        }
+        const int string = note.position->string;
+        const int fret = note.position->fret;
+        if (string < 1 || string > tuning.stringCount()) {
+            throw std::invalid_argument(
+                std::format("measure {}: the new tuning has no string {}", measure + 1, string));
+        }
+        if (fret < 0 || capo + fret > Tuning::kMaxFret) {
+            throw std::invalid_argument(std::format(
+                "measure {}: fret {} is past the neck above the capo", measure + 1, fret));
+        }
+        const int midi = tuning.openString(string).midiNumber() + capo + fret;
+        if (midi > 127) {
+            throw std::invalid_argument(
+                std::format("measure {}: fret {} on string {} is above the MIDI range", measure + 1,
+                            fret, string));
+        }
+        if (midi != note.pitch.midiNumber()) {
+            note.pitch = key.spell(midi);
+        }
+    };
     for (Voice& voice : content.voices) {
         for (Beat& beat : voice.beats) {
-            for (Note& note : beat.notes) {
-                if (!note.position) {
-                    continue;
-                }
-                const int string = note.position->string;
-                const int fret = note.position->fret;
-                if (string < 1 || string > tuning.stringCount()) {
-                    throw std::invalid_argument(std::format(
-                        "measure {}: the new tuning has no string {}", measure + 1, string));
-                }
-                if (fret < 0 || capo + fret > Tuning::kMaxFret) {
-                    throw std::invalid_argument(std::format(
-                        "measure {}: fret {} is past the neck above the capo", measure + 1, fret));
-                }
-                const int midi = tuning.openString(string).midiNumber() + capo + fret;
-                if (midi > 127) {
-                    throw std::invalid_argument(
-                        std::format("measure {}: fret {} on string {} is above the MIDI range",
-                                    measure + 1, fret, string));
-                }
-                if (midi != note.pitch.midiNumber()) {
-                    note.pitch = key.spell(midi);
-                }
+            std::ranges::for_each(beat.notes, sound);
+            // The grace notes leading into the beat (ADR-0079).
+            for (Grace& grace : beat.graces) {
+                std::ranges::for_each(grace.notes, sound);
             }
         }
     }

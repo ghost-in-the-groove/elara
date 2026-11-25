@@ -1203,6 +1203,9 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
+        if (!beat.graces.empty()) {
+            warn("grace notes dropped", place.measure);
+        }
         if (beat.isRest()) {
             if (beat.effects != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);

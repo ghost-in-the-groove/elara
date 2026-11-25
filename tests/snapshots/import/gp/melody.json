@@ -212,12 +212,28 @@
          },
          {
           "duration": "4",
+          "graces": [
+           {
+            "duration": "32",
+            "notes": [
+             {
+              "pitch": "G2",
+              "string": 6,
+              "fret": 3,
+              "effects": {
+               "dynamic": "f"
+              }
+             }
+            ]
+           }
+          ],
           "notes": [
            {
             "pitch": "E2",
             "string": 6,
             "fret": 0,
             "effects": {
+             "legatoFromPrevious": true,
              "dynamic": "f"
             }
            }

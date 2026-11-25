@@ -661,10 +661,27 @@ public:
                                               m + 1, voiceIds[v])};
             }
             Voice& voice = measure.voices[v];
+            // Grace beats lead into the next beat of the voice (ADR-0079).
+            std::vector<core::Grace> graces;
             for (const int beatId : intsOf(textOf(voiceNode.child("Beats")))) {
-                if (auto beat = readBeat(beatId, layout, staffIndex_, staff, key, m)) {
-                    voice.beats.push_back(std::move(*beat));
+                auto read = readBeat(beatId, layout, staffIndex_, staff, key, m);
+                if (!read) {
+                    continue;
                 }
+                if (read->graceOnBeat) {
+                    if (!read->beat.notes.empty()) {
+                        graces.push_back(core::Grace{.duration = read->beat.duration,
+                                                     .notes = std::move(read->beat.notes),
+                                                     .onBeat = *read->graceOnBeat});
+                    }
+                    continue;
+                }
+                read->beat.graces = std::move(graces);
+                graces.clear();
+                voice.beats.push_back(std::move(read->beat));
+            }
+            if (!graces.empty()) {
+                warnings_.add(layout.name, "grace notes after the last beat of a voice dropped", m);
             }
             const core::VoiceFill fill = core::voiceFill(voice, time);
             if (fill == core::VoiceFill::Incomplete && !voice.isEmpty()) {
@@ -729,8 +746,15 @@ private:
         return duration;
     }
 
-    std::optional<Beat> readBeat(int beatId, const TrackLayout& layout, std::size_t staffIndex,
-                                 const Staff& staff, const KeySignature& key, std::size_t m) {
+    /// A beat as the file holds it; a grace beat (`graceOnBeat` set) leads into
+    /// the next beat of its voice.
+    struct ReadBeat {
+        Beat beat;
+        std::optional<bool> graceOnBeat;
+    };
+
+    std::optional<ReadBeat> readBeat(int beatId, const TrackLayout& layout, std::size_t staffIndex,
+                                     const Staff& staff, const KeySignature& key, std::size_t m) {
         const pugi::xml_node node = beats_.find(beatId);
         if (!node) {
             throw FormatError{
@@ -738,9 +762,9 @@ private:
         }
         const std::string& who = layout.name;
         const BeatFields fields(node);
+        std::optional<bool> graceOnBeat;
         if (fields.graceNotes) {
-            warnings_.add(who, "grace notes dropped", m);
-            return std::nullopt;
+            graceOnBeat = trimmed(textOf(fields.graceNotes)) == "OnBeat";
         }
         Beat beat{.duration = durationOf(fields.rhythm.attribute("ref").as_int(-1), who, m)};
         warnBeat(fields, who, m);
@@ -757,7 +781,7 @@ private:
                 beat.notes.push_back(std::move(*note));
             }
         }
-        return beat;
+        return ReadBeat{.beat = std::move(beat), .graceOnBeat = graceOnBeat};
     }
 
     void warnBeat(const BeatFields& fields, const std::string& who, std::size_t m) {

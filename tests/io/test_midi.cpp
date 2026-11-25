@@ -428,6 +428,8 @@ TEST_CASE("MIDI export lists what MIDI cannot hold", "[io][midi]") {
     staff.measure(1).voices[0].beats = {
         Beat{.duration = Duration(NoteValue::Half), .notes = {bent}},
         Beat{.duration = Duration(NoteValue::Half), .notes = {muted}}};
+    staff.measure(1).voices[0].beats[1].graces = {elara::core::Grace{
+        .duration = Duration(NoteValue::Eighth), .notes = {staff.frettedNote(6, 2)}}};
     song.addTrack(Track(
         "Banjo", Instrument{.name = "Banjo", .kind = InstrumentKind::Fretted, .midiProgram = 105},
         {Staff{}}));
@@ -439,6 +441,7 @@ TEST_CASE("MIDI export lists what MIDI cannot hold", "[io][midi]") {
               "(measure 1)",
               "Electric Guitar: fret positions dropped (2 times, first in measure 2)",
               "Electric Guitar: bends dropped (measure 2)",
+              "Electric Guitar: grace notes dropped (measure 2)",
               "Electric Guitar: palm mutes dropped (measure 2)",
               "Banjo: fretted instrument read back as pitched"});
     // The tempo still sounds the same: a dotted quarter at 60 is a quarter at 90.

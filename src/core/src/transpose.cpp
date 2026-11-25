@@ -39,15 +39,21 @@ void transposeMeasure(Measure& content, const Staff& staff, Interval interval,
                       detail::FollowedByVoice& followed, std::size_t measure) {
     for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
         for (Beat& beat : content.voices[v].beats) {
-            for (Note& note : beat.notes) {
-                const std::optional<Pitch> moved = transposed(note.pitch, interval);
-                if (!moved) {
-                    throw std::invalid_argument(
-                        std::format("measure {}: {} would leave the MIDI range", measure + 1,
-                                    note.pitch.toString()));
+            const auto move = [&](std::vector<Note>& notes) {
+                for (Note& note : notes) {
+                    const std::optional<Pitch> moved = transposed(note.pitch, interval);
+                    if (!moved) {
+                        throw std::invalid_argument(
+                            std::format("measure {}: {} would leave the MIDI range", measure + 1,
+                                        note.pitch.toString()));
+                    }
+                    note.pitch = *moved;
                 }
-                note.pitch = *moved;
+            };
+            for (Grace& grace : beat.graces) {
+                move(grace.notes);
             }
+            move(beat.notes);
         }
     }
     if (staff.tuning()) {

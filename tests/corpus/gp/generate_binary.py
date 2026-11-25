@@ -222,7 +222,17 @@ def write_note_effects(w: Writer, fx: dict) -> None:
     if first & 0x01:
         write_bend(w, *fx["bend"])
     if first & 0x10:
-        w.zeros(5 if w.version >= 500 else 4)  # grace note: fret, dynamic, kind, length
+        # A grace note: (fret, dynamic, transition, duration code, flags); Guitar
+        # Pro 3-4 write the duration before the transition and have no flags.
+        fret, dynamic, transition, length, flags = fx["grace"]
+        if w.version >= 500:
+            for value in (fret, dynamic, transition, length, flags):
+                w.u8(value)
+        else:
+            w.i8(fret)
+            w.u8(dynamic)
+            w.u8(length)
+            w.i8(transition)
     if second & 0x04:
         w.i8(fx["tremolo"])
     if second & 0x08:
@@ -504,9 +514,11 @@ def techniques_gp5() -> dict:
               beat(0, [note(3, 0, kind="tie", dynamic=5)]),
               beat(0, [note(4, 0, kind="dead", heavy_accent=True, dynamic=7)])],
              [beat(-1, [note(6, 0)]), rest(-1)]],
-            # Measure 3 (3/4): a grace note, a shift slide, staccato, a down
-            # pick stroke and a chord diagram; text.
-            [[beat(0, [note(2, 3, effects={"grace": True, "slide": 0x01, "staccato": True})],
+            # Measure 3 (3/4): an on-beat sixteenth grace note sliding from
+            # fret 1, a shift slide, staccato, a down pick stroke and a chord
+            # diagram; text.
+            [[beat(0, [note(2, 3, effects={"grace": (1, 6, 1, 3, 0x02), "slide": 0x01,
+                                           "staccato": True})],
                    dotted=True, chord=("G", True), effects={"pick": 2}),
               beat(1, [note(2, 5)], text="let it ring"),
               rest(0)],
@@ -606,11 +618,13 @@ def melody_gp3() -> dict:
               beat(2, [note(3, 5)], tuplet=5),
               beat(2, [note(3, 4)], tuplet=5)]],
             # Measure 2 (6/8): wide vibrato and let ring with an old-style chord
-            # diagram and text, a whammy-bar dip, a downward strum.
+            # diagram and text, a whammy-bar dip, a downward strum pulled off
+            # from a thirty-second grace note at fret 3.
             [[beat(0, [note(4, 2, effects={"let_ring": True})], dotted=True,
                    chord=("E", False), text="ad lib.", effects={"wide_vibrato": True}),
               beat(1, [note(5, 0)], effects={"tremolo_bar": 50}),
-              beat(0, [note(6, 0)], effects={"strum": (0, 2)})]],
+              beat(0, [note(6, 0, effects={"grace": (3, 6, 3, 1, 0)})],
+                   effects={"strum": (0, 2)})]],
         ],
     }
     return {

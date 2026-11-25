@@ -677,6 +677,8 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     beats[0].effects.whammyBar =
         BendCurve({{.position = 0, .cents = 0}, {.position = 100, .cents = -200}});
     beats[0].effects.bassTechnique = BassTechnique::Slap;
+    beats[1].graces = {elara::core::Grace{.duration = Duration(NoteValue::Eighth),
+                                          .notes = {staff.frettedNote(2, 3)}}};
     Note louder = staff.frettedNote(6, 0);
     louder.effects.dynamic = Dynamic::F;
     staff.measure(0).voices[1].beats = {beatOf(Duration(NoteValue::Whole), {louder})};
@@ -684,6 +686,7 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     const ExportResult exported = exportMusicXml(song);
     const auto& warnings = exported.warnings;
     CHECK(hasWarning(warnings, "Electric Guitar: let ring dropped (measure 1)"));
+    CHECK(hasWarning(warnings, "Electric Guitar: grace notes dropped (measure 1)"));
     CHECK(hasWarning(warnings, "whammy bar dropped"));
     CHECK(hasWarning(warnings, "bass techniques (tap, slap, pop) dropped"));
     CHECK(hasWarning(warnings, "pinch, tapped and semi harmonics written as artificial harmonics"));

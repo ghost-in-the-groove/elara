@@ -117,8 +117,7 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
           "[io][guitarpro]") {
     const ImportResult result = load("guitar-techniques.gp");
     const core::Song& song = result.song;
-    CHECK(result.warnings ==
-          std::vector<std::string>{"Lead Guitar: grace notes dropped (measure 3)"});
+    CHECK(result.warnings.empty());
     // |: 1 |1.2. 2 :|3. 3 |, played three times
     CHECK(song.measureHeader(0).repeatStart);
     CHECK(song.measureHeader(1).repeatTimes == 3);
@@ -173,10 +172,18 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
     CHECK(bar2[2].notes[0].effects.accent == core::Accent::Accent);
     CHECK(bar2[2].notes[0].effects.dynamic == core::Dynamic::FF);
 
-    // Bar 3: the grace note is gone; a dotted, staccato, downstroked note
-    // slides to the next.
+    // Bar 3: an eighth grace note two frets up on its string leads into a
+    // dotted, staccato, downstroked note that slides to the next (ADR-0079).
     const auto& bar3 = staff.measure(2).voices[0].beats;
     REQUIRE(bar3.size() == 3);
+    REQUIRE(bar3[0].graces.size() == 1);
+    const core::Grace& grace = bar3[0].graces[0];
+    CHECK(grace.duration == Duration(NoteValue::Eighth));
+    CHECK_FALSE(grace.onBeat);
+    REQUIRE(grace.notes.size() == 1);
+    CHECK(grace.notes[0].position->string == bar3[0].notes[0].position->string);
+    CHECK(grace.notes[0].position->fret == 7);
+    CHECK(grace.notes[0].pitch.midiNumber() == bar3[0].notes[0].pitch.midiNumber() + 2);
     CHECK(bar3[0].duration == Duration(NoteValue::Quarter, 1));
     CHECK(bar3[0].effects.pickStroke == core::PickStroke::Down);
     CHECK(bar3[0].notes[0].effects.slideOut == core::SlideOut::Shift);
