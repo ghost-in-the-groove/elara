@@ -559,6 +559,10 @@ public:
     /// measure running from `start` to its barline.
     virtual void draw(std::span<const ColumnPosition> positions, double start, double barline) = 0;
 
+    /// What closes measure m before its barline, from `x`: the clef the next
+    /// measure changes to (ADR-0087). Returns where it ends (`x` for nothing).
+    virtual double ending(std::size_t /*m*/, double x) { return x; }
+
     /// The barline closing measure m at `x`: thin, thin-thick at the song's
     /// end, dots and thin-thick for an end repeat. Returns its right.
     double barline(std::size_t m, double x, bool songEnd, bool repeatEnd);

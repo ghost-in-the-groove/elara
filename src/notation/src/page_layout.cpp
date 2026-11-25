@@ -508,6 +508,7 @@ struct Changes {
     std::vector<bool> measures;       // a header or a staff's content
     std::size_t firstHeader = kNone;  // the first measure whose header differs
     std::vector<std::size_t> firstOn; // per staff, the first measure whose content differs
+    std::vector<bool> clefs;          // a staff's clef change (ADR-0087)
 
     // Whether any of measures [from, to) differs, clipped to the song.
     [[nodiscard]] bool any(std::size_t from, std::size_t to) const {
@@ -527,6 +528,7 @@ Changes changesBetween(const core::Song& before, const core::Song& now,
     Changes changes;
     changes.measures.assign(now.measureCount(), false);
     changes.firstOn.assign(staves.size(), kNone);
+    changes.clefs.assign(now.measureCount(), false);
     if (&before == &now) {
         return changes;
     }
@@ -548,7 +550,30 @@ Changes changesBetween(const core::Song& before, const core::Song& now,
             if (&a != &b && a != b) {
                 changes.measures[m] = true;
                 changes.firstOn[i] = std::min(changes.firstOn[i], m);
+                changes.clefs[m] = changes.clefs[m] || a.clef != b.clef;
             }
+        }
+    }
+    // The measures whose clef in force differs (ADR-0087): a clef change moves
+    // the notes of every measure up to the next change.
+    for (std::size_t i = 0; i < staves.size(); ++i) {
+        if (changes.firstOn[i] == kNone) {
+            continue;
+        }
+        const core::Staff& was = before.track(staves[i].track).staff(staves[i].staff);
+        const core::Staff& is = now.track(staves[i].track).staff(staves[i].staff);
+        std::size_t m = changes.firstOn[i];
+        core::Clef a = was.clefAt(m);
+        core::Clef b = is.clefAt(m);
+        while (true) {
+            if (a != b) {
+                changes.measures[m] = true;
+            }
+            if (++m == now.measureCount()) {
+                break;
+            }
+            a = was.measure(m).clef.value_or(a);
+            b = is.measure(m).clef.value_or(b);
         }
     }
     return changes;
@@ -609,8 +634,11 @@ std::vector<DisplayList> PageLayoutCache::layout(std::shared_ptr<const core::Son
         reuse.measured = reuse.measures;
     } else {
         state->widths = std::move(before->widths);
+        // A measure's width depends on the one before (signature changes) and
+        // on the clef the one after changes to (ADR-0087).
         const auto stale = [&changes](std::size_t m) {
-            return changes.measures[m] || (m > 0 && changes.measures[m - 1]);
+            return changes.measures[m] || (m > 0 && changes.measures[m - 1]) ||
+                   (m + 1 < changes.clefs.size() && changes.clefs[m + 1]);
         };
         for (std::size_t m = span.first; m < span.last;) {
             if (!stale(m)) {

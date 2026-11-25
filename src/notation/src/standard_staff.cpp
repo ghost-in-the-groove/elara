@@ -64,6 +64,8 @@ constexpr double kSlurMinHeight = 0.5;
 constexpr double kSlurNaturalHeight = 1.5; // the most it rises unless notes are in the way
 constexpr double kSlurMaxHeight = 2.5;     // beyond it the whole slur moves away instead
 constexpr double kSlurLineGap = 0.4;       // between a slur cut by a line and its edge
+constexpr double kClefChangeScale = 0.75;  // a clef change against the line's clef (ADR-0087)
+constexpr double kClefChangeGap = 0.5;     // between a clef change and the barline after it
 constexpr double kArticulationGap = 0.3;   // between a notehead and its articulation
 constexpr double kRunEndGap = 0.3;         // a technique run ends before the next column
 
@@ -122,6 +124,32 @@ int topLineIndex(Clef clef) {
 
 double yOf(int step) {
     return step * 0.5;
+}
+
+// A clef's glyph and the y of the line it sits on.
+struct ClefGlyph {
+    Glyph glyph = Glyph::GClef;
+    double y = 3.0;
+};
+
+ClefGlyph clefGlyph(Clef clef) {
+    switch (clef) {
+    case Clef::Treble:
+        break;
+    case Clef::Treble8vb:
+        return {.glyph = Glyph::GClef8vb, .y = 3.0};
+    case Clef::Bass:
+        return {.glyph = Glyph::FClef, .y = 1.0};
+    case Clef::Bass8vb:
+        return {.glyph = Glyph::FClef8vb, .y = 1.0};
+    case Clef::Alto:
+        return {.glyph = Glyph::CClef, .y = 2.0};
+    case Clef::Tenor:
+        return {.glyph = Glyph::CClef, .y = 1.0};
+    case Clef::Percussion:
+        return {.glyph = Glyph::PercussionClef, .y = 2.0};
+    }
+    return {};
 }
 
 // The written pitch: the sounding pitch moved up by `offset` semitones, spelled
@@ -329,6 +357,7 @@ public:
 
     double header(std::size_t first) override;
     double changes(std::size_t m, double x) override;
+    double ending(std::size_t m, double x) override { return endingAt(m, x); }
     void collect(std::size_t m, std::vector<ColumnInk>& ink) override;
     [[nodiscard]] double emptyWidth() const override { return widthOf(Glyph::RestWhole); }
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override;
@@ -358,38 +387,25 @@ private:
         return writtenKey(song_.measureHeader(m).keySignature, offset_);
     }
 
+    // The clef in force at measure m (ADR-0087). Measures mostly come in
+    // order, so the clef of the one asked for last carries on to the next.
+    Clef clefIn(std::size_t m) {
+        if (percussion_) {
+            return staff_.clef(); // drums keep theirs
+        }
+        if (clefMeasure_ != m) {
+            clefCached_ = clefMeasure_ + 1 == m ? staff_.measure(m).clef.value_or(clefCached_)
+                                                : staff_.clefAt(m);
+            clefMeasure_ = m;
+        }
+        return clefCached_;
+    }
+
     double headerAt(std::size_t first) {
         measure_ = first;
-        Glyph clefGlyph = Glyph::GClef;
-        double clefY = 3.0;
-        switch (clef_) {
-        case Clef::Treble:
-            break;
-        case Clef::Treble8vb:
-            clefGlyph = Glyph::GClef8vb;
-            break;
-        case Clef::Bass:
-            clefGlyph = Glyph::FClef;
-            clefY = 1.0;
-            break;
-        case Clef::Bass8vb:
-            clefGlyph = Glyph::FClef8vb;
-            clefY = 1.0;
-            break;
-        case Clef::Alto:
-            clefGlyph = Glyph::CClef;
-            clefY = 2.0;
-            break;
-        case Clef::Tenor:
-            clefGlyph = Glyph::CClef;
-            clefY = 1.0;
-            break;
-        case Clef::Percussion:
-            clefGlyph = Glyph::PercussionClef;
-            clefY = 2.0;
-            break;
-        }
-        double x = glyphFrom(clefGlyph, kClefX, clefY, Role::Clef);
+        clef_ = clefIn(first);
+        const ClefGlyph clef = clefGlyph(clef_);
+        double x = glyphFrom(clef.glyph, kClefX, clef.y, Role::Clef);
         x = keySignature(keyAt(first), x);
         if (first == 0 || song_.measureHeader(first - 1).timeSignature !=
                               song_.measureHeader(first).timeSignature) {
@@ -433,6 +449,7 @@ private:
     // Signature changes at the start of measure m, drawn after the barline.
     double changesAt(std::size_t m, double x) {
         measure_ = m;
+        clef_ = clefIn(m);
         const KeySignature before = keyAt(m - 1);
         const KeySignature now = keyAt(m);
         if (now.fifths() != before.fifths()) {
@@ -533,10 +550,30 @@ private:
         }
     }
 
+    // The clef measure m + 1 changes to, smaller, before the barline closing
+    // m: engravers warn of a change before the measure, and at the end of a
+    // line before the next (ADR-0087).
+    double endingAt(std::size_t m, double x) {
+        if (percussion_ || m + 1 >= staff_.measureCount()) {
+            return x;
+        }
+        const std::optional<Clef>& next = staff_.measure(m + 1).clef;
+        if (!next || *next == clefIn(m)) {
+            return x;
+        }
+        measure_ = m;
+        const ClefGlyph clef = clefGlyph(*next);
+        const BoundingBox& box = metrics(clef.glyph).box;
+        glyph(clef.glyph, x - box.southWest.x * kClefChangeScale, clef.y, Role::Clef,
+              kClefChangeScale);
+        return x + box.width() * kClefChangeScale + kClefChangeGap;
+    }
+
     // Reads measure m into chords_, columns_ and beamGroups_.
     void read(std::size_t m) {
         measure_ = m;
         measureIndex_ = m;
+        clef_ = clefIn(m);
         chords_.clear();
         columns_.clear();
         beamGroups_.clear();
@@ -1674,7 +1711,9 @@ private:
 
     const core::Song& song_;
     const core::Staff& staff_;
-    Clef clef_;
+    Clef clef_;                       // in force at the measure being drawn
+    Clef clefCached_ = staff_.clef(); // clefIn(): at clefMeasure_
+    std::size_t clefMeasure_ = static_cast<std::size_t>(-1);
     bool percussion_;
     int offset_;
     bool techniques_;

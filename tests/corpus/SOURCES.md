@@ -17,6 +17,7 @@ Community Group).
 | `piano-voices.musicxml` | Two staves; voices numbered 1-4 and 5-8; chord; `forward` and `backup`; meter and tempo change; a grace note and a chord symbol; lyric, repeat and text direction (reported as warnings) |
 | `drums.musicxml` | Percussion clef; unpitched notes mapped to General MIDI keys through `midi-unpitched`; chord of two drums |
 | `transposing.musicxml` | Pickup measures; B-flat clarinet with `transpose` and a written key; bass with an octave clef and its own `divisions` |
+| `clef-changes.musicxml` | Clef changes: a cello into the tenor clef and back to the bass clef after a measure's last note, a piano's left hand into the treble clef and back |
 | `slurs.musicxml` | Slurs: over stems down, over stems up with a staccato under the slur, over stems both ways, over a high note, across a barline, nested, over a beamed run, on the bass staff and on both voices of a staff |
 | `fermatas.musicxml` | Fermatas: normal, angled and square, upright and inverted, on notes, a chord, a rest and a whole-measure rest, and on both voices of a piano staff while the voice holds its own |
 
