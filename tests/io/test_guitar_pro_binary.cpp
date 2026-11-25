@@ -61,7 +61,7 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
           "[io][guitarpro]") {
     const ImportResult result = load("techniques.gp5");
     const core::Song& song = result.song;
-    CHECK(result.warnings == std::vector<std::string>{"Lead Guitar: text dropped (measure 3)"});
+    CHECK(result.warnings.empty());
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Techniques");
     // A marker names the section that starts at its measure (ADR-0062).
@@ -347,7 +347,7 @@ TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong 
           "[io][guitarpro]") {
     const ImportResult result = load("melody.gp3");
     const core::Song& song = result.song;
-    CHECK(result.warnings == std::vector<std::string>{"Nylon Guitar: text dropped (measure 2)"});
+    CHECK(result.warnings.empty());
     CHECK(core::validate(song).empty());
     CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.8125, .pan = 0.0});
     CHECK(song.info().title == "Corpus Melod\xc3\xad"
@@ -419,6 +419,24 @@ TEST_CASE("Guitar Pro 3-5: chords keep their names and diagrams", "[io][guitarpr
           core::ChordSymbol{.name = "G", .diagram = diagram({3, 0, 0, 0, 2, 3})});
     // A chord symbol does not sound.
     CHECK(techniques.song.track(0).staff(0).measure(2).voices[0].beats[0].notes.size() == 1);
+}
+
+TEST_CASE("Guitar Pro 3-5: beats keep their text", "[io][guitarpro]") {
+    // ADR-0081.
+    const ImportResult melody = load("melody.gp3");
+    const auto& bar2 = melody.song.track(0).staff(0).measure(1).voices[0].beats;
+    REQUIRE(bar2.at(0).text);
+    CHECK(*bar2[0].text == "ad lib.");
+    CHECK(bar2[0].chord); // next to a chord symbol
+    CHECK_FALSE(bar2.at(1).text);
+
+    const ImportResult techniques = load("techniques.gp5");
+    const auto& bar3 = techniques.song.track(0).staff(0).measure(2).voices[0].beats;
+    REQUIRE(bar3.at(1).text);
+    CHECK(*bar3[1].text == "let it ring");
+    CHECK_FALSE(bar3[0].text);
+    // Text does not sound.
+    CHECK(bar3[1].notes.size() == 1);
 }
 
 TEST_CASE("Guitar Pro 3-5: other versions and damaged files are errors with a reason",

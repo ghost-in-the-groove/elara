@@ -1,9 +1,7 @@
 {
  "format": "guitarpro",
  "out": null,
- "warnings": [
-  "Nylon Guitar: text dropped (measure 2)"
- ],
+ "warnings": [],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -195,6 +193,7 @@
             ]
            }
           },
+          "text": "ad lib.",
           "notes": [
            {
             "pitch": "E3",

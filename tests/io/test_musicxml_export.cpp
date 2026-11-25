@@ -583,6 +583,34 @@ TEST_CASE("MusicXML export: chord symbols keep their names and diagrams", "[musi
     CHECK(exportMusicXml(song).warnings.empty());
 }
 
+TEST_CASE("MusicXML export: beat text comes back as words", "[musicxml][export]") {
+    // ADR-0081: above the staff it belongs to, on a rest as well as a note.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    core::Staff& staff = song.track(g).staff(0);
+    const core::Duration half(core::NoteValue::Half);
+    auto& beats = staff.measure(0).voices[0].beats;
+    beats = {beatOf(half, {staff.frettedNote(3, 2)}), beatOf(half)};
+    beats[0].text = core::SharedOptional<std::string>("let ring");
+    beats[1].text = core::SharedOptional<std::string>("a <tempo> & \"fill\"");
+    auto& left = song.track(p).staff(1).measure(0).voices[0].beats;
+    left = {beatOf(core::Duration(core::NoteValue::Whole),
+                   {core::Note{.pitch = core::Pitch::fromMidi(48)}})};
+    left[0].text = core::SharedOptional<std::string>("Ped. ad lib.");
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const std::string xml = exportMusicXml(song).data;
+    CHECK(xml.find("<words>let ring</words>") != std::string::npos);
+    CHECK(xml.find("<words>a &lt;tempo&gt; &amp; &quot;fill&quot;</words>") != std::string::npos);
+    CHECK(xml.find(R"(<direction placement="above">)") != std::string::npos);
+    CHECK(exportMusicXml(song).warnings.empty());
+}
+
 TEST_CASE("MusicXML export: random songs come back unchanged", "[musicxml][export]") {
     for (const std::uint32_t seed : {1U, 2U, 3U, 20261123U}) {
         INFO("seed " << seed);

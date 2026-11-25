@@ -523,9 +523,9 @@ BendCurve bendOf(pugi::xml_node note) {
 /// one over its properties rather than a search for each.
 struct BeatFields {
     pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
-        hairpin, chord;
-    bool text = false, fading = false, wah = false, ottava = false, whammyBar = false,
-         slapped = false, popped = false;
+        hairpin, chord, freeText;
+    bool fading = false, wah = false, ottava = false, whammyBar = false, slapped = false,
+         popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
         for (const pugi::xml_node child : beat.children()) {
@@ -548,8 +548,9 @@ struct BeatFields {
                 hairpin = child;
             } else if (name == "Chord") {
                 chord = child;
+            } else if (name == "FreeText") {
+                freeText = child;
             } else {
-                text = text || name == "FreeText";
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
                 ottava = ottava || name == "Ottavia";
@@ -831,6 +832,9 @@ private:
         if (fields.chord) {
             beat.chord = chordOf(fields.chord, who, m);
         }
+        if (const std::string_view text = textOf(fields.freeText); !text.empty()) {
+            beat.text = core::SharedOptional(std::string(text)); // ADR-0081
+        }
         readBeatEffects(fields, beat.effects, who, m);
         const Dynamic dynamic = dynamicFor(trimmed(textOf(fields.dynamic))).value_or(Dynamic::MF);
         bool tapped = false;
@@ -869,9 +873,6 @@ private:
     }
 
     void warnBeat(const BeatFields& fields, const std::string& who, std::size_t m) {
-        if (fields.text) {
-            warnings_.add(who, "text dropped", m);
-        }
         if (fields.fading) {
             warnings_.add(who, "volume swells dropped", m);
         }

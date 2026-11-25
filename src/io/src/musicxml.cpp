@@ -613,6 +613,28 @@ struct ChordMark {
     ChordSymbol symbol{};
 };
 
+/// A direction's words and where they go (ADR-0081).
+struct TextMark {
+    Fraction onset{};
+    std::optional<std::size_t> staff{}; // nullopt: the first staff
+    std::string text{};
+};
+
+/// The beat of `measure` that starts at `onset`, the voices looked at in
+/// order; none when every voice is between beats there.
+Beat* beatStartingAt(Measure& measure, const Fraction& onset) {
+    for (Voice& voice : measure.voices) {
+        Fraction at;
+        for (Beat& beat : voice.beats) {
+            if (at == onset) {
+                return &beat;
+            }
+            at += beat.duration.length();
+        }
+    }
+    return nullptr;
+}
+
 /// Sharps or flats for an alteration in semitones.
 std::string alterText(double alter) {
     const long semitones = std::clamp(std::lround(alter), -2L, 2L);
@@ -977,10 +999,12 @@ private:
         std::vector<HairpinMark>& hairpins = hairpinMarks_;
         std::vector<TempoMark>& tempos = tempoMarks_;
         std::vector<ChordMark>& chords = chordMarks_;
+        std::vector<TextMark>& texts = textMarks_;
         events.clear();
         dynamics.clear();
         hairpins.clear();
         chords.clear();
+        texts.clear();
         tempos.clear();
         Fraction cursor;
         Fraction lastOnset;
@@ -1020,7 +1044,7 @@ private:
                 cursor += divisionsToWholes(child.child("duration").text().as_int(0));
                 end = std::max(end, cursor);
             } else if (name == "direction") {
-                readDirection(child, cursor, index, dynamics, hairpins, tempos,
+                readDirection(child, cursor, index, dynamics, hairpins, tempos, texts,
                               first_ ? &header : nullptr);
             } else if (name == "sound") {
                 if (first_) {
@@ -1059,6 +1083,9 @@ private:
                     mark.onset += shift;
                 }
                 for (ChordMark& mark : chords) {
+                    mark.onset += shift;
+                }
+                for (TextMark& mark : texts) {
                     mark.onset += shift;
                 }
                 for (TempoMark& mark : tempos) {
@@ -1103,6 +1130,7 @@ private:
 
         build(index, events, dynamics, hairpins, time);
         markChords(index, chords);
+        markTexts(index, texts);
     }
 
     /// A chord symbol, with a diagram from its <frame> (ADR-0080).
@@ -1136,26 +1164,28 @@ private:
     /// does, the voices looked at in order.
     void markChords(std::size_t index, std::vector<ChordMark>& chords) {
         for (ChordMark& mark : chords) {
-            Measure& measure = measures_[mark.staff.value_or(0)].back();
-            Beat* target = nullptr;
-            for (Voice& voice : measure.voices) {
-                Fraction at;
-                for (Beat& beat : voice.beats) {
-                    if (at == mark.onset) {
-                        target = &beat;
-                        break;
-                    }
-                    at += beat.duration.length();
-                }
-                if (target != nullptr) {
-                    break;
-                }
-            }
+            Beat* target = beatStartingAt(measures_[mark.staff.value_or(0)].back(), mark.onset);
             if (target == nullptr) {
                 warn("chord symbols between beats dropped", index);
                 continue;
             }
             target->chord = chordPool_.share(std::move(mark.symbol));
+        }
+    }
+
+    /// Each direction's words become the text of the beat of its staff that
+    /// starts where it does; two on one beat join with a space (ADR-0081).
+    void markTexts(std::size_t index, std::vector<TextMark>& texts) {
+        for (TextMark& mark : texts) {
+            Beat* target = beatStartingAt(measures_[mark.staff.value_or(0)].back(), mark.onset);
+            if (target == nullptr) {
+                warn("text directions dropped", index);
+                continue;
+            }
+            if (target->text) {
+                mark.text = *target->text + ' ' + mark.text;
+            }
+            target->text = SharedOptional(std::move(mark.text));
         }
     }
 
@@ -1271,7 +1301,8 @@ private:
     // `header`: the first part's measure, which takes the signs and jumps.
     void readDirection(pugi::xml_node direction, const Fraction& cursor, std::size_t index,
                        std::vector<DynamicMark>& dynamics, std::vector<HairpinMark>& hairpins,
-                       std::vector<TempoMark>& tempos, MeasureHeader* header) {
+                       std::vector<TempoMark>& tempos, std::vector<TextMark>& texts,
+                       MeasureHeader* header) {
         const Fraction onset = std::max(
             Fraction(0), cursor + divisionsToWholes(direction.child("offset").text().as_int(0)));
         std::optional<std::size_t> staff;
@@ -1280,6 +1311,7 @@ private:
         }
         std::optional<Tempo> tempo;
         std::string words;
+        std::string text; // the words as written, spaces between runs kept
         bool segnoGlyph = false;
         bool codaGlyph = false;
         for (pugi::xml_node type : direction.children("direction-type")) {
@@ -1295,6 +1327,7 @@ private:
                     tempo = readMetronome(mark, index);
                 } else if (name == "words") {
                     words += textView(mark);
+                    text += mark.child_value();
                 } else if (name == "rehearsal") {
                     // The section that starts here (ADR-0062); the first part's
                     // marks name them, as they hold the signs.
@@ -1322,8 +1355,9 @@ private:
             }
         }
         const std::optional<Navigation> fromWords = navigationWords(words);
-        if (!fromWords && words.find_first_not_of(" \t\r\n") != std::string::npos) {
-            warn("text directions dropped", index);
+        if (!fromWords && !trim(text).empty()) {
+            texts.push_back(
+                TextMark{.onset = onset, .staff = staff, .text = std::string(trim(text))});
         }
         Navigation navigation = fromWords.value_or(Navigation{});
         if (const pugi::xml_node sound = direction.child("sound")) {
@@ -2094,6 +2128,7 @@ private:
     std::vector<DynamicMark> dynamicMarks_{};
     std::vector<HairpinMark> hairpinMarks_{};
     std::vector<ChordMark> chordMarks_{};
+    std::vector<TextMark> textMarks_{};
     std::vector<TempoMark> tempoMarks_{};
     std::vector<PendingGrace> pendingGraces_{};
     std::vector<Placed> placed_{};
