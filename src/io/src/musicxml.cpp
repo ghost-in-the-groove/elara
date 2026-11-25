@@ -1957,6 +1957,26 @@ private:
         return syllable;
     }
 
+    /// The marks a chord note gives its beat: a fermata or a breath mark
+    /// stronger than the beat's, and tremolo picking, an arpeggio, a pick
+    /// stroke or a tap the beat has none of.
+    static void addBeatEffects(BeatEffects& beat, const BeatEffects& note) {
+        beat.fermata = std::max(beat.fermata, note.fermata);
+        beat.breath = std::max(beat.breath, note.breath);
+        if (!beat.tremoloPicking) {
+            beat.tremoloPicking = note.tremoloPicking;
+        }
+        if (beat.strum == Strum::None) {
+            beat.strum = note.strum;
+        }
+        if (beat.pickStroke == PickStroke::None) {
+            beat.pickStroke = note.pickStroke;
+        }
+        if (beat.bassTechnique == BassTechnique::None) {
+            beat.bassTechnique = note.bassTechnique;
+        }
+    }
+
     /// A chord note's syllables go on its beat where their verse sings nothing yet.
     static void addLyrics(Beat& beat, std::vector<Syllable>& lyrics) {
         if (lyrics.empty()) {
@@ -2532,8 +2552,7 @@ private:
                     slurAt(event, event.staff, *slot, voice.beats.size() - 1, index);
                     Beat& beat = voice.beats.back();
                     addLyrics(beat, event.lyrics);
-                    beat.effects.fermata =
-                        std::max(beat.effects.fermata, event.beatEffects.fermata);
+                    addBeatEffects(beat.effects, event.beatEffects);
                     placed.push_back(Placed{.staff = event.staff,
                                             .voice = *slot,
                                             .beat = voice.beats.size() - 1,
