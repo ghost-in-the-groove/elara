@@ -791,12 +791,12 @@ std::optional<ChordDiagram> frameDiagram(pugi::xml_node frame, int strings) {
     return played ? std::optional(std::move(diagram)) : std::nullopt;
 }
 
-/// Where a wedge (ADR-0078) or an octave line (ADR-0089) starts, or stops
-/// (None).
+/// Where a wedge (ADR-0078), an octave line (ADR-0089) or the sustain pedal
+/// (ADR-0092) starts, changes or stops (None).
 struct SpanMark {
     Fraction onset{};
     std::optional<std::size_t> staff{}; // nullopt: every staff
-    std::variant<Hairpin, Ottava> value{};
+    std::variant<Hairpin, Ottava, Pedal> value{};
 };
 
 struct Bend {
@@ -1075,7 +1075,8 @@ public:
           warnings_(warnings), voiceIds_(layout_.staves.size()),
           dynamics_(layout_.staves.size(), Dynamic::MF),
           hairpins_(layout_.staves.size(), Hairpin::None),
-          ottavas_(layout_.staves.size(), Ottava::None), measures_(layout_.staves.size()) {
+          ottavas_(layout_.staves.size(), Ottava::None), pedals_(layout_.staves.size(), false),
+          measures_(layout_.staves.size()) {
         nextClefs_.resize(layout_.staves.size());
         clefs_.reserve(layout_.staves.size());
         for (const Staff& staff : layout_.staves) {
@@ -1588,8 +1589,24 @@ private:
                         hairpins.push_back(
                             SpanMark{.onset = onset, .staff = staff, .value = ottava});
                     }
-                } else if (name == "pedal" && isType(mark, "start")) {
-                    warn("pedal marks dropped", index);
+                } else if (name == "pedal") {
+                    // The sustain pedal from its start to its stop (ADR-0092), on
+                    // the staff of the direction, else the first; "resume" and
+                    // "discontinue" go on with the pedal and stop it without a
+                    // sign, "continue" changes nothing.
+                    const std::optional<std::size_t> under = staff.value_or(0);
+                    if (isType(mark, "start") || isType(mark, "resume")) {
+                        hairpins.push_back(
+                            SpanMark{.onset = onset, .staff = under, .value = Pedal::Down});
+                    } else if (isType(mark, "change")) {
+                        hairpins.push_back(
+                            SpanMark{.onset = onset, .staff = under, .value = Pedal::Change});
+                    } else if (isType(mark, "stop") || isType(mark, "discontinue")) {
+                        hairpins.push_back(
+                            SpanMark{.onset = onset, .staff = under, .value = Pedal::None});
+                    } else if (isType(mark, "sostenuto")) {
+                        warn("sostenuto pedal marks dropped", index);
+                    }
                 }
             }
         }
@@ -2537,6 +2554,7 @@ private:
             }
             markHairpins(built[staff], staff, hairpins);
             markOttavas(built[staff], staff, hairpins);
+            markPedals(built[staff], staff, hairpins);
             measures_[staff].push_back(std::move(built[staff]));
         }
         for (const DynamicMark& mark : dynamics) {
@@ -2600,6 +2618,49 @@ private:
         for (const SpanMark& mark : marks) {
             pass(mark, ottavas_[staff]);
         }
+    }
+
+    /// The pedal marks of a measure (ADR-0092) go on the beats of every voice
+    /// that start with the pedal down, rests too: a change, or a stop and a
+    /// start together, changes it on the first beat from where it is. The pedal
+    /// carries over to the next measure. `marks` are in time order.
+    void markPedals(Measure& measure, std::size_t staff, const std::vector<SpanMark>& marks) {
+        // Whether the pedal is down after `mark`; `lifted` and `changed` say
+        // whether it came up, or was changed, since the last beat.
+        const auto pass = [staff](const SpanMark& mark, bool& down, bool& lifted, bool& changed) {
+            const auto* pedal = std::get_if<Pedal>(&mark.value);
+            if (pedal == nullptr || (mark.staff && *mark.staff != staff)) {
+                return;
+            }
+            if (*pedal == Pedal::None) {
+                lifted = lifted || down;
+                down = false;
+            } else {
+                changed = changed || lifted || (*pedal == Pedal::Change && down);
+                down = true;
+            }
+        };
+        for (Voice& voice : measure.voices) {
+            bool down = pedals_[staff];
+            auto mark = marks.begin();
+            Fraction at;
+            for (Beat& beat : voice.beats) {
+                bool lifted = false;
+                bool changed = false;
+                for (; mark != marks.end() && mark->onset <= at; ++mark) {
+                    pass(*mark, down, lifted, changed);
+                }
+                beat.effects.pedal = !down ? Pedal::None : (changed ? Pedal::Change : Pedal::Down);
+                at += beat.duration.length();
+            }
+        }
+        bool lifted = false;
+        bool changed = false;
+        bool down = pedals_[staff];
+        for (const SpanMark& mark : marks) {
+            pass(mark, down, lifted, changed);
+        }
+        pedals_[staff] = down;
     }
 
     /// A TAB staff repeats the notes of its standard staff: its string, fret and
@@ -2682,6 +2743,7 @@ private:
     std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
     std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
     std::vector<Ottava> ottavas_;                      // per staff, at the end of the last measure
+    std::vector<bool> pedals_;                         // per staff: down at the end of the last measure
     std::map<int, SlurEnd> openSlurs_{};               // by number: where each open slur starts
     std::vector<std::pair<SlurEnd, SlurEnd>> slurs_{}; // closed slurs, from start to stop
     std::vector<std::vector<Measure>> measures_;       // per staff

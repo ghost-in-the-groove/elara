@@ -32,6 +32,7 @@ using elara::core::KeyMode;
 using elara::core::KeySignature;
 using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Pedal;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
@@ -380,6 +381,25 @@ TEST_CASE("MIDI export writes a format 1 file byte for byte", "[io][midi]") {
     const auto result = exportMidi(song);
     CHECK(result.data == expected);
     CHECK(result.warnings.empty());
+}
+
+TEST_CASE("MIDI export presses and lifts the sustain pedal", "[io][midi]") {
+    // ADR-0092: controller 64 at 127 where the pedal goes down and at 0 where
+    // it comes up, after the notes struck there; a change lifts it and
+    // presses it again at once.
+    Song song = pianoSong(1);
+    auto& beats = song.track(0).staff(0).measure(0).voices[0].beats;
+    beats = {noteBeat(Duration(NoteValue::Quarter), 60), noteBeat(Duration(NoteValue::Quarter), 62),
+             noteBeat(Duration(NoteValue::Half), 64)};
+    beats[0].effects.pedal = beats[1].effects.pedal = Pedal::Down;
+    beats[2].effects.pedal = Pedal::Change;
+    const auto result = exportMidi(song);
+    CHECK(result.warnings.empty());
+    CHECK(result.data.contains(bytes({0, 0x90, 60, 80, 0, 0xB0, 64, 127})));
+    // At 1920: 62 off, 64 on, the pedal up and down (running status).
+    CHECK(result.data.contains(bytes({0, 0x90, 64, 80, 0, 0xB0, 64, 0, 0, 64, 127})));
+    // At 3840, with the end of the note.
+    CHECK(result.data.contains(bytes({0x8F, 0x00, 0x80, 64, 64, 0, 0xB0, 64, 0})));
 }
 
 TEST_CASE("MIDI export picks a division that keeps every tuplet exact", "[io][midi]") {

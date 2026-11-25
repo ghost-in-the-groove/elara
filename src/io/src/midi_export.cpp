@@ -645,6 +645,40 @@ void addNotes(MidiTrack& track, int channelNumber, const std::vector<const Sound
     }
 }
 
+// The sustain pedal of track t as controller 64 (ADR-0092): 127 where it goes
+// down, 0 where it comes up; a change lifts it and presses it again at once.
+// A pedalling goes on into the next played measure only where that is the
+// next written one.
+void addPedal(MidiTrack& track, int channelNumber, const Song& song, std::size_t t,
+              const PlayedMeasures& played, const Timing& timing) {
+    struct Pedalling {
+        Fraction start;
+        Fraction end;
+    };
+    std::vector<Pedalling> spans;
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        const std::size_t m = played.order[k];
+        const bool follows = k > 0 && played.order[k - 1] + 1 == m;
+        for (const core::PedalSpan& span : song.pedalSpans(t, m)) {
+            const Pedalling pedalling{.start = played.start[k] + span.start,
+                                      .end = played.start[k] + span.end};
+            if (!span.change && !spans.empty() && spans.back().end == pedalling.start &&
+                (follows || !span.start.isZero())) {
+                spans.back().end = pedalling.end;
+            } else {
+                spans.push_back(pedalling);
+            }
+        }
+    }
+    constexpr int kSustain = 64;
+    for (const Pedalling& span : spans) {
+        track.events.push_back(
+            channel(timing.ticks(span.start), detail::kController, channelNumber, kSustain, 127));
+        track.events.push_back(
+            channel(timing.ticks(span.end), detail::kController, channelNumber, kSustain, 0));
+    }
+}
+
 } // namespace
 
 ExportResult exportMidi(const Song& song, const MidiOptions& options) {
@@ -726,9 +760,14 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
         out.events.insert(out.events.end(), lyrics.begin(), lyrics.end());
         const auto notesFrom = static_cast<std::ptrdiff_t>(out.events.size());
         addNotes(out, channelNumber, byTrack[t], timing);
+        const auto byTick = [](const MidiEvent& a, const MidiEvent& b) { return a.tick < b.tick; };
         std::inplace_merge(out.events.begin() + header, out.events.begin() + notesFrom,
-                           out.events.end(),
-                           [](const MidiEvent& a, const MidiEvent& b) { return a.tick < b.tick; });
+                           out.events.end(), byTick);
+        // The pedal after the notes struck with it.
+        const auto pedalFrom = static_cast<std::ptrdiff_t>(out.events.size());
+        addPedal(out, channelNumber, song, t, played, timing);
+        std::inplace_merge(out.events.begin() + header, out.events.begin() + pedalFrom,
+                           out.events.end(), byTick);
         reportDropped(track, trackWarnings[t]);
         out.end = end;
         bodies[t + 1] = detail::encodeTrack(out);

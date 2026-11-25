@@ -705,6 +705,50 @@ TEST_CASE("MusicXML export: octave lines come back on every voice of their staff
     CHECK(count(R"(<octave-shift type="stop")") == 3);
 }
 
+TEST_CASE("MusicXML export: the sustain pedal comes back under its staff",
+          "[musicxml][export]") {
+    // ADR-0092: a start where it goes down, a change, a stop after the last
+    // beat under it; over a rest and on into the next measure.
+    core::Song song;
+    song.appendMeasures(2);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const core::Duration half(core::NoteValue::Half);
+    const core::Duration whole(core::NoteValue::Whole);
+    const auto key = [](int midi) {
+        return core::Note{.pitch = core::Pitch::fromMidi(midi)};
+    };
+    using enum core::Pedal;
+    for (std::size_t m = 0; m < 2; ++m) {
+        song.track(p).staff(0).measure(m).voices[0].beats = {beatOf(whole, {key(72)})};
+    }
+    core::Staff& left = song.track(p).staff(1);
+    auto& first = left.measure(0).voices[0].beats;
+    first = {beatOf(quarter, {key(48)}), beatOf(quarter, {key(52)}), beatOf(half, {key(55)})};
+    first[0].effects.pedal = first[1].effects.pedal = Down;
+    first[2].effects.pedal = Change;
+    auto& second = left.measure(1).voices[0].beats;
+    second = {beatOf(half), beatOf(half, {key(48)})};
+    second[0].effects.pedal = Down;
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const auto count = [&](std::string_view text) {
+        std::size_t found = 0;
+        for (std::size_t at = exported.data.find(text); at != std::string::npos;
+             at = exported.data.find(text, at + 1)) {
+            ++found;
+        }
+        return found;
+    };
+    CHECK(count(R"(<pedal type="start")") == 1);
+    CHECK(count(R"(<pedal type="change")") == 1);
+    CHECK(count(R"(<pedal type="stop")") == 1);
+}
+
 TEST_CASE("MusicXML export: trills come back, with an accidental mark for an unusual note",
           "[musicxml][export]") {
     // ADR-0090: in F major A trills with Bb unless written otherwise; a trill

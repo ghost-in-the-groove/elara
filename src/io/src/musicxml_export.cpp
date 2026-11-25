@@ -1264,6 +1264,26 @@ private:
         xml.close("direction");
     }
 
+    /// A start, change or stop of the sustain pedal (ADR-0092), drawn as a line.
+    void writePedal(XmlWriter& xml, std::string_view type, int staffNumber) {
+        xml.start("direction");
+        xml.attribute("placement", "below");
+        xml.endOpen();
+        xml.open("direction-type");
+        xml.start("pedal");
+        xml.attribute("type", type);
+        xml.attribute("line", "yes");
+        if (type == "start") {
+            xml.attribute("sign", "yes");
+        }
+        xml.endEmpty();
+        xml.close("direction-type");
+        if (xmlStaves_ > 1) {
+            xml.number("staff", staffNumber);
+        }
+        xml.close("direction");
+    }
+
     // ---- Voices and notes -------------------------------------------------------------
 
     /// Writes one voice of one staff and returns where it ends.
@@ -1296,8 +1316,8 @@ private:
         markTuplets(voice);
         std::vector<bool>* words =
             tabPass_ ? nullptr : &words_[static_cast<std::size_t>(s) * Measure::kMaxVoices + v];
-        // The staff's octave lines go with its first voice that has beats,
-        // which readers apply to every voice (ADR-0089).
+        // The staff's octave lines and pedal marks go with its first voice that
+        // has beats, which readers apply to every voice (ADR-0089, ADR-0092).
         const auto& voices = staff.measure(m).voices;
         const bool writesLines = !tabPass_ && std::ranges::find_if(voices, [](const Voice& other) {
                                                   return !other.isEmpty();
@@ -1316,6 +1336,13 @@ private:
             if (ottava != Ottava::None &&
                 (previous == nullptr || previous->effects.ottava != ottava)) {
                 writeOctaveShift(xml, ottava, false, s + 1);
+            }
+            const Pedal pedal = writesLines ? beat.effects.pedal : Pedal::None;
+            const bool pedalBefore = previous != nullptr && previous->effects.pedal != Pedal::None;
+            if (pedal != Pedal::None && !pedalBefore) {
+                writePedal(xml, "start", s + 1);
+            } else if (pedal == Pedal::Change) {
+                writePedal(xml, "change", s + 1);
             }
             // A run of beats with one hairpin is a wedge from its first beat to
             // the end of its last (ADR-0078).
@@ -1354,6 +1381,9 @@ private:
             }
             if (ottava != Ottava::None && (next == nullptr || next->effects.ottava != ottava)) {
                 writeOctaveShift(xml, ottava, true, s + 1);
+            }
+            if (pedal != Pedal::None && (next == nullptr || next->effects.pedal == Pedal::None)) {
+                writePedal(xml, "stop", s + 1);
             }
             onset += length;
         }
@@ -1497,6 +1527,7 @@ private:
             others.fermata = Fermata::None;
             others.slur = false;
             others.ottava = Ottava::None;
+            others.pedal = Pedal::None;
             if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
