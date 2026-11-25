@@ -194,6 +194,84 @@ TEST_CASE("Entry: the clef changes from the caret's measure", "[core][entry][cle
     CHECK(setClef(drums, Caret{.track = 1, .measure = 1}, Clef::Bass).command == nullptr);
 }
 
+TEST_CASE("Entry: a measure repeat set at the caret plays the measure or two before it",
+          "[core][entry][simile]") {
+    // ADR-0102: one undo step; the measures with the sign lose their music;
+    // taking the sign away writes out the music it played.
+    Song song;
+    song.appendMeasures(5);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
+    Staff& guitar = song.track(0).staff(0);
+    for (std::size_t m = 0; m < 5; ++m) {
+        guitar.measure(m).voices[0].beats = {
+            Beat{.duration = kWhole, .notes = {guitar.frettedNote(1, static_cast<int>(m))}}};
+    }
+    const std::vector<Beat> first = guitar.measure(0).voices[0].beats;
+    const std::vector<Beat> third = guitar.measure(2).voices[0].beats;
+    Document doc(std::move(song));
+    const auto staff = [&doc]() -> const Staff& {
+        return doc.song().track(0).staff(0);
+    };
+
+    CHECK(run(doc, setMeasureRepeat(doc.song(), at(1, 0), 1)) == at(1, 0));
+    CHECK(doc.undoName() == "Repeat measure");
+    CHECK(staff().measure(1).repeat == MeasureRepeat::One);
+    CHECK(staff().measure(1).isEmpty());
+    CHECK(repeatSource(doc.song(), staff(), 1) == 0);
+    CHECK(measureRepeatAt(doc.song(), at(1, 0)) == 1);
+    CHECK(measureRepeatAt(doc.song(), at(2, 0)) == 0);
+
+    // The sign there already, nothing before, nothing after: no change.
+    CHECK(setMeasureRepeat(doc.song(), at(1, 0), 1).command == nullptr);
+    CHECK(setMeasureRepeat(doc.song(), at(0, 0), 1).command == nullptr);
+    CHECK(setMeasureRepeat(doc.song(), at(1, 0), 2).command == nullptr);
+    CHECK(setMeasureRepeat(doc.song(), at(4, 0), 2).command == nullptr);
+    CHECK(setMeasureRepeat(doc.song(), at(2, 0), 0).command == nullptr);
+    CHECK_THROWS_AS(setMeasureRepeat(doc.song(), at(2, 0), 3), std::invalid_argument);
+
+    // Two measures: 3 and 4 play 1 (itself the measure before it) and 2.
+    run(doc, setMeasureRepeat(doc.song(), at(3, 0), 2));
+    CHECK(doc.undoName() == "Repeat two measures");
+    CHECK(staff().measure(3).repeat == MeasureRepeat::TwoFirst);
+    CHECK(staff().measure(4).repeat == MeasureRepeat::TwoSecond);
+    CHECK(staff().measure(4).isEmpty());
+    CHECK(repeatSource(doc.song(), staff(), 3) == 0);
+    CHECK(repeatSource(doc.song(), staff(), 4) == 2);
+    CHECK(measureRepeatAt(doc.song(), at(4, 0)) == 2);
+
+    // Taken away from either measure, both are written out as they sounded.
+    run(doc, setMeasureRepeat(doc.song(), at(4, 0), 0));
+    CHECK(doc.undoName() == "Write out measure repeat");
+    CHECK(staff().measure(3).repeat == MeasureRepeat::None);
+    CHECK(staff().measure(4).repeat == MeasureRepeat::None);
+    CHECK(staff().measure(3).voices[0].beats == first);
+    CHECK(staff().measure(4).voices[0].beats == third);
+    CHECK(staff().measure(1).repeat == MeasureRepeat::One);
+    doc.undo();
+    CHECK(staff().measure(3).repeat == MeasureRepeat::TwoFirst);
+
+    // A one-measure sign on half of a two-measure repeat writes out the other.
+    run(doc, setMeasureRepeat(doc.song(), at(4, 0), 1));
+    CHECK(staff().measure(3).repeat == MeasureRepeat::None);
+    CHECK(staff().measure(3).voices[0].beats == first);
+    CHECK(staff().measure(4).repeat == MeasureRepeat::One);
+    CHECK(repeatSource(doc.song(), staff(), 4) == 3);
+}
+
+TEST_CASE("Entry: a measure repeat needs measures of its length before it",
+          "[core][entry][simile]") {
+    Song song = guitarSong();
+    song.appendMeasures(1);
+    song.measureHeader(2).timeSignature = TimeSignature(3, 4);
+    song.measureHeader(3).timeSignature = TimeSignature(3, 4);
+    CHECK(setMeasureRepeat(song, at(2, 0), 1).command == nullptr);
+    CHECK(setMeasureRepeat(song, at(3, 0), 2).command == nullptr);
+    CHECK(setMeasureRepeat(song, at(3, 0), 1).command != nullptr);
+    // Drum parts take signs too.
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    CHECK(setMeasureRepeat(song, Caret{.track = 1, .measure = 1}, 1).command != nullptr);
+}
+
 TEST_CASE("Entry: beat text is written above the caret's beat", "[core][entry]") {
     // ADR-0081: on a note and on a rest, trimmed, one undo step each.
     Song song = guitarSong();

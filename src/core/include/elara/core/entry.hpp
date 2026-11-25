@@ -295,6 +295,23 @@ enum class NoteEffect : std::uint8_t {
 /// the percussion clef.
 [[nodiscard]] Entry setClef(const Song& song, const Caret& caret, Clef clef);
 
+/// Sets a measure repeat sign on the caret's measure, as one undo step
+/// (ADR-0102): `measures` 1 repeats the measure before ("Repeat measure"), 2
+/// makes the caret's measure and the next repeat the two before ("Repeat two
+/// measures"); the measures with the sign lose their own music. 0 takes the
+/// sign away, from both measures of a two-measure repeat, and writes out the
+/// music it played ("Write out measure repeat"). A two-measure repeat that
+/// loses one of its measures to a new sign is written out. Nothing changes when
+/// the sign is there already, without enough measures before (or after, for
+/// two), when a measure repeated has another length, or for 0 without a sign.
+/// The caret goes to the measure's start. Throws std::invalid_argument for more
+/// than two measures.
+[[nodiscard]] Entry setMeasureRepeat(const Song& song, const Caret& caret, std::size_t measures);
+
+/// How many measures the sign on the caret's measure repeats: 0 without one,
+/// 1 or 2 (ADR-0102).
+[[nodiscard]] std::size_t measureRepeatAt(const Song& song, const Caret& caret);
+
 /// Verse `verse` (0 for the first) of the caret's staff as typed (verseText(),
 /// ADR-0084).
 [[nodiscard]] VerseText verseAt(const Song& song, const Caret& caret, std::size_t verse);
