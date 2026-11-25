@@ -2,11 +2,11 @@
 <style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
 <rect x="0" y="0" width="120" height="169.714" fill="white"/>
 <g fill="black" stroke="black">
-<line class="staffLine" x1="8.571" y1="32.16" x2="62.95" y2="32.16" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="33.16" x2="62.95" y2="33.16" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="34.16" x2="62.95" y2="34.16" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="35.16" x2="62.95" y2="35.16" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="36.16" x2="62.95" y2="36.16" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="32.16" x2="64.675" y2="32.16" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="33.16" x2="64.675" y2="33.16" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="34.16" x2="64.675" y2="34.16" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="35.16" x2="64.675" y2="35.16" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="36.16" x2="64.675" y2="36.16" stroke-width="0.13"/>
 <line class="barline" x1="17.681" y1="32.16" x2="17.681" y2="36.16" stroke-width="0.5"/>
 <line class="barline" x1="18.411" y1="32.16" x2="18.411" y2="36.16" stroke-width="0.16"/>
 <line class="ledgerLine" x1="20.251" y1="37.16" x2="22.231" y2="37.16" stroke-width="0.16"/>
@@ -33,18 +33,20 @@
 <line class="stem" x1="45.594" y1="39.216" x2="45.594" y2="34.16" stroke-width="0.12"/>
 <line class="barline" x1="48.134" y1="32.16" x2="48.134" y2="36.16" stroke-width="0.16"/>
 <line class="barline" x1="48.864" y1="32.16" x2="48.864" y2="36.16" stroke-width="0.5"/>
-<line class="stem" x1="54.214" y1="34.492" x2="54.214" y2="31.16" stroke-width="0.12"/>
-<line class="stem" x1="56.828" y1="34.328" x2="56.828" y2="37.66" stroke-width="0.12"/>
-<line class="barline" x1="61.97" y1="32.16" x2="61.97" y2="36.16" stroke-width="0.16"/>
-<line class="barline" x1="62.7" y1="32.16" x2="62.7" y2="36.16" stroke-width="0.5"/>
+<line class="stem" x1="55.94" y1="34.492" x2="55.94" y2="31.16" stroke-width="0.12"/>
+<line class="stem" x1="53.822" y1="34.051" x2="53.822" y2="31.885" stroke-width="0.078"/>
+<line class="flag" x1="53.562" y1="32.925" x2="54.342" y2="32.275" stroke-width="0.078"/>
+<line class="stem" x1="58.554" y1="34.328" x2="58.554" y2="37.66" stroke-width="0.12"/>
+<line class="barline" x1="63.695" y1="32.16" x2="63.695" y2="36.16" stroke-width="0.16"/>
+<line class="barline" x1="64.425" y1="32.16" x2="64.425" y2="36.16" stroke-width="0.5"/>
 <line class="hairpin" x1="29.892" y1="43.164" x2="35.492" y2="42.664" stroke-width="0.16"/>
 <line class="hairpin" x1="29.892" y1="43.164" x2="35.492" y2="43.664" stroke-width="0.16"/>
-<line class="hairpin" x1="55.56" y1="42.664" x2="58.49" y2="43.164" stroke-width="0.16"/>
-<line class="hairpin" x1="55.56" y1="43.664" x2="58.49" y2="43.164" stroke-width="0.16"/>
+<line class="hairpin" x1="57.286" y1="42.664" x2="60.215" y2="43.164" stroke-width="0.16"/>
+<line class="hairpin" x1="57.286" y1="43.664" x2="60.215" y2="43.164" stroke-width="0.16"/>
 <line class="volta" x1="36.252" y1="21.044" x2="47.294" y2="21.044" stroke-width="0.16"/>
 <line class="volta" x1="36.252" y1="21.044" x2="36.252" y2="23.044" stroke-width="0.16"/>
 <line class="volta" x1="47.294" y1="21.044" x2="47.294" y2="23.044" stroke-width="0.16"/>
-<line class="volta" x1="49.314" y1="21.044" x2="61.69" y2="21.044" stroke-width="0.16"/>
+<line class="volta" x1="49.314" y1="21.044" x2="63.415" y2="21.044" stroke-width="0.16"/>
 <line class="volta" x1="49.314" y1="21.044" x2="49.314" y2="23.044" stroke-width="0.16"/>
 <polygon class="beam" stroke="none" points="24.711,33.42 29.339,32.65 29.339,33.15 24.711,33.92"/>
 <text class="clef" x="9.171" y="35.16" stroke="none">&#xE052;</text>
@@ -70,19 +72,21 @@
 <text class="repeat" x="47.494" y="34.66" stroke="none">&#xE044;</text>
 <text class="timeSignature" x="50.112" y="33.16" stroke="none">&#xE083;</text>
 <text class="timeSignature" x="50.014" y="35.16" stroke="none">&#xE084;</text>
-<text class="notehead" x="53.094" y="34.66" stroke="none">&#xE0A4;</text>
-<text class="dot" x="54.574" y="34.66" stroke="none">&#xE1E7;</text>
-<text class="articulation" x="53.516" y="35.492" stroke="none">&#xE4A3;</text>
-<text class="notehead" x="56.768" y="34.16" stroke="none">&#xE0A4;</text>
-<text class="flag" x="56.768" y="37.792" stroke="none">&#xE241;</text>
-<text class="rest" x="58.886" y="34.16" stroke="none">&#xE4E5;</text>
+<text class="notehead" x="54.82" y="34.66" stroke="none">&#xE0A4;</text>
+<text class="dot" x="56.3" y="34.66" stroke="none">&#xE1E7;</text>
+<text class="notehead" x="53.094" y="34.16" style="font-size:2.6px" stroke="none">&#xE0A4;</text>
+<text class="flag" x="53.783" y="31.859" style="font-size:2.6px" stroke="none">&#xE240;</text>
+<text class="articulation" x="55.242" y="35.492" stroke="none">&#xE4A3;</text>
+<text class="notehead" x="58.494" y="34.16" stroke="none">&#xE0A4;</text>
+<text class="flag" x="58.494" y="37.792" stroke="none">&#xE241;</text>
+<text class="rest" x="60.611" y="34.16" stroke="none">&#xE4E5;</text>
 <text class="vibrato" x="30.178" y="27.91" stroke="none">&#xEAB2;</text>
 <text class="vibrato" x="30.786" y="27.91" stroke="none">&#xEAB2;</text>
 <text class="vibrato" x="31.394" y="27.91" stroke="none">&#xEAB2;</text>
-<text class="technique" x="53.06" y="24.46" stroke="none">&#xE610;</text>
+<text class="technique" x="54.786" y="24.46" stroke="none">&#xE610;</text>
 <text class="dynamic" x="36.586" y="43.712" stroke="none">&#xE522;</text>
 <text class="dynamic" x="43.232" y="43.712" stroke="none">&#xE52F;</text>
-<text class="dynamic" x="51.888" y="43.712" stroke="none">&#xE52D;</text>
+<text class="dynamic" x="53.614" y="43.712" stroke="none">&#xE52D;</text>
 <text class="tempo" x="20.651" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="tempo" x="41.494" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Guitar Techniques</text>

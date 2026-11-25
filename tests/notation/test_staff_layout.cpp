@@ -23,6 +23,7 @@ using Catch::Matchers::WithinAbs;
 using elara::core::Beat;
 using elara::core::Clef;
 using elara::core::Duration;
+using elara::core::Grace;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 using elara::core::KeyMode;
@@ -826,6 +827,71 @@ TEST_CASE("Staff layout: drums follow the drum map", "[notation][layout]") {
             }
         }
     }
+}
+
+TEST_CASE("Staff layout: grace notes are drawn small before their chord", "[notation][layout]") {
+    constexpr double kGrace = 0.65;
+    // An eighth before the D, two sixteenths on the C, an F sharp before the F.
+    std::vector<Beat> beats{note("D5"), note("C5"), note("F4", NoteValue::Half)};
+    const std::vector<Beat> plain = beats;
+    beats[0].graces = {
+        Grace{.duration = Duration(NoteValue::Eighth), .notes = {Note{.pitch = pitch("E5")}}}};
+    beats[1].graces = {Grace{.duration = Duration(NoteValue::Sixteenth),
+                             .notes = {Note{.pitch = pitch("G4")}},
+                             .onBeat = true},
+                       Grace{.duration = Duration(NoteValue::Sixteenth),
+                             .notes = {Note{.pitch = pitch("A4")}},
+                             .onBeat = true}};
+    beats[2].graces = {
+        Grace{.duration = Duration(NoteValue::Eighth), .notes = {Note{.pitch = pitch("F#4")}}}};
+    const DisplayList list = layout(melody(beats));
+
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 7);
+    const std::vector<double> scales{kGrace, 1.0, kGrace, kGrace, 1.0, kGrace, 1.0};
+    for (std::size_t i = 0; i < heads.size(); ++i) {
+        CHECK(heads[i].scale == scales[i]);
+    }
+    // Before its chord, clear of it, and on its own staff position.
+    const auto inkRight = [](const GlyphItem& item) {
+        return item.origin.x + bravura().metrics(item.glyph).box.northEast.x * item.scale;
+    };
+    CHECK(inkRight(heads[0]) < left(heads[1]));
+    CHECK(heads[0].origin.y < heads[1].origin.y);
+    CHECK(heads[2].origin.y > heads[3].origin.y);
+
+    // Each eighth has a small flag and, played before the beat, a slash; the
+    // sixteenths share two small beams; no full-size note has a flag.
+    const auto flags = glyphs(list, Role::Flag);
+    REQUIRE(flags.size() == 2);
+    CHECK(flags[0].glyph == Glyph::Flag8thUp);
+    CHECK(std::ranges::all_of(flags, [](const GlyphItem& flag) { return flag.scale == kGrace; }));
+    CHECK(lines(list, Role::Flag).size() == 2);
+    REQUIRE(list.beams.size() == 2);
+    for (const BeamItem& beam : list.beams) {
+        CHECK_THAT(beam.thickness, WithinAbs(0.5 * kGrace, kEpsilon));
+        CHECK(beam.left.x > right(heads[1]));
+        CHECK(beam.right.x < left(heads[4]));
+    }
+    const auto stems = lines(list, Role::Stem);
+    REQUIRE(stems.size() == 7);
+    CHECK_THAT(stems[0].thickness, WithinAbs(0.12 * kGrace, kEpsilon));
+    CHECK_THAT(stems[1].thickness, WithinAbs(0.12, kEpsilon));
+
+    // The grace note's sharp comes before the F, which needs a natural.
+    const auto accidentals = glyphs(list, Role::Accidental);
+    REQUIRE(accidentals.size() == 2);
+    CHECK(accidentals[0].glyph == Glyph::AccidentalSharp);
+    CHECK(accidentals[0].scale == kGrace);
+    CHECK(accidentals[1].glyph == Glyph::AccidentalNatural);
+    CHECK(accidentals[1].scale == 1.0);
+
+    // Room is made for them: every chord moves right.
+    const auto plainHeads = glyphs(layout(melody(plain)), Role::Notehead);
+    REQUIRE(plainHeads.size() == 3);
+    CHECK(heads[1].origin.x > plainHeads[0].origin.x);
+    CHECK(heads[4].origin.x >
+          plainHeads[1].origin.x + (heads[1].origin.x - plainHeads[0].origin.x));
 }
 
 TEST_CASE("Staff layout: a keyboard's strummed chord is rolled with an arpeggio line",

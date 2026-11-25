@@ -18,7 +18,7 @@ struct FormatError {
 /// A song read from a foreign format, with what could not be represented.
 struct ImportResult {
     core::Song song{};
-    /// One line per dropped feature, e.g. "Piano: grace notes dropped (measure 2)".
+    /// One line per dropped feature, e.g. "Piano: lyrics dropped (measure 2)".
     std::vector<std::string> warnings{};
 };
 

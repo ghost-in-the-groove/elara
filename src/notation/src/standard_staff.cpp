@@ -72,6 +72,13 @@ constexpr double kArpeggioThickness = 0.12;
 constexpr double kArpeggioOverhang = 0.5;  // beyond the outer noteheads' centres
 constexpr double kArpeggioArrow = 0.6;     // length of a downward roll's arrowhead
 constexpr double kArpeggioMinLength = 2.0; // a single note's line, centred on it
+constexpr double kGraceGap = 0.35;         // between grace notes, and before their chord
+// An acciaccatura's slash, at full size: its centre down the stem from the
+// tip and off the stem, and half its run and rise.
+constexpr double kSlashDrop = 1.1;
+constexpr double kSlashOff = 0.2;
+constexpr double kSlashRun = 0.6;
+constexpr double kSlashRise = 0.5;
 
 // ---- Staff positions ----------------------------------------------------------
 
@@ -257,6 +264,10 @@ struct Chord {
     double stemStart = 0.0;
     double inkTop = 0.0; // noteheads, accidentals, stem and flag, or the rest
     double inkBottom = 0.0;
+    // The grace notes drawn small before it (ADR-0079), each shaped at full
+    // size around its own x, which is from this chord's x.
+    std::vector<Chord> graces;
+    bool slash = false; // a grace note before the beat: its stem is slashed
 };
 
 // The outer edge of a beam group's primary beam: y = edge + slope * (x - x0).
@@ -425,6 +436,7 @@ private:
                 continue;
             }
             draw(chord);
+            drawGraces(chord);
             ties(chord);
             articulations(chord);
         }
@@ -505,6 +517,20 @@ private:
                     chord.heads.push_back(headOf(note, beat.duration.value()));
                 }
                 std::ranges::sort(chord.heads, {}, &Head::step);
+                for (const core::Grace& grace : beat.graces) {
+                    if (grace.notes.empty()) {
+                        continue;
+                    }
+                    Chord small;
+                    small.voice = v;
+                    small.duration = grace.duration;
+                    small.slash = !grace.onBeat;
+                    for (const core::Note& note : grace.notes) {
+                        small.heads.push_back(headOf(note, grace.duration.value()));
+                    }
+                    std::ranges::sort(small.heads, {}, &Head::step);
+                    chord.graces.push_back(std::move(small));
+                }
                 at += chord.length;
                 chords_.push_back(std::move(chord));
             }
@@ -526,6 +552,7 @@ private:
         for (Chord& chord : chords_) {
             if (!chord.measureRest) {
                 shape(chord);
+                placeGraces(chord);
             }
         }
         // Columns: chords starting together.
@@ -677,21 +704,24 @@ private:
             order[c] = c;
         }
         std::ranges::stable_sort(order, {}, [this](std::size_t c) { return chords_[c].start; });
-        for (const std::size_t c : order) {
-            for (Head& head : chords_[c].heads) {
-                if (head.tied || head.diatonic < 0 ||
-                    head.diatonic >= static_cast<int>(state.size())) {
-                    continue;
-                }
-                std::int8_t& current = state[static_cast<std::size_t>(head.diatonic)];
-                const int expected = current == kUnset
-                                         ? key.alterFor(static_cast<Step>(head.diatonic % 7))
-                                         : current;
-                if (head.alter != expected) {
-                    head.accidental = accidentalFor(head.alter);
-                }
-                current = static_cast<std::int8_t>(head.alter);
+        const auto mark = [&](Head& head) {
+            if (head.tied || head.diatonic < 0 || head.diatonic >= static_cast<int>(state.size())) {
+                return;
             }
+            std::int8_t& current = state[static_cast<std::size_t>(head.diatonic)];
+            const int expected =
+                current == kUnset ? key.alterFor(static_cast<Step>(head.diatonic % 7)) : current;
+            if (head.alter != expected) {
+                head.accidental = accidentalFor(head.alter);
+            }
+            current = static_cast<std::int8_t>(head.alter);
+        };
+        for (const std::size_t c : order) {
+            // Grace notes come before their chord (ADR-0079).
+            for (Chord& grace : chords_[c].graces) {
+                std::ranges::for_each(grace.heads, mark);
+            }
+            std::ranges::for_each(chords_[c].heads, mark);
         }
     }
 
@@ -911,7 +941,7 @@ private:
             }
         }
         dots(x + chord.headRight, dotYs, chord.duration.dots());
-        ledgerLines(chord);
+        ledgerLines(chord, x);
         if (!hasStem(chord.duration.value())) {
             return;
         }
@@ -953,7 +983,8 @@ private:
         }
     }
 
-    void ledgerLines(const Chord& chord) {
+    // The ledger lines of a chord at x drawn at `scale` of its size.
+    void ledgerLines(const Chord& chord, double x, double scale = 1.0) {
         const double extension = defaults_.legerLineExtension;
         const auto ledger = [&](int step, bool above) {
             double from = std::numeric_limits<double>::max();
@@ -961,8 +992,8 @@ private:
             for (const Head& head : chord.heads) {
                 if (above ? head.step <= step : head.step >= step) {
                     const BoundingBox& box = metrics(head.glyph).box;
-                    from = std::min(from, chord.x + head.dx + box.southWest.x - extension);
-                    to = std::max(to, chord.x + head.dx + box.northEast.x + extension);
+                    from = std::min(from, x + (head.dx + box.southWest.x - extension) * scale);
+                    to = std::max(to, x + (head.dx + box.northEast.x + extension) * scale);
                 }
             }
             line({from, yOf(step)}, {to, yOf(step)}, defaults_.legerLineThickness,
@@ -973,6 +1004,109 @@ private:
         }
         for (int step = 10; step <= chord.heads.back().step; step += 2) {
             ledger(step, false);
+        }
+    }
+
+    // ---- Grace notes (ADR-0079) ----
+
+    // Shapes the grace notes of a chord and puts them left of its ink, its
+    // left then reaching over them. Their stems point up, or down in a voice
+    // pointing down; two or more flagged grace notes share their beams.
+    void placeGraces(Chord& chord) {
+        if (chord.graces.empty()) {
+            return;
+        }
+        const bool up = voiceCount_ < 2 || voiceUp_[chord.voice];
+        const bool beamed =
+            chord.graces.size() > 1 && std::ranges::all_of(chord.graces, [](const Chord& grace) {
+                return beamCount(grace.duration.value()) > 0;
+            });
+        double right = chord.left - kGraceGap;
+        for (auto grace = chord.graces.rbegin(); grace != chord.graces.rend(); ++grace) {
+            grace->stemUp = up;
+            grace->beamGroup = beamed ? 0 : -1;
+            shape(*grace);
+            grace->x = right - grace->right * kGraceScale;
+            right = grace->x + grace->left * kGraceScale - kGraceGap;
+        }
+        chord.left = right + kGraceGap;
+    }
+
+    // Draws the grace notes of a chord: noteheads, accidentals and ledger lines
+    // at their size, then their stems with a flag each or beams across them,
+    // and a slash through the first stem of grace notes before the beat.
+    void drawGraces(Chord& chord) {
+        if (chord.graces.empty()) {
+            return;
+        }
+        constexpr double kScale = kGraceScale;
+        const double stemWidth = defaults_.stemThickness * kScale;
+        const bool beamed = chord.graces.front().beamGroup >= 0;
+        const bool up = chord.graces.front().stemUp;
+        int beams = 0;
+        double beamTip =
+            up ? std::numeric_limits<double>::max() : std::numeric_limits<double>::lowest();
+        if (beamed) {
+            beams = std::numeric_limits<int>::max();
+            for (const Chord& grace : chord.graces) {
+                beams = std::min(beams, beamCount(grace.duration.value()));
+            }
+            const double length = (kStemLength + kBeamExtraStem * (beams - 1)) * kScale;
+            for (const Chord& grace : chord.graces) {
+                beamTip = up ? std::min(beamTip, yOf(grace.heads.front().step) - length)
+                             : std::max(beamTip, yOf(grace.heads.back().step) + length);
+            }
+        }
+        for (Chord& grace : chord.graces) {
+            const double x = chord.x + grace.x;
+            for (const Head& head : grace.heads) {
+                glyph(head.glyph, x + head.dx * kScale, yOf(head.step), Role::Notehead, kScale);
+                if (head.accidental) {
+                    glyph(*head.accidental, x + head.accidentalX * kScale, yOf(head.step),
+                          Role::Accidental, kScale);
+                }
+            }
+            ledgerLines(grace, x, kScale);
+            if (!hasStem(grace.duration.value())) {
+                continue;
+            }
+            const Head& base = up ? grace.heads.back() : grace.heads.front();
+            const Point anchor = stemAnchor(base, up);
+            grace.stemX = x + anchor.x * kScale + (up ? -stemWidth / 2 : stemWidth / 2);
+            grace.stemStart = yOf(base.step) - anchor.y * kScale;
+            const double length = stemLengthFor(grace.duration.value()) * kScale;
+            const double tip = beamed ? beamTip
+                               : up   ? yOf(grace.heads.front().step) - length
+                                      : yOf(grace.heads.back().step) + length;
+            line({grace.stemX, grace.stemStart}, {grace.stemX, tip}, stemWidth, Role::Stem);
+            if (!beamed && beamCount(grace.duration.value()) > 0) {
+                const Glyph flag = flagFor(grace.duration.value(), up);
+                const Point attach = metrics(flag)
+                                         .anchor(up ? Anchor::StemUpNW : Anchor::StemDownSW)
+                                         .value_or(Point{});
+                glyph(flag, grace.stemX - stemWidth / 2 - attach.x * kScale,
+                      tip + attach.y * kScale, Role::Flag, kScale);
+            }
+            if (grace.slash && (!beamed || &grace == &chord.graces.front())) {
+                const double cx = grace.stemX + (up ? kSlashOff : -kSlashOff) * kScale;
+                const double cy = tip + (up ? kSlashDrop : -kSlashDrop) * kScale;
+                line({cx - kSlashRun * kScale, cy + kSlashRise * kScale},
+                     {cx + kSlashRun * kScale, cy - kSlashRise * kScale}, stemWidth, Role::Flag);
+            }
+        }
+        if (beamed) {
+            const double thickness = defaults_.beamThickness * kScale;
+            const double step = (defaults_.beamThickness + defaults_.beamSpacing) * kScale;
+            const double left = chord.graces.front().stemX - stemWidth / 2;
+            const double right = chord.graces.back().stemX + stemWidth / 2;
+            for (int level = 0; level < beams; ++level) {
+                const double y = up ? beamTip + thickness / 2 + level * step
+                                    : beamTip - thickness / 2 - level * step;
+                list_.beams.push_back(BeamItem{.left = {left, y},
+                                               .right = {right, y},
+                                               .thickness = thickness,
+                                               .measure = measure_});
+            }
         }
     }
 

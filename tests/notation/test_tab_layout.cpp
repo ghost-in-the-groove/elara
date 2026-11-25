@@ -25,6 +25,7 @@ using elara::core::BendCurve;
 using elara::core::Clef;
 using elara::core::Duration;
 using elara::core::FretPosition;
+using elara::core::Grace;
 using elara::core::HarmonicKind;
 using elara::core::Instrument;
 using elara::core::Note;
@@ -287,6 +288,38 @@ TEST_CASE("Tablature layout: hammer-ons and pull-offs", "[notation][tab]") {
         CHECK(arc.thickness > arc.endThickness);
     }
     CHECK(contents(texts(list, Role::Technique)) == std::vector<std::string>{"H", "P"});
+}
+
+TEST_CASE("Tablature layout: grace notes are small fret numbers before their note",
+          "[notation][tab]") {
+    // A grace note hammered on to the 7th fret (ADR-0079).
+    Note hammer = fretted(3, 7);
+    hammer.effects.legatoFromPrevious = true;
+    Beat graced = beatOf({hammer});
+    graced.graces = {Grace{.duration = Duration(NoteValue::Eighth), .notes = {fretted(3, 5)}}};
+    const DisplayList list = tab(guitar({{play(1, 0), graced}}));
+    const auto frets = texts(list, Role::FretNumber);
+    REQUIRE(contents(frets) == std::vector<std::string>{"0", "5", "7"});
+    const double small = 1.3 * 0.65;
+    CHECK_THAT(frets[1].size, WithinAbs(small, kEpsilon));
+    CHECK_THAT(frets[2].size, WithinAbs(1.3, kEpsilon));
+    CHECK_THAT(frets[1].origin.y, WithinAbs(kLineSpace * 2 + capHeight(small) / 2, kEpsilon));
+    CHECK(frets[1].knockout);
+    // The hammer-on arc and its "H" join the grace note to its note.
+    const auto arcs = byRole(list.curves, Role::Slur);
+    REQUIRE(arcs.size() == 1);
+    CHECK(arcs[0].from.x >= frets[1].origin.x);
+    CHECK(arcs[0].to.x <= frets[2].origin.x);
+    CHECK(contents(texts(list, Role::Technique)) == std::vector<std::string>{"H"});
+    CHECK(frets[1].origin.x - frets[0].origin.x > 0.8);
+    CHECK(frets[2].origin.x - frets[1].origin.x > 0.6);
+    // Room is made for it when the note before leaves too little.
+    const auto after = [](const Beat& beat) {
+        return texts(tab(guitar({{play(1, 0, NoteValue::ThirtySecond), beat}})), Role::FretNumber)
+            .back()
+            .origin.x;
+    };
+    CHECK(after(graced) > after(beatOf({hammer})) + 0.5);
 }
 
 TEST_CASE("Tablature layout: slides between, into and out of notes", "[notation][tab]") {

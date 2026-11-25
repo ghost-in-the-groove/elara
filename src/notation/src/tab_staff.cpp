@@ -52,19 +52,28 @@ constexpr double kRhythmStem = 2.5;    // rhythm stems of quarters and shorter
 constexpr double kRhythmDotGap = 0.3;  // between a rhythm stem and its dots
 constexpr double kRhythmDotRise = 0.9; // dots this far above the end of their stem
 constexpr double kDotSeparation = 0.25;
+constexpr double kGraceGap = 0.4; // between grace fret numbers, and before their column
 
 struct TabNote {
     const core::Note* note = nullptr;
     int string = 1;
     int fret = 0;
     std::string text;
+    double size = kFretSize;
     double width = 0.0; // of the text
+};
+
+// The fret numbers of a grace note, small, left of their column (ADR-0079).
+struct TabGrace {
+    std::vector<TabNote> notes;
+    double offset = 0.0; // of their centre, from the column's
 };
 
 struct TabColumn {
     Fraction start;
     Fraction longest;
     std::vector<TabNote> notes;
+    std::vector<TabGrace> graces;         // in the order they are played
     std::vector<const core::Beat*> beats; // every beat starting here, rests included
     double x = 0.0;
 };
@@ -150,6 +159,17 @@ public:
                         notes = true;
                     }
                 }
+                for (const core::Grace& grace : beat.graces) {
+                    TabGrace small;
+                    for (const core::Note& note : grace.notes) {
+                        if (std::optional<TabNote> tab = tabNote(note, kFretSize * kGraceScale)) {
+                            small.notes.push_back(std::move(*tab));
+                        }
+                    }
+                    if (!small.notes.empty()) {
+                        column.graces.push_back(std::move(small));
+                    }
+                }
                 at += beat.duration.length();
             }
         }
@@ -162,7 +182,7 @@ public:
         if (alone_) {
             readRhythm(staff_.measure(m));
         }
-        for (const TabColumn& column : columns_) {
+        for (TabColumn& column : columns_) {
             const double centre = centreOf(column);
             ColumnInk item{.start = column.start, .longest = column.longest};
             const auto beat = std::ranges::find(rhythm_, column.start, &RhythmItem::start);
@@ -198,6 +218,14 @@ public:
                 item.left = std::min(item.left, left);
                 item.right = std::max(item.right, right);
             }
+            double edge = item.left - kGraceGap;
+            for (auto grace = column.graces.rbegin(); grace != column.graces.rend(); ++grace) {
+                const double half = std::ranges::max(grace->notes, {}, &TabNote::width).width / 2 +
+                                    kFretPadding * kGraceScale;
+                grace->offset = edge - half - centre;
+                edge = centre + grace->offset - half - kGraceGap;
+            }
+            item.left = edge + kGraceGap;
             ink.push_back(item);
         }
     }
@@ -235,6 +263,11 @@ public:
             // Dynamics go under the standard notation when the system has it.
             if (alone_ && loudest) {
                 dynamics_.strike(*loudest, centre, measure_);
+            }
+            for (const TabGrace& grace : column.graces) {
+                for (const TabNote& note : grace.notes) {
+                    drawNote(note, centre + grace.offset);
+                }
             }
             for (const TabNote& note : column.notes) {
                 drawNote(note, centre);
@@ -436,7 +469,9 @@ private:
 
     // Where the note is played (its position, or the lowest fret that sounds
     // it) and what the tablature writes for it.
-    [[nodiscard]] std::optional<TabNote> tabNote(const core::Note& note) const {
+    // The fret number of a note, its text `size` high.
+    [[nodiscard]] std::optional<TabNote> tabNote(const core::Note& note,
+                                                 double size = kFretSize) const {
         core::FretPosition position;
         if (note.position) {
             position = *note.position;
@@ -463,15 +498,16 @@ private:
         if (effects.ghost || effects.tiedFromPrevious) {
             tab.text = "(" + tab.text + ")";
         }
-        tab.width = textWidth(tab.text, kFretSize);
+        tab.size = size;
+        tab.width = textWidth(tab.text, size);
         return tab;
     }
 
     void drawNote(const TabNote& note, double centre) {
         const double y = kLineSpace * (note.string - 1);
         const double half = note.width / 2;
-        const double cap = capHeight(kFretSize);
-        text(note.text, {centre, y + cap / 2}, kFretSize, Role::FretNumber, TextAlign::Centre,
+        const double cap = capHeight(note.size);
+        text(note.text, {centre, y + cap / 2}, note.size, Role::FretNumber, TextAlign::Centre,
              true);
         const core::NoteEffects& effects = note.note->effects;
         std::optional<LastNote>& previous = last_[static_cast<std::size_t>(note.string)];
