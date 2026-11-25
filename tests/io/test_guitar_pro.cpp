@@ -271,6 +271,12 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     CHECK(right.voices[0].beats[0].effects.strum == core::Strum::Down);
     CHECK(right.voices[0].beats[1].effects.strum == core::Strum::None);
     CHECK(piano.staff(0).measure(1).voices[0].beats[0].effects.strum == core::Strum::Up);
+    // A guitar chord over the piano keeps the diagram's own six strings (ADR-0080).
+    REQUIRE(right.voices[0].beats[0].chord);
+    CHECK(*right.voices[0].beats[0].chord ==
+          core::ChordSymbol{.name = "F",
+                            .diagram =
+                                core::ChordDiagram{.firstFret = 1, .frets = {1, 1, 2, 3, 3, 1}}});
 
     // Drum notes name the kit's articulations: hi-hat, kick, snare.
     const core::Track& drums = song.track(2);

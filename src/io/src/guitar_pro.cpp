@@ -191,9 +191,10 @@ struct TrackLayout {
 };
 
 /// The chord symbols of a `DiagramCollection` (ADR-0080). A diagram counts
-/// its strings from the lowest; on a staff of `strings` strings (none for a
-/// staff without a tuning) its frets go from string 1, the highest, down.
-ChordsById chordsOf(pugi::xml_node collection, std::size_t strings) {
+/// its strings from the lowest; its frets go from string 1, the highest, down,
+/// over the staff's `strings` or, on a staff without a tuning (0), over as many
+/// as the diagram has. Drum staves keep the names only.
+ChordsById chordsOf(pugi::xml_node collection, std::size_t strings, bool drums) {
     ChordsById chords;
     for (const pugi::xml_node item : collection.child("Items").children("Item")) {
         const int id = item.attribute("id").as_int(-1);
@@ -202,18 +203,20 @@ ChordsById chordsOf(pugi::xml_node collection, std::size_t strings) {
         }
         ChordSymbol symbol{.name = trimmed(item.attribute("name").value()), .diagram = {}};
         const pugi::xml_node diagram = item.child("Diagram");
-        if (diagram && strings > 0) {
-            const int count = diagram.attribute("stringCount").as_int(static_cast<int>(strings));
+        if (diagram && !drums) {
+            const int count =
+                std::clamp(diagram.attribute("stringCount").as_int(6), 1, Tuning::kMaxStrings);
+            const std::size_t width = strings > 0 ? strings : static_cast<std::size_t>(count);
             const int base = diagram.attribute("baseFret").as_int(0);
             ChordDiagram grid{
                 .firstFret = static_cast<std::uint8_t>(std::clamp(base + 1, 1, Tuning::kMaxFret)),
-                .frets = std::vector<std::int8_t>(strings, ChordDiagram::kMuted)};
+                .frets = std::vector<std::int8_t>(width, ChordDiagram::kMuted)};
             bool played = false;
             for (const pugi::xml_node fret : diagram.children("Fret")) {
                 const int fromLowest = fret.attribute("string").as_int(-1);
                 const int value = fret.attribute("fret").as_int(-1);
                 const int index = count - 1 - fromLowest;
-                if (fromLowest >= 0 && index >= 0 && std::cmp_less(index, strings) && value >= 0 &&
+                if (fromLowest >= 0 && index >= 0 && std::cmp_less(index, width) && value >= 0 &&
                     value <= Tuning::kMaxFret) {
                     grid.frets[static_cast<std::size_t>(index)] = static_cast<std::int8_t>(value);
                     played = true;
@@ -365,7 +368,8 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
         if (!diagrams.child("Items").child("Item")) {
             diagrams = property(track, "DiagramCollection");
         }
-        layout.chords.push_back(chordsOf(diagrams, pitches ? pitches->size() : 0));
+        layout.chords.push_back(
+            chordsOf(diagrams, pitches ? pitches->size() : 0, layout.percussion));
         if (!pitches) {
             layout.staves.emplace_back(clef);
             layout.lowToHigh.emplace_back();

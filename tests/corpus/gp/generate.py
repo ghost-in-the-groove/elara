@@ -349,7 +349,9 @@ def band() -> str:
     bass = Track("Bass", set_type="electricBass", set_name="Electric Bass", program=33,
                  transpose=(0, -1), staves=[{"tuning": [28, 33, 38, 43]}], volume=0.7, pan=0.3)
     piano = Track("Piano", set_type="grandPiano", set_name="Grand Piano", program=0,
-                  staves=[{"tuning": GUITAR}, {"tuning": FIVE_STRING_BASS}])
+                  staves=[{"tuning": GUITAR, "diagrams": [(0, "F", 0, {0: 1, 1: 3, 2: 3, 3: 2,
+                                                                      4: 1, 5: 1})]},
+                          {"tuning": FIVE_STRING_BASS}])
     drums = Track("Drums", set_type="drumKit", set_name="Drums", program=0,
                   staves=[{}], articulations=[("snare", 38), ("hiHat", 42), ("kickDrum", 36)],
                   volume=0.9)
@@ -370,8 +372,10 @@ def band() -> str:
         # The first chord is rolled: upwards in measure 1, downwards in measure 2.
         roll = "Up" if measure == 0 else "Down"
         right = [
+            # A guitar chord shown over the piano in measure 1 (ADR-0080).
             [Beat("Quarter", [Note(midi=65), Note(midi=69), Note(midi=72)],
-                  elements=[f"<Arpeggio>{roll}</Arpeggio>"]),
+                  elements=[f"<Arpeggio>{roll}</Arpeggio>"] + ([chord(0)] if measure == 0
+                                                               else [])),
              Beat("Quarter", [Note(concert=flat(70))]),
              Beat("Half", [Note(midi=69)])],
             [Beat("Whole", [Note(midi=77)])],  # a second voice

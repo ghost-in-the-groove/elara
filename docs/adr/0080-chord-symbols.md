@@ -31,7 +31,10 @@ importer dropped them with a warning.
 `ChordSymbol`: its `name` as written, and an optional `ChordDiagram` with
 the fret at the top of its grid (`firstFret`, 1 at the nut) and one fret per
 string from string 1, the top line of the tablature (`ChordDiagram::kMuted`
-for a string not played). Frets count from the capo, like notes' frets.
+for a string not played). Frets count from the capo, like notes' frets. A
+diagram has its staff's strings; on a staff without a tuning (a lead sheet's
+melody, a piano track that shows guitar chords) it has as many as the file
+gives, and drum staves keep the names only.
 
 A chord symbol is not sound: playback, audio rendering and MIDI export
 ignore it, and a beat with a chord and no notes is a rest.
@@ -46,7 +49,7 @@ compare by the symbols' values.
 
 **Reading.**
 
-- Guitar Pro 3-5: the name and the frets of the staff's strings; a chord
+- Guitar Pro 3-5: the name and the frets of the track's strings; a chord
   whose strings are all not played, or that has no frets, has no diagram.
 - Guitar Pro 6-8: the item's name and diagram, `baseFret + 1` as the first
   fret, strings counted from the top.
@@ -69,7 +72,7 @@ there is none. Older files without chords read as before.
   they are drawn, a song with chord symbols looks as it did before.
 - Transposing a song leaves chord names as they are until transposition
   learns to spell them. Copying, pasting and retuning carry a diagram as it
-  is; a diagram whose strings differ from its staff's is not drawn.
+  is: it is drawn with its own strings.
 - MusicXML export lists them as dropped until it writes `<harmony>`.
 - Tests: `core.Beats share chord symbols and compare them by value`,
   `io.Guitar Pro 3-5: chords keep their names and diagrams`,
