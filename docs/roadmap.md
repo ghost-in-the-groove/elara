@@ -94,7 +94,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] SFZ instruments for the guitars and the basses: chosen in the app and
         kept for the next start, `--guitar-sfz`/`--bass-sfz`, and
         `--sfz guitars=FILE`/`basses=FILE` in `elara-cli`
-  - [ ] FLAC samples
+  - [x] FLAC samples, read by the sampler like WAV ones (ADR-0067)
   - [x] Guitar techniques mapped to a library's keyswitches and controllers:
         palm mutes, dead notes and harmonics, found by name (ADR-0068)
   - [ ] A library's legato samples for hammer-ons and pull-offs

@@ -63,7 +63,8 @@ struct SfzTechniques {
 /// library's own keyswitch or controller for it, for that note alone, when
 /// the library names one (techniques()); otherwise the sampler darkens,
 /// shortens or softens the note as the built-in synthesizer does. Samples are
-/// WAV files, read into memory as mono when the bank is made, on every core.
+/// WAV or FLAC files, read into memory as mono when the bank is made, on every
+/// core.
 class SfzBank final : public SoundBank {
 public:
     /// Reads an .sfz file and the samples it names. Samples that cannot be
