@@ -59,9 +59,10 @@ enum class Role : std::uint8_t {
                    ///< ADR-0091)
     Pedal,         ///< the sustain pedal under a staff: "Ped.", its line and hook (ADR-0092)
     Fingering,     ///< the fingers that play or pluck the notes (ADR-0093)
+    Parenthesis,   ///< the parentheses round the notehead of a ghost note (ADR-0099)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Fingering) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Parenthesis) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

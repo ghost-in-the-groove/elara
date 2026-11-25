@@ -75,6 +75,7 @@ constexpr double kSlideDrop = 0.75;
 constexpr double kSlideBreak = 0.75;
 constexpr double kSlideThickness = 0.12;
 constexpr double kGraceSlideGap = 0.9;    // between a grace note sliding to its chord and the chord
+constexpr double kParenthesisGap = 0.08;  // between a ghost note's notehead and its parentheses
 constexpr double kClefChangeScale = 0.75; // a clef change against the line's clef (ADR-0087)
 constexpr double kClefChangeGap = 0.5;    // between a clef change and the barline after it
 constexpr double kArticulationGap = 0.3;  // between a notehead and its articulation
@@ -299,6 +300,7 @@ struct Head {
     double accidentalX = 0.0; // accidental origin, from the chord's x
     double dx = 0.0;          // notehead origin, from the chord's x
     const core::Note* note = nullptr;
+    bool ghost = false; // drawn between parentheses (ADR-0099)
     // The finger of a fretting hand, small left of the notehead (ADR-0093).
     std::optional<Glyph> fingering;
     double fingeringX = 0.0; // its origin, from the chord's x
@@ -317,6 +319,9 @@ struct Chord {
     int beamGroup = -1;
     double headLeft = 0.0;
     double headRight = 0.0;
+    // Beside the noteheads, the room the parentheses of its ghost notes take
+    // on each side, gap included; 0 without ghost notes (ADR-0099).
+    double ghostPad = 0.0;
     double left = 0.0; // ink extents from the chord's x
     double right = 0.0;
     double x = 0.0;
@@ -998,6 +1003,7 @@ private:
         Head head;
         head.note = &note;
         head.tied = note.effects.tiedFromPrevious;
+        head.ghost = note.effects.ghost;
         if (percussion_) {
             const detail::DrumNote drum = detail::drumNote(note.pitch.midiNumber());
             head.step = drum.step;
@@ -1189,11 +1195,16 @@ private:
             chord.headLeft = std::min(chord.headLeft, head.dx + box.southWest.x);
             chord.headRight = std::max(chord.headRight, head.dx + box.northEast.x);
         }
-        chord.left = chord.headLeft - placeAccidentals(chord);
+        chord.ghostPad =
+            std::ranges::any_of(heads, &Head::ghost)
+                ? kParenthesisGap + std::max(metrics(Glyph::NoteheadParenthesisLeft).box.width(),
+                                             metrics(Glyph::NoteheadParenthesisRight).box.width())
+                : 0.0;
+        chord.left = chord.headLeft - chord.ghostPad - placeAccidentals(chord);
         if (fretting_ && !percussion_) {
             chord.left -= placeFingerings(chord, chord.left);
         }
-        chord.right = chord.headRight + dotsWidth(chord.duration.dots());
+        chord.right = chord.headRight + chord.ghostPad + dotsWidth(chord.duration.dots());
         if (stem && chord.beamGroup < 0 && beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
             const Head& base = chord.stemUp ? heads.back() : heads.front();
@@ -1291,7 +1302,7 @@ private:
             return 0.0;
         }
         std::vector<double> rightEdge(columns.size());
-        double edge = chord.headLeft - kAccidentalGap;
+        double edge = chord.headLeft - chord.ghostPad - kAccidentalGap;
         for (std::size_t c = 0; c < columns.size(); ++c) {
             rightEdge[c] = edge;
             edge -= columns[c].width + kAccidentalColumnGap;
@@ -1303,7 +1314,7 @@ private:
                     rightEdge[columnOf[i]] - metrics(*head.accidental).box.northEast.x;
             }
         }
-        return chord.headLeft - (edge + kAccidentalColumnGap);
+        return chord.headLeft - chord.ghostPad - (edge + kAccidentalColumnGap);
     }
 
     // The glyph of a finger: 1 to 5 from the thumb, or for a fretting hand T
@@ -1391,6 +1402,21 @@ private:
         return left - (edge + kFingeringGap);
     }
 
+    // The parentheses round the notehead of a ghost note (ADR-0099), its
+    // chord at x, at `scale` of their size.
+    void parentheses(const Head& head, double x, double scale) {
+        const BoundingBox& box = metrics(head.glyph).box;
+        const BoundingBox& opening = metrics(Glyph::NoteheadParenthesisLeft).box;
+        const BoundingBox& closing = metrics(Glyph::NoteheadParenthesisRight).box;
+        const double y = yOf(head.step);
+        glyph(Glyph::NoteheadParenthesisLeft,
+              x + (head.dx + box.southWest.x - kParenthesisGap - opening.northEast.x) * scale, y,
+              Role::Parenthesis, scale);
+        glyph(Glyph::NoteheadParenthesisRight,
+              x + (head.dx + box.northEast.x + kParenthesisGap - closing.southWest.x) * scale, y,
+              Role::Parenthesis, scale);
+    }
+
     void draw(Chord& chord) {
         const double x = chord.x;
         if (chord.rest) {
@@ -1412,6 +1438,10 @@ private:
         for (const Head& head : chord.heads) {
             glyph(head.glyph, x + head.dx, yOf(head.step), Role::Notehead);
             ink(metrics(head.glyph).box, yOf(head.step));
+            if (head.ghost) {
+                parentheses(head, x, 1.0);
+                ink(metrics(Glyph::NoteheadParenthesisLeft).box, yOf(head.step));
+            }
             if (head.accidental) {
                 glyph(*head.accidental, x + head.accidentalX, yOf(head.step), Role::Accidental);
                 ink(metrics(*head.accidental).box, yOf(head.step));
@@ -1433,7 +1463,7 @@ private:
                 dotYs.push_back(dotY);
             }
         }
-        dots(x + chord.headRight, dotYs, chord.duration.dots());
+        dots(x + chord.headRight + chord.ghostPad, dotYs, chord.duration.dots());
         ledgerLines(chord, x);
         if (!hasStem(chord.duration.value())) {
             return;
@@ -1557,6 +1587,9 @@ private:
             const double x = chord.x + grace.x;
             for (const Head& head : grace.heads) {
                 glyph(head.glyph, x + head.dx * kScale, yOf(head.step), Role::Notehead, kScale);
+                if (head.ghost) {
+                    parentheses(head, x, kScale);
+                }
                 if (head.accidental) {
                     glyph(*head.accidental, x + head.accidentalX * kScale, yOf(head.step),
                           Role::Accidental, kScale);
@@ -1638,12 +1671,13 @@ private:
         if (head.accidental) {
             return chord.x + head.accidentalX + metrics(*head.accidental).box.southWest.x;
         }
-        return chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+        return chord.x + head.dx + metrics(head.glyph).box.southWest.x -
+               (head.ghost ? chord.ghostPad : 0.0);
     }
 
-    // The right of a notehead of the chord, after its dots.
+    // The right of a notehead of the chord, after its parentheses and dots.
     [[nodiscard]] double inkRightOf(const Chord& chord, const Head& head) const {
-        return chord.x + head.dx + metrics(head.glyph).box.northEast.x +
+        return chord.x + head.dx + metrics(head.glyph).box.northEast.x + chord.ghostPad +
                dotsWidth(chord.duration.dots());
     }
 
@@ -1926,7 +1960,8 @@ private:
                 continue;
             }
             const double left = from == previous.end() ? lineStart_ : from->right;
-            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x -
+                                 (head.ghost ? chord.ghostPad : 0.0);
             tie(head.step, tieAbove(chord, i), left + kTieGap, right - kTieGap);
         }
         previous.clear();
@@ -1936,10 +1971,11 @@ private:
         const double dots = dotsWidth(chord.duration.dots());
         for (std::size_t i = 0; i < count; ++i) {
             const Head& head = chord.heads[i];
-            previous.push_back(
-                TieStart{.step = head.step,
-                         .right = chord.x + head.dx + metrics(head.glyph).box.northEast.x + dots,
-                         .above = tieAbove(chord, i)});
+            previous.push_back(TieStart{.step = head.step,
+                                        .right = chord.x + head.dx +
+                                                 metrics(head.glyph).box.northEast.x +
+                                                 chord.ghostPad + dots,
+                                        .above = tieAbove(chord, i)});
         }
     }
 
