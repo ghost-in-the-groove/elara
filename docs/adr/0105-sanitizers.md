@@ -44,6 +44,11 @@ for it.
   layout, render and export, the damaged containers, the audio engine and the
   CLI. The app is left out because Qt is not instrumented and its smoke tests
   need a display.
+- Its first run found a signed overflow: `Fraction` ordered two values by
+  multiplying across, and a damaged MusicXML file's `<divisions>` near the
+  int limit gave terms whose products pass 64 bits, so the order came out
+  wrong. Terms under 2^31 still multiply; larger ones are compared through
+  their whole parts and remainders, which never overflow.
 - A new importer gets the sanitizer for free once its corpus file and damaged
   cases are tests. Fuzzing the importers can build on the same preset.
 - Code the tests never reach stays unchecked: the sanitizers only see what runs.
