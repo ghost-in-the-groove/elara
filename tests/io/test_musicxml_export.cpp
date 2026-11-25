@@ -974,6 +974,89 @@ TEST_CASE("MusicXML export: clef changes come back on their staves", "[musicxml]
     requireSame(expected, roundTrip(song));
 }
 
+TEST_CASE("MusicXML export: measure repeats come back, their music written out",
+          "[musicxml][export][simile]") {
+    // ADR-0102: a run of repeats starts with <measure-repeat type="start">
+    // and the measures it holds, numbered by staff; the first measure after
+    // it stops it. Each repeat writes out the music it plays.
+    core::Song song;
+    song.appendMeasures(7);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    core::Staff& right = song.track(p).staff(0);
+    core::Staff& left = song.track(p).staff(1);
+    const core::Duration half(core::NoteValue::Half);
+    for (const int m : {0, 3, 6}) {
+        right.measure(static_cast<std::size_t>(m)).voices[0].beats = {
+            beatOf(half, {core::Note{.pitch = core::Pitch::fromMidi(72 + m)}}),
+            beatOf(half, {core::Note{.pitch = core::Pitch::fromMidi(74)}})};
+    }
+    for (std::size_t m = 0; m < 7; ++m) {
+        left.measure(m).voices[0].beats = {
+            beatOf(core::Duration(core::NoteValue::Whole),
+                   {core::Note{.pitch = core::Pitch::fromMidi(48 + static_cast<int>(m))}})};
+    }
+    right.measure(1).repeat = core::MeasureRepeat::One;
+    right.measure(2).repeat = core::MeasureRepeat::One;
+    right.measure(4).repeat = core::MeasureRepeat::TwoFirst;
+    right.measure(5).repeat = core::MeasureRepeat::TwoSecond;
+
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const std::string& xml = exported.data;
+    const auto measure = [&](int number) {
+        const auto from = xml.find(std::format(R"(<measure number="{}")", number));
+        return xml.substr(from, xml.find("</measure>", from) - from);
+    };
+    CHECK(measure(2).find(R"(<measure-style number="1">)") != std::string::npos);
+    CHECK(measure(2).find(R"(<measure-repeat type="start">1</measure-repeat>)") !=
+          std::string::npos);
+    CHECK(measure(3).find("measure-repeat") == std::string::npos);
+    CHECK(measure(4).find(R"(<measure-repeat type="stop"/>)") != std::string::npos);
+    CHECK(measure(5).find(R"(<measure-repeat type="start">2</measure-repeat>)") !=
+          std::string::npos);
+    CHECK(measure(7).find(R"(<measure-repeat type="stop"/>)") != std::string::npos);
+    // The music written out: C5 D5 in measures 2 and 3, as in measure 1.
+    for (const int number : {2, 3}) {
+        const std::string text = measure(number);
+        CHECK(text.find("<step>C</step>") != std::string::npos);
+        CHECK(text.find("<step>D</step>") != std::string::npos);
+    }
+    requireSame(song, roundTrip(song));
+}
+
+TEST_CASE("MusicXML export: a guitar's measure repeat covers its TAB staff; one that does not "
+          "count goes",
+          "[musicxml][export][simile]") {
+    core::Song song;
+    song.appendMeasures(3);
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    core::Staff& guitar = song.track(g).staff(0);
+    guitar.measure(0).repeat = core::MeasureRepeat::One; // nothing before it
+    guitar.measure(1).voices[0].beats = {
+        beatOf(core::Duration(core::NoteValue::Whole), {guitar.frettedNote(1, 3)})};
+    guitar.measure(2).repeat = core::MeasureRepeat::One;
+
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings ==
+          std::vector<std::string>{std::format("{}: measure repeats that do not count dropped "
+                                               "(measure 1)",
+                                               song.track(g).name())});
+    const std::string& xml = exported.data;
+    // One style for the notation staff and the TAB staff written from it.
+    CHECK(xml.find("<measure-style>") != std::string::npos);
+    CHECK(xml.find("<measure-style number") == std::string::npos);
+    CHECK(xml.find(R"(<measure-repeat type="start">1</measure-repeat>)") ==
+          xml.rfind("<measure-repeat"));
+
+    guitar.measure(0).repeat = core::MeasureRepeat::None;
+    const core::Song back = roundTrip(song);
+    const core::Staff& read = back.track(0).staff(0);
+    CHECK(read.measure(2).repeat == core::MeasureRepeat::One);
+    CHECK(read.measure(2).isEmpty());
+}
+
 TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
           "[musicxml][export]") {
     // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the
