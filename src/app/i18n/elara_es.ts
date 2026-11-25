@@ -349,6 +349,10 @@
         <translation>Elegir un instrumento SFZ para las guitarras…</translation>
     </message>
     <message>
+        <source>Use the included guitar</source>
+        <translation>Usar la guitarra incluida</translation>
+    </message>
+    <message>
         <source>Basses: %1</source>
         <translation>Bajos: %1</translation>
     </message>
@@ -1754,6 +1758,10 @@
     <message>
         <source>Play through the SoundFont that comes with Elara.</source>
         <translation>Reproducir con el SoundFont que incluye Elara.</translation>
+    </message>
+    <message>
+        <source>Play the guitars through the SFZ instrument that comes with Elara.</source>
+        <translation>Tocar las guitarras con el instrumento SFZ que incluye Elara.</translation>
     </message>
     <message>
         <source>Play the guitars through this SFZ instrument.</source>

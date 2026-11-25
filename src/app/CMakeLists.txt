@@ -199,6 +199,18 @@ if(ELARA_SOUNDFONT_DIR)
   endif()
   install(DIRECTORY "${ELARA_SOUNDFONT_DIR}/" DESTINATION "${_elara_soundfonts}")
 endif()
+# The guitar SFZ instrument that comes with the packages (ADR-0072): the folder
+# `elara.py package` fetches FreePats' clean electric guitar into, with its
+# samples and licence, in a folder of its own where the app looks for it.
+set(ELARA_GUITAR_SFZ_DIR "" CACHE PATH "Folder of the guitar SFZ instrument installed with the app")
+if(ELARA_GUITAR_SFZ_DIR)
+  if(APPLE)
+    set(_elara_sfz elara.app/Contents/Resources/sfz)
+  else()
+    set(_elara_sfz "${CMAKE_INSTALL_DATADIR}/elara/sfz")
+  endif()
+  install(DIRECTORY "${ELARA_GUITAR_SFZ_DIR}/" DESTINATION "${_elara_sfz}/freepats-clean-guitar")
+endif()
 qt_generate_deploy_qml_app_script(
   TARGET elara
   OUTPUT_SCRIPT _elara_deploy_script

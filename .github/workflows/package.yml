@@ -100,14 +100,17 @@ jobs:
           chmod +x "$tool"
           echo "APPIMAGETOOL=$tool" >> "$GITHUB_ENV"
 
-      # The SoundFont that comes with the packages (ADR-0069), downloaded and
-      # checked by elara.py package: kept between runs.
-      - name: Cache the included SoundFont
+      # The SoundFont and the guitar SFZ instrument that come with the
+      # packages (ADR-0069, ADR-0072), downloaded and checked by elara.py
+      # package: kept between runs.
+      - name: Cache the included sounds
         uses: actions/cache@v4
         with:
-          path: build/downloads/soundfont
-          key: soundfont-${{ hashFiles('scripts/elara.py') }}
-          restore-keys: soundfont-
+          path: |
+            build/downloads/soundfont
+            build/downloads/guitar-sfz
+          key: sounds-${{ hashFiles('scripts/elara.py') }}
+          restore-keys: sounds-
 
       - name: Build, install, smoke-test and pack
         run: python scripts/elara.py package --installers

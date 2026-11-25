@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -492,6 +493,46 @@ SOUNDFONT_FILES = {
         "5ad8d737e13c7f01f5b9674872a82a92b4ba253603e8ed14b9db12293550b4b9",
 }
 
+# The guitar SFZ instrument that comes with the packages (ADR-0072): the small
+# bridge pickup set of FreePats' FSBS clean electric guitar (CC0), its licence
+# and its samples, from the library's repository at a fixed commit, checked
+# against these SHA-256 digests. The instrument is saved under a plainer name,
+# the one the app shows (GUITAR_SFZ_RENAMED).
+GUITAR_SFZ_URL = ("https://raw.githubusercontent.com/freepats/electric-guitar-FSBS-clean/"
+                  "192cf0d9bf2c4ba6ead8e3524ba3f78818e4fe91/")
+GUITAR_SFZ_FILES = {
+    "EGuitarFSBS-clean bridge small 20260807.sfz":
+        "aa74229ecf4a7ea8dc5773bb0a943481e146c767304222d8210a3b5fc368f095",
+    "LICENSE.txt": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "samples/bridge/small/A2_s2_01.flac":
+        "c63270dbb8d4600600662abf55d94a63123a68ff26bc04f1f560ae209817c76e",
+    "samples/bridge/small/B3_s5_01.flac":
+        "3a02f89dcd9a2431ddd2f91391f2b9f1b39a4fa335a4db09bb387f0a5a8b8b24",
+    "samples/bridge/small/B4_s6_01.flac":
+        "56823645bde6d2d4571d9827800c5e6002bb9729918f63eebbbaa10036a9f78d",
+    "samples/bridge/small/C#6_s6_01.flac":
+        "1c4ab2abeb962c8b4e96bc72b67bacdbc803d3c07649f08a88b0bf81500ec143",
+    "samples/bridge/small/C2_s1_01.flac":
+        "769cef1cb056680d05ad093baf01ee1a3fbca521371290fe9a81cb2706c615ce",
+    "samples/bridge/small/C3_s2_02.flac":
+        "4f6a0f6411e6ccf0cbde6bbe6148d916d8e513a16484237245be2095b00c3169",
+    "samples/bridge/small/D5_s6_01.flac":
+        "2c718b0225600266bec188dc9d520d26169338b52e336404ad61eaff49043cce",
+    "samples/bridge/small/E3_s3_01.flac":
+        "80f77c9ba5845ac0e827187b8e3b3952b5fb8a818a1a1d2e65cd5d1d690a8213",
+    "samples/bridge/small/E4_s6_01.flac":
+        "d3797573c4eb28429484c923d3bf12157c7f409a64ad354601061134055d4f9f",
+    "samples/bridge/small/F2_s1_01.flac":
+        "1ec869eb4cc3e2f1c1751f6e495c551a2f542122a9d1ef6cf064ad37c2a3a1b5",
+    "samples/bridge/small/G#5_s6_03.flac":
+        "4027b0d7f6cab7df8398d161ed3f86a51cb621bf9a9e01f922455285bd91a4f6",
+    "samples/bridge/small/G3_s4_01.flac":
+        "37cdcff86d3d666dde739d96fe25f64ec864adbbf8adb6d131e2f24ea13dd200",
+    "samples/bridge/small/G4_s6_01.flac":
+        "33366b0a25842dc439b3be5d1b31b31ba44674d3c39348fa6eff6e39d5bc6314",
+}
+GUITAR_SFZ_RENAMED = {"EGuitarFSBS-clean bridge small 20260807.sfz": "FreePats Clean Guitar.sfz"}
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -501,20 +542,23 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _fetch_soundfont() -> Path | None:
-    """Downloads the included SoundFont and its licence into build/downloads/
-    soundfont the first time, checks them, and returns that folder; None when
-    a file cannot be downloaded or does not match its digest."""
-    folder = ROOT / "build" / "downloads" / "soundfont"
-    folder.mkdir(parents=True, exist_ok=True)
-    for name, digest in SOUNDFONT_FILES.items():
-        path = folder / name
+def _fetch(kind: str, url: str, files: dict[str, str],
+           renamed: dict[str, str] | None = None) -> Path | None:
+    """Downloads `files` (paths under `url`, with their digests) into
+    build/downloads/`kind` the first time, under the names `renamed` gives
+    them, checks them, and returns that folder; None when a file cannot be
+    downloaded or does not match its digest."""
+    folder = ROOT / "build" / "downloads" / kind
+    for name, digest in files.items():
+        path = folder / (renamed or {}).get(name, name)
         if path.exists() and _sha256(path) == digest:
             continue
-        partial = folder.parent / (name + ".part")  # outside the installed folder
-        log(f"downloading {SOUNDFONT_URL}{name}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        partial = folder.parent / f"{kind}.part"  # outside the installed folder
+        source = url + urllib.parse.quote(name)  # spaces, and `#` in sample names
+        log(f"downloading {source}")
         try:
-            with urllib.request.urlopen(SOUNDFONT_URL + name, timeout=300) as response, \
+            with urllib.request.urlopen(source, timeout=300) as response, \
                     partial.open("wb") as out:
                 shutil.copyfileobj(response, out)
             if _sha256(partial) != digest:
@@ -529,6 +573,17 @@ def _fetch_soundfont() -> Path | None:
     return folder
 
 
+def _fetch_soundfont() -> Path | None:
+    """The included SoundFont and its licence, in build/downloads/soundfont."""
+    return _fetch("soundfont", SOUNDFONT_URL, SOUNDFONT_FILES)
+
+
+def _fetch_guitar_sfz() -> Path | None:
+    """The included guitar SFZ instrument, its licence and its samples, in
+    build/downloads/guitar-sfz."""
+    return _fetch("guitar-sfz", GUITAR_SFZ_URL, GUITAR_SFZ_FILES, GUITAR_SFZ_RENAMED)
+
+
 def _included_soundfont(stage: Path) -> Path | None:
     """The SoundFont `stage` installed, where the app looks for it."""
     folder = (stage / "elara.app" / "Contents" / "Resources" / "soundfonts" if IS_MAC
@@ -537,10 +592,19 @@ def _included_soundfont(stage: Path) -> Path | None:
     return fonts[0] if fonts else None
 
 
+def _included_guitar_sfz(stage: Path) -> Path | None:
+    """The guitar SFZ instrument `stage` installed, where the app looks for it."""
+    folder = (stage / "elara.app" / "Contents" / "Resources" / "sfz" if IS_MAC
+              else stage / "share" / "elara" / "sfz")
+    instruments = sorted(folder.glob("*/*.sfz")) if folder.is_dir() else []
+    return instruments[0] if instruments else None
+
+
 def _smoke_test_install(stage: Path) -> int:
     """Runs what `stage` installed the way a user would: the app's smoke test,
-    a CLI render that needs its fonts and, when the SoundFont came along, the
-    app playing a song through it, with no Qt kit on PATH."""
+    a CLI render that needs its fonts and, when the SoundFont and the guitar
+    SFZ instrument came along, the app playing a song through each of them,
+    with no Qt kit on PATH."""
     tools = stage / "elara.app" / "Contents" / "MacOS" if IS_MAC else stage / "bin"
     app = tools / f"elara{EXE}"
     cli = tools / f"elara-cli{EXE}"
@@ -560,6 +624,8 @@ def _smoke_test_install(stage: Path) -> int:
     ]
     if _included_soundfont(stage) is not None:
         steps.append([str(app), "--smoke-test", str(song), "--included-soundfont"])
+    if _included_guitar_sfz(stage) is not None:
+        steps.append([str(app), "--smoke-test", str(song), "--included-guitar-sfz"])
     for step in steps:
         log("smoke: " + " ".join(Path(step[0]).name if i == 0 else a for i, a in enumerate(step)))
         result = subprocess.run(step, cwd=work, env=env, check=False, capture_output=True,
@@ -667,10 +733,16 @@ def cmd_package(args: argparse.Namespace) -> int:
     if not args.no_soundfont and (soundfont := _fetch_soundfont()) is None:
         log("no SoundFont to include (pack without one with --no-soundfont)")
         return 1
+    guitar = None
+    if not args.no_guitar_sfz and (guitar := _fetch_guitar_sfz()) is None:
+        log("no guitar SFZ instrument to include (pack without one with --no-guitar-sfz)")
+        return 1
     if (code := ensure_configured(preset)) != 0:
         return code
     soundfont_dir = soundfont.as_posix() if soundfont else ""
-    if (code := run(["cmake", "--preset", preset, f"-DELARA_SOUNDFONT_DIR={soundfont_dir}"])) != 0:
+    guitar_dir = guitar.as_posix() if guitar else ""
+    if (code := run(["cmake", "--preset", preset, f"-DELARA_SOUNDFONT_DIR={soundfont_dir}",
+                     f"-DELARA_GUITAR_SFZ_DIR={guitar_dir}"])) != 0:
         return code
     if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara", "elara-cli"])) != 0:
         return code
@@ -775,6 +847,9 @@ def main() -> int:
                          help="fail when an installer cannot be made (MSI, AppImage)")
     package.add_argument("--no-soundfont", action="store_true",
                          help="pack without the SoundFont that comes with Elara (no download)")
+    package.add_argument("--no-guitar-sfz", action="store_true",
+                         help="pack without the guitar SFZ instrument that comes with Elara "
+                              "(no download)")
 
     args = parser.parse_args()
     return args.func(args)

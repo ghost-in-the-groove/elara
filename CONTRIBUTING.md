@@ -20,7 +20,7 @@ Always go through the task runner (use `py` instead of `python` on Windows):
 | `python scripts/elara.py build` | Configure (first time) and build the `dev` preset |
 | `python scripts/elara.py test -R audio` | Build, then run tests whose name matches a regex |
 | `python scripts/elara.py bench` | Build and run the benchmarks in the optimised `release` preset (results: `docs/performance.md`) |
-| `python scripts/elara.py package` | Build the app and the CLI in the `release` preset, install, smoke-test and pack them, with the MSI installer or AppImage where their tools are found, and MuseScore General downloaded once and included (`--no-soundfont` to leave it out; `build/package/`, ADR-0048, ADR-0065, ADR-0069) |
+| `python scripts/elara.py package` | Build the app and the CLI in the `release` preset, install, smoke-test and pack them, with the MSI installer or AppImage where their tools are found, and MuseScore General and a guitar SFZ instrument downloaded once and included (`--no-soundfont`, `--no-guitar-sfz` to leave them out; `build/package/`, ADR-0048, ADR-0065, ADR-0069, ADR-0072) |
 | `python scripts/elara.py format` | Apply clang-format 23 |
 | `python scripts/elara.py cli -- --json version` | Run the headless CLI |
 | `python scripts/elara.py app` | Launch the desktop app |

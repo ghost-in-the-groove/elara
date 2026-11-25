@@ -510,6 +510,16 @@ ApplicationWindow {
                         }
                     }
                     MenuItem {
+                        // The guitar SFZ instrument that comes with Elara
+                        // (ADR-0072).
+                        visible: audio.includedGuitarSfz.length > 0
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Use the included guitar")
+                        enabled: audio.guitarSfz !== audio.includedGuitarSfz
+                                 && !audio.loadingSoundFont
+                        onTriggered: audio.setSfz("guitars", audio.includedGuitarSfz)
+                    }
+                    MenuItem {
                         text: audio.bassSfzName.length > 0
                               ? qsTr("Basses: %1").arg(audio.bassSfzName)
                               : qsTr("Choose an SFZ instrument for the basses…")
