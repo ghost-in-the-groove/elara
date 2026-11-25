@@ -30,7 +30,7 @@ applied there.
 - A conductor track with the title (track name), copyright, every meter (MIDI
   clocks per click: the dotted beat in compound meters), every key (`sf`, `mi`)
   and every tempo in quarter notes per minute (other beat units are converted,
-  with a warning), and its end at the end of the song so empty measures survive.
+  with a warning; a gradual change goes in steps, ADR-0082), and its end at the end of the song so empty measures survive.
 - One track per track: track name, instrument name, program change, notes.
   Drums play on channel 10; other tracks take channels 1-9 and 11-16 in order
   and share them beyond fifteen (warning). A key struck again while it sounds on

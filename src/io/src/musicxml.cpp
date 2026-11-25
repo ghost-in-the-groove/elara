@@ -603,7 +603,8 @@ struct DynamicMark {
 
 struct TempoMark {
     Fraction onset{};
-    Tempo tempo{};
+    std::optional<Tempo> tempo{}; // none: the tempo in force
+    bool gradual = false;         // "accel.", "rit." (ADR-0082)
 };
 
 /// A chord symbol and where it goes (ADR-0080).
@@ -802,9 +803,8 @@ Navigation soundNavigation(pugi::xml_node sound) {
     return navigation;
 }
 
-/// The usual navigation texts ("D.S. al Coda", "Da Capo", "Fine", "To Coda"),
-/// read letter by letter without case, or empty for any other text.
-std::optional<Navigation> navigationWords(std::string_view text) {
+/// The text's letters in lower case, without spaces, dots or other signs.
+std::string lowerLetters(std::string_view text) {
     std::string letters;
     for (const char c : text) {
         const auto lower = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
@@ -812,6 +812,76 @@ std::optional<Navigation> navigationWords(std::string_view text) {
             letters += lower;
         }
     }
+    return letters;
+}
+
+/// Whether the words ask for a gradual tempo change ("accel.", "rit.", "poco
+/// rall."; ADR-0082), read letter by letter without case.
+bool rampWords(std::string_view text) {
+    std::string letters = lowerLetters(text);
+    for (const std::string_view modifier : {"pocoapoco", "poco", "molto"}) {
+        if (letters.starts_with(modifier)) {
+            letters.erase(0, modifier.size());
+            break;
+        }
+    }
+    constexpr std::array<std::string_view, 10> kRamps{
+        "accel",      "accelerando", "stringendo",  "rit",    "ritard",
+        "ritardando", "rall",        "rallentando", "allarg", "allargando"};
+    return std::ranges::find(kRamps, letters) != kRamps.end();
+}
+
+/// Words that end a ramp without a tempo of their own.
+bool rampEndWords(std::string_view text) {
+    const std::string letters = lowerLetters(text);
+    return letters.starts_with("atempo") || letters == "tempoi" || letters == "tempoprimo" ||
+           rampWords(text);
+}
+
+/// Whether a tempo is set after `direction` in its part, within a few measures and
+/// before words that end the ramp: then words there start a ramp to it (ADR-0082).
+bool tempoFollows(pugi::xml_node direction) {
+    constexpr int kLookahead = 64; // measures; bounds the work on damaged files
+    pugi::xml_node node = direction.next_sibling();
+    pugi::xml_node measure = direction.parent();
+    for (int measures = 0; measures <= kLookahead; ++measures) {
+        for (; node; node = node.next_sibling()) {
+            const std::string_view name = node.name();
+            if (name == "sound" && node.attribute("tempo")) {
+                return true;
+            }
+            if (name != "direction") {
+                continue;
+            }
+            if (node.child("sound").attribute("tempo")) {
+                return true;
+            }
+            std::string words;
+            for (pugi::xml_node type : node.children("direction-type")) {
+                if (type.child("metronome")) {
+                    return true;
+                }
+                for (pugi::xml_node word : type.children("words")) {
+                    words += word.child_value();
+                }
+            }
+            if (rampEndWords(words)) {
+                return false;
+            }
+        }
+        measure = measure.next_sibling("measure");
+        if (!measure) {
+            return false;
+        }
+        node = measure.first_child();
+    }
+    return false;
+}
+
+/// The usual navigation texts ("D.S. al Coda", "Da Capo", "Fine", "To Coda"),
+/// read letter by letter without case, or empty for any other text.
+std::optional<Navigation> navigationWords(std::string_view text) {
+    const std::string letters = lowerLetters(text);
     if (letters == "fine") {
         return Navigation{.fine = true};
     }
@@ -1101,19 +1171,37 @@ private:
 
         if (first_) {
             std::ranges::stable_sort(tempos, std::less<>{}, &TempoMark::onset);
+            auto& changes = header.tempoChanges;
             for (const TempoMark& mark : tempos) {
                 if (mark.onset >= measureLength) {
                     continue;
                 }
                 if (index == 0 && mark.onset.isZero()) {
-                    score_.startTempo = mark.tempo;
+                    // The start tempo; a ramp from the start is a change there.
+                    if (mark.tempo) {
+                        score_.startTempo = *mark.tempo;
+                    }
+                    const bool atStart = !changes.empty() && changes.front().offset.isZero();
+                    if (atStart) {
+                        changes.front().tempo = score_.startTempo.value_or(Tempo{});
+                        changes.front().gradual = changes.front().gradual || mark.gradual;
+                    } else if (mark.gradual) {
+                        changes.insert(changes.begin(),
+                                       TempoChange{.tempo = score_.startTempo.value_or(Tempo{}),
+                                                   .gradual = true});
+                    }
                     continue;
                 }
-                auto& changes = header.tempoChanges;
                 if (!changes.empty() && changes.back().offset == mark.onset) {
-                    changes.back().tempo = mark.tempo;
+                    if (mark.tempo) {
+                        changes.back().tempo = *mark.tempo;
+                    }
+                    changes.back().gradual = changes.back().gradual || mark.gradual;
                 } else {
-                    changes.push_back(TempoChange{.offset = mark.onset, .tempo = mark.tempo});
+                    changes.push_back(
+                        TempoChange{.offset = mark.onset,
+                                    .tempo = mark.tempo.value_or(tempoInForce(changes)),
+                                    .gradual = mark.gradual});
                 }
             }
             // An alternate ending spans the measures from its start to its stop.
@@ -1298,6 +1386,20 @@ private:
         return makeTempo(*perMinute, Duration(*value, dotCount), index);
     }
 
+    /// The tempo at the end of the measure read so far: its last change, else
+    /// the last change of the measures before, else the start tempo.
+    [[nodiscard]] Tempo tempoInForce(const std::vector<TempoChange>& changes) const {
+        if (!changes.empty()) {
+            return changes.back().tempo;
+        }
+        for (auto header = score_.headers.rbegin(); header != score_.headers.rend(); ++header) {
+            if (!header->tempoChanges.empty()) {
+                return header->tempoChanges.back().tempo;
+            }
+        }
+        return score_.startTempo.value_or(Tempo{});
+    }
+
     // `header`: the first part's measure, which takes the signs and jumps.
     void readDirection(pugi::xml_node direction, const Fraction& cursor, std::size_t index,
                        std::vector<DynamicMark>& dynamics, std::vector<HairpinMark>& hairpins,
@@ -1355,7 +1457,10 @@ private:
             }
         }
         const std::optional<Navigation> fromWords = navigationWords(words);
-        if (!fromWords && !trim(text).empty()) {
+        // Words of a ramp become the gradual change (ADR-0082); with no tempo to
+        // go to, they stay the text of the beat.
+        const bool ramp = !fromWords && rampWords(words) && tempoFollows(direction);
+        if (!fromWords && !ramp && !trim(text).empty()) {
             texts.push_back(
                 TextMark{.onset = onset, .staff = staff, .text = std::string(trim(text))});
         }
@@ -1367,8 +1472,8 @@ private:
                 tempo = soundTempo;
             }
         }
-        if (tempo) {
-            tempos.push_back(TempoMark{.onset = onset, .tempo = *tempo});
+        if (tempo || ramp) {
+            tempos.push_back(TempoMark{.onset = onset, .tempo = tempo, .gradual = ramp});
         }
         if (header != nullptr) {
             // A glyph alone is a sign; next to a jump or "To Coda" it decorates it.
