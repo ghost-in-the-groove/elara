@@ -750,9 +750,9 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
                 mark.tempo = change.tempo;
             }
             if (change.gradual) {
-                if (const auto next = changeAfter(song, m, i)) {
-                    mark.word = rampWord(change.tempo, next->change->tempo);
-                    mark.rampEnd = mark.word.empty() ? 0.0 : rampEnd(*next);
+                if (const auto after = changeAfter(song, m, i)) {
+                    mark.word = rampWord(change.tempo, after->change->tempo);
+                    mark.rampEnd = mark.word.empty() ? 0.0 : rampEnd(*after);
                 }
             }
             if (mark.tempo || !mark.word.empty()) {
