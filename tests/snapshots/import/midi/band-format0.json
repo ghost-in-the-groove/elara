@@ -1,9 +1,7 @@
 {
  "format": "midi",
  "out": null,
- "warnings": [
-  "lyrics dropped"
- ],
+ "warnings": [],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -55,6 +53,9 @@
         [
          {
           "duration": "2",
+          "lyrics": [
+           "la"
+          ],
           "notes": [
            {
             "pitch": "Bb2",
