@@ -166,6 +166,10 @@
         <translation>Marcato</translation>
     </message>
     <message>
+        <source>Trill</source>
+        <translation>Trino</translation>
+    </message>
+    <message>
         <source>Dynamics</source>
         <translation>Dinámicas</translation>
     </message>
@@ -1464,6 +1468,10 @@
         <translation>Cambiar acento</translation>
     </message>
     <message>
+        <source>Change trill</source>
+        <translation>Cambiar trino</translation>
+    </message>
+    <message>
         <source>Change harmonic</source>
         <translation>Cambiar armónico</translation>
     </message>
@@ -1728,6 +1736,10 @@
     <message>
         <source>Marcato</source>
         <translation>Marcato</translation>
+    </message>
+    <message>
+        <source>Trill</source>
+        <translation>Trino</translation>
     </message>
     <message>
         <source>Strum down</source>

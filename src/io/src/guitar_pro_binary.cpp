@@ -18,6 +18,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <optional>
 #include <ranges>
@@ -1186,8 +1187,19 @@ private:
             readHarmonic(effects, fret, who, m);
         }
         if ((second & 0x20U) != 0) {
-            in_.skip(2); // trill fret and speed
-            warnings_.add(who, "trills dropped", m);
+            // A trill to another fret of the string (ADR-0090): 1 sixteenths,
+            // 2 thirty-seconds, 3 sixty-fourths.
+            const int other = in_.i8();
+            const std::uint8_t period = in_.u8();
+            const int semitones = other - fret;
+            if (fret >= 0 && semitones != 0 && std::abs(semitones) <= core::Trill::kMaxSemitones) {
+                effects.trill = core::Trill{.semitones = static_cast<std::int8_t>(semitones),
+                                            .speed = period == 1   ? NoteValue::Sixteenth
+                                                     : period == 3 ? NoteValue::SixtyFourth
+                                                                   : NoteValue::ThirtySecond};
+            } else {
+                warnings_.add(who, "trills to an unusual note dropped", m);
+            }
         }
         if ((second & 0x40U) != 0 && effects.vibrato == Vibrato::None) {
             effects.vibrato = Vibrato::Slight;

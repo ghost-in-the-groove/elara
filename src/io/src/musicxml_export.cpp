@@ -1681,8 +1681,8 @@ private:
         }
 
         const bool tupletMarks = firstNote && place.tuplet != 0;
-        const bool ornaments =
-            fx.vibrato != Vibrato::None || (firstNote && beatFx.tremoloPicking.has_value());
+        const bool ornaments = fx.vibrato != Vibrato::None || fx.trill.isTrill() ||
+                               (firstNote && beatFx.tremoloPicking.has_value());
         const bool tapped = firstNote && beatFx.bassTechnique == BassTechnique::Tap;
         const bool technical = tapped || (firstNote && beatFx.pickStroke != PickStroke::None) ||
                                fx.legatoFromPrevious || legatoStart.has_value() ||
@@ -1728,7 +1728,7 @@ private:
                 writeFermata(xml, beatFx.fermata);
             }
             if (ornaments) {
-                writeOrnaments(xml, fx, firstNote ? beatFx.tremoloPicking : std::nullopt,
+                writeOrnaments(xml, note, firstNote ? beatFx.tremoloPicking : std::nullopt,
                                place.measure);
             }
             if (technical) {
@@ -1859,9 +1859,13 @@ private:
         xml.endText("notehead", head);
     }
 
-    void writeOrnaments(XmlWriter& xml, const NoteEffects& fx, std::optional<NoteValue> tremolo,
+    void writeOrnaments(XmlWriter& xml, const Note& note, std::optional<NoteValue> tremolo,
                         std::size_t m) {
+        const NoteEffects& fx = note.effects;
         xml.open("ornaments");
+        if (fx.trill.isTrill()) {
+            writeTrill(xml, note, m);
+        }
         if (fx.vibrato != Vibrato::None) {
             xml.start("wavy-line");
             xml.attribute("type", "start");
@@ -1886,6 +1890,36 @@ private:
             xml.endNumber("tremolo", marks);
         }
         xml.close("ornaments");
+    }
+
+    /// A trill mark (ADR-0090), with an accidental mark when its other note is
+    /// not the next step of the key. MusicXML trills go up, at no set speed.
+    void writeTrill(XmlWriter& xml, const Note& note, std::size_t m) {
+        const Trill& trill = note.effects.trill;
+        xml.empty("trill-mark");
+        if (trill.semitones < 0) {
+            warn("trills to a lower note written as trills to the next step up", m);
+            return;
+        }
+        if (trill.speed != NoteValue::ThirtySecond) {
+            warn("trill speeds dropped", m);
+        }
+        if (trill.semitones ==
+            semitonesToNextStep(note.pitch, song_.measureHeader(m).keySignature)) {
+            return;
+        }
+        // The step above the note as written, altered to reach the other note.
+        const Spelled at = written(note.pitch);
+        const int next = (at.step + 1) % 7;
+        const int alter = detail::midiOf(at.step, at.alter, at.octave) + trill.semitones -
+                          detail::midiOf(next, 0, next == 0 ? at.octave + 1 : at.octave);
+        static constexpr std::array<std::string_view, 5> kMarks{"flat-flat", "flat", "natural",
+                                                                "sharp", "double-sharp"};
+        if (alter < -2 || alter > 2) {
+            warn("trills to notes other than the next step written to the next step", m);
+            return;
+        }
+        xml.text("accidental-mark", kMarks[static_cast<std::size_t>(alter + 2)]);
     }
 
     /// MusicXML bends are a bend, optionally a pre-bend, optionally released:

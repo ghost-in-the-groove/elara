@@ -316,6 +316,7 @@ constexpr std::array kEditNames{
     Translation{"Change slide", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change slide")},
     Translation{"Change vibrato", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change vibrato")},
     Translation{"Change accent", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change accent")},
+    Translation{"Change trill", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change trill")},
     Translation{"Change harmonic",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change harmonic")},
     Translation{"Add grace note", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Add grace note")},
@@ -1659,6 +1660,9 @@ QString ScoreDocument::caretStatus() const {
             break;
         }
     }
+    if (fx.trill.isTrill()) {
+        parts.append(tr("Trill"));
+    }
     // Then the beat's own effects.
     if (const int strum = caretStrum(); strum != 0) {
         parts.append(strum == 1 ? tr("Strum down") : tr("Strum up"));
@@ -2432,6 +2436,20 @@ int ScoreDocument::caretVibrato() const {
 
 int ScoreDocument::caretAccent() const {
     return static_cast<int>(noteEffectsAtCaret().accent);
+}
+
+int ScoreDocument::caretTrill() const {
+    return noteEffectsAtCaret().trill.semitones;
+}
+
+void ScoreDocument::toggleTrill() {
+    const bool on = caretTrill() == 0;
+    changeNoteEffects(
+        [on](const core::Song& song, const core::Caret& caret) {
+            return on ? core::setTrillToNextStep(song, caret, core::NoteValue::ThirtySecond)
+                      : core::setTrill(song, caret, core::Trill{});
+        },
+        [on](const core::NoteEffects& fx) { return fx.trill.isTrill() == on; });
 }
 
 int ScoreDocument::caretDynamic() const {

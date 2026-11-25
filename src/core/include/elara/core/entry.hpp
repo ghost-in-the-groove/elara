@@ -191,6 +191,12 @@ enum class NoteEffect : std::uint8_t {
 [[nodiscard]] Entry setVibrato(const Song& song, const Caret& caret, Vibrato vibrato);
 /// An accent, a marcato or neither ("Change accent").
 [[nodiscard]] Entry setAccent(const Song& song, const Caret& caret, Accent accent);
+/// A trill, or none with `Trill{}` ("Change trill", ADR-0090). Throws
+/// std::out_of_range for a trill more than an octave away.
+[[nodiscard]] Entry setTrill(const Song& song, const Caret& caret, Trill trill);
+/// Trills each of the caret's notes to the next step up in the key of its
+/// measure, at `speed` ("Change trill", ADR-0090).
+[[nodiscard]] Entry setTrillToNextStep(const Song& song, const Caret& caret, NoteValue speed);
 /// A harmonic of `kind`, or none ("Change harmonic"): a natural harmonic at the
 /// note's fret, the others an octave above the fretted note. Throws
 /// std::logic_error for a harmonic on a staff without strings, and

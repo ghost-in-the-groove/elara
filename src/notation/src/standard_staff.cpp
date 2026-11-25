@@ -72,6 +72,9 @@ constexpr double kOctaveGap = 0.5;     // between an octave line and the ink it 
 constexpr double kOctaveLineGap = 0.3; // between an octave line's mark and its dashes
 constexpr double kOctaveDash = 0.4;    // dashes and gaps of an octave line
 constexpr double kOctaveMinLine = 1.0; // the dashes of a line over a single short note
+constexpr double kTrillGap = 0.5;      // between a trill and the ink it clears (ADR-0090)
+constexpr double kTrillWaveGap = 0.2;  // between a trill's "tr" and its wavy line
+constexpr double kTrillEndGap = 0.5;   // a wavy line ends before the next column
 
 // A rolled chord's wavy line (ADR-0076): half waves kArpeggioWave long whose
 // control points stand kArpeggioSwing off the line, so that it swings about
@@ -525,8 +528,53 @@ private:
         slurs();
         centreMeasureRests(start, barline);
         fermatas(start, barline);
+        trills(positions, barline);
         if (techniques_) {
             markTechniques(positions, barline);
+        }
+    }
+
+    // The trills of the measure's beats (ADR-0090): "tr" centred over the
+    // notehead, clear of the ink, under the staff for the lower voice of two;
+    // then a wavy line on to the next column when there is room for it.
+    void trills(std::span<const ColumnPosition> positions, double barline) {
+        const double centre = widthOf(Glyph::NoteheadBlack) / 2;
+        const BoundingBox& box = metrics(Glyph::OrnamentTrill).box;
+        const BoundingBox& wave = metrics(Glyph::WiggleTrill).box;
+        const double advance = metrics(Glyph::WiggleTrill).advanceWidth > 0.0
+                                   ? metrics(Glyph::WiggleTrill).advanceWidth
+                                   : wave.width();
+        for (const Chord& chord : chords_) {
+            if (chord.beat == nullptr || chord.rest ||
+                std::ranges::none_of(chord.heads, [](const Head& head) {
+                    return head.note != nullptr && head.note->effects.trill.isTrill();
+                })) {
+                continue;
+            }
+            const bool below = voiceCount_ > 1 && !voiceUp_[chord.voice];
+            const double x = chord.x + centre - (box.southWest.x + box.northEast.x) / 2;
+            const double from = x + box.northEast.x + kTrillWaveGap;
+            const double to = nextColumnX(positions, chord.start, barline) - kTrillEndGap;
+            // Each wave reaches past its advance into the next: n of them span
+            // (n - 1) advances and one wave's width.
+            const int waves =
+                static_cast<int>(std::floor((to - from - wave.width()) / advance)) + 1;
+            const double reach =
+                waves >= 1 ? from + (waves - 1) * advance + wave.width() : x + box.northEast.x;
+            const Extents ink = inkBetween(x + box.southWest.x, reach);
+            const double y = below ? ink.bottom + kTrillGap + box.northEast.y
+                                   : ink.top - kTrillGap + box.southWest.y;
+            glyph(Glyph::OrnamentTrill, x, y, Role::Ornament);
+            if (waves < 1) {
+                continue;
+            }
+            // The wavy line through the middle of the letters.
+            const double middle = y - (box.southWest.y + box.northEast.y) / 2;
+            const double waveY = middle + (wave.southWest.y + wave.northEast.y) / 2;
+            for (int i = 0; i < waves; ++i) {
+                glyph(Glyph::WiggleTrill, from + i * advance - wave.southWest.x, waveY,
+                      Role::Ornament);
+            }
         }
     }
 

@@ -55,9 +55,10 @@ enum class Role : std::uint8_t {
     Lyric,         ///< a syllable under a staff, the hyphens and extender lines (ADR-0084)
     Fermata,       ///< a fermata over (or under) a beat (ADR-0085)
     OctaveLine,    ///< an octave line: "8va" or "15mb" and its dashed line (ADR-0089)
+    Ornament,      ///< a trill's "tr" over its note and its wavy line (ADR-0090)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::OctaveLine) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Ornament) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

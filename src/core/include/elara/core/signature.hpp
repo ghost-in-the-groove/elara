@@ -112,4 +112,9 @@ private:
     KeyMode mode_ = KeyMode::Major;
 };
 
+/// The semitones from `pitch` up to the next step of the scale of `key`, with
+/// the accidental the key gives that step: the note a trill alternates with
+/// unless written otherwise (ADR-0090).
+[[nodiscard]] int semitonesToNextStep(const Pitch& pitch, const KeySignature& key);
+
 } // namespace elara::core

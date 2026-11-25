@@ -450,6 +450,16 @@ core::Song randomSong(std::uint32_t seed) {
                                     } else {
                                         note.pitch = song.measureHeader(m).keySignature.spell(
                                             s == 1 ? pick(36, 59) : pick(55, 84));
+                                        // Trills to the next step of the key, or a
+                                        // semitone past it with an accidental mark.
+                                        if (pick(0, 13) == 0) {
+                                            note.effects.trill =
+                                                Trill{.semitones = static_cast<std::int8_t>(
+                                                          semitonesToNextStep(
+                                                              note.pitch,
+                                                              song.measureHeader(m).keySignature) +
+                                                          pick(0, 1))};
+                                        }
                                     }
                                     note.effects.staccato = pick(0, 9) == 0;
                                     note.effects.tenuto = pick(0, 11) == 0;
@@ -689,6 +699,51 @@ TEST_CASE("MusicXML export: octave lines come back on every voice of their staff
     CHECK(count(R"(<octave-shift type="down" size="15")") == 1);
     CHECK(count(R"(<octave-shift type="up" size="8")") == 1);
     CHECK(count(R"(<octave-shift type="stop")") == 3);
+}
+
+TEST_CASE("MusicXML export: trills come back, with an accidental mark for an unusual note",
+          "[musicxml][export]") {
+    // ADR-0090: in F major A trills with Bb unless written otherwise; a trill
+    // to B natural needs an accidental mark. Trills down and other speeds warn.
+    core::Song song;
+    song.appendMeasures(1);
+    song.measureHeader(0).keySignature = core::KeySignature(-1, core::KeyMode::Major);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const auto trilled = [](std::string_view pitch, int semitones) {
+        core::Note note{.pitch = *core::Pitch::parse(pitch)};
+        note.effects.trill = core::Trill{.semitones = static_cast<std::int8_t>(semitones)};
+        return note;
+    };
+    auto& beats = song.track(p).staff(0).measure(0).voices[0].beats;
+    beats = {beatOf(quarter, {trilled("A4", 1)}), beatOf(quarter, {trilled("A4", 2)}),
+             beatOf(quarter, {trilled("E5", 1)}), beatOf(quarter)};
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    CHECK(exported.data.find("<accidental-mark>natural</accidental-mark>") != std::string::npos);
+
+    beats[3] = beatOf(quarter, {trilled("C5", -2)});
+    beats[3].notes[0].effects.trill.speed = core::NoteValue::Sixteenth;
+    const auto warned = exportMusicXml(song);
+    CHECK(hasWarning(warned.warnings,
+                     "trills to a lower note written as trills to the next step up"));
+
+    // An alto sax is written a major sixth up, in A major for C major: a
+    // concert G trilling with Ab is a written E trilling with F natural.
+    core::Song sax;
+    sax.appendMeasures(1);
+    const std::size_t a =
+        sax.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("alto-sax")));
+    sax.track(a).staff(0).measure(0).voices[0].beats = {
+        beatOf(core::Duration(core::NoteValue::Whole), {trilled("G4", 1)})};
+    const auto saxXml = exportMusicXml(sax);
+    CHECK(saxXml.warnings.empty());
+    CHECK(saxXml.data.find("<accidental-mark>natural</accidental-mark>") != std::string::npos);
+    requireSame(sax, roundTrip(sax));
 }
 
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {

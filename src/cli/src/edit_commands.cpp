@@ -243,6 +243,21 @@ std::uint8_t strokeDirection(std::string_view verb, std::string_view word) {
     return static_cast<std::uint8_t>(found - kStrokeDirections.begin());
 }
 
+// The speed a trill alternates its notes at (ADR-0090).
+core::NoteValue trillSpeed(std::string_view word) {
+    static constexpr std::array<std::pair<std::string_view, core::NoteValue>, 3> kSpeeds{{
+        {"16", core::NoteValue::Sixteenth},
+        {"32", core::NoteValue::ThirtySecond},
+        {"64", core::NoteValue::SixtyFourth},
+    }};
+    const auto found =
+        std::ranges::find_if(kSpeeds, [word](const auto& speed) { return speed.first == word; });
+    if (found == kSpeeds.end()) {
+        throw StepSyntaxError(std::format("trill: 16, 32 or 64, not {}", word));
+    }
+    return found->second;
+}
+
 // The kinds of note effects their steps take, in the order of their enums
 // (ADR-0058): slide-in, slide-out, vibrato, accent and harmonic.
 constexpr std::array<std::string_view, 3> kSlideInKinds{"none", "from-below", "from-above"};
@@ -422,6 +437,24 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "accent") { // accent <accent|marcato|none>
         edit = setAccent(song, entry.caret,
                          static_cast<Accent>(kindOf(verb, step.word(1), kAccentKinds)));
+    } else if (verb == "trill") { // trill <on|semitones|none> [16|32|64] (ADR-0090)
+        const std::string_view what = step.word(1);
+        const NoteValue speed = step.has(2) ? trillSpeed(step.word(2)) : NoteValue::ThirtySecond;
+        if (what == "none") {
+            edit = setTrill(song, entry.caret, Trill{});
+        } else if (what == "on") { // to the next step of the key
+            edit = setTrillToNextStep(song, entry.caret, speed);
+        } else {
+            const int semitones = step.number<int>(1);
+            if (semitones == 0 || std::abs(semitones) > Trill::kMaxSemitones) {
+                throw StepSyntaxError(
+                    std::format("trill: on, none or 1 to {} semitones up or down, not {}",
+                                Trill::kMaxSemitones, what));
+            }
+            edit =
+                setTrill(song, entry.caret,
+                         Trill{.semitones = static_cast<std::int8_t>(semitones), .speed = speed});
+        }
     } else if (verb == "harmonic") { // harmonic <natural|artificial|pinch|tapped|semi|none>
         edit = setHarmonic(song, entry.caret,
                            static_cast<HarmonicKind>(kindOf(verb, step.word(1), kHarmonicKinds)));
@@ -926,7 +959,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"chord <name|none>\", \"text <words|none>\", "
         "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
-        "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", \"harmonic "
+        "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", "
+        "\"trill <on|semitones|none> [16|32|64]\", \"harmonic "
         "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "
         "save");
     editCommand->callback(

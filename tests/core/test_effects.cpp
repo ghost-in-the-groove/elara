@@ -25,6 +25,7 @@ using elara::core::ottavaOctaves;
 using elara::core::PickStroke;
 using elara::core::SlideIn;
 using elara::core::SlideOut;
+using elara::core::Trill;
 using elara::core::Vibrato;
 
 TEST_CASE("A plain note and beat carry no effects", "[core][effects]") {
@@ -221,4 +222,16 @@ TEST_CASE("Octave lines move the written notes one or two octaves", "[core][effe
     CHECK(effects.ottava == Ottava::QuindicesimaBassa);
     CHECK(effects.slur);
     CHECK(effects != BeatEffects{});
+}
+
+TEST_CASE("A trill alternates with another note at its speed", "[core][effects]") {
+    // ADR-0090: no trill by default; a trill goes up some semitones.
+    const NoteEffects plain;
+    CHECK(!plain.trill.isTrill());
+    NoteEffects trilled;
+    trilled.trill = Trill{.semitones = 2, .speed = NoteValue::Sixteenth};
+    CHECK(trilled.trill.isTrill());
+    CHECK(trilled != plain);
+    CHECK(Trill{.semitones = 1} != Trill{.semitones = 2});
+    CHECK(Trill{.semitones = 1}.speed == NoteValue::ThirtySecond);
 }

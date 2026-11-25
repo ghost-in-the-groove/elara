@@ -107,6 +107,7 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"ottavaBassaVb", 0xE51C},
     {"quindicesimaAlta", 0xE515},
     {"quindicesimaBassaMb", 0xE51D},
+    {"ornamentTrill", 0xE566},
     {"dynamicPiano", 0xE520},
     {"dynamicMezzo", 0xE521},
     {"dynamicForte", 0xE522},

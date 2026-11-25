@@ -224,6 +224,10 @@ half as long again, twice or three times as long (ADR-0085).
 `ottava <8va|8vb|15ma|15mb|none>` puts the caret's beat under an octave line:
 standard notation writes its notes one or two octaves nearer the staff, and
 neighbouring beats with the same one share a line (ADR-0089).
+`trill <on|semitones|none> [16|32|64]` trills the caret's notes: `on` each to
+the next step up in the key, a number that many semitones up (or down when
+negative, at most 12), at thirty-seconds unless a speed says otherwise
+(ADR-0090).
 `grace <semitones> [duration] [on]` adds a grace note that many semitones from
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says

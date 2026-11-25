@@ -306,6 +306,7 @@ struct Articulation {
     int string = 0;     // 0 when the note has no fret position
     int strum = 0;      // place in the order its chord is strummed (ADR-0025)
     Fraction tremolo{}; // whole notes between tremolo-picked attacks; 0 for none
+    int trill = 0;      // semitones to a trill's other note, struck every `tremolo`
     const core::NoteEffects* effects = nullptr;
     const core::BeatEffects* beat = nullptr;
 };
@@ -603,6 +604,11 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
     if (beatEffects.strum != core::Strum::None) {
         result.strum = strumPlace(beat, note, beatEffects.strum);
     }
+    // A trill alternates with its other note at its own speed (ADR-0090).
+    if (effects.trill.isTrill()) {
+        result.trill = effects.trill.semitones;
+        result.tremolo = core::Duration(effects.trill.speed).length();
+    }
     result.key = harmonicKey(note, sounding.key);
     result.moves = !effects.bend.isEmpty() || !beatEffects.whammyBar.isEmpty() ||
                    effects.slideIn != core::SlideIn::None ||
@@ -749,7 +755,8 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                 reorder = true;
             }
             // Tremolo picking strikes the note again at its speed: as many
-            // times as that value fits in the note, rounded, evenly.
+            // times as that value fits in the note, rounded, evenly. A trill
+            // does the same, every other attack on its other note.
             std::int64_t repeats = 1;
             if (articulation.tremolo > Fraction(0)) {
                 const Fraction fits = heldLength(note.length, articulation) / articulation.tremolo;
@@ -769,6 +776,11 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             for (std::int64_t r = 0; r < repeats; ++r) {
                 if (repeats > 1) {
                     attack.end = r + 1 == repeats ? span.end : attack.start + step;
+                }
+                if (articulation.trill != 0) {
+                    attack.key = r % 2 == 0 ? articulation.key
+                                            : std::clamp(articulation.key + articulation.trill, 0,
+                                                         kKeys - 1);
                 }
                 notes_.push_back(attack);
                 writtenAs.push_back(i);

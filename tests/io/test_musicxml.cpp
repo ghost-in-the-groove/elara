@@ -328,6 +328,38 @@ TEST_CASE("MusicXML: tenuto marks hold their notes, detached-legato is portato",
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: trill marks trill to the next step of the key", "[musicxml]") {
+    // ADR-0090: in D major E trills with F#, two semitones up, and C# with D,
+    // one; an accidental mark changes the other note; the wavy line after a
+    // trill mark is the trill's, not a vibrato.
+    const auto trilled = [](std::string_view step, std::string_view alter,
+                            std::string_view ornaments) {
+        return std::format("<note><pitch><step>{}</step>{}<octave>5</octave></pitch>"
+                           "<duration>4</duration><voice>1</voice><type>quarter</type>"
+                           "<notations><ornaments>{}</ornaments></notations></note>",
+                           step, alter, ornaments);
+    };
+    std::string xml = onePart(
+        "<attributes><key><fifths>2</fifths></key></attributes>" +
+        trilled("E", "", "<trill-mark/>") +
+        trilled("C", "<alter>1</alter>", R"(<trill-mark/><wavy-line type="start"/>)") +
+        trilled("C", "<alter>1</alter>", "<trill-mark/><accidental-mark>sharp</accidental-mark>") +
+        trilled("G", "", "<mordent/>"));
+    const ImportResult result = parse(xml);
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    const auto trillOf = [&](std::size_t b) {
+        return beats[b].notes.at(0).effects.trill;
+    };
+    CHECK(trillOf(0) == core::Trill{.semitones = 2, .speed = core::NoteValue::ThirtySecond});
+    CHECK(trillOf(1).semitones == 1);
+    CHECK(beats[1].notes.at(0).effects.vibrato == core::Vibrato::None);
+    CHECK(trillOf(2).semitones == 2); // to D#
+    CHECK(!trillOf(3).isTrill());
+    REQUIRE(result.warnings.size() == 1);
+    CHECK(result.warnings[0].find("ornaments dropped") != std::string::npos);
+}
+
 TEST_CASE("MusicXML: octave shifts become the octave lines of the beats under them", "[musicxml]") {
     // ADR-0089: "down" writes the notes an octave (size 15: two) lower than
     // their pitch, 8va; every voice's beats from the start to the stop take

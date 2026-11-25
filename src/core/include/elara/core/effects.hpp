@@ -107,6 +107,18 @@ struct Harmonic {
     friend constexpr bool operator==(const Harmonic&, const Harmonic&) noexcept = default;
 };
 
+/// A trill (ADR-0090): the note alternates with the note `semitones` above
+/// it (below when negative), starting on itself, in notes of `speed`.
+struct Trill {
+    static constexpr int kMaxSemitones = 12;
+
+    std::int8_t semitones = 0; // 0: no trill
+    NoteValue speed = NoteValue::ThirtySecond;
+
+    [[nodiscard]] constexpr bool isTrill() const noexcept { return semitones != 0; }
+    friend constexpr bool operator==(const Trill&, const Trill&) noexcept = default;
+};
+
 enum class Vibrato : std::uint8_t { None, Slight, Wide };
 enum class Accent : std::uint8_t { None, Accent, Marcato };
 enum class Dynamic : std::uint8_t { PPP, PP, P, MP, MF, F, FF, FFF };
@@ -129,6 +141,7 @@ struct NoteEffects {
     // memory benchmark: a Note stays 48 bytes).
     BendCurve bend{};
     Harmonic harmonic{};
+    Trill trill{};                       // ADR-0090
     bool tiedFromPrevious : 1 = false;   // tie: same pitch, sustained
     bool legatoFromPrevious : 1 = false; // hammer-on (higher) or pull-off (lower)
     SlideIn slideIn = SlideIn::None;

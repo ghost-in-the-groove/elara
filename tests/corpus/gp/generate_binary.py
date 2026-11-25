@@ -223,7 +223,7 @@ def write_note_effects(w: Writer, fx: dict) -> None:
             second |= 0x08
         if "harmonic" in fx:
             second |= 0x10
-        if fx.get("trill"):
+        if "trill" in fx:
             second |= 0x20
         if fx.get("vibrato"):
             second |= 0x40
@@ -257,8 +257,9 @@ def write_note_effects(w: Writer, fx: dict) -> None:
         for value in extra:
             w.u8(value)
     if second & 0x20:
-        w.i8(2)
-        w.i8(1)
+        fret, period = fx["trill"]  # the other fret; 1 sixteenths, 2 thirty-seconds
+        w.i8(fret)
+        w.i8(period)
 
 
 def write_note(w: Writer, n: dict) -> None:
@@ -597,7 +598,7 @@ def quartet_gp4() -> dict:
               beat(-1, [note(1, 10, effects={"bend": (1, 50, [(0, 0), (60, 50)])})])]],
             [[beat(-1, [note(1, 8)]),
               beat(0, [note(1, 8, kind="tie")]),
-              beat(0, [note(1, 5, effects={"trill": True})])]],
+              beat(0, [note(1, 5, effects={"trill": (7, 2)})])]],
         ],
     }
     return {

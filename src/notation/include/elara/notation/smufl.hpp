@@ -114,6 +114,8 @@ enum class Glyph : std::uint8_t {
     OttavaBassaVb,
     QuindicesimaAlta,
     QuindicesimaBassaMb,
+    // Ornaments (ADR-0090)
+    OrnamentTrill,
     // Dynamics
     DynamicPiano,
     DynamicMezzo,

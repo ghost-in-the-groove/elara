@@ -238,4 +238,16 @@ std::optional<KeySignature> KeySignature::parse(std::string_view text) {
     return KeySignature(fifths, mode);
 }
 
+int semitonesToNextStep(const Pitch& pitch, const KeySignature& key) {
+    constexpr int kSteps = 7;
+    const int index = static_cast<int>(pitch.step()) + 1;
+    const auto next = static_cast<Step>(index % kSteps);
+    const int octave = pitch.octave() + index / kSteps;
+    // Counted in semitones, not built as a Pitch: B9's next step is off the range.
+    constexpr std::array<int, kSteps> kNatural{0, 2, 4, 5, 7, 9, 11};
+    const int upper =
+        12 * (octave + 1) + kNatural[static_cast<std::size_t>(next)] + key.alterFor(next);
+    return upper - pitch.midiNumber();
+}
+
 } // namespace elara::core

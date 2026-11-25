@@ -4,7 +4,6 @@
  "warnings": [
   "triplet feel dropped",
   "Drums: instrument and volume changes dropped (measure 2)",
-  "Melody: trills dropped (measure 2)",
   "Melody: lyrics after the last note dropped"
  ],
  "song": {
@@ -441,6 +440,10 @@
            {
             "pitch": "A4",
             "effects": {
+             "trill": {
+              "semitones": 2,
+              "speed": "32"
+             },
              "dynamic": "f"
             }
            }

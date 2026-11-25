@@ -266,6 +266,11 @@ public:
             for (const core::Beat* beat : column.beats) {
                 addTechniques(marks, *beat);
                 addStruck(loudest, *beat);
+                for (const core::Note& note : beat->notes) {
+                    if (marks.trillFret < 0 && note.effects.trill.isTrill() && note.position) {
+                        marks.trillFret = note.position->fret + note.effects.trill.semitones;
+                    }
+                }
             }
             // Dynamics go under the standard notation when the system has it.
             if (alone_ && loudest) {

@@ -483,6 +483,28 @@ TEST_CASE("Guitar Pro: a tapped note taps its beat", "[io][guitarpro]") {
     CHECK(read[3].effects.bassTechnique == core::BassTechnique::None);
 }
 
+TEST_CASE("Guitar Pro: a note's Trill names the key of its other note", "[io][guitarpro]") {
+    // ADR-0090: fret 5 on the top string (A4, 69) trilled with B4 (71), in
+    // sixteenths as Guitar Pro plays them.
+    const std::string beats = R"(<Beat id="0"><Rhythm ref="0"/><Notes>1</Notes></Beat>)"
+                              R"(<Beat id="1"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string half = R"(<Rhythm id="0"><NoteValue>Half</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0 1", beats, half);
+    score.insert(score.find("</Notes><Rhythms>"),
+                 R"(<Note id="1"><Trill>71</Trill><Properties><Property name="Fret"><Fret>5</Fret>)"
+                 R"(</Property><Property name="String"><String>5</String></Property>)"
+                 R"(</Properties></Note>)");
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() == 2);
+    REQUIRE(read[0].notes.at(0).pitch.midiNumber() == 69);
+    CHECK(read[0].notes[0].effects.trill ==
+          core::Trill{.semitones = 2, .speed = core::NoteValue::Sixteenth});
+    CHECK(!read[1].notes.at(0).effects.trill.isTrill());
+}
+
 TEST_CASE("Guitar Pro: beats keep their free text", "[io][guitarpro]") {
     // ADR-0081: the text as written; an empty one is none.
     const std::string beats =

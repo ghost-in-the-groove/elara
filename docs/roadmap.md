@@ -143,6 +143,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML, read from Guitar Pro 6-8
   - [x] Drawn on standard notation, over barlines, cut and repeated at system breaks
   - [x] Set at the caret
+- [x] Trills: notes alternated with the next step of the key, or any note up to an octave away, at their speed (ADR-0090)
+  - [x] In the model, played and kept by the native format
+  - [x] Read and written in MusicXML, read from Guitar Pro 3-8
+  - [x] Drawn on standard notation with a wavy line, and in a lane over tablature
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 
