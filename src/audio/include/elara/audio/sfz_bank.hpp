@@ -50,6 +50,7 @@ struct SfzTechniques {
     SfzTechnique palmMute; ///< a keyswitch named "palm" or "mute", or a controller "mut"
     SfzTechnique dead;     ///< a keyswitch named "dead" or "ghost"
     SfzTechnique harmonic; ///< a keyswitch named "harm"
+    SfzTechnique legato;   ///< a keyswitch named "legato", "hammer", "pull" or "slur"
 };
 
 /// An SFZ instrument as a sound bank. Its sampler plays the tracks it is for
@@ -62,7 +63,10 @@ struct SfzTechniques {
 /// notes of their key. A palm mute, a dead note or a harmonic plays on the
 /// library's own keyswitch or controller for it, for that note alone, when
 /// the library names one (techniques()); otherwise the sampler darkens,
-/// shortens or softens the note as the built-in synthesizer does. Samples are
+/// shortens or softens the note as the built-in synthesizer does. A note
+/// joined by a hammer-on or a pull-off plays the library's legato keyswitch
+/// or its `trigger=legato` regions, and glides when it has neither; on a
+/// fretted track a picked note is never legato (ADR-0070). Samples are
 /// WAV or FLAC files, read into memory as mono when the bank is made, on every
 /// core.
 class SfzBank final : public SoundBank {

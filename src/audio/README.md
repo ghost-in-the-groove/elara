@@ -12,8 +12,9 @@ Three targets with different rules:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
   note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
-  ring and harmonics applied (ADR-0022), bends, slides, hammer-ons and
-  vibrato sent as pitch events (ADR-0023), and strums and tremolo picking
+  ring and harmonics applied (ADR-0022), bends, slides and vibrato sent as
+  pitch events (ADR-0023), hammer-ons, pull-offs and legato slides as legato
+  events (ADR-0070), and strums and tremolo picking
   spreading and repeating attacks (ADR-0025). For practice it plays at 25 % to
   200 % of the written tempo and adds a metronome on a track after the song's
   (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
@@ -43,7 +44,10 @@ Three targets with different rules:
   (`SfzTracks`); the other tracks play on another bank, and `with()` puts the
   same samples in front of another one. Palm mutes, dead notes and harmonics
   play on the library's own keyswitch or controller for them, found by name
-  (`techniques()`, ADR-0068), or else are imitated;
+  (`techniques()`, ADR-0068), or else are imitated. Hammer-ons and pull-offs
+  play a keyswitch named for legato or the `trigger=legato` regions, and
+  glide when the library has neither (ADR-0070); a fretted track's picked
+  notes are never legato;
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from

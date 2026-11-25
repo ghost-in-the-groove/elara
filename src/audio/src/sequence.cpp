@@ -427,6 +427,14 @@ NoteEvent pitchEvent(double time, std::size_t track, int key, double cents, doub
             .velocity = 0};
 }
 
+// A note joined to the voice struck as `key` (ADR-0070).
+NoteEvent legatoEvent(double time, std::size_t track, int key, double cents, int velocity) {
+    NoteEvent event = pitchEvent(time, track, key, cents, 0.0);
+    event.kind = EventKind::Legato;
+    event.velocity = velocity;
+    return event;
+}
+
 // The key a harmonic sounds: a partial of the open string (natural) or of
 // the fretted note (artificial, pinch, tapped). A semi-harmonic keeps the
 // fretted pitch, and so does a node that is not one.
@@ -841,8 +849,9 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                 clipLine(line, note.start - span.start, writtenEnds[p] - span.start, part);
                 const double base = 100.0 * (note.key - key);
                 if (!note.struck) {
-                    events.push_back(pitchEvent(
-                        note.start, t, key, base + (line.empty() ? 0.0 : line.front().cents), 0.0));
+                    events.push_back(legatoEvent(note.start, t, key,
+                                                 base + (line.empty() ? 0.0 : line.front().cents),
+                                                 note.velocity));
                 } else if (!line.empty() && line.front().cents != 0.0) {
                     events.push_back(pitchEvent(note.start, t, key, line.front().cents, 0.0));
                 }

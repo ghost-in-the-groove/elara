@@ -152,6 +152,11 @@ Event pitch(double time, int key, int cents, double glide = 0.0) {
     return {.kind = EventKind::Pitch, .time = time, .key = key, .cents = cents, .glide = glide};
 }
 
+// A note joined to the voice struck as `key`, `cents` above it (ADR-0070).
+Event joined(double time, int key, int cents) {
+    return {.kind = EventKind::Legato, .time = time, .key = key, .cents = cents};
+}
+
 std::vector<Event> eventsOf(const Sequence& sequence) {
     std::vector<Event> result;
     for (const NoteEvent& event : sequence.events()) {
@@ -538,10 +543,19 @@ TEST_CASE("Sequence: hammer-ons and pull-offs sound on the voice of the note bef
         struck.push_back(note.struck);
     }
     CHECK(struck == std::vector<bool>{true, false, false, true, true, true});
-    CHECK(eventsOf(sequence) == std::vector<Event>{on(0.0, 57), pitch(0.5, 57, 200),
-                                                   pitch(1.0, 57, 0), off(1.5, 57), on(1.5, 57),
+    // The joined notes are Legato events on the first note's key, at the
+    // offset of their own pitch, with their own velocity.
+    CHECK(eventsOf(sequence) == std::vector<Event>{on(0.0, 57), joined(0.5, 57, 200),
+                                                   joined(1.0, 57, 0), off(1.5, 57), on(1.5, 57),
                                                    off(2.0, 57), on(2.5, 59), off(3.0, 59),
                                                    on(3.0, 60), off(3.5, 60)});
+    for (const NoteEvent& event : sequence.events()) {
+        if (event.kind == EventKind::Legato) {
+            const auto note = std::ranges::find(sequence.notes(), event.time, &PlayedNote::start);
+            REQUIRE(note != sequence.notes().end());
+            CHECK(event.velocity == note->velocity);
+        }
+    }
 }
 
 TEST_CASE("Sequence: a bend follows its curve over the note", "[audio][sequence][pitch]") {
@@ -593,7 +607,7 @@ TEST_CASE("Sequence: slides glide into, between and off notes", "[audio][sequenc
           std::vector<Event>{on(0.0, 57), pitch(0.0, 57, -500), pitch(0.0, 57, 0, 0.1),
                              off(0.5, 57), on(0.5, 57), pitch(0.8, 57, 400, 0.2), off(1.0, 57),
                              on(1.0, 61), pitch(1.3, 61, -500, 0.2), off(1.5, 61), on(2.0, 57),
-                             pitch(2.3, 57, 400, 0.2), pitch(2.5, 57, 400), off(3.0, 57)});
+                             pitch(2.3, 57, 400, 0.2), joined(2.5, 57, 400), off(3.0, 57)});
 }
 
 TEST_CASE("Sequence: vibrato swings the pitch either side of the note",
