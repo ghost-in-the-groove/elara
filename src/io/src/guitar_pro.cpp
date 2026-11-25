@@ -465,8 +465,9 @@ BendCurve bendOf(pugi::xml_node note) {
 /// What the reader uses of a <Beat>, found in one pass over its children and
 /// one over its properties rather than a search for each.
 struct BeatFields {
-    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio;
-    bool text = false, chord = false, fading = false, wah = false, hairpin = false, ottava = false,
+    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
+        hairpin;
+    bool text = false, chord = false, fading = false, wah = false, ottava = false,
          whammyBar = false, slapped = false, popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
@@ -486,12 +487,13 @@ struct BeatFields {
                 tremolo = child;
             } else if (name == "Arpeggio") {
                 arpeggio = child;
+            } else if (name == "Hairpin") {
+                hairpin = child;
             } else {
                 text = text || name == "FreeText";
                 chord = chord || name == "Chord";
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
-                hairpin = hairpin || name == "Hairpin";
                 ottava = ottava || name == "Ottavia";
             }
         }
@@ -773,9 +775,6 @@ private:
         if (fields.wah) {
             warnings_.add(who, "wah dropped", m);
         }
-        if (fields.hairpin) {
-            warnings_.add(who, "crescendos and diminuendos dropped", m);
-        }
         if (fields.ottava) {
             warnings_.add(who, "octave signs dropped", m);
         }
@@ -797,6 +796,13 @@ private:
             // A chord rolled upwards sounds from its lowest note, as a downstroke
             // does (ADR-0025); Guitar Pro writes "Up" or "Down".
             effects.strum = textOf(fields.arpeggio) == "Down" ? core::Strum::Up : core::Strum::Down;
+        }
+        if (const std::string_view hairpin = textOf(fields.hairpin); hairpin == "Crescendo") {
+            effects.hairpin = core::Hairpin::Crescendo;
+        } else if (hairpin == "Decrescendo" || hairpin == "Diminuendo") {
+            effects.hairpin = core::Hairpin::Diminuendo;
+        } else if (!hairpin.empty()) {
+            warnings_.add(who, "unknown hairpins dropped", m);
         }
         if (fields.slapped) {
             effects.bassTechnique = core::BassTechnique::Slap;

@@ -83,6 +83,7 @@ one that replaces them.
 | [0075](0075-guitar-pro-keyboards-grand-staff.md) | Guitar Pro 3-5 keyboards on a grand staff | Accepted |
 | [0076](0076-arpeggio-lines.md) | Strums of keyboards are arpeggio lines | Accepted |
 | [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
+| [0078](0078-hairpins.md) | Hairpins | Accepted |
 
 ## Template
 
