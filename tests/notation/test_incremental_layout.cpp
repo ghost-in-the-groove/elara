@@ -109,7 +109,7 @@ void edit(Song& song, std::mt19937& random) {
     Track& track = song.track(t);
     auto& staff = track.staff(pick(random, track.staffCount()));
     auto& header = song.measureHeader(m);
-    switch (pick(random, 13)) {
+    switch (pick(random, 14)) {
     case 0: // another measure's notes, as paste does
         staff.measure(m) = staff.measure(pick(random, song.measureCount()));
         break;
@@ -181,6 +181,11 @@ void edit(Song& song, std::mt19937& random) {
         }
         break;
     }
+    case 12: // a hammer-on from the measure before, slurred on it (ADR-0097)
+        if (Note* note = firstNote(staff.measure(m))) {
+            note->effects.legatoFromPrevious = !note->effects.legatoFromPrevious;
+        }
+        break;
     default:
         header.keySignature = KeySignature(static_cast<int>(pick(random, 15)) - 7, KeyMode::Major);
         break;

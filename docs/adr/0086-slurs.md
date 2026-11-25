@@ -64,7 +64,7 @@ spaces, the whole slur moves away instead. A slur that goes on into the next
 line ends at the edge of the line, and the next line's goes on from its start.
 A `slur` role marks them in the display list, as it marks hammer-on arcs on
 tablature. Tablature does not draw slurs: its arcs are the hammer-ons and
-pull-offs.
+pull-offs, which standard notation slurs as well (ADR-0097).
 
 **Editing.** The app's entry bar has a slur button next to the hairpins that
 slurs the caret's beat to the next one, lit while it is; the caret's status

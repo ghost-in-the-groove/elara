@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Slurs over the beats slurred in a row (ADR-0086).
+// Slurs over the beats slurred in a row (ADR-0086), and over notes played
+// legato (ADR-0097).
 #include <elara/core/song.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/smufl.hpp>
@@ -21,10 +22,12 @@ using Catch::Matchers::WithinAbs;
 using elara::core::Beat;
 using elara::core::Clef;
 using elara::core::Duration;
+using elara::core::Grace;
 using elara::core::Instrument;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pitch;
+using elara::core::SlideOut;
 using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Track;
@@ -58,6 +61,30 @@ Beat beat(std::string_view pitch, bool slurred = false, NoteValue value = NoteVa
         made.notes.push_back(Note{.pitch = *Pitch::parse(pitch)});
     }
     made.effects.slur = slurred;
+    return made;
+}
+
+// `made` with its notes played legato from the note before them: hammered
+// on or pulled off.
+Beat legato(Beat made) {
+    for (Note& note : made.notes) {
+        note.effects.legatoFromPrevious = true;
+    }
+    return made;
+}
+
+// `made` with its notes sliding out to the next.
+Beat sliding(Beat made, SlideOut slide) {
+    for (Note& note : made.notes) {
+        note.effects.slideOut = slide;
+    }
+    return made;
+}
+
+// `made` with an eighth grace note of `pitch` before the beat.
+Beat graced(Beat made, std::string_view pitch) {
+    made.graces.push_back(Grace{.duration = Duration(NoteValue::Eighth),
+                                .notes = {Note{.pitch = *Pitch::parse(pitch)}}});
     return made;
 }
 
@@ -247,4 +274,100 @@ TEST_CASE("Slurs: a beat slurred to nothing draws none", "[notation][layout][slu
         {{beat("C5"), beat("D5"), beat("E5"), beat("F5")}, {beat("G5", true, NoteValue::Whole)}},
         {{beat("C4", false, NoteValue::Half), beat("D4", true, NoteValue::Half)}});
     CHECK(slurs(layout(song)).empty());
+}
+
+TEST_CASE("Slurs: hammer-ons, pull-offs and legato slides slur their notes",
+          "[notation][layout][slur]") {
+    SECTION("a hammer-on and a pull-off in a row: one slur over the three notes") {
+        const DisplayList list =
+            layout(treble({{beat("C5"), legato(beat("D5")), legato(beat("C5")), beat("")}}));
+        const auto found = slurs(list);
+        REQUIRE(found.size() == 1);
+        const auto notes = heads(list);
+        REQUIRE(notes.size() == 3);
+        CHECK_THAT(found[0].from.x, WithinAbs(centre(notes[0]), 0.3));
+        CHECK_THAT(found[0].to.x, WithinAbs(centre(notes[2]), 0.3));
+    }
+    SECTION("a legato slide slurs into the next note, a shift slide does not") {
+        const DisplayList list =
+            layout(treble({{sliding(beat("C5"), SlideOut::Legato), beat("D5"),
+                            sliding(beat("E5"), SlideOut::Shift), beat("F5")}}));
+        const auto found = slurs(list);
+        REQUIRE(found.size() == 1);
+        const auto notes = heads(list);
+        REQUIRE(notes.size() == 4);
+        CHECK_THAT(found[0].from.x, WithinAbs(centre(notes[0]), 0.3));
+        CHECK_THAT(found[0].to.x, WithinAbs(centre(notes[1]), 0.3));
+    }
+    SECTION("joined to a marked slur: one slur") {
+        const DisplayList list =
+            layout(treble({{beat("C5", true), beat("D5"), legato(beat("E5")), beat("")}}));
+        const auto found = slurs(list);
+        REQUIRE(found.size() == 1);
+        const auto notes = heads(list);
+        REQUIRE(notes.size() == 3);
+        CHECK_THAT(found[0].from.x, WithinAbs(centre(notes[0]), 0.3));
+        CHECK_THAT(found[0].to.x, WithinAbs(centre(notes[2]), 0.3));
+    }
+    SECTION("on a fretted staff, only to the next note on its string") {
+        // A slides legato to the B four beats on, on its string; the C on
+        // another string is not slurred to it. D is hammered on from C.
+        Beat a = sliding(beat("A4"), SlideOut::Legato);
+        a.notes[0].position = elara::core::FretPosition{.string = 3, .fret = 2};
+        Beat c = beat("C5");
+        c.notes[0].position = elara::core::FretPosition{.string = 2, .fret = 1};
+        Beat d = legato(beat("D5"));
+        d.notes[0].position = elara::core::FretPosition{.string = 2, .fret = 3};
+        Beat b = beat("B4");
+        b.notes[0].position = elara::core::FretPosition{.string = 3, .fret = 4};
+        const DisplayList list = layout(treble({{a, c, d, b}}));
+        const auto found = slurs(list);
+        REQUIRE(found.size() == 1);
+        const auto notes = heads(list);
+        REQUIRE(notes.size() == 4);
+        CHECK_THAT(found[0].from.x, WithinAbs(centre(notes[1]), 0.3));
+        CHECK_THAT(found[0].to.x, WithinAbs(centre(notes[2]), 0.3));
+    }
+    SECTION("across a barline, and from the line before") {
+        const Song song = treble({{beat("C5"), beat("D5"), beat("E5"), beat("F5")},
+                                  {legato(beat("G5")), beat("A5"), beat(""), beat("")}});
+        const auto all = slurs(layout(song));
+        REQUIRE(all.size() == 1);
+        const DisplayList second = layout(song, {.firstMeasure = 1});
+        const auto rest = slurs(second);
+        REQUIRE(rest.size() == 1);
+        CHECK(rest[0].from.x < heads(second)[0].origin.x);
+    }
+}
+
+TEST_CASE("Slurs: a grace note played legato into its note is slurred to it",
+          "[notation][layout][slur]") {
+    // B4, then D5 hammered on from its grace note C5: the slur joins the grace
+    // note to D5, under them since the grace note's stem goes up, and B4 is
+    // not slurred.
+    const DisplayList list =
+        layout(treble({{beat("B4"), legato(graced(beat("D5"), "C5")), beat(""), beat("")}}));
+    const auto found = slurs(list);
+    REQUIRE(found.size() == 1);
+    const auto notes = heads(list);
+    REQUIRE(notes.size() == 3);
+    const GlyphItem& grace = notes[1];
+    const GlyphItem& main = notes[2];
+    REQUIRE(grace.scale < 1.0);
+    CHECK(found[0].from.x > centre(notes[0]) + 0.5);
+    CHECK(found[0].from.x >= grace.origin.x);
+    CHECK(found[0].to.x <= centre(main) + 0.3);
+    CHECK(found[0].to.x > found[0].from.x);
+    CHECK(found[0].from.y > top(grace));
+    CHECK(found[0].control1.y > found[0].from.y); // bulging down
+}
+
+TEST_CASE("Slurs: a grace note sliding legato into its note is slurred to it",
+          "[notation][layout][slur]") {
+    Beat main = graced(beat("D5"), "C5");
+    main.graces[0].notes[0].effects.slideOut = SlideOut::Legato;
+    const DisplayList list = layout(treble({{beat("B4"), main, beat(""), beat("")}}));
+    const auto found = slurs(list);
+    REQUIRE(found.size() == 1);
+    CHECK(found[0].from.x > centre(heads(list)[0]) + 0.5);
 }

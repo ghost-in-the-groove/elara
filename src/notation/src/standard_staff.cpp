@@ -64,6 +64,7 @@ constexpr double kSlurMinHeight = 0.5;
 constexpr double kSlurNaturalHeight = 1.5; // the most it rises unless notes are in the way
 constexpr double kSlurMaxHeight = 2.5;     // beyond it the whole slur moves away instead
 constexpr double kSlurLineGap = 0.4;       // between a slur cut by a line and its edge
+constexpr double kGraceSlurHeight = 0.35;  // a slur from a grace note to its chord
 constexpr double kClefChangeScale = 0.75;  // a clef change against the line's clef (ADR-0087)
 constexpr double kClefChangeGap = 0.5;     // between a clef change and the barline after it
 constexpr double kArticulationGap = 0.3;   // between a notehead and its articulation
@@ -338,6 +339,43 @@ struct SlurNote {
     int voiceSide = 0; // -1: the upper voice of several, 1: a lower one, 0: alone
 };
 
+// Whether a note of `notes` is on the string of `note`; notes without a
+// string, off a fretted staff, are on any.
+[[nodiscard]] bool onStringOf(const core::Note& note, std::span<const core::Note> notes) {
+    return std::ranges::any_of(notes, [&](const core::Note& other) {
+        return !note.position || !other.position || other.position->string == note.position->string;
+    });
+}
+
+// Whether a note of `from` goes on legato to a note of `to` on its string
+// (ADR-0097): it slides legato into it, or that note is hammered on or
+// pulled off from it.
+[[nodiscard]] bool legatoBetween(std::span<const core::Note> from, std::span<const core::Note> to) {
+    return std::ranges::any_of(from,
+                               [&](const core::Note& note) {
+                                   return note.effects.slideOut == core::SlideOut::Legato &&
+                                          onStringOf(note, to);
+                               }) ||
+           std::ranges::any_of(to, [&](const core::Note& note) {
+               return note.effects.legatoFromPrevious && onStringOf(note, from);
+           });
+}
+
+// Whether `beat` is slurred to `next`, the beat after it in its voice: marked
+// so (ADR-0086), or joined to it by a hammer-on, a pull-off or a legato slide
+// (ADR-0097). A beat with grace notes is played legato from them instead, and
+// its slur starts at them (graceSlur).
+[[nodiscard]] bool slurredTo(const core::Beat& beat, const core::Beat* next) {
+    return beat.effects.slur ||
+           (next != nullptr && next->graces.empty() && legatoBetween(beat.notes, next->notes));
+}
+
+// Whether the notes of `beat` go on legato from its last grace note
+// (ADR-0097).
+[[nodiscard]] bool legatoFromGrace(const core::Beat& beat) {
+    return !beat.graces.empty() && legatoBetween(beat.graces.back().notes, beat.notes);
+}
+
 // The outer edge of a beam group's primary beam: y = edge + slope * (x - x0).
 struct BeamLine {
     double edge = 0.0;
@@ -437,8 +475,12 @@ private:
         incoming_.fill(first > 0);
         for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
             slurNotes_[v].clear();
-            const bool carried = first > 0 && !staff_.measure(first - 1).voices[v].beats.empty() &&
-                                 staff_.measure(first - 1).voices[v].beats.back().effects.slur;
+            bool carried = false;
+            if (first > 0) {
+                const std::vector<core::Beat>& before = staff_.measure(first - 1).voices[v].beats;
+                carried = !before.empty() &&
+                          slurredTo(before.back(), beatAfter(first - 1, v, before.back()));
+            }
             slurOpen_[v] = carried;
             slurIncoming_[v] = carried;
         }
@@ -1495,6 +1537,9 @@ private:
                                                .measure = measure_});
             }
         }
+        if (legatoFromGrace(*chord.beat)) {
+            graceSlur(chord, up);
+        }
     }
 
     // Stems and beams of a beam group: the beam follows the melody, slanted by
@@ -1819,6 +1864,48 @@ private:
         return note;
     }
 
+    // The beat after `beat` of voice v in measure m: the next in the measure,
+    // else the voice's first in the next measure; null at the end of the song
+    // or of the voice.
+    [[nodiscard]] const core::Beat* beatAfter(std::size_t m, std::size_t v,
+                                              const core::Beat& beat) const {
+        const std::vector<core::Beat>& beats = staff_.measure(m).voices[v].beats;
+        const auto i = static_cast<std::size_t>(&beat - beats.data());
+        if (i + 1 < beats.size()) {
+            return &beats[i + 1];
+        }
+        if (m + 1 < song_.measureCount()) {
+            const std::vector<core::Beat>& next = staff_.measure(m + 1).voices[v].beats;
+            return next.empty() ? nullptr : &next.front();
+        }
+        return nullptr;
+    }
+
+    // A slur from the last grace note of a chord to its noteheads, played
+    // legato from it (ADR-0097): on the side away from the grace notes' stems,
+    // ending before the chord's stem where that comes down on the same side.
+    void graceSlur(const Chord& chord, bool graceUp) {
+        const Chord& grace = chord.graces.back();
+        if (grace.heads.empty() || chord.heads.empty()) {
+            return;
+        }
+        const double direction = graceUp ? 1.0 : -1.0;
+        const Head& start = graceUp ? grace.heads.back() : grace.heads.front();
+        const Head& end = graceUp ? chord.heads.back() : chord.heads.front();
+        const Point from{chord.x + grace.x + (start.dx + widthOf(start.glyph) / 2) * kGraceScale,
+                         yOf(start.step) + direction * (0.5 * kGraceScale + kSlurGap)};
+        Point to{chord.x + (chord.headLeft + chord.headRight) / 2,
+                 yOf(end.step) + direction * (0.5 + kSlurGap)};
+        if (hasStem(chord.duration.value()) && chord.stemUp != graceUp) {
+            to = {chord.stemX - kSlurGap, yOf(end.step) + direction * 0.5};
+        }
+        if (to.x - from.x < kEpsilon) {
+            return;
+        }
+        curve(from, to, direction * kGraceSlurHeight, defaults_.slurMidpointThickness * kGraceScale,
+              defaults_.slurEndpointThickness, Role::Slur);
+    }
+
     // Gathers the beats of the slur going on in each voice and draws it when
     // the beat after its last slurred beat comes. A voice without beats in the
     // measure ends its slur at its last beat.
@@ -1830,7 +1917,7 @@ private:
             }
             const std::size_t v = chord.voice;
             seen[v] = true;
-            const bool slurred = chord.beat->effects.slur;
+            const bool slurred = slurredTo(*chord.beat, beatAfter(measureIndex_, v, *chord.beat));
             if (!slurOpen_[v] && !slurred) {
                 continue;
             }

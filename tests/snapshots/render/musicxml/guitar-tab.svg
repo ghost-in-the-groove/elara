@@ -88,6 +88,7 @@
 <text class="t fretNumber" x="44.437" y="43.484" style="font-size:1.3px" text-anchor="middle" stroke="none">X</text>
 <text class="t bend" x="29.395" y="34.209" style="font-size:0.95px" text-anchor="middle" stroke="none">full</text>
 <text class="t tempo" x="20.411" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 120</text>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M22.837,27.244 C23.27,27.746 24.136,27.496 24.569,26.744 C24.136,27.576 23.27,27.826 22.837,27.244Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M37.904,19.594 C38.61,19.088 40.021,19.088 40.727,19.594 C40.021,19.168 38.61,19.168 37.904,19.594Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M22.928,40.898 C23.316,40.258 24.091,40.258 24.479,40.898 C24.091,40.338 23.316,40.338 22.928,40.898Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M19.928,42.398 C26.028,41.758 38.228,41.758 44.328,42.398 C38.228,41.838 26.028,41.838 19.928,42.398Z"/>
