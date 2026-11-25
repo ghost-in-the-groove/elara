@@ -270,6 +270,9 @@ public:
                     if (marks.trillFret < 0 && note.effects.trill.isTrill() && note.position) {
                         marks.trillFret = note.position->fret + note.effects.trill.semitones;
                     }
+                    if (marks.ornament == core::Ornament::None) {
+                        marks.ornament = note.effects.ornament;
+                    }
                 }
             }
             // Dynamics go under the standard notation when the system has it.

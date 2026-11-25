@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Trills over their notes, and in a lane over tablature (ADR-0090).
+// Trills, mordents and turns over their notes, and in a lane over tablature
+// (ADR-0090, ADR-0091).
 #include <elara/core/effects.hpp>
 #include <elara/core/song.hpp>
 #include <elara/core/tuning.hpp>
@@ -29,6 +30,7 @@ using elara::core::FretPosition;
 using elara::core::Instrument;
 using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Ornament;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
@@ -197,4 +199,53 @@ TEST_CASE("Trills: tablature shows tr and the other note's fret in a lane",
     const DisplayList system = layoutSystem(song, both, bravura());
     CHECK(glyphs(system, Role::Ornament, Glyph::OrnamentTrill).size() == 1);
     CHECK(glyphs(system, Role::Technique, Glyph::OrnamentTrill).size() == 1);
+}
+
+TEST_CASE("Ornaments: mordents and turns over their notes, without a wavy line",
+          "[notation][layout][ornament]") {
+    // ADR-0091: one of each, on the four quarters of a measure.
+    const auto ornamented = [](std::string_view text, Ornament ornament) {
+        Note note{.pitch = *Pitch::parse(text)};
+        note.effects.ornament = ornament;
+        return note;
+    };
+    const DisplayList list = layoutStaff(
+        songOf({{beatOf(NoteValue::Quarter, {ornamented("G4", Ornament::Mordent)}),
+                 beatOf(NoteValue::Quarter, {ornamented("A4", Ornament::UpperMordent)}),
+                 beatOf(NoteValue::Quarter, {ornamented("B4", Ornament::Turn)}),
+                 beatOf(NoteValue::Quarter, {ornamented("C5", Ornament::InvertedTurn)})}}),
+        0, 0, bravura());
+    const auto notes = heads(list);
+    REQUIRE(notes.size() == 4);
+    const double headCentre = bravura().metrics(Glyph::NoteheadBlack).box.northEast.x / 2;
+    constexpr std::array kMarks{Glyph::OrnamentMordent, Glyph::OrnamentShortTrill,
+                                Glyph::OrnamentTurn, Glyph::OrnamentTurnInverted};
+    for (std::size_t i = 0; i < kMarks.size(); ++i) {
+        CAPTURE(i);
+        const auto marks = glyphs(list, Role::Ornament, kMarks[i]);
+        REQUIRE(marks.size() == 1);
+        CHECK_THAT((left(marks[0]) + right(marks[0])) / 2,
+                   WithinAbs(notes[i].origin.x + headCentre, kEpsilon));
+        CHECK(bottom(marks[0]) < notes[i].origin.y - 0.5); // over its note
+    }
+    CHECK(glyphs(list, Role::Ornament, Glyph::WiggleTrill).empty());
+    CHECK(glyphs(list, Role::Ornament, Glyph::OrnamentTrill).empty());
+}
+
+TEST_CASE("Ornaments: tablature shows a mordent or a turn in the trill's lane",
+          "[notation][layout][ornament]") {
+    Song song;
+    song.appendMeasures(1);
+    song.addTrack(Track("Guitar",
+                        Instrument{.name = "Guitar", .midiProgram = 25, .writtenOffset = 12},
+                        {Staff(Clef::Treble8vb, Tuning::standardGuitar())}));
+    Note note{.pitch = Pitch::fromMidi(Tuning::standardGuitar().midiAt(1, 5)),
+              .position = FretPosition{.string = 1, .fret = 5}};
+    note.effects.ornament = Ornament::Turn;
+    song.track(0).staff(0).measure(0).voices[0].beats = {beatOf(NoteValue::Whole, {note})};
+    const StaffSelection tablature{.view = StaffView::Tablature};
+    const DisplayList alone = layoutSystem(song, std::span(&tablature, 1), bravura());
+    const auto marks = glyphs(alone, Role::Technique, Glyph::OrnamentTurn);
+    REQUIRE(marks.size() == 1);
+    CHECK(marks[0].origin.y < 0.0); // above the staff
 }
