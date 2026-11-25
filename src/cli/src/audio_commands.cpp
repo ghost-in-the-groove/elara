@@ -636,6 +636,32 @@ std::string jsonStrings(const std::vector<std::string>& values) {
     return body + ']';
 }
 
+// The touches an SFZ library can play itself, with its control for each.
+std::array<std::pair<std::string_view, const audio::SfzTechnique*>, 3>
+techniquesOf(const audio::SfzBank& bank) {
+    const audio::SfzTechniques& techniques = bank.techniques();
+    return {{{audio::touchName(audio::Touch::PalmMute), &techniques.palmMute},
+             {audio::touchName(audio::Touch::Dead), &techniques.dead},
+             {audio::touchName(audio::Touch::Harmonic), &techniques.harmonic}}};
+}
+
+// {"palm-mute": {"keyswitch" or "cc": N, "label": ...} or null, ...}
+std::string techniquesJson(const audio::SfzBank& bank) {
+    std::string json = "{";
+    for (const auto& [touch, technique] : techniquesOf(bank)) {
+        json += std::format(R"({}"{}":)", json.size() == 1 ? "" : ",", touch);
+        if (!technique->found()) {
+            json += "null";
+        } else {
+            json += std::format(R"({{"{}":{},"label":"{}"}})",
+                                technique->keyswitch >= 0 ? "keyswitch" : "cc",
+                                technique->keyswitch >= 0 ? technique->keyswitch : technique->cc,
+                                jsonEscape(technique->label));
+        }
+    }
+    return json + '}';
+}
+
 int runSfz(bool json, const SfzOptions& options) {
     const auto started = std::chrono::steady_clock::now();
     const auto bank = audio::SfzBank::open(options.file);
@@ -653,12 +679,12 @@ int runSfz(bool json, const SfzOptions& options) {
     }
     if (json) {
         std::cout << std::format(
-            R"({{"file":"{}","name":"{}","regions":{},"samples":{},"sampleBytes":{},"lowestKey":{},"highestKey":{},"missingSamples":{},"unknownOpcodes":{},"skippedHeaders":{},"loadSeconds":{}}})"
+            R"({{"file":"{}","name":"{}","regions":{},"samples":{},"sampleBytes":{},"lowestKey":{},"highestKey":{},"missingSamples":{},"unknownOpcodes":{},"skippedHeaders":{},"techniques":{},"loadSeconds":{}}})"
             "\n",
             jsonEscape(options.file), jsonEscape((*bank)->name()), program.regions.size(),
             (*bank)->sampleCount(), (*bank)->sampleBytes(), lowest, highest,
             jsonStrings((*bank)->missingSamples()), jsonStrings(program.unknownOpcodes),
-            jsonStrings(program.skippedHeaders), jsonNumber(loadSeconds));
+            jsonStrings(program.skippedHeaders), techniquesJson(**bank), jsonNumber(loadSeconds));
         return kExitOk;
     }
     std::cout << std::format("{}: {} regions over keys {} to {}, {} samples ({:.1f} MB) read in "
@@ -675,6 +701,15 @@ int runSfz(bool json, const SfzOptions& options) {
             std::cout << ' ' << opcode;
         }
         std::cout << '\n';
+    }
+    for (const auto& [touch, technique] : techniquesOf(**bank)) {
+        if (technique->keyswitch >= 0) {
+            std::cout << std::format("  {}: keyswitch {} \"{}\"\n", touch, technique->keyswitch,
+                                     technique->label);
+        } else if (technique->cc >= 0) {
+            std::cout << std::format("  {}: controller {} \"{}\"\n", touch, technique->cc,
+                                     technique->label);
+        }
     }
     return kExitOk;
 }

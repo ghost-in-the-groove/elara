@@ -356,7 +356,11 @@ private:
                 program_.ccDefaults[static_cast<std::size_t>(*cc)] =
                     std::clamp(number<int>(value).value_or(0), 0, 127);
             }
-        } else if (!name.starts_with("label_cc")) {
+        } else if (const auto label = suffixNumber(name, "label_cc"); label) {
+            if (*label >= 0 && *label < 128) {
+                program_.ccLabels[static_cast<std::size_t>(*label)] = value;
+            }
+        } else {
             unknown_.insert(kindOf(name));
         }
     }
@@ -523,11 +527,12 @@ private:
             setWhole(region.end);
         } else if (name == "rt_decay") {
             setReal(region.rtDecay);
-        } else if (name == "sw_label" || name.starts_with("bend_") ||
-                   name.starts_with("amplitude_smoothcc")) {
-            // Nothing to play: a keyswitch's name; the pitch wheel's range and
-            // smoothing (Elara bends each note by its own glides); smoothing of
-            // a controller, which holds its value.
+        } else if (name == "sw_label") {
+            region.swLabel = value;
+        } else if (name.starts_with("bend_") || name.starts_with("amplitude_smoothcc")) {
+            // Nothing to play: the pitch wheel's range and smoothing (Elara
+            // bends each note by its own glides); smoothing of a controller,
+            // which holds its value.
         } else {
             return false;
         }

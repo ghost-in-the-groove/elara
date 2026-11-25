@@ -243,3 +243,17 @@ TEST_CASE("SFZ: controllers move amplitude, volume, tune and the envelope", "[au
           });
     CHECK(program.unknownOpcodes.empty());
 }
+
+TEST_CASE("SFZ: keyswitch and controller names are kept", "[audio][sfz]") {
+    const SfzProgram program = parse(R"(
+<control> label_cc70=Muting label_cc1=Mod wheel
+<group> sw_last=36 sw_label=Palm mute
+<region> sample=a.wav
+)");
+    REQUIRE(program.regions.size() == 1);
+    CHECK(program.ccLabels[70] == "Muting");
+    CHECK(program.ccLabels[1] == "Mod wheel");
+    CHECK(program.ccLabels[2].empty());
+    CHECK(program.regions[0].swLabel == "Palm mute");
+    CHECK(program.unknownOpcodes.empty());
+}
