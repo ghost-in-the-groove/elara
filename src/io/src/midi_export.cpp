@@ -65,6 +65,75 @@ bool ramps(const std::vector<PlacedChange>& changes, std::size_t index) {
                changes[index + 1].change->tempo.wholesPerSecond();
 }
 
+/// The measures in the order they are played (ADR-0083): the written measure of
+/// each and where it starts in the file, and where each written measure starts.
+struct PlayedMeasures {
+    std::vector<std::size_t> order{};
+    std::vector<Fraction> start{};   // one more than `order`: the end of the file
+    std::vector<Fraction> written{}; // one more than the measures: the song's length
+    bool straight = true;            // every measure played once, as written
+};
+
+PlayedMeasures playedMeasures(const Song& song) {
+    PlayedMeasures played;
+    played.order = song.playOrder();
+    played.written.reserve(song.measureCount() + 1);
+    Fraction position;
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        played.written.push_back(position);
+        position += song.measureHeader(m).timeSignature.measureLength();
+    }
+    played.written.push_back(position);
+    played.straight = played.order.size() == song.measureCount();
+    played.start.reserve(played.order.size() + 1);
+    position = Fraction();
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        const std::size_t m = played.order[k];
+        played.start.push_back(position);
+        position += played.written[m + 1] - played.written[m];
+        played.straight = played.straight && m == k;
+    }
+    played.start.push_back(position);
+    return played;
+}
+
+/// The notes of every played measure, moved to where it is played. A note held
+/// past its measure goes on over the measures played after it, as playback
+/// holds it.
+std::vector<SoundingNote> playedNotes(const std::vector<SoundingNote>& notes,
+                                      const PlayedMeasures& played) {
+    // The notes of written measure m are notes[byMeasure[firstOf[m] .. firstOf[m + 1]]],
+    // in their order (bucketed: an overfull measure has notes past its end).
+    const std::size_t count = played.written.size() - 1;
+    std::vector<std::size_t> firstOf(count + 2);
+    for (const SoundingNote& note : notes) {
+        ++firstOf[note.measure + 2];
+    }
+    for (std::size_t m = 2; m < firstOf.size(); ++m) {
+        firstOf[m] += firstOf[m - 1];
+    }
+    std::vector<std::size_t> byMeasure(notes.size());
+    for (std::size_t i = 0; i < notes.size(); ++i) {
+        byMeasure[firstOf[notes[i].measure + 1]++] = i;
+    }
+    std::size_t total = 0;
+    for (const std::size_t m : played.order) {
+        total += firstOf[m + 1] - firstOf[m];
+    }
+    std::vector<SoundingNote> out;
+    out.reserve(total);
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        const std::size_t m = played.order[k];
+        const Fraction shift = played.start[k] - played.written[m];
+        for (std::size_t j = firstOf[m]; j < firstOf[m + 1]; ++j) {
+            SoundingNote note = notes[byMeasure[j]];
+            note.start += shift;
+            out.push_back(note);
+        }
+    }
+    return out;
+}
+
 // Ticks per quarter note: the base, or a multiple of it that makes every time in
 // the song a whole number of ticks while the format allows it.
 struct Timing {
@@ -80,7 +149,10 @@ struct Timing {
     }
 };
 
-Timing chooseTiming(const Song& song, const std::vector<SoundingNote>& notes) {
+// Whole ticks for the written times and where each measure is played mean
+// whole ticks for the played ones, which are their differences and sums.
+Timing chooseTiming(const Song& song, const PlayedMeasures& played,
+                    const std::vector<SoundingNote>& notes) {
     std::int64_t needed = kBaseDivision;
     bool exact = true;
     const auto add = [&](const Fraction& wholeNotes) {
@@ -91,8 +163,8 @@ Timing chooseTiming(const Song& song, const std::vector<SoundingNote>& notes) {
             exact = needed <= detail::kMaxDivision;
         }
     };
-    Fraction start;
     for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        const Fraction& start = played.written[m];
         add(start);
         for (const core::TempoChange& change : song.measureHeader(m).tempoChanges) {
             add(start + change.offset);
@@ -100,7 +172,9 @@ Timing chooseTiming(const Song& song, const std::vector<SoundingNote>& notes) {
                 add(start + change.offset + kRampStep);
             }
         }
-        start += song.measureHeader(m).timeSignature.measureLength();
+    }
+    if (!played.straight) {
+        std::ranges::for_each(played.start, add);
     }
     for (const SoundingNote& note : notes) {
         // Whole ticks for the start and the length mean whole ticks for the end.
@@ -143,7 +217,8 @@ double quarterBpm(const core::Tempo& tempo) {
     return tempo.bpm() * tempo.beatUnit().length().toDouble() * 4.0;
 }
 
-MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warnings) {
+MidiTrack conductorTrack(const Song& song, const PlayedMeasures& played, const Timing& timing,
+                         Warnings& warnings) {
     MidiTrack track;
     const core::SongInfo& info = song.info();
     if (!info.title.empty()) {
@@ -174,38 +249,69 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
                 "", "tempos in beat units other than the quarter note written in quarter notes", m);
         }
     };
-    const auto tempoEvent = [&](std::int64_t tick, const core::Tempo& tempo, std::size_t m) {
-        checkBeatUnit(tempo, m);
+    // A tempo is reported where it is written, the first time its measure is played.
+    const auto tempoEvent = [&](std::int64_t tick, const core::Tempo& tempo, std::size_t m,
+                                bool report) {
         const double bpm = quarterBpm(tempo);
         const long long micros = tempoMeta(tick, bpm);
-        if (std::abs(detail::bpmFromMicroseconds(micros) - bpm) > 1e-9) {
-            warnings.add("", "tempos rounded to whole microseconds per quarter note", m);
-        }
-    };
-    // A step lasts as long as its stretch of the ramp, so the song keeps its timing
-    // (to the microsecond a quarter note).
-    const auto rampEvents = [&](const PlacedChange& from, const PlacedChange& to, std::size_t m) {
-        checkBeatUnit(from.change->tempo, m);
-        const double speed = from.change->tempo.wholesPerSecond();
-        const double slope =
-            (to.change->tempo.wholesPerSecond() - speed) / (to.at - from.at).toDouble();
-        for (Fraction step = from.at; step < to.at; step += kRampStep) {
-            const Fraction stepEnd = std::min(step + kRampStep, to.at);
-            const double length = (stepEnd - step).toDouble();
-            const double seconds =
-                core::rampSeconds(speed + slope * (step - from.at).toDouble(), slope, length);
-            tempoMeta(timing.ticks(step), length / seconds * 240.0); // wholes/s -> quarters/min
+        if (report) {
+            checkBeatUnit(tempo, m);
+            if (std::abs(detail::bpmFromMicroseconds(micros) - bpm) > 1e-9) {
+                warnings.add("", "tempos rounded to whole microseconds per quarter note", m);
+            }
         }
     };
 
     const std::vector<PlacedChange> changes = placeChanges(song);
-    std::size_t placed = 0;
-
-    Fraction start;
+    // The changes of measure m are changes[firstChange[m] .. firstChange[m + 1]].
+    std::vector<std::size_t> firstChange(song.measureCount() + 1);
     for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        firstChange[m + 1] = firstChange[m] + song.measureHeader(m).tempoChanges.size();
+    }
+
+    // The tempo set by the last of the first `count` changes.
+    const auto tempoBefore = [&](std::size_t count) -> const core::Tempo& {
+        return count == 0 ? song.startTempo() : changes[count - 1].change->tempo;
+    };
+
+    // The steps of the ramp from change i over [from, to) of the written song,
+    // moved by `shift`: one at `from`, then one every sixteenth from the change.
+    // A step lasts as long as its stretch of the ramp, so the song keeps its
+    // timing (to the microsecond a quarter note); `to` is at most the end of a
+    // measure, so every barline falls where it is written.
+    const auto rampEvents = [&](std::size_t i, Fraction from, Fraction to, Fraction shift) {
+        const PlacedChange& ramp = changes[i];
+        const PlacedChange& next = changes[i + 1];
+        const double speed = ramp.change->tempo.wholesPerSecond();
+        const double slope =
+            (next.change->tempo.wholesPerSecond() - speed) / (next.at - ramp.at).toDouble();
+        for (Fraction step = from; step < to;) {
+            const Fraction into = step - ramp.at;
+            const Fraction sixteenths = into / kRampStep;
+            const Fraction stepEnd = std::min(
+                to, ramp.at + kRampStep *
+                                  Fraction(sixteenths.numerator() / sixteenths.denominator() + 1));
+            const double length = (stepEnd - step).toDouble();
+            const double seconds =
+                core::rampSeconds(speed + slope * into.toDouble(), slope, length);
+            tempoMeta(timing.ticks(step + shift), length / seconds * 240.0); // wholes/s -> q/min
+            step = stepEnd;
+        }
+    };
+
+    // Measure by measure as played (ADR-0083). After a jump the tempo in force
+    // where the music lands is set again; a measure inside a ramp starts with a
+    // step.
+    std::vector<bool> reported(song.measureCount());
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        const std::size_t m = played.order[k];
         const core::MeasureHeader& header = song.measureHeader(m);
-        const std::int64_t tick = timing.ticks(start);
-        const core::MeasureHeader* previous = m == 0 ? nullptr : &song.measureHeader(m - 1);
+        const Fraction& start = played.written[m];
+        const Fraction& end = played.written[m + 1];
+        const Fraction shift = played.start[k] - start;
+        const std::int64_t tick = timing.ticks(played.start[k]);
+        const core::MeasureHeader* previous =
+            k == 0 ? nullptr : &song.measureHeader(played.order[k - 1]);
         if (previous == nullptr || previous->timeSignature != header.timeSignature) {
             const core::TimeSignature& time = header.timeSignature;
             track.events.push_back(
@@ -223,30 +329,47 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
                 meta(tick, detail::kMetaKeySignature,
                      bytes({key.fifths(), key.mode() == core::KeyMode::Minor ? 1 : 0})));
         }
-        if (m == 0) {
-            const bool replaced =
-                !header.tempoChanges.empty() && header.tempoChanges.front().offset == Fraction(0);
-            if (replaced) {
-                // It sounds the same, but reads back as the start tempo.
-                warnings.add("", "a tempo change at the start replaces the start tempo", 0);
+
+        const bool jumped = k == 0 || played.order[k - 1] + 1 != m;
+        const bool report = !reported[m];
+        reported[m] = true;
+        const std::size_t first = firstChange[m];
+        const std::size_t last = firstChange[m + 1];
+        const bool changesAtStart = first < last && changes[first].change->offset == Fraction(0);
+        if (first > 0 && ramps(changes, first - 1) && changes[first].at > start) {
+            // A ramp comes into the measure (and ends at a later change).
+            const Fraction& rampEnd = changes[first].at;
+            rampEvents(first - 1, start, std::min(end, rampEnd), shift);
+        } else if (jumped && !changesAtStart) {
+            // Set again unless the measure played before ends at that same speed.
+            const std::size_t before = k == 0 ? 0 : firstChange[played.order[k - 1] + 1];
+            const bool same =
+                k > 0 && !(before > 0 && ramps(changes, before - 1)) &&
+                tempoBefore(before).wholesPerSecond() == tempoBefore(first).wholesPerSecond();
+            if (!same) {
+                tempoEvent(tick, tempoBefore(first), m, k == 0);
+            }
+        } else if (k == 0) {
+            // It sounds the same, but reads back as the start tempo.
+            warnings.add("", "a tempo change at the start replaces the start tempo", m);
+        }
+        for (std::size_t i = first; i < last; ++i) {
+            const PlacedChange& change = changes[i];
+            if (ramps(changes, i)) {
+                if (report) {
+                    checkBeatUnit(change.change->tempo, m);
+                }
+                const Fraction& rampEnd = changes[i + 1].at;
+                rampEvents(i, change.at, std::min(end, rampEnd), shift);
             } else {
-                tempoEvent(0, song.startTempo(), 0);
+                tempoEvent(timing.ticks(change.at + shift), change.change->tempo, m, report);
             }
         }
-        for (const core::TempoChange& change : header.tempoChanges) {
-            if (ramps(changes, placed)) {
-                rampEvents(changes[placed], changes[placed + 1], m);
-            } else {
-                tempoEvent(timing.ticks(start + change.offset), change.tempo, m);
-            }
-            ++placed;
-        }
-        start += header.timeSignature.measureLength();
     }
-    if (song.measureCount() == 0) {
-        tempoEvent(0, song.startTempo(), 0);
+    if (played.order.empty()) {
+        tempoEvent(0, song.startTempo(), 0, true);
     }
-    track.end = timing.ticks(song.length());
+    track.end = timing.ticks(played.start.back());
     return track;
 }
 
@@ -359,9 +482,16 @@ void addNotes(MidiTrack& track, int channelNumber, const std::vector<const Sound
 } // namespace
 
 ExportResult exportMidi(const Song& song, const MidiOptions& options) {
-    const std::vector<SoundingNote> notes = core::soundingNotes(song);
-    const Timing timing = chooseTiming(song, notes);
+    const std::vector<SoundingNote> written = core::soundingNotes(song);
+    const PlayedMeasures played = playedMeasures(song);
+    const std::vector<SoundingNote> moved =
+        played.straight ? std::vector<SoundingNote>{} : playedNotes(written, played);
+    const std::vector<SoundingNote>& notes = played.straight ? written : moved;
+    const Timing timing = chooseTiming(song, played, written);
     Warnings warnings;
+    if (!played.straight) {
+        warnings.add("", "repeats and jumps written as played");
+    }
     if (!timing.exact) {
         warnings.add("",
                      std::format("times rounded to {} ticks per quarter note", timing.division));
@@ -369,7 +499,7 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
 
     const std::size_t trackCount = song.trackCount();
     std::vector<std::string> bodies(trackCount + 1);
-    bodies[0] = detail::encodeTrack(conductorTrack(song, timing, warnings));
+    bodies[0] = detail::encodeTrack(conductorTrack(song, played, timing, warnings));
 
     std::vector<std::vector<const SoundingNote*>> byTrack(trackCount);
     for (const SoundingNote& note : notes) {
@@ -388,7 +518,7 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
 
     // Each track only reads the song and its notes: encoded on several threads
     // into its own chunk, warnings merged in track order.
-    const std::int64_t end = timing.ticks(song.length());
+    const std::int64_t end = timing.ticks(played.start.back());
     std::vector<Warnings> trackWarnings(trackCount);
     const auto write = [&](std::size_t t) {
         const Track& track = song.track(t);
