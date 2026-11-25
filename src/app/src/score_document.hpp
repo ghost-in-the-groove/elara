@@ -96,6 +96,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretBendForm READ caretBendForm NOTIFY caretChanged)
     Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
     Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
+    Q_PROPERTY(int caretHairpin READ caretHairpin NOTIFY caretChanged)
     Q_PROPERTY(int caretPickStroke READ caretPickStroke NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideIn READ caretSlideIn NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
@@ -461,6 +462,9 @@ public:
     Q_INVOKABLE void setWhammy(int form, int cents);
     /// Taps, slaps or pops the caret's beat (a core::BassTechnique; 0 for none).
     Q_INVOKABLE void setBassTechnique(int technique);
+    /// Puts the caret's beat under a crescendo or diminuendo (a core::Hairpin;
+    /// 0 for none); neighbouring beats with the same one share a wedge (ADR-0078).
+    Q_INVOKABLE void setHairpin(int hairpin);
     /// "Dive -1", "Dip -1/2", "Inverted dip +1/2"...
     Q_INVOKABLE QString whammyName(int form, int cents) const;
     /// How far the whammy bar goes, in steps with its direction: "-1 1/2", "+1/2".
@@ -471,6 +475,7 @@ public:
     [[nodiscard]] int caretWhammyCents() const;
     [[nodiscard]] int caretBassTechnique() const;
     [[nodiscard]] int caretStrum() const;
+    [[nodiscard]] int caretHairpin() const;
     [[nodiscard]] int caretPickStroke() const;
     [[nodiscard]] int caretTremolo() const;
     /// The kinds of the caret's note effects (ADR-0058), numbered as their

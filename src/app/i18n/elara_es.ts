@@ -170,6 +170,14 @@
         <translation>Dinámicas</translation>
     </message>
     <message>
+        <source>Crescendo</source>
+        <translation>Crescendo</translation>
+    </message>
+    <message>
+        <source>Diminuendo</source>
+        <translation>Diminuendo</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1535,6 +1543,14 @@
     <message>
         <source>Tremolo picking 1/%1</source>
         <translation>Trémolo 1/%1</translation>
+    </message>
+    <message>
+        <source>Crescendo</source>
+        <translation>Crescendo</translation>
+    </message>
+    <message>
+        <source>Diminuendo</source>
+        <translation>Diminuendo</translation>
     </message>
     <message>
         <source>On drums, Enter adds or removes the lane&apos;s hit.</source>

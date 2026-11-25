@@ -65,11 +65,16 @@ lines `hairpinThickness` thick with `Role::Hairpin` ("hairpin"):
 - Under tablature when the system shows the staff only as tablature, like the
   marks.
 
+**Editing.** A hairpin is typed like the other beat effects (ADR-0056): the
+CLI step `hairpin <crescendo|diminuendo|none>` and the entry bar's two wedge
+buttons, after the dynamics, set it on the caret's beat as one undo step
+("Change beat effects"). A longer wedge is typed beat by beat, so it needs no
+selection and no new kind of edit; the status line names it.
+
 ## Consequences
 
 - Hairpins from Guitar Pro and MusicXML survive import, saving and MusicXML
-  export, are drawn and are heard; they are not yet typed. Editing at the
-  caret comes next and will be recorded here.
+  export, are drawn, are heard and are typed at the caret.
 - A MusicXML wedge in a second voice comes back on the first voice.
 - A hairpin with no dynamic after it rises or falls one step and the music
   goes back to its written dynamic after it; writing the dynamic it leads to
@@ -87,4 +92,6 @@ lines `hairpinThickness` thick with `Role::Hairpin` ("hairpin"):
   after a crescendo, over two voices; one step down without a softer dynamic),
   `cli.sequence_hairpins`, `notation.Hairpins: ...` (a wedge clear of the
   dynamics, a diminuendo over a barline, cut by the end of a line, under
-  tablature alone) and `cli.render_hairpins`.
+  tablature alone), `cli.render_hairpins`, `cli.edit_sets_hairpins` with
+  `cli.dump_hairpins` and `cli.edit_rejects_unknown_hairpin`, and the app
+  smoke test's diminuendo.
