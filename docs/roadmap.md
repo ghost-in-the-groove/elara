@@ -144,7 +144,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] In the model and kept by the native format; heard in playback and MIDI export
   - [x] Read from Guitar Pro 6-8 simile marks
   - [x] Drawn on standard notation and tablature
-  - [ ] Read and written in MusicXML
+  - [x] Read and written in MusicXML
   - [ ] Set at the caret
 - [x] Tenuto and portato: held notes, drawn by the notehead, beyond the staccato dot (ADR-0088)
 - [x] Staccatissimo: a quarter of the note's length, a wedge in the place of the staccato dot (ADR-0094)

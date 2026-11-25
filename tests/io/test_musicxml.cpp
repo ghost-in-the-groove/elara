@@ -1186,6 +1186,44 @@ TEST_CASE("MusicXML: clef changes hold from the measure they start", "[musicxml]
         hasWarning(result, "clef changes inside a measure moved to the next measure", "measure 4"));
 }
 
+TEST_CASE("MusicXML: a measure repeat style makes measure repeats", "[musicxml][simile]") {
+    // ADR-0102: <measure-repeat type="start"> with the measures each repeat
+    // holds, until type="stop" (the first measure shown again); the notes
+    // written out under the sign are what the repeat plays, so they go.
+    const auto style = [](std::string_view repeat) {
+        return std::format("<attributes><measure-style>{}</measure-style></attributes>", repeat);
+    };
+    const std::string four =
+        quarterNote("C", "") + quarterNote("D", "") + quarterNote("E", "") + quarterNote("F", "");
+    const std::string other =
+        quarterNote("G", "") + quarterNote("A", "") + quarterNote("B", "") + quarterNote("C", "");
+    const ImportResult result = parse(onePart(
+        four + R"(</measure><measure number="2">)" +
+        style(R"(<measure-repeat type="start">1</measure-repeat>)") + four +
+        R"(</measure><measure number="3">)" + four + R"(</measure><measure number="4">)" +
+        style(R"(<measure-repeat type="stop"/>)") + other + R"(</measure><measure number="5">)" +
+        style(R"(<measure-repeat type="start" slashes="2">2</measure-repeat>)") + four +
+        R"(</measure><measure number="6">)" + other + R"(</measure><measure number="7">)" +
+        style(R"(<measure-repeat type="stop"/>)") + four + R"(</measure><measure number="8">)" +
+        style(R"(<measure-repeat type="start">3</measure-repeat>)") + four));
+    const core::Staff& staff = result.song.track(0).staff(0);
+    REQUIRE(result.song.measureCount() == 8);
+    using core::MeasureRepeat;
+    const std::array expected{MeasureRepeat::None,     MeasureRepeat::One,
+                              MeasureRepeat::One,      MeasureRepeat::None,
+                              MeasureRepeat::TwoFirst, MeasureRepeat::TwoSecond,
+                              MeasureRepeat::None,     MeasureRepeat::None};
+    for (std::size_t m = 0; m < expected.size(); ++m) {
+        CAPTURE(m);
+        CHECK(staff.measure(m).repeat == expected[m]);
+        CHECK(staff.measure(m).isEmpty() == (expected[m] != MeasureRepeat::None));
+    }
+    CHECK(core::repeatSource(result.song, staff, 2) == 0);
+    CHECK(core::repeatSource(result.song, staff, 5) == 3);
+    CHECK(result.warnings.size() == 1);
+    CHECK(hasWarning(result, "measure repeats of more than two measures dropped", "measure 8"));
+}
+
 TEST_CASE("MusicXML: clef changes keep the staff's octave and its percussion", "[musicxml][clef]") {
     const auto part = [](std::string_view first, std::string_view change) {
         return parse(onePart(std::format("<attributes>{}</attributes>", first) +
