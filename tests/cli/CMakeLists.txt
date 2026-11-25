@@ -1175,7 +1175,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":142,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":150,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES
