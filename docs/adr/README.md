@@ -87,6 +87,7 @@ one that replaces them.
 | [0079](0079-grace-notes.md) | Grace notes | Accepted |
 | [0080](0080-chord-symbols.md) | Chord symbols | Accepted |
 | [0081](0081-beat-text.md) | Beat text | Accepted |
+| [0082](0082-gradual-tempo-changes.md) | Gradual tempo changes | Accepted |
 
 ## Template
 

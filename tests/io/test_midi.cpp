@@ -464,6 +464,21 @@ TEST_CASE("MIDI export reports a tempo change at the very start", "[io][midi]") 
     CHECK(imported->song.measureHeader(0).tempoChanges.empty());
 }
 
+TEST_CASE("MIDI export writes a gradual tempo change as a sudden one", "[io][midi]") {
+    // ADR-0082: MIDI holds tempos at points only.
+    Song song = pianoSong(2);
+    song.measureHeader(0).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(100), .gradual = true});
+    song.measureHeader(1).tempoChanges.push_back(TempoChange{.tempo = Tempo(140)});
+    const auto result = exportMidi(song);
+    CHECK(result.warnings ==
+          std::vector<std::string>{"gradual tempo changes written as sudden ones (measure 1)"});
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    REQUIRE(imported->song.measureHeader(0).tempoChanges.size() == 1);
+    CHECK_FALSE(imported->song.measureHeader(0).tempoChanges[0].gradual);
+}
+
 TEST_CASE("MIDI export gives drums channel 10 and skips it for other tracks", "[io][midi]") {
     Song song;
     song.appendMeasures(1);

@@ -4,7 +4,6 @@
  "warnings": [
   "Clarinet: volume and pan changes dropped",
   "Clarinet: lyrics dropped",
-  "gradual tempo changes written as sudden ones",
   "Clarinet: short voices filled with rests (measure 2)"
  ],
  "song": {
@@ -29,7 +28,8 @@
     "tempoChanges": [
      {
       "bpm": 60,
-      "beatUnit": "4."
+      "beatUnit": "4.",
+      "gradual": true
      }
     ]
    }

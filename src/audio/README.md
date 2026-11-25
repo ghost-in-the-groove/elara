@@ -11,7 +11,8 @@ Three targets with different rules:
 `elara_audio` holds code that is easy to test without a sound card:
 
 - the sequencer (`Sequence`: a song's measures in play order, its notes and
-  note events in seconds, ADR-0017), with accents, ghost notes, staccato, let
+  note events in seconds, ADR-0017; gradual tempo changes speed up or slow
+  down along the score, ADR-0082), with accents, ghost notes, staccato, let
   ring and harmonics applied (ADR-0022), bends, slides and vibrato sent as
   pitch events (ADR-0023), hammer-ons, pull-offs and legato slides as legato
   events (ADR-0070), and strums and tremolo picking

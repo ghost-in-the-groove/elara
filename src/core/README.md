@@ -20,7 +20,7 @@ song or of a measure) and are plain `Fraction`s.
 | Header | What it gives you |
 |---|---|
 | `signature.hpp` | `TimeSignature` (measure and beat length, "6/8" text) and `KeySignature` (circle-of-fifths position + `KeyMode`; tonic, accidentals, "Bb minor" text, `spell()` of a MIDI number in context: diatonic first, raised leading tone in minor, then naturals, then sharps or flats by key). |
-| `tempo.hpp` | `Tempo` (bpm of a beat unit, e.g. dotted quarter = 60) and `TempoChange` (a tempo at an offset inside a measure). |
+| `tempo.hpp` | `Tempo` (bpm of a beat unit, e.g. dotted quarter = 60) and `TempoChange` (a tempo at an offset inside a measure, `gradual` when it moves to the next change's; ADR-0082); `rampSeconds()` times a stretch of such a ramp. |
 
 ## Pitch
 
@@ -73,7 +73,8 @@ staves at once, and `addTrack` gives a new track as many measures as the song.
 Each `MeasureHeader` holds the time signature, the concert key and the tempo
 changes of its measure, so they move with it; new measures continue the meter
 and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
-`durationSeconds()` give the timeline of the measures as written; the
+`durationSeconds()` give the timeline of the measures as written, gradual
+tempo changes included (ADR-0082); the
 header's repeats and alternate endings (ADR-0016), signs and jumps
 (ADR-0049) say how they are played, and `playOrder()` lists the measures in
 that order. A header's `section` names the part of the song that starts there
