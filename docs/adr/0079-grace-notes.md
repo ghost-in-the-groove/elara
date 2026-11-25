@@ -58,6 +58,7 @@ one, as a guitarist plays it.
   and typing them come next, each recorded here as it lands. Until they are
   drawn and played, a song with grace notes looks and sounds as it did before
   they were kept.
-- A beat is 24 bytes larger (an empty list); see the memory benchmark.
+- A beat is 24 bytes larger on 64-bit systems: the list, empty for almost
+  every beat, allocates nothing.
 - Grace notes after the last beat of a voice have nothing to lead into and
   are not kept.

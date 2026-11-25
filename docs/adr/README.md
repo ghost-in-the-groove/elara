@@ -84,6 +84,7 @@ one that replaces them.
 | [0076](0076-arpeggio-lines.md) | Strums of keyboards are arpeggio lines | Accepted |
 | [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
 | [0078](0078-hairpins.md) | Hairpins | Accepted |
+| [0079](0079-grace-notes.md) | Grace notes | Accepted |
 
 ## Template
 
