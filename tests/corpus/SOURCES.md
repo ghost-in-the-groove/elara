@@ -19,6 +19,7 @@ Community Group).
 | `transposing.musicxml` | Pickup measures; B-flat clarinet with `transpose` and a written key; bass with an octave clef and its own `divisions` |
 | `clef-changes.musicxml` | Clef changes: a cello into the tenor clef and back to the bass clef after a measure's last note, a piano's left hand into the treble clef and back |
 | `slurs.musicxml` | Slurs: over stems down, over stems up with a staccato under the slur, over stems both ways, over a high note, across a barline, nested, over a beamed run, on the bass staff and on both voices of a staff |
+| `lead-sheet.musicxml` | Chord symbols under held notes, placed by `backup` and `forward` or by an `offset`, and words between beats, which split the held notes into tied ones; a chord under a note with a fermata, which stays whole and warns |
 | `fermatas.musicxml` | Fermatas: normal, angled and square, upright and inverted, on notes, a chord, a rest and a whole-measure rest, and on both voices of a piano staff while the voice holds its own |
 
 ## Guitar Pro 6-8 (`gp/`)

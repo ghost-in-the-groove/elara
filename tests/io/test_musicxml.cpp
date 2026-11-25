@@ -269,8 +269,8 @@ TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silent
 
 TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]") {
     // ADR-0081: words of one direction join; two directions on one beat join
-    // with a space; words next to a tempo name it; words between beats are
-    // dropped.
+    // with a space; words next to a tempo name it; words between beats split
+    // the beat they fall in (ADR-0096).
     const std::string quarter =
         R"(<duration>4</duration><voice>1</voice><type>quarter</type></note>)";
     const ImportResult result = parse(onePart(
@@ -288,7 +288,7 @@ TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]"
         R"(<note><pitch><step>C</step><octave>5</octave></pitch>)" +
         quarter));
     const auto& beats = voiceOf(result.song, 0, 0, 0).beats;
-    REQUIRE(beats.size() == 4);
+    REQUIRE(beats.size() == 5);
     REQUIRE(beats[0].text);
     CHECK(*beats[0].text == "let ring");
     REQUIRE(beats[1].text);
@@ -296,7 +296,10 @@ TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]"
     CHECK(result.song.tempoAt(0, core::Fraction(1, 4)) == core::Tempo(132));
     CHECK_FALSE(beats[2].text);
     CHECK_FALSE(beats[3].text);
-    CHECK(hasWarning(result, "text directions dropped", "measure 1"));
+    REQUIRE(beats[4].text);
+    CHECK(*beats[4].text == "late");
+    CHECK(beats[4].notes.at(0).effects.tiedFromPrevious);
+    CHECK_FALSE(hasWarning(result, "text directions dropped", "measure 1"));
 }
 
 // A quarter note of voice 1 in octave 4 with what follows its type.
@@ -692,7 +695,7 @@ TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "
 <harmony><numeral><numeral-root>5</numeral-root></numeral><kind>dominant</kind></harmony>
 <note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type></note>)"));
     const auto& beats = voiceOf(result.song, 0, 0, 0).beats;
-    REQUIRE(beats.size() == 4);
+    REQUIRE(beats.size() == 5); // the Gsus4 splits the last quarter (ADR-0096)
     REQUIRE(beats[0].chord);
     constexpr std::int8_t x = core::ChordDiagram::kMuted;
     CHECK(*beats[0].chord == core::ChordSymbol{.name = "F#m7",
@@ -704,9 +707,53 @@ TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "
     CHECK(beats[2].chord->name == "N.C.");
     CHECK(beats[2].isRest());
     CHECK_FALSE(beats[3].chord);
+    REQUIRE(beats[4].chord);
+    CHECK(beats[4].chord->name == "Gsus4");
     CHECK(result.warnings ==
-          std::vector<std::string>{"Test: chord symbols written as functions dropped (measure 1)",
-                                   "Test: chord symbols between beats dropped (measure 1)"});
+          std::vector<std::string>{"Test: chord symbols written as functions dropped (measure 1)"});
+}
+
+TEST_CASE("MusicXML: chord symbols under a held note split it into tied notes", "[musicxml]") {
+    // ADR-0096: a lead sheet holds a note while the chords change. The beat
+    // under the change splits into tied notes, so the symbol has a beat to go
+    // on; the slur over it keeps its notes, and it plays as before.
+    const auto chord = [](std::string_view root, std::string_view after) {
+        return std::format("<harmony><root><root-step>{}</root-step></root>"
+                           "<kind>major</kind>{}</harmony>",
+                           root, after);
+    };
+    const ImportResult result = parse(onePart(
+        chord("C", "") +
+        R"(<note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration>)"
+        R"(<voice>1</voice><type>whole</type></note><backup><duration>8</duration></backup>)" +
+        chord("G", "") +
+        R"(<forward><duration>8</duration></forward></measure><measure number="2">)" +
+        chord("F", "") + quarterNote("C", R"(<notations><slur type="start"/></notations>)") +
+        R"(<note><pitch><step>D</step><octave>4</octave></pitch><duration>8</duration>)"
+        R"(<voice>1</voice><type>half</type></note>)" +
+        quarterNote("E", R"(<notations><slur type="stop"/></notations>)") +
+        chord("A", "<offset>-8</offset>"))); // half a measure back: the D's middle
+    CHECK(result.warnings.empty());
+    const auto& held = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(held.size() == 2);
+    CHECK(held[0].duration == core::Duration(core::NoteValue::Half));
+    CHECK(held[1].duration == core::Duration(core::NoteValue::Half));
+    REQUIRE(held[0].chord);
+    CHECK(held[0].chord->name == "C");
+    REQUIRE(held[1].chord);
+    CHECK(held[1].chord->name == "G");
+    CHECK(held[1].notes.at(0).pitch == held[0].notes.at(0).pitch);
+    CHECK(held[1].notes.at(0).effects.tiedFromPrevious);
+
+    const auto& slurred = voiceOf(result.song, 0, 0, 1).beats;
+    REQUIRE(slurred.size() == 4); // C, D, tied D, E
+    REQUIRE(slurred[2].chord);
+    CHECK(slurred[2].chord->name == "A");
+    CHECK(slurred[2].notes.at(0).effects.tiedFromPrevious);
+    CHECK(slurred[0].effects.slur);
+    CHECK(slurred[1].effects.slur);
+    CHECK(slurred[2].effects.slur); // still to the E
+    CHECK_FALSE(slurred[3].effects.slur);
 }
 
 TEST_CASE("MusicXML: grace notes lead into the next note of their voice", "[musicxml]") {

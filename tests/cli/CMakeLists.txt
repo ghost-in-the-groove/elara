@@ -1020,6 +1020,12 @@ add_test(NAME cli.import_musicxml
 set_tests_properties(cli.import_musicxml PROPERTIES
   PASS_REGULAR_EXPRESSION "\"format\":\"musicxml\",\"out\":null,\"warnings\":\\[\\],\"song\":{.*\"title\":\"Corpus Melody\".*\"issues\":\\[\\]}")
 
+# Chord symbols under held notes split them into tied notes (ADR-0096): the
+# whole E under C and Am becomes two tied halves.
+add_test(NAME cli.import_splits_held_notes_under_chords
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/lead-sheet.musicxml")
+set_tests_properties(cli.import_splits_held_notes_under_chords PROPERTIES
+  PASS_REGULAR_EXPRESSION "{\"duration\":\"2\",\"chord\":{\"name\":\"C\"},\"notes\":\\[{\"pitch\":\"E5\"}\\]},{\"duration\":\"2\",\"chord\":{\"name\":\"Am\"},\"notes\":\\[{\"pitch\":\"E5\",\"effects\":{\"tiedFromPrevious\":true}}")
 add_test(NAME cli.import_musicxml_reports_warnings
   COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/transposing.musicxml")
 set_tests_properties(cli.import_musicxml_reports_warnings PROPERTIES

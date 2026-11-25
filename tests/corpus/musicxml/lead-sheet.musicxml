@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<!-- Self-made test file, CC0 1.0. A lead sheet: chord symbols under held
+     notes, placed by backup and forward or by an offset, and words between
+     beats; one chord under a note with a fermata, which stays whole. -->
+<score-partwise version="4.0">
+  <work><work-title>Corpus Lead Sheet</work-title></work>
+  <identification>
+    <creator type="composer">Ghost in the Groove</creator>
+    <rights>CC0 1.0</rights>
+  </identification>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Voice</part-name>
+      <score-instrument id="P1-I1"><instrument-name>Voice</instrument-name></score-instrument>
+      <midi-instrument id="P1-I1"><midi-channel>1</midi-channel><midi-program>54</midi-program></midi-instrument>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>4</divisions>
+        <key><fifths>0</fifths><mode>major</mode></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <harmony><root><root-step>C</root-step></root><kind>major</kind></harmony>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type></note>
+      <backup><duration>8</duration></backup>
+      <harmony><root><root-step>A</root-step></root><kind>minor</kind></harmony>
+      <forward><duration>8</duration></forward>
+    </measure>
+    <measure number="2">
+      <harmony><root><root-step>F</root-step></root><kind>major</kind></harmony>
+      <note><pitch><step>F</step><octave>5</octave></pitch><duration>12</duration><voice>1</voice><type>half</type><dot/></note>
+      <harmony><root><root-step>G</root-step></root><kind>dominant</kind><offset>-8</offset></harmony>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type></note>
+    </measure>
+    <measure number="3">
+      <harmony><root><root-step>C</root-step></root><kind>major</kind></harmony>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>8</duration><voice>1</voice><type>half</type></note>
+      <note><pitch><step>E</step><octave>5</octave></pitch><duration>8</duration><voice>1</voice><type>half</type></note>
+      <backup><duration>10</duration></backup>
+      <harmony><root><root-step>E</root-step></root><kind>minor</kind></harmony>
+      <direction placement="above"><direction-type><words>softly</words></direction-type></direction>
+      <forward><duration>10</duration></forward>
+    </measure>
+    <measure number="4">
+      <harmony><root><root-step>F</root-step></root><kind>major</kind></harmony>
+      <note><pitch><step>A</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>whole</type>
+        <notations><fermata type="upright"/></notations></note>
+      <backup><duration>4</duration></backup>
+      <harmony><root><root-step>G</root-step></root><kind>major</kind></harmony>
+      <forward><duration>4</duration></forward>
+      <barline location="right"><bar-style>light-heavy</bar-style></barline>
+    </measure>
+  </part>
+</score-partwise>

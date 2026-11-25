@@ -35,9 +35,10 @@ is a rest.
   looked at in order, as chord symbols do. The words of one direction join as
   written (runs of differently formatted text keep the spaces between them),
   and two directions on one beat join with a space. Words next to a metronome
-  are its tempo's name and are kept as text too. Words between beats, and
-  words over a measure rest written as one (an empty voice, which has no beat
-  to hold them), are reported as dropped (`text directions dropped`).
+  are its tempo's name and are kept as text too. Words between beats split
+  the beat sounding across them into tied beats (ADR-0096); where none can,
+  and over a measure rest written as one (an empty voice, which has no beat
+  to hold them), they are reported as dropped (`text directions dropped`).
   Placement below the staff is not kept.
 
 **Writing.** MusicXML writes a beat's text as words in a `<direction

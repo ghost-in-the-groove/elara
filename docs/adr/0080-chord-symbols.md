@@ -60,8 +60,9 @@ compare by the symbols' values.
 
 **MusicXML.** A `<harmony>` goes on the beat of its staff that starts where
 it does (after its `<offset>`), the voices looked at in order; one between
-beats is reported as dropped, and so is one written as a Roman numeral or a
-function. Its name is the root, the kind's `text` (or the usual suffix of its
+beats splits the beat sounding across it into tied beats (ADR-0096), and is
+reported as dropped only where none can split; one written as a Roman
+numeral or a function is dropped too. Its name is the root, the kind's `text` (or the usual suffix of its
 kind: `minor-seventh` is "m7"), its degrees ("add9", "b5", "no3") and "/" and
 the bass; `kind` none is "N.C." or its text. A `<frame>` is the diagram,
 string 1 the highest and strings without a `<frame-note>` not played.

@@ -60,6 +60,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Keyboards reaching into both clefs on a grand staff, split at middle C
         (ADR-0075)
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
+  - [x] Chord symbols and words between beats split the held note into tied
+        notes instead of being dropped (ADR-0096)
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip
   - [x] Played velocities as a dynamic per measure, accents and ghost notes (ADR-0045)

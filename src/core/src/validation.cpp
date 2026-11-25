@@ -4,6 +4,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <iterator>
+#include <optional>
+#include <vector>
 
 namespace elara::core {
 
@@ -54,6 +58,93 @@ std::vector<Duration> plainDurations(Tuplet tuplet = {}) {
         durations.emplace_back(value, 0, tuplet);
     }
     return durations;
+}
+
+// The plain and dotted values that add up to `length`, longest first; empty
+// when they cannot (off the 1/128 grid).
+std::vector<Duration> partsOf(Fraction length) {
+    // Dotted, then plain, value by value: 3/2, 1, 3/4, 1/2... longest first.
+    static const std::vector<Duration> kCandidates = [] {
+        std::vector<Duration> candidates;
+        for (const NoteValue value : kPlainValues) {
+            candidates.emplace_back(value, 1);
+            candidates.emplace_back(value, 0);
+        }
+        return candidates;
+    }();
+    std::vector<Duration> parts;
+    while (length > Fraction(0)) {
+        const auto fits = std::ranges::find_if(
+            kCandidates, [&](const Duration& candidate) { return candidate.length() <= length; });
+        if (fits == kCandidates.end()) {
+            return {};
+        }
+        parts.push_back(*fits);
+        length -= fits->length();
+    }
+    return parts;
+}
+
+// Whether splitting the beat into tied parts keeps how it sounds and reads.
+bool splits(const Beat& beat) {
+    const BeatEffects& fx = beat.effects;
+    return beat.duration.tuplet().isNone() && fx.fermata == Fermata::None &&
+           fx.breath == Breath::None && fx.whammyBar.isEmpty() &&
+           std::ranges::none_of(beat.notes, [](const Note& note) {
+               return !note.effects.bend.isEmpty() || note.effects.slideOut != SlideOut::None;
+           });
+}
+
+// A later part of `beat`: its notes tied on, with what spans beats.
+Beat continuationOf(const Beat& beat) {
+    const BeatEffects& fx = beat.effects;
+    Beat part;
+    part.effects.tremoloPicking = fx.tremoloPicking;
+    part.effects.hairpin = fx.hairpin;
+    part.effects.slur = fx.slur;
+    part.effects.ottava = fx.ottava;
+    part.effects.pedal = fx.pedal == Pedal::None ? Pedal::None : Pedal::Down;
+    part.notes.reserve(beat.notes.size());
+    for (const Note& note : beat.notes) {
+        const NoteEffects& from = note.effects;
+        NoteEffects tied;
+        tied.harmonic = from.harmonic;
+        tied.trill = from.trill;
+        tied.tiedFromPrevious = true;
+        tied.vibrato = from.vibrato;
+        tied.palmMute = from.palmMute;
+        tied.deadNote = from.deadNote;
+        tied.ghost = from.ghost;
+        tied.letRing = from.letRing;
+        tied.dynamic = from.dynamic;
+        part.notes.push_back(Note{.pitch = note.pitch, .position = note.position, .effects = tied});
+    }
+    return part;
+}
+
+// Splits beat `index`, `offset` after its start.
+std::optional<BeatSplit> splitBeat(Voice& voice, std::size_t index, const Fraction& offset) {
+    Beat& beat = voice.beats[index];
+    if (!splits(beat)) {
+        return std::nullopt;
+    }
+    const std::vector<Duration> head = partsOf(offset);
+    const std::vector<Duration> tail = partsOf(beat.duration.length() - offset);
+    if (head.empty() || tail.empty()) {
+        return std::nullopt;
+    }
+    const Beat continuation = continuationOf(beat);
+    std::vector<Beat> later;
+    later.reserve(head.size() + tail.size() - 1);
+    for (std::size_t p = 1; p < head.size() + tail.size(); ++p) {
+        Beat& part = later.emplace_back(continuation);
+        part.duration = p < head.size() ? head[p] : tail[p - head.size()];
+    }
+    beat.duration = head.front();
+    voice.beats.insert(voice.beats.begin() + static_cast<std::ptrdiff_t>(index) + 1,
+                       std::make_move_iterator(later.begin()),
+                       std::make_move_iterator(later.end()));
+    return BeatSplit{.first = index, .at = index + head.size(), .added = later.size()};
 }
 
 // Dotted values that last a whole number of compound beats (6/8: 2., 4.).
@@ -177,6 +268,21 @@ bool fillWithRests(Voice& voice, const TimeSignature& time) {
         return false;
     }
     return true;
+}
+
+std::optional<BeatSplit> splitBeatAt(Voice& voice, const Fraction& onset) {
+    Fraction start;
+    for (std::size_t b = 0; b < voice.beats.size(); ++b) {
+        if (start == onset) {
+            return BeatSplit{.first = b, .at = b, .added = 0};
+        }
+        const Fraction end = start + voice.beats[b].duration.length();
+        if (onset > start && onset < end) {
+            return splitBeat(voice, b, onset - start);
+        }
+        start = end;
+    }
+    return std::nullopt;
 }
 
 std::string_view issueName(IssueKind kind) noexcept {

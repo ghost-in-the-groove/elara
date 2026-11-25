@@ -189,3 +189,112 @@ TEST_CASE("Validation flags fret positions where they cannot exist", "[core][val
     CHECK(issues[1].kind == IssueKind::PositionWithoutTuning);
     CHECK(issues[1].track == 1);
 }
+
+namespace {
+
+using elara::core::Fraction;
+
+// The durations of a voice's beats, as text.
+Texts durationsOf(const Voice& voice) {
+    Texts texts;
+    for (const Beat& beat : voice.beats) {
+        texts.push_back(beat.duration.toString());
+    }
+    return texts;
+}
+
+} // namespace
+
+TEST_CASE("Splitting a beat ties its notes on from where a beat must start",
+          "[core][validation][split]") {
+    // ADR-0096: the first part keeps what the beat holds; the others tie its
+    // notes on and carry what spans beats.
+    using elara::core::splitBeatAt;
+    Note c{.pitch = Pitch::fromMidi(60)};
+    c.effects.letRing = true;
+    c.effects.staccato = true;
+    c.effects.dynamic = elara::core::Dynamic::P;
+    Beat whole{.duration = Duration(NoteValue::Whole), .notes = {c}};
+    whole.effects.hairpin = elara::core::Hairpin::Crescendo;
+    whole.effects.pedal = elara::core::Pedal::Change;
+    whole.effects.strum = elara::core::Strum::Down;
+    whole.text = elara::core::SharedOptional<std::string>(std::string("dolce"));
+    Voice voice{.beats = {whole}};
+
+    const auto split = splitBeatAt(voice, Fraction(3, 8));
+    REQUIRE(split.has_value());
+    CHECK(split->first == 0);
+    CHECK(split->at == 1);
+    CHECK(split->added == 2);
+    CHECK(durationsOf(voice) == Texts{"4.", "2", "8"});
+    CHECK(voice.length() == Fraction(1));
+    const Beat& first = voice.beats[0];
+    CHECK(first.notes.at(0).effects == c.effects);
+    CHECK(first.effects.strum == elara::core::Strum::Down);
+    CHECK(first.effects.pedal == elara::core::Pedal::Change);
+    REQUIRE(first.text);
+    for (std::size_t b = 1; b < voice.beats.size(); ++b) {
+        const Beat& part = voice.beats[b];
+        REQUIRE(part.notes.size() == 1);
+        const Note& note = part.notes[0];
+        CHECK(note.pitch == c.pitch);
+        CHECK(note.effects.tiedFromPrevious);
+        CHECK(note.effects.letRing);
+        CHECK_FALSE(note.effects.staccato);
+        CHECK(note.effects.dynamic == elara::core::Dynamic::P);
+        CHECK(part.effects.hairpin == elara::core::Hairpin::Crescendo);
+        CHECK(part.effects.pedal == elara::core::Pedal::Down);
+        CHECK(part.effects.strum == elara::core::Strum::None);
+        CHECK_FALSE(part.text);
+    }
+}
+
+TEST_CASE("Splitting a beat: rests split into rests, a beat that starts there stays",
+          "[core][validation][split]") {
+    using elara::core::splitBeatAt;
+    Voice voice = voiceOf({"2", "2"});
+    voice.beats[0].notes.clear();
+    const auto split = splitBeatAt(voice, Fraction(1, 4));
+    REQUIRE(split.has_value());
+    CHECK(split->first == 0);
+    CHECK(split->at == 1);
+    CHECK(split->added == 1);
+    CHECK(durationsOf(voice) == Texts{"4", "4", "2"});
+    CHECK(voice.beats[1].isRest());
+
+    const auto there = splitBeatAt(voice, Fraction(1, 2));
+    REQUIRE(there.has_value());
+    CHECK(there->first == 2);
+    CHECK(there->at == 2);
+    CHECK(there->added == 0);
+    CHECK(durationsOf(voice) == Texts{"4", "4", "2"});
+}
+
+TEST_CASE("Splitting a beat leaves what would sound different alone", "[core][validation][split]") {
+    // Tuplets, fermatas, breath marks, whammy bars, bends and slides out
+    // belong to the whole beat; past the voice's end nothing sounds.
+    using elara::core::splitBeatAt;
+    const auto refused = [](Voice voice, const Fraction& onset) {
+        const Voice before = voice;
+        const bool split = splitBeatAt(voice, onset).has_value();
+        CHECK(voice == before);
+        return !split;
+    };
+    CHECK(refused(voiceOf({"4*3:2", "4*3:2", "4*3:2"}), Fraction(1, 12)));
+    CHECK(refused(voiceOf({"2"}), Fraction(3, 4)));
+    Voice held = voiceOf({"1"});
+    held.beats[0].effects.fermata = elara::core::Fermata::Normal;
+    CHECK(refused(held, Fraction(1, 2)));
+    Voice breath = voiceOf({"1"});
+    breath.beats[0].effects.breath = elara::core::Breath::Comma;
+    CHECK(refused(breath, Fraction(1, 2)));
+    Voice whammy = voiceOf({"1"});
+    whammy.beats[0].effects.whammyBar = elara::core::BendCurve::bend(-100);
+    CHECK(refused(whammy, Fraction(1, 2)));
+    Voice bent = voiceOf({"1"});
+    bent.beats[0].notes[0].effects.bend = elara::core::BendCurve::bend(100);
+    CHECK(refused(bent, Fraction(1, 2)));
+    Voice slide = voiceOf({"1"});
+    slide.beats[0].notes[0].effects.slideOut = elara::core::SlideOut::Downwards;
+    CHECK(refused(slide, Fraction(1, 2)));
+}

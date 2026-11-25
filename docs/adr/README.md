@@ -101,6 +101,7 @@ one that replaces them.
 | [0093](0093-fingerings.md) | Fingerings | Accepted |
 | [0094](0094-staccatissimo.md) | Staccatissimo | Accepted |
 | [0095](0095-breath-marks.md) | Breath marks and caesuras | Accepted |
+| [0096](0096-split-beats-for-marks-between-beats.md) | Split beats for marks between beats | Accepted |
 
 ## Template
 

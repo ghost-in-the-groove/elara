@@ -60,7 +60,7 @@ sixth string of a guitar sounds F#2.
 | `chord_name.hpp` | `ChordPitch` and `splitChordName()`: a chord symbol's name as its root, suffix and bass ("Bb7/F"), for writers and transposition (ADR-0080). |
 | `retune.hpp` | `Retuning` and `makeRetune()`: one undo step that gives a fretted staff another tuning and capo, keeping its notes' pitches (frets move, as in transposition) or their frets (pitches move, spelled in the key; `Retune`) (ADR-0046). |
 | `performance.hpp` | `soundingNotes(song)`: every note as it sounds (start and length in whole notes from the start of the song, ties joined, velocity from the dynamic and ramped under hairpins (ADR-0078), grace notes borrowing time from the beat before or their own (ADR-0079), and the measure, beat, grace and note of its attack, where playback finds its articulations; `noteOf()` finds that note), ordered by time, each voice read on its own thread; what MIDI export writes and the sequencer builds on (ADR-0009, ADR-0017). |
-| `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()` and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
+| `validation.hpp` | `voiceFill()` (empty, incomplete, complete, overfull), `fillWithRests()`, `splitBeatAt()` (a beat split into tied beats so that one starts at a time, sounding the same; ADR-0096) and `validate(song)`, which lists every `Issue`: voices that do not fill their measure, fret positions on missing strings, beyond the neck, sounding another pitch or on a staff without tuning, two notes on one string, ties with nothing to tie from. |
 
 ## Utilities
 
@@ -92,6 +92,10 @@ unfinished tuplet with rests of the same tuplet), then the largest rests that
 start on a multiple of their own length, so beats stay visible (4/4 after a
 quarter: quarter + half, never a dotted half; 6/8 uses dotted rests by beat).
 It changes nothing and returns false when the gap cannot be written that way.
+`splitBeatAt()` makes a beat start at a time inside another: the beat splits
+into plain or dotted values tied to each other, the first keeping what the
+beat holds and the others what spans beats (ADR-0096); tuplets and beats with
+a fermata, a breath mark, a whammy bar, a bend or a slide out stay whole.
 
 Build a song with the `Song` API (importers, tests); once it is open for
 editing, wrap it in a `Document` and change it only through commands. Commands
