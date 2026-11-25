@@ -2,7 +2,6 @@
  "format": "musicxml",
  "out": null,
  "warnings": [
-  "Piano: chord symbols dropped (measure 1)",
   "Piano: text directions dropped (measure 2)",
   "Piano: lyrics dropped (measure 2)"
  ],
@@ -46,6 +45,9 @@
         [
          {
           "duration": "2",
+          "chord": {
+           "name": "F"
+          },
           "notes": [
            {
             "pitch": "C5"

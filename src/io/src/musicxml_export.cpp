@@ -37,6 +37,81 @@ using detail::Warnings;
 
 /// Appends indented XML to a string. The caller writes elements in the order
 /// the MusicXML schema requires; the writer only handles the syntax.
+/// A pitch of a chord name: a letter and its sharps (+) or flats (-).
+struct ChordPitch {
+    char step = 'C';
+    int alter = 0;
+};
+
+/// A chord name split as MusicXML writes it (ADR-0080): "Bb7/F" is the root
+/// B flat, the suffix "7" and the bass F.
+struct ChordSpelling {
+    ChordPitch root;
+    std::string_view suffix;
+    std::optional<ChordPitch> bass;
+};
+
+/// The pitch at the start of `text`, and how many characters it takes.
+std::optional<std::pair<ChordPitch, std::size_t>> chordPitch(std::string_view text) {
+    if (text.empty() || text[0] < 'A' || text[0] > 'G') {
+        return std::nullopt;
+    }
+    ChordPitch pitch{.step = text[0], .alter = 0};
+    std::size_t used = 1;
+    for (; used < text.size() && std::abs(pitch.alter) < 2; ++used) {
+        if (text[used] == '#') {
+            ++pitch.alter;
+        } else if (text[used] == 'b') {
+            --pitch.alter;
+        } else {
+            break;
+        }
+    }
+    return std::pair{pitch, used};
+}
+
+std::optional<ChordSpelling> spellChord(std::string_view name) {
+    const auto root = chordPitch(name);
+    if (!root) {
+        return std::nullopt;
+    }
+    ChordSpelling spelling{.root = root->first, .suffix = name.substr(root->second), .bass = {}};
+    if (const std::size_t slash = spelling.suffix.rfind('/'); slash != std::string_view::npos) {
+        const std::string_view after = spelling.suffix.substr(slash + 1);
+        if (const auto bass = chordPitch(after); bass && bass->second == after.size()) {
+            spelling.bass = bass->first;
+            spelling.suffix = spelling.suffix.substr(0, slash);
+        }
+    }
+    return spelling;
+}
+
+/// The MusicXML <kind> for a chord name's suffix; "other" when none says it.
+std::string_view kindFor(std::string_view suffix) {
+    if (const auto known =
+            std::ranges::find(detail::kChordKinds, suffix, &detail::ChordKind::suffix);
+        known != detail::kChordKinds.end()) {
+        return known->kind;
+    }
+    static constexpr std::array<detail::ChordKind, 10> kAliases{{
+        {"minor", "min"},
+        {"minor", "-"},
+        {"major", "maj"},
+        {"major-seventh", "M7"},
+        {"augmented", "aug"},
+        {"diminished", "o"},
+        {"diminished-seventh", "o7"},
+        {"half-diminished", "m7(b5)"},
+        {"suspended-fourth", "sus"},
+        {"minor-seventh", "min7"},
+    }};
+    if (const auto alias = std::ranges::find(kAliases, suffix, &detail::ChordKind::suffix);
+        alias != kAliases.end()) {
+        return alias->kind;
+    }
+    return "other";
+}
+
 class XmlWriter {
 public:
     /// `pretty`: one element per line, indented by depth; otherwise no
@@ -1189,6 +1264,9 @@ private:
                 writeWedge(xml, hairpin == Hairpin::Crescendo ? "crescendo" : "diminuendo", v,
                            s + 1);
             }
+            if (beat.chord && !tabPass_) {
+                writeHarmony(xml, *beat.chord, s + 1);
+            }
             writeGraces(xml, beat, voiceNumber, s + 1, m);
             writeBeat(xml, BeatPlace{.beat = &beat,
                                      .previous = previous,
@@ -1236,6 +1314,74 @@ private:
         }
     }
 
+    /// A chord symbol before its beat (ADR-0080): the name's root, kind (with
+    /// the name's own suffix to print) and bass, and its diagram as a frame. A
+    /// name that does not start with a pitch ("N.C.") is printed as it is.
+    void writeHarmony(XmlWriter& xml, const ChordSymbol& chord, int staff) {
+        xml.start("harmony");
+        if (chord.diagram) {
+            xml.attribute("print-frame", "yes");
+        }
+        xml.endOpen();
+        const std::optional<ChordSpelling> spelling = spellChord(chord.name);
+        xml.open("root");
+        if (spelling) {
+            writeStep(xml, "root-step", "root-alter", spelling->root);
+        } else {
+            xml.start("root-step");
+            xml.attribute("text", "");
+            xml.endText("root-step", "C");
+        }
+        xml.close("root");
+        xml.start("kind");
+        xml.attribute("text", spelling ? spelling->suffix : std::string_view(chord.name));
+        xml.endText("kind", spelling ? kindFor(spelling->suffix) : "none");
+        if (spelling && spelling->bass) {
+            xml.open("bass");
+            writeStep(xml, "bass-step", "bass-alter", *spelling->bass);
+            xml.close("bass");
+        }
+        if (chord.diagram) {
+            writeFrame(xml, *chord.diagram);
+        }
+        if (xmlStaves_ > 1) {
+            xml.number("staff", staff);
+        }
+        xml.close("harmony");
+    }
+
+    static void writeStep(XmlWriter& xml, std::string_view step, std::string_view alter,
+                          const ChordPitch& pitch) {
+        xml.text(step, std::string_view(&pitch.step, 1));
+        if (pitch.alter != 0) {
+            xml.number(alter, pitch.alter);
+        }
+    }
+
+    /// String 1 is the highest; strings not played get no <frame-note>.
+    static void writeFrame(XmlWriter& xml, const ChordDiagram& diagram) {
+        xml.open("frame");
+        xml.number("frame-strings", static_cast<std::int64_t>(diagram.frets.size()));
+        int highest = diagram.firstFret;
+        for (const std::int8_t fret : diagram.frets) {
+            highest = std::max<int>(highest, fret);
+        }
+        xml.number("frame-frets", std::max(4, highest - diagram.firstFret + 1));
+        if (diagram.firstFret > 1) {
+            xml.number("first-fret", diagram.firstFret);
+        }
+        for (std::size_t i = 0; i < diagram.frets.size(); ++i) {
+            if (diagram.frets[i] == ChordDiagram::kMuted) {
+                continue;
+            }
+            xml.open("frame-note");
+            xml.number("string", static_cast<std::int64_t>(i + 1));
+            xml.number("fret", diagram.frets[i]);
+            xml.close("frame-note");
+        }
+        xml.close("frame");
+    }
+
     /// The grace notes leading into `beat`, before it and with no duration: a
     /// slash for those before the beat (acciaccaturas), none for those on it.
     void writeGraces(XmlWriter& xml, const Beat& beat, int voice, int staff, std::size_t m) {
@@ -1254,9 +1400,6 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
-        if (beat.chord) {
-            warn("chord symbols dropped", place.measure); // ADR-0080: written next
-        }
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;

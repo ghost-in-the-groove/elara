@@ -36,6 +36,47 @@ inline constexpr std::array<int, 7> kStepSemitones{0, 2, 4, 5, 7, 9, 11};
     return result;
 }
 
+/// A MusicXML <kind> of chord and the suffix a chord name writes for it
+/// (ADR-0080): "minor-seventh" is the "m7" of "Am7".
+struct ChordKind {
+    std::string_view kind;
+    std::string_view suffix;
+};
+
+inline constexpr std::array<ChordKind, 31> kChordKinds{{
+    {"major", ""},
+    {"minor", "m"},
+    {"augmented", "+"},
+    {"diminished", "dim"},
+    {"dominant", "7"},
+    {"major-seventh", "maj7"},
+    {"minor-seventh", "m7"},
+    {"diminished-seventh", "dim7"},
+    {"augmented-seventh", "+7"},
+    {"half-diminished", "m7b5"},
+    {"major-minor", "m(maj7)"},
+    {"major-sixth", "6"},
+    {"minor-sixth", "m6"},
+    {"dominant-ninth", "9"},
+    {"major-ninth", "maj9"},
+    {"minor-ninth", "m9"},
+    {"dominant-11th", "11"},
+    {"major-11th", "maj11"},
+    {"minor-11th", "m11"},
+    {"dominant-13th", "13"},
+    {"major-13th", "maj13"},
+    {"minor-13th", "m13"},
+    {"suspended-second", "sus2"},
+    {"suspended-fourth", "sus4"},
+    {"power", "5"},
+    {"pedal", "ped"},
+    {"Neapolitan", "N6"},
+    {"Italian", "It+6"},
+    {"French", "Fr+6"},
+    {"German", "Ger+6"},
+    {"Tristan", "Tristan"},
+}};
+
 /// The MusicXML mime type of a compressed .mxl archive and of its score.
 inline constexpr std::string_view kMxlMimeType = "application/vnd.recordare.musicxml";
 inline constexpr std::string_view kMusicXmlMediaType = "application/vnd.recordare.musicxml+xml";

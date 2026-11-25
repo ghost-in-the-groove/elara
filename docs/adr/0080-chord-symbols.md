@@ -58,25 +58,39 @@ compare by the symbols' values.
   drawn, and the name already says what the structure says. They are
   dropped without a warning.
 
+**MusicXML.** A `<harmony>` goes on the beat of its staff that starts where
+it does (after its `<offset>`), the voices looked at in order; one between
+beats is reported as dropped, and so is one written as a Roman numeral or a
+function. Its name is the root, the kind's `text` (or the usual suffix of its
+kind: `minor-seventh` is "m7"), its degrees ("add9", "b5", "no3") and "/" and
+the bass; `kind` none is "N.C." or its text. A `<frame>` is the diagram,
+string 1 the highest and strings without a `<frame-note>` not played.
+Writing splits a name into a root, a suffix and a bass: the suffix is
+written as the kind's `text` (so the name comes back as written) with the
+kind that suffix means, or `other`; a name that does not start with a pitch
+("N.C.", a diagram's empty name) is a hidden root with kind `none` and the
+name as its text. A diagram is a `<frame>` with `print-frame="yes"`.
+
 **Native format.** A beat's `"chord"` is `{"name": "Am", "diagram":
 {"firstFret": 1, "frets": [0, 1, 2, 2, 0, -1]}}`, the diagram left out when
 there is none. Older files without chords read as before.
 
 ## Consequences
 
-- The model, the native format and the Guitar Pro 3-8 importers keep chord
-  symbols; `elara-cli dump` and `import --json` show them. Reading and
-  writing MusicXML `<harmony>`, drawing names (and diagrams on fretted
-  staves) above the staff, typing them at the caret and transposing their
-  names with the notes come next, each recorded here as it lands. Until
+- The model, the native format, the Guitar Pro 3-8 importers and MusicXML
+  both ways keep chord symbols; `elara-cli dump` and `import --json` show
+  them. Drawing names and diagrams above the staff, typing them at the
+  caret and transposing their names with the notes come next, each recorded
+  here as it lands. Until
   they are drawn, a song with chord symbols looks as it did before.
 - Transposing a song leaves chord names as they are until transposition
   learns to spell them. Copying, pasting and retuning carry a diagram as it
   is: it is drawn with its own strings.
-- MusicXML export lists them as dropped until it writes `<harmony>`.
 - Tests: `core.Beats share chord symbols and compare them by value`,
   `io.Guitar Pro 3-5: chords keep their names and diagrams`,
   `io.Guitar Pro: chords come from the staff's diagram collection`, the
   Guitar Pro 6 duet, `io.Beats naming the same chord share one symbol once
   read`, `io.Chord diagrams outside the neck are rejected`, the native round
-  trip and the import snapshots of the corpus.
+  trip, `io.MusicXML: chord symbols are named by root, kind, degrees and
+  bass`, `io.MusicXML export: chord symbols keep their names and diagrams`
+  and the import snapshots of the corpus.
