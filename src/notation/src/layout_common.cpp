@@ -27,6 +27,7 @@ constexpr double kLaneTextSize = 0.95;  // "P.M.", "let ring", harmonic labels
 constexpr double kLaneBaseline = 0.2;   // text baseline above the bottom of its lane
 constexpr double kLaneGlyphScale = 0.7; // strum arrows and tremolo slashes in their lanes
 constexpr double kRunDash = 0.3;        // dashes of the line after "P.M."
+constexpr double kTrillFretGap = 0.15;  // between a trill's "tr" and its fret
 constexpr double kRunHook = 0.4;        // the line's closing hook
 constexpr double kRunLineGap = 0.25;    // between the text and its line
 constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
@@ -707,6 +708,19 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
     extend(Lane::LetRing, marks.letRing, centre, end, measure);
     extend(Lane::Vibrato, marks.vibrato != core::Vibrato::None, centre, end, measure,
            marks.vibrato);
+    // A trill: "tr" and, after it, the fret its other note is at (ADR-0090).
+    if (marks.trillFret >= 0) {
+        const BoundingBox& box = font_.metrics(Glyph::OrnamentTrill).box;
+        mark(Lane::Trill, Glyph::OrnamentTrill, centre, measure);
+        TextItem item;
+        item.text = std::format("({})", marks.trillFret);
+        item.origin = {centre + box.width() / 2 + kTrillFretGap, -kLaneBaseline};
+        item.size = kLaneTextSize;
+        item.align = TextAlign::Left;
+        item.role = Role::Technique;
+        item.measure = measure;
+        items(Lane::Trill).texts.push_back(std::move(item));
+    }
     if (marks.pickStroke != core::PickStroke::None) {
         mark(Lane::PickStroke,
              marks.pickStroke == core::PickStroke::Down ? Glyph::StringsDownBow

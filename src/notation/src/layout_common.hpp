@@ -171,6 +171,7 @@ enum class Lane : std::uint8_t {
     Bend,
     Whammy,
     Vibrato,
+    Trill, ///< "tr" and the other note's fret (ADR-0090)
     PalmMute,
     LetRing,
     Harmonic,
@@ -192,9 +193,10 @@ struct ColumnTechniques {
     core::HarmonicKind harmonic = core::HarmonicKind::None;
     core::BendCurve whammy{}; ///< the whammy bar, empty without it (ADR-0061)
     core::BassTechnique bass = core::BassTechnique::None;
+    int trillFret = -1; ///< the fret a trill goes to (ADR-0090), -1 without one
 
     [[nodiscard]] bool any() const noexcept {
-        return palmMute || letRing || vibrato != core::Vibrato::None ||
+        return palmMute || letRing || vibrato != core::Vibrato::None || trillFret >= 0 ||
                pickStroke != core::PickStroke::None || strum != core::Strum::None ||
                tremoloStrokes > 0 || harmonic != core::HarmonicKind::None || !whammy.isEmpty() ||
                bass != core::BassTechnique::None;
