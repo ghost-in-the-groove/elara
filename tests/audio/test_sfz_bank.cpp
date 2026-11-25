@@ -520,3 +520,75 @@ TEST_CASE("SFZ sampler: a technique with no region for the key is imitated inste
     CHECK(tailOf(*sound, 45, Touch::PalmMute) > 0.5 * open); // the library's palm mute
     CHECK(tailOf(*sound, 60, Touch::PalmMute) < 0.1 * open); // none up there: damped
 }
+
+TEST_CASE("SFZ sampler: a hammer-on plays the library's legato regions", "[audio][sfz]") {
+    // The legato samples sound an octave above the key, so they are told
+    // apart from the plain note gliding.
+    const auto bank = bankOf("<region> sample=*sine trigger=first\n"
+                             "<region> sample=*sine trigger=legato transpose=12\n");
+    const auto sound = bank->sound(kGuitar, kRate);
+    sound->noteOn(57, 100, Touch::Normal);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(57), 0.003));
+    sound->legato(57, 200.0, 90);
+    (void)render(*sound, 0.05); // the picked note fades out at once
+    CHECK(sound->activeVoices() == 1);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(59 + 12), 0.003));
+
+    // The joined note still answers to the key that was picked: a bend moves
+    // it, the key's release ends it.
+    sound->glide(57, 400.0, 0.0);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(61 + 12), 0.003));
+    sound->noteOff(57);
+    (void)render(*sound, 0.1);
+    CHECK(sound->activeVoices() == 0);
+}
+
+TEST_CASE("SFZ sampler: with no legato samples a joined note is a glide", "[audio][sfz]") {
+    const auto bank = bankOf("<region> sample=*sine\n");
+    const auto sound = bank->sound(kGuitar, kRate);
+    sound->noteOn(57, 100, Touch::Normal);
+    (void)render(*sound, 0.1);
+    sound->legato(57, -200.0, 90);
+    CHECK(sound->activeVoices() == 1);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(55), 0.003));
+}
+
+TEST_CASE("SFZ sampler: a hammer-on plays the keyswitch named for legato, for that note only",
+          "[audio][sfz]") {
+    const auto bank = bankOf("<global> sw_lokey=24 sw_hikey=25 sw_default=24\n"
+                             "<group> sw_last=24 sw_label=Sustain\n"
+                             "<region> sample=*sine\n"
+                             "<group> sw_last=25 sw_label=Hammer-ons\n"
+                             "<region> sample=*sine transpose=12\n");
+    const auto& techniques = bank->techniques();
+    CHECK(techniques.legato.keyswitch == 25);
+    CHECK(techniques.legato.label == "Hammer-ons");
+    const auto sound = bank->sound(kGuitar, kRate);
+    sound->noteOn(57, 100, Touch::Normal);
+    (void)render(*sound, 0.1);
+    sound->legato(57, 200.0, 90);
+    (void)render(*sound, 0.05);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(59 + 12), 0.003));
+    // The track stays on its keyswitch: the next picked note sustains.
+    sound->noteOff(57);
+    (void)render(*sound, 0.1);
+    sound->noteOn(64, 100, Touch::Normal);
+    CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(64), 0.003));
+}
+
+TEST_CASE("SFZ sampler: a picked note on a fretted track is never legato", "[audio][sfz]") {
+    // A chord holds its other notes, but every string is picked.
+    const auto bank = bankOf("<region> sample=*silence trigger=first\n"
+                             "<region> sample=*sine trigger=legato\n");
+    const auto guitar = bank->sound(kGuitar, kRate);
+    guitar->noteOn(52, 100, Touch::Normal);
+    guitar->noteOn(64, 100, Touch::Normal);
+    CHECK(rms(render(*guitar, 0.1)) == 0.0);
+
+    // On a keyboard, a key going down while another is held is legato.
+    const Instrument lead{.name = "Lead", .kind = InstrumentKind::Pitched, .midiProgram = 80};
+    const auto keyboard = bank->sound(lead, kRate);
+    keyboard->noteOn(52, 100, Touch::Normal);
+    keyboard->noteOn(64, 100, Touch::Normal);
+    CHECK(rms(render(*keyboard, 0.1)) > 0.1);
+}
