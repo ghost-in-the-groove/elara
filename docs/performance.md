@@ -111,6 +111,10 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-24 | run 64 empty jobs on every core: what a parallel call costs before any job works | 27 µs (697 µs before) | `forEachIndex` hands its jobs to a pool of threads kept waiting, and the calling thread takes jobs too, instead of starting and joining threads on every call (ADR-0053) |
 | 2026-11-24 | lay out one track of the large song on A4 pages | 2.8 to 3.1 ms (3.4 to 4.1 ms before, same machine, the two builds run alternately) | measuring and laying out the systems are two parallel calls; most of what they saved was starting 24 threads twice |
 | 2026-11-24 | lay out all 20 staves on A4 pages; import from MIDI; export MusicXML; sequence the large song | within run-to-run noise (about ±10 % here) | each of their jobs takes milliseconds, so starting threads was a small part of them |
+| 2026-11-25 | read an SFZ instrument of 64 samples (12 MB of 16-bit WAV, 2 s each at 48 kHz) | 5.1 ms | each sample read and made mono on a core of its own (ADR-0066) |
+| 2026-11-25 | one second of 32 voices of the SFZ sampler at 48 kHz; each voice bending a whole step | 16.6 ms; 17.0 ms | first measurement: four-point Hermite interpolation of every frame, each of its four frames checked against the sample's end and its loop; three times the built-in plucked string |
+| 2026-11-25 | same | 10.3 ms; 11.2 to 11.8 ms (16.3 to 17.1 ms; 16.9 to 17.4 ms before, same machine, the two builds run alternately) | inside the sample and its loop the four frames are read in a row; only the frames at the edges take the checks. The output is the same, frame for frame |
+| 2026-11-25 | decode a minute of 16-bit stereo FLAC (libFLAC's default level); the same minute as WAV | 37.6 ms; 17.0 ms | about 1600 times real time (ADR-0067): a library's FLAC samples take about twice as long to read as WAV ones |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
@@ -150,3 +154,31 @@ regression was opening a `.gpx` file (see its row above), now fixed.
 | 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.2, 8.3, 6.1, 4.8 ms | 5.4, 8.9, 6.1, 5.1 ms |
 | one tuner window: low E, high E, noise | 0.39, 0.10, 1.07 ms | 0.40, 0.10, 1.12 ms |
 | find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.37 µs; 1.6 µs |
+
+**2026-11-25, after the SFZ sampler, the FLAC decoder and the techniques.**
+Every benchmark ran again, the new ones for the sampler and the decoder with
+them (rows above). Paths whose code did not change came out within the noise,
+except three that allocate the song's measures, which took longer and varied
+more than before (build: ± 4.6 ms); the code behind them has not changed
+since their rows, so they are watched for the next run rather than chased.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 12.7 ms | 12.9 ms |
+| sequence it; with every four measures repeated | 32.1 ms; 47.7 ms | 30.2 ms; 44.9 ms |
+| render its first 10 s offline; on one thread | 28.1 ms; 116 ms | 23.2 ms; 116 ms |
+| build, copy (shared measures) and validate the 20-track song | 14.4 ms, 63 µs, 4.1 ms | 18.3 ms (± 4.6), 81 µs, 2.9 ms |
+| insert a measure at its start | 17 µs | 32 µs |
+| seconds at its end (tempo map walk) | 18.7 µs | 12.0 µs |
+| MusicXML import; export; export on one thread; `.mxl` | 110 ms; 98 ms; 157 ms; 391 ms | 110 ms; 74 ms; 153 ms; 374 ms |
+| MIDI export; import | 31.4 ms; 44.6 ms | 32.2 ms; 42.4 ms |
+| GPIF import; on one thread | 125 ms; 238 ms | 103 ms; 210 ms |
+| 2 tracks from a literal-only `.gpx` | 28 to 31 ms | 30.9 ms |
+| lay out one 500-measure staff; 8 of its measures | 3.7 ms; 58 µs | 3.7 ms; 61 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.2 ms; 81 µs; 46 ms | 5.0 ms; 88 µs; 53 ms |
+| one track on A4 pages; on one thread | 2.8 to 3.1 ms; 11.1 ms | 2.2 ms; 10.3 ms |
+| the 20 staves on A4 pages; again after an edit | 23 ms; 4.1 ms | 21.9 ms; 4.1 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.6, 8.6, 19.3, 11.6 ms | 5.5, 8.6, 18.9, 11.4 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.4, 8.9, 6.1, 5.1 ms | 5.5, 8.9, 6.3, 5.1 ms |
+| one tuner window: low E, high E, noise | 0.40, 0.10, 1.12 ms | 0.42, 0.10, 1.14 ms |
+| find the caret; pick it from a click | 0.37 µs; 1.6 µs | 0.39 µs; 1.6 µs |
