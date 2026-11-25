@@ -324,6 +324,9 @@ constexpr std::array kEditNames{
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set chord symbol")},
     Translation{"Remove chord symbol",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove chord symbol")},
+    Translation{"Set beat text", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set beat text")},
+    Translation{"Remove beat text",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove beat text")},
 };
 
 // The names of Tuning::presetNames().
@@ -1584,6 +1587,9 @@ QString ScoreDocument::caretStatus() const {
     if (const QString chord = caretChord(); !chord.isEmpty()) {
         parts.append(tr("Chord %1").arg(chord)); // the beat's, before its notes
     }
+    if (const QString text = caretText(); !text.isEmpty()) {
+        parts.append(tr("\u201C%1\u201D").arg(text));
+    }
     if (caretFretted()) {
         parts.append(tr("String %1").arg(caret_.string));
         if (const auto fret = fretAtCaret()) {
@@ -2076,32 +2082,61 @@ void ScoreDocument::setChordSymbol(const QString& name) {
     });
 }
 
-QStringList ScoreDocument::songChords() const {
-    constexpr qsizetype kOffered = 12;
-    QStringList names;
-    if (!document_) {
-        return names;
-    }
-    const core::Song& song = document_->song();
-    for (std::size_t m = 0; m < song.measureCount() && names.size() < kOffered; ++m) {
+namespace {
+
+constexpr qsizetype kOffered = 12; // words a popup offers
+
+/// The different words `pick` finds on the song's beats (a pointer, null for
+/// none) in the order they first appear, at most kOffered.
+template <typename Pick>
+QStringList wordsOf(const core::Song& song, Pick pick) {
+    QStringList found;
+    for (std::size_t m = 0; m < song.measureCount() && found.size() < kOffered; ++m) {
         for (std::size_t t = 0; t < song.trackCount(); ++t) {
             const core::Track& track = song.track(t);
             for (std::size_t s = 0; s < track.staffCount(); ++s) {
                 for (const core::Voice& voice : track.staff(s).measure(m).voices) {
                     for (const core::Beat& beat : voice.beats) {
-                        if (!beat.chord || beat.chord->name.empty()) {
+                        const std::string* words = pick(beat);
+                        if (words == nullptr || words->empty()) {
                             continue;
                         }
-                        const QString name = qstring(beat.chord->name);
-                        if (!names.contains(name) && names.size() < kOffered) {
-                            names.append(name);
+                        const QString text = qstring(*words);
+                        if (!found.contains(text) && found.size() < kOffered) {
+                            found.append(text);
                         }
                     }
                 }
             }
         }
     }
-    return names;
+    return found;
+}
+
+} // namespace
+
+QStringList ScoreDocument::songChords() const {
+    if (!document_) {
+        return {};
+    }
+    return wordsOf(document_->song(), [](const core::Beat& beat) -> const std::string* {
+        return beat.chord ? &beat.chord->name : nullptr;
+    });
+}
+
+void ScoreDocument::setBeatText(const QString& text) {
+    runEntry([this, words = text.toStdString()](const core::Song& song) {
+        return core::setBeatText(song, caret_, words);
+    });
+}
+
+QStringList ScoreDocument::songTexts() const {
+    if (!document_) {
+        return {};
+    }
+    return wordsOf(document_->song(), [](const core::Beat& beat) -> const std::string* {
+        return beat.text ? &*beat.text : nullptr;
+    });
 }
 
 void ScoreDocument::setPickStroke(int direction) {
@@ -2386,6 +2421,13 @@ int ScoreDocument::caretStrum() const {
 
 int ScoreDocument::caretHairpin() const {
     return static_cast<int>(beatEffectsAtCaret().hairpin);
+}
+
+QString ScoreDocument::caretText() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return {};
+    }
+    return qstring(core::beatTextAt(document_->song(), caret_));
 }
 
 QString ScoreDocument::caretChord() const {

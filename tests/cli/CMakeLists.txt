@@ -434,6 +434,21 @@ set_tests_properties(cli.dump_chords PROPERTIES
   FIXTURES_REQUIRED cli_chords
   PASS_REGULAR_EXPRESSION "\"chord\":{\"name\":\"Em\",\"diagram\":{\"firstFret\":1,\"frets\":\\[-1,-1,-1,2,2,-1\\]}}"
   FAIL_REGULAR_EXPRESSION "G7")
+# Beat text typed at the caret (ADR-0081): words with spaces over a note; a
+# second text over the next beat goes again.
+set(ELARA_CLI_TEXT "${CMAKE_CURRENT_BINARY_DIR}/cli-text.elara")
+add_test(NAME cli.edit_writes_text
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_TEXT}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 5" "fret 2" "text let it ring" right "fret 3"
+    "text solo" "text none")
+set_tests_properties(cli.edit_writes_text PROPERTIES
+  FIXTURES_SETUP cli_text
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Remove beat text\"}")
+add_test(NAME cli.dump_text COMMAND elara-cli --json dump "${ELARA_CLI_TEXT}")
+set_tests_properties(cli.dump_text PROPERTIES
+  FIXTURES_REQUIRED cli_text
+  PASS_REGULAR_EXPRESSION "\"text\":\"let it ring\""
+  FAIL_REGULAR_EXPRESSION "solo")
 # Grace notes typed at the caret (ADR-0079): two on the 7th fret of the G
 # string, then one on the next note taken off again.
 set(ELARA_CLI_GRACES "${CMAKE_CURRENT_BINARY_DIR}/cli-graces.elara")

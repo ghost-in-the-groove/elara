@@ -99,6 +99,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretHairpin READ caretHairpin NOTIFY caretChanged)
     Q_PROPERTY(int caretGraceNotes READ caretGraceNotes NOTIFY caretChanged)
     Q_PROPERTY(QString caretChord READ caretChord NOTIFY caretChanged)
+    Q_PROPERTY(QString caretText READ caretText NOTIFY caretChanged)
     Q_PROPERTY(int caretPickStroke READ caretPickStroke NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideIn READ caretSlideIn NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
@@ -477,6 +478,12 @@ public:
     /// The names of the song's chord symbols in the order they first appear,
     /// at most 12: what the chord popup offers.
     Q_INVOKABLE QStringList songChords() const;
+    /// Writes a text above the caret's beat; an empty one takes it away
+    /// (ADR-0081).
+    Q_INVOKABLE void setBeatText(const QString& text);
+    /// The song's beat texts in the order they first appear, at most 12: what
+    /// the text popup offers.
+    Q_INVOKABLE QStringList songTexts() const;
     /// "Dive -1", "Dip -1/2", "Inverted dip +1/2"...
     Q_INVOKABLE QString whammyName(int form, int cents) const;
     /// How far the whammy bar goes, in steps with its direction: "-1 1/2", "+1/2".
@@ -490,6 +497,7 @@ public:
     [[nodiscard]] int caretHairpin() const;
     [[nodiscard]] int caretGraceNotes() const;
     [[nodiscard]] QString caretChord() const;
+    [[nodiscard]] QString caretText() const;
     [[nodiscard]] int caretPickStroke() const;
     [[nodiscard]] int caretTremolo() const;
     /// The kinds of the caret's note effects (ADR-0058), numbered as their

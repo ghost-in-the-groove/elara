@@ -56,11 +56,19 @@ the system shows it, otherwise over its tablature, and a text on a beat
 where no notes start gets a column of its own. The display list's role for
 them is `beatText`.
 
+**Editing.** `setBeatText()` writes a text above the caret's beat, a rest as
+well as a note, as one undo step, its surrounding whitespace dropped; an
+empty text takes it away. The command line types `text <words>` and `text
+none`. In the app, Ctrl+T or the entry bar's text button opens a popup under
+the caret's beat, the one chord symbols use: words typed and Enter, or one of
+the texts the song already has, set it; the bin takes it away. The caret's
+status shows the text in quotes.
+
 ## Consequences
 
 - The model, the native format, the Guitar Pro 3-8 importers and MusicXML
-  both ways keep beat texts, layout draws them, and `elara-cli dump` and
-  `import --json` show them. Typing them at the caret comes next.
+  both ways keep beat texts, layout draws them, the caret types them, and
+  `elara-cli dump` and `import --json` show them.
 - A text longer than the room before the line's end runs past it, and a
   line with texts on several rows is taller by each row (about 1.5 staff
   spaces).
@@ -74,5 +82,7 @@ them is `beatText`.
   silently`,
   `io.MusicXML export: beat text comes back as words`, the native round trip,
   `io.song.json uses text forms and omits defaults`, the `notation.Beat text:
-  ...` layout tests (place, above chord symbols, rows, rests and views) and
-  the render snapshots of the corpus.
+  ...` layout tests (place, above chord symbols, rows, rests and views), the
+  render snapshots of the corpus, `core.Entry: beat text is written above the
+  caret's beat`, `cli.edit_writes_text` with `cli.dump_text`, and the app's
+  smoke test, which writes a text and takes it away.

@@ -97,7 +97,8 @@ its notes have one (strings without a note not played, the grid from the nut
 unless a fret lies past the fourth); otherwise it keeps the diagram it had,
 so renaming an imported chord keeps its shape. The command line types
 `chord <name>` and `chord none`. In the app, Ctrl+K or the entry bar's chord
-button opens a popup under the caret's beat: a name typed and Enter, or one of
+button opens a popup under the caret's beat (`WordsPopup`, which beat text
+shares, ADR-0081): a name typed and Enter, or one of
 the chords the song already names, sets it; the bin takes it away.
 
 ## Consequences
