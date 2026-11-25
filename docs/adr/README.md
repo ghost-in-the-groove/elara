@@ -81,6 +81,7 @@ one that replaces them.
 | [0073](0073-grand-staff.md) | A brace and the barlines join a grand staff | Accepted |
 | [0074](0074-pdf-export.md) | PDF export written by Elara | Accepted |
 | [0075](0075-guitar-pro-keyboards-grand-staff.md) | Guitar Pro 3-5 keyboards on a grand staff | Accepted |
+| [0076](0076-arpeggio-lines.md) | Strums of keyboards are arpeggio lines | Accepted |
 | [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
 
 ## Template
