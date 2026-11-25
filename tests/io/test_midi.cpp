@@ -439,9 +439,8 @@ TEST_CASE("MIDI export lists what MIDI cannot hold", "[io][midi]") {
               "song info other than the title and copyright dropped",
               "tempos in beat units other than the quarter note written in quarter notes "
               "(measure 1)",
-              "Electric Guitar: fret positions dropped (2 times, first in measure 2)",
+              "Electric Guitar: fret positions dropped (3 times, first in measure 2)",
               "Electric Guitar: bends dropped (measure 2)",
-              "Electric Guitar: grace notes dropped (measure 2)",
               "Electric Guitar: palm mutes dropped (measure 2)",
               "Banjo: fretted instrument read back as pitched"});
     // The tempo still sounds the same: a dotted quarter at 60 is a quarter at 90.

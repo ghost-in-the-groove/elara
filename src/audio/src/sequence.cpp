@@ -469,7 +469,10 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
                                  .measure(sounding.measure)
                                  .voices[sounding.voice]
                                  .beats[sounding.beat];
-    const core::Note& note = beat.notes[sounding.note];
+    const core::Note& note = core::noteOf(song, sounding);
+    // A grace note (ADR-0079) has none of its beat's strum, tremolo or whammy.
+    static const core::BeatEffects kGraceBeat{};
+    const core::BeatEffects& beatEffects = sounding.grace == 0 ? beat.effects : kGraceBeat;
     const core::NoteEffects& effects = note.effects;
     Articulation result{.key = sounding.key,
                         .velocity = sounding.velocity,
@@ -477,7 +480,7 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
                         .letRing = effects.letRing,
                         .string = note.position ? note.position->string : 0,
                         .effects = &effects,
-                        .beat = &beat.effects};
+                        .beat = &beatEffects};
     if (effects.accent == core::Accent::Accent) {
         result.velocity += kDynamicStep;
     } else if (effects.accent == core::Accent::Marcato) {
@@ -487,17 +490,17 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
         result.velocity -= 2 * kDynamicStep;
     }
     result.velocity = std::clamp(result.velocity, 1, 127);
-    if (beat.effects.tremoloPicking) {
-        result.tremolo = core::Duration(*beat.effects.tremoloPicking).length();
+    if (beatEffects.tremoloPicking) {
+        result.tremolo = core::Duration(*beatEffects.tremoloPicking).length();
     }
     if (track.instrument().kind == core::InstrumentKind::Percussion) {
         return result; // keys are drums: no partials, no touches, no strings to strum
     }
-    if (beat.effects.strum != core::Strum::None) {
-        result.strum = strumPlace(beat, note, beat.effects.strum);
+    if (beatEffects.strum != core::Strum::None) {
+        result.strum = strumPlace(beat, note, beatEffects.strum);
     }
     result.key = harmonicKey(note, sounding.key);
-    result.moves = !effects.bend.isEmpty() || !beat.effects.whammyBar.isEmpty() ||
+    result.moves = !effects.bend.isEmpty() || !beatEffects.whammyBar.isEmpty() ||
                    effects.slideIn != core::SlideIn::None ||
                    effects.slideOut != core::SlideOut::None || effects.legatoFromPrevious ||
                    effects.vibrato != core::Vibrato::None;

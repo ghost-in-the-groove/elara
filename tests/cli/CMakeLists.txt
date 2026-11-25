@@ -1007,11 +1007,11 @@ endforeach()
 add_test(NAME cli.sequence_repeats
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp")
 set_tests_properties(cli.sequence_repeats PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"measure\":0,\"start\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":2,[^}]*}\\],\"noteCount\":24,\"eventCount\":91}")
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"measure\":0,\"start\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":1,[^}]*},{\"measure\":0,[^}]*},{\"measure\":2,[^}]*}\\],\"noteCount\":25,\"eventCount\":93}")
 add_test(NAME cli.sequence_endings
   COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/techniques.gp5")
 set_tests_properties(cli.sequence_endings PROPERTIES
-  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 22 notes, 67 events in 13\\.950 s")
+  PASS_REGULAR_EXPRESSION "played measures: 1 2 3 2 4\n5 measures, 23 notes, 69 events in 13\\.950 s")
 # Signs and jumps read from Guitar Pro (ADR-0049): D.S. al Coda from a Guitar
 # Pro 5 file, D.S.S. al Double Coda from GPIF.
 add_test(NAME cli.sequence_dal_segno COMMAND elara-cli sequence "${ELARA_CORPUS}/gp/dal-segno.gp5")
@@ -1051,18 +1051,20 @@ set_tests_properties(cli.sequence_events PROPERTIES
   PASS_REGULAR_EXPRESSION "\"duration\":8\\.4,.*\"notes\":\\[{\"track\":0,\"staff\":0,\"voice\":0,\"pass\":0,\"start\":0,\"end\":0\\.6,\"key\":60,\"velocity\":80},.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":60,\"velocity\":80},{\"time\":0\\.6,\"kind\":\"off\",\"track\":0,\"key\":60,\"velocity\":0},{\"time\":0\\.6,\"kind\":\"on\",\"track\":0,\"key\":62,")
 # Articulations (ADR-0022): the palm mute, the natural harmonic that rings
 # until its string is struck again in the next pass, the accented dead note
-# (ff 112 + 16, at most 127) and the staccato note (half of 1.125 s).
+# (ff 112 + 16, at most 127) and the staccato note (half of the 0.75 s its
+# grace note leaves it, ADR-0079), softer under its diminuendo (ADR-0078).
 add_test(NAME cli.sequence_articulations
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_articulations PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":88,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":88,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.975,\"end\":13\\.35,\"key\":57,\"velocity\":76}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
 # Pitch articulations (ADR-0023): the hammer-on in the triplet is not struck
 # but joins the voice of the note before it a whole tone up (ADR-0070), and
-# the shift slide goes up to the next note over the last 0.2 s.
+# the shift slide goes up to the next note over the last half of the staccato
+# note its grace note shortened (ADR-0079).
 add_test(NAME cli.sequence_pitch
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_pitch PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"legato\",\"track\":0,\"key\":47,\"cents\":200,\"velocity\":80},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":12\\.9625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.2}")
+  PASS_REGULAR_EXPRESSION "\"start\":0\\.8,\"end\":1,\"key\":49,\"velocity\":80,\"struck\":false}.*{\"time\":0\\.8,\"kind\":\"legato\",\"track\":0,\"key\":47,\"cents\":200,\"velocity\":80},{\"time\":1,\"kind\":\"off\",\"track\":0,\"key\":47,\"velocity\":0}.*{\"time\":13\\.1625,\"kind\":\"pitch\",\"track\":0,\"key\":57,\"cents\":200,\"glide\":0\\.1875}")
 # Strums and tremolo picking (ADR-0025): the upstroke strikes the chord from
 # its highest string, 0.01 s apart; the tremolo-picked quarter is struck every
 # sixteenth, and its last attack picks up its slide out where the attack
@@ -1083,6 +1085,19 @@ add_test(NAME cli.sequence_hairpins
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes)
 set_tests_properties(cli.sequence_hairpins PROPERTIES
   PASS_REGULAR_EXPRESSION "\"start\":1.2,\"end\":1.8,\"key\":59,\"velocity\":80\},\{[^}]*\"start\":1.8,\"end\":6.9,\"key\":73,\"velocity\":88,.*\"pass\":5,\"start\":12.6,[^}]*\"velocity\":80\}.*\"pass\":5,\"start\":13.725,\"end\":14.1,\"key\":59,\"velocity\":68\}")
+# Grace notes (ADR-0079): the thirty-second before the last beat of the Guitar
+# Pro 3 melody cuts the eighth before it short and the beat's open E is
+# hammered on from it; the eighth grace before the first beat of the last
+# measure of guitar-techniques.gp borrows no time from the measure before and
+# delays its beat.
+add_test(NAME cli.sequence_grace_before_beat
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/melody.gp3" --notes)
+set_tests_properties(cli.sequence_grace_before_beat PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":4\\.4,\"end\":4\\.7,\"key\":45,\"velocity\":96\},\{[^}]*\"start\":4\\.7,\"end\":4\\.8,\"key\":43,\"velocity\":96\},\{[^}]*\"start\":4\\.8,\"end\":5\\.6,\"key\":40,\"velocity\":96,\"struck\":false\}")
+add_test(NAME cli.sequence_grace_on_measure_start
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes)
+set_tests_properties(cli.sequence_grace_on_measure_start PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"pass\":5,\"start\":12\\.6,\"end\":12\\.975,\"key\":59,\"velocity\":80\},\{[^}]*\"pass\":5,\"start\":12\\.975,\"end\":13\\.35,\"key\":57,")
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)

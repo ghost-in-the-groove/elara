@@ -86,7 +86,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] In the model, read from Guitar Pro 3-8 and kept by the native format
   - [x] Read and written in MusicXML
   - [ ] Drawn as small notes and fret numbers
-  - [ ] Played by borrowing time
+  - [x] Played by borrowing time
   - [ ] Typed at the caret
 - [x] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being

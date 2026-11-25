@@ -203,7 +203,6 @@ void reportDropped(const Track& track, Warnings& warnings) {
                             warnings.add(who, what, m);
                         }
                     };
-                    drop(!beat.graces.empty(), "grace notes dropped");
                     if (!beat.notes.empty()) {
                         drop(!be.whammyBar.isEmpty(), "whammy bar dropped");
                         drop(be.pickStroke != core::PickStroke::None, "pick strokes dropped");
@@ -212,7 +211,8 @@ void reportDropped(const Track& track, Warnings& warnings) {
                         drop(be.bassTechnique != core::BassTechnique::None,
                              "bass techniques (tap, slap, pop) dropped");
                     }
-                    for (const Note& note : beat.notes) {
+                    // Grace notes sound (ADR-0079), with what MIDI drops of any note.
+                    const auto dropFrom = [&](const Note& note) {
                         const core::NoteEffects& e = note.effects;
                         drop(note.position.has_value(), "fret positions dropped");
                         drop(!e.bend.isEmpty(), "bends dropped");
@@ -227,6 +227,10 @@ void reportDropped(const Track& track, Warnings& warnings) {
                         drop(e.letRing, "let ring dropped");
                         drop(e.staccato, "staccato dropped");
                         drop(e.accent != core::Accent::None, "accents dropped");
+                    };
+                    std::ranges::for_each(beat.notes, dropFrom);
+                    for (const core::Grace& grace : beat.graces) {
+                        std::ranges::for_each(grace.notes, dropFrom);
                     }
                 }
             }

@@ -12,6 +12,7 @@ using elara::core::Duration;
 using elara::core::Dynamic;
 using elara::core::Fraction;
 using elara::core::FretPosition;
+using elara::core::Grace;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 using elara::core::Note;
@@ -83,6 +84,96 @@ TEST_CASE("Sounding notes start where their beat starts and last their written l
          .beat = 1,
          .measure = 1},
     };
+    CHECK(soundingNotes(song) == expected);
+}
+
+TEST_CASE("Grace notes borrow their time from the beat before or their own",
+          "[core][performance]") {
+    Song song = pianoSong(2);
+    auto& first = song.track(0).staff(0).measure(0).voices[0].beats;
+    // A sixteenth before the D, an eighth chord on the F (ADR-0079).
+    first = {beat(NoteValue::Quarter, {note(60)}), beat(NoteValue::Quarter, {note(62)}),
+             beat(NoteValue::Half, {note(65)})};
+    first[1].graces = {Grace{.duration = Duration(NoteValue::Sixteenth), .notes = {note(64)}}};
+    first[2].graces = {Grace{.duration = Duration(NoteValue::Eighth),
+                             .notes = {note(67), note(69, false, Dynamic::F)},
+                             .onBeat = true}};
+    // Two eighths before a beat after an eighth take half of it: a 32nd each.
+    auto& second = song.track(0).staff(0).measure(1).voices[0].beats;
+    second = {beat(NoteValue::Eighth, {note(60)}), beat(NoteValue::Quarter, {note(62)})};
+    second[1].graces = {Grace{.duration = Duration(NoteValue::Eighth), .notes = {note(64)}},
+                        Grace{.duration = Duration(NoteValue::Eighth), .notes = {note(65)}}};
+
+    const std::vector<SoundingNote> expected{
+        {.start = Fraction(0), .length = Fraction(3, 16), .key = 60, .velocity = 80},
+        {.start = Fraction(3, 16),
+         .length = Fraction(1, 16),
+         .key = 64,
+         .velocity = 80,
+         .beat = 1,
+         .grace = 1},
+        {.start = Fraction(1, 4), .length = Fraction(1, 4), .key = 62, .velocity = 80, .beat = 1},
+        {.start = Fraction(1, 2),
+         .length = Fraction(1, 8),
+         .key = 67,
+         .velocity = 80,
+         .beat = 2,
+         .grace = 1},
+        {.start = Fraction(1, 2),
+         .length = Fraction(1, 8),
+         .key = 69,
+         .velocity = 96,
+         .beat = 2,
+         .note = 1,
+         .grace = 1},
+        {.start = Fraction(5, 8), .length = Fraction(3, 8), .key = 65, .velocity = 80, .beat = 2},
+        {.start = Fraction(1), .length = Fraction(1, 16), .key = 60, .velocity = 80, .measure = 1},
+        {.start = Fraction(17, 16),
+         .length = Fraction(1, 32),
+         .key = 64,
+         .velocity = 80,
+         .beat = 1,
+         .grace = 1,
+         .measure = 1},
+        {.start = Fraction(35, 32),
+         .length = Fraction(1, 32),
+         .key = 65,
+         .velocity = 80,
+         .beat = 1,
+         .grace = 2,
+         .measure = 1},
+        {.start = Fraction(9, 8),
+         .length = Fraction(1, 4),
+         .key = 62,
+         .velocity = 80,
+         .beat = 1,
+         .measure = 1}};
+    CHECK(soundingNotes(song) == expected);
+}
+
+TEST_CASE("A grace note before the first beat of a measure plays on it", "[core][performance]") {
+    Song song = pianoSong(2);
+    for (std::size_t m = 0; m < 2; ++m) {
+        auto& beats = song.track(0).staff(0).measure(m).voices[0].beats;
+        beats = {beat(NoteValue::Whole, {note(60 + static_cast<int>(m))})};
+        beats[0].graces = {Grace{.duration = Duration(NoteValue::Eighth), .notes = {note(64)}}};
+    }
+    // The measure before keeps its whole note: repeats and jumps may play
+    // another measure before this one.
+    const std::vector<SoundingNote> expected{
+        {.start = Fraction(0), .length = Fraction(1, 8), .key = 64, .velocity = 80, .grace = 1},
+        {.start = Fraction(1, 8), .length = Fraction(7, 8), .key = 60, .velocity = 80},
+        {.start = Fraction(1),
+         .length = Fraction(1, 8),
+         .key = 64,
+         .velocity = 80,
+         .grace = 1,
+         .measure = 1},
+        {.start = Fraction(9, 8),
+         .length = Fraction(7, 8),
+         .key = 61,
+         .velocity = 80,
+         .measure = 1}};
     CHECK(soundingNotes(song) == expected);
 }
 
