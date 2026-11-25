@@ -101,6 +101,35 @@ of each verse in its voice (`middle` or `end` after a syllable joined to the
 next, `begin` or `single` otherwise), an extender a plain `<extend/>`, which
 readers stretch to the next syllable.
 
+**MIDI.** A Standard MIDI File holds one line of lyrics: a Lyric meta event
+per syllable at the tick of its note. The MMA's recommended practice for these
+events (RP-017) is not freely available, and files disagree, so the reader is
+lenient: spaces, carriage returns, line feeds and karaoke's `/` and `\` around
+a syllable are not part of it, a hyphen after it, or alone or before the next
+one, joins it to the next, and an event left empty sings nothing. A syllable
+goes on the note that starts nearest it, at most a 32nd note away, the highest
+of a chord; a track's events go to the channel of that track whose notes start
+with most of them, or, for a track of words only, to the channel of the whole
+file that does (the melody, not the bass under it). Syllables away from any
+note, or on a note that already sings, are dropped with a warning. The writer
+puts each syllable of a track's first staff that sings in an event right
+before the note it starts with: a hyphen after it when the word goes on, a
+space when it ends, the text as written (UTF-8). Repeats are written as played
+(ADR-0083), so each pass through a repeated measure sings the verse of that
+pass, the first verse on the first pass, when the measure has it and the first
+verse otherwise; other verses, a second staff's lyrics and extenders are
+dropped with a warning.
+
+Many files end each word with a space, or start the next word with one or
+with a new line, and leave the syllables of a word bare ("Twin" "kle "). When
+most of a track's syllables that no hyphen joins are parted from the next
+that way, a syllable that is not joins the next. Karaoke files (.kar, marked
+by a text event "@KMIDI KARAOKE FILE") keep their words in text events after
+a header of "@" lines: their words are the lyrics unless the file also has
+Lyric events, and the first two "@T" lines are the song's title and artist.
+Elara does not write .kar files: its MIDI lyrics are Lyric events, which
+karaoke players read too.
+
 **Drawing.** Lyrics go right under the staff's notes, where the eye looks
 for them, and dynamics and hairpins go under the lyrics. Engraving manuals put
 the dynamics of a vocal staff above it instead; Elara keeps them in one place
@@ -132,8 +161,10 @@ of MusicXML, fold them into the joining hyphen and the extender.
   native format, and show in `elara-cli import --json` and `dump`.
 - Lyrics draw in every layout (lines, pages, strips, SVG, PDF and the app);
   a `lyric` role marks their texts and lines in the display list.
-- Verses are typed whole in the app and the CLI. Until MIDI lyric events
-  are read and written, MIDI keeps warning that lyrics are dropped.
+- Verses are typed whole in the app and the CLI.
+- MIDI carries the verse each pass sings, so a song with its verses under a
+  repeat exports to a karaoke-ready file; read back, it is one verse over the
+  measures as played.
 - Guitar Pro has no extenders: its lyrics come without them, and a held
   syllable written to MusicXML and read back keeps its line.
 - Tests: the `core.Lyrics text: ...` cases (syllables, blanks, line breaks,
@@ -153,5 +184,11 @@ of MusicXML, fold them into the joining hyphen and the extender.
   come back with their verses, hyphens and extenders`, the native round trip
   with `io.song.json uses text forms and omits defaults`, the
   `notation.Lyrics: ...` layout cases (placement, held syllables, spacing,
-  dynamics, lines that break a word or a melisma, tablature) and the render
-  snapshots of the corpus band, quartet and piano.
+  dynamics, lines that break a word or a melisma, tablature), the render
+  snapshots of the corpus band, quartet and piano, `io.MIDI import puts lyric
+  events on the notes they start with`, `io.MIDI import gives a lyrics track
+  without notes to the melody it sings`, `io.MIDI export sings each pass of a
+  repeat with its verse`, `io.MIDI import reads words parted by spaces
+  instead of hyphens`, `io.MIDI import reads a karaoke file's words, title and
+  artist`, `io.MIDI import leaves the text events of other files alone`,
+  `cli.import_karaoke` and the corpus MIDI band snapshots.

@@ -11,6 +11,7 @@
 *.gp5  binary
 *.mid  binary
 *.midi binary
+*.kar  binary
 *.mxl  binary
 *.sf2  binary
 *.sf3  binary

@@ -17,9 +17,9 @@ namespace elara::io {
 
 namespace {
 
-constexpr std::array<std::string_view, 12> kExtensions{
-    ".elara", ".musicxml", ".xml", ".mxl", ".mid", ".midi",
-    ".smf",   ".gp",       ".gpx", ".gp5", ".gp4", ".gp3",
+constexpr std::array<std::string_view, 13> kExtensions{
+    ".elara", ".musicxml", ".xml", ".mxl", ".mid", ".midi", ".smf",
+    ".kar",   ".gp",       ".gpx", ".gp5", ".gp4", ".gp3",
 };
 
 bool among(std::string_view extension, std::initializer_list<std::string_view> names) {
@@ -43,7 +43,7 @@ std::expected<ImportResult, FormatError> openFile(const std::filesystem::path& p
     if (among(extension, {".musicxml", ".xml", ".mxl"})) {
         return importMusicXmlFile(path);
     }
-    if (among(extension, {".mid", ".midi", ".smf"})) {
+    if (among(extension, {".mid", ".midi", ".smf", ".kar"})) {
         return importMidiFile(path);
     }
     if (among(extension, {".gp", ".gpx", ".gp5", ".gp4", ".gp3"})) {

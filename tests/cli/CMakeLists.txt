@@ -894,6 +894,16 @@ add_test(NAME cli.import_rejects_damaged_midi
   COMMAND elara-cli import "${CMAKE_CURRENT_BINARY_DIR}/damaged.mid")
 set_tests_properties(cli.import_rejects_damaged_midi PROPERTIES WILL_FAIL TRUE)
 
+# Karaoke files (ADR-0084): read for their words, title and artist.
+add_test(NAME cli.import_karaoke
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/midi/karaoke.kar")
+set_tests_properties(cli.import_karaoke PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"title\":\"Corpus Song\",\"artist\":\"Ghost in the Groove\".*\"lyrics\":\\[\"Hel-\"\\]")
+add_test(NAME cli.export_rejects_karaoke
+  COMMAND elara-cli export "${ELARA_CLI_IMPORTED}" "${CMAKE_CURRENT_BINARY_DIR}/out.kar")
+set_tests_properties(cli.export_rejects_karaoke PROPERTIES
+  FIXTURES_REQUIRED cli_imported WILL_FAIL TRUE)
+
 # Guitar Pro (ADR-0010): read only.
 add_test(NAME cli.import_guitar_pro
   COMMAND elara-cli --json import "${ELARA_CORPUS}/gp/guitar-techniques.gp")
@@ -1090,6 +1100,7 @@ file(GLOB _corpus_files CONFIGURE_DEPENDS
   "${ELARA_CORPUS}/musicxml/*.musicxml"
   "${ELARA_CORPUS}/musicxml/*.mxl"
   "${ELARA_CORPUS}/midi/*.mid"
+  "${ELARA_CORPUS}/midi/*.kar"
   "${ELARA_CORPUS}/gp/*.gp"
   "${ELARA_CORPUS}/gp/*.gp[345]"
   "${ELARA_CORPUS}/gp/*.gpx")

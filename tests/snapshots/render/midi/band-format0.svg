@@ -275,6 +275,7 @@
 <text class="t fretNumber" x="100.808" y="51.01" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
 <rect class="knockout" x="100.343" y="51.47" width="0.931" height="1.144" fill="white" stroke="none"/>
 <text class="t fretNumber" x="100.808" y="52.51" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
+<text class="t lyric" x="37.177" y="69.149" style="font-size:1.5px" text-anchor="middle" stroke="none">la</text>
 <text class="t tempo" x="37.75" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 100</text>
 <text class="t tempo" x="71.234" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 80</text>
 <text class="t trackName" x="25.023" y="28.728" style="font-size:1.6px" text-anchor="end" stroke="none">Electric Bass (finger)</text>

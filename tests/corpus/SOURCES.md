@@ -57,4 +57,5 @@ pseudo-random sequence, not a recording.
 |---|---|
 | `played-piano.mid` | Format 1 with a conductor track (title, copyright, D major); two hands played without quantization (starts off by up to 24 ticks, early and late releases, uneven velocities) split at middle C into two staves; a last note released just after the barline; sustain pedal (reported) |
 | `drums.mid` | Channel 10 at 96 ticks per quarter note with short drum-machine notes: crash, closed and open hi-hat, snare and kick on the hands' and feet's voices, pedal hi-hat |
-| `band-format0.mid` | Format 0 with three channels becoming three tracks named by program (fingered bass, steel guitar, flute); 3/4 then 6/8; B-flat major spelling; triplet eighths; a tempo change; a lyric (reported) |
+| `band-format0.mid` | Format 0 with three channels becoming three tracks named by program (fingered bass, steel guitar, flute); 3/4 then 6/8; B-flat major spelling; triplet eighths; a tempo change; a lyric on the flute, the highest of the notes it starts with |
+| `karaoke.kar` | A karaoke file (format 1): the "@KMIDI KARAOKE FILE" mark; a track of words in text events after a header whose "@T" lines give the title and artist; words parted by spaces, with "\" and "/" starting a paragraph and a line; the words sung by the melody track, not the piano under it |

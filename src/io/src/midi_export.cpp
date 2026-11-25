@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // MIDI export (ADR-0009): the song's sounding notes as a format 1 Standard MIDI File.
+#include <elara/core/lyrics.hpp>
 #include <elara/core/performance.hpp>
 #include <elara/io/midi.hpp>
 
@@ -513,6 +514,94 @@ std::string_view kindName(core::InstrumentKind kind) {
     return "pitched";
 }
 
+// The lyrics of the track's first staff that sings, a Lyric meta event per
+// syllable at its beat, with a hyphen after it when the word goes on and a
+// space when it ends (ADR-0084). MIDI has one line of lyrics: each pass through
+// a repeated measure sings the verse of that pass (the first verse on the
+// first pass) when the measure has it, else the first verse.
+std::vector<MidiEvent> lyricEvents(const Track& track, const PlayedMeasures& played,
+                                   const Timing& timing, Warnings& warnings) {
+    const core::Staff* sung = nullptr;
+    for (std::size_t s = 0; s < track.staffCount(); ++s) {
+        if (core::verseCount(track.staff(s)) == 0) {
+            continue;
+        }
+        if (sung == nullptr) {
+            sung = &track.staff(s);
+        } else {
+            warnings.add(track.name(), "lyrics of a second staff dropped");
+            break;
+        }
+    }
+    if (sung == nullptr) {
+        return {};
+    }
+    // The verses each measure sings anywhere, and those its passes sang.
+    std::vector<std::uint32_t> verses(sung->measureCount());
+    for (std::size_t m = 0; m < sung->measureCount(); ++m) {
+        for (const core::Voice& voice : sung->measure(m).voices) {
+            for (const Beat& beat : voice.beats) {
+                if (!beat.lyrics) {
+                    continue;
+                }
+                for (std::size_t v = 0; v < beat.lyrics->size() && v < core::kMaxVerses; ++v) {
+                    if (!(*beat.lyrics)[v].text.empty()) {
+                        verses[m] |= 1U << v;
+                    }
+                }
+            }
+        }
+    }
+    std::vector<std::uint32_t> sang(sung->measureCount());
+    std::vector<std::size_t> passes(sung->measureCount());
+    std::vector<MidiEvent> events;
+    bool extenders = false;
+    struct Placed {
+        Fraction start{};
+        const core::Syllable* syllable = nullptr;
+    };
+    std::vector<Placed> placed;
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        const std::size_t m = played.order[k];
+        const std::size_t pass = passes[m]++;
+        const std::size_t verse =
+            pass < core::kMaxVerses && (verses[m] >> pass & 1U) != 0 ? pass : 0;
+        if ((verses[m] >> verse & 1U) == 0) {
+            continue;
+        }
+        sang[m] |= 1U << verse;
+        // The first syllable at each place, voices in order.
+        placed.clear();
+        for (const core::Voice& voice : sung->measure(m).voices) {
+            Fraction start;
+            for (const Beat& beat : voice.beats) {
+                if (beat.lyrics && verse < beat.lyrics->size() &&
+                    !(*beat.lyrics)[verse].text.empty() &&
+                    std::ranges::find(placed, start, &Placed::start) == placed.end()) {
+                    placed.push_back({.start = start, .syllable = &(*beat.lyrics)[verse]});
+                }
+                start += beat.duration.length();
+            }
+        }
+        std::ranges::sort(placed, {}, &Placed::start);
+        for (const Placed& at : placed) {
+            const core::Syllable& syllable = *at.syllable;
+            extenders = extenders || syllable.extend;
+            events.push_back(meta(timing.ticks(played.start[k] + at.start), detail::kMetaLyric,
+                                  syllable.text + (syllable.hyphen ? '-' : ' ')));
+        }
+    }
+    for (std::size_t m = 0; m < verses.size(); ++m) {
+        if ((verses[m] & ~sang[m]) != 0) {
+            warnings.add(track.name(), "verses no repeat sings dropped", m);
+        }
+    }
+    if (extenders) {
+        warnings.add(track.name(), "lyric extenders dropped");
+    }
+    return events;
+}
+
 // Note events of one track. A note struck again while the same key still
 // sounds on the channel is retriggered; the key is released when the last of
 // its notes ends.
@@ -628,7 +717,15 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
                                  std::format("{} instrument read back as {}",
                                              kindName(instrument.kind), kindName(back)));
         }
+        // Lyric events go before the notes they start with.
+        const std::vector<MidiEvent> lyrics = lyricEvents(track, played, timing, trackWarnings[t]);
+        const auto header = static_cast<std::ptrdiff_t>(out.events.size());
+        out.events.insert(out.events.end(), lyrics.begin(), lyrics.end());
+        const auto notesFrom = static_cast<std::ptrdiff_t>(out.events.size());
         addNotes(out, channelNumber, byTrack[t], timing);
+        std::inplace_merge(out.events.begin() + header, out.events.begin() + notesFrom,
+                           out.events.end(),
+                           [](const MidiEvent& a, const MidiEvent& b) { return a.tick < b.tick; });
         reportDropped(track, trackWarnings[t]);
         out.end = end;
         bodies[t + 1] = detail::encodeTrack(out);

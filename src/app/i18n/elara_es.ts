@@ -1594,10 +1594,6 @@
         <translation>MusicXML (*.musicxml *.xml *.mxl)</translation>
     </message>
     <message>
-        <source>MIDI (*.mid *.midi *.smf)</source>
-        <translation>MIDI (*.mid *.midi *.smf)</translation>
-    </message>
-    <message>
         <source>Elara (*.elara)</source>
         <translation>Elara (*.elara)</translation>
     </message>
@@ -1788,6 +1784,10 @@
     <message>
         <source>Dive %1</source>
         <translation>Hundimiento %1</translation>
+    </message>
+    <message>
+        <source>MIDI (*.mid *.midi *.smf *.kar)</source>
+        <translation>MIDI (*.mid *.midi *.smf *.kar)</translation>
     </message>
     <message>
         <source>Pull-up %1</source>

@@ -13,6 +13,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
 #include <iterator>
 #include <map>
@@ -32,6 +33,7 @@ using core::Note;
 using core::NoteValue;
 using core::Pitch;
 using core::Song;
+using core::Syllable;
 using core::TimeSignature;
 using core::Tuplet;
 using detail::MidiEvent;
@@ -47,6 +49,14 @@ struct RawNote {
     int velocity = 0;
 };
 
+// A syllable on the note it starts with (ADR-0084): where the note starts and
+// its key, which picks the staff of a keyboard.
+struct SungSyllable {
+    std::int64_t start = 0;
+    int key = 0;
+    Syllable syllable{};
+};
+
 // The notes of one channel of one MIDI track: one Elara track.
 struct Source {
     int channel = 0;
@@ -56,12 +66,20 @@ struct Source {
     std::optional<int> volume{}; // controller 7 before the first note
     std::optional<int> pan{};    // controller 10 before the first note
     std::vector<RawNote> notes{};
+    std::vector<SungSyllable> lyrics{}; // by start
 };
 
 template <typename T>
 struct Timed {
     std::int64_t tick = 0;
     T value{};
+};
+
+// The Lyric events of one MIDI track and the sources of its channels.
+struct LyricLine {
+    std::vector<Timed<std::string>> events{};
+    std::size_t firstSource = 0;
+    std::size_t endSource = 0;
 };
 
 struct Gathered {
@@ -72,12 +90,16 @@ struct Gathered {
     std::vector<Timed<long long>> tempos{};    // microseconds per quarter note
     std::vector<Timed<std::string>> markers{}; // sections (ADR-0062)
     std::vector<Source> sources{};
-    std::int64_t end = 0;       // last tick of any track
-    std::int64_t lastStart = 0; // where the last note starts
+    std::vector<LyricLine> lyrics{};
+    std::vector<LyricLine> texts{};     // text events, the words of a karaoke file
+    std::vector<std::string> karaoke{}; // its "@T" lines: title, artist...
+    std::int64_t end = 0;               // last tick of any track
+    std::int64_t lastStart = 0;         // where the last note starts
 };
 
 void readMeta(const MidiEvent& event, Gathered& out, std::string& trackName,
-              std::string& instrumentName, Warnings& warnings) {
+              std::string& instrumentName, std::vector<Timed<std::string>>& lyrics,
+              std::vector<Timed<std::string>>& texts, Warnings& warnings) {
     const std::string& p = event.payload;
     const auto byteAt = [&p](std::size_t i) {
         return static_cast<std::uint8_t>(p[i]);
@@ -99,7 +121,10 @@ void readMeta(const MidiEvent& event, Gathered& out, std::string& trackName,
         }
         break;
     case detail::kMetaLyric:
-        warnings.add("", "lyrics dropped");
+        lyrics.push_back({event.tick, p});
+        break;
+    case detail::kMetaText:
+        texts.push_back({event.tick, p});
         break;
     case detail::kMetaMarker:
         out.markers.push_back({event.tick, p});
@@ -139,6 +164,34 @@ void readMeta(const MidiEvent& event, Gathered& out, std::string& trackName,
     }
 }
 
+/// A karaoke file (.kar: a text event "@KMIDI KARAOKE FILE") keeps its words
+/// in text events, after a header of "@" lines whose "@T" lines are its title,
+/// artist and more. Its words are the lyrics unless the file has Lyric events.
+void readKaraoke(Gathered& out) {
+    const auto header = [](const Timed<std::string>& text) {
+        return text.value.starts_with('@');
+    };
+    const bool karaoke = std::ranges::any_of(out.texts, [](const LyricLine& line) {
+        return std::ranges::any_of(line.events, [](const Timed<std::string>& text) {
+            return text.value.starts_with("@K");
+        });
+    });
+    if (!karaoke) {
+        return;
+    }
+    for (LyricLine& line : out.texts) {
+        for (const Timed<std::string>& text : line.events) {
+            if (text.value.starts_with("@T")) {
+                out.karaoke.push_back(text.value.substr(2));
+            }
+        }
+        std::erase_if(line.events, header);
+        if (out.lyrics.empty() && !line.events.empty()) {
+            out.lyrics.push_back(std::move(line));
+        }
+    }
+}
+
 Gathered gather(const MidiFile& file, Warnings& warnings) {
     Gathered out;
     for (std::size_t t = 0; t < file.tracks.size(); ++t) {
@@ -146,6 +199,8 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
         out.end = std::max(out.end, track.end);
         std::string trackName;
         std::string instrumentName;
+        std::vector<Timed<std::string>> lyrics;
+        std::vector<Timed<std::string>> texts;
         std::array<std::optional<std::size_t>, 16> sourceOf{};
         // Attacks waiting for their note-off, per channel and key (oldest first).
         std::vector<std::vector<std::pair<std::int64_t, int>>> sounding(16 * 128);
@@ -166,7 +221,7 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
         };
         for (const MidiEvent& event : track.events) {
             if (event.status == detail::kMetaEvent) {
-                readMeta(event, out, trackName, instrumentName, warnings);
+                readMeta(event, out, trackName, instrumentName, lyrics, texts, warnings);
                 continue;
             }
             if (!event.isChannelMessage()) {
@@ -247,7 +302,18 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
             }
             out.sources[s].instrumentName = instrumentName;
         }
+        if (!lyrics.empty()) {
+            out.lyrics.push_back({.events = std::move(lyrics),
+                                  .firstSource = firstSource,
+                                  .endSource = out.sources.size()});
+        }
+        if (!texts.empty()) {
+            out.texts.push_back({.events = std::move(texts),
+                                 .firstSource = firstSource,
+                                 .endSource = out.sources.size()});
+        }
     }
+    readKaraoke(out);
     for (Source& source : out.sources) {
         std::ranges::stable_sort(source.notes, [](const RawNote& a, const RawNote& b) {
             return std::tie(a.start, a.key) < std::tie(b.start, b.key);
@@ -265,6 +331,158 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
     std::ranges::stable_sort(out.tempos, byTick);
     std::ranges::stable_sort(out.markers, byTick);
     return out;
+}
+
+// ---- Lyrics (ADR-0084) ------------------------------------------------------------
+
+/// The syllables of a track's Lyric events, one per event: spaces, line ends
+/// and karaoke's "/" and "\" around it are not part of it, and a hyphen after
+/// it, or before the next, joins it to the next. Many files end each word with
+/// a space (or start the next with one, or with a new line) and leave the
+/// syllables of a word bare: when most syllables that a hyphen does not join
+/// are parted so, one that is not joins the next. Events left empty sing
+/// nothing.
+std::vector<Timed<Syllable>> syllablesOf(const std::vector<Timed<std::string>>& events) {
+    constexpr std::string_view kMarks = " \t\r\n/\\";
+    const auto trim = [kMarks](std::string_view text) {
+        const auto first = text.find_first_not_of(kMarks);
+        if (first == std::string_view::npos) {
+            return std::string_view{};
+        }
+        return text.substr(first, text.find_last_not_of(kMarks) - first + 1);
+    };
+    const auto parted = [&](std::size_t i) {
+        const std::string& text = events[i].value;
+        if (!text.empty() && kMarks.find(text.back()) != std::string_view::npos) {
+            return true;
+        }
+        if (i + 1 < events.size()) {
+            const std::string& next = events[i + 1].value;
+            return next.empty() || kMarks.find(next.front()) != std::string_view::npos;
+        }
+        return true;
+    };
+    std::vector<Timed<Syllable>> out;
+    std::vector<bool> spaced; // whether the syllable is parted from the next
+    for (std::size_t i = 0; i < events.size(); ++i) {
+        const auto& [tick, text] = events[i];
+        std::string_view word = trim(text);
+        if (!word.empty() && word.front() == '-') {
+            if (!out.empty()) {
+                out.back().value.hyphen = true;
+            }
+            const auto rest = word.find_first_not_of('-');
+            word = rest == std::string_view::npos ? std::string_view{} : trim(word.substr(rest));
+        }
+        bool hyphen = false;
+        while (!word.empty() && word.back() == '-') {
+            word.remove_suffix(1);
+            hyphen = true;
+        }
+        word = trim(word);
+        if (!word.empty()) {
+            out.push_back({tick, Syllable{.text = std::string(word), .hyphen = hyphen}});
+            spaced.push_back(parted(i));
+        } else if (hyphen && !out.empty()) {
+            out.back().value.hyphen = true;
+        }
+    }
+    if (out.size() < 2) {
+        return out;
+    }
+    std::size_t bare = 0;   // syllables before the last that no hyphen joins
+    std::size_t spaces = 0; // and of those, the ones parted from the next
+    for (std::size_t i = 0; i + 1 < out.size(); ++i) {
+        if (!out[i].value.hyphen) {
+            ++bare;
+            if (spaced[i]) {
+                ++spaces;
+            }
+        }
+    }
+    if (spaces > 0 && spaces * 3 >= bare) {
+        for (std::size_t i = 0; i + 1 < out.size(); ++i) {
+            out[i].value.hyphen = out[i].value.hyphen || !spaced[i];
+        }
+    }
+    return out;
+}
+
+/// The note of `notes` (sorted by start) that starts nearest `tick`, at most
+/// `reach` ticks away; the highest of a chord, where the melody usually is.
+const RawNote* noteAt(const std::vector<RawNote>& notes, std::int64_t tick, std::int64_t reach) {
+    const RawNote* best = nullptr;
+    auto it = std::ranges::lower_bound(notes, tick - reach, {}, &RawNote::start);
+    for (; it != notes.end() && it->start <= tick + reach; ++it) {
+        if (best == nullptr || std::abs(it->start - tick) <= std::abs(best->start - tick)) {
+            best = &*it;
+        }
+    }
+    return best;
+}
+
+/// Gives each track's Lyric events to the source whose notes start with most
+/// of them, the higher notes when two match as many (the melody over its
+/// accompaniment): one of the same MIDI track when any matches, else any of
+/// the file (a track of words only). Drums sing nothing.
+void assignLyrics(Gathered& out, int division, Warnings& warnings) {
+    const std::int64_t reach = std::max(1, division / 8); // a 32nd note
+    for (const LyricLine& line : out.lyrics) {
+        const std::vector<Timed<Syllable>> syllables = syllablesOf(line.events);
+        if (syllables.empty()) {
+            continue;
+        }
+        // How many syllables the source's notes start with, and their keys added up.
+        const auto matches = [&](const Source& source) {
+            std::pair<std::size_t, long long> found{};
+            if (source.channel == detail::kPercussionChannel) {
+                return found;
+            }
+            for (const Timed<Syllable>& syllable : syllables) {
+                if (const RawNote* note = noteAt(source.notes, syllable.tick, reach)) {
+                    ++found.first;
+                    found.second += note->key;
+                }
+            }
+            return found;
+        };
+        const auto bestOf = [&](std::size_t first, std::size_t end) {
+            std::optional<std::size_t> best;
+            std::pair<std::size_t, long long> most{};
+            for (std::size_t s = first; s < end; ++s) {
+                if (const auto found = matches(out.sources[s]); found.first > 0 && found > most) {
+                    best = s;
+                    most = found;
+                }
+            }
+            return best;
+        };
+        std::optional<std::size_t> target = bestOf(line.firstSource, line.endSource);
+        if (!target) {
+            target = bestOf(0, out.sources.size());
+        }
+        if (!target) {
+            warnings.add("", "lyrics off the notes dropped");
+            continue;
+        }
+        Source& source = out.sources[*target];
+        for (const auto& [tick, syllable] : syllables) {
+            const RawNote* note = noteAt(source.notes, tick, reach);
+            if (note == nullptr) {
+                warnings.add("", "lyrics off the notes dropped");
+                continue;
+            }
+            const auto taken = std::ranges::find(source.lyrics, note->start, &SungSyllable::start);
+            if (taken != source.lyrics.end()) {
+                warnings.add("", "lyrics sharing a note dropped");
+                continue;
+            }
+            source.lyrics.push_back({.start = note->start, .key = note->key, .syllable = syllable});
+        }
+    }
+    for (Source& source : out.sources) {
+        std::ranges::stable_sort(source.lyrics, {}, &SungSyllable::start);
+    }
 }
 
 // ---- Measures ---------------------------------------------------------------
@@ -1162,6 +1380,47 @@ core::Track trackFor(const Source& source) {
 
 // Writes a source's notes into its track, whose staves have the song's measures.
 // Touches nothing else, so tracks can be written on several threads.
+/// Puts each syllable on the beat its note starts in `staff`, as the first
+/// verse (ADR-0084): the beat of the first voice that has a note there.
+void placeLyrics(core::Staff& staff, const std::vector<SungSyllable>& lyrics, const Grids& grids,
+                 const std::vector<MeasureInfo>& measures, const std::string& name,
+                 Warnings& warnings) {
+    const Fraction songEnd = measures.back().end();
+    for (const SungSyllable& sung : lyrics) {
+        const Fraction at = grids.snap(sung.start);
+        if (at >= songEnd) {
+            continue;
+        }
+        const std::size_t m = measureAt(measures, at);
+        const Fraction offset = at - measures[m].start;
+        core::Measure& measure = staff.measure(m);
+        Beat* target = nullptr;
+        for (core::Voice& voice : measure.voices) {
+            Fraction start;
+            for (Beat& beat : voice.beats) {
+                if (start == offset && !beat.isRest()) {
+                    target = &beat;
+                    break;
+                }
+                start += beat.duration.length();
+                if (start > offset) {
+                    break;
+                }
+            }
+            if (target != nullptr) {
+                break;
+            }
+        }
+        if (target == nullptr) {
+            warnings.add(name, "lyrics off the notes dropped", m);
+        } else if (target->lyrics) {
+            warnings.add(name, "lyrics sharing a note dropped", m); // snapped together
+        } else {
+            target->lyrics = core::SharedOptional(std::vector<Syllable>{sung.syllable});
+        }
+    }
+}
+
 void writeNotes(core::Track& result, const Source& source, const std::vector<MeasureInfo>& measures,
                 int division, Warnings& warnings) {
     if (measures.empty()) {
@@ -1173,9 +1432,16 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
     const Fraction songEnd = measures.back().end();
     const std::size_t staffCount = result.staffCount();
     // Keyboards are split at middle C; each staff gets its own grids.
+    const auto staffOf = [staffCount](int key) -> std::size_t {
+        return staffCount == 2 && key < 60 ? 1 : 0;
+    };
     std::vector<std::vector<RawNote>> raws(staffCount);
     for (const RawNote& raw : source.notes) {
-        raws[staffCount == 2 && raw.key < 60 ? 1 : 0].push_back(raw);
+        raws[staffOf(raw.key)].push_back(raw);
+    }
+    std::vector<std::vector<SungSyllable>> lyrics(staffCount);
+    for (const SungSyllable& sung : source.lyrics) {
+        lyrics[staffOf(sung.key)].push_back(sung);
     }
     bool shortened = false;
     for (std::size_t s = 0; s < staffCount; ++s) {
@@ -1234,6 +1500,7 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
         for (std::size_t v = 0; v < placed.size(); ++v) {
             writeVoice(placed[v], v, false, measures, grids, loudness, result.staff(s));
         }
+        placeLyrics(result.staff(s), lyrics[s], grids, measures, name, warnings);
     }
     if (shortened) {
         warnings.add(name, "notes overlapping more than four voices shortened");
@@ -1242,13 +1509,20 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
 
 std::expected<ImportResult, FormatError> importParsed(const MidiFile& file, Warnings& warnings,
                                                       const MidiOptions& options) {
-    const Gathered gathered = gather(file, warnings);
+    Gathered gathered = gather(file, warnings);
+    assignLyrics(gathered, file.division, warnings);
     const std::vector<MeasureInfo> measures = layMeasures(gathered, file.division, warnings);
 
     ImportResult result;
     Song& song = result.song;
     song.info().title = gathered.title;
     song.info().copyright = gathered.copyright;
+    if (!gathered.karaoke.empty()) { // a karaoke file's title and artist
+        song.info().title = gathered.karaoke[0];
+        if (gathered.karaoke.size() > 1) {
+            song.info().artist = gathered.karaoke[1];
+        }
+    }
     if (!gathered.tempos.empty() && gathered.tempos.front().tick == 0) {
         long long micros = gathered.tempos.front().value;
         for (const auto& tempo : gathered.tempos) {

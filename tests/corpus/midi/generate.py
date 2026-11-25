@@ -198,10 +198,35 @@ def band_format0() -> bytes:
     return smf(0, q, [track(events)])
 
 
+def karaoke() -> bytes:
+    """A karaoke file: the "@K" mark, a track of words in text events after a
+    header of "@" lines (title and author), words parted by spaces with "\\" and
+    "/" starting a paragraph and a line, a sung melody and a piano under it."""
+    q = 480
+    marker = [(0, text(0x01, "@KMIDI KARAOKE FILE")), (0, time_signature(4, 4, 24)),
+              (0, tempo(96))]
+    words = [(0, text(0x03, "Words")), (0, text(0x01, "@V0100")), (0, text(0x01, "@LENGL")),
+             (0, text(0x01, "@TCorpus Song")), (0, text(0x01, "@TGhost in the Groove"))]
+    syllables = ["\\Hel", "lo ", "lit", "tle ", "/song ", "of ", "mine"]
+    melody = [(67, 1), (64, 1), (65, 1), (62, 1), (64, 1), (62, 1), (60, 2)]
+    voice = [(0, text(0x03, "Melody")), (0, program(0, 53))]
+    at = 0
+    for syllable, (key, beats) in zip(syllables, melody):
+        words.append((at, text(0x01, syllable)))
+        note(voice, 0, at, beats * q, key, 90)
+        at += beats * q
+    piano = [(0, text(0x03, "Piano")), (0, program(1, 0))]
+    for measure, chord in enumerate([(48, 55, 64), (43, 53, 59)]):
+        for key in chord:
+            note(piano, 1, measure * 4 * q, 4 * q, key, 60)
+    return smf(1, q, [track(marker), track(words), track(voice), track(piano)])
+
+
 FILES = {
     "played-piano.mid": played_piano,
     "drums.mid": drums,
     "band-format0.mid": band_format0,
+    "karaoke.kar": karaoke,
 }
 
 

@@ -592,7 +592,7 @@ QStringList ScoreDocument::nameFilters() {
     return {tr("Scores (%1)").arg(all),
             tr("Guitar Pro (*.gp *.gpx *.gp5 *.gp4 *.gp3)"),
             tr("MusicXML (*.musicxml *.xml *.mxl)"),
-            tr("MIDI (*.mid *.midi *.smf)"),
+            tr("MIDI (*.mid *.midi *.smf *.kar)"),
             tr("Elara (*.elara)"),
             tr("All files (*)")};
 }

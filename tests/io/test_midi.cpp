@@ -35,6 +35,7 @@ using elara::core::NoteValue;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
+using elara::core::Syllable;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::TimeSignature;
@@ -1034,7 +1035,6 @@ TEST_CASE("MIDI import rejects what is not a Standard MIDI File", "[io][midi]") 
 TEST_CASE("MIDI import lists what the model cannot hold", "[io][midi]") {
     const std::vector<Event> events{
         program(0, 0, 0),
-        metaText(0, 0x05, "la"),
         {0, bytes({0xB0, 64, 127})}, // sustain pedal down
         {0, bytes({0xE0, 0, 0x50})}, // pitch bend up
         on(0, 0, 60),
@@ -1045,7 +1045,7 @@ TEST_CASE("MIDI import lists what the model cannot hold", "[io][midi]") {
     const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
     REQUIRE(imported.has_value());
     CHECK(imported->warnings ==
-          std::vector<std::string>{"lyrics dropped", "sustain pedal dropped", "pitch bends dropped",
+          std::vector<std::string>{"sustain pedal dropped", "pitch bends dropped",
                                    "program changes dropped",
                                    "notes without a note-off end with their track"});
 }
@@ -1108,4 +1108,171 @@ TEST_CASE("MIDI import counts a warning of tracks with the same name once", "[io
               std::vector<std::string>{
                   "Lead: notes overlapping more than four voices shortened (2 times)"});
     }
+}
+
+// The first verse of each beat, "-" after a syllable joined to the next and
+// "_" after a held one; "" for a beat that sings nothing.
+std::vector<std::string> lyricsOf(const elara::core::Voice& voice, std::size_t verse = 0) {
+    std::vector<std::string> out;
+    for (const Beat& beat : voice.beats) {
+        std::string text;
+        if (beat.lyrics && verse < beat.lyrics->size()) {
+            const Syllable& syllable = (*beat.lyrics)[verse];
+            text = syllable.text + (syllable.hyphen ? "-" : "") + (syllable.extend ? "_" : "");
+        }
+        out.push_back(text);
+    }
+    return out;
+}
+
+TEST_CASE("MIDI import puts lyric events on the notes they start with", "[io][midi][lyrics]") {
+    // ADR-0084: a syllable per Lyric event; a hyphen after it (or before the
+    // next) joins it to the next; spaces, line ends and karaoke's "/" and "\"
+    // around it are not part of it.
+    const std::vector<Event> events{
+        metaText(0, 0x05, "Twin-"),
+        on(0, 0, 60),
+        off(480, 0, 60),
+        metaText(480, 0x05, "kle "),
+        metaText(480, 0x05, "\r"),
+        on(480, 0, 60),
+        off(960, 0, 60),
+        on(960, 0, 67),
+        metaText(962, 0x05, "lit"), // a little late
+        off(1440, 0, 67),
+        metaText(1440, 0x05, "-tle"),
+        on(1440, 0, 67),
+        off(1920, 0, 67),
+        metaText(1920, 0x05, "\\star"),
+        on(1920, 0, 69),
+        off(2400, 0, 69),
+        metaText(2600, 0x05, " oops"), // over a rest
+    };
+    const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings == std::vector<std::string>{"lyrics off the notes dropped"});
+    const auto& staff = imported->song.track(0).staff(0);
+    CHECK(lyricsOf(staff.measure(0).voices[0]) ==
+          std::vector<std::string>{"Twin-", "kle", "lit-", "tle"});
+    CHECK(lyricsOf(staff.measure(1).voices[0]).front() == "star");
+}
+
+TEST_CASE("MIDI import gives a lyrics track without notes to the melody it sings",
+          "[io][midi][lyrics]") {
+    // The words in a track of their own go to the track whose notes start
+    // with most of them: the melody, not the bass under it.
+    const auto data = bytesOf(
+        smf(1, 480,
+            {{metaText(0, 0x03, "Song")},
+             {metaText(0, 0x03, "Words"), metaText(0, 0x05, "Hel-"), metaText(480, 0x05, "lo")},
+             {program(0, 1, 33), on(0, 1, 40), off(960, 1, 40)},
+             {program(0, 2, 73), on(0, 2, 72), off(480, 2, 72), on(480, 2, 74), off(960, 2, 74)}}));
+    const auto imported = importMidi(data);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const Song& song = imported->song;
+    REQUIRE(song.trackCount() == 2);
+    CHECK(lyricsOf(song.track(0).staff(0).measure(0).voices[0]).front().empty());
+    const auto melody = lyricsOf(song.track(1).staff(0).measure(0).voices[0]);
+    REQUIRE(melody.size() >= 2);
+    CHECK(melody[0] == "Hel-");
+    CHECK(melody[1] == "lo");
+}
+
+TEST_CASE("MIDI export sings each pass of a repeat with its verse", "[io][midi][lyrics]") {
+    // ADR-0084: a Lyric event per syllable on its note, with a hyphen when the
+    // word goes on and a space when it ends. MIDI has one line of lyrics: the
+    // second pass through a repeat sings the second verse.
+    using Verses = std::vector<Syllable>;
+    Song song = pianoSong(2);
+    auto& staff = song.track(0).staff(0);
+    auto& first = staff.measure(0).voices[0].beats;
+    first = {noteBeat(Duration(NoteValue::Half), 60), noteBeat(Duration(NoteValue::Half), 62)};
+    first[0].lyrics = elara::core::SharedOptional(Verses{{.text = "one"}, {.text = "two"}});
+    auto& second = staff.measure(1).voices[0].beats;
+    second = {noteBeat(Duration(NoteValue::Half), 64), noteBeat(Duration(NoteValue::Half), 65)};
+    second[0].lyrics = elara::core::SharedOptional(Verses{{.text = "end", .hyphen = true}});
+    second[1].lyrics =
+        elara::core::SharedOptional(Verses{{.text = "ing", .extend = true}, {.text = "x"}});
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+
+    const auto result = exportMidi(song);
+    CHECK(result.warnings ==
+          std::vector<std::string>{"repeats and jumps written as played",
+                                   "Piano: verses no repeat sings dropped (measure 2)",
+                                   "Piano: lyric extenders dropped"});
+    const auto lyric = [](const std::string& text) {
+        return bytes({0xFF, 0x05, static_cast<int>(text.size())}) + text;
+    };
+    // Right before the note it starts with.
+    CHECK(result.data.find(lyric("one ") + bytes({0, 0x90, 60})) != std::string::npos);
+    CHECK(result.data.find(lyric("end-")) != std::string::npos);
+    CHECK(result.data.find(lyric("ing ")) != std::string::npos);
+
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    const auto& played = imported->song.track(0).staff(0);
+    REQUIRE(played.measureCount() == 3);
+    CHECK(lyricsOf(played.measure(0).voices[0]) == std::vector<std::string>{"one", ""});
+    CHECK(lyricsOf(played.measure(1).voices[0]) == std::vector<std::string>{"two", ""});
+    CHECK(lyricsOf(played.measure(2).voices[0]) == std::vector<std::string>{"end-", "ing"});
+}
+
+TEST_CASE("MIDI import reads words parted by spaces instead of hyphens", "[io][midi][lyrics]") {
+    // Many files end a word with a space and leave the syllables of a word
+    // bare: "Twin" "kle " joins "Twin" to "kle".
+    const std::vector<Event> events{
+        metaText(0, 0x05, "Twin"),      on(0, 0, 60),    off(480, 0, 60),
+        metaText(480, 0x05, "kle "),    on(480, 0, 60),  off(960, 0, 60),
+        metaText(960, 0x05, "lit"),     on(960, 0, 67),  off(1440, 0, 67),
+        metaText(1440, 0x05, "tle"),    on(1440, 0, 67), off(1920, 0, 67),
+        metaText(1920, 0x05, "\rstar"), on(1920, 0, 69), off(3840, 0, 69),
+    };
+    const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
+    REQUIRE(imported.has_value());
+    const auto& staff = imported->song.track(0).staff(0);
+    CHECK(lyricsOf(staff.measure(0).voices[0]) ==
+          std::vector<std::string>{"Twin-", "kle", "lit-", "tle"});
+    CHECK(lyricsOf(staff.measure(1).voices[0]).front() == "star");
+}
+
+TEST_CASE("MIDI import reads a karaoke file's words, title and artist", "[io][midi][lyrics]") {
+    // A .kar file (a MIDI file marked "@KMIDI KARAOKE FILE") keeps its words in
+    // text events: "@" lines are its header, "@T" lines its title and artist,
+    // "\" starts a paragraph and "/" a line.
+    std::vector<Event> melody{program(0, 0, 73)};
+    for (int i = 0; i < 7; ++i) {
+        melody.push_back(on(480 * i, 0, 60 + i));
+        melody.push_back(off(480 * (i + 1), 0, 60 + i));
+    }
+    const auto data = bytesOf(
+        smf(1, 480,
+            {{metaText(0, 0x01, "@KMIDI KARAOKE FILE")},
+             {metaText(0, 0x03, "Words"), metaText(0, 0x01, "@V0100"), metaText(0, 0x01, "@LENGL"),
+              metaText(0, 0x01, "@TTwinkle"), metaText(0, 0x01, "@TTraditional"),
+              metaText(0, 0x01, "\\Twin"), metaText(480, 0x01, "kle "), metaText(960, 0x01, "twin"),
+              metaText(1440, 0x01, "kle"), metaText(1920, 0x01, "/lit"),
+              metaText(2400, 0x01, "tle "), metaText(2880, 0x01, "star")},
+             melody}));
+    const auto imported = importMidi(data);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const Song& song = imported->song;
+    CHECK(song.info().title == "Twinkle");
+    CHECK(song.info().artist == "Traditional");
+    REQUIRE(song.trackCount() == 1);
+    const auto& staff = song.track(0).staff(0);
+    CHECK(lyricsOf(staff.measure(0).voices[0]) ==
+          std::vector<std::string>{"Twin-", "kle", "twin-", "kle"});
+    CHECK(lyricsOf(staff.measure(1).voices[0]) ==
+          std::vector<std::string>{"lit-", "tle", "star", ""});
+}
+
+TEST_CASE("MIDI import leaves the text events of other files alone", "[io][midi][lyrics]") {
+    const std::vector<Event> events{metaText(0, 0x01, "Created by a sequencer"), on(0, 0, 60),
+                                    off(1920, 0, 60)};
+    const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
+    REQUIRE(imported.has_value());
+    CHECK(lyricsOf(imported->song.track(0).staff(0).measure(0).voices[0]).front().empty());
 }
