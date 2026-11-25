@@ -294,6 +294,8 @@ constexpr std::array kEditNames{
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
     Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
     Translation{"Change section", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change section")},
+    Translation{"Change triplet feel",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change triplet feel")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
     Translation{"Change key signature",
@@ -1183,6 +1185,27 @@ void ScoreDocument::setTempoGradual(int measure, bool gradual) {
     }
     if (auto change = core::changeTempoGradual(document_->song(), static_cast<std::size_t>(measure),
                                                gradual)) {
+        execute(std::move(change));
+    }
+}
+
+int ScoreDocument::tripletFeelAt(int measure) const {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return 0;
+    }
+    return static_cast<int>(
+        document_->song().measureHeader(static_cast<std::size_t>(measure)).tripletFeel);
+}
+
+void ScoreDocument::setTripletFeelFrom(int measure, int feel) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount()) || feel < 0 ||
+        feel > static_cast<int>(core::TripletFeel::ScottishSixteenth)) {
+        return;
+    }
+    if (auto change = core::changeTripletFeel(document_->song(), static_cast<std::size_t>(measure),
+                                              static_cast<core::TripletFeel>(feel))) {
         execute(std::move(change));
     }
 }

@@ -137,6 +137,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QVariantMap caretNavigation READ caretNavigation NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
+    Q_PROPERTY(int caretTripletFeel READ caretTripletFeel NOTIFY caretChanged)
     Q_PROPERTY(QString caretSection READ caretSection NOTIFY caretChanged)
     Q_PROPERTY(int caretClef READ caretClef NOTIFY caretChanged)
     Q_PROPERTY(int caretRepeat READ caretRepeat NOTIFY caretChanged)
@@ -328,6 +329,14 @@ public:
     /// Makes the tempo change that starts `measure` gradual or sudden again, as
     /// one undo step ("Change tempo"); not on the first measure (ADR-0082).
     Q_INVOKABLE void setTempoGradual(int measure, bool gradual);
+    /// The triplet feel of `measure` (ADR-0104), numbered as the measure popup
+    /// offers it: 0 none, 1 triplet eighths, 2 triplet sixteenths, 3 dotted
+    /// eighths, 4 dotted sixteenths, 5 Scottish eighths, 6 Scottish sixteenths
+    /// (core::TripletFeel); 0 for a missing measure.
+    Q_INVOKABLE int tripletFeelAt(int measure) const;
+    /// Changes the triplet feel from `measure` until the next change of it,
+    /// numbered as tripletFeelAt(), as one undo step ("Change triplet feel").
+    Q_INVOKABLE void setTripletFeelFrom(int measure, int feel);
     /// The name of the section that starts at `measure` (ADR-0062), empty when
     /// none does.
     Q_INVOKABLE QString sectionAt(int measure) const;
@@ -607,6 +616,9 @@ public:
     }
     [[nodiscard]] QVariantMap caretTempo() const {
         return tempoAt(static_cast<int>(caret_.measure));
+    }
+    [[nodiscard]] int caretTripletFeel() const {
+        return tripletFeelAt(static_cast<int>(caret_.measure));
     }
     [[nodiscard]] QString caretSection() const {
         return sectionAt(static_cast<int>(caret_.measure));

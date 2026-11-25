@@ -249,6 +249,33 @@ Popup {
             }
         }
 
+        // The triplet feel (ADR-0104): how the measure plays its pairs of
+        // eighths or sixteenths, drawn above the staff where it changes.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Swing")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            ComboBox {
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                model: [qsTr("Straight"), qsTr("Triplet eighths"), qsTr("Triplet sixteenths"),
+                    qsTr("Dotted eighths"), qsTr("Dotted sixteenths"), qsTr("Scottish eighths"),
+                    qsTr("Scottish sixteenths")]
+                currentIndex: root.document.caretTripletFeel
+                onActivated: index => root.document.setTripletFeelFrom(root.document.caretMeasure,
+                                                                       index)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Play pairs of eighths or sixteenths long and short, as in a shuffle")
+            }
+        }
+
         Label {
             Layout.fillWidth: true
             text: qsTr("From this measure until the next change.")
