@@ -672,9 +672,9 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
     struct Mark {
         std::size_t measure = 0;
         double x = 0.0;
-        std::optional<core::Tempo> tempo; // none: only a gradual change goes on
-        std::string_view word;            // "accel.", "rit." or none
-        double rampEnd = 0.0;             // where its dashed line ends, if beyond x
+        std::optional<core::Tempo> tempo{}; // none: only a gradual change goes on
+        std::string_view word{};            // "accel.", "rit." or none
+        double rampEnd = 0.0;               // where its dashed line ends, if beyond x
     };
     std::vector<Mark> marks;
     if (measures.empty()) {
