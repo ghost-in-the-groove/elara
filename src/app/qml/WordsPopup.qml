@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The chord symbol of the caret's beat (ADR-0080): typed as a name, or picked
-// from the chords the song already names; on a fretted staff the beat's frets
-// give it its diagram.
+// Words for the caret's beat, its chord symbol (ADR-0080) or its text
+// (ADR-0081): typed, or picked from the ones the song already has. The owner
+// says what they are and applies them.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -11,14 +11,25 @@ import Elara.App
 Popup {
     id: root
 
-    required property ScoreDocument document
-
-    readonly property color ink: Theme.ink
-    /// The song's chord names, read as the popup opens.
+    /// What the popup is for: "Chord symbol", "Text".
+    property string title
+    property string placeholder
+    property string hint
+    property string removeTip
+    /// The caret's beat's words now.
+    property string current
+    /// The song's words to pick from, set as the popup opens (`opening`).
     property var offered: []
 
-    function apply(name: string) {
-        root.document.setChordSymbol(name);
+    readonly property color ink: Theme.ink
+
+    /// The popup is about to show: time to set `offered`.
+    signal opening
+    /// Words to apply to the caret's beat; empty takes them away.
+    signal applied(string words)
+
+    function apply(words: string) {
+        root.applied(words);
         root.close();
     }
 
@@ -29,8 +40,8 @@ Popup {
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
     onAboutToShow: {
-        offered = root.document.songChords();
-        nameField.text = root.document.caretChord;
+        root.opening();
+        nameField.text = root.current;
     }
     onOpened: {
         nameField.selectAll();
@@ -78,15 +89,15 @@ Popup {
 
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Chord symbol")
+                text: root.title
                 font.pixelSize: Theme.fontTitle
                 font.weight: Font.DemiBold
                 color: root.ink
             }
             IconButton {
-                visible: root.document.caretChord.length > 0
+                visible: root.current.length > 0
                 iconPath: "M6 7 L18 7 M9 7 L9 19 L15 19 L15 7 M10 4 L14 4"
-                tip: qsTr("Remove the chord symbol")
+                tip: root.removeTip
                 onClicked: root.apply("")
             }
             IconButton {
@@ -100,13 +111,13 @@ Popup {
             id: nameField
 
             Layout.fillWidth: true
-            placeholderText: qsTr("Am7, C/G, N.C.…")
+            placeholderText: root.placeholder
             selectByMouse: true
             font.pixelSize: Theme.fontTitle
             onAccepted: root.apply(text)
         }
 
-        // The chords the song names already, one click away.
+        // The words the song has already, one click away.
         Flow {
             Layout.fillWidth: true
             visible: root.offered.length > 0
@@ -119,7 +130,7 @@ Popup {
                     id: chip
 
                     required property string modelData
-                    readonly property bool current: modelData === root.document.caretChord
+                    readonly property bool current: modelData === root.current
 
                     text: modelData
                     focusPolicy: Qt.NoFocus
@@ -157,8 +168,7 @@ Popup {
 
         Label {
             Layout.fillWidth: true
-            text: root.document.caretFretted ? qsTr("Enter names it; the beat's frets draw its diagram.")
-                                             : qsTr("Enter names it; an empty name takes it away.")
+            text: root.hint
             font.pixelSize: Theme.fontSmall
             opacity: 0.5
             wrapMode: Text.Wrap

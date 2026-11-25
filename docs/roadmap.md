@@ -109,11 +109,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         systems between them (ADR-0057)
   - [x] Recent scores on the welcome pane and in an Open recent menu, kept for
         the next start (ADR-0071)
-- [ ] Beat text: words above the beat, "let it ring", "ad lib." (ADR-0081)
+- [x] Beat text: words above the beat, "let it ring", "ad lib." (ADR-0081)
   - [x] In the model, read from Guitar Pro 3-8, MusicXML both ways and kept by
         the native format
   - [x] Drawn above the staff
-  - [ ] Typed at the caret
+  - [x] Typed at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 
