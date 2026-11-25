@@ -930,6 +930,37 @@ std::string chordNameAt(const Song& song, const Caret& at) {
     return beat.chord ? beat.chord->name : std::string();
 }
 
+Entry setBeatText(const Song& song, const Caret& at, std::string_view text) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    text = trimmed(text);
+    Measure content = measureAt(song, caret);
+    Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    if (text.empty()) {
+        if (!beat.text) {
+            return unchanged(caret);
+        }
+        beat.text.reset();
+        return replace(caret, std::move(content), "Remove beat text");
+    }
+    if (beat.text && *beat.text == text) {
+        return unchanged(caret);
+    }
+    beat.text = SharedOptional(std::string(text));
+    return replace(caret, std::move(content), "Set beat text");
+}
+
+std::string beatTextAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return {};
+    }
+    const Beat& beat = voiceAt(song, caret).beats[caret.beat];
+    return beat.text ? *beat.text : std::string();
+}
+
 Dynamic dynamicAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     const Staff& staff = song.track(caret.track).staff(caret.staff);

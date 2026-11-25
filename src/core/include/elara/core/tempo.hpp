@@ -63,7 +63,8 @@ struct TempoChange {
 /// the time of a gradual tempo change (ADR-0082), distance / speed without one.
 [[nodiscard]] inline double rampSeconds(double speed, double slope, double distance) {
     constexpr double kSteady = 1e-12; // relative change below which the speed holds
-    if (std::abs(slope * distance) <= kSteady * speed) {
+    // Steady first, so no path divides by a zero slope.
+    if (slope == 0.0 || std::abs(slope * distance) <= kSteady * speed) {
         return distance / speed;
     }
     return std::log1p(slope * distance / speed) / slope;

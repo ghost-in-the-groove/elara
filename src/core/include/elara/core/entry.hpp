@@ -255,6 +255,15 @@ enum class NoteEffect : std::uint8_t {
 /// the free slot.
 [[nodiscard]] std::string chordNameAt(const Song& song, const Caret& caret);
 
+/// Writes `text` above the caret's beat (surrounding whitespace dropped), rest
+/// or not, as one undo step ("Set beat text"); an empty text takes the beat's
+/// text away ("Remove beat text") (ADR-0081). Nothing changes on the free slot
+/// or when the beat has that text already.
+[[nodiscard]] Entry setBeatText(const Song& song, const Caret& caret, std::string_view text);
+
+/// The text above the caret's beat; empty without one and on the free slot.
+[[nodiscard]] std::string beatTextAt(const Song& song, const Caret& caret);
+
 /// Whether the notes the caret is on (as for toggleEffect) all have `effect`,
 /// in any of its forms: what the next toggle turns off. False on a rest, the
 /// free slot or a string without a note.

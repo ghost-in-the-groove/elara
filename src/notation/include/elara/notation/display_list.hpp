@@ -51,9 +51,10 @@ enum class Role : std::uint8_t {
     Arpeggio,      ///< the wavy line left of a rolled chord, and its arrowhead (ADR-0076)
     Hairpin,       ///< a crescendo or diminuendo wedge under a staff (ADR-0078)
     Chord,         ///< a chord symbol above a staff: its name and diagram (ADR-0080)
+    BeatText,      ///< a beat's text above a staff: "let it ring", "ad lib." (ADR-0081)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Chord) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::BeatText) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

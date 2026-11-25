@@ -338,34 +338,37 @@ private:
     std::vector<Wedge> wedges_;
 };
 
-// ---- Chord symbols (ADR-0080) -----------------------------------------------------------
+// ---- Chord symbols and beat text (ADR-0080, ADR-0081) ------------------------------------
 
 inline constexpr double kChordGap = 0.8; // between neighbouring chord symbols
 inline constexpr double kChordBarlineReach =
     0.6;                                    // how far one reaches into the gap after a barline
 inline constexpr double kChordEndGap = 0.3; // between one and the barline after it
 
-/// Chord symbols above a staff: each name centred over its column with its
-/// diagram under it on staves with frets, all of a line on one baseline above
-/// the technique lanes.
-class ChordRow {
+/// What is written above a staff over its beats. Chord symbols: each name
+/// centred over its column with its diagram under it on staves with frets, all
+/// of a line on one baseline above the technique lanes. Beat texts above them,
+/// each starting at its column; one that would run into the text before it
+/// goes on a row above. Texts take no room between the columns.
+class AboveRow {
 public:
     /// `diagrams`: the staff has frets, so diagrams show.
-    ChordRow(const EngravingFont& font, bool diagrams) : font_(font), diagrams_(diagrams) {}
+    AboveRow(const EngravingFont& font, bool diagrams) : font_(font), diagrams_(diagrams) {}
 
-    /// Reads the chord symbols of `measure`, one per start (the first voice's),
-    /// and gives the columns of `ink` (in time order) their reach; a column with
-    /// no ink is added where one starts and no notes do. `centre` is where a
-    /// symbol's middle lies from its column's x.
+    /// Reads the chord symbols and texts of `measure`, one of each per start
+    /// (the first voice's), and gives the columns of `ink` (in time order) the
+    /// chord symbols' reach; a column with no ink is added where one starts and
+    /// no notes do. `centre` is where a symbol's middle lies from its column's x.
     void collect(const core::Measure& measure, std::vector<ColumnInk>& ink, double centre);
 
-    /// The chord symbols read last, with their columns at `positions`.
+    /// What was read last, with its columns at `positions`.
     void draw(std::span<const ColumnPosition> positions, double centre, std::size_t measure);
 
-    [[nodiscard]] bool empty() const noexcept { return marks_.empty(); }
+    [[nodiscard]] bool empty() const noexcept { return marks_.empty() && texts_.empty(); }
 
     /// Places the line's chord symbols above `top` (the highest ink of the
-    /// staff, negative above it), draws them into `list` and forgets them.
+    /// staff, negative above it) and its texts above them, draws them into
+    /// `list` and forgets them.
     void place(DisplayList& list, double top);
 
 private:
@@ -373,6 +376,7 @@ private:
         core::Fraction start;
         core::Fraction length; // of its beat
         const core::ChordSymbol* symbol = nullptr;
+        const std::string* text = nullptr;
     };
 
     struct Mark {
@@ -380,6 +384,15 @@ private:
         double centre = 0.0;
         std::size_t measure = 0;
     };
+
+    struct TextMark {
+        const std::string* text = nullptr;
+        double left = 0.0;
+        std::size_t measure = 0;
+    };
+
+    // Places the line's texts above `top`, rows upwards.
+    void placeTexts(DisplayList& list, double top);
 
     [[nodiscard]] bool showsDiagram(const core::ChordSymbol& symbol) const noexcept {
         return diagrams_ && symbol.diagram && !symbol.diagram->frets.empty();
@@ -394,8 +407,9 @@ private:
 
     const EngravingFont& font_;
     bool diagrams_;
-    std::vector<Read> read_;  // of the measure read last
-    std::vector<Mark> marks_; // of the line
+    std::vector<Read> read_;      // of the measure read last
+    std::vector<Mark> marks_;     // of the line
+    std::vector<TextMark> texts_; // of the line
 };
 
 // ---- Staff writers --------------------------------------------------------------------

@@ -24,33 +24,6 @@
     </message>
 </context>
 <context>
-    <name>ChordPopup</name>
-    <message>
-        <source>Chord symbol</source>
-        <translation>Cifrado</translation>
-    </message>
-    <message>
-        <source>Remove the chord symbol</source>
-        <translation>Quitar el cifrado</translation>
-    </message>
-    <message>
-        <source>Close</source>
-        <translation>Cerrar</translation>
-    </message>
-    <message>
-        <source>Am7, C/G, N.C.…</source>
-        <translation>Am7, C/G, N.C.…</translation>
-    </message>
-    <message>
-        <source>Enter names it; the beat&apos;s frets draw its diagram.</source>
-        <translation>Intro lo pone; los trastes del tiempo dibujan su diagrama.</translation>
-    </message>
-    <message>
-        <source>Enter names it; an empty name takes it away.</source>
-        <translation>Intro lo pone; un nombre vacío lo quita.</translation>
-    </message>
-</context>
-<context>
     <name>EntryBar</name>
     <message>
         <source>Whole note</source>
@@ -255,6 +228,10 @@
     <message>
         <source>Chord symbol (Ctrl+K)</source>
         <translation>Cifrado (Ctrl+K)</translation>
+    </message>
+    <message>
+        <source>Text (Ctrl+T)</source>
+        <translation>Texto (Ctrl+T)</translation>
     </message>
     <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
@@ -721,6 +698,45 @@
     </message>
 </context>
 <context>
+    <name>ScoreView</name>
+    <message>
+        <source>Chord symbol</source>
+        <translation>Cifrado</translation>
+    </message>
+    <message>
+        <source>Am7, C/G, N.C.…</source>
+        <translation>Am7, C/G, N.C.…</translation>
+    </message>
+    <message>
+        <source>Enter names it; the beat&apos;s frets draw its diagram.</source>
+        <translation>Intro lo pone; los trastes del tiempo dibujan su diagrama.</translation>
+    </message>
+    <message>
+        <source>Enter names it; an empty name takes it away.</source>
+        <translation>Intro lo pone; un nombre vacío lo quita.</translation>
+    </message>
+    <message>
+        <source>Remove the chord symbol</source>
+        <translation>Quitar el cifrado</translation>
+    </message>
+    <message>
+        <source>Text</source>
+        <translation>Texto</translation>
+    </message>
+    <message>
+        <source>let it ring, ad lib., solo…</source>
+        <translation>dejar sonar, ad lib., solo…</translation>
+    </message>
+    <message>
+        <source>Enter writes it above the beat; an empty text takes it away.</source>
+        <translation>Intro lo escribe sobre el tiempo; un texto vacío lo quita.</translation>
+    </message>
+    <message>
+        <source>Remove the text</source>
+        <translation>Quitar el texto</translation>
+    </message>
+</context>
+<context>
     <name>SignatureFields</name>
     <message>
         <source>Time signature</source>
@@ -1092,6 +1108,13 @@
     </message>
 </context>
 <context>
+    <name>WordsPopup</name>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+</context>
+<context>
     <name>elara::app::ScoreDocument</name>
     <message>
         <source>Electric guitar</source>
@@ -1346,6 +1369,14 @@
         <translation>Quitar notas de adorno</translation>
     </message>
     <message>
+        <source>Set beat text</source>
+        <translation>Poner texto</translation>
+    </message>
+    <message>
+        <source>Remove beat text</source>
+        <translation>Quitar texto</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1558,6 +1589,10 @@
     <message>
         <source>Beat %1</source>
         <translation>Tiempo %1</translation>
+    </message>
+    <message>
+        <source>“%1”</source>
+        <translation>«%1»</translation>
     </message>
     <message>
         <source>String %1</source>

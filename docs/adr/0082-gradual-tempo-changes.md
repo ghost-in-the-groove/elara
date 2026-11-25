@@ -66,5 +66,5 @@ measures of `elara-cli edit --json` show `"gradual": true`.
   gradual change ...` layout tests (which way it goes, what it leaves out, and
   the line across systems), `core.A tempo change can be made gradual and
   sudden again`, `cli.edit_gradual_tempo` with `cli.sequence_gradual_tempo`
-  (9.545 s: 8 ln 2 s for the ramp over two measures) and `cli.render_gradual_tempo`, and the
-  app's smoke test.
+  (9.545 s: 8 ln 2 s for the ramp over two measures) and
+  `cli.render_gradual_tempo`, and the app's smoke test.
