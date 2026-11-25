@@ -535,6 +535,25 @@ set_tests_properties(cli.dump_slurs PROPERTIES
 add_test(NAME cli.edit_rejects_unknown_slur
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "slur maybe")
 set_tests_properties(cli.edit_rejects_unknown_slur PROPERTIES WILL_FAIL TRUE)
+# Clef changes at the caret (ADR-0087): a flute down to the bass clef, its
+# first note name then near the bass staff's middle line; a guitar keeps its
+# octave; the tenor clef undone.
+set(ELARA_CLI_CLEFS "${CMAKE_CURRENT_BINARY_DIR}/cli-clefs.elara")
+add_test(NAME cli.edit_changes_clefs
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CLEFS}" "add-track flute"
+    "add-track electric-guitar" "append-measures 3" "caret 0 1 0" "clef bass" "pitch C"
+    "caret 1 1 0" "clef bass" "caret 1 2 0" "clef tenor" undo)
+set_tests_properties(cli.edit_changes_clefs PROPERTIES
+  FIXTURES_SETUP cli_clefs
+  PASS_REGULAR_EXPRESSION "\"redo\":{\"count\":1,\"next\":\"Change clef\"}")
+add_test(NAME cli.dump_clefs COMMAND elara-cli --json dump "${ELARA_CLI_CLEFS}")
+set_tests_properties(cli.dump_clefs PROPERTIES
+  FIXTURES_REQUIRED cli_clefs
+  PASS_REGULAR_EXPRESSION "\"clef\":\"treble\",\"clefs\":\\[{\"measure\":1,\"clef\":\"bass\"}\\].*\"C3\".*\"clef\":\"treble-8vb\",.*\"clefs\":\\[{\"measure\":1,\"clef\":\"bass-8vb\"}\\]"
+  FAIL_REGULAR_EXPRESSION "tenor")
+add_test(NAME cli.edit_rejects_percussion_clef
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "clef percussion")
+set_tests_properties(cli.edit_rejects_percussion_clef PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_unknown_fermata
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fermata endless")
 set_tests_properties(cli.edit_rejects_unknown_fermata PROPERTIES WILL_FAIL TRUE)

@@ -228,6 +228,10 @@ otherwise, and `grace none` removes the beat's grace notes (ADR-0079).
 beat's frets on a fretted staff when two or more notes have one, and `chord
 none` takes it away (ADR-0080). `text <words>` writes words above the caret's
 beat and `text none` takes them away (ADR-0081).
+`clef <treble|treble-8vb|bass|bass-8vb|alto|tenor>` changes the clef of the
+caret's staff from the caret's measure on; the staff keeps its octave, so `clef
+bass` on a guitar is the octave bass clef, and the clef of the measure before
+removes the change. Drum staves keep their clef (ADR-0087).
 `lyrics <verse> <measure> <text>` types verse `verse` (0 for the first) of the
 caret's staff from measure `measure` on, a syllable for each note of its first
 voice: spaces and hyphens part the syllables, one more space leaves a note
