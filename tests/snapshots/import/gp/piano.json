@@ -1,0 +1,338 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Piano",
+   "subtitle": "Guitar Pro 5",
+   "artist": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 80
+  },
+  "measures": [
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Acoustic Grand Piano",
+     "kind": "keyboard"
+    },
+    "mix": {
+     "volume": 0.8125
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "accent": "accent",
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "strum": "up"
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "B4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "tiedFromPrevious": true,
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ],
+          "effects": {
+           "strum": "up"
+          }
+         },
+         {
+          "duration": "4"
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C3",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [],
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C3",
+            "effects": {
+             "dynamic": "f"
+            }
+           },
+           {
+            "pitch": "F2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Electric Piano",
+    "instrument": {
+     "name": "Electric Piano 1",
+     "kind": "keyboard",
+     "midiProgram": 4
+    },
+    "mix": {
+     "volume": 0.8125
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C5",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "A4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "F2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C3",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G2",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 6.0,
+ "issues": []
+}

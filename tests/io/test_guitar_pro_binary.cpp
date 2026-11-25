@@ -6,6 +6,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -167,6 +169,72 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     CHECK(bar4[2].effects.whammyBar == core::BendCurve({{.position = 0, .cents = 0},
                                                         {.position = 50, .cents = -100},
                                                         {.position = 100, .cents = 0}}));
+}
+
+TEST_CASE("Guitar Pro 5: a piano reaching into both clefs becomes a grand staff split at middle C",
+          "[io][guitarpro]") {
+    const ImportResult result = load("piano.gp5");
+    CHECK(core::validate(result.song).empty());
+    const core::Track& piano = result.song.track(0);
+    CHECK(piano.instrument().kind == core::InstrumentKind::Keyboard);
+    REQUIRE(piano.staffCount() == 2);
+    CHECK(piano.staff(0).clef() == core::Clef::Treble);
+    CHECK(piano.staff(1).clef() == core::Clef::Bass);
+    const auto sorted = [](const core::Beat& beat) {
+        std::vector<int> pitches = midiOf(beat);
+        std::ranges::sort(pitches);
+        return pitches;
+    };
+
+    // Measure 1: the strummed chord splits between the hands, both keeping the
+    // strum; a beat with nothing below middle C is a rest on the bass staff.
+    const auto& upper = piano.staff(0).measure(0).voices[0].beats;
+    const auto& lower = piano.staff(1).measure(0).voices[0].beats;
+    REQUIRE(upper.size() == 3);
+    REQUIRE(lower.size() == 3);
+    CHECK(sorted(upper[0]) == std::vector{64, 72});
+    CHECK(sorted(lower[0]) == std::vector{41});
+    CHECK(upper[0].effects.strum == core::Strum::Up);
+    CHECK(lower[0].effects.strum == core::Strum::Up);
+    CHECK(sorted(upper[1]) == std::vector{69});
+    CHECK(lower[1].isRest());
+    CHECK(lower[1].effects == core::BeatEffects{});
+    CHECK(sorted(upper[2]) == std::vector{67});
+    CHECK(sorted(lower[2]) == std::vector{48});
+    for (std::size_t b = 0; b < upper.size(); ++b) {
+        CHECK(upper[b].duration == lower[b].duration);
+    }
+    const auto accented = std::ranges::find_if(
+        upper[0].notes, [](const core::Note& note) { return note.pitch.midiNumber() == 72; });
+    REQUIRE(accented != upper[0].notes.end());
+    CHECK(accented->effects.accent == core::Accent::Accent);
+    CHECK(piano.staff(1).measure(0).voices[1].isEmpty());
+
+    // Measure 2: the melody of the first voice leaves no rests on the bass
+    // staff, where the left hand keeps the second voice: voices are numbered
+    // the same in every measure, and the first voice had notes there before.
+    const core::Measure& right = piano.staff(0).measure(1);
+    const core::Measure& left = piano.staff(1).measure(1);
+    CHECK(right.voices[0].beats.size() == 7);
+    CHECK(right.voices[1].isEmpty());
+    CHECK(left.voices[0].isEmpty());
+    REQUIRE(left.voices[1].beats.size() == 1);
+    CHECK(sorted(left.voices[1].beats[0]) == std::vector{41, 48});
+    CHECK(left.voices[1].beats[0].duration == Duration(NoteValue::Whole));
+
+    // The left hand always in the second voice: it becomes the bass staff's
+    // first voice, and the treble staff keeps only the right hand.
+    const core::Track& electric = result.song.track(1);
+    REQUIRE(electric.staffCount() == 2);
+    for (std::size_t m = 0; m < 2; ++m) {
+        CHECK(electric.staff(0).measure(m).voices[1].isEmpty());
+        CHECK(electric.staff(1).measure(m).voices[1].isEmpty());
+    }
+    CHECK(electric.staff(0).measure(0).voices[0].beats.size() == 2);
+    const auto& bass = electric.staff(1).measure(1).voices[0].beats;
+    REQUIRE(bass.size() == 2);
+    CHECK(sorted(bass[0]) == std::vector{48});
+    CHECK(sorted(bass[1]) == std::vector{43});
 }
 
 TEST_CASE("Guitar Pro 5: directions become signs and jumps", "[io][guitarpro]") {
