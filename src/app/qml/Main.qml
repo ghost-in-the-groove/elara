@@ -235,6 +235,16 @@ ApplicationWindow {
         onRejected: window.pendingAction = null
     }
 
+    FileDialog {
+        id: pdfDialog
+
+        title: qsTr("Export the score as PDF")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("PDF documents (*.pdf)")]
+        defaultSuffix: "pdf"
+        onAccepted: score.exportPdf(selectedFile)
+    }
+
     Dialog {
         id: unsavedDialog
 
@@ -478,6 +488,12 @@ ApplicationWindow {
                             text: qsTr("Clear the list")
                             onTriggered: recent.clear()
                         }
+                    }
+                    MenuItem {
+                        // The score as shown, on A4 pages (ADR-0074).
+                        text: qsTr("Export as PDF…")
+                        enabled: window.hasScore
+                        onTriggered: pdfDialog.open()
                     }
                     MenuSeparator {}
 
@@ -1048,6 +1064,11 @@ ApplicationWindow {
         sequences: [StandardKey.SaveAs]
         enabled: window.hasScore
         onActivated: saveDialog.open()
+    }
+    Shortcut {
+        sequences: [StandardKey.Print]
+        enabled: window.hasScore
+        onActivated: pdfDialog.open()
     }
     Shortcut {
         sequences: [StandardKey.Undo]

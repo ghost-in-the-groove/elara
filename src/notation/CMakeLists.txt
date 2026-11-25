@@ -9,8 +9,10 @@ add_library(elara_notation STATIC
   src/cursor.cpp
   src/display_list.cpp
   src/drum_map.cpp
+  src/font_outlines.cpp
   src/layout_common.cpp
   src/page_layout.cpp
+  src/pdf.cpp
   src/smufl.cpp
   src/standard_staff.cpp
   src/svg.cpp

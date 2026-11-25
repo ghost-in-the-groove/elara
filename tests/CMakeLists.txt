@@ -84,7 +84,7 @@ elara_add_unit_tests(notation
   notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
   notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
-  notation/test_incremental_layout.cpp
+  notation/test_incremental_layout.cpp notation/test_pdf.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
@@ -154,9 +154,10 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 51 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
-  # The file opened is the first of the recent scores (ADR-0071).
+  # The file opened is the first of the recent scores (ADR-0071), and the
+  # score exports as a PDF document of its one page (ADR-0074).
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)

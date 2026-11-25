@@ -8,7 +8,9 @@
 #include "audio_controller.hpp"
 #include "recent_scores.hpp"
 #include "score_page.hpp"
+#include <QByteArray>
 #include <QCoreApplication>
+#include <QFile>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QImage>
@@ -17,6 +19,7 @@
 #include <QQuickItem>
 #include <QSize>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -205,6 +208,7 @@ void Startup::queueSteps() {
             clickCursor();
             return false;
         });
+        queuePdf();
         queuePractice();
         queueLoop();
         if (!options_.soundFont.isEmpty()) {
@@ -1618,6 +1622,40 @@ void Startup::queueSfz() {
 // playback a new sequence and leave it where the click on the cursor put it.
 // A new song then starts playback from its beginning. The A-B loop that
 // queueLoop() left stays through the edit and goes with the new song.
+// The score exported as PDF (ADR-0074) into a folder of its own: a whole
+// document with as many pages as the score shows.
+void Startup::queuePdf() {
+    steps_.emplace_back([this] {
+        const auto problem = [this](const QString& what) {
+            if (editProblem_.isEmpty()) {
+                editProblem_ = QStringLiteral("PDF export: %1").arg(what);
+            }
+        };
+        const QTemporaryDir folder;
+        const QString file = folder.filePath(QStringLiteral("score")); // ".pdf" is added
+        if (!score_->exportPdf(QUrl::fromLocalFile(file))) {
+            problem(QStringLiteral("it failed"));
+            return false;
+        }
+        QFile written(file + QStringLiteral(".pdf"));
+        if (!written.open(QIODevice::ReadOnly)) {
+            problem(QStringLiteral("no file was written"));
+            return false;
+        }
+        const QByteArray pdf = written.readAll();
+        const qsizetype pages = pdf.count("/Type /Page ");
+        if (!pdf.startsWith("%PDF-1.7\n") || !pdf.endsWith("%%EOF\n")) {
+            problem(QStringLiteral("the file is no whole PDF document"));
+        } else if (pages != score_->pageCount()) {
+            problem(
+                QStringLiteral("%1 pages for a score of %2").arg(pages).arg(score_->pageCount()));
+        }
+        std::printf("pdf: %lld %s, %lld bytes\n", static_cast<long long>(pages),
+                    pages == 1 ? "page" : "pages", static_cast<long long>(pdf.size()));
+        return false;
+    });
+}
+
 void Startup::queueKeepPosition() {
     const auto check = [this](const char* what) {
         auto* audio = window_->findChild<AudioController*>();

@@ -341,6 +341,12 @@ public:
     /// Saves the song as a .elara file (the extension is added when missing).
     /// Returns false, and reports why through editFailed(), when it cannot.
     Q_INVOKABLE bool save(const QUrl& file);
+    /// Writes the song as the score shows it (its track or all of them, in its
+    /// view) on A4 pages to `file`, a PDF document (".pdf" is added when
+    /// missing; ADR-0074). The pages are laid out again, so the continuous
+    /// view prints as pages too. Returns false, and reports why through
+    /// editFailed(), when it cannot.
+    Q_INVOKABLE bool exportPdf(const QUrl& file);
 
     // ---- Keyboard entry -----------------------------------------------------
 

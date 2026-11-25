@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Benchmarks for elara_notation: laying out staves and writing them as SVG.
 #include <elara/core/entry.hpp>
+#include <elara/io/compression.hpp>
 #include <elara/notation/caret.hpp>
+#include <elara/notation/font_outlines.hpp>
 #include <elara/notation/page_layout.hpp>
+#include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
@@ -18,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -104,6 +108,26 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     pages.threads = 1;
     BENCHMARK("the same on one thread") {
         return layoutPages(song, both, font, pages);
+    };
+
+    // PDF (ADR-0074): the font's outlines read once, then those pages written
+    // plain, and compressed as the app and the CLI write them.
+    const auto otf = std::filesystem::path(ELARA_FONT_DIR) / "Bravura.otf";
+    BENCHMARK("read the outlines of the glyphs from Bravura.otf") {
+        return elara::notation::FontOutlines::fromFile(otf);
+    };
+    const auto outlines = elara::notation::FontOutlines::fromFile(otf);
+    REQUIRE(outlines.has_value());
+    const elara::notation::PdfOptions compressed{
+        .compress = [](std::string_view data) { return elara::io::zlibCompress(data); }};
+    std::printf("those pages as PDF: %zu bytes, %zu compressed\n",
+                elara::notation::toPdf(paged, *outlines).size(),
+                elara::notation::toPdf(paged, *outlines, compressed).size());
+    BENCHMARK("write those pages as PDF") {
+        return elara::notation::toPdf(paged, *outlines);
+    };
+    BENCHMARK("write those pages as PDF, compressed") {
+        return elara::notation::toPdf(paged, *outlines, compressed);
     };
 
     // Keyboard entry (ADR-0032): the app looks for the caret on every page
