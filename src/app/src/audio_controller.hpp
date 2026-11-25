@@ -39,9 +39,14 @@ class AudioController : public QObject {
     Q_PROPERTY(bool looping READ looping NOTIFY loopChanged)
     Q_PROPERTY(double loopFrom READ loopFrom NOTIFY loopChanged)
     Q_PROPERTY(double loopTo READ loopTo NOTIFY loopChanged)
-    // The sound of the tracks (ADR-0043): a SoundFont, or the built-in synthesizer.
+    // The sound of the tracks (ADR-0043): a SoundFont, or the built-in
+    // synthesizer, and SFZ instruments for the guitars and the basses (ADR-0066).
     Q_PROPERTY(QString soundFont READ soundFont NOTIFY soundFontChanged)
     Q_PROPERTY(QString soundFontName READ soundFontName NOTIFY soundFontChanged)
+    Q_PROPERTY(QString guitarSfz READ guitarSfz NOTIFY sfzChanged)
+    Q_PROPERTY(QString guitarSfzName READ guitarSfzName NOTIFY sfzChanged)
+    Q_PROPERTY(QString bassSfz READ bassSfz NOTIFY sfzChanged)
+    Q_PROPERTY(QString bassSfzName READ bassSfzName NOTIFY sfzChanged)
     Q_PROPERTY(bool loadingSoundFont READ loadingSoundFont NOTIFY loadingSoundFontChanged)
     Q_PROPERTY(bool rememberSound MEMBER rememberSound_ NOTIFY rememberSoundChanged)
 
@@ -94,19 +99,36 @@ public:
     Q_INVOKABLE void markLoop();
     Q_INVOKABLE void clearLoop();
     /// The SoundFont the tracks play through; empty for the built-in synthesizer.
-    [[nodiscard]] QString soundFont() const { return soundFont_; }
+    [[nodiscard]] QString soundFont() const { return soundFont_.file; }
     /// Its file name without the extension.
     [[nodiscard]] QString soundFontName() const;
-    /// True while a SoundFont opens.
+    /// The SFZ instruments the guitars and the basses play; empty for none.
+    [[nodiscard]] QString guitarSfz() const { return guitars_.file; }
+    [[nodiscard]] QString bassSfz() const { return basses_.file; }
+    /// Their file names without the extension.
+    [[nodiscard]] QString guitarSfzName() const;
+    [[nodiscard]] QString bassSfzName() const;
+    /// True while a SoundFont or an SFZ instrument opens.
     [[nodiscard]] bool loadingSoundFont() const { return loading_ > 0; }
     /// Opens the SoundFont at `file` (a path or a file URL) on a worker; once
     /// it has, the tracks play through it. A file that does not open leaves
     /// the sound as it was and says why in errorMessage().
     Q_INVOKABLE void setSoundFont(const QString& file);
-    /// Plays the tracks through the built-in synthesizer again.
+    /// Opens the SFZ instrument at `file` (a path or a file URL) and its
+    /// samples on a worker for the tracks of `tracks`, "guitars" or "basses";
+    /// once it has, those tracks play through it and the others as before. A
+    /// file that does not open leaves the sound as it was and says why.
+    Q_INVOKABLE void setSfz(const QString& tracks, const QString& file);
+    /// The guitars or the basses play as the other tracks again.
+    Q_INVOKABLE void clearSfz(const QString& tracks);
+    /// Plays every track through the built-in synthesizer again.
     Q_INVOKABLE void useBuiltinSound();
-    /// Opens the SoundFont chosen last time, when rememberSound is on.
-    Q_INVOKABLE void restoreSoundFont();
+    /// Opens the SoundFont and the SFZ instruments chosen last time, when
+    /// rememberSound is on.
+    Q_INVOKABLE void restoreSound();
+    /// The sound track `track` of the open song plays with: the timbre's
+    /// name, the SoundFont preset's or the SFZ instrument's.
+    Q_INVOKABLE [[nodiscard]] QString trackSound(int track) const;
 
     Q_INVOKABLE void playTestTone(double frequencyHz = 440.0, double seconds = 1.5);
 
@@ -121,6 +143,7 @@ signals:
     void countingInChanged();
     void loopChanged();
     void soundFontChanged();
+    void sfzChanged();
     void loadingSoundFontChanged();
     void rememberSoundChanged();
 
@@ -138,7 +161,19 @@ private:
     void applyLoop();
 
     enum class Loop : std::uint8_t { None, Marked, Looping };
-    void useSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank, const QString& file);
+
+    // A sound the tracks can play through: the SoundFont, or an SFZ
+    // instrument, with the file it came from.
+    struct SoundPart {
+        std::shared_ptr<const elara::audio::SoundBank> bank; // null for none
+        QString file;
+        int request = 0; // the last file asked for wins
+    };
+    SoundPart* sfzPart(const QString& tracks);
+    void setLoading(int change);
+    void useSoundPart(SoundPart& part, std::shared_ptr<const elara::audio::SoundBank> bank,
+                      const QString& file);
+    void useSoundBank();
 
     QPointer<elara::app::ScoreDocument> document_;
     std::unique_ptr<elara::audio::SystemAudio> audio_;
@@ -156,9 +191,10 @@ private:
     double loopFrom_ = 0.0;
     double loopTo_ = 0.0;
     std::shared_ptr<const elara::audio::SoundBank> bank_; // null for the built-in synthesizer
-    QString soundFont_;
-    int loading_ = 0;      // SoundFonts opening
-    int soundRequest_ = 0; // the last one asked for wins
+    SoundPart soundFont_;
+    SoundPart guitars_;
+    SoundPart basses_;
+    int loading_ = 0; // SoundFonts and SFZ instruments opening
     bool rememberSound_ = false;
     QString deviceDescription_;
     QString errorMessage_;

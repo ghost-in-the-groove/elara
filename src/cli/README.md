@@ -29,9 +29,9 @@ elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metrono
                              [--count-in-at SECONDS]
 elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
                                  [--events] [--speed 100] [--metronome] [--soundfont FILE.sf2]
-                                 [--sfz FILE.sfz]
+                                 [--sfz [TRACKS=]FILE.sfz]...
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
-                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2] [--sfz FILE.sfz]
+                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2] [--sfz [TRACKS=]FILE.sfz]...
 elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
 elara-cli [--json] sfz <FILE.sfz>                             # what Elara plays of an SFZ
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
@@ -233,9 +233,13 @@ or the preset's. `soundfont FILE --json` lists the presets as
 `{"bank", "program", "name"}`, by bank and program.
 
 With `--sfz` an SFZ instrument plays every track but the percussion ones,
-which stay on the SoundFont or the built-in synthesizer (ADR-0066);
-`render-audio --json` says `"sfz"` (the file, or null) and the tracks it plays
-sound as the instrument's name. `sfz FILE --json` reads the instrument and its
+which stay on the SoundFont or the built-in synthesizer (ADR-0066).
+`--sfz guitars=FILE` plays only the tracks of a General MIDI guitar (programs
+25 to 32 as GM numbers them), `--sfz basses=FILE` only the basses' (33 to 40),
+and `pitched=FILE` is the same as `FILE`. The option repeats: a later
+instrument takes its tracks from the earlier ones, and a file named twice is
+read once. `render-audio --json` says `"sfz"`, a list of `{"file", "tracks"}`,
+and the tracks an instrument plays sound as its name. `sfz FILE --json` reads the instrument and its
 samples: `{"file", "name", "regions", "samples", "sampleBytes", "lowestKey",
 "highestKey", "missingSamples", "unknownOpcodes", "skippedHeaders",
 "loadSeconds"}`; it fails when no sample can be read.

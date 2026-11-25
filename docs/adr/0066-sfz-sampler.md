@@ -50,6 +50,12 @@ dependency or guard rule.
   on every core, and shares them with every track it plays. Percussion tracks
   go to another bank: the SoundFont when there is one, or else the built-in
   synthesizer.
+- An instrument plays every pitched track, or only the tracks of a General
+  MIDI guitar or bass (`SfzTracks`), and leaves the others to the bank behind
+  it, so instruments stack: a SoundFont, a bass library in front of it and a
+  guitar library in front of both. The app offers one instrument for the
+  guitars and one for the basses; `elara-cli` takes `--sfz` as often as needed,
+  `guitars=FILE`, `basses=FILE` or `FILE` for every pitched track.
 - Its `TrackSound` has 64 voices made in advance. A note plays every region
   that matches it, read with four-point Hermite interpolation at the key's
   pitch and the sample's rate. A glide moves only the voices of its key, a

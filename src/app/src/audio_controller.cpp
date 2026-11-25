@@ -3,6 +3,7 @@
 
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
+#include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/sound_font.hpp>
 #include <elara/audio/system_audio.hpp>
 
@@ -297,6 +298,8 @@ void AudioController::applyLoop() {
 namespace {
 
 const QString kSoundFontKey = QStringLiteral("audio/soundFont");
+const QString kGuitarSfzKey = QStringLiteral("audio/guitarSfz");
+const QString kBassSfzKey = QStringLiteral("audio/bassSfz");
 
 // A local path from a path or a file URL, as file dialogs give them.
 QString localPath(const QString& file) {
@@ -304,28 +307,44 @@ QString localPath(const QString& file) {
     return url.isLocalFile() ? url.toLocalFile() : file;
 }
 
+QString baseName(const QString& file) {
+    return file.isEmpty() ? QString() : QFileInfo(file).completeBaseName();
+}
+
 } // namespace
 
 QString AudioController::soundFontName() const {
-    return soundFont_.isEmpty() ? QString() : QFileInfo(soundFont_).completeBaseName();
+    return baseName(soundFont_.file);
+}
+
+QString AudioController::guitarSfzName() const {
+    return baseName(guitars_.file);
+}
+
+QString AudioController::bassSfzName() const {
+    return baseName(basses_.file);
+}
+
+void AudioController::setLoading(int change) {
+    const bool before = loading_ > 0;
+    loading_ += change;
+    if ((loading_ > 0) != before) {
+        emit loadingSoundFontChanged();
+    }
 }
 
 void AudioController::setSoundFont(const QString& file) {
     const QString path = localPath(file);
-    const int request = ++soundRequest_;
-    if (loading_++ == 0) {
-        emit loadingSoundFontChanged();
-    }
+    const int request = ++soundFont_.request;
+    setLoading(1);
     // Reading the presets of a large font takes a moment: away from the
     // interface thread.
     elara::app::whenDone(
         QtConcurrent::run(
             [path] { return elara::audio::SoundFont::open(QFileInfo(path).filesystemFilePath()); }),
         this, [this, path, request](const auto& opened) {
-            if (--loading_ == 0) {
-                emit loadingSoundFontChanged();
-            }
-            if (request != soundRequest_) {
+            setLoading(-1);
+            if (request != soundFont_.request) {
                 return; // another sound was asked for since
             }
             if (!opened) {
@@ -334,37 +353,134 @@ void AudioController::setSoundFont(const QString& file) {
                 return;
             }
             setErrorMessage({});
-            useSoundBank(*opened, path);
+            useSoundPart(soundFont_, *opened, path);
         });
 }
 
-void AudioController::useBuiltinSound() {
-    ++soundRequest_; // a SoundFont still opening is no longer wanted
-    useSoundBank(nullptr, {});
+AudioController::SoundPart* AudioController::sfzPart(const QString& tracks) {
+    if (tracks == QStringLiteral("guitars")) {
+        return &guitars_;
+    }
+    if (tracks == QStringLiteral("basses")) {
+        return &basses_;
+    }
+    return nullptr;
 }
 
-void AudioController::restoreSoundFont() {
+void AudioController::setSfz(const QString& tracks, const QString& file) {
+    SoundPart* part = sfzPart(tracks);
+    if (part == nullptr) {
+        return;
+    }
+    const QString path = localPath(file);
+    const int request = ++part->request;
+    setLoading(1);
+    // The samples of an instrument are read into memory, on every core.
+    elara::app::whenDone(
+        QtConcurrent::run(
+            [path] { return elara::audio::SfzBank::open(QFileInfo(path).filesystemFilePath()); }),
+        this, [this, part, path, request](const auto& opened) {
+            setLoading(-1);
+            if (request != part->request) {
+                return; // another instrument was asked for since
+            }
+            if (!opened) {
+                setErrorMessage(tr("The SFZ instrument did not open: %1")
+                                    .arg(QString::fromStdString(opened.error())));
+                return;
+            }
+            const auto missing = static_cast<int>((*opened)->missingSamples().size());
+            setErrorMessage(
+                missing == 0
+                    ? QString()
+                    : tr("%n sample(s) of the SFZ instrument could not be read", "", missing));
+            useSoundPart(*part, *opened, path);
+        });
+}
+
+void AudioController::clearSfz(const QString& tracks) {
+    if (SoundPart* part = sfzPart(tracks); part != nullptr) {
+        ++part->request; // an instrument still opening is no longer wanted
+        useSoundPart(*part, nullptr, {});
+    }
+}
+
+void AudioController::useBuiltinSound() {
+    for (SoundPart* part : {&soundFont_, &guitars_, &basses_}) {
+        ++part->request; // a sound still opening is no longer wanted
+        useSoundPart(*part, nullptr, {});
+    }
+}
+
+void AudioController::restoreSound() {
     if (!rememberSound_) {
         return;
     }
-    const QString file = QSettings().value(kSoundFontKey).toString();
-    if (!file.isEmpty() && QFileInfo::exists(file)) {
+    const QSettings settings;
+    const auto saved = [&settings](const QString& key) {
+        const QString file = settings.value(key).toString();
+        return !file.isEmpty() && QFileInfo::exists(file) ? file : QString();
+    };
+    if (const QString file = saved(kSoundFontKey); !file.isEmpty()) {
         setSoundFont(file);
+    }
+    if (const QString file = saved(kGuitarSfzKey); !file.isEmpty()) {
+        setSfz(QStringLiteral("guitars"), file);
+    }
+    if (const QString file = saved(kBassSfzKey); !file.isEmpty()) {
+        setSfz(QStringLiteral("basses"), file);
     }
 }
 
-// The tracks play through `bank` from now on, playing or not, at the same
-// place: the player makes their sounds again as it loads the sequence.
-void AudioController::useSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank,
+QString AudioController::trackSound(int track) const {
+    const auto song = document_ ? document_->song() : nullptr;
+    if (!song || track < 0 || static_cast<std::size_t>(track) >= song->trackCount()) {
+        return {};
+    }
+    const auto bank = bank_ ? bank_ : elara::audio::builtinBank();
+    return QString::fromStdString(
+        bank->soundName(song->track(static_cast<std::size_t>(track)).instrument()));
+}
+
+// `part` plays through `bank`, from `file`, which is remembered when
+// rememberSound is on.
+void AudioController::useSoundPart(SoundPart& part,
+                                   std::shared_ptr<const elara::audio::SoundBank> bank,
                                    const QString& file) {
-    bank_ = std::move(bank);
-    if (soundFont_ != file) {
-        soundFont_ = file;
-        emit soundFontChanged();
+    const bool font = &part == &soundFont_;
+    part.bank = std::move(bank);
+    if (part.file != file) {
+        part.file = file;
+        if (font) {
+            emit soundFontChanged();
+        } else {
+            emit sfzChanged();
+        }
     }
     if (rememberSound_) {
-        QSettings().setValue(kSoundFontKey, file);
+        QSettings().setValue(font                 ? kSoundFontKey
+                             : &part == &guitars_ ? kGuitarSfzKey
+                                                  : kBassSfzKey,
+                             file);
     }
+    useSoundBank();
+}
+
+// The tracks play through the SoundFont, or the built-in synthesizer, and
+// the guitars and basses through their SFZ instruments, from now on, playing
+// or not, at the same place: the player makes their sounds again as it loads
+// the sequence. The instruments share their samples with the banks they had.
+void AudioController::useSoundBank() {
+    using elara::audio::SfzTracks;
+    std::shared_ptr<const elara::audio::SoundBank> bank = soundFont_.bank;
+    const std::pair<const SoundPart*, SfzTracks> instruments[] = {{&basses_, SfzTracks::Basses},
+                                                                  {&guitars_, SfzTracks::Guitars}};
+    for (const auto& [part, tracks] : instruments) {
+        if (const auto* sfz = dynamic_cast<const elara::audio::SfzBank*>(part->bank.get())) {
+            bank = sfz->with(bank ? bank : elara::audio::builtinBank(), tracks);
+        }
+    }
+    bank_ = std::move(bank);
     if (player_) {
         player_->setSoundBank(bank_);
         if (document_ && document_->song() && document_->sequence()) {

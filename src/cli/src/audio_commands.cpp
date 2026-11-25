@@ -304,11 +304,50 @@ int runSequence(bool json, const SequenceOptions& options) {
     return kExitOk;
 }
 
+// An SFZ instrument of --sfz and the tracks it plays.
+struct SfzChoice {
+    audio::SfzTracks tracks = audio::SfzTracks::Pitched;
+    std::string file;
+};
+
+// The values of --sfz, each "[pitched=|guitars=|basses=]FILE".
+std::expected<std::vector<SfzChoice>, std::string>
+sfzChoices(const std::vector<std::string>& values) {
+    std::vector<SfzChoice> choices;
+    for (const std::string& value : values) {
+        const auto equals = value.find('=');
+        const std::string_view family(value.data(), equals == std::string::npos ? 0 : equals);
+        if (family.empty() ||
+            !std::ranges::all_of(family, [](char c) { return c >= 'a' && c <= 'z'; })) {
+            choices.push_back({.file = value});
+            continue;
+        }
+        const auto tracks = audio::sfzTracksFromName(family);
+        if (!tracks) {
+            return std::unexpected(
+                std::format("--sfz plays pitched, guitars or basses tracks, not {}", family));
+        }
+        choices.push_back({.tracks = *tracks, .file = value.substr(equals + 1)});
+    }
+    return choices;
+}
+
+// The instruments of --sfz as a JSON list of their files and tracks.
+std::string sfzJson(const std::vector<SfzChoice>& choices) {
+    std::string json = "[";
+    for (const SfzChoice& choice : choices) {
+        json += std::format(R"({}{{"file":"{}","tracks":"{}"}})", json.size() == 1 ? "" : ",",
+                            jsonEscape(choice.file), audio::sfzTracksName(choice.tracks));
+    }
+    return json + ']';
+}
+
 // The sound bank of --soundfont and --sfz: the built-in synthesizer when both
-// are empty. With an SFZ instrument the SoundFont, or else the built-in
-// synthesizer, plays the percussion tracks.
+// are empty. Each SFZ instrument plays its tracks and leaves the others to the
+// banks before it, down to the SoundFont or the built-in synthesizer, which
+// play the percussion tracks. A file named twice is read once.
 std::expected<std::shared_ptr<const audio::SoundBank>, std::string>
-soundBankFrom(const std::string& soundFont, const std::string& sfz = {}) {
+soundBankFrom(const std::string& soundFont, const std::vector<SfzChoice>& sfz = {}) {
     std::shared_ptr<const audio::SoundBank> bank = audio::builtinBank();
     if (!soundFont.empty()) {
         auto opened = audio::SoundFont::open(soundFont);
@@ -317,12 +356,23 @@ soundBankFrom(const std::string& soundFont, const std::string& sfz = {}) {
         }
         bank = *std::move(opened);
     }
-    if (!sfz.empty()) {
-        auto opened = audio::SfzBank::open(sfz, bank);
-        if (!opened) {
-            return std::unexpected(opened.error());
+    std::vector<std::shared_ptr<const audio::SfzBank>> read;
+    for (std::size_t i = 0; i < sfz.size(); ++i) {
+        std::shared_ptr<const audio::SfzBank> instrument;
+        for (std::size_t j = 0; j < i && !instrument; ++j) {
+            if (sfz[j].file == sfz[i].file) {
+                instrument = read[j]->with(bank, sfz[i].tracks);
+            }
         }
-        bank = *std::move(opened);
+        if (!instrument) {
+            auto opened = audio::SfzBank::open(sfz[i].file, bank, sfz[i].tracks);
+            if (!opened) {
+                return std::unexpected(opened.error());
+            }
+            instrument = *std::move(opened);
+        }
+        read.push_back(instrument);
+        bank = std::move(instrument);
     }
     return bank;
 }
@@ -332,6 +382,10 @@ std::string jsonPath(const std::string& path) {
     return path.empty() ? std::string("null") : '"' + jsonEscape(path) + '"';
 }
 
+constexpr const char* kSfzHelp =
+    "Play tracks with this SFZ instrument: every track but the percussion ones, or with "
+    "guitars= or basses= only those. Repeatable; a later one takes its tracks from the earlier";
+
 struct RenderAudioOptions {
     std::string file;
     std::string out;
@@ -339,7 +393,7 @@ struct RenderAudioOptions {
     double tail = 2.0;
     bool events = false;
     std::string soundFont;
-    std::string sfz;
+    std::vector<std::string> sfz;
     PracticeOptions practice;
 };
 
@@ -348,7 +402,11 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     if (!song) {
         return fail(song.error());
     }
-    const auto bank = soundBankFrom(options.soundFont, options.sfz);
+    const auto sfz = sfzChoices(options.sfz);
+    if (!sfz) {
+        return usageError(sfz.error());
+    }
+    const auto bank = soundBankFrom(options.soundFont, *sfz);
     if (!bank) {
         return fail(bank.error());
     }
@@ -400,7 +458,7 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
         std::string body = std::format(
             R"({{"file":"{}","out":{},"soundFont":{},"sfz":{},"sampleRate":{},"channels":2,"frames":{},"seconds":{},"peak":{:.4f},"rms":{:.4f},"tracks":[)",
             jsonEscape(options.file), jsonPath(options.out), jsonPath(options.soundFont),
-            jsonPath(options.sfz), options.sampleRate, frames, jsonNumber(seconds), peak, rms);
+            sfzJson(*sfz), options.sampleRate, frames, jsonNumber(seconds), peak, rms);
         for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
             body += std::format(R"({}{{"track":{},"name":"{}","timbre":"{}","sound":"{}"}})",
                                 t == 0 ? "" : ",", t, jsonEscape(song->track(t).name()),
@@ -455,7 +513,7 @@ struct PlayOptions {
     bool countIn = false;
     std::vector<double> loop; // from, to
     std::string soundFont;
-    std::string sfz;
+    std::vector<std::string> sfz;
 };
 
 int runPlay(bool json, const PlayOptions& options) {
@@ -467,7 +525,11 @@ int runPlay(bool json, const PlayOptions& options) {
     if (!song) {
         return fail(song.error());
     }
-    const auto bank = soundBankFrom(options.soundFont, options.sfz);
+    const auto sfz = sfzChoices(options.sfz);
+    if (!sfz) {
+        return usageError(sfz.error());
+    }
+    const auto bank = soundBankFrom(options.soundFont, *sfz);
     if (!bank) {
         return fail(bank.error());
     }
@@ -832,8 +894,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     renderAudio->add_option("--soundfont", rendering->soundFont,
                             "Play the tracks with this SoundFont (SF2 or SF3)");
-    renderAudio->add_option("--sfz", rendering->sfz,
-                            "Play the tracks but the percussion ones with this SFZ instrument");
+    renderAudio->add_option("--sfz", rendering->sfz, kSfzHelp)->type_name("[TRACKS=]FILE");
     renderAudio->add_flag("--events", rendering->events,
                           "List the note events dispatched, with their sample frames");
     addPracticeOptions(*renderAudio, rendering->practice);
@@ -856,8 +917,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
                           "Click one measure of beats before playback starts");
     playCommand->add_option("--soundfont", playing->soundFont,
                             "Play the tracks with this SoundFont (SF2 or SF3)");
-    playCommand->add_option("--sfz", playing->sfz,
-                            "Play the tracks but the percussion ones with this SFZ instrument");
+    playCommand->add_option("--sfz", playing->sfz, kSfzHelp)->type_name("[TRACKS=]FILE");
     playCommand->add_option("--loop", playing->loop, "Loop from FROM to TO seconds")
         ->expected(2)
         ->type_name("FROM TO");

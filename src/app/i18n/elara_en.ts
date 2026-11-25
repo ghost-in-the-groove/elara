@@ -2,6 +2,16 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en">
 <context>
+    <name>AudioController</name>
+    <message numerus="yes">
+        <source>%n sample(s) of the SFZ instrument could not be read</source>
+        <translation>
+            <numerusform>%n sample of the SFZ instrument could not be read</numerusform>
+            <numerusform>%n samples of the SFZ instrument could not be read</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>Main</name>
     <message numerus="yes">
         <source>%n measure(s)</source>
