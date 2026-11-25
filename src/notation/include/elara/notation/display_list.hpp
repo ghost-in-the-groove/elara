@@ -44,7 +44,7 @@ enum class Role : std::uint8_t {
                    ///< measure repeat signs (ADR-0102)
     Volta,         ///< the bracket and numbers of an alternate ending
     Tuplet,        ///< the number of a tuplet and its bracket
-    Tempo,         ///< a tempo mark: its note and "= 120"
+    Tempo,         ///< a tempo mark: its note and "= 120"; a triplet feel mark
     Dynamic,       ///< a dynamics mark under a staff: "p", "mf", "ff"
     Navigation,    ///< segno and coda signs, "Fine", "To Coda" and jumps ("D.S. al Coda")
     Section,       ///< the name of a section of the song ("Chorus") and its box

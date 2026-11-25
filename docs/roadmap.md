@@ -86,7 +86,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] In the model and kept by the native format; heard in playback and MIDI export
   - [x] Read from Guitar Pro 3-8, read and written in MusicXML
   - [x] Changed from a measure on with the CLI `feel` step, one undo step
-  - [ ] Drawn above the staff where it changes
+  - [x] Drawn above the staff where it changes
   - [ ] Set in the measure popup
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)

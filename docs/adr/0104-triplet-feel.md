@@ -57,6 +57,15 @@ one; other ratios and note values are dropped with a warning ("unusual swing
 dropped"). **Written** to MusicXML as a `<sound>` with `<swing>` in the first
 part where the feel changes, `<straight/>` where it ends.
 
+**Drawn** above the first staff of a system where the feel changes, on the
+tempo marks' baseline and after the tempo mark of that measure's start: the
+pair as written (two beamed eighths, or sixteenths), "=", and the pair as
+played: a quarter and an eighth under a "3" bracket (eighths under it for a
+sixteenth feel), a dotted note and its third, or the Scottish short note and
+dotted note. Where the feel ends, the pair equals the same pair. The beamed
+pairs and the bracket are SMuFL's text-based notes; the single notes and the
+dot are the metronome notes the tempo mark uses.
+
 **Changed** from a measure until the next change of it, like the signatures
 (ADR-0033): `changeTripletFeel()`, one undo step ("Change triplet feel"), and
 the CLI's `feel <m> <name>` step; new measures continue the feel before them.
@@ -64,5 +73,6 @@ the CLI's `feel <m> <name>` step; new measures continue the feel before them.
 ## Consequences
 
 - Shuffles and swing tunes from Guitar Pro play as they are meant to.
-- The mark above the staff and setting the feel in the measure popup come
-  next; until then the feel is heard but not shown.
+- The mark is seven to nine staff spaces wide; two feel changes in
+  consecutive narrow measures can touch, as two tempo marks can.
+- Setting the feel in the measure popup comes next.
