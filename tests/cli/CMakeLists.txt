@@ -627,6 +627,20 @@ add_test(NAME cli.dump_tenuto COMMAND elara-cli --json dump "${ELARA_CLI_TENUTO}
 set_tests_properties(cli.dump_tenuto PROPERTIES
   FIXTURES_REQUIRED cli_tenuto
   PASS_REGULAR_EXPRESSION "\"C5\",\"effects\":{\"tenuto\":true}}.*\"D5\",\"effects\":{\"staccato\":true,\"tenuto\":true}}")
+# Staccatissimo at the caret (ADR-0094): on the C, and in the place of the
+# staccato on the D.
+set(ELARA_CLI_STACCATISSIMO "${CMAKE_CURRENT_BINARY_DIR}/cli-staccatissimo.elara")
+add_test(NAME cli.edit_toggles_staccatissimo
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_STACCATISSIMO}" "add-track piano"
+    "append-measures 1" "pitch C" "effect staccatissimo" right "pitch D" "effect staccato"
+    "effect staccatissimo")
+set_tests_properties(cli.edit_toggles_staccatissimo PROPERTIES
+  FIXTURES_SETUP cli_staccatissimo
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change effect\"}")
+add_test(NAME cli.dump_staccatissimo COMMAND elara-cli --json dump "${ELARA_CLI_STACCATISSIMO}")
+set_tests_properties(cli.dump_staccatissimo PROPERTIES
+  FIXTURES_REQUIRED cli_staccatissimo
+  PASS_REGULAR_EXPRESSION "\"C5\",\"effects\":{\"staccatissimo\":true}}.*\"D5\",\"effects\":{\"staccatissimo\":true}}")
 # Clef changes at the caret (ADR-0087): a flute down to the bass clef, its
 # first note name then near the bass staff's middle line; a guitar keeps its
 # octave; the tenor clef undone.
@@ -1096,7 +1110,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":136,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":138,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES

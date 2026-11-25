@@ -379,9 +379,10 @@ constexpr std::array<EffectKey, ScoreDocument::kEffectCount> kEffects{{
     {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ghost note"), u'O'},
     {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Accent"), u'>'},
     {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccato"), u'\''},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tenuto"), u'_'}, // ADR-0088
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tenuto"), u'_'},        // ADR-0088
+    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccatissimo"), u'"'}, // ADR-0094
 }};
-static_assert(static_cast<int>(core::NoteEffect::Tenuto) + 1 == ScoreDocument::kEffectCount);
+static_assert(static_cast<int>(core::NoteEffect::Staccatissimo) + 1 == ScoreDocument::kEffectCount);
 
 // The kit pieces of drum entry, by their names in elara_core.
 constexpr std::array kDrumPieceNames{

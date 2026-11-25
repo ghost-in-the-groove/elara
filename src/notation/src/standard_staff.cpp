@@ -1674,21 +1674,24 @@ private:
     }
 
     // Staccato, tenuto and accents on the notehead side of the chord: the
-    // staccato dot nearest, the tenuto line beyond it (both: portato,
-    // ADR-0088), each in a space when inside the staff, the accent outside.
+    // staccato dot nearest, or the staccatissimo wedge in its place (ADR-0094),
+    // the tenuto line beyond it (both: portato, ADR-0088), each in a space
+    // when inside the staff, the accent outside.
     void articulations(Chord& chord) {
         if (chord.rest || chord.heads.empty()) {
             return;
         }
         bool staccato = false;
+        bool staccatissimo = false;
         bool tenuto = false;
         core::Accent accent = core::Accent::None;
         for (const Head& head : chord.heads) {
             staccato = staccato || head.note->effects.staccato;
+            staccatissimo = staccatissimo || head.note->effects.staccatissimo;
             tenuto = tenuto || head.note->effects.tenuto;
             accent = std::max(accent, head.note->effects.accent);
         }
-        if (!staccato && !tenuto && accent == core::Accent::None) {
+        if (!staccato && !staccatissimo && !tenuto && accent == core::Accent::None) {
             return;
         }
         const bool above = !chord.stemUp;
@@ -1707,7 +1710,9 @@ private:
             chord.marks = yOf(target) + direction * metrics(mark).box.height() / 2;
             edge = *chord.marks + direction * kArticulationGap;
         };
-        if (staccato) {
+        if (staccatissimo) {
+            inSpace(above ? Glyph::ArticStaccatissimoAbove : Glyph::ArticStaccatissimoBelow);
+        } else if (staccato) {
             inSpace(above ? Glyph::ArticStaccatoAbove : Glyph::ArticStaccatoBelow);
         }
         if (tenuto) {

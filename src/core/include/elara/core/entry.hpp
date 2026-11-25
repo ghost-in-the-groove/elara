@@ -131,19 +131,20 @@ enum class PitchMode : std::uint8_t {
 /// A note effect that typing toggles (ADR-0037), in the form it is usually
 /// written.
 enum class NoteEffect : std::uint8_t {
-    Tie,      ///< tied from the previous note
-    Legato,   ///< hammer-on or pull-off from the previous note
-    Slide,    ///< a shift slide to the next note
-    Bend,     ///< a full-step bend
-    Vibrato,  ///< slight vibrato
-    PalmMute, ///< palm mute
-    DeadNote, ///< a muted, percussive note
-    LetRing,  ///< let ring
-    Harmonic, ///< a natural harmonic at the note's fret
-    Ghost,    ///< a soft note, written in parentheses
-    Accent,   ///< an accent
-    Staccato, ///< staccato
-    Tenuto,   ///< tenuto; with staccato, portato (ADR-0088)
+    Tie,           ///< tied from the previous note
+    Legato,        ///< hammer-on or pull-off from the previous note
+    Slide,         ///< a shift slide to the next note
+    Bend,          ///< a full-step bend
+    Vibrato,       ///< slight vibrato
+    PalmMute,      ///< palm mute
+    DeadNote,      ///< a muted, percussive note
+    LetRing,       ///< let ring
+    Harmonic,      ///< a natural harmonic at the note's fret
+    Ghost,         ///< a soft note, written in parentheses
+    Accent,        ///< an accent
+    Staccato,      ///< staccato
+    Tenuto,        ///< tenuto; with staccato, portato (ADR-0088)
+    Staccatissimo, ///< staccatissimo, which takes the place of a staccato (ADR-0094)
 };
 
 /// Whether `effect` is a technique of strings (hammer-on or pull-off, palm

@@ -449,6 +449,7 @@ private:
         addFlag(object, "ghost", fx.ghost);
         addFlag(object, "letRing", fx.letRing);
         addFlag(object, "staccato", fx.staccato);
+        addFlag(object, "staccatissimo", fx.staccatissimo);
         addFlag(object, "tenuto", fx.tenuto);
         addEnumIfNot(object, "accent", kAccentNames, fx.accent, Accent::None);
         addEnumIfNot(object, "ornament", kOrnamentNames, fx.ornament, Ornament::None);
@@ -1145,6 +1146,7 @@ private:
         fx.ghost = flag(object, "ghost");
         fx.letRing = flag(object, "letRing");
         fx.staccato = flag(object, "staccato");
+        fx.staccatissimo = flag(object, "staccatissimo");
         fx.tenuto = flag(object, "tenuto");
         fx.accent = enumValue(object, "accent", kAccentNames, Accent::None);
         fx.ornament = enumValue(object, "ornament", kOrnamentNames, Ornament::None);

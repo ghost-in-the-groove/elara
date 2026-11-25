@@ -488,6 +488,7 @@ void reportDropped(const Track& track, Warnings& warnings) {
                         drop(e.ghost, "ghost notes dropped");
                         drop(e.letRing, "let ring dropped");
                         drop(e.staccato, "staccato dropped");
+                        drop(e.staccatissimo, "staccatissimo dropped");
                         drop(e.tenuto, "tenuto dropped");
                         drop(e.trill.isTrill(), "trills dropped");
                         drop(e.ornament != core::Ornament::None, "mordents and turns dropped");

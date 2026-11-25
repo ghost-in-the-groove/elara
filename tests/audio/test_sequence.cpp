@@ -507,6 +507,26 @@ TEST_CASE("Sequence: portato notes sound three quarters of their length, tenuto 
     CHECK_THAT(sequence.notes()[1].end, WithinAbs(1.5, kEpsilon));
 }
 
+TEST_CASE("Sequence: staccatissimo notes sound a quarter of their length",
+          "[audio][sequence][articulation]") {
+    // ADR-0094: shorter than a staccato, with a tenuto too.
+    Song song = pianoSong(1);
+    Note short1 = note(60);
+    short1.effects.staccatissimo = true;
+    Note short2 = note(62);
+    short2.effects.staccatissimo = true;
+    short2.effects.tenuto = true;
+    Note dotted = note(64);
+    dotted.effects.staccato = true;
+    voice(song, 0) = {beat(NoteValue::Half, {short1}), beat(NoteValue::Quarter, {short2}),
+                      beat(NoteValue::Quarter, {dotted})};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 3);
+    CHECK_THAT(sequence.notes()[0].end, WithinAbs(0.25, kEpsilon));
+    CHECK_THAT(sequence.notes()[1].end - sequence.notes()[1].start, WithinAbs(0.125, kEpsilon));
+    CHECK_THAT(sequence.notes()[2].end - sequence.notes()[2].start, WithinAbs(0.25, kEpsilon));
+}
+
 TEST_CASE("Sequence: a trill alternates with its other note at its speed",
           "[audio][sequence][articulation]") {
     // ADR-0090: from the note itself, in sixteenths over a half note (1 s at

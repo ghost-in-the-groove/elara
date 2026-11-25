@@ -98,6 +98,7 @@ core::Song richSong() {
     slid.effects.ghost = true;
     Note muted = lead.frettedNote(6, 0);
     muted.effects.palmMute = true;
+    muted.effects.staccatissimo = true; // ADR-0094
     muted.effects.deadNote = true;
     Note hammer = lead.frettedNote(6, 2);
     hammer.effects.legatoFromPrevious = true;
@@ -237,6 +238,7 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("trill":{"semitones":2,"speed":"16"})") != std::string::npos);
     CHECK(json.find(R"("ornament":"inverted-turn")") != std::string::npos);
     CHECK(json.find(R"("fingering":"index","pluck":"ring")") != std::string::npos);
+    CHECK(json.find(R"("staccatissimo":true)") != std::string::npos);
     CHECK(json.find(R"("hairpin":"crescendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"diminuendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"none")") == std::string::npos);

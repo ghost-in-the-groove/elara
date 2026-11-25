@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <iterator>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -548,6 +549,46 @@ TEST_CASE("Tablature layout: tenuto by the notehead, beyond a staccato dot, acce
     CHECK(dot.origin.y > heads[1].origin.y);
     CHECK(line.origin.y > dot.origin.y);
     CHECK(line.origin.x < heads[2].origin.x);
+}
+
+TEST_CASE("Tablature layout: a staccatissimo wedge in the place of a staccato dot",
+          "[notation][tab]") {
+    // ADR-0094: by the notehead, a tenuto beyond it.
+    Note high = fretted(1, 0); // written E5: stem down, marks above
+    high.effects.staccatissimo = true;
+    high.effects.staccato = true;
+    Note low = fretted(6, 3); // written G3: stem up, marks below
+    low.effects.staccatissimo = true;
+    low.effects.tenuto = true;
+    const Song song = guitar({{beatOf({high}, NoteValue::Half), beatOf({low}), beatOf({low})}});
+    const StaffSelection standard{};
+    const DisplayList list = layoutSystem(song, std::span(&standard, 1), bravura());
+    auto heads = byRole(list.glyphs, Role::Notehead);
+    std::ranges::stable_sort(heads, {}, [](const GlyphItem& item) { return item.origin.x; });
+    REQUIRE(heads.size() == 3);
+    const auto marks = byRole(list.glyphs, Role::Articulation);
+    REQUIRE(marks.size() == 5);
+    const auto all = [&](Glyph glyph) {
+        std::vector<GlyphItem> found;
+        std::ranges::copy_if(marks, std::back_inserter(found),
+                             [glyph](const GlyphItem& item) { return item.glyph == glyph; });
+        std::ranges::stable_sort(found, {}, [](const GlyphItem& item) { return item.origin.x; });
+        return found;
+    };
+    // Above the stem-down note, alone: no dot beside it.
+    const auto above = all(Glyph::ArticStaccatissimoAbove);
+    REQUIRE(above.size() == 1);
+    CHECK(above[0].origin.y < heads[0].origin.y);
+    CHECK(all(Glyph::ArticStaccatoAbove).empty());
+    // Under the stem-up notes, the tenuto line beyond each wedge.
+    const auto wedges = all(Glyph::ArticStaccatissimoBelow);
+    const auto lines = all(Glyph::ArticTenutoBelow);
+    REQUIRE(wedges.size() == 2);
+    REQUIRE(lines.size() == 2);
+    for (std::size_t i = 0; i < 2; ++i) {
+        CHECK(wedges[i].origin.y > heads[i + 1].origin.y);
+        CHECK(lines[i].origin.y > wedges[i].origin.y);
+    }
 }
 
 TEST_CASE("Tablature layout: techniques go above the notation without tablature",
