@@ -419,6 +419,21 @@ add_test(NAME cli.dump_hairpins COMMAND elara-cli --json dump "${ELARA_CLI_HAIRP
 set_tests_properties(cli.dump_hairpins PROPERTIES
   FIXTURES_REQUIRED cli_hairpins
   PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"D5\"}\],\"effects\":{\"hairpin\":\"crescendo\"}}.*\"E5\"}\],\"effects\":{\"hairpin\":\"diminuendo\"}}")
+# Chord symbols typed at the caret (ADR-0080): two frets make the diagram of
+# Em; G7 over a single note has none, and goes again.
+set(ELARA_CLI_CHORDS "${CMAKE_CURRENT_BINARY_DIR}/cli-chords.elara")
+add_test(NAME cli.edit_names_chords
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CHORDS}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 5" "fret 2" "caret 0 0 0 4" "fret 2" "chord Em" right
+    "fret 3" "chord G7" "chord none")
+set_tests_properties(cli.edit_names_chords PROPERTIES
+  FIXTURES_SETUP cli_chords
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Remove chord symbol\"}")
+add_test(NAME cli.dump_chords COMMAND elara-cli --json dump "${ELARA_CLI_CHORDS}")
+set_tests_properties(cli.dump_chords PROPERTIES
+  FIXTURES_REQUIRED cli_chords
+  PASS_REGULAR_EXPRESSION "\"chord\":{\"name\":\"Em\",\"diagram\":{\"firstFret\":1,\"frets\":\\[-1,-1,-1,2,2,-1\\]}}"
+  FAIL_REGULAR_EXPRESSION "G7")
 # Grace notes typed at the caret (ADR-0079): two on the 7th fret of the G
 # string, then one on the next note taken off again.
 set(ELARA_CLI_GRACES "${CMAKE_CURRENT_BINARY_DIR}/cli-graces.elara")

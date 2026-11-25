@@ -90,12 +90,22 @@ need by their ideal spaces, and one on a beat where no notes start (a
 measure of rests) gets a column of its own. Barres and fingerings are not
 drawn: a dot on each stopped string says what a barre says.
 
+**Editing.** `setChordSymbol()` names the caret's beat, a rest as well as a
+note, as one undo step; an empty name takes the symbol away. On a staff with
+frets the symbol gets the diagram the beat's frets make when two or more of
+its notes have one (strings without a note not played, the grid from the nut
+unless a fret lies past the fourth); otherwise it keeps the diagram it had,
+so renaming an imported chord keeps its shape. The command line types
+`chord <name>` and `chord none`. In the app, Ctrl+K or the entry bar's chord
+button opens a popup over the caret's beat: a name typed and Enter, or one of
+the chords the song already names, sets it; the bin takes it away.
+
 ## Consequences
 
 - The model, the native format, the Guitar Pro 3-8 importers and MusicXML
-  both ways keep chord symbols, layout draws them, and `elara-cli dump` and
-  `import --json` show them. Typing them at the caret and transposing their
-  names with the notes come next, each recorded here as it lands.
+  both ways keep chord symbols, layout draws them, the caret types them, and
+  `elara-cli dump` and `import --json` show them. Transposing their names
+  with the notes comes next.
 - A line with chord symbols is taller by their row (about 2.5 staff spaces
   for names, 6 with diagrams), and measures with many of them on short notes
   grow to keep their names apart.
@@ -111,4 +121,8 @@ drawn: a dot on each stopped string says what a barre says.
   bass`, `io.MusicXML export: chord symbols keep their names and diagrams`,
   the import snapshots of the corpus, the `notation.Chord symbols: ...`
   layout tests (names, diagrams, frets up the neck, tablature, technique
-  lanes, spacing, measures of rests) and the render snapshots of the corpus.
+  lanes, spacing, measures of rests), the render snapshots of the corpus,
+  `core.Entry: chord symbols name the caret's beat, with the diagram its
+  frets make`, `core.Entry: chord symbols on staves without frets have no
+  diagram`, `cli.edit_names_chords` with `cli.dump_chords`, and the app's
+  smoke test, which names the caret's beat and takes the name away.

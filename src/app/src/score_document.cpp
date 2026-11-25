@@ -320,6 +320,10 @@ constexpr std::array kEditNames{
     Translation{"Add grace note", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Add grace note")},
     Translation{"Remove grace notes",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove grace notes")},
+    Translation{"Set chord symbol",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set chord symbol")},
+    Translation{"Remove chord symbol",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove chord symbol")},
 };
 
 // The names of Tuning::presetNames().
@@ -1648,6 +1652,9 @@ QString ScoreDocument::caretStatus() const {
     if (caretGraceNotes() > 0) {
         parts.append(tr("Grace notes"));
     }
+    if (const QString chord = caretChord(); !chord.isEmpty()) {
+        parts.append(tr("Chord %1").arg(chord));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -2063,6 +2070,40 @@ void ScoreDocument::toggleGraceNote() {
     });
 }
 
+void ScoreDocument::setChordSymbol(const QString& name) {
+    runEntry([this, text = name.toStdString()](const core::Song& song) {
+        return core::setChordSymbol(song, caret_, text);
+    });
+}
+
+QStringList ScoreDocument::songChords() const {
+    constexpr qsizetype kOffered = 12;
+    QStringList names;
+    if (!document_) {
+        return names;
+    }
+    const core::Song& song = document_->song();
+    for (std::size_t m = 0; m < song.measureCount() && names.size() < kOffered; ++m) {
+        for (std::size_t t = 0; t < song.trackCount(); ++t) {
+            const core::Track& track = song.track(t);
+            for (std::size_t s = 0; s < track.staffCount(); ++s) {
+                for (const core::Voice& voice : track.staff(s).measure(m).voices) {
+                    for (const core::Beat& beat : voice.beats) {
+                        if (!beat.chord || beat.chord->name.empty()) {
+                            continue;
+                        }
+                        const QString name = qstring(beat.chord->name);
+                        if (!names.contains(name) && names.size() < kOffered) {
+                            names.append(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return names;
+}
+
 void ScoreDocument::setPickStroke(int direction) {
     if (direction < 0 || direction > 2) {
         return;
@@ -2345,6 +2386,13 @@ int ScoreDocument::caretStrum() const {
 
 int ScoreDocument::caretHairpin() const {
     return static_cast<int>(beatEffectsAtCaret().hairpin);
+}
+
+QString ScoreDocument::caretChord() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return {};
+    }
+    return qstring(core::chordNameAt(document_->song(), caret_));
 }
 
 int ScoreDocument::caretGraceNotes() const {

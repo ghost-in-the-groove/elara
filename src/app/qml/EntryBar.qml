@@ -14,6 +14,8 @@ Rectangle {
 
     /// The measure button: the caret's measure, its signatures and length.
     signal measureRequested
+    /// The chord button: the chord symbol of the caret's beat (ADR-0080).
+    signal chordRequested
 
     /// Opens the note effects panel.
     function openEffects() {
@@ -1134,6 +1136,37 @@ Rectangle {
 
                                 cents: modelData
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        Tool {
+            tip: qsTr("Chord symbol (Ctrl+K)")
+            onClicked: root.chordRequested()
+
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: "M7 6 L7 20 M12 6 L12 20 M17 6 L17 20 M5 6 L19 6 M5 11 L19 11 M5 16 L19 16"
+                    color: root.ink
+                }
+                // A dot while the caret's beat names a chord.
+                Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 5
+                    color: Material.accent
+                    scale: root.document.caretChord.length > 0 ? 1 : 0
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutBack
                         }
                     }
                 }
