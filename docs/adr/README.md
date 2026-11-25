@@ -85,6 +85,7 @@ one that replaces them.
 | [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
 | [0078](0078-hairpins.md) | Hairpins | Accepted |
 | [0079](0079-grace-notes.md) | Grace notes | Accepted |
+| [0080](0080-chord-symbols.md) | Chord symbols | Accepted |
 
 ## Template
 

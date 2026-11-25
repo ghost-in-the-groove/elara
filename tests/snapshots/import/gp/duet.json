@@ -47,6 +47,20 @@
         [
          {
           "duration": "4",
+          "chord": {
+           "name": "Eb",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             0,
+             0,
+             1,
+             2,
+             2,
+             0
+            ]
+           }
+          },
           "notes": [
            {
             "pitch": "F2",

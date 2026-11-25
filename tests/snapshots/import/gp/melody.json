@@ -2,7 +2,6 @@
  "format": "guitarpro",
  "out": null,
  "warnings": [
-  "Nylon Guitar: chord names and diagrams dropped (2 times, first in measure 1)",
   "Nylon Guitar: text dropped (measure 2)"
  ],
  "song": {
@@ -81,6 +80,20 @@
          },
          {
           "duration": "4",
+          "chord": {
+           "name": "Am",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             0,
+             1,
+             2,
+             2,
+             0,
+             -1
+            ]
+           }
+          },
           "notes": [
            {
             "pitch": "D4",
@@ -168,6 +181,20 @@
         [
          {
           "duration": "4.",
+          "chord": {
+           "name": "E",
+           "diagram": {
+            "firstFret": 1,
+            "frets": [
+             0,
+             0,
+             1,
+             2,
+             2,
+             0
+            ]
+           }
+          },
           "notes": [
            {
             "pitch": "E3",

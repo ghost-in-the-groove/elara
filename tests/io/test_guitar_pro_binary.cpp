@@ -61,9 +61,7 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
           "[io][guitarpro]") {
     const ImportResult result = load("techniques.gp5");
     const core::Song& song = result.song;
-    CHECK(result.warnings ==
-          std::vector<std::string>{"Lead Guitar: chord names and diagrams dropped (measure 3)",
-                                   "Lead Guitar: text dropped (measure 3)"});
+    CHECK(result.warnings == std::vector<std::string>{"Lead Guitar: text dropped (measure 3)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Techniques");
     // A marker names the section that starts at its measure (ADR-0062).
@@ -349,10 +347,7 @@ TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong 
           "[io][guitarpro]") {
     const ImportResult result = load("melody.gp3");
     const core::Song& song = result.song;
-    CHECK(result.warnings ==
-          std::vector<std::string>{
-              "Nylon Guitar: chord names and diagrams dropped (2 times, first in measure 1)",
-              "Nylon Guitar: text dropped (measure 2)"});
+    CHECK(result.warnings == std::vector<std::string>{"Nylon Guitar: text dropped (measure 2)"});
     CHECK(core::validate(song).empty());
     CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.8125, .pan = 0.0});
     CHECK(song.info().title == "Corpus Melod\xc3\xad"
@@ -391,6 +386,39 @@ TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong 
     CHECK(bar2[2].graces[0].notes[0].position == core::FretPosition{.string = 6, .fret = 3});
     CHECK(bar2[2].graces[0].notes[0].pitch.midiNumber() == 43);
     CHECK(bar2[2].notes[0].effects.legatoFromPrevious);
+}
+
+TEST_CASE("Guitar Pro 3-5: chords keep their names and diagrams", "[io][guitarpro]") {
+    // ADR-0080. Frets go from string 1, the highest; -1 is a string not played.
+    constexpr std::int8_t x = core::ChordDiagram::kMuted;
+    const auto chordOf = [](const core::Song& song, std::size_t m, std::size_t b) {
+        const core::Beat& beat = song.track(0).staff(0).measure(m).voices[0].beats.at(b);
+        REQUIRE(beat.chord);
+        return *beat.chord;
+    };
+    const auto diagram = [](std::vector<std::int8_t> frets) {
+        return core::ChordDiagram{.firstFret = 1, .frets = std::move(frets)};
+    };
+
+    // Guitar Pro 3: the newer format, then the older one with six frets.
+    const ImportResult melody = load("melody.gp3");
+    CHECK(chordOf(melody.song, 0, 2) ==
+          core::ChordSymbol{.name = "Am", .diagram = diagram({0, 1, 2, 2, 0, x})});
+    CHECK(chordOf(melody.song, 1, 0) ==
+          core::ChordSymbol{.name = "E", .diagram = diagram({0, 0, 1, 2, 2, 0})});
+    CHECK_FALSE(melody.song.track(0).staff(0).measure(0).voices[0].beats[0].chord);
+
+    // Guitar Pro 4 and 5: the newer format, seven frets for six strings.
+    const ImportResult quartet = load("quartet.gp4");
+    const core::Beat& melodyBeat = quartet.song.track(3).staff(0).measure(0).voices[0].beats[0];
+    REQUIRE(melodyBeat.chord);
+    CHECK(*melodyBeat.chord ==
+          core::ChordSymbol{.name = "D/F#", .diagram = diagram({2, 3, 2, 0, x, 2})});
+    const ImportResult techniques = load("techniques.gp5");
+    CHECK(chordOf(techniques.song, 2, 0) ==
+          core::ChordSymbol{.name = "G", .diagram = diagram({3, 0, 0, 0, 2, 3})});
+    // A chord symbol does not sound.
+    CHECK(techniques.song.track(0).staff(0).measure(2).voices[0].beats[0].notes.size() == 1);
 }
 
 TEST_CASE("Guitar Pro 3-5: other versions and damaged files are errors with a reason",

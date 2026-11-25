@@ -48,7 +48,7 @@ sixth string of a guitar sounds F#2.
 | Header | What it gives you |
 |---|---|
 | `effects.hpp` | `NoteEffects` (tie and hammer-on/pull-off from the previous note, slides in/out, `BendCurve` in cents, `Harmonic`, vibrato, palm mute, dead and ghost notes, let ring, staccato, accent, `Dynamic`) and `BeatEffects` (pick stroke, strum, tremolo picking, whammy bar, bass tap/slap/pop, `Hairpin`: consecutive beats with the same crescendo or diminuendo share one wedge, ADR-0078); `naturalHarmonicSemitones()`, `dynamicVelocity()`; `BendForm` with `bendForm()`, read from a curve's shape, and `bendCurve()` (ADR-0055); `whammyForm()`, `whammyCents()` and `whammyCurve()`, the same forms going down or up for the whammy bar (ADR-0060). |
-| `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes, no notes = rest; the `Grace` notes leading into it, which take no time, ADR-0079), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
+| `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes, no notes = rest; the `Grace` notes leading into it, which take no time, ADR-0079; the `ChordSymbol` named above it, a name and an optional `ChordDiagram`, which does not sound, ADR-0080), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. `drumPieces()`: the kit pieces of drum entry, top of the staff first (ADR-0035). |
 | `song.hpp` | `Staff` (clef, tuning, capo, measures shared with the staff's copies until one changes, ADR-0051; `frettedNote()`, `setTuning()`), `Track` (instrument + staves, `fromPreset()`, its `TrackMix`: volume, pan, mute, solo, ADR-0020), `MeasureHeader`, `SongInfo` (`Credit` names its lines, `creditOf()` reads or writes one; ADR-0059), `Song` (`audible()`: whether mute and solo let a track sound, as `TrackMix::audible()` decides). |
 | `document.hpp` | `Document` (a song being edited: undo/redo history with a limit, save point, `isModified()`) and the `Command` interface (ADR-0005). |
@@ -64,7 +64,7 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
-| `shared_value.hpp` | `SharedValue<T>`: a value its copies share until one of them changes it (`edit()` copies it first when shared), safe to copy and read on other threads (ADR-0051) |
+| `shared_value.hpp` | `SharedValue<T>`: a value its copies share until one of them changes it (`edit()` copies it first when shared), safe to copy and read on other threads (ADR-0051); `SharedOptional<T>`: an optional value its copies share and nobody changes, compared by value, so a beat without one costs a null pointer (ADR-0080) |
 | `parallel.hpp` | `forEachIndex()`: independent jobs on the calling thread and the threads of `WorkerPool::shared()`, kept waiting so a parallel call starts no threads (ADR-0053); the first exception is rethrown and nested calls are allowed. `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export, sequencing and notation layout. |
 
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all

@@ -63,7 +63,8 @@ class Writer:
 # ---- Song description -------------------------------------------------------------
 #
 # A beat is a dict: dur (-2 whole ... 4 sixty-fourth), dotted, tuplet, rest,
-# empty, notes, chord (name, new format?), text, effects, mix.
+# empty, notes, chord (name, new format?, first fret, frets from string 1), text,
+# effects, mix.
 # A note: string (1 = highest), fret, kind ("normal", "tie", "dead"), dynamic
 # (1 ppp ... 8 fff), ghost, accent, heavy_accent, effects.
 
@@ -93,34 +94,44 @@ def write_bend(w: Writer, kind: int, value: int, points) -> None:
         w.u8(0)
 
 
-def write_chord(w: Writer, name: str, new_format: bool) -> None:
+def write_chord(w: Writer, name: str, new_format: bool, first_fret: int = 0,
+                frets=()) -> None:
+    # frets: from string 1 (the highest), -1 for a string not played.
+    played = list(frets) + [-1] * (7 - len(frets))
     if w.version >= 500:
         w.u8(1)
         w.zeros(16)
         w.byte_string(name, 21)
         w.zeros(4)
-        w.i32(0)
-        for _ in range(7):
-            w.i32(-1)
+        w.i32(first_fret)
+        for fret in played:
+            w.i32(fret)
         w.zeros(32)
     elif not new_format:
         w.u8(0)
         w.int_byte_string(name)
-        w.i32(0)  # first fret: no frets follow
+        w.i32(first_fret)  # 0: no frets follow
+        if first_fret:
+            for fret in played[:6]:
+                w.i32(fret)
     elif w.version >= 400:
         w.u8(1)
         w.zeros(16)
         w.byte_string(name, 22)
         w.zeros(3)
-        w.i32(0)
-        for _ in range(7):
-            w.i32(-1)
+        w.i32(first_fret)
+        for fret in played:
+            w.i32(fret)
         w.zeros(32)
     else:
         w.u8(1)
         w.zeros(25)
         w.byte_string(name, 22)
-        w.zeros(76)
+        w.zeros(12)
+        w.i32(first_fret)
+        for fret in played[:6]:
+            w.i32(fret)
+        w.zeros(36)
 
 
 def write_beat_effects(w: Writer, fx: dict) -> None:
@@ -519,7 +530,7 @@ def techniques_gp5() -> dict:
             # diagram; text.
             [[beat(0, [note(2, 3, effects={"grace": (1, 6, 1, 3, 0x02), "slide": 0x01,
                                            "staccato": True})],
-                   dotted=True, chord=("G", True), effects={"pick": 2}),
+                   dotted=True, chord=("G", True, 1, [3, 0, 0, 0, 2, 3]), effects={"pick": 2}),
               beat(1, [note(2, 5)], text="let it ring"),
               rest(0)],
              [EMPTY]],
@@ -580,7 +591,8 @@ def quartet_gp4() -> dict:
     melody = {
         "name": "Melody", "channel": 3, "program": 73, "strings": STANDARD,
         "content": [
-            [[beat(0, [note(1, 5)]),
+            # A chord diagram in the newer format, with a string not played.
+            [[beat(0, [note(1, 5)], chord=("D/F#", True, 1, [2, 3, 2, 0, -1, 2])),
               beat(0, [note(1, 8, effects={"vibrato": True})]),
               beat(-1, [note(1, 10, effects={"bend": (1, 50, [(0, 0), (60, 50)])})])]],
             [[beat(-1, [note(1, 8)]),
@@ -611,7 +623,8 @@ def melody_gp3() -> dict:
             # hammer-on, a slide with a chord diagram, then a tapped quintuplet.
             [[beat(0, [note(1, 12)], effects={"natural_harmonic": True}),
               beat(0, [note(2, 1, effects={"hammer": True})]),
-              beat(0, [note(2, 3, effects={"slide": True})], chord=("Am", True)),
+              beat(0, [note(2, 3, effects={"slide": True})],
+                   chord=("Am", True, 1, [0, 1, 2, 2, 0, -1])),
               beat(2, [note(3, 2)], tuplet=5, effects={"slap": 1}),
               beat(2, [note(3, 2)], tuplet=5),
               beat(2, [note(3, 4)], tuplet=5),
@@ -621,7 +634,8 @@ def melody_gp3() -> dict:
             # diagram and text, a whammy-bar dip, a downward strum pulled off
             # from a thirty-second grace note at fret 3.
             [[beat(0, [note(4, 2, effects={"let_ring": True})], dotted=True,
-                   chord=("E", False), text="ad lib.", effects={"wide_vibrato": True}),
+                   chord=("E", False, 1, [0, 0, 1, 2, 2, 0]), text="ad lib.",
+                   effects={"wide_vibrato": True}),
               beat(1, [note(5, 0)], effects={"tremolo_bar": 50}),
               beat(0, [note(6, 0, effects={"grace": (3, 6, 3, 1, 0)})],
                    effects={"strum": (0, 2)})]],

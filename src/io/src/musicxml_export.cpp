@@ -1254,6 +1254,9 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
+        if (beat.chord) {
+            warn("chord symbols dropped", place.measure); // ADR-0080: written next
+        }
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;

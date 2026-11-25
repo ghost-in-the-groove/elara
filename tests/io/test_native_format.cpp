@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace core = elara::core;
@@ -123,6 +124,11 @@ core::Song richSong() {
     first.back().graces = {
         Grace{.duration = Duration(NoteValue::Sixteenth), .notes = {graceSlide}},
         Grace{.duration = *Duration::parse("16*3:2"), .notes = {graceDead}, .onBeat = true}};
+    // Chord symbols (ADR-0080): with a diagram, and a name alone on a rest.
+    const ChordDiagram e7{.firstFret = 1, .frets = {0, 3, 1, 0, 2, 0}};
+    first.front().chord = SharedOptional(ChordSymbol{.name = "E7", .diagram = e7});
+    lead.measure(0).voices[2].beats[1].chord =
+        SharedOptional(ChordSymbol{.name = "N.C.", .diagram = {}});
 
     // Bass with techniques, piano on both staves, drums by key; a breve somewhere.
     Staff& bass = song.track(1).staff(0);
@@ -169,6 +175,31 @@ TEST_CASE("Every part of the model survives a JSON round trip", "[io][native]") 
     CHECK(*loaded == song);
 }
 
+TEST_CASE("Beats naming the same chord share one symbol once read", "[io][native]") {
+    core::Song song = richSong();
+    auto& beats = song.track(0).staff(0).measure(0).voices[0].beats;
+    beats[1].chord = core::SharedOptional(*beats[0].chord); // equal, not shared
+    REQUIRE(&*beats[1].chord != &*beats[0].chord);
+    const auto loaded = songFromJson(songToJson(song));
+    REQUIRE(loaded.has_value());
+    const auto& read = loaded->track(0).staff(0).measure(0).voices[0].beats;
+    CHECK(&*read[1].chord == &*read[0].chord);
+    CHECK_FALSE(read[4].chord);
+    CHECK(*loaded == song);
+}
+
+TEST_CASE("Chord diagrams outside the neck are rejected", "[io][native]") {
+    const std::string bad = songToJson(richSong());
+    for (const auto& [from, to] : std::vector<std::pair<std::string, std::string>>{
+             {R"("firstFret":1)", R"("firstFret":0)"},
+             {R"("frets":[0,3,1,0,2,0])", R"("frets":[0,3,1,0,2,-2])"},
+             {R"("frets":[0,3,1,0,2,0])", R"("frets":[])"}}) {
+        std::string json = bad;
+        json.replace(json.find(from), from.size(), to);
+        CHECK_FALSE(songFromJson(json).has_value());
+    }
+}
+
 TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     const auto json = songToJson(richSong());
     CHECK(json.find(R"("timeSignature":"6/8","keySignature":"C minor")") != std::string::npos);
@@ -186,6 +217,11 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
             R"({"duration":"16..","graces":[{"duration":"16","notes":[{"pitch":"F3","string":4,"fret":1,"effects":{"slideOut":"legato"}}]},{"duration":"16*3:2","notes":[{"pitch":"F#3","string":4,"fret":2,"effects":{"deadNote":true}}],"onBeat":true}],"notes":)") !=
         std::string::npos);
     CHECK(json.find(R"("graces":[])") == std::string::npos);
+    CHECK(
+        json.find(
+            R"({"duration":"8","chord":{"name":"E7","diagram":{"firstFret":1,"frets":[0,3,1,0,2,0]}},)") !=
+        std::string::npos);
+    CHECK(json.find(R"({"duration":"2","chord":{"name":"N.C."}})") != std::string::npos);
     CHECK(json.find(R"("onBeat":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2],"section":"Chorus"})") !=

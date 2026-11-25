@@ -20,6 +20,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <format>
 #include <iterator>
@@ -40,6 +41,8 @@ using core::Accent;
 using core::Beat;
 using core::BendCurve;
 using core::BendPoint;
+using core::ChordDiagram;
+using core::ChordSymbol;
 using core::Clef;
 using core::Duration;
 using core::Dynamic;
@@ -173,15 +176,62 @@ constexpr std::uint8_t kMaxRepeatTimes = 255;
 // The PartConfiguration flag of a track the full score shows as tablature.
 constexpr std::uint8_t kTablaturePart = 2;
 
+/// A staff's chord symbols by the id its beats refer to them by (ADR-0080).
+using ChordsById = std::vector<std::pair<int, core::SharedOptional<ChordSymbol>>>;
+
 struct TrackLayout {
     std::string name;
     Instrument instrument;
     core::TrackMix mix;
     std::vector<Staff> staves;
     std::vector<std::vector<int>> lowToHigh; // per staff: open strings, lowest first
+    std::vector<ChordsById> chords;          // per staff
     std::vector<int> drumKeys;               // per instrument articulation
     bool percussion = false;
 };
+
+/// The chord symbols of a `DiagramCollection` (ADR-0080). A diagram counts
+/// its strings from the lowest; its frets go from string 1, the highest, down,
+/// over the staff's `strings` or, on a staff without a tuning (0), over as many
+/// as the diagram has. Drum staves keep the names only.
+ChordsById chordsOf(pugi::xml_node collection, std::size_t strings, bool drums) {
+    ChordsById chords;
+    for (const pugi::xml_node item : collection.child("Items").children("Item")) {
+        const int id = item.attribute("id").as_int(-1);
+        if (id < 0) {
+            continue;
+        }
+        ChordSymbol symbol{.name = trimmed(item.attribute("name").value()), .diagram = {}};
+        const pugi::xml_node diagram = item.child("Diagram");
+        if (diagram && !drums) {
+            const int count =
+                std::clamp(diagram.attribute("stringCount").as_int(6), 1, Tuning::kMaxStrings);
+            const std::size_t width = strings > 0 ? strings : static_cast<std::size_t>(count);
+            const int base = diagram.attribute("baseFret").as_int(0);
+            ChordDiagram grid{
+                .firstFret = static_cast<std::uint8_t>(std::clamp(base + 1, 1, Tuning::kMaxFret)),
+                .frets = std::vector<std::int8_t>(width, ChordDiagram::kMuted)};
+            bool played = false;
+            for (const pugi::xml_node fret : diagram.children("Fret")) {
+                const int fromLowest = fret.attribute("string").as_int(-1);
+                const int value = fret.attribute("fret").as_int(-1);
+                const int index = count - 1 - fromLowest;
+                if (fromLowest >= 0 && index >= 0 && std::cmp_less(index, width) && value >= 0 &&
+                    value <= Tuning::kMaxFret) {
+                    grid.frets[static_cast<std::size_t>(index)] = static_cast<std::int8_t>(value);
+                    played = true;
+                }
+            }
+            if (played) {
+                symbol.diagram = std::move(grid);
+            }
+        }
+        if (!symbol.name.empty() || symbol.diagram) {
+            chords.emplace_back(id, core::SharedOptional(std::move(symbol)));
+        }
+    }
+    return chords;
+}
 
 std::optional<std::vector<int>> tuningOf(pugi::xml_node staff) {
     const pugi::xml_node tuning = property(staff, "Tuning");
@@ -313,6 +363,13 @@ TrackLayout readTrack(pugi::xml_node track, std::size_t index,
         const Clef clef = layout.percussion ? Clef::Percussion : clefFor(clefName, octave);
         const pugi::xml_node owner = ownerOf(s);
         const auto pitches = tuningAt(s);
+        // Guitar Pro 7 and 8 keep a staff's chords on the staff, 6 on the track.
+        pugi::xml_node diagrams = property(staffNodes[s], "DiagramCollection");
+        if (!diagrams.child("Items").child("Item")) {
+            diagrams = property(track, "DiagramCollection");
+        }
+        layout.chords.push_back(
+            chordsOf(diagrams, pitches ? pitches->size() : 0, layout.percussion));
         if (!pitches) {
             layout.staves.emplace_back(clef);
             layout.lowToHigh.emplace_back();
@@ -466,9 +523,9 @@ BendCurve bendOf(pugi::xml_node note) {
 /// one over its properties rather than a search for each.
 struct BeatFields {
     pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
-        hairpin;
-    bool text = false, chord = false, fading = false, wah = false, ottava = false,
-         whammyBar = false, slapped = false, popped = false;
+        hairpin, chord;
+    bool text = false, fading = false, wah = false, ottava = false, whammyBar = false,
+         slapped = false, popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
         for (const pugi::xml_node child : beat.children()) {
@@ -489,9 +546,10 @@ struct BeatFields {
                 arpeggio = child;
             } else if (name == "Hairpin") {
                 hairpin = child;
+            } else if (name == "Chord") {
+                chord = child;
             } else {
                 text = text || name == "FreeText";
-                chord = chord || name == "Chord";
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
                 ottava = ottava || name == "Ottavia";
@@ -770,6 +828,9 @@ private:
         }
         Beat beat{.duration = durationOf(fields.rhythm.attribute("ref").as_int(-1), who, m)};
         warnBeat(fields, who, m);
+        if (fields.chord) {
+            beat.chord = chordOf(fields.chord, who, m);
+        }
         readBeatEffects(fields, beat.effects, who, m);
         const Dynamic dynamic = dynamicFor(trimmed(textOf(fields.dynamic))).value_or(Dynamic::MF);
         for (const int noteId : intsOf(textOf(fields.notes))) {
@@ -786,12 +847,24 @@ private:
         return ReadBeat{.beat = std::move(beat), .graceOnBeat = graceOnBeat};
     }
 
+    /// The chord symbol a beat refers to by its id in the staff's diagram
+    /// collection (ADR-0080).
+    core::SharedOptional<ChordSymbol> chordOf(pugi::xml_node chord, const std::string& who,
+                                              std::size_t m) {
+        const ChordsById& chords = layout_.chords[staffIndex_];
+        const std::optional<int> id = intOf(textOf(chord));
+        const auto found = std::ranges::find_if(
+            chords, [&](const auto& entry) { return id && entry.first == *id; });
+        if (found == chords.end()) {
+            warnings_.add(who, "chords missing from the diagram collection dropped", m);
+            return {};
+        }
+        return found->second;
+    }
+
     void warnBeat(const BeatFields& fields, const std::string& who, std::size_t m) {
         if (fields.text) {
             warnings_.add(who, "text dropped", m);
-        }
-        if (fields.chord) {
-            warnings_.add(who, "chord names and diagrams dropped", m);
         }
         if (fields.fading) {
             warnings_.add(who, "volume swells dropped", m);
