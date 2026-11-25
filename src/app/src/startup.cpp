@@ -2014,7 +2014,7 @@ void Startup::queueExport() {
             problem(QStringLiteral("exporting changed the song's modified state"));
         }
         // Each export suggests the song's file with its own extension.
-        for (const QString extension : {QStringLiteral("musicxml"), QStringLiteral("mid")}) {
+        for (const QString& extension : {QStringLiteral("musicxml"), QStringLiteral("mid")}) {
             if (!score_->exportFile(extension).toLocalFile().endsWith(QLatin1Char('.') +
                                                                       extension)) {
                 problem(QStringLiteral("no .%1 file suggested").arg(extension));
