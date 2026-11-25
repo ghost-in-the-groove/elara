@@ -234,6 +234,10 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     CHECK(right.voices[0].beats[0].notes.size() == 3);
     CHECK(right.voices[0].beats[1].notes[0].pitch == core::Pitch(core::Step::B, -1, 4));
     CHECK(right.voices[1].beats[0].notes[0].pitch.midiNumber() == 77);
+    // Rolled chords: upwards sounds from the lowest note, as a downstroke does.
+    CHECK(right.voices[0].beats[0].effects.strum == core::Strum::Down);
+    CHECK(right.voices[0].beats[1].effects.strum == core::Strum::None);
+    CHECK(piano.staff(0).measure(1).voices[0].beats[0].effects.strum == core::Strum::Up);
 
     // Drum notes name the kit's articulations: hi-hat, kick, snare.
     const core::Track& drums = song.track(2);
