@@ -245,6 +245,14 @@
         <translation>Elara (*.elara)</translation>
     </message>
     <message>
+        <source>Export the score as PDF</source>
+        <translation>Exportar la partitura como PDF</translation>
+    </message>
+    <message>
+        <source>PDF documents (*.pdf)</source>
+        <translation>Documentos PDF (*.pdf)</translation>
+    </message>
+    <message>
         <source>Save the changes?</source>
         <translation>¿Guardar los cambios?</translation>
     </message>
@@ -323,6 +331,10 @@
     <message>
         <source>Clear the list</source>
         <translation>Vaciar la lista</translation>
+    </message>
+    <message>
+        <source>Export as PDF…</source>
+        <translation>Exportar como PDF…</translation>
     </message>
     <message>
         <source>Opening the SoundFont…</source>
@@ -1423,6 +1435,18 @@
     <message>
         <source>Could not save %1: %2</source>
         <translation>No se pudo guardar %1: %2</translation>
+    </message>
+    <message>
+        <source>Could not export %1: %2</source>
+        <translation>No se pudo exportar %1: %2</translation>
+    </message>
+    <message>
+        <source>The music font is missing.</source>
+        <translation>Falta la fuente musical.</translation>
+    </message>
+    <message>
+        <source>Exported %1.</source>
+        <translation>Exportado %1.</translation>
     </message>
     <message>
         <source>Only a track with strings has a tuning.</source>

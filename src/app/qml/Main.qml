@@ -134,6 +134,12 @@ ApplicationWindow {
         }
     }
 
+    /// Asks where to export the score as PDF, suggesting a file beside the song's.
+    function exportPdf() {
+        pdfDialog.selectedFile = score.pdfFile();
+        pdfDialog.open();
+    }
+
     ScoreDocument {
         id: score
 
@@ -233,6 +239,16 @@ ApplicationWindow {
                 window.runPendingAction();
         }
         onRejected: window.pendingAction = null
+    }
+
+    FileDialog {
+        id: pdfDialog
+
+        title: qsTr("Export the score as PDF")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [qsTr("PDF documents (*.pdf)")]
+        defaultSuffix: "pdf"
+        onAccepted: score.exportPdf(selectedFile)
     }
 
     Dialog {
@@ -478,6 +494,12 @@ ApplicationWindow {
                             text: qsTr("Clear the list")
                             onTriggered: recent.clear()
                         }
+                    }
+                    MenuItem {
+                        // The score as shown, on A4 pages (ADR-0074).
+                        text: qsTr("Export as PDF…")
+                        enabled: window.hasScore
+                        onTriggered: window.exportPdf()
                     }
                     MenuSeparator {}
 
@@ -1058,6 +1080,11 @@ ApplicationWindow {
         sequences: [StandardKey.SaveAs]
         enabled: window.hasScore
         onActivated: saveDialog.open()
+    }
+    Shortcut {
+        sequences: [StandardKey.Print]
+        enabled: window.hasScore
+        onActivated: window.exportPdf()
     }
     Shortcut {
         sequences: [StandardKey.Undo]

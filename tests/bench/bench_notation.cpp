@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Benchmarks for elara_notation: laying out staves and writing them as SVG.
 #include <elara/core/entry.hpp>
+#include <elara/io/compression.hpp>
 #include <elara/notation/caret.hpp>
+#include <elara/notation/font_outlines.hpp>
 #include <elara/notation/page_layout.hpp>
+#include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
@@ -18,6 +21,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -160,4 +164,37 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     };
     relayout(both, "lay out one track on A4 pages again after an edit");
     relayout(score, "lay out all 20 staves on A4 pages again after an edit");
+}
+
+// PDF (ADR-0074): the font's outlines read once, then the A4 pages of one
+// track (notation and tablature) written plain and compressed, as the app and
+// the CLI write them, on every core and on one thread.
+TEST_CASE("PDF benchmarks", "[benchmark][notation][pdf]") {
+    const auto song = elara::bench::largeSong();
+    const std::array<StaffSelection, 2> both{StaffSelection{.view = StaffView::Standard},
+                                             StaffSelection{.view = StaffView::Tablature}};
+    const auto paged = layoutPages(song, both, bravura(), {});
+    const auto otf = std::filesystem::path(ELARA_FONT_DIR) / "Bravura.otf";
+    BENCHMARK("read the outlines of the glyphs from Bravura.otf") {
+        return elara::notation::FontOutlines::fromFile(otf);
+    };
+    const auto outlines = elara::notation::FontOutlines::fromFile(otf);
+    REQUIRE(outlines.has_value());
+    elara::notation::PdfOptions compressed{.compress = elara::io::zlibCompress};
+    std::printf("%zu A4 pages as PDF: %zu bytes, %zu compressed\n", paged.size(),
+                elara::notation::toPdf(paged, *outlines).size(),
+                elara::notation::toPdf(paged, *outlines, compressed).size());
+    BENCHMARK("write those pages as PDF") {
+        return elara::notation::toPdf(paged, *outlines);
+    };
+    BENCHMARK("write those pages as PDF, compressed") {
+        return elara::notation::toPdf(paged, *outlines, compressed);
+    };
+    compressed.threads = 1;
+    BENCHMARK("the same on one thread") {
+        return elara::notation::toPdf(paged, *outlines, compressed);
+    };
+    BENCHMARK("write those pages as PDF, on one thread") {
+        return elara::notation::toPdf(paged, *outlines, {.threads = 1});
+    };
 }

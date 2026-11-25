@@ -8,20 +8,26 @@
 #include <elara/core/instrument.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
+#include <elara/io/compression.hpp>
 #include <elara/io/native_format.hpp>
 #include <elara/io/open.hpp>
 #include <elara/notation/caret.hpp>
 #include <elara/notation/cursor.hpp>
+#include <elara/notation/font_outlines.hpp>
 #include <elara/notation/page_layout.hpp>
+#include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
 #include "when_done.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QFuture>
+#include <QSaveFile>
+#include <QStandardPaths>
 #include <QVariantMap>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -37,6 +43,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -96,6 +103,27 @@ const notation::EngravingFont* musicMetrics() {
         return *std::move(loaded);
     }();
     return font ? &*font : nullptr;
+}
+
+// The music font's glyph outlines, for PDF documents (ADR-0074): read from the
+// app's resources the first time a score is exported.
+const notation::FontOutlines* musicOutlines() {
+    static const std::optional<notation::FontOutlines> outlines =
+        []() -> std::optional<notation::FontOutlines> {
+        QFile file(QStringLiteral(":/fonts/Bravura.otf"));
+        if (!file.open(QIODevice::ReadOnly)) {
+            return std::nullopt;
+        }
+        const QByteArray otf = file.readAll();
+        auto loaded = notation::FontOutlines::fromBytes(
+            std::span(reinterpret_cast<const std::uint8_t*>(otf.constData()),
+                      static_cast<std::size_t>(otf.size())));
+        if (!loaded) {
+            return std::nullopt;
+        }
+        return *std::move(loaded);
+    }();
+    return outlines ? &*outlines : nullptr;
 }
 
 notation::TrackView trackView(ScoreDocument::View view) {
@@ -1277,6 +1305,64 @@ bool ScoreDocument::save(const QUrl& file) {
         emit songChanged(); // an untitled song is named after its file
     }
     emit historyChanged();
+    return true;
+}
+
+QUrl ScoreDocument::pdfFile() const {
+    if (source_.isLocalFile()) {
+        const QFileInfo file(source_.toLocalFile());
+        return QUrl::fromLocalFile(
+            file.dir().filePath(file.completeBaseName() + QStringLiteral(".pdf")));
+    }
+    QString name = songTitle().trimmed();
+    // Characters no file name may hold on any of the three systems.
+    for (QChar& c : name) {
+        if (QStringLiteral("\\/:*?\"<>|").contains(c) || c.unicode() < 0x20) {
+            c = QLatin1Char('-');
+        }
+    }
+    if (name.isEmpty()) {
+        name = tr("Untitled");
+    }
+    const QString folder = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    return QUrl::fromLocalFile(QDir(folder).filePath(name + QStringLiteral(".pdf")));
+}
+
+bool ScoreDocument::exportPdf(const QUrl& file) {
+    if (!song_) {
+        return false;
+    }
+    QString local = file.isLocalFile() ? file.toLocalFile() : file.toString();
+    if (!local.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive)) {
+        local += QStringLiteral(".pdf");
+    }
+    const notation::EngravingFont* font = musicMetrics();
+    const notation::FontOutlines* outlines = musicOutlines();
+    if (font == nullptr || outlines == nullptr) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, tr("The music font is missing.")));
+        return false;
+    }
+    std::string pdf;
+    try {
+        const auto staves =
+            notation::selectTracks(*song_, shownTracks(*song_, track_), trackView(view_));
+        const auto pages = notation::layoutPages(*song_, staves, *font, pageOptions());
+        pdf = notation::toPdf(pages, *outlines,
+                              {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
+                               .title = song_->info().title,
+                               .compress = io::zlibCompress});
+    } catch (const std::exception& error) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
+        return false;
+    }
+    // Written whole or not at all: a failed export leaves no half file behind.
+    QSaveFile out(local);
+    const auto size = static_cast<qint64>(pdf.size());
+    if (!out.open(QIODevice::WriteOnly) || out.write(pdf.data(), size) != size || !out.commit()) {
+        emit editFailed(tr("Could not export %1: %2").arg(local, out.errorString()));
+        return false;
+    }
+    emit notice(tr("Exported %1.").arg(QFileInfo(local).fileName()));
     return true;
 }
 
