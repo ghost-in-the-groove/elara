@@ -30,6 +30,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | nota | note | `Note` | |
 | silencio | rest | `Beat::isRest()` | A beat without notes; an empty voice is a measure rest |
 | cifrado (acorde) | chord symbol | `ChordSymbol`, `Beat::chord` | The harmony named above a beat ("Am7", "C/G"); it does not sound (ADR-0080) |
+| texto (de tiempo) | beat text | `Beat::text` | Words written above a beat ("let it ring", "ad lib."); it does not sound (ADR-0081) |
 | diagrama de acorde | chord diagram | `ChordDiagram` | Where a chord's strings are stopped, from string 1 down, with the fret at the top of the grid (ADR-0080) |
 | nota de adorno (apoyatura, mordente) | grace note | `Grace`, `Beat::graces` | Small notes that take no time, leading into the beat that holds them; on the beat or before it (ADR-0079) |
 | compás incompleto / sobrecargado | incomplete / overfull voice | `VoiceFill` | Shorter / longer than its time signature |

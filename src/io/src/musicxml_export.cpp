@@ -1222,6 +1222,9 @@ private:
             if (beat.chord && !tabPass_) {
                 writeHarmony(xml, *beat.chord, s + 1);
             }
+            if (beat.text && !tabPass_) {
+                writeWords(xml, *beat.text, s + 1);
+            }
             writeGraces(xml, beat, voiceNumber, s + 1, m);
             writeBeat(xml, BeatPlace{.beat = &beat,
                                      .previous = previous,
@@ -1303,6 +1306,20 @@ private:
             xml.number("staff", staff);
         }
         xml.close("harmony");
+    }
+
+    /// A beat's text: words above its staff (ADR-0081).
+    void writeWords(XmlWriter& xml, std::string_view text, int staff) const {
+        xml.start("direction");
+        xml.attribute("placement", "above");
+        xml.endOpen();
+        xml.open("direction-type");
+        xml.text("words", text);
+        xml.close("direction-type");
+        if (xmlStaves_ > 1) {
+            xml.number("staff", staff);
+        }
+        xml.close("direction");
     }
 
     static void writeStep(XmlWriter& xml, std::string_view step, std::string_view alter,

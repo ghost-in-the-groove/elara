@@ -2,7 +2,6 @@
  "format": "musicxml",
  "out": null,
  "warnings": [
-  "Piano: text directions dropped (measure 2)",
   "Piano: lyrics dropped (measure 2)"
  ],
  "song": {
@@ -84,6 +83,7 @@
         [
          {
           "duration": "4.",
+          "text": "Calmer",
           "notes": [
            {
             "pitch": "C5"

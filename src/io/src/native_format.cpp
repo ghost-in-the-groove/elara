@@ -303,6 +303,9 @@ private:
         if (value.chord) {
             add(object, "chord", chord(*value.chord));
         }
+        if (value.text) {
+            addText(object, "text", *value.text);
+        }
         if (!value.graces.empty()) {
             yyjson_mut_val* graces = yyjson_mut_arr(doc_);
             for (const Grace& g : value.graces) {
@@ -884,6 +887,9 @@ private:
         if (yyjson_val* chord = optionalObject(object, "chord")) {
             Scope scope(*this, "chord");
             beat.chord = readChord(chord);
+        }
+        if (const auto text = optionalText(object, "text")) {
+            beat.text = SharedOptional(std::string(*text)); // ADR-0081
         }
         if (yyjson_val* graces = optionalArray(object, "graces")) {
             Scope scope(*this, "graces");
