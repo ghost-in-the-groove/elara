@@ -605,7 +605,7 @@ def quartet_gp4() -> dict:
         "info": {"title": "Corpus Band", "subtitle": "Guitar Pro 4", "artist": "Ghost in the Groove",
                  "words": "Ghost in the Groove", "copyright": "CC0 1.0", "tab": "Elara contributors"},
         "triplet_feel": True,
-        "lyrics": (4, [(1, "la la la")]),
+        "lyrics": (4, [(1, "[Verse] Sing a-long  hey there"), (2, "oh")]),
         "tempo": 90, "key": -1,
                 # |:1. 1 :|2. 2 |: Guitar Pro 4 counts the times played again and names
         # each alternate ending by its number.

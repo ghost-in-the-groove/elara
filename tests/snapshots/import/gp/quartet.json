@@ -3,9 +3,9 @@
  "out": null,
  "warnings": [
   "triplet feel dropped",
-  "Melody: lyrics dropped",
   "Drums: instrument and volume changes dropped (measure 2)",
-  "Melody: trills dropped (measure 2)"
+  "Melody: trills dropped (measure 2)",
+  "Melody: lyrics after the last note dropped"
  ],
  "song": {
   "format": "elara",
@@ -350,6 +350,9 @@
             ]
            }
           },
+          "lyrics": [
+           "Sing"
+          ],
           "notes": [
            {
             "pitch": "A4",
@@ -361,6 +364,9 @@
          },
          {
           "duration": "4",
+          "lyrics": [
+           "a-"
+          ],
           "notes": [
            {
             "pitch": "C5",
@@ -373,6 +379,9 @@
          },
          {
           "duration": "2",
+          "lyrics": [
+           "long"
+          ],
           "notes": [
            {
             "pitch": "D5",
@@ -398,6 +407,10 @@
         [
          {
           "duration": "2",
+          "lyrics": [
+           "",
+           "oh"
+          ],
           "notes": [
            {
             "pitch": "C5",
@@ -421,6 +434,9 @@
          },
          {
           "duration": "4",
+          "lyrics": [
+           "hey"
+          ],
           "notes": [
            {
             "pitch": "A4",

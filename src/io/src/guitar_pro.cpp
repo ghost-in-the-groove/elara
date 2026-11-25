@@ -3,6 +3,7 @@
 // inside a zip archive; this reader follows the structure of files saved by
 // Guitar Pro (the format has no public specification). Guitar Pro 3-5 files go
 // to guitar_pro_binary.cpp.
+#include <elara/core/lyrics.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/guitar_pro.hpp>
 
@@ -83,6 +84,25 @@ std::string trimmed(std::string_view text) {
     }
     const auto last = text.find_last_not_of(" \t\r\n");
     return std::string(text.substr(first, last - first + 1));
+}
+
+/// The syllables Guitar Pro dispatched to a beat, one <Line> per verse; a
+/// hyphen after one joins it to the next (ADR-0084).
+core::SharedOptional<std::vector<core::Syllable>> lyricsOf(pugi::xml_node lyrics) {
+    std::vector<core::Syllable> verses;
+    for (const pugi::xml_node line : lyrics.children("Line")) {
+        std::string text = trimmed(textOf(line));
+        const bool hyphen = text.size() > 1 && text.back() == '-';
+        if (hyphen) {
+            text.pop_back();
+        }
+        verses.push_back(core::Syllable{.text = std::move(text), .hyphen = hyphen});
+    }
+    while (!verses.empty() && verses.back().text.empty()) {
+        verses.pop_back();
+    }
+    return verses.empty() ? core::SharedOptional<std::vector<core::Syllable>>{}
+                          : core::SharedOptional(std::move(verses));
 }
 
 std::optional<int> intOf(std::string_view text) {
@@ -523,7 +543,7 @@ BendCurve bendOf(pugi::xml_node note) {
 /// one over its properties rather than a search for each.
 struct BeatFields {
     pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
-        hairpin, chord, freeText;
+        hairpin, chord, freeText, lyrics;
     bool fading = false, wah = false, ottava = false, whammyBar = false, slapped = false,
          popped = false;
 
@@ -550,6 +570,8 @@ struct BeatFields {
                 chord = child;
             } else if (name == "FreeText") {
                 freeText = child;
+            } else if (name == "Lyrics") {
+                lyrics = child;
             } else {
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
@@ -835,6 +857,9 @@ private:
         if (const std::string_view text = textOf(fields.freeText); !text.empty()) {
             beat.text = core::SharedOptional(std::string(text)); // ADR-0081
         }
+        if (fields.lyrics) {
+            beat.lyrics = lyricsOf(fields.lyrics);
+        }
         readBeatEffects(fields, beat.effects, who, m);
         const Dynamic dynamic = dynamicFor(trimmed(textOf(fields.dynamic))).value_or(Dynamic::MF);
         bool tapped = false;
@@ -1101,6 +1126,7 @@ public:
         readHeaders(song);
         readTempos(song);
         readStaves(song, threads);
+        placeVerses(song);
         return song;
     }
 
@@ -1146,9 +1172,7 @@ private:
             }
             const bool tablatureShown = parts_.empty() || (parts_[index] & kTablaturePart) != 0;
             TrackLayout layout = readTrack(track, index, clefs, tablatureShown, warnings_);
-            if (hasLyrics(track)) {
-                warnings_.add(layout.name, "lyrics dropped");
-            }
+            readTrackLyrics(track, index);
             song.track(song.addTrack(core::Track(layout.name, layout.instrument, layout.staves)))
                 .setMix(layout.mix);
             for (std::size_t s = 0; s < layout.staves.size(); ++s) {
@@ -1168,13 +1192,39 @@ private:
         return flatStaff < ids.size() ? bars_.find(ids[flatStaff]) : pugi::xml_node{};
     }
 
-    static bool hasLyrics(pugi::xml_node track) {
-        for (const pugi::xml_node line : track.child("Lyrics").children("Line")) {
-            if (!trimmed(textOf(line.child("Text"))).empty()) {
-                return true;
+    // A track's lyrics (ADR-0084): five lines of text, each from its bar
+    // (Offset, 0 for the first). Once Guitar Pro has dispatched them, its beats
+    // hold the syllables, read with them; otherwise they go on the track's
+    // first staff when its beats are read.
+    void readTrackLyrics(pugi::xml_node track, std::size_t index) {
+        const pugi::xml_node lyrics = track.child("Lyrics");
+        if (std::string_view(lyrics.attribute("dispatched").as_string()) == "true") {
+            return;
+        }
+        std::size_t verse = 0;
+        for (const pugi::xml_node line : lyrics.children("Line")) {
+            if (const std::string_view text = textOf(line.child("Text")); !trimmed(text).empty()) {
+                verses_.push_back(PendingVerse{.track = index,
+                                               .verse = verse,
+                                               .first = static_cast<std::size_t>(std::max(
+                                                   0, line.child("Offset").text().as_int())),
+                                               .text = std::string(text)});
+            }
+            ++verse;
+        }
+    }
+
+    void placeVerses(Song& song) {
+        std::vector<std::size_t> left(song.trackCount());
+        for (const PendingVerse& verse : verses_) {
+            left[verse.track] += core::placeVerse(song.track(verse.track).staff(0), verse.verse,
+                                                  verse.first, verse.text);
+        }
+        for (std::size_t t = 0; t < left.size(); ++t) {
+            if (left[t] > 0) {
+                warnings_.add(song.track(t).name(), "lyrics after the last note dropped");
             }
         }
-        return false;
     }
 
     void readHeaders(Song& song) {
@@ -1421,6 +1471,14 @@ private:
     std::vector<TrackLayout> layouts_;
     std::vector<StaffRef> staves_; // every staff of every track, in score order
     std::size_t staffOffset_ = 0;
+    // Lines of lyrics Guitar Pro has not dispatched to beats yet.
+    struct PendingVerse {
+        std::size_t track = 0;
+        std::size_t verse = 0;
+        std::size_t first = 0;
+        std::string text{};
+    };
+    std::vector<PendingVerse> verses_;
 };
 
 // What the full score shows of each track, read from Guitar Pro's

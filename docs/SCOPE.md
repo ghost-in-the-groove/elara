@@ -18,6 +18,8 @@ guitar tablature and scores, on Windows, macOS and Linux.
 - Measures, key and time signatures, tuplets, ties, dynamics, repeats, voltas,
   Coda/Segno.
 - Page view and continuous view; SMuFL symbols (Bravura font).
+- Lyrics under the staff (planned after 1.0, written early for songbooks:
+  ADR-0084).
 
 **Files**
 - Import Guitar Pro `.gp3`, `.gp4`, `.gp5`, `.gpx`, `.gp` (7-8).
@@ -44,7 +46,7 @@ guitar tablature and scores, on Windows, macOS and Linux.
 
 - Audio recording, clips, DAW timeline.
 - VST3 plugins, piano roll.
-- Advanced orchestral notation: parts/cues, cue notes, cross-staff beaming, lyrics.
+- Advanced orchestral notation: parts/cues, cue notes, cross-staff beaming.
 
 ## Constraints
 

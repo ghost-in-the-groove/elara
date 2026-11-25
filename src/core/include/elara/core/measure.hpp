@@ -66,10 +66,21 @@ struct ChordSymbol {
     friend bool operator==(const ChordSymbol&, const ChordSymbol&) = default;
 };
 
+/// One syllable sung on a beat (ADR-0084). `hyphen` joins it to the next
+/// syllable of its word, drawn between them. Empty text: nothing is sung there.
+struct Syllable {
+    std::string text{};
+    bool hyphen = false;
+
+    friend bool operator==(const Syllable&, const Syllable&) = default;
+};
+
 /// Notes that start together and share a written duration. No notes = a rest.
 /// `graces` lead into the beat, in the order they are played (ADR-0079);
 /// `chord` names its harmony, shared by the beats that name the same one
-/// (ADR-0080); `text` is written above it (ADR-0081). Neither sounds.
+/// (ADR-0080); `text` is written above it (ADR-0081); `lyrics` holds the
+/// syllable of each verse sung on it, verse n + 1 at index n, never ending
+/// with an empty one (ADR-0084). None of them sounds.
 struct Beat {
     Duration duration{};
     std::vector<Note> notes{};
@@ -77,6 +88,7 @@ struct Beat {
     std::vector<Grace> graces{};
     SharedOptional<ChordSymbol> chord{};
     SharedOptional<std::string> text{};
+    SharedOptional<std::vector<Syllable>> lyrics{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 
