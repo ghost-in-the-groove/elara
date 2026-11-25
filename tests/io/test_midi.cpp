@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 using Catch::Matchers::WithinAbs;
@@ -501,6 +502,91 @@ TEST_CASE("MIDI export writes a gradual tempo change with nowhere to go as a sud
     REQUIRE(imported.has_value());
     REQUIRE(imported->song.measureHeader(1).tempoChanges.size() == 1);
     CHECK(imported->song.measureHeader(1).tempoChanges[0].tempo == Tempo(90));
+}
+
+TEST_CASE("MIDI export writes repeats and jumps as they are played", "[io][midi]") {
+    // ADR-0083: MIDI has no repeats, so the file holds the measures in play
+    // order, the way playback and audio render go through them.
+    Song song = pianoSong(4);
+    auto& staff = song.track(0).staff(0);
+    for (std::size_t m = 0; m < 4; ++m) {
+        staff.measure(m).voices[0].beats = {
+            noteBeat(Duration(NoteValue::Whole), std::array{60, 62, 64, 65}[m])};
+    }
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(1).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(80)});
+    song.measureHeader(1).section = "Verse";
+    song.measureHeader(2).alternateEndings = 0b01;
+    song.measureHeader(2).repeatTimes = 2;
+    song.measureHeader(3).alternateEndings = 0b10;
+    song.measureHeader(3).timeSignature = TimeSignature(3, 4);
+    staff.measure(3).voices[0].beats = {noteBeat(Duration(NoteValue::Half, 1), 65)};
+
+    const auto result = exportMidi(song);
+    CHECK(result.warnings == std::vector<std::string>{"repeats and jumps written as played"});
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    const Song& played = imported->song;
+    REQUIRE(played.measureCount() == 6); // 1, 2, first ending, 1, 2, second ending
+    std::vector<std::pair<Fraction, int>> notes;
+    for (const auto& note : elara::core::soundingNotes(played)) {
+        notes.emplace_back(note.start, note.key);
+    }
+    CHECK(notes == std::vector<std::pair<Fraction, int>>{{Fraction(0), 60},
+                                                         {Fraction(1), 62},
+                                                         {Fraction(2), 64},
+                                                         {Fraction(3), 60},
+                                                         {Fraction(4), 62},
+                                                         {Fraction(5), 65}});
+    // Each pass keeps its tempo change; going back to the start sets the tempo
+    // in force there again.
+    CHECK(played.measureHeader(1).tempoChanges.size() == 1);
+    REQUIRE(played.measureHeader(3).tempoChanges.size() == 1);
+    CHECK(played.measureHeader(3).tempoChanges[0].offset == Fraction(0));
+    CHECK(played.measureHeader(3).tempoChanges[0].tempo == Tempo(120));
+    CHECK(played.measureHeader(4).tempoChanges.size() == 1);
+    CHECK(played.measureHeader(5).timeSignature == TimeSignature(3, 4));
+    CHECK(played.measureHeader(4).section == "Verse");
+    // 2 s, 1 + 1.5 s, 3 s, again 2 s and 2.5 s, then three quarters at 80.
+    CHECK_THAT(played.secondsAt(played.measureCount()), WithinAbs(14.25, 1e-9));
+}
+
+TEST_CASE("MIDI export keeps the timing of a gradual tempo change over a repeat", "[io][midi]") {
+    // A ramp from a triplet offset of measure 1 to measure 3, with measures 2 and 3
+    // repeated: the second time, the music lands in the ramp off its sixteenths.
+    Song song = pianoSong(3);
+    song.measureHeader(0).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 3), .tempo = Tempo(100), .gradual = true});
+    song.measureHeader(2).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 4), .tempo = Tempo(140)});
+    song.measureHeader(1).repeatStart = true;
+    song.measureHeader(2).repeatTimes = 2;
+    const auto result = exportMidi(song);
+    CHECK(result.warnings == std::vector<std::string>{"repeats and jumps written as played"});
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    const Song& played = imported->song;
+    REQUIRE(played.measureCount() == 5);
+    // Each measure lasts as long as written, in every pass (to the hundredth of a
+    // BPM the importer reads the steps to).
+    const auto lasts = [](const Song& s, std::size_t m) {
+        return s.secondsAt(m + 1) - s.secondsAt(m);
+    };
+    const std::array<std::size_t, 5> order{0, 1, 2, 1, 2};
+    for (std::size_t k = 0; k < order.size(); ++k) {
+        CHECK_THAT(lasts(played, k), WithinAbs(lasts(song, order[k]), 1e-4));
+    }
+}
+
+TEST_CASE("MIDI export of a song played straight through warns of nothing", "[io][midi]") {
+    Song song = pianoSong(2);
+    song.measureHeader(0).repeatStart = true; // a start repeat alone is played once
+    const auto result = exportMidi(song);
+    CHECK(result.warnings.empty());
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    CHECK(imported->song.measureCount() == 2);
 }
 
 TEST_CASE("MIDI export gives drums channel 10 and skips it for other tracks", "[io][midi]") {

@@ -51,8 +51,9 @@ tempo", "tempo primo" or another such word: a ramp needs somewhere to go, and
 words with nowhere to go stay the text of the beat (ADR-0081).
 
 **MIDI: steps.** MIDI holds tempos at points only, so the export writes a ramp
-as a tempo event every sixteenth note, each with the steady tempo that lasts as
-long as that stretch of the ramp (`rampSeconds`). The song keeps its timing, to
+as a tempo event every sixteenth note, and one at each barline inside the ramp
+(ADR-0083), each with the steady tempo that lasts as long as that stretch of
+the ramp (`rampSeconds`). The song keeps its timing, to
 the microsecond a quarter note; read back, the steps are sudden changes.
 
 A gradual change to the same speed, or with no change after it, has nothing

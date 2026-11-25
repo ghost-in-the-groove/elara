@@ -22,7 +22,8 @@ the voice), velocity from the dynamic. The MIDI writer uses it, tests compare
 songs by it, and playback (milestone 4) will build on it. Articulations are not
 applied there.
 
-**Export.** A format 1 file:
+**Export.** A format 1 file, with the measures in play order: repeats,
+alternate endings and jumps written as played (ADR-0083):
 
 - Ticks per quarter note: 960, or the least multiple of 960 that makes every
   time in the song a whole number of ticks, while it fits in 15 bits; otherwise
