@@ -65,6 +65,9 @@ std::string measuresJson(const core::Song& song) {
             }
             out += std::format(R"(,"endings":[{}])", endings);
         }
+        if (header.doubleBar) {
+            out += R"(,"doubleBar":true)";
+        }
         if (header.tripletFeel != core::TripletFeel::None) {
             out += std::format(R"(,"tripletFeel":"{}")",
                                kTripletFeelNames.at(static_cast<std::size_t>(header.tripletFeel)));

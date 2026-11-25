@@ -986,6 +986,22 @@ add_test(NAME cli.edit_rejects_ending_zero
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "ending 0 0")
 set_tests_properties(cli.edit_rejects_single_repeat cli.edit_rejects_unknown_repeat
   cli.edit_rejects_ending_past_eight cli.edit_rejects_ending_zero PROPERTIES WILL_FAIL TRUE)
+# Double barlines (ADR-0103): two set and one taken off again, each one undo
+# step, saved and read back.
+set(ELARA_CLI_DOUBLE_BARS "${CMAKE_CURRENT_BINARY_DIR}/cli-double-bars.elara")
+add_test(NAME cli.edit_sets_double_barlines
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_DOUBLE_BARS}" "add-track electric-guitar"
+    "append-measures 3" "barline 1 double" "barline 2 double" "barline 2 single")
+set_tests_properties(cli.edit_sets_double_barlines PROPERTIES
+  FIXTURES_SETUP cli_double_bars
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\",\"doubleBar\":true},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":5,\"next\":\"Change barline\"}")
+add_test(NAME cli.dump_double_barlines COMMAND elara-cli --json dump "${ELARA_CLI_DOUBLE_BARS}")
+set_tests_properties(cli.dump_double_barlines PROPERTIES
+  FIXTURES_REQUIRED cli_double_bars
+  PASS_REGULAR_EXPRESSION "\"doubleBar\":true")
+add_test(NAME cli.edit_rejects_unknown_barline
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "barline 0 triple")
+set_tests_properties(cli.edit_rejects_unknown_barline PROPERTIES WILL_FAIL TRUE)
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste

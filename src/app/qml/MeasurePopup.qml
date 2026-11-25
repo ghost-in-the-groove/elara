@@ -472,6 +472,33 @@ Popup {
             }
         }
 
+        // The barline that closes the measure: a double one ends a section
+        // (ADR-0103).
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                rightPadding: 5
+                text: qsTr("Barline")
+                font.pixelSize: 13
+                color: Qt.alpha(root.ink, 0.7)
+            }
+            Chip {
+                text: qsTr("Double")
+                on: root.repeats.doubleBar === true
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Close this measure with a double barline, as at the end of a section")
+                onClicked: root.document.setRepeats(root.document.caretMeasure, {
+                                                        doubleBar: !on
+                                                    })
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+        }
+
         Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 2

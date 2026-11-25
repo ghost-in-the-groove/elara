@@ -78,10 +78,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Rolled chords of keyboards and other instruments without frets: an
         arpeggio line left of the chord (ADR-0076)
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
-- [ ] Double barlines: two thin lines closing a section (ADR-0103)
+- [x] Double barlines: two thin lines closing a section (ADR-0103)
   - [x] In the model and kept by the native format; drawn on every staff
   - [x] Read from Guitar Pro 3-8, read and written in MusicXML
-  - [ ] Set at the caret
+  - [x] Set at the caret: a chip in the measure popup and the CLI `barline`
+        step, one undo step
 - [ ] Triplet feel: pairs of eighths or sixteenths played long and short (ADR-0104)
   - [x] In the model and kept by the native format; heard in playback and MIDI export
   - [x] Read from Guitar Pro 3-8, read and written in MusicXML

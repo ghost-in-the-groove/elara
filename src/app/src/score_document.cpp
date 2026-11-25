@@ -293,6 +293,7 @@ constexpr std::array kEditNames{
     Translation{"Change navigation marks",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
     Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
+    Translation{"Change barline", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change barline")},
     Translation{"Change section", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change section")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
@@ -1112,6 +1113,7 @@ QVariantMap ScoreDocument::repeatsAt(int measure) const {
     repeats.insert(QStringLiteral("start"), header.repeatStart);
     repeats.insert(QStringLiteral("times"), header.repeatEnd() ? header.repeatTimes : 0);
     repeats.insert(QStringLiteral("endings"), endings);
+    repeats.insert(QStringLiteral("doubleBar"), header.doubleBar);
     return repeats;
 }
 
@@ -1140,6 +1142,10 @@ void ScoreDocument::setRepeats(int measure, const QVariantMap& repeats) {
             }
         }
         header.alternateEndings = static_cast<std::uint8_t>(endings);
+    }
+    if (const auto found = repeats.constFind(QStringLiteral("doubleBar"));
+        found != repeats.cend()) {
+        header.doubleBar = found->toBool();
     }
     if (header != document_->song().measureHeader(m)) {
         execute(std::make_unique<core::SetMeasureHeader>(m, std::move(header)));
