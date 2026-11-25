@@ -129,6 +129,8 @@ core::Song richSong() {
     first.front().chord = SharedOptional(ChordSymbol{.name = "E7", .diagram = e7});
     lead.measure(0).voices[2].beats[1].chord =
         SharedOptional(ChordSymbol{.name = "N.C.", .diagram = {}});
+    // Beat text (ADR-0081).
+    lead.measure(0).voices[2].beats[0].text = SharedOptional<std::string>("let ring");
 
     // Bass with techniques, piano on both staves, drums by key; a breve somewhere.
     Staff& bass = song.track(1).staff(0);
@@ -222,6 +224,7 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
             R"({"duration":"8","chord":{"name":"E7","diagram":{"firstFret":1,"frets":[0,3,1,0,2,0]}},)") !=
         std::string::npos);
     CHECK(json.find(R"({"duration":"2","chord":{"name":"N.C."}})") != std::string::npos);
+    CHECK(json.find(R"({"duration":"2","text":"let ring"})") != std::string::npos);
     CHECK(json.find(R"("onBeat":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2],"section":"Chorus"})") !=

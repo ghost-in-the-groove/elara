@@ -704,9 +704,10 @@ private:
                 beat.chord = chords_.share(std::move(*chord));
             }
         }
-        if ((flags & 0x04U) != 0) {
-            (void)in_.intByteString();
-            warnings_.add(track.name, "text dropped", m);
+        if ((flags & 0x04U) != 0) { // text above the beat (ADR-0081)
+            if (std::string text = in_.intByteString(); !text.empty()) {
+                beat.text = core::SharedOptional(std::move(text));
+            }
         }
         NoteDefaults defaults;
         if ((flags & 0x08U) != 0) {
