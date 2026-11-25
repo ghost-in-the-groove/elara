@@ -24,6 +24,8 @@ using elara::core::Beat;
 using elara::core::Clef;
 using elara::core::Duration;
 using elara::core::Grace;
+using elara::core::Harmonic;
+using elara::core::HarmonicKind;
 using elara::core::Instrument;
 using elara::core::InstrumentKind;
 using elara::core::KeyMode;
@@ -827,6 +829,25 @@ TEST_CASE("Staff layout: drums follow the drum map", "[notation][layout]") {
             }
         }
     }
+}
+
+TEST_CASE("Staff layout: dead notes are crosses, natural harmonics diamonds",
+          "[notation][layout]") {
+    Beat dead = note("C5");
+    dead.notes[0].effects.deadNote = true;
+    Beat natural = note("D5", NoteValue::Half);
+    natural.notes[0].effects.harmonic = Harmonic{.kind = HarmonicKind::Natural, .fretTenths = 120};
+    // An artificial harmonic is the stopped note, its kind named over the staff.
+    Beat artificial = note("E5");
+    artificial.notes[0].effects.harmonic =
+        Harmonic{.kind = HarmonicKind::Artificial, .fretTenths = 120};
+    std::vector<Glyph> heads;
+    for (const GlyphItem& item :
+         glyphs(layout(melody({dead, natural, artificial})), Role::Notehead)) {
+        heads.push_back(item.glyph);
+    }
+    CHECK(heads == std::vector<Glyph>{Glyph::NoteheadXBlack, Glyph::NoteheadDiamondHalf,
+                                      Glyph::NoteheadBlack});
 }
 
 TEST_CASE("Staff layout: grace notes are drawn small before their chord", "[notation][layout]") {
