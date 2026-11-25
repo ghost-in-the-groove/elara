@@ -68,6 +68,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] `elara-cli import <file> --json` snapshot tests per corpus file
 - [x] Export as MusicXML… and Export as MIDI… in the app, beside Export as PDF…,
       telling what the format leaves out
+- [x] Import warnings in the app: what opening a file approximated or dropped,
+      told when it opens and listed from the status bar while it is open
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
 
@@ -296,4 +298,5 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         desktop entry, drawn from its SVG at build time (ADR-0064)
   - [x] An MSI installer (Windows) and an AppImage (Linux), built and
         smoke-tested by CI with `elara.py package --installers` (ADR-0065)
+- [x] Packages built with the vcpkg that CI tests, at the manifest's baseline
 - [ ] Release automation and 1.0
