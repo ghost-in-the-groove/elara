@@ -66,6 +66,7 @@ using core::Staff;
 using core::Step;
 using core::Tempo;
 using core::TimeSignature;
+using core::TripletFeel;
 using core::Tuning;
 using core::Tuplet;
 using core::Vibrato;
@@ -1296,6 +1297,7 @@ private:
             readRepeats(bar, song.measureHeader(m), m);
             // <DoubleBar/>: a double barline closes the bar (ADR-0103).
             song.measureHeader(m).doubleBar = static_cast<bool>(bar.child("DoubleBar"));
+            song.measureHeader(m).tripletFeel = tripletFeel(bar, m);
             readDirections(bar, song.measureHeader(m), m);
             readSection(bar, song.measureHeader(m));
             warnMasterBar(bar, m);
@@ -1357,10 +1359,32 @@ private:
         if (bar.child("Fermatas")) {
             warnings_.add({}, "fermatas dropped", m);
         }
-        if (const pugi::xml_node feel = bar.child("TripletFeel");
-            feel && textOf(feel) != std::string_view("NoTripletFeel")) {
-            warnings_.add({}, "triplet feel dropped", m);
+    }
+
+    // <TripletFeel> (ADR-0104): how the bar plays its pairs of eighths or
+    // sixteenths.
+    TripletFeel tripletFeel(pugi::xml_node bar, std::size_t m) {
+        static constexpr std::array<std::pair<std::string_view, TripletFeel>, 7> kFeels{{
+            {"NoTripletFeel", TripletFeel::None},
+            {"Triplet8th", TripletFeel::Eighth},
+            {"Triplet16th", TripletFeel::Sixteenth},
+            {"Dotted8th", TripletFeel::DottedEighth},
+            {"Dotted16th", TripletFeel::DottedSixteenth},
+            {"Scottish8th", TripletFeel::ScottishEighth},
+            {"Scottish16th", TripletFeel::ScottishSixteenth},
+        }};
+        const pugi::xml_node feel = bar.child("TripletFeel");
+        if (!feel) {
+            return TripletFeel::None;
         }
+        const std::string_view text = textOf(feel);
+        for (const auto& [name, value] : kFeels) {
+            if (text == name) {
+                return value;
+            }
+        }
+        warnings_.add({}, "triplet feel dropped", m);
+        return TripletFeel::None;
     }
 
     /// Tempo automations: "bpm unit" at a bar and a position inside it (a share

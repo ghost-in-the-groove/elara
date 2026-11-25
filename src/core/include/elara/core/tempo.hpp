@@ -5,6 +5,7 @@
 #include <elara/core/fraction.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 
 namespace elara::core {
@@ -57,6 +58,26 @@ struct TempoChange {
 
     friend constexpr bool operator==(const TempoChange&, const TempoChange&) noexcept = default;
 };
+
+/// How the pairs of a note value are played (ADR-0104): straight, or long and
+/// short as a triplet quarter and eighth (swing, shuffle), as a dotted note
+/// and the note a quarter its length, or the other way round (the Scotch snap).
+enum class TripletFeel : std::uint8_t {
+    None,
+    Eighth,            ///< pairs of eighths, 2:1
+    Sixteenth,         ///< pairs of sixteenths, 2:1
+    DottedEighth,      ///< pairs of eighths, 3:1
+    DottedSixteenth,   ///< pairs of sixteenths, 3:1
+    ScottishEighth,    ///< pairs of eighths, 1:3
+    ScottishSixteenth, ///< pairs of sixteenths, 1:3
+};
+
+/// Where `offset` whole notes into a measure `length` long is played under
+/// `feel`: the first half of each pair, counted from the start of the measure,
+/// stretched or squeezed onto the part its first note takes and the second
+/// half onto the rest. The edges of the pairs do not move; a pair that the end
+/// of the measure cuts, and offsets outside the measure, stay straight.
+[[nodiscard]] Fraction swung(TripletFeel feel, const Fraction& offset, const Fraction& length);
 
 /// The seconds `distance` whole notes take from where the speed is `speed`
 /// whole notes a second and changes by `slope` per whole note along the score:

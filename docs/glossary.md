@@ -108,6 +108,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | sección / marcador / ensayo | section (marker, rehearsal mark) | `MeasureHeader::section`, `changeSection()` | The named part of a song (intro, chorus...) that starts at a measure and runs to the next one that names a section (ADR-0062) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
 | cambio gradual de tempo | gradual tempo change | `TempoChange::gradual` | Accelerando or ritardando to the next change's tempo (ADR-0082) |
+| swing (sensación de tresillo) | triplet feel | `MeasureHeader::tripletFeel`, `TripletFeel`, `swung()` | Pairs of eighths or sixteenths played long and short: 2:1 (swing, shuffle), 3:1 (dotted) or 1:3 (Scottish) (ADR-0104) |
 | metrónomo | metronome | `SequenceOptions::metronome` | A click on every beat, a high wood block on the first; events on `Sequence::metronomeTrack()` (ADR-0024) |
 | pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
 | compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |
