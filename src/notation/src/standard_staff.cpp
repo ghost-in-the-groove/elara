@@ -1461,6 +1461,7 @@ void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
 void StandardWriter::draw(std::span<const ColumnPosition> positions, double start, double barline) {
     drawMeasure(positions, start, barline);
     strikeDynamics();
+    dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
 }
 
 } // namespace

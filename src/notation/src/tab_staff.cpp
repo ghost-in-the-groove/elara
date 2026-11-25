@@ -236,6 +236,9 @@ public:
 
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override {
         measure_ = measureIndex_;
+        if (alone_) {
+            dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
+        }
         if (columns_.empty()) {
             if (alone_) {
                 glyphCentred(Glyph::RestWhole, (start + barline) / 2, height() / 2, Role::Rest);

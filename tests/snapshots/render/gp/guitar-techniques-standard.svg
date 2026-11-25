@@ -39,6 +39,10 @@
 <line class="stem" x1="58.554" y1="34.328" x2="58.554" y2="37.66" stroke-width="0.12"/>
 <line class="barline" x1="63.695" y1="32.16" x2="63.695" y2="36.16" stroke-width="0.16"/>
 <line class="barline" x1="64.425" y1="32.16" x2="64.425" y2="36.16" stroke-width="0.5"/>
+<line class="hairpin" x1="29.892" y1="43.164" x2="35.492" y2="42.664" stroke-width="0.16"/>
+<line class="hairpin" x1="29.892" y1="43.164" x2="35.492" y2="43.664" stroke-width="0.16"/>
+<line class="hairpin" x1="57.286" y1="42.664" x2="60.215" y2="43.164" stroke-width="0.16"/>
+<line class="hairpin" x1="57.286" y1="43.664" x2="60.215" y2="43.164" stroke-width="0.16"/>
 <line class="volta" x1="36.252" y1="21.044" x2="47.294" y2="21.044" stroke-width="0.16"/>
 <line class="volta" x1="36.252" y1="21.044" x2="36.252" y2="23.044" stroke-width="0.16"/>
 <line class="volta" x1="47.294" y1="21.044" x2="47.294" y2="23.044" stroke-width="0.16"/>
