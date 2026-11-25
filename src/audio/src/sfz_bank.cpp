@@ -227,12 +227,16 @@ public:
         }
         // The library's legato keyswitch, else its regions for a key going
         // down while another is held, played as the picked note was.
-        const Played& picked = keyPlayed_[static_cast<std::size_t>(key)];
+        // A joined note draws a random number of its own (lorand, hirand).
+        Played picked = keyPlayed_[static_cast<std::size_t>(key)];
+        picked.chance = random();
         const SfzTechnique& technique = data_->techniques.legato;
         std::array<std::uint32_t, kVoices> regions{};
         if (technique.keyswitch >= 0) {
-            const Played played{
-                .touch = Touch::Normal, .keyswitch = technique.keyswitch, .cc = picked.cc};
+            const Played played{.touch = Touch::Normal,
+                                .keyswitch = technique.keyswitch,
+                                .cc = picked.cc,
+                                .chance = picked.chance};
             const std::size_t count = joinedRegions(target, velocity, played, false, regions);
             if (count > 0) {
                 join(key, target, cents, velocity, played, std::span(regions).first(count));

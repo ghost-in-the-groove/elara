@@ -179,8 +179,7 @@ TEST_CASE("SFZ sampler: round robin takes the regions of a key in turn", "[audio
     CHECK(sounded == std::vector<bool>{true, false, true, false});
 }
 
-TEST_CASE("SFZ sampler: a random round robin plays one take of a key per note",
-          "[audio][sfz]") {
+TEST_CASE("SFZ sampler: a random round robin plays one take of a key per note", "[audio][sfz]") {
     // Four takes, each a quarter of the random range, told apart by their
     // levels.
     const auto bank = bankOf("<region> sample=*sine amplitude=20 lorand=0 hirand=0.25\n"

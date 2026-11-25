@@ -37,7 +37,9 @@ Three targets with different rules:
   into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
   and `SfzBank` plays them through a sampler of Elara's own: WAV and FLAC
   samples read into memory on every core, regions picked by key, velocity,
-  controllers, keyswitch and round robin, the amplitude envelope, loops,
+  controllers, keyswitch and round robin (in turn, or at random with
+  `lorand`/`hirand` from a generator of each sound's own, the same sequence
+  every time), the amplitude envelope, loops,
   release samples and exclusive groups, 64 voices per track, each note glided
   on its own.
   An instrument plays every pitched track, or only the guitars or the basses
