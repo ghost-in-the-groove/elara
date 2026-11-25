@@ -29,9 +29,11 @@ elara-cli [--json] sequence <FILE> [--notes] [--events] [--speed 100] [--metrono
                              [--count-in-at SECONDS]
 elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [--tail 2]
                                  [--events] [--speed 100] [--metronome] [--soundfont FILE.sf2]
+                                 [--sfz FILE.sfz]
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
-                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2]
+                         [--count-in] [--loop FROM TO] [--soundfont FILE.sf2] [--sfz FILE.sfz]
 elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
+elara-cli [--json] sfz <FILE.sfz>                             # what Elara plays of an SFZ
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll|strips]
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
@@ -229,6 +231,14 @@ plays its instrument's General MIDI preset. `render-audio --json` says
 `"soundFont"` (the file, or null) and each track's `"sound"`: the timbre's name,
 or the preset's. `soundfont FILE --json` lists the presets as
 `{"bank", "program", "name"}`, by bank and program.
+
+With `--sfz` an SFZ instrument plays every track but the percussion ones,
+which stay on the SoundFont or the built-in synthesizer (ADR-0066);
+`render-audio --json` says `"sfz"` (the file, or null) and the tracks it plays
+sound as the instrument's name. `sfz FILE --json` reads the instrument and its
+samples: `{"file", "name", "regions", "samples", "sampleBytes", "lowestKey",
+"highestKey", "missingSamples", "unknownOpcodes", "skippedHeaders",
+"loadSeconds"}`; it fails when no sample can be read.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 

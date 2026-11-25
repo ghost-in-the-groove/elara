@@ -48,12 +48,17 @@ elara_add_unit_tests(audio
           audio/test_synth.cpp audio/test_tone_generator.cpp
           audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
           audio/test_tuner.cpp audio/test_sound_bank.cpp audio/test_sound_font.cpp
+          audio/test_sfz.cpp audio/test_sfz_bank.cpp
   LIBRARIES elara::audio elara::audio_fluid)
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
 # Writes the test SoundFont for the elara-cli tests that play one (ADR-0043).
 add_executable(elara_make_test_soundfont audio/make_test_soundfont.cpp)
 elara_target_warnings(elara_make_test_soundfont)
+# Writes the test SFZ instrument for the elara-cli tests that play one (ADR-0066).
+add_executable(elara_make_test_sfz audio/make_test_sfz.cpp)
+target_link_libraries(elara_make_test_sfz PRIVATE elara::audio)
+elara_target_warnings(elara_make_test_sfz)
 
 elara_add_unit_tests(io
   SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp io/test_midi.cpp io/test_guitar_pro.cpp

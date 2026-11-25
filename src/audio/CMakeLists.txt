@@ -6,6 +6,8 @@ add_library(elara_audio STATIC
   src/player.cpp
   src/sample_ring.cpp
   src/sequence.cpp
+  src/sfz.cpp
+  src/sfz_bank.cpp
   src/sound_bank.cpp
   src/synth.cpp
   src/tone_generator.cpp
