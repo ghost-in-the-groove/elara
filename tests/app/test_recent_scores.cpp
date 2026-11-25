@@ -47,6 +47,8 @@ TEST_CASE("Recent scores: the latest file first, each once", "[app][recent]") {
     CHECK(first.value("url").toUrl() == QUrl::fromLocalFile(dir.filePath("a.gp")));
     CHECK(first.value("format").toString() == "GP");
     CHECK(first.value("folder").toString() == QDir::toNativeSeparators(dir.path()));
+    CHECK(recent.scores()[1].toMap().value("format").toString() == "ELARA");
+    CHECK(recent.scores()[2].toMap().value("format").toString() == "XML");
 }
 
 TEST_CASE("Recent scores: at most eight, the oldest dropped", "[app][recent]") {

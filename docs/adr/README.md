@@ -74,6 +74,7 @@ one that replaces them.
 | [0066](0066-sfz-sampler.md) | SFZ instruments through Elara's own sampler | Accepted |
 | [0067](0067-flac-decoder.md) | A FLAC decoder of Elara's own | Accepted |
 | [0068](0068-sfz-techniques.md) | Guitar techniques on a library's keyswitches and controllers | Accepted |
+| [0071](0071-recent-scores.md) | Recent scores | Accepted |
 
 ## Template
 

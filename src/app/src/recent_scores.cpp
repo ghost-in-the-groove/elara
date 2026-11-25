@@ -27,6 +27,13 @@ QString pathOf(const QUrl& file) {
     return file.isLocalFile() ? QDir::cleanPath(file.toLocalFile()) : QString();
 }
 
+// A file's format as a short badge: its extension in capitals, MusicXML's
+// as XML.
+QString formatOf(const QFileInfo& info) {
+    const QString suffix = info.suffix().toUpper();
+    return suffix == QStringLiteral("MUSICXML") ? QStringLiteral("XML") : suffix;
+}
+
 } // namespace
 
 RecentScores::RecentScores(QObject* parent) : QObject(parent) {}
@@ -61,7 +68,7 @@ QVariantList RecentScores::scores() const {
         result.append(QVariantMap{
             {QStringLiteral("url"), QUrl::fromLocalFile(path)},
             {QStringLiteral("name"), info.completeBaseName()},
-            {QStringLiteral("format"), info.suffix().toUpper()},
+            {QStringLiteral("format"), formatOf(info)},
             {QStringLiteral("folder"), QDir::toNativeSeparators(info.absolutePath())},
         });
     }

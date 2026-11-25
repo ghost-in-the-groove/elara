@@ -20,7 +20,8 @@ class RecentScores : public QObject {
     Q_PROPERTY(bool remember READ remember WRITE setRemember NOTIFY rememberChanged)
     /// The recent files that still exist, the latest first: maps of `url`,
     /// `name` (the file name without its extension), `format` (the extension
-    /// in capitals) and `folder` (the folder's path as the system writes it).
+    /// in capitals, MusicXML's as XML) and `folder` (the folder's path as the
+    /// system writes it).
     Q_PROPERTY(QVariantList scores READ scores NOTIFY scoresChanged)
 
 public:
