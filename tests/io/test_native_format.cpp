@@ -151,6 +151,9 @@ core::Song richSong() {
         beat("1", {Note{.pitch = Pitch(Step::C, 0, 5)}, Note{.pitch = Pitch(Step::E, -1, 5)}})};
     song.track(2).staff(1).measure(2).voices[0].beats = {
         beat("1", {Note{.pitch = Pitch(Step::C, 1, 3)}})};
+    // Octave lines on the piano, 15ma over its right hand (ADR-0089).
+    song.track(2).staff(0).measure(2).voices[0].beats[0].effects.ottava = Ottava::QuindicesimaAlta;
+    song.track(2).staff(1).measure(2).voices[0].beats[0].effects.ottava = Ottava::Bassa;
     // Clef changes, one on an empty measure at the end (ADR-0087).
     song.track(2).staff(1).measure(1).clef = Clef::Treble;
     song.track(2).staff(1).measure(4).clef = Clef::Tenor;
@@ -232,6 +235,9 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("slur":false)") == std::string::npos);
     CHECK(json.find(R"({"duration":"4","effects":{"fermata":"short"}})") != std::string::npos);
     CHECK(json.find(R"("fermata":"none")") == std::string::npos);
+    CHECK(json.find(R"("effects":{"ottava":"15ma"})") != std::string::npos);
+    CHECK(json.find(R"("effects":{"ottava":"8vb"})") != std::string::npos);
+    CHECK(json.find(R"("ottava":"none")") == std::string::npos);
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default
     CHECK(json.find(R"("tiedFromPrevious":false)") == std::string::npos);
     CHECK(

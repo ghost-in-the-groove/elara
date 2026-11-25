@@ -103,6 +103,10 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"fermataShortBelow", 0xE4C5},
     {"fermataLongAbove", 0xE4C6},
     {"fermataLongBelow", 0xE4C7},
+    {"ottavaAlta", 0xE511},
+    {"ottavaBassaVb", 0xE51C},
+    {"quindicesimaAlta", 0xE515},
+    {"quindicesimaBassaMb", 0xE51D},
     {"dynamicPiano", 0xE520},
     {"dynamicMezzo", 0xE521},
     {"dynamicForte", 0xE522},
@@ -143,7 +147,7 @@ constexpr std::array<std::string_view, kAnchorCount> kAnchorNames{
     "cutOutSE", "cutOutSW",   "cutOutNW", "opticalCenter",
 };
 
-constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 18> kDefaults{{
+constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 19> kDefaults{{
     {"staffLineThickness", &EngravingDefaults::staffLineThickness},
     {"stemThickness", &EngravingDefaults::stemThickness},
     {"beamThickness", &EngravingDefaults::beamThickness},
@@ -162,6 +166,7 @@ constexpr std::array<std::pair<std::string_view, double EngravingDefaults::*>, 1
     {"tupletBracketThickness", &EngravingDefaults::tupletBracketThickness},
     {"hairpinThickness", &EngravingDefaults::hairpinThickness},
     {"repeatEndingLineThickness", &EngravingDefaults::repeatEndingLineThickness},
+    {"octaveLineThickness", &EngravingDefaults::octaveLineThickness},
 }};
 
 FontError error(std::string_view what) {

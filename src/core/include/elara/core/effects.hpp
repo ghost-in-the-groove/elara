@@ -171,6 +171,35 @@ enum class Fermata : std::uint8_t { None, Short, Normal, Long };
     return 1.0;
 }
 
+/// An octave line over or under the beat (ADR-0089): its notes are written
+/// one or two octaves from where they sound, as the line says. Consecutive
+/// beats with the same octave line share one line.
+enum class Ottava : std::uint8_t {
+    None,
+    Alta,              ///< 8va: sounding an octave above the written notes
+    Bassa,             ///< 8vb: an octave below
+    QuindicesimaAlta,  ///< 15ma: two octaves above
+    QuindicesimaBassa, ///< 15mb: two octaves below
+};
+
+/// How many octaves above its written note a note under `ottava` sounds:
+/// 1 for 8va, -1 for 8vb, 2 for 15ma, -2 for 15mb, 0 without a line.
+[[nodiscard]] constexpr int ottavaOctaves(Ottava ottava) noexcept {
+    switch (ottava) {
+    case Ottava::Alta:
+        return 1;
+    case Ottava::Bassa:
+        return -1;
+    case Ottava::QuindicesimaAlta:
+        return 2;
+    case Ottava::QuindicesimaBassa:
+        return -2;
+    case Ottava::None:
+        break;
+    }
+    return 0;
+}
+
 /// Effects that apply to every note of a beat.
 struct BeatEffects {
     BendCurve whammyBar{};
@@ -183,6 +212,9 @@ struct BeatEffects {
     // Slurred to the next beat of its voice (ADR-0086): a slur runs from the
     // first of the beats slurred in a row to the beat after the last of them.
     bool slur = false;
+    // Whole bytes, not bit-fields: GCC 14 cannot copy-list-initialize (`= {}`)
+    // a class whose enum bit-field has a default member initializer.
+    Ottava ottava = Ottava::None; // ADR-0089
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

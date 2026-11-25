@@ -138,6 +138,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML
   - [x] Drawn on standard notation, clear of the notes, across lines
   - [x] Set at the caret
+- [x] Octave lines: 8va, 8vb, 15ma and 15mb over the beats whose notes they write nearer the staff (ADR-0089)
+  - [x] In the model and kept by the native format
+  - [x] Read and written in MusicXML, read from Guitar Pro 6-8
+  - [x] Drawn on standard notation, over barlines, cut and repeated at system breaks
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

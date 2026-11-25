@@ -1244,6 +1244,26 @@ private:
         xml.close("direction");
     }
 
+    /// An octave line's start or stop (ADR-0089): 8va writes the notes an
+    /// octave down from their pitch.
+    void writeOctaveShift(XmlWriter& xml, Ottava ottava, bool stop, int staffNumber) {
+        const bool above = ottavaOctaves(ottava) > 0;
+        xml.start("direction");
+        xml.attribute("placement", above ? "above" : "below");
+        xml.endOpen();
+        xml.open("direction-type");
+        xml.start("octave-shift");
+        xml.attribute("type", stop ? "stop" : (above ? "down" : "up"));
+        xml.attribute("size",
+                      static_cast<std::int64_t>(std::abs(ottavaOctaves(ottava)) == 2 ? 15 : 8));
+        xml.endEmpty();
+        xml.close("direction-type");
+        if (xmlStaves_ > 1) {
+            xml.number("staff", staffNumber);
+        }
+        xml.close("direction");
+    }
+
     // ---- Voices and notes -------------------------------------------------------------
 
     /// Writes one voice of one staff and returns where it ends.
@@ -1276,6 +1296,12 @@ private:
         markTuplets(voice);
         std::vector<bool>* words =
             tabPass_ ? nullptr : &words_[static_cast<std::size_t>(s) * Measure::kMaxVoices + v];
+        // The staff's octave lines go with its first voice that has beats,
+        // which readers apply to every voice (ADR-0089).
+        const auto& voices = staff.measure(m).voices;
+        const bool writesLines = !tabPass_ && std::ranges::find_if(voices, [](const Voice& other) {
+                                                  return !other.isEmpty();
+                                              }) == voices.begin() + static_cast<std::ptrdiff_t>(v);
         Fraction onset;
         for (std::size_t i = 0; i < voice.beats.size(); ++i) {
             const Beat& beat = voice.beats[i];
@@ -1286,6 +1312,11 @@ private:
             flushDynamics(xml, onset, s + 1);
             const Beat* previous = beatBefore(staff, m, v, i);
             const Beat* next = beatAfter(staff, m, v, i);
+            const Ottava ottava = writesLines ? beat.effects.ottava : Ottava::None;
+            if (ottava != Ottava::None &&
+                (previous == nullptr || previous->effects.ottava != ottava)) {
+                writeOctaveShift(xml, ottava, false, s + 1);
+            }
             // A run of beats with one hairpin is a wedge from its first beat to
             // the end of its last (ADR-0078).
             const Hairpin hairpin = tabPass_ ? Hairpin::None : beat.effects.hairpin;
@@ -1320,6 +1351,9 @@ private:
                                      .words = words});
             if (hairpin != Hairpin::None && (next == nullptr || next->effects.hairpin != hairpin)) {
                 writeWedge(xml, "stop", v, s + 1);
+            }
+            if (ottava != Ottava::None && (next == nullptr || next->effects.ottava != ottava)) {
+                writeOctaveShift(xml, ottava, true, s + 1);
             }
             onset += length;
         }
@@ -1462,6 +1496,7 @@ private:
             others.hairpin = Hairpin::None;
             others.fermata = Fermata::None;
             others.slur = false;
+            others.ottava = Ottava::None;
             if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
