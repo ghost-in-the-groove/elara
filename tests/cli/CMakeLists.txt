@@ -1170,6 +1170,19 @@ add_test(NAME cli.sfz_song_pitch COMMAND elara-cli --json tune "${_sfz_song_wav}
 set_tests_properties(cli.sfz_song_pitch PROPERTIES
   FIXTURES_REQUIRED cli_sfz_song_wav
   PASS_REGULAR_EXPRESSION "\"note\":\"D3\",\"cents\":-?0(\\.[0-9]+)?,")
+# Two takes of each note, one picked at random per note (lorand, hirand): the
+# D3 plays one of them, as loud as the library of one sample (both would
+# reach about 0.53).
+set(_takes_sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz/test-takes.sfz")
+add_test(NAME cli.sfz_takes COMMAND elara-cli --json sfz "${_takes_sfz}")
+set_tests_properties(cli.sfz_takes PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"name\":\"test-takes\",\"regions\":2,.*\"unknownOpcodes\":\\[\\],")
+add_test(NAME cli.render_audio_sfz_takes
+  COMMAND elara-cli --json render-audio "${_sfz_song}" --sfz "${_takes_sfz}")
+set_tests_properties(cli.render_audio_sfz_takes PROPERTIES
+  FIXTURES_REQUIRED "cli_sfz;cli_sfz_song"
+  PASS_REGULAR_EXPRESSION "\"peak\":0\\.2[0-9]*,")
 add_test(NAME cli.render_audio_sfz_basses
   COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "basses=${_test_sfz}")
 set_tests_properties(cli.render_audio_sfz_basses PROPERTIES

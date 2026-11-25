@@ -153,9 +153,10 @@ public:
         }
         const bool othersHeld = heldCount_ > 0;
         Played played = playing(touch);
+        played.chance = random();
         if (!strike(key, velocity, played, othersHeld) && played.touch != touch) {
             // The library's technique has nothing for this key: imitate it.
-            played = {.touch = touch, .keyswitch = switch_, .cc = -1};
+            played = {.touch = touch, .keyswitch = switch_, .cc = -1, .chance = played.chance};
             strike(key, velocity, played, othersHeld);
         }
         if (!keyDown_[k]) {
@@ -226,12 +227,16 @@ public:
         }
         // The library's legato keyswitch, else its regions for a key going
         // down while another is held, played as the picked note was.
-        const Played& picked = keyPlayed_[static_cast<std::size_t>(key)];
+        // A joined note draws a random number of its own (lorand, hirand).
+        Played picked = keyPlayed_[static_cast<std::size_t>(key)];
+        picked.chance = random();
         const SfzTechnique& technique = data_->techniques.legato;
         std::array<std::uint32_t, kVoices> regions{};
         if (technique.keyswitch >= 0) {
-            const Played played{
-                .touch = Touch::Normal, .keyswitch = technique.keyswitch, .cc = picked.cc};
+            const Played played{.touch = Touch::Normal,
+                                .keyswitch = technique.keyswitch,
+                                .cc = picked.cc,
+                                .chance = picked.chance};
             const std::size_t count = joinedRegions(target, velocity, played, false, regions);
             if (count > 0) {
                 join(key, target, cents, velocity, played, std::span(regions).first(count));
@@ -285,6 +290,7 @@ private:
         Touch touch = Touch::Normal;
         int keyswitch = -1;
         int cc = -1;
+        double chance = 0.0; ///< the note's random number in [0, 1) (lorand, hirand)
 
         // A controller's value for this note.
         [[nodiscard]] int value(const std::array<int, 128>& values, int controller) const noexcept {
@@ -299,11 +305,12 @@ private:
                                         : touch == Touch::Harmonic ? &techniques.harmonic
                                                                    : nullptr;
         if (technique == nullptr || !technique->found()) {
-            return {.touch = touch, .keyswitch = switch_, .cc = -1};
+            return {.touch = touch, .keyswitch = switch_, .cc = -1, .chance = 0.0};
         }
         return {.touch = Touch::Normal,
                 .keyswitch = technique->keyswitch >= 0 ? technique->keyswitch : switch_,
-                .cc = technique->cc};
+                .cc = technique->cc,
+                .chance = 0.0};
     }
 
     // Starts the regions a key going down plays, played this way; false when
@@ -387,6 +394,9 @@ private:
             }
         }
         if (region.swLast >= 0 && region.swLast != played.keyswitch) {
+            return false;
+        }
+        if (played.chance < region.loRand || played.chance >= region.hiRand) {
             return false;
         }
         if (region.seqLength > 1) {
@@ -583,6 +593,17 @@ private:
         return *best;
     }
 
+    // The next number of the sound's own generator, in [0, 1): the same
+    // sequence for every sound, so that the output depends only on the calls
+    // (xorshift64*).
+    double random() noexcept {
+        random_ ^= random_ >> 12U;
+        random_ ^= random_ << 25U;
+        random_ ^= random_ >> 27U;
+        const std::uint64_t bits = random_ * 0x2545F4914F6CDD1DULL;
+        return static_cast<double>(bits >> 11U) * 0x1.0p-53;
+    }
+
     static void release(Voice& voice) noexcept {
         if (voice.stage != Stage::Off) {
             voice.stage = Stage::Release;
@@ -729,6 +750,7 @@ private:
     int heldCount_ = 0;
     std::int64_t frame_ = 0;
     std::uint64_t order_ = 0;
+    std::uint64_t random_ = 0x9E3779B97F4A7C15ULL;
 };
 
 // The samples a program names, read on every core (the program's worker
