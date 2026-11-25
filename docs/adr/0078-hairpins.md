@@ -29,8 +29,12 @@ wedges of the same kind that touch become one.
 - The native format writes `"hairpin":"crescendo"` or `"diminuendo"` in a
   beat's effects and omits it otherwise; format version 1 still reads every
   older file (ADR-0006).
-- The MusicXML export reports hairpins as dropped until it writes them; the
-  MIDI export writes the velocities they ramp (below).
+- MusicXML: a `<wedge>` that starts (`crescendo`, `diminuendo`) and later
+  stops puts its hairpin on the beats of the staff's first voice that start
+  between the two, carried across measures; export writes a wedge from the
+  first beat of each run to the end of its last, numbered by voice, under the
+  staff it belongs to.
+- The MIDI export writes the velocities hairpins ramp (below).
 
 **Playback ramps the velocity.** `soundingNotes()` turns the hairpins of a
 staff, whichever of its voices hold them, into wedges and moves the velocity
@@ -48,10 +52,11 @@ of every note of the staff struck under one:
 
 ## Consequences
 
-- Guitar Pro hairpins survive import and saving and are heard; they are not
-  yet drawn, read from MusicXML or typed. Those come next, each recorded here
-  as it lands: a wedge under the staff on the dynamics baseline, MusicXML
-  wedges both ways, and editing at the caret.
+- Hairpins from Guitar Pro and MusicXML survive import, saving and MusicXML
+  export, and are heard; they are not yet drawn or typed. Those come next,
+  each recorded here as it lands: a wedge under the staff on the dynamics
+  baseline, and editing at the caret.
+- A MusicXML wedge in a second voice comes back on the first voice.
 - A hairpin with no dynamic after it rises or falls one step and the music
   goes back to its written dynamic after it; writing the dynamic it leads to
   says how far it goes.
@@ -59,6 +64,9 @@ of every note of the staff struck under one:
   the note. Guitar Pro has the same limit.
 - Tests: `io.Guitar Pro: a guitar keeps ...` (a crescendo over two beats, a
   diminuendo written as a decrescendo), the native round trip and text forms,
+  `io.MusicXML: wedges become hairpins ...` (across a barline, stopped at the
+  end of the song), the MusicXML round trip of a song with every feature
+  (a wedge over a barline, one on the upper staff of a piano),
   `core.A hairpin ramps the velocity of the notes under it` (to the forte
   after a crescendo, over two voices; one step down without a softer dynamic)
   and `cli.sequence_hairpins`.

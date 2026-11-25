@@ -1120,6 +1120,23 @@ private:
         }
     }
 
+    /// A wedge's start or stop; voices number their wedges apart.
+    void writeWedge(XmlWriter& xml, std::string_view type, std::size_t voice, int staffNumber) {
+        xml.start("direction");
+        xml.attribute("placement", "below");
+        xml.endOpen();
+        xml.open("direction-type");
+        xml.start("wedge");
+        xml.attribute("type", type);
+        xml.attribute("number", static_cast<std::int64_t>(voice + 1));
+        xml.endEmpty();
+        xml.close("direction-type");
+        if (xmlStaves_ > 1) {
+            xml.number("staff", staffNumber);
+        }
+        xml.close("direction");
+    }
+
     // ---- Voices and notes -------------------------------------------------------------
 
     /// Writes one voice of one staff and returns where it ends.
@@ -1158,13 +1175,26 @@ private:
                 flushTempo(xml, onset, onset + length);
             }
             flushDynamics(xml, onset, s + 1);
+            const Beat* previous = beatBefore(staff, m, v, i);
+            const Beat* next = beatAfter(staff, m, v, i);
+            // A run of beats with one hairpin is a wedge from its first beat to
+            // the end of its last (ADR-0078).
+            const Hairpin hairpin = tabPass_ ? Hairpin::None : beat.effects.hairpin;
+            if (hairpin != Hairpin::None &&
+                (previous == nullptr || previous->effects.hairpin != hairpin)) {
+                writeWedge(xml, hairpin == Hairpin::Crescendo ? "crescendo" : "diminuendo", v,
+                           s + 1);
+            }
             writeBeat(xml, BeatPlace{.beat = &beat,
-                                     .previous = beatBefore(staff, m, v, i),
-                                     .next = beatAfter(staff, m, v, i),
+                                     .previous = previous,
+                                     .next = next,
                                      .voice = voiceNumber,
                                      .staff = s + 1,
                                      .measure = m,
                                      .tuplet = tuplets_[i]});
+            if (hairpin != Hairpin::None && (next == nullptr || next->effects.hairpin != hairpin)) {
+                writeWedge(xml, "stop", v, s + 1);
+            }
             onset += length;
         }
         if (carriesTempo) {
@@ -1203,9 +1233,6 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
-        if (beat.effects.hairpin != Hairpin::None) {
-            warn("hairpins dropped", place.measure);
-        }
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;

@@ -76,7 +76,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
 - [ ] Hairpins (crescendo, diminuendo; ADR-0078)
   - [x] In the model, read from Guitar Pro 6-8 and kept by the native format
-  - [ ] Read and written in MusicXML
+  - [x] Read and written in MusicXML
   - [ ] Drawn under the staff
   - [x] Played as a velocity ramp
   - [ ] Typed at the caret
