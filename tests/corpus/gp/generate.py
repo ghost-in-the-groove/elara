@@ -602,6 +602,8 @@ def double_coda() -> str:
     for measure, direction in enumerate(directions):
         bar = [[Beat("Whole", [Note(string=5, fret=measure, midi=GUITAR[5] + measure)])]]
         extra = f"<Directions>{direction}</Directions>" if direction else ""
+        if measure + 1 in sections:
+            extra += "<DoubleBar />"  # closing the section before the next one
         if measure in sections:
             letter, text = sections[measure]
             extra += (f"<Section><Letter>{cdata(letter)}</Letter>"

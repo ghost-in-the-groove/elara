@@ -108,6 +108,7 @@ one that replaces them.
 | [0100](0100-natural-harmonics-as-diamonds.md) | Natural harmonics as diamonds | Accepted |
 | [0101](0101-tremolo-picking-on-the-stem.md) | Tremolo picking on the stem | Accepted |
 | [0102](0102-measure-repeats.md) | Measure repeats | Accepted |
+| [0103](0103-double-barlines.md) | Double barlines | Accepted |
 
 ## Template
 

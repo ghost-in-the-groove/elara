@@ -72,7 +72,8 @@ sixth string of a guitar sounds F#2.
 `Song` owns the number of measures: `insertMeasures`/`removeMeasures` change all
 staves at once, and `addTrack` gives a new track as many measures as the song.
 Each `MeasureHeader` holds the time signature, the concert key and the tempo
-changes of its measure, so they move with it; new measures continue the meter
+changes of its measure, and whether a double barline closes it (`doubleBar`,
+ADR-0103), so they move with it; new measures continue the meter
 and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
 `durationSeconds()` give the timeline of the measures as written, gradual
 tempo changes included (ADR-0082) and fermatas held: `fermataHolds()` gives

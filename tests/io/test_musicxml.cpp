@@ -1224,6 +1224,29 @@ TEST_CASE("MusicXML: a measure repeat style makes measure repeats", "[musicxml][
     CHECK(hasWarning(result, "measure repeats of more than two measures dropped", "measure 8"));
 }
 
+TEST_CASE("MusicXML: a light-light barline is a double barline", "[musicxml][barline]") {
+    // ADR-0103: on the right of a measure, or on the left of the next; the
+    // other styles change nothing.
+    const auto barline = [](std::string_view location, std::string_view style) {
+        return std::format(R"(<barline location="{}"><bar-style>{}</bar-style></barline>)",
+                           location, style);
+    };
+    const std::string whole =
+        quarterNote("C", "") + quarterNote("D", "") + quarterNote("E", "") + quarterNote("F", "");
+    const ImportResult result = parse(
+        onePart(whole + barline("right", "light-light") + R"(</measure><measure number="2">)" +
+                whole + R"(</measure><measure number="3">)" + barline("left", "light-light") +
+                whole + R"(</measure><measure number="4">)" + whole + barline("right", "dashed") +
+                R"(</measure><measure number="5">)" + whole + barline("right", "light-heavy")));
+    REQUIRE(result.song.measureCount() == 5);
+    CHECK(result.warnings.empty());
+    const std::array expected{true, true, false, false, false};
+    for (std::size_t m = 0; m < expected.size(); ++m) {
+        CAPTURE(m);
+        CHECK(result.song.measureHeader(m).doubleBar == expected[m]);
+    }
+}
+
 TEST_CASE("MusicXML: clef changes keep the staff's octave and its percussion", "[musicxml][clef]") {
     const auto part = [](std::string_view first, std::string_view change) {
         return parse(onePart(std::format("<attributes>{}</attributes>", first) +

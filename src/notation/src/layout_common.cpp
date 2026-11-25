@@ -1425,15 +1425,32 @@ void LyricsRow::place(DisplayList& list, double bottom, double staffHeight, doub
 StaffWriter::StaffWriter(const EngravingFont& font, double height, std::size_t lines)
     : font_(font), defaults_(font.defaults()), height_(height), lines_(lines) {}
 
-double StaffWriter::barline(std::size_t m, double x, bool songEnd, bool repeatEnd) {
+BarlineKind closingBarline(const core::Song& song, std::size_t m) {
+    const core::MeasureHeader& header = song.measureHeader(m);
+    if (header.repeatEnd()) {
+        return BarlineKind::RepeatEnd;
+    }
+    if (m + 1 >= song.measureCount()) {
+        return BarlineKind::Final;
+    }
+    return header.doubleBar && !song.measureHeader(m + 1).repeatStart ? BarlineKind::Double
+                                                                      : BarlineKind::Single;
+}
+
+double StaffWriter::barline(std::size_t m, double x, BarlineKind kind) {
     measure_ = m;
-    if (repeatEnd) {
+    if (kind == BarlineKind::RepeatEnd) {
         x = repeatDots(x) + defaults_.repeatBarlineDotSeparation;
     }
     const double thin = defaults_.thinBarlineThickness;
     line({x + thin / 2, 0.0}, {x + thin / 2, height_}, thin, Role::Barline);
     x += thin;
-    if (songEnd || repeatEnd) {
+    if (kind == BarlineKind::Double) {
+        x += defaults_.barlineSeparation;
+        line({x + thin / 2, 0.0}, {x + thin / 2, height_}, thin, Role::Barline);
+        x += thin;
+    }
+    if (kind == BarlineKind::Final || kind == BarlineKind::RepeatEnd) {
         const double thick = defaults_.thickBarlineThickness;
         x += defaults_.thinThickBarlineSeparation;
         line({x + thick / 2, 0.0}, {x + thick / 2, height_}, thick, Role::Barline);

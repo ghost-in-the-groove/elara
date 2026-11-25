@@ -576,6 +576,14 @@ private:
 
 // ---- Staff writers --------------------------------------------------------------------
 
+/// The barline that closes a measure.
+enum class BarlineKind : std::uint8_t { Single, Double, Final, RepeatEnd };
+
+/// The barline closing measure m: an end repeat, the song's final barline, a
+/// double barline (ADR-0103) unless the next measure opens with a start
+/// repeat, which stands for it, or else a single one.
+[[nodiscard]] BarlineKind closingBarline(const core::Song& song, std::size_t m);
+
 /// Lays out one staff measure by measure while the system layout spaces the
 /// columns of all its staves together. The y of the staff's top line is 0.
 class StaffWriter {
@@ -612,9 +620,10 @@ public:
     /// measure changes to (ADR-0087). Returns where it ends (`x` for nothing).
     virtual double ending(std::size_t /*m*/, double x) { return x; }
 
-    /// The barline closing measure m at `x`: thin, thin-thick at the song's
-    /// end, dots and thin-thick for an end repeat. Returns its right.
-    double barline(std::size_t m, double x, bool songEnd, bool repeatEnd);
+    /// The barline closing measure m at `x`: thin, two thin lines for a
+    /// double barline, thin-thick at the song's end, dots and thin-thick for
+    /// an end repeat. Returns its right.
+    double barline(std::size_t m, double x, BarlineKind kind);
 
     /// The start repeat of measure m, thick-thin and dots, from `x`; returns
     /// its right.

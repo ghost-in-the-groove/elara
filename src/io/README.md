@@ -27,7 +27,9 @@ maps all nineteen for both Guitar Pro readers) and from MusicXML's `<sound>`
 attributes, `<segno/>` and `<coda/>` glyphs and navigation texts; MusicXML export
 writes them back. Sections (ADR-0062) come from Guitar Pro's markers and
 section marks, MusicXML's rehearsal marks and MIDI markers; both exports write
-them back.
+them back. Double barlines (ADR-0103) come from Guitar Pro 3-8 and from
+MusicXML's `light-light` barlines, and MusicXML export writes back those that
+show; the native format keeps a header's `"doubleBar"`.
 
 Importers are implemented from public documentation only (CONTRIBUTING.md,
 golden rule 6) and tested against the self-made corpus in `tests/corpus/`

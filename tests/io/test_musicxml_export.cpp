@@ -1057,6 +1057,50 @@ TEST_CASE("MusicXML export: a guitar's measure repeat covers its TAB staff; one 
     CHECK(read.measure(2).isEmpty());
 }
 
+TEST_CASE("MusicXML export: double barlines come back as light-light barlines",
+          "[musicxml][export][barline]") {
+    // ADR-0103: one under an end repeat or at the song's end does not show,
+    // and is not written.
+    core::Song song;
+    song.appendMeasures(4);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    for (std::size_t m = 0; m < 4; ++m) {
+        song.track(p).staff(0).measure(m).voices[0].beats = {
+            beatOf(core::Duration(core::NoteValue::Whole),
+                   {core::Note{.pitch = core::Pitch::fromMidi(60 + static_cast<int>(m))}})};
+    }
+    song.measureHeader(0).doubleBar = true;
+    song.measureHeader(2).doubleBar = true;
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const std::string& xml = exported.data;
+    const auto measure = [&](int number) {
+        const auto from = xml.find(std::format(R"(<measure number="{}")", number));
+        return xml.substr(from, xml.find("</measure>", from) - from);
+    };
+    // Written once, at the right of the measure, though the part has two staves.
+    for (const int number : {1, 3}) {
+        const std::string text = measure(number);
+        const std::string_view style = "<bar-style>light-light</bar-style>";
+        const auto at = text.find(style);
+        REQUIRE(at != std::string::npos);
+        CHECK(text.find("light-light", at + style.size()) == std::string::npos);
+    }
+    CHECK(measure(2).find("light-light") == std::string::npos);
+    requireSame(song, roundTrip(song));
+
+    song.measureHeader(1).repeatTimes = 2;
+    song.measureHeader(1).doubleBar = true;
+    song.measureHeader(3).doubleBar = true;
+    const std::string under = exportMusicXml(song).data;
+    CHECK(under.find("light-light") != std::string::npos);
+    const auto second = under.find(R"(<measure number="2")");
+    const std::string closing = under.substr(second, under.find("</measure>", second) - second);
+    CHECK(closing.find("light-light") == std::string::npos);
+    CHECK(closing.find("light-heavy") != std::string::npos);
+}
+
 TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
           "[musicxml][export]") {
     // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the

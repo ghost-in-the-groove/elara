@@ -348,6 +348,8 @@ def write_header(w: Writer, index: int, h: dict) -> None:
         flags |= 0x20
     if "key" in h:
         flags |= 0x40
+    if h.get("double_bar"):
+        flags |= 0x80
     if w.version >= 500 and index > 0:
         w.u8(0)
     w.u8(flags)
@@ -676,7 +678,7 @@ def dal_segno_gp5() -> dict:
                  "tab": "Elara contributors"},
         "tempo": 120, "key": 0,
         "directions": {2: 2, 17: 3, 10: 4, 0: 5},
-        "measures": [{"time": (4, 4)}, {}, {}, {}, {}, {}],
+        "measures": [{"time": (4, 4)}, {}, {}, {"double_bar": True}, {}, {}],
         "tracks": [guitar],
     }
 

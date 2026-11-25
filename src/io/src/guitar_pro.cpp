@@ -1294,6 +1294,8 @@ private:
             song.measureHeader(m).timeSignature = time;
             song.measureHeader(m).keySignature = key;
             readRepeats(bar, song.measureHeader(m), m);
+            // <DoubleBar/>: a double barline closes the bar (ADR-0103).
+            song.measureHeader(m).doubleBar = static_cast<bool>(bar.child("DoubleBar"));
             readDirections(bar, song.measureHeader(m), m);
             readSection(bar, song.measureHeader(m));
             warnMasterBar(bar, m);

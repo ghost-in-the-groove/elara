@@ -25,6 +25,7 @@
     "toCoda": true
    },
    {
+    "doubleBar": true,
     "jump": "dal-segno",
     "jumpThen": "al-coda"
    },

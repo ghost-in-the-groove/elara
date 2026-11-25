@@ -370,6 +370,11 @@ TEST_CASE("Guitar Pro: directions become signs and jumps", "[io][guitarpro]") {
     CHECK(song.measureHeader(0).section == "Intro");
     CHECK(song.measureHeader(1).section.empty());
     CHECK(song.measureHeader(5).section == "B");
+    // A double barline closes the measure before it (ADR-0103).
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        CAPTURE(m);
+        CHECK(song.measureHeader(m).doubleBar == (m == 4));
+    }
 }
 
 TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {

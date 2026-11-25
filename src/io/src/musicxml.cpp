@@ -1804,6 +1804,7 @@ private:
     void readBarline(pugi::xml_node barline, std::size_t index, MeasureHeader& header) {
         if (first_) {
             readRepeats(barline, index, header);
+            readDoubleBar(barline, index, header);
         }
         if (barline.child("fermata")) {
             warn("fermatas dropped", index);
@@ -1818,6 +1819,22 @@ private:
                 navigation.coda = signKind(barline.attribute("coda").value(), "double-coda");
             }
             navigate(header, navigation, index);
+        }
+    }
+
+    /// A light-light barline (ADR-0103): on the right of measure `index`, or
+    /// on its left for the measure before.
+    void readDoubleBar(pugi::xml_node barline, std::size_t index, MeasureHeader& header) {
+        if (textOf(barline.child("bar-style")) != "light-light") {
+            return;
+        }
+        const std::string_view location = barline.attribute("location").value();
+        if (location == "left") {
+            if (index > 0 && index <= score_.headers.size()) {
+                score_.headers[index - 1].doubleBar = true;
+            }
+        } else if (location.empty() || location == "right") {
+            header.doubleBar = true;
         }
     }
 

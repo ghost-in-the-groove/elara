@@ -884,9 +884,8 @@ void measureRange(const core::Song& song, std::span<const StaffSelection> staves
             }
             writer.collect(m, columns[s]);
             emptyWidth = std::max(emptyWidth, writer.emptyWidth());
-            width.barline = std::max(width.barline, writer.barline(m, writer.ending(m, 0.0),
-                                                                   m + 1 == song.measureCount(),
-                                                                   header.repeatEnd()));
+            width.barline = std::max(
+                width.barline, writer.barline(m, writer.ending(m, 0.0), closingBarline(song, m)));
             writer.clearItems();
         }
         if (header.repeatStart) {
@@ -1026,7 +1025,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
                 ColumnBox{.measure = m, .start = position.start, .x = position.x});
         }
         measures.push_back(std::move(box));
-        const bool songEnd = m + 1 == song.measureCount();
+        const BarlineKind closes = closingBarline(song, m);
         // The barline after what closes the measure on any staff.
         double closing = barline;
         for (const auto& writer : writers) {
@@ -1034,7 +1033,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         }
         double after = closing;
         for (const auto& writer : writers) {
-            after = std::max(after, writer->barline(m, closing, songEnd, header.repeatEnd()));
+            after = std::max(after, writer->barline(m, closing, closes));
         }
         barlineEnds.push_back(after);
         x = after;
