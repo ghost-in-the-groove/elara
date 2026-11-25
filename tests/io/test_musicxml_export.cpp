@@ -817,6 +817,35 @@ TEST_CASE("MusicXML export: mordents and turns come back", "[musicxml][export]")
     requireSame(song, roundTrip(song));
 }
 
+TEST_CASE("MusicXML export: fingerings come back by the kind of instrument", "[musicxml][export]") {
+    // ADR-0093: a piano's thumb is 1, a guitar's T; the plucking fingers too.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("classical-guitar")));
+    const core::Duration whole(core::NoteValue::Whole);
+    core::Note key{.pitch = *core::Pitch::parse("C4")};
+    key.effects.fingering = core::Finger::Thumb;
+    song.track(p).staff(0).measure(0).voices[0].beats = {beatOf(whole, {key})};
+    core::Staff& strings = song.track(g).staff(0);
+    core::Note low = strings.frettedNote(6, 3);
+    low.effects.fingering = core::Finger::Ring;
+    low.effects.pluck = core::Finger::Thumb;
+    core::Note high = strings.frettedNote(2, 1);
+    high.effects.fingering = core::Finger::Thumb;
+    high.effects.pluck = core::Finger::Little;
+    strings.measure(0).voices[0].beats = {beatOf(whole, {low, high})};
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    CHECK(exported.data.find("<fingering>1</fingering>") != std::string::npos);
+    CHECK(exported.data.find("<fingering>3</fingering>") != std::string::npos);
+    CHECK(exported.data.find("<fingering>T</fingering>") != std::string::npos);
+    CHECK(exported.data.find("<pluck>c</pluck>") != std::string::npos);
+    requireSame(song, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
     // ADR-0086: a slur starts on the first beat slurred in a row and stops on
     // the beat after the last, across barlines, numbered by staff and voice; a

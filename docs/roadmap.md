@@ -158,6 +158,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML and in MIDI files (controller 64)
   - [x] Drawn under standard notation: "Ped.", a line with notches at the changes and a hook
   - [x] Set at the caret
+- [x] Fingerings: the finger that plays each note and, on strings, the one that plucks it (ADR-0093)
+  - [x] In the model and kept by the native format
+  - [x] Read and written in MusicXML, read from Guitar Pro 3-5
+  - [x] Drawn over or under the notes, small and left of them for a fretting hand
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

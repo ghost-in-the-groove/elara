@@ -274,11 +274,19 @@ def write_note(w: Writer, n: dict) -> None:
         flags |= 0x10
     if n.get("accent"):
         flags |= 0x40
+    if "fingers" in n:
+        flags |= 0x80
     w.u8(flags)
     w.u8({"normal": 1, "tie": 2, "dead": 3}[n.get("kind", "normal")])
     if flags & 0x10:
         w.i8(n["dynamic"])
     w.i8(n["fret"])
+    if flags & 0x80:
+        # The fretting and the plucking hand: -1 none, 0 the thumb to 4 the
+        # little finger.
+        left, right = n["fingers"]
+        w.i8(left)
+        w.i8(right)
     if w.version >= 500:
         w.u8(0)
     if flags & 0x08:
@@ -520,9 +528,9 @@ def techniques_gp5() -> dict:
                                            "vibrato": True})], mix={"tempo": 80}),
               beat(0, [note(1, 12, effects={"harmonic": (1,), "let_ring": True})])],
              [EMPTY]],
-            # Measure 2: a tie that does not repeat its fret, a loud dead note
-            # with a heavy accent; a second voice.
-            [[beat(-1, [note(3, 5, dynamic=5)]),
+            # Measure 2: a tie that does not repeat its fret (fretted with the
+            # ring finger), a loud dead note with a heavy accent; a second voice.
+            [[beat(-1, [note(3, 5, dynamic=5, fingers=(3, -1))]),
               beat(0, [note(3, 0, kind="tie", dynamic=5)]),
               beat(0, [note(4, 0, kind="dead", heavy_accent=True, dynamic=7)])],
              [beat(-1, [note(6, 0)]), rest(-1)]],
@@ -621,9 +629,10 @@ def melody_gp3() -> dict:
         "name": "Nylon Guitar", "channel": 1, "program": 24, "strings": STANDARD,
         "content": [
             # Measure 1: a natural harmonic (kept per beat in Guitar Pro 3), a
-            # hammer-on, a slide with a chord diagram, then a tapped quintuplet.
+            # hammer-on fretted with the index and plucked with m, a slide with
+            # a chord diagram, then a tapped quintuplet.
             [[beat(0, [note(1, 12)], effects={"natural_harmonic": True}),
-              beat(0, [note(2, 1, effects={"hammer": True})]),
+              beat(0, [note(2, 1, effects={"hammer": True}, fingers=(1, 2))]),
               beat(0, [note(2, 3, effects={"slide": True})],
                    chord=("Am", True, 1, [0, 1, 2, 2, 0, -1])),
               beat(2, [note(3, 2)], tuplet=5, effects={"slap": 1}),

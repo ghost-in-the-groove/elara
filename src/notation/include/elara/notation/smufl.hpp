@@ -122,6 +122,18 @@ enum class Glyph : std::uint8_t {
     OrnamentTurnInverted,
     // The sustain pedal (ADR-0092)
     KeyboardPedalPed,
+    // Fingerings (ADR-0093)
+    Fingering1,
+    Fingering2,
+    Fingering3,
+    Fingering4,
+    Fingering5,
+    FingeringTUpper, ///< the thumb of a fretting hand
+    FingeringPLower, ///< the plucking fingers: p, i, m, a, c
+    FingeringILower,
+    FingeringMLower,
+    FingeringALower,
+    FingeringCLower,
     // Dynamics
     DynamicPiano,
     DynamicMezzo,

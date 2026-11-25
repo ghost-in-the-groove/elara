@@ -288,6 +288,9 @@ struct Head {
     double accidentalX = 0.0; // accidental origin, from the chord's x
     double dx = 0.0;          // notehead origin, from the chord's x
     const core::Note* note = nullptr;
+    // The finger of a fretting hand, small left of the notehead (ADR-0093).
+    std::optional<Glyph> fingering;
+    double fingeringX = 0.0; // its origin, from the chord's x
 };
 
 struct Chord {
@@ -357,8 +360,10 @@ struct Column {
 class StandardWriter final : public StaffWriter {
 public:
     StandardWriter(const core::Song& song, const core::Track& track, const core::Staff& staff,
-                   const EngravingFont& font, bool techniques)
+                   bool lowerStaff, const EngravingFont& font, bool techniques)
         : StaffWriter(font, kStaffHeight, 5), song_(song), staff_(staff), clef_(staff.clef()),
+          fretting_(track.instrument().kind == core::InstrumentKind::Fretted),
+          lowerStaff_(lowerStaff),
           percussion_(staff.clef() == Clef::Percussion ||
                       track.instrument().kind == core::InstrumentKind::Percussion),
           offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
@@ -530,12 +535,69 @@ private:
         for (const TupletSpan& group : tuplets_) {
             tuplet(group);
         }
+        fingerings();
         slurs();
         centreMeasureRests(start, barline);
         fermatas(start, barline);
         ornaments(positions, barline);
         if (techniques_) {
             markTechniques(positions, barline);
+        }
+    }
+
+    // The fingerings over a chord's notes, or for a fretted instrument the
+    // plucking fingers (ADR-0093): one over the other in the order of the
+    // notes, centred on the noteheads, clear of the ink; under the notes on a
+    // lower staff of the track and for the lower voice of two. Slurs go round
+    // them.
+    void fingerings() {
+        std::vector<Glyph> marks;
+        for (Chord& chord : chords_) {
+            if (chord.beat == nullptr || chord.rest || percussion_) {
+                continue;
+            }
+            marks.clear();
+            for (const Head& head : chord.heads) { // top to bottom
+                if (head.note == nullptr) {
+                    continue;
+                }
+                const core::Finger finger =
+                    fretting_ ? head.note->effects.pluck : head.note->effects.fingering;
+                if (finger != core::Finger::None) {
+                    marks.push_back(fretting_ ? pluckGlyph(finger) : fingerGlyph(finger));
+                }
+            }
+            if (marks.empty()) {
+                continue;
+            }
+            const bool below = voiceCount_ > 1 ? !voiceUp_[chord.voice] : lowerStaff_;
+            const double middle = chord.x + (chord.headLeft + chord.headRight) / 2;
+            double half = 0.0;
+            for (const Glyph mark : marks) {
+                half = std::max(half, metrics(mark).box.width() / 2);
+            }
+            const Extents ink = inkBetween(middle - half, middle + half);
+            double edge = below ? ink.bottom + kFingeringGap : ink.top - kFingeringGap;
+            // Outwards from the notes: under them the highest note's first,
+            // over them the lowest note's.
+            for (std::size_t k = 0; k < marks.size(); ++k) {
+                const Glyph mark = below ? marks[k] : marks[marks.size() - 1 - k];
+                const BoundingBox& box = metrics(mark).box;
+                const double x = middle - (box.southWest.x + box.northEast.x) / 2;
+                const double y = below ? edge + box.northEast.y : edge + box.southWest.y;
+                glyph(mark, x, y, Role::Fingering);
+                edge = below ? y - box.southWest.y + kFingeringStackGap
+                             : y - box.northEast.y - kFingeringStackGap;
+            }
+            const double outer = below ? edge - kFingeringStackGap : edge + kFingeringStackGap;
+            if (below) {
+                chord.inkBottom = std::max(chord.inkBottom, outer);
+            } else {
+                chord.inkTop = std::min(chord.inkTop, outer);
+            }
+            if (below == chord.stemUp) { // on the notehead side
+                chord.marks = outer;
+            }
         }
     }
 
@@ -1019,6 +1081,9 @@ private:
             chord.headRight = std::max(chord.headRight, head.dx + box.northEast.x);
         }
         chord.left = chord.headLeft - placeAccidentals(chord);
+        if (fretting_ && !percussion_) {
+            chord.left -= placeFingerings(chord, chord.left);
+        }
         chord.right = chord.headRight + dotsWidth(chord.duration.dots());
         if (stem && chord.beamGroup < 0 && beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
@@ -1086,6 +1151,91 @@ private:
         return chord.headLeft - (edge + kAccidentalColumnGap);
     }
 
+    // The glyph of a finger: 1 to 5 from the thumb, or for a fretting hand T
+    // and 1 to 4 from the index (ADR-0093).
+    [[nodiscard]] Glyph fingerGlyph(core::Finger finger) const {
+        static constexpr std::array kFrom{Glyph::Fingering1, Glyph::Fingering1, Glyph::Fingering2,
+                                          Glyph::Fingering3, Glyph::Fingering4, Glyph::Fingering5};
+        static constexpr std::array kFretting{Glyph::FingeringTUpper, Glyph::FingeringTUpper,
+                                              Glyph::Fingering1,      Glyph::Fingering2,
+                                              Glyph::Fingering3,      Glyph::Fingering4};
+        return (fretting_ ? kFretting : kFrom)[static_cast<std::size_t>(finger) % kFrom.size()];
+    }
+
+    // The letter of a plucking finger: p, i, m, a, c.
+    [[nodiscard]] static Glyph pluckGlyph(core::Finger finger) {
+        static constexpr std::array kLetters{Glyph::FingeringPLower, Glyph::FingeringPLower,
+                                             Glyph::FingeringILower, Glyph::FingeringMLower,
+                                             Glyph::FingeringALower, Glyph::FingeringCLower};
+        return kLetters[static_cast<std::size_t>(finger) % kLetters.size()];
+    }
+
+    // The fingerings of a fretting hand (ADR-0093), small, each level with its
+    // notehead in columns left of `left`, the accidentals' edge, so that two in
+    // a column keep a staff space apart; returns the width they take, gaps
+    // included.
+    double placeFingerings(Chord& chord, double left) {
+        constexpr int kClearance = 2; // steps: a staff space
+        const auto fingered = [](const Head& head) {
+            return head.note != nullptr && head.note->effects.fingering != core::Finger::None;
+        };
+        if (std::ranges::none_of(chord.heads, fingered)) {
+            for (Head& head : chord.heads) {
+                head.fingering.reset();
+            }
+            return 0.0;
+        }
+        struct FingerColumn {
+            std::vector<int> steps;
+            double width = 0.0;
+        };
+        std::vector<FingerColumn> columns;
+        std::vector<std::size_t> columnOf(chord.heads.size(), 0);
+        for (std::size_t i = 0; i < chord.heads.size(); ++i) {
+            Head& head = chord.heads[i];
+            head.fingering.reset();
+            if (!fingered(head)) {
+                continue;
+            }
+            head.fingering = fingerGlyph(head.note->effects.fingering);
+            std::size_t c = 0;
+            while (c < columns.size() &&
+                   std::ranges::any_of(
+                       columns[c].steps,
+                       [&](int step) { return std::abs(step - head.step) < kClearance; })) {
+                ++c;
+            }
+            if (c == columns.size()) {
+                columns.emplace_back();
+            }
+            columns[c].steps.push_back(head.step);
+            columns[c].width = std::max(columns[c].width,
+                                        metrics(*head.fingering).box.width() * kFingeringLeftScale);
+            columnOf[i] = c;
+        }
+        if (columns.empty()) {
+            return 0.0;
+        }
+        // Clear of the ledger lines, which reach left of the noteheads.
+        const bool ledgers = chord.heads.front().step <= -2 || chord.heads.back().step >= 10;
+        const double from =
+            ledgers ? std::min(left, chord.headLeft - defaults_.legerLineExtension) : left;
+        std::vector<double> rightEdge(columns.size());
+        double edge = from - kFingeringGap;
+        for (std::size_t c = 0; c < columns.size(); ++c) {
+            rightEdge[c] = edge;
+            edge -= columns[c].width + kFingeringGap;
+        }
+        for (std::size_t i = 0; i < chord.heads.size(); ++i) {
+            Head& head = chord.heads[i];
+            if (head.fingering) {
+                head.fingeringX = rightEdge[columnOf[i]] -
+                                  metrics(*head.fingering).box.northEast.x * kFingeringLeftScale;
+            }
+        }
+        return left - (edge + kFingeringGap);
+    }
+
     void draw(Chord& chord) {
         const double x = chord.x;
         if (chord.rest) {
@@ -1110,6 +1260,16 @@ private:
             if (head.accidental) {
                 glyph(*head.accidental, x + head.accidentalX, yOf(head.step), Role::Accidental);
                 ink(metrics(*head.accidental).box, yOf(head.step));
+            }
+            if (head.fingering) { // level with the middle of its notehead
+                const BoundingBox& box = metrics(*head.fingering).box;
+                const double y =
+                    yOf(head.step) + (box.southWest.y + box.northEast.y) * kFingeringLeftScale / 2;
+                glyph(*head.fingering, x + head.fingeringX, y, Role::Fingering,
+                      kFingeringLeftScale);
+                chord.inkTop = std::min(chord.inkTop, y - box.northEast.y * kFingeringLeftScale);
+                chord.inkBottom =
+                    std::max(chord.inkBottom, y - box.southWest.y * kFingeringLeftScale);
             }
             const bool onLine = head.step % 2 == 0;
             const bool lower = voiceCount_ > 1 && !voiceUp_[chord.voice];
@@ -2051,6 +2211,8 @@ private:
     Clef clef_;                       // in force at the measure being drawn
     Clef clefCached_ = staff_.clef(); // clefIn(): at clefMeasure_
     std::size_t clefMeasure_ = static_cast<std::size_t>(-1);
+    bool fretting_;   // fingerings are of a fretting hand, the plucking one's apart (ADR-0093)
+    bool lowerStaff_; // a staff under the track's first, whose fingerings go under it
     bool percussion_;
     int offset_;
     bool techniques_;
@@ -2117,7 +2279,8 @@ std::unique_ptr<StaffWriter> makeStandardWriter(const core::Song& song, std::siz
                                                 std::size_t staff, const EngravingFont& font,
                                                 bool techniques) {
     const core::Track& part = song.track(track);
-    return std::make_unique<StandardWriter>(song, part, part.staff(staff), font, techniques);
+    return std::make_unique<StandardWriter>(song, part, part.staff(staff), staff > 0, font,
+                                            techniques);
 }
 
 } // namespace elara::notation::detail

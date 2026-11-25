@@ -113,6 +113,8 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
     Q_PROPERTY(int caretTrill READ caretTrill NOTIFY caretChanged)
     Q_PROPERTY(int caretOrnament READ caretOrnament NOTIFY caretChanged)
+    Q_PROPERTY(int caretFingering READ caretFingering NOTIFY caretChanged)
+    Q_PROPERTY(int caretPluck READ caretPluck NOTIFY caretChanged)
     Q_PROPERTY(int caretDynamic READ caretDynamic NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
@@ -562,6 +564,14 @@ public:
     /// core::Ornament (0 none), and the one setOrnament() gives them.
     [[nodiscard]] int caretOrnament() const;
     Q_INVOKABLE void setOrnament(int kind);
+    /// The finger that plays the caret's notes and the one that plucks them
+    /// (ADR-0093), numbered as core::Finger (0 none, 1 the thumb to 5 the
+    /// little finger); setFingering() and setPluck() give one to all of them.
+    /// Only a fretted staff has plucking fingers.
+    [[nodiscard]] int caretFingering() const;
+    [[nodiscard]] int caretPluck() const;
+    Q_INVOKABLE void setFingering(int finger);
+    Q_INVOKABLE void setPluck(int finger);
     /// The dynamic at the caret (ADR-0047), numbered as core::Dynamic (0 ppp
     /// to 7 fff): the notes there, or the last ones struck before them.
     [[nodiscard]] int caretDynamic() const;

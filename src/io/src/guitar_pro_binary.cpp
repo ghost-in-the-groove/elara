@@ -41,6 +41,7 @@ using core::ChordSymbol;
 using core::Clef;
 using core::Duration;
 using core::Dynamic;
+using core::Finger;
 using core::Fraction;
 
 using core::HarmonicKind;
@@ -999,8 +1000,16 @@ private:
         if ((flags & 0x20U) != 0) {
             fret = in_.i8();
         }
+        // The fingers of the fretting and the plucking hand (ADR-0093): -1 none,
+        // 0 the thumb to 4 the little finger.
+        Finger fingering = Finger::None;
+        Finger pluck = Finger::None;
         if ((flags & 0x80U) != 0) {
-            in_.skip(2); // fingering
+            const auto finger = [](int value) {
+                return value >= 0 && value <= 4 ? static_cast<Finger>(value + 1) : Finger::None;
+            };
+            fingering = finger(in_.i8());
+            pluck = finger(in_.i8());
         }
         if (version_ >= 500) {
             if ((flags & 0x01U) != 0) {
@@ -1009,6 +1018,8 @@ private:
             in_.skip(1);
         }
         core::NoteEffects effects;
+        effects.fingering = fingering;
+        effects.pluck = pluck;
         effects.dynamic = dynamicFor(dynamic);
         effects.ghost = (flags & 0x04U) != 0;
         if ((flags & 0x02U) != 0) {

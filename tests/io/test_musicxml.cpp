@@ -353,6 +353,66 @@ TEST_CASE("MusicXML: mordents and turns are the notes' ornaments", "[musicxml]")
     CHECK(result.warnings[0].find("ornaments dropped") != std::string::npos);
 }
 
+TEST_CASE("MusicXML: fingerings by the kind of instrument, and plucking fingers", "[musicxml]") {
+    // ADR-0093: on a piano 1 is the thumb; on a guitar 1 is the index, T the
+    // thumb and p, i, m, a, c the plucking fingers. A second fingering (a
+    // substitution) and a text that names no finger warn.
+    const auto fingered = [](std::string_view step, std::string_view technical) {
+        return quarterNote(
+            step, std::format("<notations><technical>{}</technical></notations>", technical));
+    };
+    const ImportResult piano = parse(onePart(
+        fingered("C", "<fingering>1</fingering>") + fingered("D", "<fingering>5</fingering>") +
+        fingered("E", "<fingering>3</fingering><fingering>1</fingering>") +
+        fingered("F", "<fingering>3-1</fingering>")));
+    const std::vector<core::Beat>& keys = voiceOf(piano.song, 0, 0, 0).beats;
+    REQUIRE(keys.size() == 4);
+    const auto fingerOf = [](const std::vector<core::Beat>& beats, std::size_t b) {
+        return beats[b].notes.at(0).effects.fingering;
+    };
+    CHECK(fingerOf(keys, 0) == core::Finger::Thumb);
+    CHECK(fingerOf(keys, 1) == core::Finger::Little);
+    CHECK(fingerOf(keys, 2) == core::Finger::Middle);
+    CHECK(fingerOf(keys, 3) == core::Finger::None);
+    REQUIRE(piano.warnings.size() == 1);
+    CHECK(piano.warnings[0].find("fingerings other than one finger dropped") != std::string::npos);
+
+    // A guitar part: its staff has a tuning.
+    std::string tuning = "<staff-details><staff-lines>6</staff-lines>";
+    constexpr std::array<std::pair<std::string_view, int>, 6> kStrings{
+        {{"E", 2}, {"A", 2}, {"D", 3}, {"G", 3}, {"B", 3}, {"E", 4}}};
+    for (std::size_t line = 0; line < kStrings.size(); ++line) {
+        tuning += std::format("<staff-tuning line=\"{}\"><tuning-step>{}</tuning-step>"
+                              "<tuning-octave>{}</tuning-octave></staff-tuning>",
+                              line + 1, kStrings[line].first, kStrings[line].second);
+    }
+    tuning += "</staff-details>";
+    std::string score = onePart(fingered("C", "<fingering>1</fingering><pluck>p</pluck>") +
+                                fingered("D", "<fingering>T</fingering><pluck>a</pluck>") +
+                                fingered("E", "<fingering>4</fingering><pluck>x</pluck>") +
+                                fingered("F", "<fingering>5</fingering><pluck>q</pluck>"));
+    score.insert(score.find("</attributes>"), tuning);
+    const ImportResult guitar = parse(score);
+    REQUIRE(guitar.song.track(0).instrument().kind == core::InstrumentKind::Fretted);
+    const std::vector<core::Beat>& strings = voiceOf(guitar.song, 0, 0, 0).beats;
+    REQUIRE(strings.size() == 4);
+    const auto pluckOf = [&](std::size_t b) {
+        return strings[b].notes.at(0).effects.pluck;
+    };
+    CHECK(fingerOf(strings, 0) == core::Finger::Index);
+    CHECK(pluckOf(0) == core::Finger::Thumb);
+    CHECK(fingerOf(strings, 1) == core::Finger::Thumb);
+    CHECK(pluckOf(1) == core::Finger::Ring);
+    CHECK(fingerOf(strings, 2) == core::Finger::Little);
+    CHECK(pluckOf(2) == core::Finger::Little);
+    CHECK(fingerOf(strings, 3) == core::Finger::None); // a fretting hand has four fingers
+    CHECK(pluckOf(3) == core::Finger::None);
+    REQUIRE(guitar.warnings.size() == 2);
+    CHECK(guitar.warnings[0].find("fingerings other than one finger dropped") != std::string::npos);
+    CHECK(guitar.warnings[1].find("plucking fingers other than p, i, m, a and c dropped") !=
+          std::string::npos);
+}
+
 TEST_CASE("MusicXML: trill marks trill to the next step of the key", "[musicxml]") {
     // ADR-0090: in D major E trills with F#, two semitones up, and C# with D,
     // one; an accidental mark changes the other note; the wavy line after a

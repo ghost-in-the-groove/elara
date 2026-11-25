@@ -319,6 +319,10 @@ constexpr std::array kEditNames{
     Translation{"Change trill", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change trill")},
     Translation{"Change ornament",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change ornament")},
+    Translation{"Change fingering",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change fingering")},
+    Translation{"Change plucking finger",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change plucking finger")},
     Translation{"Change harmonic",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change harmonic")},
     Translation{"Add grace note", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Add grace note")},
@@ -1681,6 +1685,15 @@ QString ScoreDocument::caretStatus() const {
     case core::Ornament::None:
         break;
     }
+    const auto latin = [](std::string_view text) {
+        return QLatin1StringView(text.data(), static_cast<qsizetype>(text.size()));
+    };
+    if (fx.fingering != core::Finger::None) {
+        parts.append(tr("Finger %1").arg(latin(core::fingeringText(fx.fingering, caretFretted()))));
+    }
+    if (fx.pluck != core::Finger::None) {
+        parts.append(tr("Plucked with %1").arg(latin(core::pluckText(fx.pluck))));
+    }
     // Then the beat's own effects.
     if (const int strum = caretStrum(); strum != 0) {
         parts.append(strum == 1 ? tr("Strum down") : tr("Strum up"));
@@ -2487,6 +2500,38 @@ void ScoreDocument::setOrnament(int kind) {
             return core::setOrnament(song, caret, ornament);
         },
         [ornament](const core::NoteEffects& fx) { return fx.ornament == ornament; });
+}
+
+int ScoreDocument::caretFingering() const {
+    return static_cast<int>(noteEffectsAtCaret().fingering);
+}
+
+int ScoreDocument::caretPluck() const {
+    return static_cast<int>(noteEffectsAtCaret().pluck);
+}
+
+void ScoreDocument::setFingering(int finger) {
+    if (finger < 0 || finger > static_cast<int>(core::Finger::Little)) {
+        return;
+    }
+    const auto chosen = static_cast<core::Finger>(finger);
+    changeNoteEffects(
+        [chosen](const core::Song& song, const core::Caret& caret) {
+            return core::setFingering(song, caret, std::span(&chosen, 1));
+        },
+        [chosen](const core::NoteEffects& fx) { return fx.fingering == chosen; });
+}
+
+void ScoreDocument::setPluck(int finger) {
+    if (finger < 0 || finger > static_cast<int>(core::Finger::Little) || !caretFretted()) {
+        return;
+    }
+    const auto chosen = static_cast<core::Finger>(finger);
+    changeNoteEffects(
+        [chosen](const core::Song& song, const core::Caret& caret) {
+            return core::setPluck(song, caret, chosen);
+        },
+        [chosen](const core::NoteEffects& fx) { return fx.pluck == chosen; });
 }
 
 void ScoreDocument::toggleTrill() {

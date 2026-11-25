@@ -967,6 +967,30 @@ Rectangle {
                             active: root.document.caretOrnament === 4
                             onClicked: root.document.setOrnament(active ? 0 : 4)
                         }
+
+                        // The finger that plays the caret's notes, numbered as
+                        // core::Finger: each click the next one, then none. On a
+                        // fretted staff 1 is the index and T the thumb, which
+                        // comes last (ADR-0093).
+                        EffectKind {
+                            readonly property bool fretted: root.document.caretFretted
+                            readonly property int finger: root.document.caretFingering
+                            tip: qsTr("Fingering: again for the next finger")
+                            label: (fretted ? ["1", "T", "1", "2", "3", "4"]
+                                            : ["1", "1", "2", "3", "4", "5"])[finger]
+                            active: finger !== 0
+                            onClicked: root.document.setFingering(
+                                fretted ? [2, 0, 3, 4, 5, 1][finger] : (finger + 1) % 6)
+                        }
+                        // The finger that plucks them on a fretted staff: p, i, m,
+                        // a, c, then none.
+                        EffectKind {
+                            visible: root.document.caretFretted
+                            tip: qsTr("Plucking finger: again for the next one")
+                            label: ["p", "p", "i", "m", "a", "c"][root.document.caretPluck]
+                            active: root.document.caretPluck !== 0
+                            onClicked: root.document.setPluck((root.document.caretPluck + 1) % 6)
+                        }
                     }
 
                     Label {

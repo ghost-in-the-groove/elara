@@ -446,6 +446,30 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "ornament") { // ornament <mordent|upper-mordent|turn|inverted-turn|none>
         edit = setOrnament(song, entry.caret,
                            static_cast<Ornament>(kindOf(verb, step.word(1), kOrnamentKinds)));
+    } else if (verb == "fingering") {
+        // fingering <finger...> (ADR-0093): one per note from the lowest up, or
+        // one for all; 1-5 from the thumb, or t and 1-4 on a fretted instrument.
+        const bool fretted =
+            song.track(entry.caret.track).instrument().kind == InstrumentKind::Fretted;
+        std::vector<Finger> fingers;
+        for (std::size_t i = 1; i == 1 || step.has(i); ++i) {
+            const std::string_view word = step.word(i);
+            const std::optional<Finger> finger =
+                word == "none" ? std::optional(Finger::None) : fingerOfText(word, fretted);
+            if (!finger) {
+                throw StepSyntaxError(std::format("not a finger: {}", word));
+            }
+            fingers.push_back(*finger);
+        }
+        edit = setFingering(song, entry.caret, fingers);
+    } else if (verb == "pluck") { // pluck <p|i|m|a|c|none> (ADR-0093)
+        const std::string_view word = step.word(1);
+        const std::optional<Finger> finger =
+            word == "none" ? std::optional(Finger::None) : pluckOfText(word);
+        if (!finger) {
+            throw StepSyntaxError(std::format("not a plucking finger: {}", word));
+        }
+        edit = setPluck(song, entry.caret, *finger);
     } else if (verb == "trill") { // trill <on|semitones|none> [16|32|64] (ADR-0090)
         const std::string_view what = step.word(1);
         const NoteValue speed = step.has(2) ? trillSpeed(step.word(2)) : NoteValue::ThirtySecond;
@@ -970,7 +994,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
         "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", "
         "\"trill <on|semitones|none> [16|32|64]\", "
-        "\"ornament <mordent|upper-mordent|turn|inverted-turn|none>\", \"harmonic "
+        "\"ornament <mordent|upper-mordent|turn|inverted-turn|none>\", "
+        "\"fingering <1-5|t|none>...\", \"pluck <p|i|m|a|c|none>\", \"harmonic "
         "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "
         "save");
     editCommand->callback(

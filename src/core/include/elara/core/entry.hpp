@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -200,6 +201,14 @@ enum class NoteEffect : std::uint8_t {
 /// A mordent, an upper mordent, a turn, an inverted turn or none
 /// ("Change ornament", ADR-0091).
 [[nodiscard]] Entry setOrnament(const Song& song, const Caret& caret, Ornament ornament);
+/// The fingers that play the caret's notes ("Change fingering", ADR-0093): one
+/// for each, from the lowest note up, or one for all of them. Throws
+/// std::invalid_argument for another number of fingers.
+[[nodiscard]] Entry setFingering(const Song& song, const Caret& caret,
+                                 std::span<const Finger> fingers);
+/// The finger that plucks the caret's notes ("Change plucking finger",
+/// ADR-0093). Throws std::logic_error on a staff without strings.
+[[nodiscard]] Entry setPluck(const Song& song, const Caret& caret, Finger finger);
 /// A harmonic of `kind`, or none ("Change harmonic"): a natural harmonic at the
 /// note's fret, the others an octave above the fretted note. Throws
 /// std::logic_error for a harmonic on a staff without strings, and

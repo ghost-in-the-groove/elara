@@ -443,6 +443,21 @@ TEST_CASE("Guitar Pro 3-5: chords keep their names and diagrams", "[io][guitarpr
     CHECK(techniques.song.track(0).staff(0).measure(2).voices[0].beats[0].notes.size() == 1);
 }
 
+TEST_CASE("Guitar Pro 3-5: notes keep the fingers of both hands", "[io][guitarpro]") {
+    // ADR-0093: the fretting hand's finger, then the plucking hand's.
+    const auto noteOf = [](const core::Song& song, std::size_t m, std::size_t b) {
+        return song.track(0).staff(0).measure(m).voices[0].beats.at(b).notes.at(0);
+    };
+    const core::Note plucked = noteOf(load("melody.gp3").song, 0, 1);
+    CHECK(plucked.effects.fingering == core::Finger::Index);
+    CHECK(plucked.effects.pluck == core::Finger::Middle);
+    const core::Note fretted = noteOf(load("techniques.gp5").song, 1, 0);
+    CHECK(fretted.effects.fingering == core::Finger::Ring);
+    CHECK(fretted.effects.pluck == core::Finger::None);
+    CHECK(fretted.effects.dynamic == core::Dynamic::MF); // what follows the fingers
+    CHECK(noteOf(load("techniques.gp5").song, 0, 0).effects.fingering == core::Finger::None);
+}
+
 TEST_CASE("Guitar Pro 3-5: beats keep their text", "[io][guitarpro]") {
     // ADR-0081.
     const ImportResult melody = load("melody.gp3");

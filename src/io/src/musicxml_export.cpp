@@ -1719,7 +1719,8 @@ private:
         const bool technical = tapped || (firstNote && beatFx.pickStroke != PickStroke::None) ||
                                fx.legatoFromPrevious || legatoStart.has_value() ||
                                (note.position && !percussion_) || !fx.bend.isEmpty() ||
-                               fx.harmonic.kind != HarmonicKind::None;
+                               fx.harmonic.kind != HarmonicKind::None ||
+                               fx.fingering != Finger::None || fx.pluck != Finger::None;
         const bool articulations =
             fx.staccato || fx.tenuto || fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
             fx.slideOut == SlideOut::Downwards || fx.slideOut == SlideOut::Upwards;
@@ -1783,6 +1784,13 @@ private:
                     xml.start(name);
                     xml.attribute("type", "start");
                     xml.endText(name, *legatoStart ? "H" : "P");
+                }
+                if (fx.fingering != Finger::None) { // ADR-0093
+                    xml.text("fingering", fingeringText(fx.fingering, track_.instrument().kind ==
+                                                                          InstrumentKind::Fretted));
+                }
+                if (fx.pluck != Finger::None) {
+                    xml.text("pluck", pluckText(fx.pluck));
                 }
                 if (note.position && !percussion_) {
                     xml.number("string", note.position->string);
