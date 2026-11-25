@@ -414,6 +414,43 @@ TEST_CASE("Guitar Pro: a bar whose clef differs from the bar before changes it",
     CHECK(imported->warnings == std::vector<std::string>{"Gtr: clef changes dropped (measure 5)"});
 }
 
+TEST_CASE("Guitar Pro: a simile mark makes a measure repeat", "[io][guitarpro][simile]") {
+    // ADR-0102: Simple repeats the bar before, FirstOfDouble and
+    // SecondOfDouble the two bars before; the bar's own beats (Guitar Pro
+    // keeps a rest there) are dropped, and so is a mark it does not know.
+    const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0", beat, whole);
+    const std::array marks{"Simple", "Simple", "FirstOfDouble", "SecondOfDouble", "Triple"};
+    std::string masterBars;
+    std::string bars;
+    for (std::size_t m = 1; m <= marks.size(); ++m) {
+        masterBars += std::format("<MasterBar><Time>4/4</Time><Bars>{}</Bars></MasterBar>", m);
+        bars += std::format(R"(<Bar id="{}"><Clef>G2</Clef><SimileMark>{}</SimileMark>)"
+                            "<Voices>0 -1 -1 -1</Voices></Bar>",
+                            m, marks[m - 1]);
+    }
+    score.insert(score.find("</MasterBars>"), masterBars);
+    score.insert(score.find("</Bars><Voices>"), bars);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    const core::Staff& staff = imported->song.track(0).staff(0);
+    REQUIRE(imported->song.measureCount() == 6);
+    using core::MeasureRepeat;
+    CHECK(staff.measure(0).repeat == MeasureRepeat::None);
+    CHECK(staff.measure(1).repeat == MeasureRepeat::One);
+    CHECK(staff.measure(2).repeat == MeasureRepeat::One);
+    CHECK(staff.measure(3).repeat == MeasureRepeat::TwoFirst);
+    CHECK(staff.measure(4).repeat == MeasureRepeat::TwoSecond);
+    CHECK(staff.measure(5).repeat == MeasureRepeat::None);
+    for (std::size_t m = 1; m <= 4; ++m) {
+        CHECK(staff.measure(m).isEmpty());
+        CHECK(core::repeatSource(imported->song, staff, m) == 0);
+    }
+    CHECK_FALSE(staff.measure(5).isEmpty()); // the unknown mark keeps the bar's beats
+    CHECK(imported->warnings == std::vector<std::string>{"Gtr: simile marks dropped (measure 6)"});
+}
+
 TEST_CASE("Guitar Pro: a tenuto note is held, with a staccato portato", "[io][guitarpro]") {
     // ADR-0088: the Accent flags of a GPIF note: 1 staccato, 16 tenuto.
     const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";

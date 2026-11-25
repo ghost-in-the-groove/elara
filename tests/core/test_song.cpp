@@ -15,12 +15,15 @@ using elara::core::findInstrumentPreset;
 using elara::core::FretPosition;
 using elara::core::InstrumentKind;
 using elara::core::instrumentPresets;
+using elara::core::MeasureRepeat;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pitch;
+using elara::core::repeatSource;
 using elara::core::Song;
 using elara::core::Staff;
 using elara::core::Step;
+using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::TrackMix;
 using elara::core::Tuning;
@@ -266,4 +269,62 @@ TEST_CASE("A fretted staff turns string and fret into a note", "[core][song]") {
     const Staff drums(Clef::Percussion);
     CHECK_THROWS_AS(drums.frettedNote(1, 0), std::logic_error);
     CHECK_THROWS_AS(Staff(Clef::Treble8vb, Tuning::standardGuitar(), -1), std::invalid_argument);
+}
+
+TEST_CASE("A measure repeat stands for the measure or two measures before it", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("piano"));
+    song.appendMeasures(6);
+    Staff& staff = song.track(0).staff(0);
+    const Beat whole{.duration = Duration(NoteValue::Whole),
+                     .notes = {Note{.pitch = Pitch::fromMidi(60)}}};
+    staff.measure(0).voices[0].beats = {whole};
+    staff.measure(1).repeat = MeasureRepeat::One;
+    staff.measure(2).repeat = MeasureRepeat::One; // a repeat of a repeat
+    staff.measure(3).voices[0].beats = {whole};
+    staff.measure(4).repeat = MeasureRepeat::TwoFirst;
+    staff.measure(5).repeat = MeasureRepeat::TwoSecond;
+
+    CHECK(repeatSource(song, staff, 0) == 0);
+    CHECK(repeatSource(song, staff, 1) == 0);
+    CHECK(repeatSource(song, staff, 2) == 0);
+    CHECK(repeatSource(song, staff, 3) == 3);
+    CHECK(repeatSource(song, staff, 4) == 0); // measure 2, which repeats measure 0
+    CHECK(repeatSource(song, staff, 5) == 3);
+}
+
+TEST_CASE("A measure repeat counts on an empty measure after music of its length", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("piano"));
+    song.appendMeasures(5);
+    Staff& staff = song.track(0).staff(0);
+    // Nothing before it.
+    staff.measure(0).repeat = MeasureRepeat::One;
+    CHECK(repeatSource(song, staff, 0) == 0);
+    // One measure where two are repeated.
+    staff.measure(1).repeat = MeasureRepeat::TwoFirst;
+    CHECK(repeatSource(song, staff, 1) == 1);
+    // Music of its own wins over the sign.
+    staff.measure(2).repeat = MeasureRepeat::One;
+    staff.measure(2).voices[1].beats = {Beat{.duration = Duration(NoteValue::Whole)}};
+    CHECK(repeatSource(song, staff, 2) == 2);
+    // A measure of another length cannot be repeated.
+    staff.measure(4).repeat = MeasureRepeat::One;
+    CHECK(repeatSource(song, staff, 4) == 3);
+    song.measureHeader(4).timeSignature = TimeSignature(3, 4);
+    CHECK(repeatSource(song, staff, 4) == 4);
+}
+
+TEST_CASE("A measure repeat holds the pedal of the measure it repeats", "[core][song]") {
+    Song song;
+    song.addTrack(presetTrack("piano"));
+    song.appendMeasures(2);
+    Staff& left = song.track(0).staff(1);
+    Beat held{.duration = Duration(NoteValue::Whole),
+              .notes = {Note{.pitch = Pitch::fromMidi(48)}}};
+    held.effects.pedal = elara::core::Pedal::Down;
+    left.measure(0).voices[0].beats = {held};
+    left.measure(1).repeat = MeasureRepeat::One;
+    REQUIRE(song.pedalSpans(0, 0).size() == 1);
+    CHECK(song.pedalSpans(0, 1) == song.pedalSpans(0, 0));
 }

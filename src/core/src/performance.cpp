@@ -110,7 +110,8 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
     std::vector<OpenNote> open;
     std::vector<OpenNote> next;
     for (std::size_t m = 0; m < staff.measureCount(); ++m) {
-        const Voice& voice = staff.measure(m).voices[v];
+        // A measure repeat sounds the music of the measure it repeats.
+        const Voice& voice = staff.measure(repeatSource(song, staff, m)).voices[v];
         if (voice.isEmpty()) {
             open.clear(); // a measure rest
             continue;
@@ -298,12 +299,15 @@ void rampHairpins(std::span<std::vector<SoundingNote>> voices,
 
 } // namespace
 
+const Beat& beatOf(const Song& song, const SoundingNote& sounding) {
+    const Staff& staff = song.track(sounding.track).staff(sounding.staff);
+    return staff.measure(repeatSource(song, staff, sounding.measure))
+        .voices.at(sounding.voice)
+        .beats.at(sounding.beat);
+}
+
 const Note& noteOf(const Song& song, const SoundingNote& sounding) {
-    const Beat& beat = song.track(sounding.track)
-                           .staff(sounding.staff)
-                           .measure(sounding.measure)
-                           .voices.at(sounding.voice)
-                           .beats.at(sounding.beat);
+    const Beat& beat = beatOf(song, sounding);
     const std::vector<Note>& notes =
         sounding.grace == 0 ? beat.notes : beat.graces.at(sounding.grace - 1U).notes;
     return notes.at(sounding.note);

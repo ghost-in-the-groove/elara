@@ -148,6 +148,7 @@ public:
     void collect(std::size_t m, std::vector<ColumnInk>& ink) override {
         measure_ = m;
         measureIndex_ = m;
+        repeat_ = shownRepeat(song_, staff_, m);
         columns_.clear();
         bool notes = false;
         for (const core::Voice& voice : staff_.measure(m).voices) {
@@ -236,7 +237,7 @@ public:
     }
 
     [[nodiscard]] double emptyWidth() const override {
-        return alone_ ? widthOf(Glyph::RestWhole) : 0.0;
+        return std::max(alone_ ? widthOf(Glyph::RestWhole) : 0.0, repeatWidth(repeat_));
     }
 
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override {
@@ -246,8 +247,9 @@ public:
             aboveRow_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2, measureIndex_);
             lyrics_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2);
         }
+        measureRepeat(repeat_, start, barline);
         if (columns_.empty()) {
-            if (alone_) {
+            if (alone_ && repeat_ == core::MeasureRepeat::None) {
                 glyphCentred(Glyph::RestWhole, (start + barline) / 2, height() / 2, Role::Rest);
             }
             lanes_.column({}, barline, barline, measure_);
@@ -675,6 +677,7 @@ private:
     AboveRow aboveRow_; // chord symbols and beat text, when alone (ADR-0080, ADR-0081)
     LyricsRow lyrics_;  // when alone (ADR-0084)
     std::size_t measureIndex_ = 0;
+    core::MeasureRepeat repeat_ = core::MeasureRepeat::None; // the sign of the measure read
     std::vector<TabColumn> columns_;
     std::array<std::optional<LastNote>, core::Tuning::kMaxStrings + 1> last_{};
     std::vector<PendingBend> pendingBends_;

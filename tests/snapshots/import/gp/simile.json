@@ -1,0 +1,215 @@
+{
+ "format": "guitarpro",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Simile",
+   "artist": "Ghost in the Groove",
+   "copyright": "CC0 1.0",
+   "transcriber": "Elara contributors"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {},
+   {},
+   {},
+   {},
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Guitar",
+    "instrument": {
+     "name": "Electric Guitar",
+     "kind": "fretted",
+     "midiProgram": 27,
+     "writtenOffset": 12
+    },
+    "mix": {
+     "volume": 0.795
+    },
+    "staves": [
+     {
+      "clef": "treble-8vb",
+      "tuning": "E2 A2 D3 G3 B3 E4",
+      "repeats": [
+       {
+        "measure": 1,
+        "repeat": "one"
+       },
+       {
+        "measure": 4,
+        "repeat": "two-first"
+       },
+       {
+        "measure": 5,
+        "repeat": "two-second"
+       }
+      ],
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3",
+            "string": 5,
+            "fret": 3
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3",
+            "string": 5,
+            "fret": 5
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3",
+            "string": 5,
+            "fret": 3
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3",
+            "string": 5,
+            "fret": 5
+           }
+          ]
+         }
+        ]
+       ],
+       [],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E3",
+            "string": 5,
+            "fret": 7
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3",
+            "string": 5,
+            "fret": 5
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3",
+            "string": 5,
+            "fret": 3
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3",
+            "string": 5,
+            "fret": 5
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "B2",
+            "string": 5,
+            "fret": 2
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C3",
+            "string": 5,
+            "fret": 3
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D3",
+            "string": 5,
+            "fret": 5
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E3",
+            "string": 5,
+            "fret": 7
+           }
+          ]
+         }
+        ]
+       ],
+       [],
+       [],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C3",
+            "string": 5,
+            "fret": 3
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 14.0,
+ "issues": []
+}

@@ -473,7 +473,9 @@ public:
     double changes(std::size_t m, double x) override;
     double ending(std::size_t m, double x) override { return endingAt(m, x); }
     void collect(std::size_t m, std::vector<ColumnInk>& ink) override;
-    [[nodiscard]] double emptyWidth() const override { return widthOf(Glyph::RestWhole); }
+    [[nodiscard]] double emptyWidth() const override {
+        return std::max(widthOf(Glyph::RestWhole), repeatWidth(repeat_));
+    }
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override;
 
 private:
@@ -654,6 +656,7 @@ private:
         fingerings();
         slurs();
         centreMeasureRests(start, barline);
+        measureRepeat(repeat_, start, barline);
         fermatas(start, barline);
         ornaments(positions, barline);
         if (techniques_) {
@@ -798,6 +801,9 @@ private:
     }
 
     void centreMeasureRests(double start, double barline) {
+        if (repeat_ != core::MeasureRepeat::None) { // its sign instead (ADR-0102)
+            return;
+        }
         for (const Chord& chord : chords_) {
             if (chord.measureRest) {
                 const BoundingBox& box = metrics(Glyph::RestWhole).box;
@@ -839,6 +845,7 @@ private:
         const core::Measure& measure = staff_.measure(m);
         const TimeSignature time = song_.measureHeader(m).timeSignature;
         const Fraction length = time.measureLength();
+        repeat_ = shownRepeat(song_, staff_, m);
         voiceCount_ = 0;
         for (const core::Voice& voice : measure.voices) {
             if (!voice.isEmpty()) {
@@ -2725,6 +2732,7 @@ private:
     AboveRow aboveRow_; // chord symbols and beat text (ADR-0080, ADR-0081)
     LyricsRow lyrics_;  // ADR-0084
     std::size_t measureIndex_ = 0;
+    core::MeasureRepeat repeat_ = core::MeasureRepeat::None; // the sign of the measure read
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
     std::array<bool, core::Measure::kMaxVoices> incoming_{}; // ties from the line before

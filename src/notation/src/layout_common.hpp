@@ -648,6 +648,22 @@ protected:
 
     /// Draws `which` with its box centred on (x, y).
     void glyphCentred(Glyph which, double x, double y, Role role);
+
+    /// The measure repeat sign measure m of `staff` shows (ADR-0102): its
+    /// own when it counts (core::repeatSource()), otherwise none.
+    [[nodiscard]] static core::MeasureRepeat shownRepeat(const core::Song& song,
+                                                         const core::Staff& staff, std::size_t m);
+
+    /// What the sign of `repeat` needs between the gaps of its measure; 0 for
+    /// none.
+    [[nodiscard]] double repeatWidth(core::MeasureRepeat repeat) const;
+
+    /// The measure repeat sign of the measure drawn, from `start` to
+    /// `barline`, on the middle of the staff (ADR-0102): one measure's in the
+    /// middle of the measure, a two-measure repeat's over the barline between
+    /// its measures, or in the middle of each when a line ends between them.
+    /// Call it for every measure drawn, in order.
+    void measureRepeat(core::MeasureRepeat repeat, double start, double barline);
     void line(Point from, Point to, double thickness, Role role, double dash = 0.0) {
         list_.lines.push_back(LineItem{.from = from,
                                        .to = to,
@@ -714,8 +730,20 @@ private:
     /// the staff in a space; returns their right.
     double repeatDots(double x);
 
+    // The first measure of a two-measure repeat, whose sign waits for the
+    // second measure on the same line.
+    struct HalfRepeat {
+        double barline = 0.0;
+        double middle = 0.0;
+        std::size_t measure = 0;
+    };
+
+    // Draws the sign of a waiting first measure in its middle.
+    void flushRepeat();
+
     double height_;
     std::size_t lines_;
+    std::optional<HalfRepeat> halfRepeat_;
 };
 
 /// Standard notation of a staff; with `techniques`, palm mutes, vibrato and the

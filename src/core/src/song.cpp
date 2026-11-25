@@ -476,7 +476,9 @@ std::vector<PedalSpan> Song::pedalSpans(std::size_t track, std::size_t measure) 
     std::vector<PedalSpan> pieces;
     const Track& part = tracks_[track];
     for (std::size_t s = 0; s < part.staffCount(); ++s) {
-        addPedalPieces(part.staff(s).measure(measure), pieces);
+        // A measure repeat holds the pedal of the measure it repeats (ADR-0102).
+        const Staff& staff = part.staff(s);
+        addPedalPieces(staff.measure(repeatSource(*this, staff, measure)), pieces);
     }
     return joinPedalPieces(pieces);
 }
@@ -556,6 +558,31 @@ Tempo Song::tempoAt(std::size_t measure, const Fraction& offset) const {
 
 std::string& creditOf(SongInfo& info, Credit credit) {
     return creditIn(info, credit);
+}
+
+std::size_t repeatSource(const Song& song, const Staff& staff, std::size_t measure) {
+    std::size_t at = measure;
+    for (;;) {
+        const Measure& current = staff.measure(at);
+        std::size_t back = 0;
+        switch (current.repeat) {
+        case MeasureRepeat::None:
+            break;
+        case MeasureRepeat::One:
+            back = 1;
+            break;
+        case MeasureRepeat::TwoFirst:
+        case MeasureRepeat::TwoSecond:
+            back = 2;
+            break;
+        }
+        if (back == 0 || at < back || !current.isEmpty() ||
+            song.measureHeader(at - back).timeSignature.measureLength() !=
+                song.measureHeader(at).timeSignature.measureLength()) {
+            return at;
+        }
+        at -= back;
+    }
 }
 
 const std::string& creditOf(const SongInfo& info, Credit credit) {

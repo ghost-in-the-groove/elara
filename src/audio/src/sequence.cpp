@@ -591,10 +591,7 @@ int harmonicKey(const core::Note& note, int key) {
 
 Articulation articulationOf(const core::Song& song, const core::SoundingNote& sounding) {
     const core::Track& track = song.track(sounding.track);
-    const core::Beat& beat = track.staff(sounding.staff)
-                                 .measure(sounding.measure)
-                                 .voices[sounding.voice]
-                                 .beats[sounding.beat];
+    const core::Beat& beat = core::beatOf(song, sounding);
     const core::Note& note = core::noteOf(song, sounding);
     // A grace note (ADR-0079) has none of its beat's strum, tremolo or whammy.
     static const core::BeatEffects kGraceBeat{};

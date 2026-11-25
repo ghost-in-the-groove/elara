@@ -89,6 +89,7 @@ elara_add_unit_tests(notation
   notation/test_lyrics_layout.cpp notation/test_fermata_layout.cpp
   notation/test_slur_layout.cpp notation/test_slide_layout.cpp notation/test_ghost_layout.cpp
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
+  notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
   notation/test_fingering_layout.cpp
   LIBRARIES elara::notation elara::io)

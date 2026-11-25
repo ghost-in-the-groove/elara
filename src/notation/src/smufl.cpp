@@ -148,6 +148,8 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"tremolo2", 0xE221},
     {"tremolo3", 0xE222},
     {"repeatDot", 0xE044},
+    {"repeat1Bar", 0xE500},
+    {"repeat2Bars", 0xE501},
     {"segno", 0xE047},
     {"coda", 0xE048},
     {"metNoteWhole", 0xECA2},

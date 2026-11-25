@@ -107,6 +107,7 @@ one that replaces them.
 | [0099](0099-ghost-notes-in-parentheses.md) | Ghost notes in parentheses | Accepted |
 | [0100](0100-natural-harmonics-as-diamonds.md) | Natural harmonics as diamonds | Accepted |
 | [0101](0101-tremolo-picking-on-the-stem.md) | Tremolo picking on the stem | Accepted |
+| [0102](0102-measure-repeats.md) | Measure repeats | Accepted |
 
 ## Template
 
