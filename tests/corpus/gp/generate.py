@@ -338,8 +338,11 @@ def band() -> str:
     bars = []
     for measure in range(2):
         bass_bar = [[Beat("Half", [bass_note(0, 1)]), Beat("Half", [bass_note(1, 3)])]]
+        # The first chord is rolled: upwards in measure 1, downwards in measure 2.
+        roll = "Up" if measure == 0 else "Down"
         right = [
-            [Beat("Quarter", [Note(midi=65), Note(midi=69), Note(midi=72)]),
+            [Beat("Quarter", [Note(midi=65), Note(midi=69), Note(midi=72)],
+                  elements=[f"<Arpeggio>{roll}</Arpeggio>"]),
              Beat("Quarter", [Note(concert=flat(70))]),
              Beat("Half", [Note(midi=69)])],
             [Beat("Whole", [Note(midi=77)])],  # a second voice
