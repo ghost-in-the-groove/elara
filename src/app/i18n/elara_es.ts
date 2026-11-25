@@ -814,6 +814,18 @@
         <translation>%1.</translation>
     </message>
     <message>
+        <source>Barline</source>
+        <translation>Barra</translation>
+    </message>
+    <message>
+        <source>Double</source>
+        <translation>Doble</translation>
+    </message>
+    <message>
+        <source>Close this measure with a double barline, as at the end of a section</source>
+        <translation>Cerrar este compás con una doble barra, como al final de una sección</translation>
+    </message>
+    <message>
         <source>Insert before</source>
         <translation>Insertar antes</translation>
     </message>
@@ -1526,6 +1538,10 @@
     <message>
         <source>Paste</source>
         <translation>Pegar</translation>
+    </message>
+    <message>
+        <source>Change barline</source>
+        <translation>Cambiar barra de compás</translation>
     </message>
     <message>
         <source>Change section</source>

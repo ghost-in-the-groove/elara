@@ -311,10 +311,12 @@ public:
     /// The repeats of `measure` (ADR-0016): "start" (it opens a repeated
     /// section), "times" (how often the section it closes plays, 2 to 255, or
     /// 0 when it closes none) and "endings" (the times through the repeat that
-    /// play it, 1 to 8, in order).
+    /// play it, 1 to 8, in order), and "doubleBar" (a double barline closes
+    /// it, ADR-0103).
     Q_INVOKABLE QVariantMap repeatsAt(int measure) const;
     /// Changes the repeats of `measure` named in `repeats`, keyed as
-    /// repeatsAt() gives them, as one undo step ("Change repeats").
+    /// repeatsAt() gives them, as one undo step ("Change repeats", or "Change
+    /// barline" for the double barline alone).
     Q_INVOKABLE void setRepeats(int measure, const QVariantMap& repeats);
     /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
     /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,

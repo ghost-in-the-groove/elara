@@ -117,11 +117,17 @@ void SetMeasureHeader::apply(Song& song) {
     repeats.repeatTimes = header_.repeatTimes;
     repeats.alternateEndings = header_.alternateEndings;
     const bool repeated = repeats != target;
-    const bool marked = navigation || repeated;
+    // And with the new double barline (ADR-0103).
+    MeasureHeader barline = target;
+    barline.doubleBar = header_.doubleBar;
+    const bool barred = barline != target;
+    const bool marked = navigation || repeated || barred;
     if (navigation && marks == header_) {
         name_ = "Change navigation marks";
     } else if (repeated && repeats == header_) {
         name_ = "Change repeats";
+    } else if (barred && barline == header_) {
+        name_ = "Change barline";
     } else if (!marked && time && !key && !tempo) {
         name_ = "Change time signature";
     } else if (!marked && key && !time && !tempo) {
