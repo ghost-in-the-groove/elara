@@ -16,6 +16,7 @@
 #include <random>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -303,6 +304,29 @@ std::string quarterNote(std::string_view step, std::string_view rest) {
     return std::format("<note><pitch><step>{}</step><octave>4</octave></pitch>"
                        "<duration>4</duration><voice>1</voice><type>quarter</type>{}</note>",
                        step, rest);
+}
+
+TEST_CASE("MusicXML: staccatissimo is its own mark, spiccato a staccato", "[musicxml]") {
+    // ADR-0094.
+    const auto marked = [](std::string_view step, std::string_view marks) {
+        return quarterNote(step, std::format("<notations><articulations>{}</articulations>"
+                                             "</notations>",
+                                             marks));
+    };
+    const ImportResult result =
+        parse(onePart(marked("C", "<staccatissimo/>") + marked("D", "<spiccato/>") +
+                      marked("E", "<staccatissimo/><tenuto/>") + quarterNote("F", "")));
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    const auto marks = [&](std::size_t b) {
+        const core::NoteEffects& fx = beats[b].notes.at(0).effects;
+        return std::tuple(fx.staccatissimo, fx.staccato, fx.tenuto);
+    };
+    CHECK(marks(0) == std::tuple(true, false, false));
+    CHECK(marks(1) == std::tuple(false, true, false));
+    CHECK(marks(2) == std::tuple(true, false, true));
+    CHECK(marks(3) == std::tuple(false, false, false));
+    CHECK(result.warnings.empty());
 }
 
 TEST_CASE("MusicXML: tenuto marks hold their notes, detached-legato is portato", "[musicxml]") {

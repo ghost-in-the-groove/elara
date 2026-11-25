@@ -154,6 +154,29 @@ TEST_CASE("Effects: each toggle sets the effect's usual form and clears it",
     CHECK(onString(other.song(), 0, 1, 1).effects.slideOut == SlideOut::None);
 }
 
+TEST_CASE("Effects: a staccatissimo takes the place of a staccato, and back",
+          "[core][entry][effects]") {
+    // ADR-0094.
+    Document doc(guitarSong());
+    const Caret caret = at(0, 1, 1);
+    const auto effects = [&] {
+        return noteEffectsAt(doc.song(), caret);
+    };
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Staccato));
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Tenuto));
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Staccatissimo));
+    CHECK(effects().staccatissimo);
+    CHECK_FALSE(effects().staccato);
+    CHECK(effects().tenuto);
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Staccato));
+    CHECK(effects().staccato);
+    CHECK_FALSE(effects().staccatissimo);
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Staccatissimo));
+    run(doc, toggleEffect(doc.song(), caret, NoteEffect::Staccatissimo));
+    CHECK_FALSE(effects().staccato);
+    CHECK_FALSE(effects().staccatissimo);
+}
+
 TEST_CASE("Effects: a natural harmonic needs strings and a node", "[core][entry][effects]") {
     const Song song = guitarSong();
     // Frets 5 and 7 are near nodes of the string; fret 6 is not.
@@ -166,7 +189,7 @@ TEST_CASE("Effects: a natural harmonic needs strings and a node", "[core][entry]
 TEST_CASE("Effects: techniques of strings go on fretted staves only", "[core][entry][effects]") {
     constexpr std::array kOfStrings{NoteEffect::Legato, NoteEffect::PalmMute, NoteEffect::DeadNote,
                                     NoteEffect::Harmonic};
-    for (int e = 0; e <= static_cast<int>(NoteEffect::Tenuto); ++e) {
+    for (int e = 0; e <= static_cast<int>(NoteEffect::Staccatissimo); ++e) {
         const auto effect = static_cast<NoteEffect>(e);
         CHECK(needsStrings(effect) == (std::ranges::find(kOfStrings, effect) != kOfStrings.end()));
     }

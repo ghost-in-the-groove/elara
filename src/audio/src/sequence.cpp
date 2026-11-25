@@ -301,7 +301,8 @@ struct Articulation {
     int velocity = 80;
     Touch touch = Touch::Normal;
     bool staccato = false;
-    bool tenuto = false; // with staccato, portato (ADR-0088)
+    bool staccatissimo = false; // ADR-0094
+    bool tenuto = false;        // with staccato, portato (ADR-0088)
     bool letRing = false;
     bool moves = false; // a bend, whammy bar, slide, hammer-on or vibrato (ADR-0023)
     int string = 0;     // 0 when the note has no fret position
@@ -315,9 +316,13 @@ struct Articulation {
     const core::BeatEffects* beat = nullptr;
 };
 
-// How long a note of written length `length` sounds: half of it staccato,
-// three quarters portato (ADR-0088), all of it otherwise.
+// How long a note of written length `length` sounds: a quarter of it
+// staccatissimo (ADR-0094), half of it staccato, three quarters portato
+// (ADR-0088), all of it otherwise.
 Fraction heldLength(const Fraction& length, const Articulation& articulation) {
+    if (articulation.staccatissimo) {
+        return length / Fraction(4);
+    }
     if (!articulation.staccato) {
         return length;
     }
@@ -585,6 +590,7 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
     Articulation result{.key = sounding.key,
                         .velocity = sounding.velocity,
                         .staccato = effects.staccato,
+                        .staccatissimo = effects.staccatissimo,
                         .tenuto = effects.tenuto,
                         .letRing = effects.letRing,
                         .string = note.position ? note.position->string : 0,

@@ -278,6 +278,7 @@ void mergeEffects(NoteEffects& into, const NoteEffects& from) {
     into.ghost = into.ghost || from.ghost;
     into.letRing = into.letRing || from.letRing;
     into.staccato = into.staccato || from.staccato;
+    into.staccatissimo = into.staccatissimo || from.staccatissimo;
     into.tenuto = into.tenuto || from.tenuto;
     if (into.accent == Accent::None) {
         into.accent = from.accent;
@@ -2117,8 +2118,10 @@ private:
     void readArticulations(pugi::xml_node articulations, NoteEffects& fx, std::size_t index) {
         for (pugi::xml_node mark : articulations.children()) {
             const std::string_view name = mark.name();
-            if (name == "staccato" || name == "staccatissimo" || name == "spiccato") {
+            if (name == "staccato" || name == "spiccato") {
                 fx.staccato = true;
+            } else if (name == "staccatissimo") { // ADR-0094
+                fx.staccatissimo = true;
             } else if (name == "tenuto") {
                 fx.tenuto = true;
             } else if (name == "detached-legato") { // portato (ADR-0088)

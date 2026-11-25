@@ -48,5 +48,5 @@ it on the caret's notes, the CLI's `effect tenuto` and the `_` key in the app.
 
 - Portato needs no state of its own: every reader and writer that knows
   staccato and tenuto handles it.
-- Not covered: staccatissimo and other articulations (stress, unstress,
-  spiccato), which still read as staccato or warn.
+- Not covered: staccatissimo (since ADR-0094) and other articulations
+  (stress, unstress, spiccato), which still read as staccato or warn.

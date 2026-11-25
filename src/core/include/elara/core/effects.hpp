@@ -201,7 +201,8 @@ struct NoteEffects {
     bool ghost : 1 = false;    // soft, written in parentheses
     bool letRing : 1 = false;
     bool staccato : 1 = false;
-    bool tenuto : 1 = false; // held its full length; with staccato, portato (ADR-0088)
+    bool staccatissimo : 1 = false; // shorter than staccato, a wedge (ADR-0094)
+    bool tenuto : 1 = false;        // held its full length; with staccato, portato (ADR-0088)
     Accent accent = Accent::None;
     Dynamic dynamic = Dynamic::MF;
     Ornament ornament = Ornament::None; // ADR-0091

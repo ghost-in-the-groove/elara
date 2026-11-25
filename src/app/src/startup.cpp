@@ -1096,6 +1096,8 @@ void Startup::queueEffects() {
                   score_->effectForKey(QStringLiteral("'")) == kStaccato &&
                   score_->effectForKey(QStringLiteral("_")) ==
                       static_cast<int>(core::NoteEffect::Tenuto) &&
+                  score_->effectForKey(QStringLiteral("\"")) ==
+                      static_cast<int>(core::NoteEffect::Staccatissimo) &&
                   score_->effectForKey(QStringLiteral("p")) ==
                       static_cast<int>(core::NoteEffect::PalmMute) &&
                   score_->effectForKey(QStringLiteral("a")) < 0,

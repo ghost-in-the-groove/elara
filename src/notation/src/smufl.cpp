@@ -97,6 +97,8 @@ constexpr std::array<GlyphInfo, kGlyphCount> kGlyphs{{
     {"articMarcatoBelow", 0xE4AD},
     {"articTenutoAbove", 0xE4A4},
     {"articTenutoBelow", 0xE4A5},
+    {"articStaccatissimoAbove", 0xE4A6},
+    {"articStaccatissimoBelow", 0xE4A7},
     {"fermataAbove", 0xE4C0},
     {"fermataBelow", 0xE4C1},
     {"fermataShortAbove", 0xE4C4},

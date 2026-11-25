@@ -467,6 +467,8 @@ core::Song randomSong(std::uint32_t seed) {
                                     }
                                     note.effects.staccato = pick(0, 9) == 0;
                                     note.effects.tenuto = pick(0, 11) == 0;
+                                    note.effects.staccatissimo = // ADR-0094
+                                        !note.effects.staccato && pick(0, 13) == 0;
                                     note.effects.ghost = pick(0, 15) == 0;
                                     beat.notes.push_back(note);
                                 }

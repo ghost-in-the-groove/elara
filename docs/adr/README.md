@@ -99,6 +99,7 @@ one that replaces them.
 | [0091](0091-mordents-and-turns.md) | Mordents and turns | Accepted |
 | [0092](0092-pedal-marks.md) | Pedal marks | Accepted |
 | [0093](0093-fingerings.md) | Fingerings | Accepted |
+| [0094](0094-staccatissimo.md) | Staccatissimo | Accepted |
 
 ## Template
 

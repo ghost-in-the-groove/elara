@@ -170,7 +170,7 @@ struct EntryState {
 };
 
 // The names `effect <name>` takes (ADR-0037).
-constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 13> kEffectNames{{
+constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 14> kEffectNames{{
     {"tie", core::NoteEffect::Tie},
     {"legato", core::NoteEffect::Legato},
     {"slide", core::NoteEffect::Slide},
@@ -184,6 +184,7 @@ constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 13> kEffectN
     {"accent", core::NoteEffect::Accent},
     {"staccato", core::NoteEffect::Staccato},
     {"tenuto", core::NoteEffect::Tenuto},
+    {"staccatissimo", core::NoteEffect::Staccatissimo}, // ADR-0094
 }};
 
 // The forms `bend <form> [cents]` takes (ADR-0055).
