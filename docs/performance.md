@@ -115,6 +115,9 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-25 | one second of 32 voices of the SFZ sampler at 48 kHz; each voice bending a whole step | 16.6 ms; 17.0 ms | first measurement: four-point Hermite interpolation of every frame, each of its four frames checked against the sample's end and its loop; three times the built-in plucked string |
 | 2026-11-25 | same | 10.3 ms; 11.2 to 11.8 ms (16.3 to 17.1 ms; 16.9 to 17.4 ms before, same machine, the two builds run alternately) | inside the sample and its loop the four frames are read in a row; only the frames at the edges take the checks. The output is the same, frame for frame |
 | 2026-11-25 | decode a minute of 16-bit stereo FLAC (libFLAC's default level); the same minute as WAV | 37.6 ms; 17.0 ms | about 1600 times real time (ADR-0067): a library's FLAC samples take about twice as long to read as WAV ones |
+| 2026-11-25 | read the outlines of the glyphs Elara draws from `Bravura.otf` | 0.65 ms | first version (ADR-0074): the CFF charstrings of the glyphs run once; the app does it on its first PDF export |
+| 2026-11-25 | write the 21 A4 pages of one 500-measure track (notation and tablature) as PDF; compressed | 60 ms; 89 ms | first version (ADR-0074): every number formatted with `std::format`. 2.1 MB, 0.3 MB compressed |
+| 2026-11-25 | same | 1.7 ms; 4.1 ms (one thread: 8.8 ms; 45 ms) | numbers written with `std::to_chars` straight into the page's content, and each page written and compressed on a core of its own; the document is the same byte for byte. On one thread, zlib at its default level is most of the time left |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.

@@ -78,6 +78,7 @@ one that replaces them.
 | [0070](0070-sfz-legato.md) | Hammer-ons and pull-offs play a library's legato samples | Accepted |
 | [0071](0071-recent-scores.md) | Recent scores | Accepted |
 | [0073](0073-grand-staff.md) | A brace and the barlines join a grand staff | Accepted |
+| [0074](0074-pdf-export.md) | PDF export written by Elara | Accepted |
 
 ## Template
 

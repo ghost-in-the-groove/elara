@@ -34,7 +34,9 @@ font.**
   become `?`); the title goes in the document information as UTF-16.
 - Streams are compressed when the caller passes a compressor: `elara_io`
   wraps miniz as `zlibCompress()` (and `zlibDecompress()` for tests), so the
-  notation module stays free of third-party libraries.
+  notation module stays free of third-party libraries. Each page is written
+  and compressed on a core of its own; the document is the same, byte for
+  byte, on any number of threads.
 - `elara-cli render --pdf FILE` writes every page (or the line) as one
   document and reports `"pdf": {"file", "pages", "bytes"}`. The app's More
   menu has Export as PDF… (Ctrl+P), which lays the shown track or tracks out
@@ -46,9 +48,9 @@ font.**
 - The PDF looks the same in every viewer: there is no font to substitute or
   fail to load, and text is searchable and copyable for titles and names
   (music glyphs are shapes, not text).
-- The outlines cost a tenth of a millisecond to read; the 21 pages of a
-  500-measure track are written in a few milliseconds (`docs/performance.md`),
-  so the app exports on the interface thread.
+- The outlines take 0.65 ms to read; the 21 pages of a 500-measure track are
+  written in 4.1 ms, compressed, each page on a core of its own
+  (`docs/performance.md`), so the app exports on the interface thread.
 - Unit tests check every glyph's outline against the bounding box in the
   font's metadata, the structure of a document (cross-reference offsets, page
   tree, transforms, items) and that compressed streams inflate to the plain

@@ -3,13 +3,19 @@
 // (ISO 32000-1): each page's content stream maps staff spaces to points with
 // y down, as display lists measure; glyphs are form XObjects of their
 // outlines; texts use the standard Type 1 fonts.
+#include <elara/core/parallel.hpp>
 #include <elara/notation/pdf.hpp>
 
 #include <array>
+#include <charconv>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <map>
+#include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -19,20 +25,45 @@ namespace {
 
 constexpr double kKnockoutPad = 0.08; // of a text's size, around a knocked-out text
 
-// At most four decimals, no trailing zeros, no "-0".
-std::string number(double value) {
-    std::string text = std::format("{:.4f}", value);
-    while (text.back() == '0') {
-        text.pop_back();
+// Appends `value` with at most four decimals, no trailing zeros and no "-0".
+// Pages hold hundreds of thousands of numbers, so this avoids std::format.
+void put(std::string& out, double value) {
+    const double scaled = std::round(value * 10000.0);
+    if (!(std::abs(scaled) < 1e15)) { // not a number, or far beyond any page
+        out += '0';
+        return;
     }
-    if (text.back() == '.') {
-        text.pop_back();
+    auto units = static_cast<long long>(scaled);
+    if (units < 0) {
+        out += '-';
+        units = -units;
     }
-    return text == "-0" ? "0" : text;
+    std::array<char, 20> whole{};
+    const auto written = std::to_chars(whole.data(), whole.data() + whole.size(), units / 10000);
+    out.append(whole.data(), written.ptr);
+    if (const auto fraction = static_cast<int>(units % 10000); fraction != 0) {
+        std::array<char, 5> text{'.', static_cast<char>('0' + fraction / 1000),
+                                 static_cast<char>('0' + fraction / 100 % 10),
+                                 static_cast<char>('0' + fraction / 10 % 10),
+                                 static_cast<char>('0' + fraction % 10)};
+        std::size_t length = text.size();
+        while (text[length - 1] == '0') {
+            --length;
+        }
+        out.append(text.data(), length);
+    }
 }
 
-std::string point(const Point& p) {
-    return number(p.x) + " " + number(p.y);
+void put(std::string& out, const Point& p) {
+    put(out, p.x);
+    out += ' ';
+    put(out, p.y);
+}
+
+std::string number(double value) {
+    std::string text;
+    put(text, value);
+    return text;
 }
 
 // The next code point of UTF-8 `text` from `at`, moving past it; U+FFFD for a
@@ -127,13 +158,20 @@ class Content {
 public:
     void lineWidth(double width) {
         if (width != width_) {
-            ops_ += number(width) + " w\n";
+            put(ops_, width);
+            ops_ += " w\n";
             width_ = width;
         }
     }
     void dash(double length) {
         if (length != dash_) {
-            ops_ += length > 0.0 ? std::format("[{}] 0 d\n", number(length)) : "[] 0 d\n";
+            if (length > 0.0) {
+                ops_ += '[';
+                put(ops_, length);
+                ops_ += "] 0 d\n";
+            } else {
+                ops_ += "[] 0 d\n";
+            }
             dash_ = length;
         }
     }
@@ -147,9 +185,12 @@ public:
         if (points.empty()) {
             return;
         }
-        ops_ += point(points.front()) + " m";
+        put(ops_, points.front());
+        ops_ += " m";
         for (std::size_t i = 1; i < points.size(); ++i) {
-            ops_ += " " + point(points[i]) + " l";
+            ops_ += ' ';
+            put(ops_, points[i]);
+            ops_ += " l";
         }
         ops_ += " h f\n";
     }
@@ -162,26 +203,37 @@ private:
     bool round_ = false;
 };
 
+// Appends the points of a path, each followed by a space, then `op`.
+void putPath(std::string& out, std::initializer_list<Point> points, std::string_view op) {
+    for (const Point& p : points) {
+        put(out, p);
+        out += ' ';
+    }
+    out += op;
+}
+
 void writeCurve(Content& content, const CurveItem& curve) {
+    std::string& ops = content.ops();
     if (curve.thickness <= curve.endThickness) {
         content.roundJoin(false);
         content.lineWidth(curve.thickness);
-        content.ops() += std::format("{} m {} {} {} c S\n", point(curve.from),
-                                     point(curve.control1), point(curve.control2), point(curve.to));
+        putPath(ops, {curve.from}, "m ");
+        putPath(ops, {curve.control1, curve.control2, curve.to}, "c S\n");
         return;
     }
     // A lens, as the SVG writer draws it: the control points moved up and down
     // so that the middle gets `thickness`, stroked with the end thickness.
     const double offset = (curve.thickness - curve.endThickness) / 1.5;
     const auto moved = [](const Point& p, double by) {
-        return point(Point{p.x, p.y + by});
+        return Point{p.x, p.y + by};
     };
     content.roundJoin(true);
     content.lineWidth(curve.endThickness);
-    content.ops() += std::format(
-        "{} m {} {} {} c {} {} {} c h B\n", point(curve.from), moved(curve.control1, -offset / 2),
-        moved(curve.control2, -offset / 2), point(curve.to), moved(curve.control2, offset / 2),
-        moved(curve.control1, offset / 2), point(curve.from));
+    putPath(ops, {curve.from}, "m ");
+    putPath(ops, {moved(curve.control1, -offset / 2), moved(curve.control2, -offset / 2), curve.to},
+            "c ");
+    putPath(ops, {moved(curve.control2, offset / 2), moved(curve.control1, offset / 2), curve.from},
+            "c h B\n");
 }
 
 // The outline of a glyph as a form XObject's path, in staff spaces, y up.
@@ -201,16 +253,15 @@ std::string glyphPath(const std::vector<OutlineStep>& outline, std::array<double
     for (const OutlineStep& step : outline) {
         switch (step.kind) {
         case OutlineStep::Kind::Move:
-            path += point(step.to) + " m\n";
+            putPath(path, {step.to}, "m\n");
             grow(step.to);
             break;
         case OutlineStep::Kind::Line:
-            path += point(step.to) + " l\n";
+            putPath(path, {step.to}, "l\n");
             grow(step.to);
             break;
         case OutlineStep::Kind::Curve:
-            path += std::format("{} {} {} c\n", point(step.control1), point(step.control2),
-                                point(step.to));
+            putPath(path, {step.control1, step.control2, step.to}, "c\n");
             grow(step.control1);
             grow(step.control2);
             grow(step.to);
@@ -221,6 +272,69 @@ std::string glyphPath(const std::vector<OutlineStep>& outline, std::array<double
         }
     }
     return path + "f\n";
+}
+
+// The content stream of one page: staff spaces, y down from the top of the
+// page, `m` of them around it, mapped to `k` points each.
+std::string pageContent(const DisplayList& page, const std::map<Glyph, std::size_t>& glyphs,
+                        double k, double m) {
+    Content content;
+    std::string& ops = content.ops();
+    ops.reserve(48 * (page.lines.size() + page.glyphs.size() + page.texts.size()) + 256);
+    put(ops, k);
+    ops += " 0 0 ";
+    put(ops, -k);
+    ops += ' ';
+    put(ops, Point{m * k, (page.bottom - page.top + 2 * m) * k - (m - page.top) * k});
+    ops += " cm\n0 g 0 G 0 J 0 j\n";
+    for (const LineItem& line : page.lines) {
+        content.roundJoin(false);
+        content.lineWidth(line.thickness);
+        content.dash(line.dash);
+        putPath(ops, {line.from}, "m ");
+        putPath(ops, {line.to}, "l S\n");
+    }
+    content.dash(0.0);
+    for (const BeamItem& beam : page.beams) {
+        const double half = beam.thickness / 2;
+        const std::array<Point, 4> corners{
+            Point{beam.left.x, beam.left.y - half}, Point{beam.right.x, beam.right.y - half},
+            Point{beam.right.x, beam.right.y + half}, Point{beam.left.x, beam.left.y + half}};
+        content.polygon(corners);
+    }
+    for (const GlyphItem& item : page.glyphs) {
+        if (glyphs.contains(item.glyph)) {
+            ops += "q ";
+            put(ops, item.scale);
+            ops += " 0 0 ";
+            put(ops, -item.scale);
+            ops += ' ';
+            put(ops, item.origin);
+            ops += " cm /G";
+            ops += std::to_string(static_cast<int>(item.glyph));
+            ops += " Do Q\n";
+        }
+    }
+    for (const TextItem& text : page.texts) {
+        const double left = textLeft(text);
+        if (text.knockout) {
+            const double pad = kKnockoutPad * text.size;
+            ops += std::format("1 g {} {} {} {} re f 0 g\n", number(left - pad),
+                               number(text.origin.y - capHeight(text.size) - pad),
+                               number(textWidth(text.text, text.size) + 2 * pad),
+                               number(capHeight(text.size) + 2 * pad));
+        }
+        ops += std::format("BT /{} 1 Tf {} 0 0 {} {} {} Tm {} Tj ET\n", text.italic ? "F2" : "F1",
+                           number(text.size), number(-text.size), number(left),
+                           number(text.origin.y), literal(text.text));
+    }
+    for (const CurveItem& curve : page.curves) {
+        writeCurve(content, curve);
+    }
+    for (const PolygonItem& polygon : page.polygons) {
+        content.polygon(polygon.points);
+    }
+    return std::move(ops);
 }
 
 // The objects of a document, numbered from 1, written with their cross-reference table.
@@ -240,22 +354,35 @@ public:
         return object;
     }
     // A stream object: `dict` holds the entries besides its length and filter.
+    // Safe to call from several threads.
     std::string stream(std::string_view dict, std::string_view data) const {
+        std::string packed;
         if (options_.compress) {
-            const std::string packed = options_.compress(data);
-            return std::format("<< {} /Length {} /Filter /FlateDecode >>\nstream\n{}\nendstream",
-                               dict, packed.size(), packed);
+            packed = options_.compress(data);
+            data = packed;
         }
-        return std::format("<< {} /Length {} >>\nstream\n{}\nendstream", dict, data.size(), data);
+        std::string object = std::format("<< {} /Length {}{} >>\nstream\n", dict, data.size(),
+                                         options_.compress ? " /Filter /FlateDecode" : "");
+        object.reserve(object.size() + data.size() + 10);
+        object += data;
+        object += "\nendstream";
+        return object;
     }
 
     std::string write(std::size_t root, std::size_t info) const {
         std::string pdf = "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n";
         std::vector<std::size_t> offsets;
         offsets.reserve(objects_.size());
+        std::size_t size = pdf.size() + 64 * (objects_.size() + 2);
+        for (const std::string& object : objects_) {
+            size += object.size() + 32;
+        }
+        pdf.reserve(size);
         for (std::size_t i = 0; i < objects_.size(); ++i) {
             offsets.push_back(pdf.size());
-            pdf += std::format("{} 0 obj\n{}\nendobj\n", i + 1, objects_[i]);
+            pdf += std::format("{} 0 obj\n", i + 1);
+            pdf += objects_[i];
+            pdf += "\nendobj\n";
         }
         const std::size_t xref = pdf.size();
         pdf += std::format("xref\n0 {}\n0000000000 65535 f \n", objects_.size() + 1);
@@ -308,58 +435,21 @@ std::string toPdf(std::span<const DisplayList> pages, const FontOutlines& font,
     const std::size_t resources = document.add(std::format(
         "<< /Font << /F1 {} 0 R /F2 {} 0 R >> /XObject <<{} >> >>", regular, italic, xobjects));
 
-    std::string kids;
+    // Each page's content, written and compressed on every core.
     const double k = options.staffSpace;
     const double m = options.margin;
-    for (const DisplayList& page : pages) {
+    std::vector<std::string> contents(pages.size());
+    core::forEachIndex(0, pages.size(),
+                       core::threadsFor(options.threads, pages.size(), 2, pages.size()),
+                       [&](std::size_t p) {
+                           contents[p] = document.stream("", pageContent(pages[p], glyphs, k, m));
+                       });
+    std::string kids;
+    for (std::size_t p = 0; p < pages.size(); ++p) {
+        const DisplayList& page = pages[p];
         const double width = (page.width + 2 * m) * k;
         const double height = (page.bottom - page.top + 2 * m) * k;
-        Content content;
-        std::string& ops = content.ops();
-        // Staff spaces, y down from the page's top, to points.
-        ops += std::format("{} 0 0 {} {} {} cm\n0 g 0 G 0 J 0 j\n", number(k), number(-k),
-                           number(m * k), number(height - (m - page.top) * k));
-        for (const LineItem& line : page.lines) {
-            content.roundJoin(false);
-            content.lineWidth(line.thickness);
-            content.dash(line.dash);
-            ops += std::format("{} m {} l S\n", point(line.from), point(line.to));
-        }
-        content.dash(0.0);
-        for (const BeamItem& beam : page.beams) {
-            const double half = beam.thickness / 2;
-            const std::array<Point, 4> corners{
-                Point{beam.left.x, beam.left.y - half}, Point{beam.right.x, beam.right.y - half},
-                Point{beam.right.x, beam.right.y + half}, Point{beam.left.x, beam.left.y + half}};
-            content.polygon(corners);
-        }
-        for (const GlyphItem& item : page.glyphs) {
-            if (const auto found = glyphs.find(item.glyph); found != glyphs.end()) {
-                ops += std::format("q {} 0 0 {} {} {} cm /G{} Do Q\n", number(item.scale),
-                                   number(-item.scale), number(item.origin.x),
-                                   number(item.origin.y), static_cast<int>(item.glyph));
-            }
-        }
-        for (const TextItem& text : page.texts) {
-            const double left = textLeft(text);
-            if (text.knockout) {
-                const double pad = kKnockoutPad * text.size;
-                ops += std::format("1 g {} {} {} {} re f 0 g\n", number(left - pad),
-                                   number(text.origin.y - capHeight(text.size) - pad),
-                                   number(textWidth(text.text, text.size) + 2 * pad),
-                                   number(capHeight(text.size) + 2 * pad));
-            }
-            ops += std::format("BT /{} 1 Tf {} 0 0 {} {} {} Tm {} Tj ET\n",
-                               text.italic ? "F2" : "F1", number(text.size), number(-text.size),
-                               number(left), number(text.origin.y), literal(text.text));
-        }
-        for (const CurveItem& curve : page.curves) {
-            writeCurve(content, curve);
-        }
-        for (const PolygonItem& polygon : page.polygons) {
-            content.polygon(polygon.points);
-        }
-        const std::size_t stream = document.add(document.stream("", ops));
+        const std::size_t stream = document.add(std::move(contents[p]));
         const std::size_t object = document.add(
             std::format("<< /Type /Page /Parent {} 0 R /MediaBox [0 0 {} {}] /Resources {} 0 R "
                         "/Contents {} 0 R >>",

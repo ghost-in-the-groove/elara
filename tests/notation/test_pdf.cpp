@@ -229,6 +229,41 @@ TEST_CASE("PDF: a page per display list, each object where the cross-reference t
     CHECK(pdf.find("/Title <FEFF0053006F006E0067>") != std::string::npos);
 }
 
+TEST_CASE("PDF: numbers have at most four decimals and no negative zero", "[notation][pdf]") {
+    DisplayList page;
+    page.width = 10.0;
+    page.bottom = 10.0;
+    page.lines.push_back(LineItem{.from = {-0.00004, 1.99996},
+                                  .to = {-12.34567, 0.5},
+                                  .thickness = 0.1,
+                                  .role = Role::StaffLine});
+    const std::string pdf = elara::notation::toPdf(std::span(&page, 1), outlines());
+    CHECK(pdf.find("0 2 m -12.3457 0.5 l S") != std::string::npos);
+}
+
+TEST_CASE("PDF: pages written on every core make the same document as on one thread",
+          "[notation][pdf]") {
+    std::vector<DisplayList> pages;
+    for (int copy = 0; copy < 6; ++copy) {
+        for (const DisplayList& page : twoPages()) {
+            pages.push_back(page);
+        }
+    }
+    PdfOptions one{.title = "Song", .threads = 1};
+    PdfOptions every{.title = "Song", .threads = 4};
+    CHECK(elara::notation::toPdf(pages, outlines(), one) ==
+          elara::notation::toPdf(pages, outlines(), every));
+    const auto compress = [](std::string_view data) {
+        return elara::io::zlibCompress(data);
+    };
+    one.compress = compress;
+    every.compress = compress;
+    const std::string packed = elara::notation::toPdf(pages, outlines(), every);
+    CHECK(elara::notation::toPdf(pages, outlines(), one) == packed);
+    CHECK(count(packed, "/Type /Page ") == 12);
+    checkCrossReferences(packed);
+}
+
 TEST_CASE("PDF: compressed streams inflate to the plain ones", "[notation][pdf]") {
     const std::vector<DisplayList> pages = twoPages();
     const std::string plain = elara::notation::toPdf(pages, outlines(), {.title = "Song"});

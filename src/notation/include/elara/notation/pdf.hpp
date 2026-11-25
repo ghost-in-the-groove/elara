@@ -17,8 +17,12 @@ struct PdfOptions {
     double margin = 0.0;                    ///< staff spaces of white around each page
     std::string title{};                    ///< the document's title, in its properties
     /// Compresses a stream into the zlib format (RFC 1950), for the FlateDecode
-    /// filter; without it the streams are written as they are.
+    /// filter; without it the streams are written as they are. Called from
+    /// several threads at once when there are several pages.
     std::function<std::string(std::string_view)> compress{};
+    /// Threads that write (and compress) the pages: 0 for every core when
+    /// there are several pages, 1 for the calling thread only.
+    unsigned threads = 0;
 };
 
 /// The display lists as a PDF document, one page each: a page shows its list

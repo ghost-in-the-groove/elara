@@ -110,26 +110,6 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         return layoutPages(song, both, font, pages);
     };
 
-    // PDF (ADR-0074): the font's outlines read once, then those pages written
-    // plain, and compressed as the app and the CLI write them.
-    const auto otf = std::filesystem::path(ELARA_FONT_DIR) / "Bravura.otf";
-    BENCHMARK("read the outlines of the glyphs from Bravura.otf") {
-        return elara::notation::FontOutlines::fromFile(otf);
-    };
-    const auto outlines = elara::notation::FontOutlines::fromFile(otf);
-    REQUIRE(outlines.has_value());
-    const elara::notation::PdfOptions compressed{
-        .compress = [](std::string_view data) { return elara::io::zlibCompress(data); }};
-    std::printf("those pages as PDF: %zu bytes, %zu compressed\n",
-                elara::notation::toPdf(paged, *outlines).size(),
-                elara::notation::toPdf(paged, *outlines, compressed).size());
-    BENCHMARK("write those pages as PDF") {
-        return elara::notation::toPdf(paged, *outlines);
-    };
-    BENCHMARK("write those pages as PDF, compressed") {
-        return elara::notation::toPdf(paged, *outlines, compressed);
-    };
-
     // Keyboard entry (ADR-0032): the app looks for the caret on every page
     // after each move; the last measure is the worst case. Then a click.
     const elara::core::Caret last{.measure = song.measureCount() - 1, .string = 3};
@@ -184,4 +164,38 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     };
     relayout(both, "lay out one track on A4 pages again after an edit");
     relayout(score, "lay out all 20 staves on A4 pages again after an edit");
+}
+
+// PDF (ADR-0074): the font's outlines read once, then the A4 pages of one
+// track (notation and tablature) written plain and compressed, as the app and
+// the CLI write them, on every core and on one thread.
+TEST_CASE("PDF benchmarks", "[benchmark][notation][pdf]") {
+    const auto song = elara::bench::largeSong();
+    const std::array<StaffSelection, 2> both{StaffSelection{.view = StaffView::Standard},
+                                             StaffSelection{.view = StaffView::Tablature}};
+    const auto paged = layoutPages(song, both, bravura(), {});
+    const auto otf = std::filesystem::path(ELARA_FONT_DIR) / "Bravura.otf";
+    BENCHMARK("read the outlines of the glyphs from Bravura.otf") {
+        return elara::notation::FontOutlines::fromFile(otf);
+    };
+    const auto outlines = elara::notation::FontOutlines::fromFile(otf);
+    REQUIRE(outlines.has_value());
+    elara::notation::PdfOptions compressed{
+        .compress = [](std::string_view data) { return elara::io::zlibCompress(data); }};
+    std::printf("%zu A4 pages as PDF: %zu bytes, %zu compressed\n", paged.size(),
+                elara::notation::toPdf(paged, *outlines).size(),
+                elara::notation::toPdf(paged, *outlines, compressed).size());
+    BENCHMARK("write those pages as PDF") {
+        return elara::notation::toPdf(paged, *outlines);
+    };
+    BENCHMARK("write those pages as PDF, compressed") {
+        return elara::notation::toPdf(paged, *outlines, compressed);
+    };
+    compressed.threads = 1;
+    BENCHMARK("the same on one thread") {
+        return elara::notation::toPdf(paged, *outlines, compressed);
+    };
+    BENCHMARK("write those pages as PDF, on one thread") {
+        return elara::notation::toPdf(paged, *outlines, {.threads = 1});
+    };
 }
