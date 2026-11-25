@@ -100,6 +100,7 @@ struct SfzRegion {
     int swHiKey = -1;       ///< ...(-1: none)
     int swLast = -1;        ///< plays only after this keyswitch (-1: always)
     int swDefault = -1;     ///< the keyswitch before any is struck
+    std::string swLabel;    ///< the name of its keyswitch (`sw_label`)
     std::int64_t group = 0; ///< exclusive group...
     std::int64_t offBy = 0; ///< ...whose notes silence this one (0: none)
     bool offFast = true;    ///< silenced at once, or else through its release
@@ -120,6 +121,8 @@ struct SfzProgram {
     std::vector<SfzRegion> regions;
     /// Controller values before any is sent (`set_ccN`), 0 when unset.
     std::array<int, 128> ccDefaults{};
+    /// Controller names (`label_ccN`), empty when unnamed.
+    std::array<std::string, 128> ccLabels{};
     /// Opcodes Elara does not play, each once and sorted, with the numbers in
     /// their names as "N" ("lfoN_pitch_onccN").
     std::vector<std::string> unknownOpcodes;

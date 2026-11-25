@@ -391,3 +391,95 @@ TEST_CASE("SFZ sampler: an instrument for guitars or basses leaves the other tra
     CHECK(elara::audio::sfzTracksFromName("guitars") == SfzTracks::Guitars);
     CHECK_FALSE(elara::audio::sfzTracksFromName("drums").has_value());
 }
+
+namespace {
+
+// The level of the last 0.1 s of 0.6 s of a note: near 0 once a touch the
+// sampler imitates has damped it.
+double tailOf(TrackSound& sound, int key, Touch touch) {
+    sound.reset();
+    sound.noteOn(key, 100, touch);
+    const auto out = render(sound, 0.6);
+    sound.noteOff(key);
+    return rms(std::span(out).last(4800));
+}
+
+} // namespace
+
+TEST_CASE("SFZ sampler: a palm mute plays the library's palm-mute keyswitch, for that note only",
+          "[audio][sfz]") {
+    const auto bank = bankOf("<global> sw_lokey=24 sw_hikey=26 sw_default=24 lokey=40 hikey=80\n"
+                             "<group> sw_last=24 sw_label=Sustain\n"
+                             "<region> sample=*silence\n"
+                             "<group> sw_last=25 sw_label=Palm Mute\n"
+                             "<region> sample=*sine\n");
+    const auto& techniques = bank->techniques();
+    CHECK(techniques.palmMute.keyswitch == 25);
+    CHECK(techniques.palmMute.cc == -1);
+    CHECK(techniques.palmMute.label == "Palm Mute");
+    CHECK_FALSE(techniques.dead.found());
+    CHECK_FALSE(techniques.harmonic.found());
+
+    const auto reference = bankOf("<region> sample=*sine\n")->sound(kGuitar, kRate);
+    const double open = tailOf(*reference, 52, Touch::Normal);
+    const auto sound = bank->sound(kGuitar, kRate);
+    // The library's samples play the palm mute: Elara does not damp it too.
+    CHECK(tailOf(*sound, 52, Touch::PalmMute) > 0.5 * open);
+    // The track stays on its keyswitch: the next plain note sustains.
+    CHECK(tailOf(*sound, 52, Touch::Normal) == 0.0);
+}
+
+TEST_CASE("SFZ sampler: a palm mute turns up the library's muting controller", "[audio][sfz]") {
+    const auto bank = bankOf("<control> label_cc70=Muting\n"
+                             "<region> sample=*silence hicc70=63\n"
+                             "<region> sample=*sine locc70=64\n");
+    CHECK(bank->techniques().palmMute.cc == 70);
+    CHECK(bank->techniques().palmMute.keyswitch == -1);
+    CHECK(bank->techniques().palmMute.label == "Muting");
+    const auto sound = bank->sound(kGuitar, kRate);
+    CHECK(tailOf(*sound, 52, Touch::Normal) == 0.0);
+    CHECK(tailOf(*sound, 52, Touch::PalmMute) > 0.1);
+    CHECK(tailOf(*sound, 52, Touch::Normal) == 0.0); // the controller went back
+
+    // A name on a controller no region listens to is not a technique.
+    const auto unused = bankOf("<control> label_cc70=Muting\n<region> sample=*sine\n");
+    CHECK_FALSE(unused->techniques().palmMute.found());
+    const auto damped = unused->sound(kGuitar, kRate);
+    CHECK(tailOf(*damped, 52, Touch::PalmMute) < 0.1 * tailOf(*damped, 52, Touch::Normal));
+}
+
+TEST_CASE("SFZ sampler: dead notes and harmonics take the keyswitches named for them",
+          "[audio][sfz]") {
+    const auto bank = bankOf("<global> sw_lokey=24 sw_hikey=27 sw_default=24 lokey=40 hikey=80\n"
+                             "<group> sw_last=24 sw_label=Open\n"
+                             "<region> sample=*silence\n"
+                             "<group> sw_last=26 sw_label=Dead notes\n"
+                             "<region> sample=*sine\n"
+                             "<group> sw_last=27 sw_label=Harmonics\n"
+                             "<region> sample=*sine amplitude=50\n");
+    const auto& techniques = bank->techniques();
+    CHECK_FALSE(techniques.palmMute.found());
+    CHECK(techniques.dead.keyswitch == 26);
+    CHECK(techniques.dead.label == "Dead notes");
+    CHECK(techniques.harmonic.keyswitch == 27);
+    const auto sound = bank->sound(kGuitar, kRate);
+    const double dead = tailOf(*sound, 52, Touch::Dead);
+    const double harmonic = tailOf(*sound, 52, Touch::Harmonic);
+    CHECK(dead > 0.1);
+    CHECK(harmonic > 0.1);
+    CHECK(harmonic < 0.6 * dead); // the harmonics' own region, at half amplitude
+    CHECK(tailOf(*sound, 52, Touch::Normal) == 0.0);
+}
+
+TEST_CASE("SFZ sampler: a technique with no region for the key is imitated instead",
+          "[audio][sfz]") {
+    const auto bank = bankOf("<global> sw_lokey=24 sw_hikey=25 sw_default=24\n"
+                             "<group> sw_last=24 sw_label=Sustain\n"
+                             "<region> sample=*sine lokey=40 hikey=80\n"
+                             "<group> sw_last=25 sw_label=Palm Mute\n"
+                             "<region> sample=*sine lokey=40 hikey=50\n");
+    const auto sound = bank->sound(kGuitar, kRate);
+    const double open = tailOf(*sound, 60, Touch::Normal);
+    CHECK(tailOf(*sound, 45, Touch::PalmMute) > 0.5 * open); // the library's palm mute
+    CHECK(tailOf(*sound, 60, Touch::PalmMute) < 0.1 * open); // none up there: damped
+}
