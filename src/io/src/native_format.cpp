@@ -436,6 +436,7 @@ private:
         addFlag(object, "ghost", fx.ghost);
         addFlag(object, "letRing", fx.letRing);
         addFlag(object, "staccato", fx.staccato);
+        addFlag(object, "tenuto", fx.tenuto);
         addEnumIfNot(object, "accent", kAccentNames, fx.accent, Accent::None);
         addEnumIfNot(object, "dynamic", kDynamicNames, fx.dynamic, Dynamic::MF);
         return object;
@@ -1109,6 +1110,7 @@ private:
         fx.ghost = flag(object, "ghost");
         fx.letRing = flag(object, "letRing");
         fx.staccato = flag(object, "staccato");
+        fx.tenuto = flag(object, "tenuto");
         fx.accent = enumValue(object, "accent", kAccentNames, Accent::None);
         fx.dynamic = enumValue(object, "dynamic", kDynamicNames, Dynamic::MF);
         return fx;

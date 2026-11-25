@@ -535,6 +535,20 @@ set_tests_properties(cli.dump_slurs PROPERTIES
 add_test(NAME cli.edit_rejects_unknown_slur
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "slur maybe")
 set_tests_properties(cli.edit_rejects_unknown_slur PROPERTIES WILL_FAIL TRUE)
+# Tenuto at the caret (ADR-0088): on the C, and with a staccato (portato) on
+# the D, which plays three quarters of its length.
+set(ELARA_CLI_TENUTO "${CMAKE_CURRENT_BINARY_DIR}/cli-tenuto.elara")
+add_test(NAME cli.edit_toggles_tenuto
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_TENUTO}" "add-track piano"
+    "append-measures 1" "pitch C" "effect tenuto" right "pitch D" "effect staccato"
+    "effect tenuto")
+set_tests_properties(cli.edit_toggles_tenuto PROPERTIES
+  FIXTURES_SETUP cli_tenuto
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change effect\"}")
+add_test(NAME cli.dump_tenuto COMMAND elara-cli --json dump "${ELARA_CLI_TENUTO}")
+set_tests_properties(cli.dump_tenuto PROPERTIES
+  FIXTURES_REQUIRED cli_tenuto
+  PASS_REGULAR_EXPRESSION "\"C5\",\"effects\":{\"tenuto\":true}}.*\"D5\",\"effects\":{\"staccato\":true,\"tenuto\":true}}")
 # Clef changes at the caret (ADR-0087): a flute down to the bass clef, its
 # first note name then near the bass staff's middle line; a guitar keeps its
 # octave; the tenor clef undone.
@@ -959,7 +973,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":113,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":115,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES

@@ -277,6 +277,7 @@ void mergeEffects(NoteEffects& into, const NoteEffects& from) {
     into.ghost = into.ghost || from.ghost;
     into.letRing = into.letRing || from.letRing;
     into.staccato = into.staccato || from.staccato;
+    into.tenuto = into.tenuto || from.tenuto;
     if (into.accent == Accent::None) {
         into.accent = from.accent;
     }
@@ -2066,6 +2067,11 @@ private:
             const std::string_view name = mark.name();
             if (name == "staccato" || name == "staccatissimo" || name == "spiccato") {
                 fx.staccato = true;
+            } else if (name == "tenuto") {
+                fx.tenuto = true;
+            } else if (name == "detached-legato") { // portato (ADR-0088)
+                fx.tenuto = true;
+                fx.staccato = true;
             } else if (name == "accent") {
                 if (fx.accent == Accent::None) {
                     fx.accent = Accent::Accent;
@@ -2081,7 +2087,7 @@ private:
             } else if (name == "falloff") {
                 fx.slideOut = SlideOut::Downwards;
             } else {
-                warn("articulations other than staccato and accents dropped", index);
+                warn("articulations other than staccato, tenuto and accents dropped", index);
             }
         }
     }

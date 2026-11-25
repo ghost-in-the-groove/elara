@@ -413,6 +413,25 @@ TEST_CASE("Guitar Pro: a bar whose clef differs from the bar before changes it",
     CHECK(imported->warnings == std::vector<std::string>{"Gtr: clef changes dropped (measure 5)"});
 }
 
+TEST_CASE("Guitar Pro: a tenuto note is held, with a staccato portato", "[io][guitarpro]") {
+    // ADR-0088: the Accent flags of a GPIF note: 1 staccato, 16 tenuto.
+    const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
+    for (const auto& [flags, staccato] : {std::pair(16, false), std::pair(17, true)}) {
+        CAPTURE(flags);
+        std::string score = guitarScore(0, "0", beat, whole);
+        score.insert(score.find(R"(<Note id="0">)") + 13,
+                     std::format("<Accent>{}</Accent>", flags));
+        const auto imported = importGpif(score);
+        REQUIRE(imported.has_value());
+        const core::NoteEffects& fx =
+            imported->song.track(0).staff(0).measure(0).voices[0].beats.at(0).notes.at(0).effects;
+        CHECK(fx.tenuto);
+        CHECK(fx.staccato == staccato);
+        CHECK(imported->warnings.empty());
+    }
+}
+
 TEST_CASE("Guitar Pro: a tapped note taps its beat", "[io][guitarpro]") {
     // ADR-0060: the model taps beats, Guitar Pro notes, with either hand.
     const std::string beats = R"(<Beat id="0"><Rhythm ref="0"/><Notes>1</Notes></Beat>)"

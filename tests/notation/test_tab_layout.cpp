@@ -514,6 +514,42 @@ TEST_CASE("Tablature layout: standard notation shows ties and articulations", "[
     CHECK(marks[2].origin.y > heads[2].origin.y);
 }
 
+TEST_CASE("Tablature layout: tenuto by the notehead, beyond a staccato dot, accents outside",
+          "[notation][tab]") {
+    // ADR-0088.
+    Note held = fretted(1, 0); // written E5: stem down, marks above
+    held.effects.tenuto = true;
+    held.effects.accent = elara::core::Accent::Accent;
+    Note portato = fretted(6, 3); // written G3: stem up, marks below
+    portato.effects.staccato = true;
+    portato.effects.tenuto = true;
+    const Song song =
+        guitar({{beatOf({held}, NoteValue::Half), beatOf({portato}), beatOf({fretted(6, 3)})}});
+    const StaffSelection standard{};
+    const DisplayList list = layoutSystem(song, std::span(&standard, 1), bravura());
+    auto heads = byRole(list.glyphs, Role::Notehead);
+    std::ranges::stable_sort(heads, {}, [](const GlyphItem& item) { return item.origin.x; });
+    REQUIRE(heads.size() == 3);
+    const auto marks = byRole(list.glyphs, Role::Articulation);
+    REQUIRE(marks.size() == 4);
+    const auto find = [&](Glyph glyph) {
+        const auto found = std::ranges::find(marks, glyph, &GlyphItem::glyph);
+        REQUIRE(found != marks.end());
+        return *found;
+    };
+    const GlyphItem tenuto = find(Glyph::ArticTenutoAbove);
+    const GlyphItem accent = find(Glyph::ArticAccentAbove);
+    CHECK(tenuto.origin.y < heads[0].origin.y);
+    CHECK(accent.origin.y <
+          tenuto.origin.y - bravura().metrics(Glyph::ArticTenutoAbove).box.height());
+    // Portato: the dot under the notehead, the line under the dot.
+    const GlyphItem dot = find(Glyph::ArticStaccatoBelow);
+    const GlyphItem line = find(Glyph::ArticTenutoBelow);
+    CHECK(dot.origin.y > heads[1].origin.y);
+    CHECK(line.origin.y > dot.origin.y);
+    CHECK(line.origin.x < heads[2].origin.x);
+}
+
 TEST_CASE("Tablature layout: techniques go above the notation without tablature",
           "[notation][tab]") {
     Note muted = fretted(6, 0);

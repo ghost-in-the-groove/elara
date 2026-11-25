@@ -1429,19 +1429,22 @@ private:
         }
     }
 
-    // Staccato and accents on the notehead side of the chord, the staccato
-    // dot in a space when inside the staff.
+    // Staccato, tenuto and accents on the notehead side of the chord: the
+    // staccato dot nearest, the tenuto line beyond it (both: portato,
+    // ADR-0088), each in a space when inside the staff, the accent outside.
     void articulations(Chord& chord) {
         if (chord.rest || chord.heads.empty()) {
             return;
         }
         bool staccato = false;
+        bool tenuto = false;
         core::Accent accent = core::Accent::None;
         for (const Head& head : chord.heads) {
             staccato = staccato || head.note->effects.staccato;
+            tenuto = tenuto || head.note->effects.tenuto;
             accent = std::max(accent, head.note->effects.accent);
         }
-        if (!staccato && accent == core::Accent::None) {
+        if (!staccato && !tenuto && accent == core::Accent::None) {
             return;
         }
         const bool above = !chord.stemUp;
@@ -1450,15 +1453,21 @@ private:
         const BoundingBox& head = metrics(outer.glyph).box;
         const double centre = chord.x + outer.dx + (head.southWest.x + head.northEast.x) / 2;
         double edge = yOf(outer.step) + direction * (0.5 + kArticulationGap);
-        if (staccato) {
-            int target = outer.step + (above ? -2 : 2);
+        int target = outer.step;
+        const auto inSpace = [&](Glyph mark) {
+            target += above ? -2 : 2;
             if (target % 2 == 0 && target >= 0 && target <= 2 * kMiddleStep) {
                 target += above ? -1 : 1;
             }
-            const Glyph dot = above ? Glyph::ArticStaccatoAbove : Glyph::ArticStaccatoBelow;
-            glyphCentred(dot, centre, yOf(target), Role::Articulation);
-            edge = yOf(target) + direction * (metrics(dot).box.height() / 2 + kArticulationGap);
-            chord.marks = yOf(target) + direction * metrics(dot).box.height() / 2;
+            glyphCentred(mark, centre, yOf(target), Role::Articulation);
+            chord.marks = yOf(target) + direction * metrics(mark).box.height() / 2;
+            edge = *chord.marks + direction * kArticulationGap;
+        };
+        if (staccato) {
+            inSpace(above ? Glyph::ArticStaccatoAbove : Glyph::ArticStaccatoBelow);
+        }
+        if (tenuto) {
+            inSpace(above ? Glyph::ArticTenutoAbove : Glyph::ArticTenutoBelow);
         }
         if (accent == core::Accent::None) {
             return;

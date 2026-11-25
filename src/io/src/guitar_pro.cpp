@@ -1030,9 +1030,7 @@ private:
             } else if ((flags & 8) != 0) {
                 effects.accent = Accent::Accent;
             }
-            if ((flags & 16) != 0) {
-                warnings_.add(who, "tenuto marks dropped", m);
-            }
+            effects.tenuto = (flags & 16) != 0; // with the staccato, portato (ADR-0088)
         }
         effects.ghost = fields.ghost;
         effects.palmMute = fields.palmMuted;

@@ -63,7 +63,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | ligadura de prolongación | tie | `tiedFromPrevious` | Same pitch, no new attack |
 | ligadura de expresión | slur | `BeatEffects::slur`, `Role::Slur` | A curve over notes played as one phrase: each beat but the last slurred to the next of its voice (ADR-0086) |
 | plica | stem | `Stem` | |
-| articulación | articulation | `staccato`, `Accent` | Staccato, accent, marcato |
+| articulación | articulation | `staccato`, `tenuto`, `Accent` | Staccato, tenuto (both: portato, ADR-0088), accent, marcato |
 | barra (de corcheas) | beam | `Beam` | |
 | alteración | accidental | `Accidental` | |
 | altura | pitch | `Pitch` | step + alter + octave |

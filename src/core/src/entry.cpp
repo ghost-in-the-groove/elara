@@ -245,6 +245,8 @@ bool hasEffect(const NoteEffects& fx, NoteEffect effect) {
         return fx.accent != Accent::None;
     case NoteEffect::Staccato:
         return fx.staccato;
+    case NoteEffect::Tenuto:
+        return fx.tenuto;
     }
     return false;
 }
@@ -677,6 +679,9 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
             break;
         case NoteEffect::Staccato:
             fx.staccato = on;
+            break;
+        case NoteEffect::Tenuto:
+            fx.tenuto = on;
             break;
         }
     }

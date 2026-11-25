@@ -202,7 +202,8 @@ caret's string is a drum lane, from the crash at the top to the hi-hat pedal
 that General MIDI key's lane (moving the caret to it), and `delete` removes the
 lane's piece only. `effect <name>` toggles a note effect on the caret's notes
 (ADR-0037): `tie`, `legato`, `slide`, `bend`, `vibrato`, `palm-mute`,
-`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent` or `staccato`.
+`dead-note`, `let-ring`, `harmonic`, `ghost`, `accent`, `staccato` or `tenuto`
+(with `staccato`, portato: ADR-0088).
 `bend <form> [cents]` sets a bend on them (ADR-0055): `bend`, `release` (bend
 and release), `pre-bend`, `pre-release` (pre-bend and release) or `none`, up by
 `cents` (a full step, 200, by default). `strum <down|up|none>`, `pick

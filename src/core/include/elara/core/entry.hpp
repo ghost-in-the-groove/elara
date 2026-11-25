@@ -142,6 +142,7 @@ enum class NoteEffect : std::uint8_t {
     Ghost,    ///< a soft note, written in parentheses
     Accent,   ///< an accent
     Staccato, ///< staccato
+    Tenuto,   ///< tenuto; with staccato, portato (ADR-0088)
 };
 
 /// Whether `effect` is a technique of strings (hammer-on or pull-off, palm

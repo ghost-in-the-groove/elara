@@ -93,6 +93,7 @@ one that replaces them.
 | [0085](0085-fermatas.md) | Fermatas | Accepted |
 | [0086](0086-slurs.md) | Slurs | Accepted |
 | [0087](0087-clef-changes.md) | Clef changes | Accepted |
+| [0088](0088-tenuto.md) | Tenuto and portato | Accepted |
 
 ## Template
 
