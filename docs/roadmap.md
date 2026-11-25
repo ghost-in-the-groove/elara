@@ -138,6 +138,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Slides drawn on the standard staff: lines between notes, into and out of a note (ADR-0098)
 - [x] Ghost notes: noteheads between parentheses on the standard staff (ADR-0099)
 - [x] Natural harmonics: diamond noteheads on the standard staff (ADR-0100)
+- [x] Tremolo picking: slashes through the stem on the standard staff (ADR-0101)
 - [x] Clef changes: a measure changes its staff's clef, drawn smaller before the barline (ADR-0087)
 - [ ] Measure repeats: a measure plays the measure, or the two measures, before it (ADR-0102)
   - [x] In the model and kept by the native format; heard in playback and MIDI export

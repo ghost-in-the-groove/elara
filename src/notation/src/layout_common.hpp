@@ -231,6 +231,13 @@ struct ColumnTechniques {
 /// Adds the marks of the notes of `beat` to `marks`.
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat);
 
+/// The slashes of tremolo picking at `speed`: one per beam of the repeated
+/// notes, three at most.
+[[nodiscard]] int tremoloStrokes(core::NoteValue speed) noexcept;
+
+/// The glyph of `strokes` tremolo slashes, 1 to 3.
+[[nodiscard]] Glyph tremoloGlyph(int strokes) noexcept;
+
 /// Collects technique marks column by column: "P.M.", "let ring" and vibrato
 /// run on while consecutive columns have them, across barlines.
 class TechniqueLanes {
