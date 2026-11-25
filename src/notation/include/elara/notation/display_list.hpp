@@ -47,9 +47,10 @@ enum class Role : std::uint8_t {
     Dynamic,       ///< a dynamics mark under a staff: "p", "mf", "ff"
     Navigation,    ///< segno and coda signs, "Fine", "To Coda" and jumps ("D.S. al Coda")
     Section,       ///< the name of a section of the song ("Chorus") and its box
+    Brace,         ///< the brace joining the staves of a piano (a grand staff)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Section) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Brace) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

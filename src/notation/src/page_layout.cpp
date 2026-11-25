@@ -76,9 +76,11 @@ struct Candidate {
 
 class LineBreaker {
 public:
-    // `indent` is taken from the width of the first system.
-    LineBreaker(std::span<const MeasureWidth> widths, double width, double indent, double lastFill)
-        : widths_(widths), width_(width), indent_(indent), lastFill_(lastFill) {
+    // `indent` is taken from the width of the first system, `braces` from
+    // the width of every system.
+    LineBreaker(std::span<const MeasureWidth> widths, double width, double indent, double braces,
+                double lastFill)
+        : widths_(widths), width_(width - braces), indent_(indent), lastFill_(lastFill) {
         natural_.reserve(widths.size());
         tightest_.reserve(widths.size());
         ideal_.reserve(widths.size());
@@ -314,7 +316,7 @@ std::vector<Line> breakLines(const core::Song& song, std::span<const StaffSelect
                              std::span<const MeasureWidth> widths, const Span& span,
                              const PageLayoutOptions& options) {
     const LineBreaker breaker(widths, span.width, detail::nameIndent(song, staves),
-                              options.lastSystemFill);
+                              detail::braceRoom(staves), options.lastSystemFill);
     return options.measuresPerSystem > 0 ? breaker.every(options.measuresPerSystem)
                                          : breaker.best();
 }
