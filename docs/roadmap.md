@@ -148,6 +148,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML, read from Guitar Pro 3-8
   - [x] Drawn on standard notation with a wavy line, and in a lane over tablature
   - [x] Set at the caret
+- [x] Mordents and turns: quick notes on the steps of the key at the start of a note (ADR-0091)
+  - [x] In the model, played and kept by the native format
+  - [x] Read and written in MusicXML, read from Guitar Pro 6-8
+  - [x] Drawn on standard notation and in a lane over tablature
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

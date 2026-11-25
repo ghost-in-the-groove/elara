@@ -460,6 +460,10 @@ core::Song randomSong(std::uint32_t seed) {
                                                               song.measureHeader(m).keySignature) +
                                                           pick(0, 1))};
                                         }
+                                        if (pick(0, 13) == 0) { // ADR-0091
+                                            note.effects.ornament =
+                                                static_cast<Ornament>(pick(1, 4));
+                                        }
                                     }
                                     note.effects.staccato = pick(0, 9) == 0;
                                     note.effects.tenuto = pick(0, 11) == 0;

@@ -227,7 +227,8 @@ neighbouring beats with the same one share a line (ADR-0089).
 `trill <on|semitones|none> [16|32|64]` trills the caret's notes: `on` each to
 the next step up in the key, a number that many semitones up (or down when
 negative, at most 12), at thirty-seconds unless a speed says otherwise
-(ADR-0090).
+(ADR-0090). `ornament <mordent|upper-mordent|turn|inverted-turn|none>` gives
+them a mordent or a turn (ADR-0091).
 `grace <semitones> [duration] [on]` adds a grace note that many semitones from
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says
