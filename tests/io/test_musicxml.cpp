@@ -328,6 +328,31 @@ TEST_CASE("MusicXML: tenuto marks hold their notes, detached-legato is portato",
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: mordents and turns are the notes' ornaments", "[musicxml]") {
+    // ADR-0091: MusicXML's inverted mordent is the upper one; a delayed turn
+    // is none of them.
+    const auto marked = [](std::string_view ornaments) {
+        return std::format("<note><pitch><step>E</step><octave>5</octave></pitch>"
+                           "<duration>4</duration><voice>1</voice><type>quarter</type>"
+                           "<notations><ornaments>{}</ornaments></notations></note>",
+                           ornaments);
+    };
+    const ImportResult result =
+        parse(onePart(marked("<mordent/>") + marked("<inverted-mordent/>") + marked("<turn/>") +
+                      marked("<inverted-turn/><delayed-turn/>")));
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    const auto ornamentOf = [&](std::size_t b) {
+        return beats[b].notes.at(0).effects.ornament;
+    };
+    CHECK(ornamentOf(0) == core::Ornament::Mordent);
+    CHECK(ornamentOf(1) == core::Ornament::UpperMordent);
+    CHECK(ornamentOf(2) == core::Ornament::Turn);
+    CHECK(ornamentOf(3) == core::Ornament::InvertedTurn);
+    REQUIRE(result.warnings.size() == 1);
+    CHECK(result.warnings[0].find("ornaments dropped") != std::string::npos);
+}
+
 TEST_CASE("MusicXML: trill marks trill to the next step of the key", "[musicxml]") {
     // ADR-0090: in D major E trills with F#, two semitones up, and C# with D,
     // one; an accidental mark changes the other note; the wavy line after a
@@ -344,7 +369,7 @@ TEST_CASE("MusicXML: trill marks trill to the next step of the key", "[musicxml]
         trilled("E", "", "<trill-mark/>") +
         trilled("C", "<alter>1</alter>", R"(<trill-mark/><wavy-line type="start"/>)") +
         trilled("C", "<alter>1</alter>", "<trill-mark/><accidental-mark>sharp</accidental-mark>") +
-        trilled("G", "", "<mordent/>"));
+        trilled("G", "", "<schleifer/>"));
     const ImportResult result = parse(xml);
     const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
     REQUIRE(beats.size() == 4);

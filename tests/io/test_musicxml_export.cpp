@@ -746,6 +746,30 @@ TEST_CASE("MusicXML export: trills come back, with an accidental mark for an unu
     requireSame(sax, roundTrip(sax));
 }
 
+TEST_CASE("MusicXML export: mordents and turns come back", "[musicxml][export]") {
+    // ADR-0091: each kind on a note of its own, a turn with a trill as well.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const auto ornamented = [](core::Ornament ornament) {
+        core::Note note{.pitch = *core::Pitch::parse("E5")};
+        note.effects.ornament = ornament;
+        return note;
+    };
+    core::Note both = ornamented(core::Ornament::Turn);
+    both.effects.trill = core::Trill{.semitones = 1};
+    song.track(p).staff(0).measure(0).voices[0].beats = {
+        beatOf(quarter, {ornamented(core::Ornament::Mordent)}),
+        beatOf(quarter, {ornamented(core::Ornament::UpperMordent)}),
+        beatOf(quarter, {ornamented(core::Ornament::InvertedTurn)}), beatOf(quarter, {both})};
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    CHECK(exported.data.find("<inverted-mordent/>") != std::string::npos);
+    requireSame(song, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
     // ADR-0086: a slur starts on the first beat slurred in a row and stops on
     // the beat after the last, across barlines, numbered by staff and voice; a

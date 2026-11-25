@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <miniz.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -503,6 +504,40 @@ TEST_CASE("Guitar Pro: a note's Trill names the key of its other note", "[io][gu
     CHECK(read[0].notes[0].effects.trill ==
           core::Trill{.semitones = 2, .speed = core::NoteValue::Sixteenth});
     CHECK(!read[1].notes.at(0).effects.trill.isTrill());
+}
+
+TEST_CASE("Guitar Pro: a note's Ornament is its mordent or turn", "[io][guitarpro]") {
+    // ADR-0091: Guitar Pro's lower mordent is the plain one.
+    std::string beats;
+    std::string notes;
+    std::string ids;
+    constexpr std::array<std::string_view, 5> kKinds{"LowerMordent", "UpperMordent", "Turn",
+                                                     "InvertedTurn", "Shake"};
+    for (std::size_t i = 0; i < kKinds.size(); ++i) {
+        beats +=
+            std::format(R"(<Beat id="{}"><Rhythm ref="0"/><Notes>{}</Notes></Beat>)", i, i + 1);
+        notes += std::format(
+            R"(<Note id="{}"><Ornament>{}</Ornament><Properties><Property name="Fret">)"
+            R"(<Fret>5</Fret></Property><Property name="String"><String>5</String></Property>)"
+            R"(</Properties></Note>)",
+            i + 1, kKinds[i]);
+        ids += std::format("{}{}", i == 0 ? "" : " ", i);
+    }
+    const std::string sixteenth = R"(<Rhythm id="0"><NoteValue>16th</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, ids, beats, sixteenth);
+    score.insert(score.find("</Notes><Rhythms>"), notes);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() >= 5); // then rests to the end of the measure
+    CHECK(read[0].notes.at(0).effects.ornament == core::Ornament::Mordent);
+    CHECK(read[1].notes.at(0).effects.ornament == core::Ornament::UpperMordent);
+    CHECK(read[2].notes.at(0).effects.ornament == core::Ornament::Turn);
+    CHECK(read[3].notes.at(0).effects.ornament == core::Ornament::InvertedTurn);
+    CHECK(read[4].notes.at(0).effects.ornament == core::Ornament::None);
+    CHECK(std::ranges::count_if(imported->warnings, [](const std::string& warning) {
+              return warning.find("ornaments dropped") != std::string::npos;
+          }) == 1);
 }
 
 TEST_CASE("Guitar Pro: beats keep their free text", "[io][guitarpro]") {
