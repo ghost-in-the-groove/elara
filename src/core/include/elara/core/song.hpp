@@ -27,8 +27,14 @@ public:
     explicit Staff(Clef clef = Clef::Treble, std::optional<Tuning> tuning = std::nullopt,
                    int capo = 0);
 
+    /// The staff's own clef: the one in force until a measure changes it.
     [[nodiscard]] Clef clef() const noexcept { return clef_; }
     void setClef(Clef clef) noexcept { clef_ = clef; }
+
+    /// The clef in force at measure m: the latest change at or before it
+    /// (Measure::clef, ADR-0087), else the staff's own. Throws
+    /// std::out_of_range for a missing measure.
+    [[nodiscard]] Clef clefAt(std::size_t m) const;
 
     [[nodiscard]] const std::optional<Tuning>& tuning() const noexcept { return tuning_; }
     [[nodiscard]] bool isFretted() const noexcept { return tuning_.has_value(); }

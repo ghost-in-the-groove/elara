@@ -826,7 +826,11 @@ private:
         const MeasureHeader* previous = m > 0 ? &song_.measureHeader(m - 1) : nullptr;
         const bool key = previous == nullptr || previous->keySignature != header.keySignature;
         const bool time = previous == nullptr || previous->timeSignature != header.timeSignature;
-        if (!key && !time) {
+        bool clefs = false;
+        for (int s = 0; s < staffCount_ && previous != nullptr; ++s) {
+            clefs = clefs || clefChanges(m, s);
+        }
+        if (!key && !time && !clefs) {
             return;
         }
         xml.open("attributes");
@@ -854,7 +858,7 @@ private:
                 xml.number("staves", xmlStaves_);
             }
             for (int s = 0; s < xmlStaves_; ++s) {
-                writeClef(xml, s);
+                writeClef(xml, s, 0);
             }
             for (int s = 0; s < xmlStaves_; ++s) {
                 writeStaffDetails(xml, s);
@@ -868,11 +872,29 @@ private:
                 }
                 xml.close("transpose");
             }
+        } else {
+            for (int s = 0; s < staffCount_; ++s) {
+                if (clefChanges(m, s)) {
+                    writeClef(xml, s, m);
+                }
+            }
         }
         xml.close("attributes");
     }
 
-    void writeClef(XmlWriter& xml, int s) const {
+    /// Whether measure m changes the clef of staff s (ADR-0087); TAB staves
+    /// keep theirs.
+    [[nodiscard]] bool clefChanges(std::size_t m, int s) const {
+        if (m == 0 || s >= staffCount_) {
+            return false;
+        }
+        const Staff& staff = track_.staff(static_cast<std::size_t>(s));
+        const std::optional<Clef>& clef = staff.measure(m).clef;
+        return clef && *clef != staff.clefAt(m - 1);
+    }
+
+    /// The clef of staff s in force at measure m.
+    void writeClef(XmlWriter& xml, int s, std::size_t m) const {
         xml.start("clef");
         if (xmlStaves_ > 1) {
             xml.attribute("number", s + 1);
@@ -890,7 +912,7 @@ private:
         if (s >= staffCount_) {
             sign("TAB", 5, 0);
         } else {
-            switch (track_.staff(static_cast<std::size_t>(s)).clef()) {
+            switch (track_.staff(static_cast<std::size_t>(s)).clefAt(m)) {
             case Clef::Treble:
                 sign("G", 2, 0);
                 break;

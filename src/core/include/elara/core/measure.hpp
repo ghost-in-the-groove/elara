@@ -4,6 +4,7 @@
 #include <elara/core/duration.hpp>
 #include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
+#include <elara/core/instrument.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/shared_value.hpp>
 #include <elara/core/tuning.hpp>
@@ -119,6 +120,9 @@ struct Measure {
     static constexpr std::size_t kMaxVoices = 4;
 
     std::array<Voice, kMaxVoices> voices{};
+    /// The clef the staff changes to from the start of this measure until the
+    /// next change (ADR-0087); none keeps the clef in force.
+    std::optional<Clef> clef{};
 
     [[nodiscard]] bool isEmpty() const noexcept;
 

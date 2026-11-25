@@ -271,6 +271,23 @@ private:
         if (value.capo() != 0) {
             addInt(object, "capo", value.capo());
         }
+        // The measures that change the clef (ADR-0087), apart from their
+        // content: a change can stand on an empty measure at the end.
+        yyjson_mut_val* clefs = nullptr;
+        for (std::size_t m = 0; m < value.measureCount(); ++m) {
+            if (const std::optional<Clef>& clef = value.measure(m).clef) {
+                if (clefs == nullptr) {
+                    clefs = yyjson_mut_arr(doc_);
+                }
+                yyjson_mut_val* change = yyjson_mut_obj(doc_);
+                addInt(change, "measure", static_cast<std::int64_t>(m));
+                addText(change, "clef", nameOf(kClefNames, *clef));
+                yyjson_mut_arr_append(clefs, change);
+            }
+        }
+        if (clefs != nullptr) {
+            add(object, "clefs", clefs);
+        }
         std::size_t used = value.measureCount(); // trailing empty measures are omitted
         while (used > 0 && value.measure(used - 1).isEmpty()) {
             --used;
@@ -865,6 +882,30 @@ private:
         Scope stavesScope(*this, "staves");
         forEach(stavesJson, [&](std::size_t s, yyjson_val* staffJson) {
             readMeasures(staffJson, track.staff(s), song.measureCount());
+            readClefs(staffJson, track.staff(s), song.measureCount());
+        });
+    }
+
+    // The measures that change the staff's clef (ADR-0087).
+    void readClefs(yyjson_val* staffJson, Staff& staff, std::size_t measureCount) {
+        yyjson_val* clefs = optionalArray(staffJson, "clefs");
+        if (clefs == nullptr) {
+            return;
+        }
+        Scope scope(*this, "clefs");
+        forEach(clefs, [&](std::size_t, yyjson_val* change) {
+            if (!yyjson_is_obj(change)) {
+                fail("expected an object");
+            }
+            const auto m = static_cast<std::size_t>(
+                integer(change, "measure", 0, static_cast<std::int64_t>(measureCount) - 1));
+            const std::string_view name = requiredText(change, "clef");
+            const auto clef = enumFrom<Clef>(kClefNames, name);
+            if (!clef) {
+                Scope inner(*this, "clef");
+                fail(std::format("unknown value: {}", name));
+            }
+            staff.measure(m).clef = *clef;
         });
     }
 
