@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
+#include <elara/core/tuning.hpp>
+
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -8,6 +10,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace elara::audio {
@@ -32,7 +35,7 @@ class TunerController : public QObject {
     Q_PROPERTY(int stringIndex READ stringIndex NOTIFY readingChanged)
     Q_PROPERTY(double stringCents READ stringCents NOTIFY readingChanged)
     Q_PROPERTY(double level READ level NOTIFY levelChanged)
-    Q_PROPERTY(QStringList tuningLabels READ tuningLabels CONSTANT)
+    Q_PROPERTY(QStringList tuningLabels READ tuningLabels NOTIFY tuningLabelsChanged)
     Q_PROPERTY(int tuning READ tuning WRITE setTuning NOTIFY tuningChanged)
     Q_PROPERTY(QStringList stringNames READ stringNames NOTIFY tuningChanged)
     Q_PROPERTY(int a4 READ a4 WRITE setA4 NOTIFY a4Changed)
@@ -66,10 +69,16 @@ public:
     /// The input level, 0 (-60 dBFS or less) to 1 (full scale), falling slowly.
     [[nodiscard]] double level() const { return level_; }
 
-    /// "Chromatic" first, then the tuning presets.
+    /// "Chromatic" first, then the tuning presets and, after showTuning()
+    /// with a tuning no preset has, that track's.
     [[nodiscard]] QStringList tuningLabels() const;
     [[nodiscard]] int tuning() const { return tuning_; }
     void setTuning(int index);
+    /// Tunes to `notes` (open strings from the lowest, as core::Tuning writes
+    /// them), the tuning of the track `track`: its preset when one has these
+    /// strings, otherwise an entry of the track's own after the presets.
+    /// Ignored when `notes` is not a tuning.
+    Q_INVOKABLE void showTuning(const QString& notes, const QString& track);
     /// The open strings of the tuning, lowest first; empty for chromatic.
     [[nodiscard]] QStringList stringNames() const { return stringNames_; }
 
@@ -85,6 +94,7 @@ signals:
     void readingChanged();
     void levelChanged();
     void tuningChanged();
+    void tuningLabelsChanged();
     void a4Changed();
     void errorMessageChanged();
 
@@ -95,6 +105,8 @@ private:
     void applyOptions();
     void showReading();
     void setErrorMessage(const QString& message);
+    /// The tuning of entry `index` of tuningLabels(); none for chromatic.
+    [[nodiscard]] std::optional<elara::core::Tuning> tuningAt(int index) const;
 
     std::unique_ptr<elara::audio::MicrophoneInput> input_;
     std::unique_ptr<elara::audio::Tuner> tuner_;
@@ -110,6 +122,9 @@ private:
     double stringCents_ = 0.0;
     double level_ = 0.0;
     int tuning_ = 1; // standard guitar
+    // A track's tuning that no preset has, the entry after the presets.
+    std::optional<elara::core::Tuning> trackTuning_;
+    QString trackName_;
     QStringList stringNames_;
     int a4_ = 440;
     QString errorMessage_;

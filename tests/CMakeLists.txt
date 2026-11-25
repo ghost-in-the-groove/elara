@@ -141,6 +141,10 @@ if(TARGET elara)
   # The tuner opened at start. Without an audio input (as in CI) it says so
   # instead of listening; either way its QML must load without warnings.
   add_test(NAME app.smoke_tuner COMMAND elara --smoke-test --tuner)
+  # The tuner open over a bass: it tunes to the bass's strings, to a tuning of
+  # the track's own when the bass is tuned a whole step down, and back on undo.
+  add_test(NAME app.smoke_tuner_track
+    COMMAND elara --smoke-test --tuner "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
   # The song panel open, with the first track's tuning, while the song is edited.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
@@ -154,7 +158,8 @@ if(TARGET elara)
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner app.smoke_song_pane app.smoke_measure app.smoke_lyrics app.smoke_effects
+    app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
+    app.smoke_effects
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
@@ -170,6 +175,8 @@ if(TARGET elara)
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(app.smoke_tuner_track PROPERTIES
+    PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
 
   # A SoundFont from the command line (ADR-0043), the test font of the CLI
   # tests: the window plays through it, keeps it when another file fails to
