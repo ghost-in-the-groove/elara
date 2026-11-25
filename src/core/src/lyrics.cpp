@@ -16,7 +16,7 @@ SharedOptional<std::vector<Syllable>> withVerse(const SharedOptional<std::vector
                                                 std::size_t verse, Syllable syllable) {
     std::vector<Syllable> verses = lyrics ? *lyrics : std::vector<Syllable>{};
     if (syllable.text.empty()) {
-        syllable.hyphen = false;
+        syllable = Syllable{};
         if (verse >= verses.size()) {
             return lyrics;
         }

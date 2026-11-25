@@ -2,8 +2,7 @@
 <!-- Self-made test file, CC0 1.0. A piano on two staves with voices numbered the
      way MuseScore does (1-4 for staff 1, 5-8 for staff 2): a chord, a second voice
      that starts late (forward), backup between staves, a meter change with a tempo
-     change, and features the model cannot hold yet (grace note, lyric, repeat,
-     chord symbol), which must be reported as warnings. -->
+     change, a grace note, a lyric, a repeat, a chord symbol and words. -->
 <score-partwise version="4.0">
   <movement-title>Corpus Piano</movement-title>
   <part-list>
@@ -36,7 +35,7 @@
       <barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>
       <attributes><time><beats>6</beats><beat-type>8</beat-type></time></attributes>
       <direction placement="above"><direction-type><words>Calmer</words></direction-type><sound tempo="80"/></direction>
-      <note><pitch><step>C</step><octave>5</octave></pitch><duration>3</duration><voice>1</voice><type>quarter</type><dot/><staff>1</staff><lyric number="1"><syllable>single</syllable><text>la</text></lyric></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>3</duration><voice>1</voice><type>quarter</type><dot/><staff>1</staff><lyric number="1"><syllabic>single</syllabic><text>la</text></lyric></note>
       <note><rest/><duration>3</duration><voice>1</voice><type>quarter</type><dot/><staff>1</staff></note>
       <backup><duration>6</duration></backup>
       <note><grace slash="yes"/><pitch><step>G</step><octave>3</octave></pitch><voice>5</voice><type>eighth</type><staff>2</staff></note>

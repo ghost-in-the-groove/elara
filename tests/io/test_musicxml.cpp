@@ -70,6 +70,22 @@ std::string summary(const core::Voice& voice) {
     return text;
 }
 
+// The verses sung on each beat, spelled as in song.json: "be-" joins the next
+// syllable, "low_" is held over the notes after it, "" sings nothing.
+std::vector<std::vector<std::string>> lyricsOf(const core::Voice& voice) {
+    std::vector<std::vector<std::string>> out;
+    for (const core::Beat& beat : voice.beats) {
+        std::vector<std::string>& verses = out.emplace_back();
+        if (beat.lyrics) {
+            for (const core::Syllable& syllable : *beat.lyrics) {
+                verses.push_back(syllable.text + (syllable.hyphen ? "-" : "") +
+                                 (syllable.extend ? "_" : ""));
+            }
+        }
+    }
+    return out;
+}
+
 const core::Voice& voiceOf(const core::Song& song, std::size_t track, std::size_t staff,
                            std::size_t measure, std::size_t voice = 0) {
     return song.track(track).staff(staff).measure(measure).voices.at(voice);
@@ -241,11 +257,13 @@ TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silent
     REQUIRE(first.chord);
     CHECK(first.chord->name == "F");
 
-    // Words are the beat's text (ADR-0081); lyrics are not kept.
+    // Words are the beat's text (ADR-0081), lyrics its syllables (ADR-0084).
     CHECK_FALSE(hasWarning(result, "text", "measure 2"));
     REQUIRE(voiceOf(result.song, 0, 0, 1).beats.at(0).text);
     CHECK(*voiceOf(result.song, 0, 0, 1).beats[0].text == "Calmer");
-    CHECK(hasWarning(result, "lyric", "measure 2"));
+    CHECK_FALSE(hasWarning(result, "lyric", "measure 2"));
+    CHECK(lyricsOf(voiceOf(result.song, 0, 0, 1)) ==
+          std::vector<std::vector<std::string>>{{"la"}, {}});
 }
 
 TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]") {
@@ -278,6 +296,63 @@ TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]"
     CHECK_FALSE(beats[2].text);
     CHECK_FALSE(beats[3].text);
     CHECK(hasWarning(result, "text directions dropped", "measure 1"));
+}
+
+// A quarter note of voice 1 in octave 4 with what follows its type.
+std::string quarterNote(std::string_view step, std::string_view rest) {
+    return std::format("<note><pitch><step>{}</step><octave>4</octave></pitch>"
+                       "<duration>4</duration><voice>1</voice><type>quarter</type>{}</note>",
+                       step, rest);
+}
+
+TEST_CASE("MusicXML: lyrics give each beat a syllable per verse", "[musicxml]") {
+    // ADR-0084: <lyric number> is the verse; begin and middle syllables join
+    // the next one with a hyphen; elided syllables share the beat; <extend/>
+    // holds the syllable over the notes after it.
+    const ImportResult result = parse(onePart(
+        quarterNote("C",
+                    R"(<lyric number="1"><syllabic>begin</syllabic><text>be</text></lyric>)"
+                    R"(<lyric number="2"><syllabic>single</syllabic><text>oh</text></lyric>)") +
+        quarterNote("D", R"(<lyric number="1"><syllabic>end</syllabic><text>low</text>)"
+                         R"(<extend type="start"/></lyric>)") +
+        quarterNote("E", R"(<lyric number="1"><extend type="stop"/></lyric>)") +
+        quarterNote("F",
+                    R"(<lyric number="3"><syllabic>begin</syllabic><text>ti</text>)"
+                    R"(<elision>‿</elision><syllabic>middle</syllabic><text>a</text></lyric>)")));
+    CHECK(lyricsOf(voiceOf(result.song, 0, 0, 0)) ==
+          std::vector<std::vector<std::string>>{{"be-", "oh"}, {"low_"}, {}, {"", "", "ti‿a-"}});
+    CHECK(result.warnings.empty());
+}
+
+TEST_CASE("MusicXML: lyrics without a number, on chords, hidden or on grace notes", "[musicxml]") {
+    // No number is verse 1; a chord note's syllable goes on the beat when its
+    // verse has none there yet; a hyphen typed after the text joins the next
+    // syllable; hidden lyrics are not sung.
+    const ImportResult result = parse(onePart(
+        quarterNote("C", R"(<lyric name="verse"><text>one</text></lyric>)") +
+        quarterNote("D", R"(<lyric number="1"><text>two</text></lyric>)") +
+        R"(<note><chord/><pitch><step>F</step><octave>4</octave></pitch><duration>4</duration>)"
+        R"(<voice>1</voice><type>quarter</type><lyric number="1"><text>dos</text></lyric>)"
+        R"(<lyric number="2"><syllabic>begin</syllabic><text>deux-</text></lyric></note>)" +
+        quarterNote("E", R"(<lyric number="1" print-object="no"><text>hidden</text></lyric>)"
+                         R"(<lyric number="17"><text>far</text></lyric>)") +
+        R"(<note><grace/><pitch><step>A</step><octave>4</octave></pitch><voice>1</voice>)"
+        R"(<type>eighth</type><lyric number="1"><text>la</text></lyric></note>)" +
+        quarterNote("G", R"(<lyric number="1"><text>end-</text></lyric>)")));
+    CHECK(lyricsOf(voiceOf(result.song, 0, 0, 0)) ==
+          std::vector<std::vector<std::string>>{{"one"}, {"two", "deux-"}, {}, {"end-"}});
+    CHECK(result.warnings ==
+          std::vector<std::string>{"Test: verses after the 16th dropped (measure 1)",
+                                   "Test: lyrics on grace notes dropped (measure 1)"});
+
+    // Verses named instead of numbered follow the order the part names them in.
+    const ImportResult named = parse(
+        onePart(quarterNote("C", R"(<lyric number="v-a"><text>a</text></lyric>)"
+                                 R"(<lyric number="v-b"><text>b</text></lyric>)") +
+                quarterNote("D", R"(<lyric number="v-b"><text>c</text></lyric>)") +
+                R"(<note><rest/><duration>8</duration><voice>1</voice><type>half</type></note>)"));
+    CHECK(lyricsOf(voiceOf(named.song, 0, 0, 0)) ==
+          std::vector<std::vector<std::string>>{{"a", "b"}, {"", "c"}, {}});
 }
 
 TEST_CASE("MusicXML: rit. and accel. make the tempo change there gradual", "[musicxml]") {

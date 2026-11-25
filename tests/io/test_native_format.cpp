@@ -132,9 +132,9 @@ core::Song richSong() {
     // Beat text (ADR-0081).
     lead.measure(0).voices[2].beats[0].text = SharedOptional<std::string>("let ring");
     // Lyrics (ADR-0084): a syllable joined to the next, a verse that sings
-    // nothing there, a third verse.
+    // nothing there, a third verse held over the notes after it.
     first[1].lyrics = SharedOptional(std::vector<Syllable>{
-        {.text = "be", .hyphen = true}, {}, {.text = "low", .hyphen = false}});
+        {.text = "be", .hyphen = true}, {}, {.text = "low", .hyphen = false, .extend = true}});
 
     // Bass with techniques, piano on both staves, drums by key; a breve somewhere.
     Staff& bass = song.track(1).staff(0);
@@ -229,7 +229,7 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
         std::string::npos);
     CHECK(json.find(R"({"duration":"2","chord":{"name":"N.C."}})") != std::string::npos);
     CHECK(json.find(R"({"duration":"2","text":"let ring"})") != std::string::npos);
-    CHECK(json.find(R"("lyrics":["be-","","low"])") != std::string::npos);
+    CHECK(json.find(R"("lyrics":["be-","","low_"])") != std::string::npos);
     CHECK(json.find(R"("onBeat":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2],"section":"Chorus"})") !=
