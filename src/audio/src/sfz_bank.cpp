@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-#include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/flac_reader.hpp>
+#include <elara/audio/sfz_bank.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/parallel.hpp>
 
