@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The caret's measure: its time and key signatures, which change from it until
-// the next change, its tempo, the section it starts, its signs and jumps, its
-// repeats, and measures inserted before or after it, or it deleted.
+// The caret's measure: its time and key signatures and its staff's clef, which
+// change from it until the next change, its tempo, the section it starts, its
+// signs and jumps, its repeats, and measures inserted before or after it, or it
+// deleted.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -133,6 +134,31 @@ Popup {
                               root.document.caretMeasure, numerator, denominator)
             onKeyChosen: (fifths, minor) => root.document.setKeySignatureFrom(
                              root.document.caretMeasure, fifths, minor)
+        }
+
+        // The clef of the caret's staff (ADR-0087); a guitar keeps its octave
+        // clefs, drums their own.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: root.document.caretClef >= 0
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Clef")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            ComboBox {
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                model: [qsTr("Treble"), qsTr("Bass"), qsTr("Alto"), qsTr("Tenor")]
+                currentIndex: root.document.caretClef
+                onActivated: index => root.document.setClef(index)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("The clef of this staff from this measure on")
+            }
         }
 
         // The tempo the measure starts with (ADR-0042), in the beat the song

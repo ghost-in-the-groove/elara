@@ -131,6 +131,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QVariantMap caretRepeats READ caretRepeats NOTIFY caretChanged)
     Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
     Q_PROPERTY(QString caretSection READ caretSection NOTIFY caretChanged)
+    Q_PROPERTY(int caretClef READ caretClef NOTIFY caretChanged)
     // Selected measures (ADR-0036).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(int selectionFirst READ selectionFirst NOTIFY selectionChanged)
@@ -572,6 +573,13 @@ public:
     [[nodiscard]] QString caretSection() const {
         return sectionAt(static_cast<int>(caret_.measure));
     }
+    /// The clef in force at the caret (ADR-0087) as the measure popup offers
+    /// it: 0 treble, 1 bass, 2 alto, 3 tenor, the octave forms as the plain
+    /// ones; -1 on a drum staff or without a caret.
+    [[nodiscard]] int caretClef() const;
+    /// Changes the clef of the caret's staff from the caret's measure on, `clef`
+    /// numbered as caretClef(); the staff keeps its octave (ADR-0087).
+    Q_INVOKABLE void setClef(int clef);
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
     Q_INVOKABLE void insertMeasure(bool after);

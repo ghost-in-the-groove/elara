@@ -330,6 +330,7 @@ constexpr std::array kEditNames{
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove beat text")},
     Translation{"Set lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set lyrics")},
     Translation{"Remove lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove lyrics")},
+    Translation{"Change clef", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change clef")},
 };
 
 // The names of Tuning::presetNames().
@@ -2512,6 +2513,44 @@ int ScoreDocument::caretFermata() const {
 
 bool ScoreDocument::caretSlur() const {
     return beatEffectsAtCaret().slur;
+}
+
+namespace {
+
+// The clefs the measure popup offers, in its order (ADR-0087).
+constexpr std::array kOfferedClefs{core::Clef::Treble, core::Clef::Bass, core::Clef::Alto,
+                                   core::Clef::Tenor};
+
+} // namespace
+
+int ScoreDocument::caretClef() const {
+    if (!document_ || !hasCaret(document_->song()) || caretOnDrums()) {
+        return -1;
+    }
+    const core::Caret caret = core::clampCaret(document_->song(), caret_);
+    switch (document_->song().track(caret.track).staff(caret.staff).clefAt(caret.measure)) {
+    case core::Clef::Treble:
+    case core::Clef::Treble8vb:
+        return 0;
+    case core::Clef::Bass:
+    case core::Clef::Bass8vb:
+        return 1;
+    case core::Clef::Alto:
+        return 2;
+    case core::Clef::Tenor:
+        return 3;
+    case core::Clef::Percussion:
+        break;
+    }
+    return -1;
+}
+
+void ScoreDocument::setClef(int clef) {
+    if (clef < 0 || std::cmp_greater_equal(clef, kOfferedClefs.size())) {
+        return;
+    }
+    runEntry([this, chosen = kOfferedClefs.at(static_cast<std::size_t>(clef))](
+                 const core::Song& song) { return core::setClef(song, caret_, chosen); });
 }
 
 QString ScoreDocument::caretText() const {
