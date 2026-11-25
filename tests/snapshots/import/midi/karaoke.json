@@ -1,0 +1,228 @@
+{
+ "format": "midi",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Song",
+   "artist": "Ghost in the Groove"
+  },
+  "tempo": {
+   "bpm": 96
+  },
+  "measures": [
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Melody",
+    "instrument": {
+     "name": "Voice Oohs",
+     "kind": "pitched",
+     "midiProgram": 53
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "lyrics": [
+           "Hel-"
+          ],
+          "notes": [
+           {
+            "pitch": "G4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "lyrics": [
+           "lo"
+          ],
+          "notes": [
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "lyrics": [
+           "lit-"
+          ],
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "lyrics": [
+           "tle"
+          ],
+          "notes": [
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "lyrics": [
+           "song"
+          ],
+          "notes": [
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "lyrics": [
+           "of"
+          ],
+          "notes": [
+           {
+            "pitch": "D4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         },
+         {
+          "duration": "2",
+          "lyrics": [
+           "mine"
+          ],
+          "notes": [
+           {
+            "pitch": "C4",
+            "effects": {
+             "dynamic": "f"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Acoustic Grand Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "E4",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "G3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "C3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "B3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "F3",
+            "effects": {
+             "dynamic": "mp"
+            }
+           },
+           {
+            "pitch": "G2",
+            "effects": {
+             "dynamic": "mp"
+            }
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 5.0,
+ "issues": []
+}

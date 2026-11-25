@@ -1113,7 +1113,7 @@ TEST_CASE("MIDI import puts lyric events on the notes they start with", "[io][mi
         metaText(1920, 0x05, "\\star"),
         on(1920, 0, 69),
         off(2400, 0, 69),
-        metaText(2600, 0x05, "oops"), // over a rest
+        metaText(2600, 0x05, " oops"), // over a rest
     };
     const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
     REQUIRE(imported.has_value());
@@ -1184,4 +1184,62 @@ TEST_CASE("MIDI export sings each pass of a repeat with its verse", "[io][midi][
     CHECK(lyricsOf(played.measure(0).voices[0]) == std::vector<std::string>{"one", ""});
     CHECK(lyricsOf(played.measure(1).voices[0]) == std::vector<std::string>{"two", ""});
     CHECK(lyricsOf(played.measure(2).voices[0]) == std::vector<std::string>{"end-", "ing"});
+}
+
+TEST_CASE("MIDI import reads words parted by spaces instead of hyphens", "[io][midi][lyrics]") {
+    // Many files end a word with a space and leave the syllables of a word
+    // bare: "Twin" "kle " joins "Twin" to "kle".
+    const std::vector<Event> events{
+        metaText(0, 0x05, "Twin"),      on(0, 0, 60),    off(480, 0, 60),
+        metaText(480, 0x05, "kle "),    on(480, 0, 60),  off(960, 0, 60),
+        metaText(960, 0x05, "lit"),     on(960, 0, 67),  off(1440, 0, 67),
+        metaText(1440, 0x05, "tle"),    on(1440, 0, 67), off(1920, 0, 67),
+        metaText(1920, 0x05, "\rstar"), on(1920, 0, 69), off(3840, 0, 69),
+    };
+    const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
+    REQUIRE(imported.has_value());
+    const auto& staff = imported->song.track(0).staff(0);
+    CHECK(lyricsOf(staff.measure(0).voices[0]) ==
+          std::vector<std::string>{"Twin-", "kle", "lit-", "tle"});
+    CHECK(lyricsOf(staff.measure(1).voices[0]).front() == "star");
+}
+
+TEST_CASE("MIDI import reads a karaoke file's words, title and artist", "[io][midi][lyrics]") {
+    // A .kar file (a MIDI file marked "@KMIDI KARAOKE FILE") keeps its words in
+    // text events: "@" lines are its header, "@T" lines its title and artist,
+    // "\" starts a paragraph and "/" a line.
+    std::vector<Event> melody{program(0, 0, 73)};
+    for (int i = 0; i < 7; ++i) {
+        melody.push_back(on(480 * i, 0, 60 + i));
+        melody.push_back(off(480 * (i + 1), 0, 60 + i));
+    }
+    const auto data = bytesOf(
+        smf(1, 480,
+            {{metaText(0, 0x01, "@KMIDI KARAOKE FILE")},
+             {metaText(0, 0x03, "Words"), metaText(0, 0x01, "@V0100"), metaText(0, 0x01, "@LENGL"),
+              metaText(0, 0x01, "@TTwinkle"), metaText(0, 0x01, "@TTraditional"),
+              metaText(0, 0x01, "\\Twin"), metaText(480, 0x01, "kle "), metaText(960, 0x01, "twin"),
+              metaText(1440, 0x01, "kle"), metaText(1920, 0x01, "/lit"),
+              metaText(2400, 0x01, "tle "), metaText(2880, 0x01, "star")},
+             melody}));
+    const auto imported = importMidi(data);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const Song& song = imported->song;
+    CHECK(song.info().title == "Twinkle");
+    CHECK(song.info().artist == "Traditional");
+    REQUIRE(song.trackCount() == 1);
+    const auto& staff = song.track(0).staff(0);
+    CHECK(lyricsOf(staff.measure(0).voices[0]) ==
+          std::vector<std::string>{"Twin-", "kle", "twin-", "kle"});
+    CHECK(lyricsOf(staff.measure(1).voices[0]) ==
+          std::vector<std::string>{"lit-", "tle", "star", ""});
+}
+
+TEST_CASE("MIDI import leaves the text events of other files alone", "[io][midi][lyrics]") {
+    const std::vector<Event> events{metaText(0, 0x01, "Created by a sequencer"), on(0, 0, 60),
+                                    off(1920, 0, 60)};
+    const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
+    REQUIRE(imported.has_value());
+    CHECK(lyricsOf(imported->song.track(0).staff(0).measure(0).voices[0]).front().empty());
 }

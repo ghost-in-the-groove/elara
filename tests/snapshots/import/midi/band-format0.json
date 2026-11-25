@@ -53,9 +53,6 @@
         [
          {
           "duration": "2",
-          "lyrics": [
-           "la"
-          ],
           "notes": [
            {
             "pitch": "Bb2",
@@ -405,6 +402,9 @@
         [
          {
           "duration": "4",
+          "lyrics": [
+           "la"
+          ],
           "notes": [
            {
             "pitch": "Bb4"
