@@ -143,11 +143,14 @@ if(TARGET elara)
   # The measure popup open at the caret while the measures are edited.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # The lyrics popup open over a staff that sings while a verse is typed.
+  add_test(NAME app.smoke_lyrics
+    COMMAND elara --smoke-test --lyrics "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
   # The note effects panel open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   set_tests_properties(app.smoke app.smoke_open_tracks app.smoke_open_views app.smoke_open_missing
-    app.smoke_tuner app.smoke_song_pane app.smoke_measure app.smoke_effects
+    app.smoke_tuner app.smoke_song_pane app.smoke_measure app.smoke_lyrics app.smoke_effects
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"

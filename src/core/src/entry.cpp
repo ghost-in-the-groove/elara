@@ -2,6 +2,7 @@
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/lyrics.hpp>
 #include <elara/core/transpose.hpp>
 
 #include <algorithm>
@@ -959,6 +960,45 @@ std::string beatTextAt(const Song& song, const Caret& at) {
     }
     const Beat& beat = voiceAt(song, caret).beats[caret.beat];
     return beat.text ? *beat.text : std::string();
+}
+
+VerseText verseAt(const Song& song, const Caret& at, std::size_t verse) {
+    const Caret caret = clampCaret(song, at);
+    return verseText(song.track(caret.track).staff(caret.staff), verse);
+}
+
+VerseEntry setVerse(const Song& song, const Caret& at, std::size_t verse, std::size_t first,
+                    std::string_view text) {
+    const Caret caret = clampCaret(song, at);
+    if (first >= song.measureCount()) {
+        throw std::out_of_range("setVerse: no such measure");
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    // Measures are shared between copies (ADR-0051): the copy writes only
+    // those the verse changes.
+    Staff typed = staff;
+    placeVerse(typed, verse, 0, "");
+    const std::size_t leftover = placeVerse(typed, verse, first, text);
+    bool sung = false;
+    std::vector<std::unique_ptr<Command>> steps;
+    for (std::size_t m = 0; m < staff.measureCount(); ++m) {
+        const Measure& now = std::as_const(typed).measure(m);
+        sung = sung || std::ranges::any_of(now.voices[0].beats, [verse](const Beat& beat) {
+                   return beat.lyrics && verse < beat.lyrics->size() &&
+                          !(*beat.lyrics)[verse].text.empty();
+               });
+        if (now != staff.measure(m)) {
+            steps.push_back(
+                std::make_unique<ReplaceMeasure>(caret.track, caret.staff, m, now, "Set lyrics"));
+        }
+    }
+    if (steps.empty()) {
+        return {.entry = unchanged(caret), .leftover = leftover};
+    }
+    return {.entry = Entry{.command = std::make_unique<CommandGroup>(
+                               sung ? "Set lyrics" : "Remove lyrics", std::move(steps)),
+                           .caret = caret},
+            .leftover = leftover};
 }
 
 Dynamic dynamicAt(const Song& song, const Caret& at) {

@@ -1261,6 +1261,32 @@ void Startup::queueEffects() {
         if (!textBefore.isEmpty()) {
             score_->setBeatText(textBefore);
         }
+        // Lyrics (ADR-0084): a new verse typed from the caret's measure, shown
+        // by the lyrics popup as typed, then taken away.
+        if (const int verse = score_->caretVerseCount(); verse < ScoreDocument::maxVerses()) {
+            const int leftover =
+                score_->setVerse(verse, score_->caretMeasure(), QStringLiteral("la_"));
+            const QVariantMap typed = score_->caretVerse(verse);
+            check(leftover == 0 &&
+                      typed.value(QStringLiteral("text")).toString() == QStringLiteral("la_") &&
+                      typed.value(QStringLiteral("first")).toInt() >= score_->caretMeasure() &&
+                      score_->caretVerseCount() == verse + 1 &&
+                      score_->undoName() == ScoreDocument::tr("Set lyrics"),
+                  "the verse did not go on as typed");
+            auto* popup = window_->findChild<QObject*>(QStringLiteral("lyricsPopup"));
+            check(popup != nullptr, "there is no lyrics popup");
+            if (popup != nullptr) {
+                popup->setProperty("verse", verse);
+                QMetaObject::invokeMethod(popup, "open");
+                check(popup->property("text").toString() == QStringLiteral("la_"),
+                      "the lyrics popup does not show the verse");
+                QMetaObject::invokeMethod(popup, "close");
+            }
+            score_->setVerse(verse, 0, QString());
+            check(score_->caretVerseCount() == verse &&
+                      score_->undoName() == ScoreDocument::tr("Remove lyrics"),
+                  "the verse did not go");
+        }
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
         const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
@@ -1406,7 +1432,8 @@ void Startup::clickCursor() {
     // panel open at the caret can: they close first, and the click waits until
     // they are gone.
     for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel"),
-                                QStringLiteral("chordPopup"), QStringLiteral("textPopup")}) {
+                                QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
+                                QStringLiteral("lyricsPopup")}) {
         if (auto* popup = window_->findChild<QObject*>(name);
             popup != nullptr && popup->property("visible").toBool()) {
             QMetaObject::invokeMethod(popup, "close");

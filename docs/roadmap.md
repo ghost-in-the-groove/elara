@@ -120,12 +120,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         the native format
   - [x] Drawn above the staff
   - [x] Typed at the caret
-- [ ] Lyrics: a syllable per verse under the beats that sing it (ADR-0084)
+- [x] Lyrics: a syllable per verse under the beats that sing it (ADR-0084)
   - [x] In the model, read from Guitar Pro 4-8 and kept by the native format;
         verses typed as text placed on the beats with notes
   - [x] Read and written in MusicXML
   - [x] Drawn under the staff
-  - [ ] Typed at the caret
+  - [x] Typed at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

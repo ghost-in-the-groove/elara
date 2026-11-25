@@ -176,6 +176,21 @@ Item {
     function openTextPopupAtCaret() {
         openWordsPopupAtCaret(textPopup);
     }
+    /// Opens the lyrics popup away from the caret's staff, so that the
+    /// lyrics under it show as they change: at the bottom of the view, over
+    /// the transport, under a staff in its upper half and under the entry bar
+    /// otherwise (ADR-0084).
+    function openLyricsPopupAtCaret() {
+        if (document.caretPage < 0)
+            return;
+        const at = caretPoint();
+        lyricsPopup.x = Math.max(8, Math.min(width - lyricsPopup.width - 8,
+                                             at.x - lyricsPopup.width / 2));
+        lyricsPopup.y = at.y < height / 2
+                ? Math.max(8, height - lyricsPopup.implicitHeight - 96)
+                : entryStrip.height + 8;
+        lyricsPopup.open();
+    }
     function openWordsPopupAtCaret(popup) {
         if (document.caretPage < 0)
             return;
@@ -273,6 +288,11 @@ Item {
         }
         if (control && !shift && event.key === Qt.Key_T) {
             openTextPopupAtCaret();
+            event.accepted = true;
+            return;
+        }
+        if (control && shift && event.key === Qt.Key_L) {
+            openLyricsPopupAtCaret();
             event.accepted = true;
             return;
         }
@@ -661,6 +681,14 @@ Item {
         onClosed: root.forceActiveFocus()
     }
 
+    LyricsPopup {
+        id: lyricsPopup
+        objectName: "lyricsPopup"
+
+        document: root.document
+        onClosed: root.forceActiveFocus()
+    }
+
     // The note entry bar: a strip over the top of the pages while there is a
     // caret, so that only the transport covers the score.
     Rectangle {
@@ -693,6 +721,7 @@ Item {
             onMeasureRequested: root.openMeasurePopupAtCaret()
             onChordRequested: root.openChordPopupAtCaret()
             onTextRequested: root.openTextPopupAtCaret()
+            onLyricsRequested: root.openLyricsPopupAtCaret()
         }
 
         Rectangle {

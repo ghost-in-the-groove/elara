@@ -6,6 +6,7 @@
 #include <elara/core/commands.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/lyrics.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/io/compression.hpp>
@@ -327,6 +328,8 @@ constexpr std::array kEditNames{
     Translation{"Set beat text", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set beat text")},
     Translation{"Remove beat text",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove beat text")},
+    Translation{"Set lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set lyrics")},
+    Translation{"Remove lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove lyrics")},
 };
 
 // The names of Tuning::presetNames().
@@ -2153,6 +2156,39 @@ QStringList ScoreDocument::songTexts() const {
     return wordsOf(document_->song(), [](const core::Beat& beat) -> const std::string* {
         return beat.text ? &*beat.text : nullptr;
     });
+}
+
+int ScoreDocument::caretVerseCount() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    const core::Song& song = document_->song();
+    const core::Caret caret = core::clampCaret(song, caret_);
+    return static_cast<int>(core::verseCount(song.track(caret.track).staff(caret.staff)));
+}
+
+QVariantMap ScoreDocument::caretVerse(int verse) const {
+    core::VerseText typed;
+    if (document_ && hasCaret(document_->song()) && verse >= 0) {
+        typed = core::verseAt(document_->song(), caret_, static_cast<std::size_t>(verse));
+    }
+    return {{QStringLiteral("first"), static_cast<int>(typed.first)},
+            {QStringLiteral("text"), qstring(typed.text)}};
+}
+
+int ScoreDocument::setVerse(int verse, int first, const QString& text) {
+    if (verse < 0 || verse >= maxVerses() || first < 0) {
+        return 0;
+    }
+    std::size_t leftover = 0;
+    runEntry([&](const core::Song& song) {
+        core::VerseEntry typed =
+            core::setVerse(song, caret_, static_cast<std::size_t>(verse),
+                           static_cast<std::size_t>(first), text.toStdString());
+        leftover = typed.leftover;
+        return std::move(typed.entry);
+    });
+    return static_cast<int>(leftover);
 }
 
 void ScoreDocument::setPickStroke(int direction) {

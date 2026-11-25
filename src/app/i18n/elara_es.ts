@@ -234,8 +234,67 @@
         <translation>Texto (Ctrl+T)</translation>
     </message>
     <message>
+        <source>Lyrics (Ctrl+Shift+L)</source>
+        <translation>Letra (Ctrl+Mayús+L)</translation>
+    </message>
+    <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
         <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
+    </message>
+</context>
+<context>
+    <name>LyricsPopup</name>
+    <message>
+        <source>Lyrics</source>
+        <translation>Letra</translation>
+    </message>
+    <message>
+        <source>Remove this verse</source>
+        <translation>Quitar esta estrofa</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+    <message>
+        <source>Verse</source>
+        <translation>Estrofa</translation>
+    </message>
+    <message>
+        <source>New verse</source>
+        <translation>Estrofa nueva</translation>
+    </message>
+    <message>
+        <source>Verse %1</source>
+        <translation>Estrofa %1</translation>
+    </message>
+    <message>
+        <source>Verse text</source>
+        <translation>Texto de la estrofa</translation>
+    </message>
+    <message>
+        <source>A syllable for each note. Spaces and hyphens part syllables, one more space skips a note, _ holds a syllable and + joins two words.</source>
+        <translation>Una sílaba por nota. Los espacios y los guiones separan sílabas, un espacio más salta una nota, _ alarga una sílaba y + une dos palabras.</translation>
+    </message>
+    <message>
+        <source>Syllables after the last note left out: %1</source>
+        <translation>Sílabas que no caben tras la última nota: %1</translation>
+    </message>
+    <message>
+        <source>From measure</source>
+        <translation>Desde el compás</translation>
+    </message>
+    <message>
+        <source>First measure of the verse</source>
+        <translation>Primer compás de la estrofa</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Aplicar</translation>
+    </message>
+    <message>
+        <source>Ctrl+Enter</source>
+        <translation>Ctrl+Intro</translation>
     </message>
 </context>
 <context>
@@ -1377,6 +1436,14 @@
         <translation>Quitar texto</translation>
     </message>
     <message>
+        <source>Set lyrics</source>
+        <translation>Poner letra</translation>
+    </message>
+    <message>
+        <source>Remove lyrics</source>
+        <translation>Quitar letra</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1892,6 +1959,10 @@
     <message>
         <source>Open the caret&apos;s measure at start.</source>
         <translation>Abrir el compás del cursor al iniciar.</translation>
+    </message>
+    <message>
+        <source>Open the lyrics of the caret&apos;s staff at start.</source>
+        <translation>Abrir la letra del pentagrama del cursor al iniciar.</translation>
     </message>
     <message>
         <source>Open the first track&apos;s tuning in the song panel at start.</source>

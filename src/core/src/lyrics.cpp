@@ -31,6 +31,17 @@ SharedOptional<std::vector<Syllable>> withVerse(const SharedOptional<std::vector
                           : SharedOptional(std::move(verses));
 }
 
+/// A syllable read from text: underscores after it hold it.
+Syllable syllableFrom(std::string word) {
+    Syllable syllable;
+    while (word.size() > 1 && word.back() == '_') {
+        word.pop_back();
+        syllable.extend = true;
+    }
+    syllable.text = std::move(word);
+    return syllable;
+}
+
 /// Whether a syllable goes on the beat: it has notes, not all of them tied.
 bool sings(const Beat& beat) {
     return std::ranges::any_of(beat.notes,
@@ -57,7 +68,7 @@ std::vector<std::optional<Syllable>> syllablesOf(std::string_view text) {
             // With the spaces around it, a comment separates like a line break.
             comment = true;
             if (!word.empty()) {
-                pending = Syllable{.text = std::move(word)};
+                pending = syllableFrom(std::move(word));
                 word.clear();
             }
             run = 0;
@@ -67,7 +78,7 @@ std::vector<std::optional<Syllable>> syllablesOf(std::string_view text) {
         if (c == ' ' || c == '-' || c == '\t' || c == '\n' || c == '\r') {
             const bool counted = c == '-' || ((c == ' ' || c == '\t') && !afterComment);
             if (!word.empty()) {
-                pending = Syllable{.text = std::move(word)};
+                pending = syllableFrom(std::move(word));
                 word.clear();
                 run = 0;
             }
@@ -93,7 +104,7 @@ std::vector<std::optional<Syllable>> syllablesOf(std::string_view text) {
         word += c == '+' ? ' ' : c;
     }
     if (!word.empty()) {
-        out.emplace_back(Syllable{.text = std::move(word)});
+        out.emplace_back(syllableFrom(std::move(word)));
     } else if (pending) {
         out.emplace_back(std::move(pending));
     }
@@ -129,6 +140,79 @@ std::size_t placeVerse(Staff& staff, std::size_t verse, std::size_t first, std::
     return static_cast<std::size_t>(std::count_if(
         syllables.begin() + static_cast<std::ptrdiff_t>(next), syllables.end(),
         [](const std::optional<Syllable>& syllable) { return syllable.has_value(); }));
+}
+
+std::size_t verseCount(const Staff& staff) {
+    std::size_t count = 0;
+    for (std::size_t m = 0; m < staff.measureCount(); ++m) {
+        for (const Voice& voice : staff.measure(m).voices) {
+            for (const Beat& beat : voice.beats) {
+                if (!beat.lyrics) {
+                    continue;
+                }
+                const std::vector<Syllable>& verses = *beat.lyrics;
+                for (std::size_t verse = verses.size(); verse > count; --verse) {
+                    if (!verses[verse - 1].text.empty()) {
+                        count = verse;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return count;
+}
+
+VerseText verseText(const Staff& staff, std::size_t verse) {
+    const auto syllableOf = [verse](const Beat& beat) -> const Syllable* {
+        if (!sings(beat) || !beat.lyrics || verse >= beat.lyrics->size() ||
+            (*beat.lyrics)[verse].text.empty()) {
+            return nullptr;
+        }
+        return &(*beat.lyrics)[verse];
+    };
+    std::size_t first = 0;
+    while (first < staff.measureCount() &&
+           std::ranges::none_of(
+               staff.measure(first).voices[0].beats,
+               [&](const Beat& beat) { return syllableOf(beat) != nullptr; })) {
+        ++first;
+    }
+    if (first == staff.measureCount()) {
+        return {};
+    }
+    VerseText typed{.first = first};
+    std::string& text = typed.text;
+    const Syllable* last = nullptr;
+    std::size_t blanks = 0; // beats with notes since the last syllable
+    for (std::size_t m = first; m < staff.measureCount(); ++m) {
+        for (const Beat& beat : staff.measure(m).voices[0].beats) {
+            if (!sings(beat)) {
+                continue;
+            }
+            const Syllable* syllable = syllableOf(beat);
+            if (syllable == nullptr) {
+                ++blanks;
+                continue;
+            }
+            if (last != nullptr) {
+                text += last->hyphen ? '-' : ' ';
+            }
+            text.append(blanks, ' ');
+            blanks = 0;
+            for (const char c : syllable->text) {
+                text += c == ' ' ? '+' : c;
+            }
+            if (syllable->extend) {
+                text += '_';
+            }
+            last = syllable;
+        }
+    }
+    if (last != nullptr && last->hyphen) {
+        text += '-';
+    }
+    return typed;
 }
 
 } // namespace elara::core

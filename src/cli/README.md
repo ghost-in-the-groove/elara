@@ -224,6 +224,12 @@ otherwise, and `grace none` removes the beat's grace notes (ADR-0079).
 beat's frets on a fretted staff when two or more notes have one, and `chord
 none` takes it away (ADR-0080). `text <words>` writes words above the caret's
 beat and `text none` takes them away (ADR-0081).
+`lyrics <verse> <measure> <text>` types verse `verse` (0 for the first) of the
+caret's staff from measure `measure` on, a syllable for each note of its first
+voice: spaces and hyphens part the syllables, one more space leaves a note
+blank, `_` after a syllable holds it and `+` is a space inside one. What the
+verse held before is replaced, syllables after the last note are dropped with a
+warning, and `lyrics <verse> none` takes the verse away (ADR-0084).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.

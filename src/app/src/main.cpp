@@ -150,6 +150,9 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption measureOption(
         QStringLiteral("measure"),
         QCoreApplication::translate("main", "Open the caret's measure at start."));
+    const QCommandLineOption lyricsOption(
+        QStringLiteral("lyrics"),
+        QCoreApplication::translate("main", "Open the lyrics of the caret's staff at start."));
     const QCommandLineOption tuningOption(
         QStringLiteral("tuning"),
         QCoreApplication::translate("main",
@@ -185,9 +188,9 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main", "Play the basses through this SFZ instrument."),
         QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       songPaneOption, measureOption, effectsOption, tuningOption, continuousOption,
-                       languageOption, soundFontOption, includedSoundFontOption, guitarSfzOption,
-                       includedGuitarSfzOption, bassSfzOption});
+                       songPaneOption, measureOption, lyricsOption, effectsOption, tuningOption,
+                       continuousOption, languageOption, soundFontOption, includedSoundFontOption,
+                       guitarSfzOption, includedGuitarSfzOption, bassSfzOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -284,6 +287,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
                                  {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
+                                 {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
                                  {QStringLiteral("showEffects"), options.effects},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},

@@ -41,7 +41,7 @@ null pointer, like its chord symbol and text (ADR-0080, ADR-0081). Lyrics do
 not sound.
 
 **Verses typed as text** follow Guitar Pro's syntax, so the same code reads
-Guitar Pro's lines and, later, what is typed in the app: `syllablesOf(text)`
+Guitar Pro's lines and what is typed in the app: `syllablesOf(text)`
 splits a verse into syllables, and `placeVerse(staff, verse, first, text)`
 puts them on the beats of the staff's first voice from a measure on, one per
 beat with notes, past rests and beats whose notes are all tied from the beat
@@ -55,12 +55,31 @@ loose:
   are next to it count on their own (`"stare \nA"` leaves none,
   `"go  \nnow"` one);
 - a comment in brackets, with the spaces around it, separates like a line
-  break.
+  break;
+- an underscore after a syllable holds it (Elara's addition: Guitar Pro has
+  no extenders), so `"love_ me"` draws a line after "love".
 
 Files written by hand were found to disagree with the manual in places (a
 double space inside a line leaving no blank); the beats Guitar Pro dispatched
 are what Elara reads from those files, so the rule only places Guitar Pro 3-6
 lyrics and typed verses.
+
+**Typing.** A verse is typed whole, as text, not syllable by syllable at the
+caret: the text is how songbooks and Guitar Pro users write lyrics, and a
+syllable per beat would make every correction a walk along the staff.
+`setVerse(song, caret, verse, first, text)` replaces the whole verse of the
+caret's staff with `text` placed from measure `first`, as one undo step ("Set
+lyrics", "Remove lyrics" when nothing is left), and counts the syllables after
+the last note, which are dropped. `verseText(staff, verse)` gives the verse
+back as text that places it again as it is, from the measure of its first
+syllable: a space or hyphen after each syllable, a space more for each blank
+beat, "+" for a space inside a syllable and "_" after a held one. Typing works
+on the first voice, where lyrics are placed; syllables on rests or tied notes
+read from files are not part of the text and go when the verse is typed
+again. A staff sings at most 16 verses, as many as MusicXML numbers in
+practice. The app types a verse in a lyrics popup (Ctrl+Shift+L) with a chip
+per verse, the first measure and the text; `elara-cli edit` has
+`lyrics <verse> <measure> <text>`.
 
 **Reading.** Guitar Pro 4-5: the five lines go on the first staff of their
 track. Guitar Pro 6-8: the beats' syllables when the lyrics are dispatched,
@@ -113,12 +132,15 @@ of MusicXML, fold them into the joining hyphen and the extender.
   native format, and show in `elara-cli import --json` and `dump`.
 - Lyrics draw in every layout (lines, pages, strips, SVG, PDF and the app);
   a `lyric` role marks their texts and lines in the display list.
-- Typing verses at the caret is follow-up work; until MIDI lyric events are
-  read and written, MIDI keeps warning that lyrics are dropped.
+- Verses are typed whole in the app and the CLI. Until MIDI lyric events
+  are read and written, MIDI keeps warning that lyrics are dropped.
 - Guitar Pro has no extenders: its lyrics come without them, and a held
   syllable written to MusicXML and read back keeps its line.
 - Tests: the `core.Lyrics text: ...` cases (syllables, blanks, line breaks,
-  comments), `core.A verse goes on the beats with notes, past rests and tied
+  comments, held syllables), `core.A verse reads back as the text that places
+  it`, `core.Entry: a verse typed as text replaces the verse of the caret's
+  staff`, `cli.edit_types_lyrics`, `cli.dump_lyrics`,
+  `cli.edit_removes_lyrics`, the lyrics popup in `app.smoke`, `core.A verse goes on the beats with notes, past rests and tied
   notes`, `core.A verse starts at its measure and replaces what the verse held
   there`, `io.Guitar Pro 4: a band keeps its instruments, drums and tempo
   changes` (the corpus melody sings two verses, with a hyphen, a blank beat, a

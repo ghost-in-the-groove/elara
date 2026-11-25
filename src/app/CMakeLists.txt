@@ -70,6 +70,7 @@ qt_add_qml_module(elara
     qml/EntryBar.qml
     qml/MeasurePopup.qml
     qml/WordsPopup.qml
+    qml/LyricsPopup.qml
     qml/SignatureFields.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
