@@ -466,8 +466,8 @@ BendCurve bendOf(pugi::xml_node note) {
 /// one over its properties rather than a search for each.
 struct BeatFields {
     pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio;
-    bool text = false, chord = false, fading = false, wah = false, hairpin = false,
-         ottava = false, whammyBar = false, slapped = false, popped = false;
+    bool text = false, chord = false, fading = false, wah = false, hairpin = false, ottava = false,
+         whammyBar = false, slapped = false, popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
         for (const pugi::xml_node child : beat.children()) {
@@ -796,8 +796,7 @@ private:
         } else if (fields.arpeggio) {
             // A chord rolled upwards sounds from its lowest note, as a downstroke
             // does (ADR-0025); Guitar Pro writes "Up" or "Down".
-            effects.strum =
-                textOf(fields.arpeggio) == "Down" ? core::Strum::Up : core::Strum::Down;
+            effects.strum = textOf(fields.arpeggio) == "Down" ? core::Strum::Up : core::Strum::Down;
         }
         if (fields.slapped) {
             effects.bassTechnique = core::BassTechnique::Slap;
