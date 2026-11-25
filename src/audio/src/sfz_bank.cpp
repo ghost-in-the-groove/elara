@@ -514,23 +514,39 @@ private:
     // The sample at a fractional position: four-point Hermite between the
     // frames around it, which wrap at the loop while it loops.
     float at(const Voice& voice, double position, bool looping) const noexcept {
-        const double base = std::floor(position);
+        // A position is never negative, so truncating floors it.
+        const auto index = static_cast<std::size_t>(position);
+        const auto base = static_cast<double>(index);
         const auto t = static_cast<float>(position - base);
-        const auto frame = [&](double index) -> float {
-            if (looping && index >= voice.loopEnd) {
-                index -= voice.loopEnd - voice.loopStart;
-            } else if (voice.periodic && index < 0.0) {
-                index += voice.loopEnd; // a generator's period has no start
-            }
-            if (index < 0.0 || index >= voice.end) {
-                return 0.0f;
-            }
-            return voice.frames[static_cast<std::size_t>(index)];
-        };
-        const float y0 = frame(base - 1.0);
-        const float y1 = frame(base);
-        const float y2 = frame(base + 1.0);
-        const float y3 = frame(base + 2.0);
+        float y0 = 0.0f;
+        float y1 = 0.0f;
+        float y2 = 0.0f;
+        float y3 = 0.0f;
+        if (index >= 1 && base + 2.0 < (looping ? voice.loopEnd : voice.end)) {
+            // Inside the sample, and the loop: four frames in a row, as nearly
+            // every frame of a note reads them.
+            const float* frames = voice.frames + (index - 1);
+            y0 = frames[0];
+            y1 = frames[1];
+            y2 = frames[2];
+            y3 = frames[3];
+        } else {
+            const auto frame = [&](double spot) -> float {
+                if (looping && spot >= voice.loopEnd) {
+                    spot -= voice.loopEnd - voice.loopStart;
+                } else if (voice.periodic && spot < 0.0) {
+                    spot += voice.loopEnd; // a generator's period has no start
+                }
+                if (spot < 0.0 || spot >= voice.end) {
+                    return 0.0f;
+                }
+                return voice.frames[static_cast<std::size_t>(spot)];
+            };
+            y0 = frame(base - 1.0);
+            y1 = frame(base);
+            y2 = frame(base + 1.0);
+            y3 = frame(base + 2.0);
+        }
         const float c1 = 0.5f * (y2 - y0);
         const float c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3;
         const float c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
