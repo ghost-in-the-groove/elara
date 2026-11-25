@@ -105,6 +105,7 @@ one that replaces them.
 | [0097](0097-legato-slurs-on-the-standard-staff.md) | Legato slurs on the standard staff | Accepted |
 | [0098](0098-slides-on-the-standard-staff.md) | Slides on the standard staff | Accepted |
 | [0099](0099-ghost-notes-in-parentheses.md) | Ghost notes in parentheses | Accepted |
+| [0100](0100-natural-harmonics-as-diamonds.md) | Natural harmonics as diamonds | Accepted |
 
 ## Template
 

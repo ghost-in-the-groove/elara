@@ -1015,8 +1015,13 @@ private:
         head.diatonic = diatonicIndex(written);
         head.step = topLineIndex(clef_) - head.diatonic;
         head.alter = written.alter();
-        head.glyph = noteheadFor(value, note.effects.deadNote ? detail::DrumHead::X
-                                                              : detail::DrumHead::Normal);
+        // A dead note is a cross; a natural harmonic, written where it is
+        // touched, a diamond (ADR-0100).
+        const detail::DrumHead shape = note.effects.deadNote ? detail::DrumHead::X
+                                       : note.effects.harmonic.kind == core::HarmonicKind::Natural
+                                           ? detail::DrumHead::Diamond
+                                           : detail::DrumHead::Normal;
+        head.glyph = noteheadFor(value, shape);
         return head;
     }
 
