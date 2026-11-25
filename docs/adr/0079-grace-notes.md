@@ -55,6 +55,21 @@ one, as a guitarist plays it.
   `<grace/>` for the second, with the notes' strings and frets and no
   duration. A grace note's dynamic is the one in force at its beat.
 
+**Drawing.** Grace notes are drawn at 65% of their staff's size, in the order
+they are played, left of the chord they lead into:
+
+- Standard notation: small noteheads, accidentals and ledger lines; stems up,
+  or down in a voice pointing down; a small flag each or, for two or more
+  flagged grace notes of one beat, small beams across them; a slash through
+  the stem of a grace before the beat (an acciaccatura), none for one on it
+  (an appoggiatura). Their accidentals count before their chord's: a grace F
+  sharp before an F makes it need a natural.
+- Tablature: small fret numbers on their strings, joined to their note by
+  the slides and hammer-on arcs drawn between any two notes.
+- The column of their chord reaches left over them, so spacing makes room for
+  them where the beat before leaves too little; they take no time and add no
+  column.
+
 **Playback.** A grace note sounds for its written value, taken from the beat
 it borrows from:
 
@@ -75,10 +90,10 @@ it borrows from:
 ## Consequences
 
 - Guitar Pro and MusicXML grace notes survive import, saving and MusicXML
-  export, and are heard in playback, audio rendering and MIDI export. Drawing
-  them as small notes and fret numbers and typing them come next, each
-  recorded here as it lands. Until they are drawn, a song with grace notes
-  looks as it did before they were kept.
+  export, are drawn in notation, tablature, PDF and SVG, and are heard in
+  playback, audio rendering and MIDI export. Typing them at the caret comes
+  next, recorded here when it lands. The caret and selection pass over them:
+  they belong to their beat.
 - A beat is 24 bytes larger on 64-bit systems: the list, empty for almost
   every beat, allocates nothing.
 - Grace notes after the last beat of a voice have nothing to lead into and
@@ -89,6 +104,9 @@ it borrows from:
   `io.MusicXML export: grace notes on a guitar keep their strings and slides`,
   `core.Grace notes borrow their time from the beat before or their own`,
   `core.A grace note before the first beat of a measure plays on it`,
-  `cli.sequence_grace_before_beat`, `cli.sequence_grace_on_measure_start`
+  `cli.sequence_grace_before_beat`, `cli.sequence_grace_on_measure_start`,
+  `notation.Staff layout: grace notes are drawn small before their chord`,
+  `notation.Tablature layout: grace notes are small fret numbers before their note`,
+  the render snapshots of the corpus
   and the round trips of the corpus and of a song with every feature (a
   grace before a beat and a chord of them on one).

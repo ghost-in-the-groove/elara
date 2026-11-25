@@ -40,6 +40,7 @@ inline constexpr double kRepeatGap =
 inline constexpr double kMinNoteGap = 0.4;   // between the ink of neighbouring columns
 inline constexpr double kEndGap = 1.0;       // after the last note, before the barline
 inline constexpr double kQuarterSpace = 3.0; // ideal distance after a quarter note
+inline constexpr double kGraceScale = 0.65;  // of grace notes and their fret numbers (ADR-0079)
 inline constexpr double kEpsilon = 1e-9;
 
 // Text extents as layout assumes them: ascenders (and parentheses) reach
@@ -360,9 +361,9 @@ protected:
     virtual void close(double /*width*/) {}
 
     // Inline: layout draws tens of thousands of glyphs and lines.
-    void glyph(Glyph which, double x, double y, Role role) {
-        list_.glyphs.push_back(
-            GlyphItem{.glyph = which, .origin = {x, y}, .role = role, .measure = measure_});
+    void glyph(Glyph which, double x, double y, Role role, double scale = 1.0) {
+        list_.glyphs.push_back(GlyphItem{
+            .glyph = which, .origin = {x, y}, .role = role, .measure = measure_, .scale = scale});
     }
 
     /// Draws `which` with the left of its box at `x`; returns the right of the box.
