@@ -426,6 +426,35 @@ TEST_CASE("MusicXML: notes without a type and gaps are written as standard value
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: wedges become hairpins on the beats under them", "[musicxml]") {
+    const auto note = [](const char* step, int duration) {
+        return std::string(R"(<note><pitch><step>)") + step +
+               R"(</step><octave>4</octave></pitch><duration>)" + std::to_string(duration) +
+               "</duration></note>";
+    };
+    const auto wedge = [](const char* type) {
+        return std::string(R"(<direction placement="below"><direction-type><wedge type=")") + type +
+               R"("/></direction-type></direction>)";
+    };
+    // C D <E F | G> A2., then a crescendo stopped at the end of the last measure.
+    const ImportResult result = parse(onePart(
+        note("C", 4) + note("D", 4) + wedge("diminuendo") + note("E", 4) + note("F", 4) +
+        R"(</measure><measure number="2">)" + note("G", 4) + wedge("stop") + note("A", 12) +
+        R"(</measure><measure number="3">)" + wedge("crescendo") + note("B", 16) + wedge("stop")));
+    CHECK(result.warnings.empty());
+    const auto hairpins = [&result](std::size_t m) {
+        std::vector<core::Hairpin> kinds;
+        for (const core::Beat& beat : voiceOf(result.song, 0, 0, m).beats) {
+            kinds.push_back(beat.effects.hairpin);
+        }
+        return kinds;
+    };
+    using enum core::Hairpin;
+    CHECK(hairpins(0) == std::vector{None, None, Diminuendo, Diminuendo});
+    CHECK(hairpins(1) == std::vector{Diminuendo, None});
+    CHECK(hairpins(2) == std::vector{Crescendo});
+}
+
 TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[musicxml]") {
     // |: 1 |1.2. 2 :|3. 3 |, played three times, as notation programs write it.
     const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";

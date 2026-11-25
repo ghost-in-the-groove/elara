@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <utility>
 #include <vector>
 
 using elara::core::Beat;
@@ -168,4 +169,38 @@ TEST_CASE("A song without tracks sounds nothing", "[core][performance]") {
     Song song;
     song.appendMeasures(3);
     CHECK(soundingNotes(song).empty());
+}
+
+TEST_CASE("A hairpin ramps the velocity of the notes under it", "[core][performance]") {
+    using elara::core::Hairpin;
+    Song song = pianoSong(3);
+    Staff& staff = song.track(0).staff(0);
+    // p: C <D E F | G (f): the crescendo leads from p (48) to f (96) over three
+    // quarters; voice 2 holds a note struck under it.
+    auto& rising = staff.measure(0).voices[0].beats;
+    rising = {beat(NoteValue::Quarter, {note(60, false, Dynamic::P)}),
+              beat(NoteValue::Quarter, {note(62, false, Dynamic::P)}),
+              beat(NoteValue::Quarter, {note(64, false, Dynamic::P)}),
+              beat(NoteValue::Quarter, {note(65, false, Dynamic::P)})};
+    for (std::size_t b = 1; b < 4; ++b) {
+        rising[b].effects.hairpin = Hairpin::Crescendo;
+    }
+    staff.measure(0).voices[1].beats = {beat(NoteValue::Half),
+                                        beat(NoteValue::Half, {note(55, false, Dynamic::P)})};
+    staff.measure(1).voices[0].beats = {beat(NoteValue::Whole, {note(67, false, Dynamic::F)})};
+    // mf: >A B> C: no softer dynamic follows, so the diminuendo falls one step
+    // (16) and the note after it is played as written.
+    auto& falling = staff.measure(2).voices[0].beats;
+    falling = {beat(NoteValue::Quarter, {note(69)}), beat(NoteValue::Quarter, {note(71)}),
+               beat(NoteValue::Half, {note(72)})};
+    falling[0].effects.hairpin = Hairpin::Diminuendo;
+    falling[1].effects.hairpin = Hairpin::Diminuendo;
+
+    std::vector<std::pair<int, int>> velocities; // key, velocity
+    for (const SoundingNote& sounding : soundingNotes(song)) {
+        velocities.emplace_back(sounding.key, sounding.velocity);
+    }
+    const std::vector<std::pair<int, int>> expected{
+        {60, 48}, {62, 48}, {64, 64}, {55, 64}, {65, 80}, {67, 96}, {69, 80}, {71, 72}, {72, 80}};
+    CHECK(velocities == expected);
 }

@@ -274,18 +274,25 @@ public:
         first_ = m;
         known_ = false;
         marks_.clear();
+        wedges_.clear();
     }
 
     /// Notes struck together at `dynamic`, centred at `centre`; columns come in
     /// time order.
     void strike(core::Dynamic dynamic, double centre, std::size_t measure);
 
-    /// Whether the line has no marks.
-    [[nodiscard]] bool empty() const noexcept { return marks_.empty(); }
+    /// The hairpins of `measure`, measure m of the staff: wedges from the
+    /// column of their first beat to the column after their last, or to
+    /// `barline`; measures come in order (ADR-0078).
+    void hairpins(const core::Measure& measure, std::size_t m,
+                  std::span<const ColumnPosition> positions, double barline);
 
-    /// Places the marks under `bottom` (the lowest ink of the staff) and
-    /// `staffHeight`, left of `end` (the end of the line), and draws them into
-    /// `list`.
+    /// Whether the line has no marks and no hairpins.
+    [[nodiscard]] bool empty() const noexcept { return marks_.empty() && wedges_.empty(); }
+
+    /// Places the marks and hairpins under `bottom` (the lowest ink of the
+    /// staff) and `staffHeight`, left of `end` (the end of the line), and draws
+    /// them into `list`.
     void place(DisplayList& list, double bottom, double staffHeight, double end);
 
 private:
@@ -295,6 +302,24 @@ private:
         std::size_t measure = 0;
     };
 
+    struct Span {
+        core::Fraction start;
+        core::Fraction end;
+        core::Hairpin hairpin = core::Hairpin::None;
+    };
+
+    struct Wedge {
+        core::Hairpin hairpin = core::Hairpin::None;
+        double left = 0.0;
+        double right = 0.0;
+        std::size_t measure = 0; // where it starts
+        std::size_t last = 0;    // where it ends
+        bool toBarline = false;  // ends at the barline of `last`
+        bool continued = false;  // from the line before
+    };
+
+    void placeWedges(DisplayList& list, double middle, double end);
+
     const EngravingFont& font_;
     const core::Staff* staff_ = nullptr;
     std::size_t first_ = 0;
@@ -302,6 +327,8 @@ private:
     core::Dynamic current_ = core::Dynamic::MF;
     std::vector<Mark> marks_;
     std::vector<double> origins_; // of the marks being placed
+    std::vector<Span> spans_;     // of the measure being read
+    std::vector<Wedge> wedges_;
 };
 
 // ---- Staff writers --------------------------------------------------------------------

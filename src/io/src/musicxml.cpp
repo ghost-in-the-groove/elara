@@ -595,6 +595,13 @@ struct TempoMark {
     Tempo tempo{};
 };
 
+/// Where a wedge starts (its hairpin) or stops (None).
+struct HairpinMark {
+    Fraction onset{};
+    std::optional<std::size_t> staff{}; // nullopt: every staff
+    Hairpin hairpin = Hairpin::None;
+};
+
 struct Bend {
     int cents = 0;
     bool preBend = false;
@@ -798,7 +805,8 @@ public:
                Warnings& warnings)
         : info_(info), layout_(std::move(layout)), first_(first), score_(score),
           warnings_(warnings), voiceIds_(layout_.staves.size()),
-          dynamics_(layout_.staves.size(), Dynamic::MF), measures_(layout_.staves.size()) {}
+          dynamics_(layout_.staves.size(), Dynamic::MF),
+          hairpins_(layout_.staves.size(), Hairpin::None), measures_(layout_.staves.size()) {}
 
     void read(pugi::xml_node part) {
         const auto measures = part.children("measure");
@@ -863,9 +871,11 @@ private:
         // Buffers reused from measure to measure.
         std::vector<Event>& events = events_;
         std::vector<DynamicMark>& dynamics = dynamicMarks_;
+        std::vector<HairpinMark>& hairpins = hairpinMarks_;
         std::vector<TempoMark>& tempos = tempoMarks_;
         events.clear();
         dynamics.clear();
+        hairpins.clear();
         tempos.clear();
         Fraction cursor;
         Fraction lastOnset;
@@ -902,7 +912,8 @@ private:
                 cursor += divisionsToWholes(child.child("duration").text().as_int(0));
                 end = std::max(end, cursor);
             } else if (name == "direction") {
-                readDirection(child, cursor, index, dynamics, tempos, first_ ? &header : nullptr);
+                readDirection(child, cursor, index, dynamics, hairpins, tempos,
+                              first_ ? &header : nullptr);
             } else if (name == "sound") {
                 if (first_) {
                     navigate(header, soundNavigation(child), index);
@@ -930,6 +941,9 @@ private:
                     event.onset += shift;
                 }
                 for (DynamicMark& mark : dynamics) {
+                    mark.onset += shift;
+                }
+                for (HairpinMark& mark : hairpins) {
                     mark.onset += shift;
                 }
                 for (TempoMark& mark : tempos) {
@@ -972,7 +986,7 @@ private:
             score_.headers.push_back(std::move(header));
         }
 
-        build(index, events, dynamics, time);
+        build(index, events, dynamics, hairpins, time);
     }
 
     void readAttributes(pugi::xml_node attributes, std::size_t index, MeasureHeader* header) {
@@ -1086,8 +1100,8 @@ private:
 
     // `header`: the first part's measure, which takes the signs and jumps.
     void readDirection(pugi::xml_node direction, const Fraction& cursor, std::size_t index,
-                       std::vector<DynamicMark>& dynamics, std::vector<TempoMark>& tempos,
-                       MeasureHeader* header) {
+                       std::vector<DynamicMark>& dynamics, std::vector<HairpinMark>& hairpins,
+                       std::vector<TempoMark>& tempos, MeasureHeader* header) {
         const Fraction onset = std::max(
             Fraction(0), cursor + divisionsToWholes(direction.child("offset").text().as_int(0)));
         std::optional<std::size_t> staff;
@@ -1121,8 +1135,15 @@ private:
                     segnoGlyph = true;
                 } else if (name == "coda") {
                     codaGlyph = true;
-                } else if (name == "wedge" && !stop) {
-                    warn("hairpins dropped", index);
+                } else if (name == "wedge") {
+                    // From its start to its stop (ADR-0078); "continue" changes nothing.
+                    const Hairpin hairpin = isType(mark, "crescendo")    ? Hairpin::Crescendo
+                                            : isType(mark, "diminuendo") ? Hairpin::Diminuendo
+                                                                         : Hairpin::None;
+                    if (hairpin != Hairpin::None || isType(mark, "stop")) {
+                        hairpins.push_back(
+                            HairpinMark{.onset = onset, .staff = staff, .hairpin = hairpin});
+                    }
                 } else if (name == "octave-shift" && !stop) {
                     warn("octave lines dropped", index);
                 } else if (name == "pedal" && isType(mark, "start")) {
@@ -1567,7 +1588,7 @@ private:
     };
 
     void build(std::size_t index, std::vector<Event>& events, std::vector<DynamicMark>& dynamics,
-               const TimeSignature& time) {
+               std::vector<HairpinMark>& hairpins, const TimeSignature& time) {
         const std::size_t staffCount = layout_.staves.size();
         std::vector<Measure> built(staffCount);
         auto& ends = ends_;
@@ -1714,6 +1735,7 @@ private:
         }
 
         mergeTab(index, events, built, placed);
+        std::ranges::stable_sort(hairpins, std::less<>{}, &HairpinMark::onset);
         for (std::size_t staff = 0; staff < staffCount; ++staff) {
             if (!isPercussion()) {
                 checkPositions(layout_.staves[staff], built[staff], index);
@@ -1726,6 +1748,7 @@ private:
                     warn("voices longer than their measure kept as written", index);
                 }
             }
+            markHairpins(built[staff], staff, hairpins);
             measures_[staff].push_back(std::move(built[staff]));
         }
         for (const DynamicMark& mark : dynamics) {
@@ -1735,6 +1758,32 @@ private:
                 }
             }
         }
+    }
+
+    /// The wedges of a measure go on the beats of the staff's first voice that
+    /// start under them; the hairpin in force carries over to the next measure.
+    /// `marks` are in time order.
+    void markHairpins(Measure& measure, std::size_t staff, const std::vector<HairpinMark>& marks) {
+        Hairpin& state = hairpins_[staff];
+        auto mark = marks.begin();
+        const auto passUntil = [&](const std::optional<Fraction>& at) {
+            for (; mark != marks.end() && (!at || mark->onset <= *at); ++mark) {
+                if (!mark->staff || *mark->staff == staff) {
+                    state = mark->hairpin;
+                }
+            }
+        };
+        const auto voice =
+            std::ranges::find_if(measure.voices, [](const Voice& v) { return !v.isEmpty(); });
+        if (voice != measure.voices.end()) {
+            Fraction at;
+            for (Beat& beat : voice->beats) {
+                passUntil(at);
+                beat.effects.hairpin = state;
+                at += beat.duration.length();
+            }
+        }
+        passUntil(std::nullopt);
     }
 
     /// A TAB staff repeats the notes of its standard staff: its string, fret and
@@ -1813,12 +1862,14 @@ private:
     std::vector<std::optional<ClefInfo>> lastClefs_{};
     std::vector<std::vector<std::string>> voiceIds_; // per staff, MusicXML voice ids
     std::vector<Dynamic> dynamics_;                  // per staff, at the end of the last measure
+    std::vector<Hairpin> hairpins_;                  // per staff, at the end of the last measure
     std::vector<std::vector<Measure>> measures_;     // per staff
 
     // Per-measure buffers, kept to reuse their storage.
     static constexpr std::size_t kNoSlot = static_cast<std::size_t>(-1);
     std::vector<Event> events_{};
     std::vector<DynamicMark> dynamicMarks_{};
+    std::vector<HairpinMark> hairpinMarks_{};
     std::vector<TempoMark> tempoMarks_{};
     std::vector<Placed> placed_{};
     std::vector<std::array<Fraction, Measure::kMaxVoices>> ends_{};
