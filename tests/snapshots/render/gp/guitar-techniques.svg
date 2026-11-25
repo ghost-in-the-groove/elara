@@ -207,6 +207,7 @@
 <text class="t tempo" x="22.348" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 100</text>
 <text class="t tempo" x="45.336" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 80</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M24.775,38.601 C25.469,39.103 26.857,38.853 27.551,38.101 C26.857,38.933 25.469,39.183 24.775,38.601Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M41.23,30.951 C41.935,30.445 43.347,30.445 44.052,30.951 C43.347,30.525 41.935,30.525 41.23,30.951Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M24.865,58.224 C25.514,57.584 26.812,57.584 27.461,58.224 C26.812,57.664 25.514,57.664 24.865,58.224Z"/>
 <path class="bend" fill="none" stroke-width="0.12" d="M31.476,55.842 C32.016,55.842 32.376,54.399 32.376,52.235"/>

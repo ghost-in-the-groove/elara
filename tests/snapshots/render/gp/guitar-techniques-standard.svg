@@ -154,6 +154,7 @@
 <text class="t tempo" x="22.348" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 100</text>
 <text class="t tempo" x="44.251" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 80</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M24.775,44.173 C25.469,44.675 26.857,44.425 27.551,43.673 C26.857,44.505 25.469,44.755 24.775,44.173Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M40.145,36.523 C40.851,36.017 42.262,36.017 42.968,36.523 C42.262,36.097 40.851,36.097 40.145,36.523Z"/>
 </g>
 </svg>

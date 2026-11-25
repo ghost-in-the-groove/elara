@@ -222,7 +222,9 @@
 <text class="t tempo" x="34.546" y="27.914" style="font-size:1.4px" text-anchor="start" stroke="none">= 80</text>
 <text class="t section" x="17.281" y="24.43" style="font-size:1.5px" text-anchor="start" stroke="none">Intro</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.539,48.489 C24.496,48.991 26.409,48.741 27.365,47.989 C26.409,48.821 24.496,49.071 23.539,48.489Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M48.931,44.039 C50.279,44.718 52.976,44.718 54.325,44.039 C52.976,44.798 50.279,44.798 48.931,44.039Z"/>
+<path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M71.616,44.314 C71.901,44.61 72.472,44.298 72.757,43.689 C72.472,44.326 71.901,44.639 71.616,44.314Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.63,77.109 C24.541,76.469 26.364,76.469 27.275,77.109 C26.364,76.549 24.541,76.549 23.63,77.109Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M72.451,72.609 C72.713,71.969 73.235,71.969 73.497,72.609 C73.235,72.049 72.713,72.049 72.451,72.609Z"/>
 <path class="bend" fill="none" stroke-width="0.12" d="M34.434,74.727 C34.974,74.727 35.334,73.285 35.334,71.12"/>
