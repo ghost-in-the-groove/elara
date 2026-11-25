@@ -135,9 +135,13 @@ enum class Glyph : std::uint8_t {
     MetAugmentationDot,
     // Staff groups
     Brace,
+    // Chord diagrams (ADR-0080)
+    FretboardFilledCircle,
+    FretboardX,
+    FretboardO,
 };
 
-inline constexpr std::size_t kGlyphCount = static_cast<std::size_t>(Glyph::Brace) + 1;
+inline constexpr std::size_t kGlyphCount = static_cast<std::size_t>(Glyph::FretboardO) + 1;
 
 /// The SMuFL name of a glyph ("noteheadBlack").
 [[nodiscard]] std::string_view glyphName(Glyph glyph) noexcept;
