@@ -85,6 +85,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read from Guitar Pro 3-8, read and written in MusicXML
   - [x] Set at the caret: a chip in the measure popup and the CLI `barline`
         step, one undo step
+- [ ] Triplet feel: pairs of eighths or sixteenths played long and short (ADR-0104)
+  - [x] In the model and kept by the native format; heard in playback and MIDI export
+  - [x] Read from Guitar Pro 3-8, read and written in MusicXML
+  - [x] Changed from a measure on with the CLI `feel` step, one undo step
+  - [x] Drawn above the staff where it changes
+  - [ ] Set in the measure popup
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)

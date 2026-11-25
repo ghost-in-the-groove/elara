@@ -419,6 +419,43 @@ TEST_CASE("Guitar Pro: a bar whose clef differs from the bar before changes it",
     CHECK(imported->warnings == std::vector<std::string>{"Gtr: clef changes dropped (measure 5)"});
 }
 
+TEST_CASE("Guitar Pro: a master bar's TripletFeel is its triplet feel", "[io][guitarpro][feel]") {
+    // ADR-0104; a feel Elara does not know plays straight.
+    const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0", beat, whole);
+    const std::array feels{"Triplet8th",  "Triplet16th",  "Dotted8th",     "Dotted16th",
+                           "Scottish8th", "Scottish16th", "NoTripletFeel", "Quintuplet8th"};
+    std::string masterBars;
+    std::string bars;
+    for (std::size_t m = 1; m <= feels.size(); ++m) {
+        masterBars += std::format(
+            "<MasterBar><Time>4/4</Time><Bars>{}</Bars><TripletFeel>{}</TripletFeel></MasterBar>",
+            m, feels[m - 1]);
+        bars += std::format(R"(<Bar id="{}"><Clef>G2</Clef><Voices>-1 -1 -1 -1</Voices></Bar>)", m);
+    }
+    score.insert(score.find("</MasterBars>"), masterBars);
+    score.insert(score.find("</Bars><Voices>"), bars);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    REQUIRE(imported->song.measureCount() == 9);
+    using core::TripletFeel;
+    const std::array expected{TripletFeel::None,
+                              TripletFeel::Eighth,
+                              TripletFeel::Sixteenth,
+                              TripletFeel::DottedEighth,
+                              TripletFeel::DottedSixteenth,
+                              TripletFeel::ScottishEighth,
+                              TripletFeel::ScottishSixteenth,
+                              TripletFeel::None,
+                              TripletFeel::None};
+    for (std::size_t m = 0; m < expected.size(); ++m) {
+        CAPTURE(m);
+        CHECK(imported->song.measureHeader(m).tripletFeel == expected[m]);
+    }
+    CHECK(imported->warnings == std::vector<std::string>{"triplet feel dropped (measure 9)"});
+}
+
 TEST_CASE("Guitar Pro: a simile mark makes a measure repeat", "[io][guitarpro][simile]") {
     // ADR-0102: Simple repeats the bar before, FirstOfDouble and
     // SecondOfDouble the two bars before; the bar's own beats (Guitar Pro

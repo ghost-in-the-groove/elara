@@ -563,9 +563,11 @@ def techniques_gp5() -> dict:
         "tempo": 100, "key": 1,
                 # Intro |: 2 |1. 3 :|2. 4 |: Guitar Pro 5 counts the times played and
         # keeps the alternate endings as bits.
+        # Triplet eighths in measure 2, sixteenths in measure 3 (ADR-0104).
         "measures": [{"time": (4, 4), "marker": "Intro"},
-                     {"repeat_open": True},
-                     {"time": (3, 4), "key": (2, 0), "repeat_close": 2, "alternate": 0b01},
+                     {"repeat_open": True, "triplet_feel": 1},
+                     {"time": (3, 4), "key": (2, 0), "repeat_close": 2, "alternate": 0b01,
+                      "triplet_feel": 2},
                      {"time": (4, 4), "alternate": 0b10}],
         "tracks": [lead],
     }

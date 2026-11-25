@@ -425,6 +425,26 @@ TEST_CASE("MIDI export picks a division that keeps every tuplet exact", "[io][mi
           std::vector<std::string>{"times rounded to 960 ticks per quarter note"});
 }
 
+TEST_CASE("MIDI export plays a triplet feel's pairs long and short", "[io][midi][feel]") {
+    // ADR-0104: two swung eighths and a quarter, exact at 960 ticks a quarter;
+    // read back, the pair is the triplet quarter and eighth it was played as.
+    Song song = pianoSong(1);
+    song.measureHeader(0).tripletFeel = elara::core::TripletFeel::Eighth;
+    const Duration eighth(NoteValue::Eighth);
+    song.track(0).staff(0).measure(0).voices[0].beats = {noteBeat(eighth, 60), noteBeat(eighth, 62),
+                                                         noteBeat(Duration(NoteValue::Quarter), 64),
+                                                         noteBeat(Duration(NoteValue::Half), 65)};
+    const auto exported = exportMidi(song);
+    CHECK(exported.warnings.empty());
+    CHECK(division(exported.data) == 960);
+    const ImportResult back = reimport(song);
+    const auto& beats = back.song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(beats.size() == 4);
+    CHECK(beats[0].duration.length() == Fraction(1, 6));
+    CHECK(beats[1].duration.length() == Fraction(1, 12));
+    CHECK(beats[2].duration.length() == Fraction(1, 4));
+}
+
 TEST_CASE("MIDI export retriggers a key struck again while it sounds", "[io][midi]") {
     Song song = pianoSong(1);
     auto& measure = song.track(0).staff(0).measure(0);

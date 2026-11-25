@@ -391,7 +391,11 @@ std::vector<std::size_t> Song::playOrder() const {
 
 double Song::secondsAt(std::size_t measure, const Fraction& offset) const {
     checkPosition(measure, offset);
-    const Fraction target = measureStart(measure) + offset;
+    const Fraction target =
+        measureStart(measure) + (measure < measureCount()
+                                     ? swung(headers_[measure].tripletFeel, offset,
+                                             headers_[measure].timeSignature.measureLength())
+                                     : offset);
     const auto written = [this](const Fraction& at) {
         return writtenSeconds(startTempo_, headers_, at.toDouble());
     };

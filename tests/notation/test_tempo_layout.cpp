@@ -176,6 +176,84 @@ TEST_CASE("Tempo marks: a change shows where it happens", "[notation][layout][te
     }
 }
 
+TEST_CASE("Triplet feel marks: the pair as written equals the pair as played",
+          "[notation][layout][tempo][feel]") {
+    // ADR-0104: after the tempo mark where the feel starts, alone where it
+    // changes, and a straight pair where it ends.
+    using elara::core::TripletFeel;
+    const auto glyphsOf = [](const DisplayList& list, std::size_t m) {
+        std::vector<Glyph> found;
+        for (const GlyphItem& item : glyphs(list, Role::Tempo)) {
+            if (item.measure == m) {
+                found.push_back(item.glyph);
+            }
+        }
+        return found;
+    };
+    const std::vector eighthPair{Glyph::TextBlackNoteShortStem, Glyph::TextCont8thBeamShortStem,
+                                 Glyph::TextBlackNoteFrac8thShortStem};
+    const std::vector sixteenthPair{Glyph::TextBlackNoteShortStem, Glyph::TextCont16thBeamShortStem,
+                                    Glyph::TextBlackNoteFrac16thShortStem};
+    const auto join = [](std::initializer_list<std::vector<Glyph>> parts) {
+        std::vector<Glyph> all;
+        for (const auto& part : parts) {
+            all.insert(all.end(), part.begin(), part.end());
+        }
+        return all;
+    };
+
+    Song song = quarters(4);
+    song.measureHeader(0).tripletFeel = TripletFeel::Eighth;
+    song.measureHeader(1).tripletFeel = TripletFeel::Eighth;
+    song.measureHeader(2).tripletFeel = TripletFeel::DottedSixteenth;
+    const DisplayList list = layout(song);
+    CHECK(glyphsOf(list, 0) == join({{Glyph::MetNoteQuarterUp},
+                                     eighthPair,
+                                     {Glyph::TextTupletBracketStartShortStem,
+                                      Glyph::MetNoteQuarterUp, Glyph::TextTuplet3ShortStem,
+                                      Glyph::MetNote8thUp, Glyph::TextTupletBracketEndShortStem}}));
+    CHECK(glyphsOf(list, 1).empty()); // the same feel goes on
+    CHECK(glyphsOf(list, 2) ==
+          join({sixteenthPair,
+                {Glyph::MetNote16thUp, Glyph::MetAugmentationDot, Glyph::MetNote32ndUp}}));
+    CHECK(glyphsOf(list, 3) == join({sixteenthPair, sixteenthPair})); // straight again
+    const auto marks = texts(list, Role::Tempo);
+    REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "=", "=", "="});
+    // On the tempo's line, after its text, the "=" between the pairs.
+    const auto all = glyphs(list, Role::Tempo);
+    CHECK(left(all[1]) > marks[0].origin.x + textWidth("= 120", marks[0].size));
+    CHECK(marks[1].origin.y == marks[0].origin.y);
+    CHECK(marks[1].origin.x > right(all[3]));
+    CHECK(left(all[4]) > marks[1].origin.x + textWidth("=", marks[1].size));
+    CHECK_THAT(bottom(all[1]), WithinAbs(marks[0].origin.y, 0.15));
+    // Each mark starts over its measure's first note.
+    const auto heads = glyphs(list, Role::Notehead);
+    const auto firstOf = [&all](std::size_t m) {
+        return *std::ranges::find(all, m, &GlyphItem::measure);
+    };
+    CHECK_THAT(left(firstOf(2)), WithinAbs(left(heads[8]), kEpsilon));
+
+    SECTION("Scottish pairs and triplet sixteenths") {
+        song.measureHeader(0).tripletFeel = TripletFeel::ScottishEighth;
+        song.measureHeader(1).tripletFeel = TripletFeel::None;
+        song.measureHeader(2).tripletFeel = TripletFeel::Sixteenth;
+        const DisplayList other = layout(song);
+        CHECK(glyphsOf(other, 0) ==
+              join({{Glyph::MetNoteQuarterUp},
+                    eighthPair,
+                    {Glyph::MetNote16thUp, Glyph::MetNote8thUp, Glyph::MetAugmentationDot}}));
+        CHECK(glyphsOf(other, 1) == join({eighthPair, eighthPair}));
+        CHECK(glyphsOf(other, 2) ==
+              join({sixteenthPair,
+                    {Glyph::TextTupletBracketStartShortStem, Glyph::MetNote8thUp,
+                     Glyph::TextTuplet3ShortStem, Glyph::MetNote16thUp,
+                     Glyph::TextTupletBracketEndShortStem}}));
+    }
+    SECTION("none without a triplet feel") {
+        CHECK(glyphs(layout(quarters(2)), Role::Tempo).size() == 1);
+    }
+}
+
 TEST_CASE("Tempo marks: beat units and fractions of a beat", "[notation][layout][tempo]") {
     Song song = quarters(1);
     song.setStartTempo(Tempo(60, Duration(NoteValue::Quarter, 1)));

@@ -232,6 +232,10 @@ std::unique_ptr<Command> changeKeySignature(const Song& song, std::size_t from, 
     return changeRun(song, from, key, &MeasureHeader::keySignature, "Change key signature");
 }
 
+std::unique_ptr<Command> changeTripletFeel(const Song& song, std::size_t from, TripletFeel feel) {
+    return changeRun(song, from, feel, &MeasureHeader::tripletFeel, "Change triplet feel");
+}
+
 // ---- Tempo -------------------------------------------------------------------
 
 std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,

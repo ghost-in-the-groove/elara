@@ -18,6 +18,7 @@ add_library(elara_core STATIC
   src/retune.cpp
   src/signature.cpp
   src/song.cpp
+  src/tempo.cpp
   src/transpose.cpp
   src/tuning.cpp
   src/validation.cpp

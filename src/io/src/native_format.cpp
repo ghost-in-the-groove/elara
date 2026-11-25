@@ -66,6 +66,9 @@ constexpr std::array kJumpToNames =
     std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
 constexpr std::array kJumpThenNames =
     std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
+constexpr std::array kTripletFeelNames = std::to_array<std::string_view>( // ADR-0104
+    {"none", "eighth", "sixteenth", "dotted-eighth", "dotted-sixteenth", "scottish-eighth",
+     "scottish-sixteenth"});
 
 template <typename Enum, std::size_t N>
 std::string_view nameOf(const std::array<std::string_view, N>& names, Enum value) {
@@ -223,6 +226,8 @@ private:
             add(object, "alternateEndings", endings);
         }
         addFlag(object, "doubleBar", value.doubleBar);
+        addEnumIfNot(object, "tripletFeel", kTripletFeelNames, value.tripletFeel,
+                     TripletFeel::None);
         addFlag(object, "segno", value.segno);
         addFlag(object, "segnoSegno", value.segnoSegno);
         addFlag(object, "coda", value.coda);
@@ -859,6 +864,7 @@ private:
             });
         }
         header.doubleBar = flag(object, "doubleBar");
+        header.tripletFeel = enumValue(object, "tripletFeel", kTripletFeelNames, TripletFeel::None);
         header.segno = flag(object, "segno");
         header.segnoSegno = flag(object, "segnoSegno");
         header.coda = flag(object, "coda");

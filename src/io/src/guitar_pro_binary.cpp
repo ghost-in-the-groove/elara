@@ -59,6 +59,7 @@ using core::SlideOut;
 using core::Song;
 using core::Staff;
 using core::TimeSignature;
+using core::TripletFeel;
 using core::Tuning;
 using core::Tuplet;
 using core::Vibrato;
@@ -317,8 +318,9 @@ struct HeaderData {
     bool repeatStart = false;
     std::uint8_t repeatTimes = 0;
     std::uint8_t alternateEndings = 0;
-    bool doubleBar = false; // ADR-0103
-    std::string section;    // the marker's name (ADR-0062)
+    bool doubleBar = false;                      // ADR-0103
+    TripletFeel tripletFeel = TripletFeel::None; // ADR-0104
+    std::string section;                         // the marker's name (ADR-0062)
 };
 
 struct TempoMark {
@@ -337,8 +339,9 @@ public:
     Song read() {
         readVersion();
         readInfo();
+        // Guitar Pro 3 and 4: triplet eighths for the whole song (ADR-0104).
         if (version_ < 500 && in_.flag()) {
-            warnings_.add({}, "triplet feel dropped");
+            songFeel_ = TripletFeel::Eighth;
         }
         if (version_ >= 400) {
             readLyrics();
@@ -498,6 +501,7 @@ private:
             HeaderData header;
             header.repeatStart = (flags & 0x04U) != 0;
             header.doubleBar = (flags & 0x80U) != 0;
+            header.tripletFeel = songFeel_;
             if (version_ < 500) {
                 // Guitar Pro 3 and 4 count the times the section is played again,
                 // and name one alternate ending: it takes every time up to its
@@ -535,7 +539,17 @@ private:
                 if ((flags & 0x10U) == 0) {
                     in_.skip(1);
                 }
-                if (in_.u8() != 0) {
+                // Triplet eighths or sixteenths (ADR-0104).
+                switch (in_.u8()) {
+                case 0:
+                    break;
+                case 1:
+                    header.tripletFeel = TripletFeel::Eighth;
+                    break;
+                case 2:
+                    header.tripletFeel = TripletFeel::Sixteenth;
+                    break;
+                default:
                     warnings_.add({}, "triplet feel dropped", m);
                 }
             }
@@ -1325,6 +1339,7 @@ private:
             header.repeatTimes = headers_[m].repeatTimes;
             header.alternateEndings = headers_[m].alternateEndings;
             header.doubleBar = headers_[m].doubleBar;
+            header.tripletFeel = headers_[m].tripletFeel;
             header.section = headers_[m].section;
         }
         addDirections(song);
@@ -1511,6 +1526,7 @@ private:
     std::array<ChannelData, 64> channels_{};              // four ports of sixteen MIDI channels
     std::array<int, detail::kGpDirections> directions_{}; // 0: none (Guitar Pro 3 and 4)
     std::vector<HeaderData> headers_;
+    TripletFeel songFeel_ = TripletFeel::None; // Guitar Pro 3-4's, on every measure
     std::vector<TrackData> tracks_;
     std::vector<TempoMark> tempos_;
     detail::ChordPool chords_;
