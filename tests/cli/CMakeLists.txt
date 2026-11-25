@@ -31,6 +31,12 @@ set_tests_properties(cli.tune_tone PROPERTIES
   FIXTURES_REQUIRED tone_wav
   PASS_REGULAR_EXPRESSION "\"sampleRate\":48000,\"windows\":13,\"pitched\":13,\"a4\":440,\"frequency\":(439\\.99[0-9]*|440(\\.00[0-9]*)?),\"note\":\"A4\",\"cents\":-?0(\\.0[0-9]*)?,\"clarity\":(0\\.99[0-9]*|1)}")
 
+# A FLAC recording, encoded by libFLAC (audio.flac_against_libflac), tunes the same.
+add_test(NAME cli.tune_flac COMMAND elara-cli --json tune "${CMAKE_BINARY_DIR}/tests/flac/a440.flac")
+set_tests_properties(cli.tune_flac PROPERTIES
+  FIXTURES_REQUIRED flac_files
+  PASS_REGULAR_EXPRESSION "\"sampleRate\":44100,.*\"note\":\"A4\",\"cents\":-?0(\\.[0-9]*)?,")
+
 add_test(NAME cli.tune_reference COMMAND elara-cli tune "${_tone_wav}" --a4 432)
 set_tests_properties(cli.tune_reference PROPERTIES
   FIXTURES_REQUIRED tone_wav
