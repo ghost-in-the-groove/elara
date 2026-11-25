@@ -174,6 +174,7 @@ TEST_CASE("Header edits are named for what they change", "[core][document]") {
     CHECK(edit([](MeasureHeader& h) { h.repeatTimes = 3; }) == "Change repeats");
     CHECK(edit([](MeasureHeader& h) { h.alternateEndings = 0b011; }) == "Change repeats");
     CHECK(edit([](MeasureHeader& h) { h.segno = true; }) == "Change navigation marks");
+    CHECK(edit([](MeasureHeader& h) { h.doubleBar = true; }) == "Change barline");
     CHECK(edit([](MeasureHeader& h) { h.keySignature = KeySignature(2, KeyMode::Major); }) ==
           "Change key signature");
     // Repeats and something else at once: a general name.

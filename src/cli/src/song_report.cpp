@@ -65,6 +65,9 @@ std::string measuresJson(const core::Song& song) {
             }
             out += std::format(R"(,"endings":[{}])", endings);
         }
+        if (header.doubleBar) {
+            out += R"(,"doubleBar":true)";
+        }
         std::string signs;
         for (const SignName& sign : kSignNames) {
             if (header.*sign.flag) {

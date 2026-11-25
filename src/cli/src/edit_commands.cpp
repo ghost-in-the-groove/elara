@@ -826,6 +826,17 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (header != song.measureHeader(measure)) {
             doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
         }
+    } else if (verb == "barline") { // barline <m> double|single
+        const std::size_t measure = step.index(1);
+        MeasureHeader header = song.measureHeader(measure);
+        const std::string_view kind = step.word(2);
+        if ((kind != "double" && kind != "single") || step.has(3)) {
+            throw StepSyntaxError(std::format("barline: expected double or single, not {}", kind));
+        }
+        header.doubleBar = kind == "double";
+        if (header != song.measureHeader(measure)) {
+            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+        }
     } else if (verb == "ending") { // ending <m> <time>... | none
         const std::size_t measure = step.index(1);
         MeasureHeader header = song.measureHeader(measure);

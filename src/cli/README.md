@@ -141,6 +141,7 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
 or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
 [al-fine|al-coda|al-double-coda]`, `repeat <m> [start] [end <times>]` or
 `repeat <m> none`, `ending <m> <time>...` or `ending <m> none`,
+`barline <m> double|single`,
 `section <m> [name]`, `undo`, `redo`,
 `save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
@@ -155,7 +156,9 @@ The measures of `edit` and `dump` list them as `"signs":["segno","to-coda"]`,
 `times` times (2 to 255), both or neither, and `ending` the times through the
 repeat that play it (1 to 8); each is one undo step, "Change repeats"
 (ADR-0016). The measures list them as `"repeatStart":true`, `"repeatTimes":3`
-and `"endings":[1,2]`. `section` names the section that starts at measure `m`
+and `"endings":[1,2]`. `barline` closes measure `m` with a double barline or
+a single one, one undo step, "Change barline" (ADR-0103); the measures list
+the double one as `"doubleBar":true`. `section` names the section that starts at measure `m`
 (no name takes it off), one undo step, "Change section" (ADR-0062); the
 measures list it as `"section":"Chorus"`.
 

@@ -43,4 +43,6 @@ are read as before, as single barlines.
 - Imported scores keep the ends of their sections; songs without double
   barlines lay out and save exactly as before.
 - A double barline costs its measure the separation and a line's width.
-- Setting it at the caret is the next step.
+- The measure popup sets it with a Double chip under the repeats, and
+  `elara-cli edit` with `barline <m> double|single`; each is one undo step,
+  "Change barline".
