@@ -87,7 +87,7 @@ elara_add_unit_tests(notation
   notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
   notation/test_incremental_layout.cpp notation/test_pdf.cpp notation/test_chord_layout.cpp notation/test_beat_text_layout.cpp
   notation/test_lyrics_layout.cpp notation/test_fermata_layout.cpp
-  notation/test_slur_layout.cpp
+  notation/test_slur_layout.cpp notation/test_slide_layout.cpp
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
   notation/test_fingering_layout.cpp
