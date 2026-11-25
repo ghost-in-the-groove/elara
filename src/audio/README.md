@@ -41,7 +41,9 @@ Three targets with different rules:
   on its own.
   An instrument plays every pitched track, or only the guitars or the basses
   (`SfzTracks`); the other tracks play on another bank, and `with()` puts the
-  same samples in front of another one;
+  same samples in front of another one. Palm mutes, dead notes and harmonics
+  play on the library's own keyswitch or controller for them, found by name
+  (`techniques()`, ADR-0068), or else are imitated;
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from
