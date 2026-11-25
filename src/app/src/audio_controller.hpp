@@ -49,6 +49,8 @@ class AudioController : public QObject {
     Q_PROPERTY(QString bassSfzName READ bassSfzName NOTIFY sfzChanged)
     Q_PROPERTY(bool loadingSoundFont READ loadingSoundFont NOTIFY loadingSoundFontChanged)
     Q_PROPERTY(bool rememberSound MEMBER rememberSound_ NOTIFY rememberSoundChanged)
+    // The SoundFont that comes with Elara, empty for none (ADR-0069).
+    Q_PROPERTY(QString includedSoundFont READ includedSoundFont CONSTANT)
 
 public:
     explicit AudioController(QObject* parent = nullptr);
@@ -108,6 +110,9 @@ public:
     /// Their file names without the extension.
     [[nodiscard]] QString guitarSfzName() const;
     [[nodiscard]] QString bassSfzName() const;
+    /// The SoundFont that comes with Elara's packages, which the tracks play
+    /// through until another sound is chosen; empty when there is none.
+    [[nodiscard]] QString includedSoundFont() const { return includedSoundFont_; }
     /// True while a SoundFont or an SFZ instrument opens.
     [[nodiscard]] bool loadingSoundFont() const { return loading_ > 0; }
     /// Opens the SoundFont at `file` (a path or a file URL) on a worker; once
@@ -124,7 +129,8 @@ public:
     /// Plays every track through the built-in synthesizer again.
     Q_INVOKABLE void useBuiltinSound();
     /// Opens the SoundFont and the SFZ instruments chosen last time, when
-    /// rememberSound is on.
+    /// rememberSound is on: the included SoundFont when no sound was ever
+    /// chosen or the file chosen is gone.
     Q_INVOKABLE void restoreSound();
     /// The sound track `track` of the open song plays with: the timbre's
     /// name, the SoundFont preset's or the SFZ instrument's.
@@ -194,6 +200,7 @@ private:
     SoundPart soundFont_;
     SoundPart guitars_;
     SoundPart basses_;
+    QString includedSoundFont_;
     int loading_ = 0; // SoundFonts and SFZ instruments opening
     bool rememberSound_ = false;
     QString deviceDescription_;

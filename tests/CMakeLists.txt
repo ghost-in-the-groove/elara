@@ -91,7 +91,8 @@ elara_target_warnings(elara_benchmarks)
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
-    app/test_when_done.cpp app/test_app_icon.cpp app/bench_score_painter.cpp)
+    app/test_when_done.cpp app/test_app_icon.cpp app/test_included_sound.cpp
+    app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
     Catch2::Catch2)
   target_compile_definitions(elara_app_tests PRIVATE
@@ -154,6 +155,39 @@ if(TARGET elara)
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
     TIMEOUT 60
     PASS_REGULAR_EXPRESSION "sound: test-soundfont[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
+
+  # The SoundFont that comes with the packages (ADR-0069), where they put it
+  # around the app: the test SoundFont, there for this test alone.
+  if(APPLE)
+    set(_included_soundfonts "$<TARGET_BUNDLE_CONTENT_DIR:elara>/Resources/soundfonts")
+  else()
+    set(_included_soundfonts "$<TARGET_FILE_DIR:elara>/../share/elara/soundfonts")
+  endif()
+  add_test(NAME app.included_soundfont_put
+    COMMAND "${CMAKE_COMMAND}" "-DFROM=${CMAKE_CURRENT_BINARY_DIR}/cli/test-soundfont.sf2"
+      "-DTO=${_included_soundfonts}" -P "${CMAKE_CURRENT_SOURCE_DIR}/app/included_soundfont.cmake")
+  add_test(NAME app.included_soundfont_remove
+    COMMAND "${CMAKE_COMMAND}" "-DTO=${_included_soundfonts}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/app/included_soundfont.cmake")
+  # Before the SoundFont is put there, the option fails with a message.
+  set_tests_properties(app.included_soundfont_put PROPERTIES
+    FIXTURES_REQUIRED cli_soundfont FIXTURES_SETUP app_included_soundfont
+    DEPENDS app.included_soundfont_none)
+  set_tests_properties(app.included_soundfont_remove PROPERTIES
+    FIXTURES_CLEANUP app_included_soundfont)
+  add_test(NAME app.smoke_included_soundfont
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp" --included-soundfont)
+  set_tests_properties(app.smoke_included_soundfont PROPERTIES
+    FIXTURES_REQUIRED app_included_soundfont
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "sound: test-soundfont[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
+  add_test(NAME app.included_soundfont_none COMMAND elara --included-soundfont)
+  set_tests_properties(app.included_soundfont_none PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    PASS_REGULAR_EXPRESSION "no SoundFont comes with this build of Elara")
 
   # SFZ instruments from the command line (ADR-0066), the test guitar of the
   # CLI tests for the basses of band.gp: its bass track plays the instrument

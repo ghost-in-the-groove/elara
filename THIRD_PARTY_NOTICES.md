@@ -21,6 +21,7 @@ and be listed here before it is merged.
 | [libogg](https://xiph.org/ogg/), [libvorbis](https://xiph.org/vorbis/) | 1.3.6, 1.3.7 | BSD-3-Clause | The compressed samples of SF3 SoundFonts (through libsndfile) | vcpkg |
 | [libFLAC](https://xiph.org/flac/), [Opus](https://opus-codec.org) | 1.5.0, 1.6.1 | BSD-3-Clause | Linked by libsndfile; not used by Elara | vcpkg |
 | [gcem](https://github.com/kthohr/gcem) | 1.18.0 | Apache-2.0 | Compile-time maths inside FluidSynth | vcpkg |
+| [MuseScore General](https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/) | 0.2 | MIT (FluidR3 by Frank Wen, FluidR3Mono by Michael Cowgill, adapted by S. Christian Collins) | The SoundFont the packages come with and the app plays through by default (ADR-0069) | Downloaded by `elara.py package` from MuseScore's mirror, pinned SHA-256, and installed with its licence (`MuseScore_General_License.md`) next to it; not in the repository |
 
 FluidSynth and libsndfile are LGPL: Windows builds load them as DLLs, other
 builds link them statically, and Elara's complete source (AGPL) lets anyone
@@ -30,6 +31,4 @@ relink it with a modified version, as LGPL-2.1 section 6 asks.
 
 | Component | Licence | Planned use |
 |---|---|---|
-| sfizz | BSD-2-Clause | SFZ sampler for guitar articulations (milestone 4) |
 | Steinberg VST3 SDK | MIT | Plugin hosting (after 1.0) |
-| MuseScore General SF3 | MIT | Default sound bank (milestone 4) |

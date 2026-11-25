@@ -329,6 +329,10 @@
         <translation>Elegir una SoundFont…</translation>
     </message>
     <message>
+        <source>Use the included SoundFont</source>
+        <translation>Usar el SoundFont incluido</translation>
+    </message>
+    <message>
         <source>Guitars: %1</source>
         <translation>Guitarras: %1</translation>
     </message>
@@ -1726,6 +1730,10 @@
     <message>
         <source>Play through this SoundFont (SF2 or SF3).</source>
         <translation>Tocar con esta SoundFont (SF2 o SF3).</translation>
+    </message>
+    <message>
+        <source>Play through the SoundFont that comes with Elara.</source>
+        <translation>Reproducir con el SoundFont que incluye Elara.</translation>
     </message>
     <message>
         <source>Play the guitars through this SFZ instrument.</source>

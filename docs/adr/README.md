@@ -72,6 +72,7 @@ one that replaces them.
 | [0064](0064-app-icon.md) | The app icon | Accepted |
 | [0065](0065-installers.md) | Installers | Accepted |
 | [0066](0066-sfz-sampler.md) | SFZ instruments through Elara's own sampler | Accepted |
+| [0069](0069-included-soundfont.md) | MuseScore General comes with the packages | Accepted |
 
 ## Template
 
