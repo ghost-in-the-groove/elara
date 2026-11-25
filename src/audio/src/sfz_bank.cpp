@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <initializer_list>
 #include <map>
 #include <numbers>
 #include <set>
@@ -35,6 +36,7 @@ struct SfzData {
     std::array<std::vector<std::uint32_t>, 128> offKey; ///< regions struck by a key coming up
     std::array<bool, 128> switches{};                   ///< keys in a keyswitch range
     int defaultSwitch = -1;
+    SfzTechniques techniques;
     std::vector<std::string> missing;
     std::size_t bytes = 0;
 };
@@ -149,23 +151,18 @@ public:
             switch_ = key;
         }
         const bool othersHeld = heldCount_ > 0;
-        for (const std::uint32_t r : data_->onKey[k]) {
-            const SfzRegion& region = data_->program.regions[r];
-            if (!matches(r, region, velocity)) {
-                continue;
-            }
-            if ((region.trigger == SfzTrigger::First && othersHeld) ||
-                (region.trigger == SfzTrigger::Legato && !othersHeld)) {
-                continue;
-            }
-            start(r, key, velocity, touch, 1.0, true);
+        Played played = playing(touch);
+        if (!strike(key, velocity, played, othersHeld) && played.touch != touch) {
+            // The library's technique has nothing for this key: imitate it.
+            played = {.touch = touch, .keyswitch = switch_, .cc = -1};
+            strike(key, velocity, played, othersHeld);
         }
         if (!keyDown_[k]) {
             keyDown_[k] = true;
             ++heldCount_;
         }
         keyVelocity_[k] = velocity;
-        keyTouch_[k] = touch;
+        keyPlayed_[k] = played;
         keyStruck_[k] = frame_;
     }
 
@@ -188,11 +185,11 @@ public:
         keyDown_[k] = false;
         --heldCount_;
         const double held = static_cast<double>(frame_ - keyStruck_[k]) / rate_;
+        const Played& played = keyPlayed_[k];
         for (const std::uint32_t r : data_->offKey[k]) {
             const SfzRegion& region = data_->program.regions[r];
-            if (matches(r, region, keyVelocity_[k])) {
-                start(r, key, keyVelocity_[k], keyTouch_[k], decibels(-region.rtDecay * held),
-                      false);
+            if (matches(r, region, keyVelocity_[k], played)) {
+                start(r, key, keyVelocity_[k], played, decibels(-region.rtDecay * held), false);
             }
         }
     }
@@ -250,21 +247,69 @@ public:
     }
 
 private:
+    // How a note is played: the touch the sampler imitates (Normal when the
+    // library plays it), the keyswitch its regions answer to, and a
+    // controller the library's technique turns up for it.
+    struct Played {
+        Touch touch = Touch::Normal;
+        int keyswitch = -1;
+        int cc = -1;
+
+        // A controller's value for this note.
+        [[nodiscard]] int value(const std::array<int, 128>& values, int controller) const noexcept {
+            return controller == cc ? 127 : values[static_cast<std::size_t>(controller)];
+        }
+    };
+
+    [[nodiscard]] Played playing(Touch touch) const noexcept {
+        const SfzTechniques& techniques = data_->techniques;
+        const SfzTechnique* technique = touch == Touch::PalmMute   ? &techniques.palmMute
+                                        : touch == Touch::Dead     ? &techniques.dead
+                                        : touch == Touch::Harmonic ? &techniques.harmonic
+                                                                   : nullptr;
+        if (technique == nullptr || !technique->found()) {
+            return {.touch = touch, .keyswitch = switch_, .cc = -1};
+        }
+        return {.touch = Touch::Normal,
+                .keyswitch = technique->keyswitch >= 0 ? technique->keyswitch : switch_,
+                .cc = technique->cc};
+    }
+
+    // Starts the regions a key going down plays, played this way; false when
+    // no region answers.
+    bool strike(int key, int velocity, const Played& played, bool othersHeld) noexcept {
+        bool struck = false;
+        for (const std::uint32_t r : data_->onKey[static_cast<std::size_t>(key)]) {
+            const SfzRegion& region = data_->program.regions[r];
+            if (!matches(r, region, velocity, played)) {
+                continue;
+            }
+            if ((region.trigger == SfzTrigger::First && othersHeld) ||
+                (region.trigger == SfzTrigger::Legato && !othersHeld)) {
+                continue;
+            }
+            struck = true;
+            start(r, key, velocity, played, 1.0, true);
+        }
+        return struck;
+    }
+
     // Whether a region plays a note of this velocity now: its velocity range,
     // controllers, keyswitch and turn in its round robin.
-    bool matches(std::uint32_t r, const SfzRegion& region, int velocity) noexcept {
+    bool matches(std::uint32_t r, const SfzRegion& region, int velocity,
+                 const Played& played) noexcept {
         if (velocity < region.loVel || velocity > region.hiVel) {
             return false;
         }
         for (const SfzCcRange& range : region.ccRanges) {
             if (range.cc >= 0 && range.cc < 128) {
-                const int value = cc_[static_cast<std::size_t>(range.cc)];
+                const int value = played.value(cc_, range.cc);
                 if (value < range.lo || value > range.hi) {
                     return false;
                 }
             }
         }
-        if (region.swLast >= 0 && region.swLast != switch_) {
+        if (region.swLast >= 0 && region.swLast != played.keyswitch) {
             return false;
         }
         if (region.seqLength > 1) {
@@ -275,9 +320,10 @@ private:
         return true;
     }
 
-    void start(std::uint32_t r, int key, int velocity, Touch touch, double extraGain,
+    void start(std::uint32_t r, int key, int velocity, const Played& played, double extraGain,
                bool follows) noexcept {
         const SfzRegion& region = data_->program.regions[r];
+        const Touch touch = played.touch;
         if (region.group != 0) {
             for (Voice& other : voices_) {
                 if (other.stage != Stage::Off && other.offBy == region.group) {
@@ -296,7 +342,7 @@ private:
         double audible = region.amplitude;
         for (const SfzCcModulation& modulation : region.ccModulations) {
             if (modulation.target == SfzTarget::Amplitude) {
-                audible *= modulation.depth * cc_[static_cast<std::size_t>(modulation.cc)];
+                audible *= modulation.depth * played.value(cc_, modulation.cc);
             }
         }
         if (audible <= 0.0 || extraGain <= 0.0) {
@@ -351,8 +397,7 @@ private:
         double sustain = region.ampegSustain;
         double releaseTime = region.ampegRelease;
         for (const SfzCcModulation& modulation : region.ccModulations) {
-            const double amount =
-                modulation.depth * cc_[static_cast<std::size_t>(modulation.cc)] / 127.0;
+            const double amount = modulation.depth * played.value(cc_, modulation.cc) / 127.0;
             switch (modulation.target) {
             case SfzTarget::Amplitude:
                 amplitude *= amount / 100.0;
@@ -598,7 +643,7 @@ private:
     int switch_ = -1;
     std::array<bool, 128> keyDown_{};
     std::array<int, 128> keyVelocity_{};
-    std::array<Touch, 128> keyTouch_{};
+    std::array<Played, 128> keyPlayed_{};
     std::array<std::int64_t, 128> keyStruck_{};
     int heldCount_ = 0;
     std::int64_t frame_ = 0;
@@ -614,6 +659,57 @@ readSamples(const std::vector<std::filesystem::path>& paths) {
     core::forEachIndex(0, paths.size(), core::threadsFor(0, paths.size(), 2, paths.size()),
                        [&](std::size_t i) { results[i] = readWav(paths[i]); });
     return results;
+}
+
+// Whether a library's name for a control holds one of `words`, in any case.
+bool names(std::string_view label, std::initializer_list<std::string_view> words) {
+    std::string lower(label);
+    std::ranges::transform(lower, lower.begin(), [](char c) {
+        return c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    });
+    return std::ranges::any_of(
+        words, [&lower](std::string_view word) { return lower.find(word) != std::string::npos; });
+}
+
+// Whether a region's choice or its sound depends on controller `cc`.
+bool listensTo(const SfzProgram& program, int cc) {
+    return std::ranges::any_of(program.regions, [cc](const SfzRegion& region) {
+        return std::ranges::any_of(region.ccRanges,
+                                   [cc](const SfzCcRange& range) { return range.cc == cc; }) ||
+               std::ranges::any_of(region.ccModulations, [cc](const SfzCcModulation& modulation) {
+                   return modulation.cc == cc;
+               });
+    });
+}
+
+// The library's keyswitches and controllers for the touches, by their names:
+// the first keyswitch named for each, and for a palm mute without one, a
+// controller named for muting that some region listens to.
+SfzTechniques findTechniques(const SfzProgram& program) {
+    SfzTechniques found;
+    for (const SfzRegion& region : program.regions) {
+        if (region.swLast < 0 || region.swLabel.empty()) {
+            continue;
+        }
+        SfzTechnique* technique = nullptr;
+        if (names(region.swLabel, {"harm"})) {
+            technique = &found.harmonic;
+        } else if (names(region.swLabel, {"dead", "ghost"})) {
+            technique = &found.dead;
+        } else if (names(region.swLabel, {"palm", "mute"})) {
+            technique = &found.palmMute;
+        }
+        if (technique != nullptr && !technique->found()) {
+            *technique = {.keyswitch = region.swLast, .cc = -1, .label = region.swLabel};
+        }
+    }
+    for (int cc = 0; cc < 128 && !found.palmMute.found(); ++cc) {
+        const std::string& label = program.ccLabels[static_cast<std::size_t>(cc)];
+        if (names(label, {"palm", "mut"}) && listensTo(program, cc)) {
+            found.palmMute = {.keyswitch = -1, .cc = cc, .label = label};
+        }
+    }
+    return found;
 }
 
 std::vector<float> generator(std::string_view name) {
@@ -728,6 +824,7 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
                                                      : std::format("no sample could be read: {}",
                                                                    data->missing.front()));
     }
+    data->techniques = findTechniques(kept);
     data->program = std::move(kept);
     // Samples no kept region plays are dropped from memory.
     for (std::size_t i = 0; i < names.size(); ++i) {
@@ -803,6 +900,10 @@ std::size_t SfzBank::sampleCount() const noexcept {
 
 std::size_t SfzBank::sampleBytes() const noexcept {
     return data_->bytes;
+}
+
+const SfzTechniques& SfzBank::techniques() const noexcept {
+    return data_->techniques;
 }
 
 std::unique_ptr<TrackSound> SfzBank::sound(const core::Instrument& instrument,

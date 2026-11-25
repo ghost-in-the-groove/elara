@@ -1090,11 +1090,11 @@ set_tests_properties(cli.sfz_write PROPERTIES FIXTURES_SETUP cli_sfz)
 add_test(NAME cli.sfz COMMAND elara-cli --json sfz "${_test_sfz}")
 set_tests_properties(cli.sfz PROPERTIES
   FIXTURES_REQUIRED cli_sfz
-  PASS_REGULAR_EXPRESSION "\"name\":\"test-guitar\",\"regions\":3,\"samples\":2,\"sampleBytes\":176400,\"lowestKey\":0,\"highestKey\":127,\"missingSamples\":\\[\\],\"unknownOpcodes\":\\[\"lfoN_pitch_onccN\"\\],\"skippedHeaders\":\\[\\],\"loadSeconds\":[0-9.e-]+}")
+  PASS_REGULAR_EXPRESSION "\"name\":\"test-guitar\",\"regions\":3,\"samples\":2,\"sampleBytes\":176400,\"lowestKey\":0,\"highestKey\":127,\"missingSamples\":\\[\\],\"unknownOpcodes\":\\[\"lfoN_pitch_onccN\"\\],\"skippedHeaders\":\\[\\],\"techniques\":{\"palm-mute\":{\"cc\":70,\"label\":\"Muting\"},\"dead\":null,\"harmonic\":null},\"loadSeconds\":[0-9.e-]+}")
 add_test(NAME cli.sfz_text COMMAND elara-cli sfz "${_test_sfz}")
 set_tests_properties(cli.sfz_text PROPERTIES
   FIXTURES_REQUIRED cli_sfz
-  PASS_REGULAR_EXPRESSION "^test-guitar: 3 regions over keys 0 to 127, 2 samples \\(0\\.2 MB\\) read in [0-9.]+ s\n  opcodes not played: lfoN_pitch_onccN\n$")
+  PASS_REGULAR_EXPRESSION "^test-guitar: 3 regions over keys 0 to 127, 2 samples \\(0\\.2 MB\\) read in [0-9.]+ s\n  opcodes not played: lfoN_pitch_onccN\n  palm-mute: controller 70 \"Muting\"\n$")
 add_test(NAME cli.sfz_rejects_other_files COMMAND elara-cli sfz "${ELARA_CORPUS}/gp/band.gp")
 set_tests_properties(cli.sfz_rejects_other_files PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_audio_sfz
