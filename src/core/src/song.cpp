@@ -405,17 +405,24 @@ std::vector<FermataHold> Song::fermataHolds(std::size_t measure) const {
     if (measure >= measureCount()) {
         throw std::out_of_range("Song::fermataHolds: measure out of range");
     }
+    const auto isHeld = [](const Beat& beat) {
+        return beat.effects.fermata != Fermata::None;
+    };
     std::vector<FermataHold> held;
     for (const Track& track : tracks_) {
         for (std::size_t s = 0; s < track.staffCount(); ++s) {
             for (const Voice& voice : track.staff(s).measure(measure).voices) {
+                // Most voices hold nothing: find that, and where the last hold
+                // is, before summing lengths, which costs far more than a look.
+                const auto lastHeld =
+                    std::find_if(voice.beats.rbegin(), voice.beats.rend(), isHeld);
                 Fraction at;
-                for (const Beat& beat : voice.beats) {
-                    const Fraction length = beat.duration.length();
-                    if (beat.effects.fermata != Fermata::None) {
+                for (auto beat = voice.beats.begin(); beat != lastHeld.base(); ++beat) {
+                    const Fraction length = beat->duration.length();
+                    if (isHeld(*beat)) {
                         held.push_back({.start = at,
                                         .end = at + length,
-                                        .stretch = fermataStretch(beat.effects.fermata)});
+                                        .stretch = fermataStretch(beat->effects.fermata)});
                     }
                     at += length;
                 }
