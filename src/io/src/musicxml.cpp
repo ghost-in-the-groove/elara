@@ -2147,9 +2147,16 @@ private:
             // To the next step of the key unless an accidental mark says
             // otherwise, at thirty-seconds.
             int semitones = core::semitonesToNextStep(note.pitch, concertKey_);
-            if (otherAlter) {
-                const auto next = static_cast<Step>((static_cast<int>(note.pitch.step()) + 1) % 7);
-                semitones += *otherAlter - concertKey_.alterFor(next);
+            // An accidental mark spells the step above the note as written,
+            // so the interval holds for a transposing part as well.
+            const pugi::xml_node pitch = ornaments.parent().parent().child("pitch");
+            const auto step = stepOf(textView(pitch.child("step")));
+            if (otherAlter && step) {
+                const int alter = roundedIn(pitch.child("alter"), -3, 3);
+                const int octave = intIn(pitch.child("octave"), 4, -2, 10);
+                const int next = (static_cast<int>(*step) + 1) % 7;
+                semitones = detail::midiOf(next, *otherAlter, next == 0 ? octave + 1 : octave) -
+                            midiOf(*step, alter, octave);
             }
             if (semitones > 0 && semitones <= Trill::kMaxSemitones) {
                 fx.trill = Trill{.semitones = static_cast<std::int8_t>(semitones)};

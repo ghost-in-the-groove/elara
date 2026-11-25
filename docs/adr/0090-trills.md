@@ -41,7 +41,8 @@ key, which is where a trill goes unless written otherwise.
 `{"semitones": 2, "speed": "32"}`. MusicXML reads a trill mark as a trill to
 the next step of the key, changed by an accidental mark, and the wavy line
 after it as the trill's; it writes trill marks back with an accidental mark
-when the other note is not the next step, warning for trills to a lower note
+when the other note is not the next step (spelling the step above the note as
+written, so a transposing part keeps the interval), warning for trills to a lower note
 and for speeds other than thirty-seconds, which it cannot write. Guitar Pro 3-5
 and 6-8 read trills with their other note, at their speed in Guitar Pro 3-5 and
 in sixteenths in 6-8. MIDI export warns "trills dropped": it writes no

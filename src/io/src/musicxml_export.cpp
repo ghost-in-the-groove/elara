@@ -1904,13 +1904,15 @@ private:
         if (trill.speed != NoteValue::ThirtySecond) {
             warn("trill speeds dropped", m);
         }
-        const KeySignature& key = song_.measureHeader(m).keySignature;
-        const int byKey = semitonesToNextStep(note.pitch, key);
-        if (trill.semitones == byKey) {
+        if (trill.semitones ==
+            semitonesToNextStep(note.pitch, song_.measureHeader(m).keySignature)) {
             return;
         }
-        const auto next = static_cast<Step>((static_cast<int>(note.pitch.step()) + 1) % 7);
-        const int alter = key.alterFor(next) + trill.semitones - byKey;
+        // The step above the note as written, altered to reach the other note.
+        const Spelled at = written(note.pitch);
+        const int next = (at.step + 1) % 7;
+        const int alter = detail::midiOf(at.step, at.alter, at.octave) + trill.semitones -
+                          detail::midiOf(next, 0, next == 0 ? at.octave + 1 : at.octave);
         static constexpr std::array<std::string_view, 5> kMarks{"flat-flat", "flat", "natural",
                                                                 "sharp", "double-sharp"};
         if (alter < -2 || alter > 2) {

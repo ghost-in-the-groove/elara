@@ -450,6 +450,16 @@ core::Song randomSong(std::uint32_t seed) {
                                     } else {
                                         note.pitch = song.measureHeader(m).keySignature.spell(
                                             s == 1 ? pick(36, 59) : pick(55, 84));
+                                        // Trills to the next step of the key, or a
+                                        // semitone past it with an accidental mark.
+                                        if (pick(0, 13) == 0) {
+                                            note.effects.trill =
+                                                Trill{.semitones = static_cast<std::int8_t>(
+                                                          semitonesToNextStep(
+                                                              note.pitch,
+                                                              song.measureHeader(m).keySignature) +
+                                                          pick(0, 1))};
+                                        }
                                     }
                                     note.effects.staccato = pick(0, 9) == 0;
                                     note.effects.tenuto = pick(0, 11) == 0;
@@ -721,6 +731,19 @@ TEST_CASE("MusicXML export: trills come back, with an accidental mark for an unu
     const auto warned = exportMusicXml(song);
     CHECK(hasWarning(warned.warnings,
                      "trills to a lower note written as trills to the next step up"));
+
+    // An alto sax is written a major sixth up, in A major for C major: a
+    // concert G trilling with Ab is a written E trilling with F natural.
+    core::Song sax;
+    sax.appendMeasures(1);
+    const std::size_t a =
+        sax.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("alto-sax")));
+    sax.track(a).staff(0).measure(0).voices[0].beats = {
+        beatOf(core::Duration(core::NoteValue::Whole), {trilled("G4", 1)})};
+    const auto saxXml = exportMusicXml(sax);
+    CHECK(saxXml.warnings.empty());
+    CHECK(saxXml.data.find("<accidental-mark>natural</accidental-mark>") != std::string::npos);
+    requireSame(sax, roundTrip(sax));
 }
 
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
