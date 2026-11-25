@@ -39,9 +39,11 @@ font.**
   byte, on any number of threads.
 - `elara-cli render --pdf FILE` writes every page (or the line) as one
   document and reports `"pdf": {"file", "pages", "bytes"}`. The app's More
-  menu has Export as PDF… (Ctrl+P), which lays the shown track or tracks out
-  again on A4 pages in the shown view, so the continuous view exports as pages
-  too, and writes the file through `QSaveFile`.
+  menu has Export as PDF… (Ctrl+P). It suggests the song's file with `.pdf`
+  for its extension (or the song's title in the documents folder), lays the
+  shown track or tracks out again on A4 pages in the shown view, so the
+  continuous view exports as pages too, and writes the file through
+  `QSaveFile`.
 
 ## Consequences
 

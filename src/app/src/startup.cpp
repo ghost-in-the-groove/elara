@@ -11,6 +11,7 @@
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QImage>
@@ -1641,6 +1642,18 @@ void Startup::queuePdf() {
         if (!written.open(QIODevice::ReadOnly)) {
             problem(QStringLiteral("no file was written"));
             return false;
+        }
+        // Export as PDF… suggests the song's file with ".pdf" for its extension.
+        if (score_->source().isLocalFile()) {
+            const QFileInfo source(score_->source().toLocalFile());
+            const QFileInfo suggested(score_->pdfFile().toLocalFile());
+            if (suggested.dir() != source.dir() ||
+                suggested.fileName() != source.completeBaseName() + QStringLiteral(".pdf")) {
+                problem(QStringLiteral("%1 suggested for %2")
+                            .arg(suggested.filePath(), source.filePath()));
+            }
+        } else if (!score_->pdfFile().toLocalFile().endsWith(QStringLiteral(".pdf"))) {
+            problem(QStringLiteral("no PDF file suggested for a song without a file"));
         }
         const QByteArray pdf = written.readAll();
         const qsizetype pages = pdf.count("/Type /Page ");

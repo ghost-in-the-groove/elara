@@ -134,6 +134,12 @@ ApplicationWindow {
         }
     }
 
+    /// Asks where to export the score as PDF, suggesting a file beside the song's.
+    function exportPdf() {
+        pdfDialog.selectedFile = score.pdfFile();
+        pdfDialog.open();
+    }
+
     ScoreDocument {
         id: score
 
@@ -493,7 +499,7 @@ ApplicationWindow {
                         // The score as shown, on A4 pages (ADR-0074).
                         text: qsTr("Export as PDF…")
                         enabled: window.hasScore
-                        onTriggered: pdfDialog.open()
+                        onTriggered: window.exportPdf()
                     }
                     MenuSeparator {}
 
@@ -1078,7 +1084,7 @@ ApplicationWindow {
     Shortcut {
         sequences: [StandardKey.Print]
         enabled: window.hasScore
-        onActivated: pdfDialog.open()
+        onActivated: window.exportPdf()
     }
     Shortcut {
         sequences: [StandardKey.Undo]

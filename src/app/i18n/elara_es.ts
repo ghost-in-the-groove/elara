@@ -1442,7 +1442,7 @@
     </message>
     <message>
         <source>The music font is missing.</source>
-        <translation type="unfinished">Falta la fuente musical.</translation>
+        <translation>Falta la fuente musical.</translation>
     </message>
     <message>
         <source>Exported %1.</source>

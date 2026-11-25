@@ -22,10 +22,12 @@
 #include "when_done.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QFuture>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QVariantMap>
 #include <QtConcurrent/QtConcurrentRun>
 
@@ -1304,6 +1306,26 @@ bool ScoreDocument::save(const QUrl& file) {
     }
     emit historyChanged();
     return true;
+}
+
+QUrl ScoreDocument::pdfFile() const {
+    if (source_.isLocalFile()) {
+        const QFileInfo file(source_.toLocalFile());
+        return QUrl::fromLocalFile(
+            file.dir().filePath(file.completeBaseName() + QStringLiteral(".pdf")));
+    }
+    QString name = songTitle().trimmed();
+    // Characters no file name may hold on any of the three systems.
+    for (QChar& c : name) {
+        if (QStringLiteral("\\/:*?\"<>|").contains(c) || c.unicode() < 0x20) {
+            c = QLatin1Char('-');
+        }
+    }
+    if (name.isEmpty()) {
+        name = tr("Untitled");
+    }
+    const QString folder = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    return QUrl::fromLocalFile(QDir(folder).filePath(name + QStringLiteral(".pdf")));
 }
 
 bool ScoreDocument::exportPdf(const QUrl& file) {

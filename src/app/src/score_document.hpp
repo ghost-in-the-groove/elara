@@ -347,6 +347,10 @@ public:
     /// view prints as pages too. Returns false, and reports why through
     /// editFailed(), when it cannot.
     Q_INVOKABLE bool exportPdf(const QUrl& file);
+    /// The file Export as PDF… suggests: the song's file with ".pdf" for its
+    /// extension, or the song's title (or "Untitled") in the documents folder
+    /// for a song without a file.
+    Q_INVOKABLE [[nodiscard]] QUrl pdfFile() const;
 
     // ---- Keyboard entry -----------------------------------------------------
 
