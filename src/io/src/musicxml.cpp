@@ -1361,9 +1361,49 @@ private:
 
     /// Each chord symbol goes on the beat of its staff that starts where it
     /// does, the voices looked at in order.
+    /// The beat of `staff` in measure `index`, the last read, that starts at
+    /// `onset`; where none does, the beat sounding across it splits into tied
+    /// beats, in the first voice that can (ADR-0096). Null when none can.
+    Beat* beatAt(std::size_t index, std::size_t staff, const Fraction& onset) {
+        Measure& measure = measures_[staff].back();
+        if (Beat* beat = beatStartingAt(measure, onset)) {
+            return beat;
+        }
+        for (std::size_t v = 0; v < measure.voices.size(); ++v) {
+            if (const auto split = core::splitBeatAt(measure.voices[v], onset)) {
+                moveSlurEnds(SlurEnd{.measure = index,
+                                     .staff = staff,
+                                     .voice = v,
+                                     .beat = split->first,
+                                     .grace = false},
+                             split->added);
+                return &measure.voices[v].beats[split->at];
+            }
+        }
+        return nullptr;
+    }
+
+    /// Slur ends on beats after `split` in its voice and measure move on by
+    /// the `added` beats it split into, so that slurs keep their notes.
+    void moveSlurEnds(const SlurEnd& split, std::size_t added) {
+        const auto move = [&](SlurEnd& end) {
+            if (end.measure == split.measure && end.staff == split.staff &&
+                end.voice == split.voice && end.beat > split.beat) {
+                end.beat += added;
+            }
+        };
+        for (auto& [number, open] : openSlurs_) {
+            move(open);
+        }
+        for (auto& [from, to] : slurs_) {
+            move(from);
+            move(to);
+        }
+    }
+
     void markChords(std::size_t index, std::vector<ChordMark>& chords) {
         for (ChordMark& mark : chords) {
-            Beat* target = beatStartingAt(measures_[mark.staff.value_or(0)].back(), mark.onset);
+            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset);
             if (target == nullptr) {
                 warn("chord symbols between beats dropped", index);
                 continue;
@@ -1376,7 +1416,7 @@ private:
     /// starts where it does; two on one beat join with a space (ADR-0081).
     void markTexts(std::size_t index, std::vector<TextMark>& texts) {
         for (TextMark& mark : texts) {
-            Beat* target = beatStartingAt(measures_[mark.staff.value_or(0)].back(), mark.onset);
+            Beat* target = beatAt(index, mark.staff.value_or(0), mark.onset);
             if (target == nullptr) {
                 warn("text directions dropped", index);
                 continue;

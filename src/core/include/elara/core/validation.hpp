@@ -28,6 +28,27 @@ enum class VoiceFill : std::uint8_t { Empty, Incomplete, Complete, Overfull };
 /// (e.g. after a 5:3 tuplet that does not fill its beat).
 bool fillWithRests(Voice& voice, const TimeSignature& time);
 
+/// Where splitBeatAt() made a beat start.
+struct BeatSplit {
+    std::size_t first = 0; ///< the beat that was split, now its first part
+    std::size_t at = 0;    ///< the part that starts at the onset
+    std::size_t added = 0; ///< beats inserted after `first` (the later beats moved on by as many)
+};
+
+/// Makes a beat of `voice` start at `onset` by splitting the beat that sounds
+/// across it into beats of plain or dotted values, longest first, its notes
+/// tied from each part to the next (ADR-0096). It sounds the same. The first
+/// part keeps the notes' effects, the strum, grace notes, chord symbol, text
+/// and lyrics; the others tie the notes on and carry what spans beats: the
+/// hairpin, octave line, pedal (down, not changed again), slur and tremolo
+/// picking, and the notes' harmonics, trill, vibrato, palm muting, let ring,
+/// dead or ghost note and dynamic. Rests split into rests. A beat that starts
+/// at `onset` is left as it is. Returns nullopt, changing nothing, when no
+/// beat starts or sounds there, or the beat is a tuplet or has a fermata, a
+/// breath mark, a whammy bar, or a note that bends or slides out: those
+/// belong to the whole beat.
+[[nodiscard]] std::optional<BeatSplit> splitBeatAt(Voice& voice, const Fraction& onset);
+
 enum class IssueKind : std::uint8_t {
     VoiceIncomplete,       // shorter than its measure (not empty)
     VoiceOverfull,         // longer than its measure
