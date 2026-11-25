@@ -25,11 +25,23 @@
       "displayName": "Release with debug info",
       "inherits": "base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "sanitize",
+      "displayName": "Debug, no app, with AddressSanitizer and UndefinedBehaviorSanitizer (GCC or Clang)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ELARA_BUILD_APP": "OFF",
+        "ELARA_SANITIZE": "address,undefined",
+        "ELARA_WARNINGS_AS_ERRORS": "OFF"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev" },
-    { "name": "release", "configurePreset": "release" }
+    { "name": "release", "configurePreset": "release" },
+    { "name": "sanitize", "configurePreset": "sanitize" }
   ],
   "testPresets": [
     {
@@ -43,6 +55,16 @@
       "configurePreset": "release",
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error", "timeout": 120 }
+    },
+    {
+      "name": "sanitize",
+      "configurePreset": "sanitize",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "timeout": 600 },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_init_order=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
     }
   ]
 }

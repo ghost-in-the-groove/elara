@@ -10,6 +10,8 @@ one pull request, with a test that proves it. Tick the box in the same PR.
 - [x] Task runner `scripts/elara.py` (doctor, check, build, test, format, guard, cli, app)
 - [x] Architecture guard and clang-format check
 - [x] `elara-cli`: `version`, `render-tone`, `devices`, `tone`
+- [x] Every test but the app's under AddressSanitizer and UndefinedBehaviorSanitizer:
+      the `sanitize` preset and CI job (ADR-0105)
 - [x] Qt Quick window with a test-tone button through JUCE; `--smoke-test`
 - [x] CI workflow for Windows, macOS and Linux
 - [x] First green build on Windows (MSVC 19.44, Qt 6.12.1, JUCE 9.0.6)
