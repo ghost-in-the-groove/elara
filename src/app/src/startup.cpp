@@ -6,6 +6,7 @@
 #include <elara/core/instrument.hpp>
 
 #include "audio_controller.hpp"
+#include "recent_scores.hpp"
 #include "score_page.hpp"
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -15,6 +16,7 @@
 #include <QPointF>
 #include <QQuickItem>
 #include <QSize>
+#include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
 
@@ -132,6 +134,20 @@ void Startup::queueSteps() {
         return;
     }
     if (options_.smokeTest) {
+        // The file opened went to the top of the recent scores (kept only in
+        // memory during a check), and the welcome pane's list shows it.
+        steps_.emplace_back([this] {
+            const auto* recent = window_->findChild<RecentScores*>();
+            QStringList names;
+            for (const QVariant& entry : recent != nullptr ? recent->scores() : QVariantList{}) {
+                const QVariantMap map = entry.toMap();
+                names.append(
+                    QStringLiteral("%1 (%2)").arg(map.value(QStringLiteral("name")).toString(),
+                                                  map.value(QStringLiteral("format")).toString()));
+            }
+            std::printf("recent: %s\n", qPrintable(names.join(QStringLiteral(", "))));
+            return false;
+        });
         for (const View view : std::array{View::Standard, View::Tablature, View::Both}) {
             steps_.emplace_back([this, view] {
                 if (score_->view() == view || (view != View::Standard && !score_->hasTablature())) {

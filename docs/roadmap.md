@@ -79,6 +79,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       smooth zoom (ADR-0015)
   - [x] Continuous view: the music as one scroll, cut into strips of whole
         systems between them (ADR-0057)
+  - [x] Recent scores on the welcome pane and in an Open recent menu, kept for
+        the next start (ADR-0071)
 
 ## Milestone 4 - Playback  -> usable as a player
 

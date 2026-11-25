@@ -317,6 +317,14 @@
         <translation>Pista</translation>
     </message>
     <message>
+        <source>Open recent</source>
+        <translation>Abrir reciente</translation>
+    </message>
+    <message>
+        <source>Clear the list</source>
+        <translation>Vaciar la lista</translation>
+    </message>
+    <message>
         <source>Opening the SoundFont…</source>
         <translation>Abriendo la SoundFont…</translation>
     </message>
@@ -990,6 +998,18 @@
     <message>
         <source>or drop a file anywhere in this window</source>
         <translation>o suelta un archivo en cualquier parte de esta ventana</translation>
+    </message>
+    <message>
+        <source>Recent</source>
+        <translation>Recientes</translation>
+    </message>
+    <message>
+        <source>Open %1</source>
+        <translation>Abrir %1</translation>
+    </message>
+    <message>
+        <source>Remove from the list</source>
+        <translation>Quitar de la lista</translation>
     </message>
 </context>
 <context>
