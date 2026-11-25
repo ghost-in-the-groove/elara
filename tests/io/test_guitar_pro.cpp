@@ -231,7 +231,6 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     CHECK(result.warnings ==
           std::vector<std::string>{"Clarinet: volume and pan changes dropped",
                                    "Clarinet: lyrics dropped",
-                                   "gradual tempo changes written as sudden ones",
                                    "Clarinet: short voices filled with rests (measure 2)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().words == "Ghost in the Groove");
@@ -247,6 +246,7 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     REQUIRE(song.measureHeader(1).tempoChanges.size() == 1);
     CHECK(song.measureHeader(1).tempoChanges[0].tempo ==
           core::Tempo(60, Duration(NoteValue::Quarter, 1)));
+    CHECK(song.measureHeader(1).tempoChanges[0].gradual); // linear, with nowhere to go
     REQUIRE(song.trackCount() == 4);
 
     const core::Track& bass = song.track(0);
@@ -388,6 +388,40 @@ TEST_CASE("Guitar Pro: tempo changes sit at their share of the bar", "[io][guita
     REQUIRE(changes.size() == 1);
     CHECK(changes[0].offset == core::Fraction(3, 4));
     CHECK(changes[0].tempo == core::Tempo(50, Duration(NoteValue::Half)));
+}
+
+TEST_CASE("Guitar Pro: a linear tempo point moves to the next one", "[io][guitarpro]") {
+    // ADR-0082: Guitar Pro repeats the tempo in force at the linear point;
+    // the next point's tempo is reached where it stands.
+    const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/></Beat>)";
+    const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
+    const std::string tempos =
+        "<Automation><Type>Tempo</Type><Linear>false</Linear><Bar>0</Bar><Position>0</Position>"
+        "<Value>72 2</Value></Automation><Automation><Type>Tempo</Type><Linear>true</Linear>"
+        "<Bar>0</Bar><Position>0.5</Position><Value>72 2</Value></Automation>"
+        "<Automation><Type>Tempo</Type><Linear>false</Linear><Bar>0</Bar>"
+        "<Position>0.75</Position><Value>80 2</Value></Automation>";
+    const auto imported = importGpif(guitarScore(0, "0", beat, whole, tempos));
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    CHECK(imported->song.startTempo() == core::Tempo(72));
+    const auto& changes = imported->song.measureHeader(0).tempoChanges;
+    REQUIRE(changes.size() == 2);
+    CHECK(changes[0] == core::TempoChange{.offset = core::Fraction(1, 2),
+                                          .tempo = core::Tempo(72),
+                                          .gradual = true});
+    CHECK(changes[1] ==
+          core::TempoChange{.offset = core::Fraction(3, 4), .tempo = core::Tempo(80)});
+
+    // A linear point at the very start is a gradual change there.
+    const std::string fromStart =
+        "<Automation><Type>Tempo</Type><Linear>true</Linear><Bar>0</Bar><Position>0</Position>"
+        "<Value>72 2</Value></Automation>";
+    const auto started = importGpif(guitarScore(0, "0", beat, whole, fromStart));
+    REQUIRE(started.has_value());
+    CHECK(started->song.startTempo() == core::Tempo(72));
+    REQUIRE(started->song.measureHeader(0).tempoChanges.size() == 1);
+    CHECK(started->song.measureHeader(0).tempoChanges[0].gradual);
 }
 
 TEST_CASE("Guitar Pro: other versions and damaged files are errors with a reason",

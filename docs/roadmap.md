@@ -26,6 +26,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Time and key signatures, tempo map
   - [x] A tempo change from any measure, with the CLI `tempo-from` step and the
         app's measure popup (ADR-0042)
+  - [ ] Gradual tempo changes, accelerando and ritardando (ADR-0082)
+    - [x] In the model and playback, read from Guitar Pro 6-8, kept by the
+          native format
+    - [ ] Drawn after the tempo mark
+    - [ ] Typed in the CLI and the measure popup
+    - [ ] Written in MusicXML and MIDI
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)
   - [x] Read from Guitar Pro 5 and GPIF, read and written in MusicXML

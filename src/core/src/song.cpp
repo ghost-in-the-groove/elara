@@ -351,24 +351,31 @@ std::vector<std::size_t> Song::playOrder() const {
 
 double Song::secondsAt(std::size_t measure, const Fraction& offset) const {
     checkPosition(measure, offset);
+    // From one tempo to the next the speed holds, or moves linearly along the
+    // score after a gradual change (ADR-0082): seconds add up change by change,
+    // up to `target` whole notes into the song.
+    const double target = (measureStart(measure) + offset).toDouble();
     double seconds = 0.0;
-    Tempo tempo = startTempo_;
-    for (std::size_t m = 0; m <= measure && m < headers_.size(); ++m) {
-        const MeasureHeader& header = headers_[m];
-        const Fraction end = m == measure ? offset : header.timeSignature.measureLength();
-        Fraction cursor;
+    double from = 0.0; // where the tempo in force started
+    double speed = startTempo_.wholesPerSecond();
+    bool gradual = false;
+    Fraction start;
+    for (const MeasureHeader& header : headers_) {
         for (const TempoChange& change : header.tempoChanges) {
-            if (m == measure && change.offset > end) {
-                break;
+            const double at = (start + change.offset).toDouble();
+            const double next = change.tempo.wholesPerSecond();
+            const double slope = gradual && at > from ? (next - speed) / (at - from) : 0.0;
+            seconds += rampSeconds(speed, slope, std::min(at, target) - from);
+            if (at >= target) {
+                return seconds;
             }
-            const Fraction at = change.offset < end ? change.offset : end;
-            seconds += tempo.secondsFor(at - cursor);
-            cursor = at;
-            tempo = change.tempo;
+            from = at;
+            speed = next;
+            gradual = change.gradual;
         }
-        seconds += tempo.secondsFor(end - cursor);
+        start += header.timeSignature.measureLength();
     }
-    return seconds;
+    return seconds + rampSeconds(speed, 0.0, target - from);
 }
 
 Tempo Song::tempoAt(std::size_t measure, const Fraction& offset) const {

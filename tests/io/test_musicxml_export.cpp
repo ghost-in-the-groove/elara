@@ -741,6 +741,8 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     Song song;
     song.setStartTempo(Tempo(100.0, Duration(NoteValue::Quarter, 0, Tuplet(3, 2))));
     song.appendMeasures(1);
+    song.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(90.0), .gradual = true}};
     const std::size_t g =
         song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
     Staff& staff = song.track(g).staff(0);
@@ -774,6 +776,7 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     const auto& warnings = exported.warnings;
     CHECK(hasWarning(warnings, "Electric Guitar: let ring dropped (measure 1)"));
     CHECK(hasWarning(warnings, "whammy bar dropped"));
+    CHECK(hasWarning(warnings, "gradual tempo changes written as sudden ones"));
     CHECK(hasWarning(warnings, "bass techniques (tap, slap, pop) dropped"));
     CHECK(hasWarning(warnings, "pinch, tapped and semi harmonics written as artificial harmonics"));
     CHECK(hasWarning(warnings, "shift slides written as legato slides"));

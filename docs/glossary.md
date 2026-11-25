@@ -91,6 +91,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
 | sección / marcador / ensayo | section (marker, rehearsal mark) | `MeasureHeader::section`, `changeSection()` | The named part of a song (intro, chorus...) that starts at a measure and runs to the next one that names a section (ADR-0062) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
+| cambio gradual de tempo | gradual tempo change | `TempoChange::gradual` | Accelerando or ritardando to the next change's tempo (ADR-0082) |
 | metrónomo | metronome | `SequenceOptions::metronome` | A click on every beat, a high wood block on the first; events on `Sequence::metronomeTrack()` (ADR-0024) |
 | pulso | pulse | `TimeSignature::pulseLength()` | The beat a player counts: three of the denominator's value in a compound meter (6/8: a dotted quarter) |
 | compás compuesto | compound meter | `TimeSignature::isCompound()` | 6/8, 9/8, 12/8, 6/4 |

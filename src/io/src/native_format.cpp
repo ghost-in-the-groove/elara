@@ -191,6 +191,7 @@ private:
                 if (!change.offset.isZero()) {
                     addText(item, "offset", change.offset.toString());
                 }
+                addFlag(item, "gradual", change.gradual);
                 yyjson_mut_arr_append(changes, item);
             }
             add(object, "tempoChanges", changes);
@@ -755,8 +756,8 @@ private:
                 if (at >= header.timeSignature.measureLength() || !ascending) {
                     fail("tempo changes must be in ascending order inside the measure");
                 }
-                header.tempoChanges.push_back(
-                    TempoChange{.offset = at, .tempo = readTempo(change)});
+                header.tempoChanges.push_back(TempoChange{
+                    .offset = at, .tempo = readTempo(change), .gradual = flag(change, "gradual")});
             });
         }
         header.repeatStart = flag(object, "repeatStart");

@@ -61,7 +61,7 @@ core::Song richSong() {
     song.measureHeader(1).keySignature = KeySignature(-3, KeyMode::Minor);
     song.measureHeader(1).tempoChanges = {
         TempoChange{.offset = Fraction(0), .tempo = Tempo(60, Duration(NoteValue::Quarter, 1))},
-        TempoChange{.offset = Fraction(3, 8), .tempo = Tempo(90)}};
+        TempoChange{.offset = Fraction(3, 8), .tempo = Tempo(90), .gradual = true}};
     song.measureHeader(2).keySignature = KeySignature(4, KeyMode::Major);
     // |: 1 |1.2. 2 :|3. 3 |, played three times
     song.measureHeader(1).repeatStart = true;

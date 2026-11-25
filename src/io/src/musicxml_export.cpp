@@ -1035,6 +1035,9 @@ private:
             }
         }
         for (const TempoChange& change : header.tempoChanges) {
+            if (change.gradual) {
+                warnings_.add({}, "gradual tempo changes written as sudden ones", m);
+            }
             tempoMarks_.push_back(
                 TempoMark{.offset = change.offset, .tempo = writable(change.tempo, m)});
         }

@@ -1286,12 +1286,13 @@ private:
             const int bar = intOf(automation.child("Bar"), 0);
             const double position =
                 std::clamp(automation.child("Position").text().as_double(0.0), 0.0, 1.0);
-            if (automation.child("Linear").text().as_bool(false)) {
-                warnings_.add({}, "gradual tempo changes written as sudden ones");
-            }
+            // A linear point moves to the next one's tempo (ADR-0082).
+            const bool gradual = automation.child("Linear").text().as_bool(false);
             if (bar == 0 && position == 0.0) {
                 song.setStartTempo(tempo);
-                continue;
+                if (!gradual) {
+                    continue; // a gradual start is a change at the start as well
+                }
             }
             if (bar < 0 || static_cast<std::size_t>(bar) >= song.measureCount()) {
                 continue;
@@ -1311,8 +1312,10 @@ private:
                 });
             if (at != changes.end() && at->offset == offset) {
                 at->tempo = tempo;
+                at->gradual = gradual;
             } else {
-                changes.insert(at, core::TempoChange{.offset = offset, .tempo = tempo});
+                changes.insert(
+                    at, core::TempoChange{.offset = offset, .tempo = tempo, .gradual = gradual});
             }
         }
     }

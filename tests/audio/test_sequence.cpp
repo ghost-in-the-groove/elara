@@ -309,6 +309,32 @@ TEST_CASE("Sequence: every measure keeps the tempo written there", "[audio][sequ
     }
 }
 
+TEST_CASE("Sequence: a gradual tempo change speeds the notes up on the way", "[audio][sequence]") {
+    // ADR-0082: quarter = 60 to 120 over the second measure; its quarter
+    // notes start at 4 ln(1 + x/4) seconds into it, x the quarters before.
+    Song song = pianoSong(3);
+    song.setStartTempo(Tempo(60.0));
+    song.measureHeader(1).tempoChanges.push_back(
+        TempoChange{.tempo = Tempo(60.0), .gradual = true});
+    song.measureHeader(2).tempoChanges.push_back(TempoChange{.tempo = Tempo(120.0)});
+    voice(song, 1) = {beat(NoteValue::Quarter, {note(60)}), beat(NoteValue::Quarter, {note(62)}),
+                      beat(NoteValue::Quarter, {note(64)}), beat(NoteValue::Quarter, {note(65)})};
+    const Sequence sequence(song);
+    const auto& notes = sequence.notes();
+    REQUIRE(notes.size() == 4);
+    for (std::size_t i = 0; i < 4; ++i) {
+        const double x = static_cast<double>(i);
+        CHECK_THAT(notes[i].start, WithinAbs(4.0 + 4.0 * std::log(1.0 + x / 4.0), kEpsilon));
+    }
+    CHECK_THAT(notes[3].end, WithinAbs(4.0 + 4.0 * std::log(2.0), kEpsilon));
+    REQUIRE(sequence.measures().size() == 3);
+    CHECK_THAT(sequence.measures()[2].start, WithinAbs(4.0 + 4.0 * std::log(2.0), kEpsilon));
+    CHECK_THAT(sequence.duration(), WithinAbs(6.0 + 4.0 * std::log(2.0), kEpsilon));
+    // Played at half speed, every time doubles.
+    const Sequence slow(song, {.speed = 0.5});
+    CHECK_THAT(slow.duration(), WithinAbs(2.0 * sequence.duration(), kEpsilon));
+}
+
 TEST_CASE("Sequence: tied notes sound for their whole written length", "[audio][sequence]") {
     Song song = pianoSong(2);
     song.measureHeader(1).tempoChanges.push_back(TempoChange{.tempo = Tempo(60.0)});

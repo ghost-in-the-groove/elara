@@ -49,25 +49,68 @@ constexpr int kAccentClick = 100;     // velocity of the first click of a measur
 constexpr int kClickVelocity = 80;
 
 // The tempo of every written measure, times `speed`, as segments: from an
-// offset (in whole notes, as a double) on, seconds pass at a rate per whole
-// note. Exact offsets are converted once, so equal positions give equal
-// seconds.
+// offset (in whole notes, as a double) on, the speed in whole notes a second
+// holds, or moves by a slope per whole note after a gradual change (ADR-0082).
+// Exact offsets are converted once, so equal positions give equal seconds.
 class TempoMap {
 public:
     TempoMap(const core::Song& song, double speed) : speed_(speed) {
+        // Every change along the song, with its slope: towards the next
+        // change's speed when it is gradual.
+        struct Change {
+            std::size_t measure = 0;
+            double offset = 0.0; // in the measure
+            double at = 0.0;     // in the song
+            double speed = 0.0;
+            bool gradual = false;
+            double slope = 0.0;
+        };
+        std::vector<Change> changes;
+        std::vector<double> starts; // of the measures, in the song
+        starts.reserve(song.measureCount());
+        Fraction start;
+        for (std::size_t m = 0; m < song.measureCount(); ++m) {
+            starts.push_back(start.toDouble());
+            for (const core::TempoChange& change : song.measureHeader(m).tempoChanges) {
+                changes.push_back({.measure = m,
+                                   .offset = change.offset.toDouble(),
+                                   .at = (start + change.offset).toDouble(),
+                                   .speed = speedOf(change.tempo),
+                                   .gradual = change.gradual});
+            }
+            start += song.measureHeader(m).timeSignature.measureLength();
+        }
+        for (std::size_t c = 0; c < changes.size(); ++c) {
+            Change& change = changes[c];
+            if (change.gradual && c + 1 < changes.size() && changes[c + 1].at > change.at) {
+                change.slope =
+                    (changes[c + 1].speed - change.speed) / (changes[c + 1].at - change.at);
+            }
+        }
+
         first_.reserve(song.measureCount() + 1);
-        core::Tempo tempo = song.startTempo();
+        double current = speedOf(song.startTempo()); // at `from`
+        double slope = 0.0;
+        double from = 0.0;
+        std::size_t c = 0;
         for (std::size_t m = 0; m < song.measureCount(); ++m) {
             first_.push_back(segments_.size());
-            segments_.push_back({.offset = 0.0, .seconds = 0.0, .perWhole = perWhole(tempo)});
-            for (const core::TempoChange& change : song.measureHeader(m).tempoChanges) {
-                const double offset = change.offset.toDouble();
+            segments_.push_back({.offset = 0.0,
+                                 .seconds = 0.0,
+                                 .speed = current + slope * (starts[m] - from),
+                                 .slope = slope});
+            for (; c < changes.size() && changes[c].measure == m; ++c) {
                 const Segment& before = segments_.back();
-                tempo = change.tempo;
                 segments_.push_back(
-                    {.offset = offset,
-                     .seconds = before.seconds + (offset - before.offset) * before.perWhole,
-                     .perWhole = perWhole(tempo)});
+                    {.offset = changes[c].offset,
+                     .seconds =
+                         before.seconds + core::rampSeconds(before.speed, before.slope,
+                                                            changes[c].offset - before.offset),
+                     .speed = changes[c].speed,
+                     .slope = changes[c].slope});
+                current = changes[c].speed;
+                slope = changes[c].slope;
+                from = changes[c].at;
             }
         }
         first_.push_back(segments_.size());
@@ -82,13 +125,15 @@ public:
             ++s;
         }
         const Segment& segment = segments_[s];
-        return segment.seconds + (offset - segment.offset) * segment.perWhole;
+        return segment.seconds +
+               core::rampSeconds(segment.speed, segment.slope, offset - segment.offset);
     }
 
     struct Segment {
         double offset = 0.0;
         double seconds = 0.0; // from the start of the measure
-        double perWhole = 0.0;
+        double speed = 0.0;   // whole notes a second at `offset`
+        double slope = 0.0;   // change of speed per whole note
     };
 
     // The tempo segments of measure m, in order.
@@ -97,8 +142,8 @@ public:
     }
 
 private:
-    [[nodiscard]] double perWhole(const core::Tempo& tempo) const {
-        return tempo.secondsFor(Fraction(1)) / speed_;
+    [[nodiscard]] double speedOf(const core::Tempo& tempo) const {
+        return tempo.wholesPerSecond() * speed_;
     }
 
     double speed_ = 1.0;
@@ -558,7 +603,7 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                                                      beats.denominator())});
         for (const TempoMap::Segment& segment : tempo.segments(measure.measure)) {
             tempi_.push_back(
-                {.time = measure.start + segment.seconds, .perWhole = segment.perWhole});
+                {.time = measure.start + segment.seconds, .perWhole = 1.0 / segment.speed});
         }
     }
 

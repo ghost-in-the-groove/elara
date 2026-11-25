@@ -176,6 +176,9 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
         }
         for (const core::TempoChange& change : header.tempoChanges) {
             tempoEvent(timing.ticks(start + change.offset), change.tempo, m);
+            if (change.gradual) {
+                warnings.add("", "gradual tempo changes written as sudden ones", m);
+            }
         }
         start += header.timeSignature.measureLength();
     }

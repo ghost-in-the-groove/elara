@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
@@ -85,6 +86,43 @@ TEST_CASE("Seconds follow the tempo map", "[core][timeline]") {
     CHECK(song.tempoAt(3) == Tempo(240));
     CHECK(song.tempoAt(0) == Tempo(120));
     CHECK_THROWS_AS(song.secondsAt(5), std::out_of_range);
+}
+
+TEST_CASE("A gradual tempo change moves to the next tempo along the score", "[core][timeline]") {
+    // ADR-0082: quarter = 60 (a quarter of a whole note a second) to 120 over
+    // the second measure. The speed grows by 1/4 per whole note, so a whole
+    // note takes 4 ln 2 seconds instead of 4 or 2, and its first half 4 ln 1.5.
+    Song song;
+    song.appendMeasures(4);
+    song.setStartTempo(Tempo(60));
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(0), .tempo = Tempo(60), .gradual = true}};
+    song.measureHeader(2).tempoChanges = {TempoChange{.offset = Fraction(0), .tempo = Tempo(120)}};
+    CHECK_THAT(song.secondsAt(1), WithinAbs(4.0, 1e-12));
+    CHECK_THAT(song.secondsAt(1, Fraction(1, 2)), WithinAbs(4.0 + 4.0 * std::log(1.5), 1e-12));
+    CHECK_THAT(song.secondsAt(2), WithinAbs(4.0 + 4.0 * std::log(2.0), 1e-12));
+    CHECK_THAT(song.secondsAt(3), WithinAbs(6.0 + 4.0 * std::log(2.0), 1e-12));
+    // The written tempo is the change's, not the one heard on the way.
+    CHECK(song.tempoAt(1, Fraction(1, 2)) == Tempo(60));
+
+    // Slowing down across a bar line, from the middle of one measure to the
+    // middle of the next, in dotted quarters: 120 to 60 quarter-equivalents.
+    Song slower;
+    slower.appendMeasures(2);
+    slower.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(120), .gradual = true}};
+    slower.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(40, Duration(NoteValue::Quarter, 1))}};
+    // The speed falls from 1/2 to 1/4 whole note a second over one whole note.
+    CHECK_THAT(slower.secondsAt(1, Fraction(1, 2)), WithinAbs(1.0 + 4.0 * std::log(2.0), 1e-12));
+    CHECK_THAT(slower.durationSeconds(), WithinAbs(3.0 + 4.0 * std::log(2.0), 1e-12));
+
+    // The last gradual change has nowhere to go: it holds.
+    Song held;
+    held.appendMeasures(2);
+    held.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(0), .tempo = Tempo(60), .gradual = true}};
+    CHECK_THAT(held.durationSeconds(), WithinAbs(6.0, 1e-12));
 }
 
 TEST_CASE("Tempo can count dotted beats", "[core][timeline]") {
