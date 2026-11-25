@@ -395,7 +395,9 @@ std::vector<Timed<Syllable>> syllablesOf(const std::vector<Timed<std::string>>& 
     for (std::size_t i = 0; i + 1 < out.size(); ++i) {
         if (!out[i].value.hyphen) {
             ++bare;
-            spaces += spaced[i] ? 1 : 0;
+            if (spaced[i]) {
+                ++spaces;
+            }
         }
     }
     if (spaces > 0 && spaces * 3 >= bare) {
