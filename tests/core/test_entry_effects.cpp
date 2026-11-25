@@ -417,6 +417,14 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     run(doc, setTrill(doc.song(), caret, Trill{}));
     CHECK(!noteEffectsAt(doc.song(), caret).trill.isTrill());
 
+    // Mordents and turns (ADR-0091).
+    run(doc, setOrnament(doc.song(), caret, Ornament::InvertedTurn));
+    CHECK(doc.undoName() == "Change ornament");
+    CHECK(noteEffectsAt(doc.song(), caret).ornament == Ornament::InvertedTurn);
+    CHECK(setOrnament(doc.song(), caret, Ornament::InvertedTurn).command == nullptr);
+    run(doc, setOrnament(doc.song(), caret, Ornament::None));
+    CHECK(noteEffectsAt(doc.song(), caret).ornament == Ornament::None);
+
     // Harmonics: natural at the note's fret, the others an octave above the
     // fretted note; none removes it.
     run(doc, setHarmonic(doc.song(), caret, HarmonicKind::Natural));
