@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Audio subcommands: sequence, render-audio, play, soundfont, render-tone, devices, tone,
 // tune, listen.
+#include <elara/audio/flac_reader.hpp>
 #include <elara/audio/microphone_input.hpp>
 #include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/pitch_detector.hpp>
@@ -574,7 +575,7 @@ int runTune(bool json, const TuneOptions& options) {
     if (!tunerTuning(options.tuning, tuning)) {
         return usageError(std::format("unknown tuning: {}", options.tuning));
     }
-    const auto wav = audio::readWav(options.file);
+    const auto wav = audio::readAudioFile(options.file);
     if (!wav) {
         return fail(std::format("{}: {}", options.file, wav.error()));
     }
@@ -817,9 +818,11 @@ void addAudioCommands(CLI::App& app, Context& context) {
 
     auto tuned = std::make_shared<TuneOptions>();
     auto* tune = app.add_subcommand(
-        "tune", "Detect the pitch of a WAV recording, as a tuner would: the nearest note, how many "
-                "cents off, and with --tuning the nearest open string");
-    tune->add_option("file", tuned->file, "A WAV file (PCM or float, any channels)")->required();
+        "tune",
+        "Detect the pitch of a WAV or FLAC recording, as a tuner would: the nearest note, how many "
+        "cents off, and with --tuning the nearest open string");
+    tune->add_option("file", tuned->file, "A WAV (PCM or float) or FLAC file, any channels")
+        ->required();
     tune->add_option("--a4", tuned->a4Hz, "Reference frequency of A4 in Hz")
         ->check(CLI::Range(400.0, 480.0))
         ->capture_default_str();

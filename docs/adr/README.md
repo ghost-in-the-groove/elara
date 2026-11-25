@@ -71,6 +71,7 @@ one that replaces them.
 | [0063](0063-section-marks.md) | Section marks in the score | Accepted |
 | [0064](0064-app-icon.md) | The app icon | Accepted |
 | [0065](0065-installers.md) | Installers | Accepted |
+| [0067](0067-flac-decoder.md) | A FLAC decoder of Elara's own | Accepted |
 
 ## Template
 

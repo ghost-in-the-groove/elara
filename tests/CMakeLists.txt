@@ -48,7 +48,20 @@ elara_add_unit_tests(audio
           audio/test_synth.cpp audio/test_tone_generator.cpp
           audio/test_wav_reader.cpp audio/test_wav_writer.cpp audio/test_pitch_detector.cpp
           audio/test_tuner.cpp audio/test_sound_bank.cpp audio/test_sound_font.cpp
+          audio/test_flac_reader.cpp
   LIBRARIES elara::audio elara::audio_fluid)
+
+# The FLAC decoder against libFLAC, which encodes the test files through
+# libsndfile (ADR-0067); it leaves a440.flac for the CLI tests.
+find_package(SndFile CONFIG REQUIRED)
+add_executable(elara_check_flac audio/check_flac.cpp)
+target_link_libraries(elara_check_flac PRIVATE elara::audio SndFile::sndfile)
+elara_target_warnings(elara_check_flac)
+add_test(NAME audio.flac_against_libflac
+  COMMAND elara_check_flac "${CMAKE_CURRENT_BINARY_DIR}/flac")
+set_tests_properties(audio.flac_against_libflac PROPERTIES
+  FIXTURES_SETUP flac_files
+  PASS_REGULAR_EXPRESSION "flac check: ok")
 
 find_package(miniz CONFIG REQUIRED) # the .mxl tests build archives
 # Writes the test SoundFont for the elara-cli tests that play one (ADR-0043).

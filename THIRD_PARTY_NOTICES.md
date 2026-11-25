@@ -19,7 +19,7 @@ and be listed here before it is merged.
 | [FluidSynth](https://www.fluidsynth.org) | 2.6.2 | LGPL-2.1-or-later | SoundFont playback (`elara_audio_fluid`, ADR-0043) | vcpkg, through the overlay port in `cmake/vcpkg-ports/fluidsynth` (based on vcpkg's port, MIT) that leaves out its audio drivers |
 | [libsndfile](https://github.com/libsndfile/libsndfile) | 1.2.2 | LGPL-2.1-or-later | Reading SF3 SoundFonts (through FluidSynth) | vcpkg, without its MPEG codecs |
 | [libogg](https://xiph.org/ogg/), [libvorbis](https://xiph.org/vorbis/) | 1.3.6, 1.3.7 | BSD-3-Clause | The compressed samples of SF3 SoundFonts (through libsndfile) | vcpkg |
-| [libFLAC](https://xiph.org/flac/), [Opus](https://opus-codec.org) | 1.5.0, 1.6.1 | BSD-3-Clause | Linked by libsndfile; not used by Elara | vcpkg |
+| [libFLAC](https://xiph.org/flac/), [Opus](https://opus-codec.org) | 1.5.0, 1.6.1 | BSD-3-Clause | Linked by libsndfile; libFLAC also encodes the FLAC test files (ADR-0067) | vcpkg |
 | [gcem](https://github.com/kthohr/gcem) | 1.18.0 | Apache-2.0 | Compile-time maths inside FluidSynth | vcpkg |
 
 FluidSynth and libsndfile are LGPL: Windows builds load them as DLLs, other

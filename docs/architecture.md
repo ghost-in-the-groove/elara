@@ -30,7 +30,7 @@ links (a module can only use what it links) and `scripts/verify_architecture.py`
 | `src/core` | `elara_core` | Musical model, commands with undo/redo | 1 |
 | `src/io` | `elara_io` | Native `.elara` format (ADR-0006), MusicXML import and export (ADR-0007, ADR-0008), MIDI import and export (ADR-0009), Guitar Pro 3-8 import (ADR-0010) | 1, 2 |
 | `src/notation` | `elara_notation` | SMuFL font metrics (ADR-0011); layout of standard notation and tablature into a display list, staves aligned in systems, line breaking and pages, or strips of one endless page for a continuous view, SVG output (ADR-0012, ADR-0013, ADR-0014, ADR-0057); where the keyboard entry caret shows and the caret a click picks (ADR-0032) | 3 |
-| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV reading and writing; the tuner's pitch detection (ADR-0028); sound banks (ADR-0043) | 0, 4, 6 |
+| `src/audio` | `elara_audio` | Sequencer: songs as played, in seconds (ADR-0017); the built-in synthesizer, offline rendering (ADR-0018) and real-time playback (ADR-0019); WAV and FLAC reading (ADR-0067), WAV writing; the tuner's pitch detection (ADR-0028); sound banks (ADR-0043) | 0, 4, 6 |
 | `src/audio/backend_juce` | `elara_audio_juce` | System audio devices via JUCE: output, and the input the tuner listens to (ADR-0029) | 0, 4, 6 |
 | `src/audio/backend_fluid` | `elara_audio_fluid` | SoundFonts (SF2, SF3) as sound banks, through FluidSynth (ADR-0043) | 4 |
 | `src/cli` | `elara-cli` | Headless access to every feature, JSON output | 0+ |

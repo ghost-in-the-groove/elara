@@ -40,8 +40,9 @@ Three targets with different rules:
   loops a passage (`setLoop()`, ADR-0024). It is an `AudioSource`, the
   interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
-  block by block with `WavFileWriter`), and `readWav()`/`decodeWav()` for
-  PCM and float WAV files;
+  block by block with `WavFileWriter`), `readWav()`/`decodeWav()` for
+  PCM and float WAV files, `readFlac()`/`decodeFlac()` for FLAC files, decoded
+  by Elara from RFC 9639 (ADR-0067), and `readAudioFile()` for either;
 - the tuner's `PitchDetector` (YIN, ADR-0028) and `tunerReading()`, which names
   the nearest note, its cents and the nearest open string; `Tuner`, which
   turns a stream of samples into steady readings, and `SampleRing`, the
