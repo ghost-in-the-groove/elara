@@ -1060,6 +1060,264 @@ void AboveRow::diagram(DisplayList& list, const core::ChordDiagram& shape, doubl
     }
 }
 
+// ---- Lyrics (ADR-0084) -----------------------------------------------------------------
+
+namespace {
+
+constexpr double kLyricSize = 1.5;           // font size of a syllable
+constexpr double kLyricInkGap = 0.8;         // between the ink above and the first verse
+constexpr double kLyricLineGap = 0.3;        // between the lines of two verses
+constexpr double kHyphenLength = 0.5;        // a hyphen between two syllables
+constexpr double kHyphenMinLength = 0.2;     // when there is little room
+constexpr double kHyphenMinGap = 0.15;       // at least between a hyphen and a syllable
+constexpr double kHyphenRoom = 1.0;          // kept after a syllable joined to the next
+constexpr double kHyphenSpacing = 6.0;       // a hyphen for every this much room
+constexpr double kHyphenRise = 0.27;         // of the font size, above the baseline
+constexpr double kLyricLineThickness = 0.12; // hyphens and extender lines
+constexpr double kExtenderGap = 0.2;         // between a held syllable and its line
+constexpr double kMinExtender = 0.4;         // shorter lines are left out
+constexpr std::size_t kHeldMeasures = 16;    // the most measures a syllable is held over
+
+// Whether `beat` sings a syllable in `verse`.
+bool sings(const core::Beat& beat, std::size_t verse) {
+    return beat.lyrics && verse < beat.lyrics->size() && !(*beat.lyrics)[verse].text.empty();
+}
+
+} // namespace
+
+LyricsRow::LyricsRow(const core::Staff& staff) : staff_(staff) {
+    for (std::size_t m = 0; m < staff.measureCount() && !any_; ++m) {
+        for (const core::Voice& voice : staff.measure(m).voices) {
+            for (const core::Beat& beat : voice.beats) {
+                if (beat.lyrics) {
+                    any_ = true;
+                }
+            }
+        }
+    }
+}
+
+void LyricsRow::start(std::size_t m) {
+    syllables_.clear();
+    held_.clear();
+    drawn_.clear();
+    if (!any_) {
+        return;
+    }
+    for (std::size_t before = m > kHeldMeasures ? m - kHeldMeasures : 0; before < m; ++before) {
+        const core::Measure& measure = staff_.measure(before);
+        for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
+            const std::vector<core::Beat>& beats = measure.voices[v].beats;
+            for (std::size_t b = 0; b < beats.size(); ++b) {
+                if (!beats[b].lyrics) {
+                    continue;
+                }
+                const std::vector<core::Syllable>& verses = *beats[b].lyrics;
+                for (std::size_t verse = 0; verse < verses.size(); ++verse) {
+                    if (!verses[verse].extend || verses[verse].hyphen ||
+                        verses[verse].text.empty()) {
+                        continue;
+                    }
+                    if (const auto to = heldTo(before, v, b, verse); to && to->measure >= m) {
+                        held_.push_back(Held{.verse = verse, .to = *to, .measure = m});
+                    }
+                }
+            }
+        }
+    }
+}
+
+std::optional<LyricsRow::Spot> LyricsRow::heldTo(std::size_t m, std::size_t voice, std::size_t beat,
+                                                 std::size_t verse) const {
+    std::optional<Spot> last;
+    const std::size_t limit = std::min(staff_.measureCount(), m + kHeldMeasures + 1);
+    std::size_t next = beat + 1;
+    for (std::size_t at = m; at < limit; ++at, next = 0) {
+        const std::vector<core::Beat>& beats = staff_.measure(at).voices[voice].beats;
+        if (beats.empty()) {
+            return last; // a measure rest
+        }
+        core::Fraction start;
+        for (std::size_t b = 0; b < next && b < beats.size(); ++b) {
+            start += beats[b].duration.length();
+        }
+        for (std::size_t b = next; b < beats.size(); ++b) {
+            if (beats[b].isRest() || sings(beats[b], verse)) {
+                return last;
+            }
+            last = Spot{.measure = at, .start = start};
+            start += beats[b].duration.length();
+        }
+    }
+    return last;
+}
+
+void LyricsRow::collect(std::size_t m, std::vector<ColumnInk>& ink, double centre) {
+    read_.clear();
+    readMeasure_ = m;
+    if (!any_) {
+        return;
+    }
+    const core::Measure& measure = staff_.measure(m);
+    for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
+        const std::vector<core::Beat>& beats = measure.voices[v].beats;
+        core::Fraction at;
+        for (std::size_t b = 0; b < beats.size(); ++b) {
+            const core::Beat& beat = beats[b];
+            if (beat.lyrics) {
+                const std::vector<core::Syllable>& verses = *beat.lyrics;
+                for (std::size_t verse = 0; verse < verses.size(); ++verse) {
+                    const bool taken = std::ranges::any_of(read_, [&](const Read& item) {
+                        return item.start == at && item.verse == verse;
+                    });
+                    if (!verses[verse].text.empty() && !taken) {
+                        read_.push_back(Read{.start = at,
+                                             .length = beat.duration.length(),
+                                             .verse = verse,
+                                             .voice = v,
+                                             .beat = b,
+                                             .syllable = &verses[verse]});
+                    }
+                }
+            }
+            at += beat.duration.length();
+        }
+    }
+    if (read_.empty()) {
+        return;
+    }
+    std::ranges::sort(read_, [](const Read& a, const Read& b) {
+        return a.start != b.start ? a.start < b.start : a.verse < b.verse;
+    });
+    for (const Read& item : read_) {
+        auto column = std::ranges::lower_bound(ink, item.start, {}, &ColumnInk::start);
+        if (column == ink.end() || column->start != item.start) {
+            column = ink.insert(column, ColumnInk{.start = item.start,
+                                                  .longest = item.length,
+                                                  .left = centre,
+                                                  .right = centre});
+        }
+        const core::Syllable& syllable = *item.syllable;
+        const double width = textWidth(syllable.text, kLyricSize);
+        const double left = syllable.extend ? 0.0 : centre - width / 2;
+        const double right = left + width + (syllable.hyphen ? kHyphenRoom : 0.0);
+        column->belowLeft = column->below ? std::min(column->belowLeft, left) : left;
+        column->belowRight = column->below ? std::max(column->belowRight, right) : right;
+        column->below = true;
+    }
+}
+
+void LyricsRow::draw(std::span<const ColumnPosition> positions, double centre) {
+    if (!any_) {
+        return;
+    }
+    headWidth_ = centre * 2;
+    drawn_.push_back(
+        Drawn{.measure = readMeasure_, .positions = {positions.begin(), positions.end()}});
+    for (const Read& item : read_) {
+        const core::Syllable& syllable = *item.syllable;
+        const double x = columnX(positions, item.start);
+        const double width = textWidth(syllable.text, kLyricSize);
+        syllables_.push_back(
+            Sung{.syllable = &syllable,
+                 .verse = item.verse,
+                 .left = syllable.extend ? x : x + centre - width / 2,
+                 .width = width,
+                 .measure = readMeasure_,
+                 .heldTo = syllable.extend && !syllable.hyphen
+                               ? heldTo(readMeasure_, item.voice, item.beat, item.verse)
+                               : std::nullopt});
+    }
+}
+
+double LyricsRow::noteEnd(const Spot& spot, double end) const {
+    for (const Drawn& measure : drawn_) {
+        if (measure.measure == spot.measure) {
+            return columnX(measure.positions, spot.start) + headWidth_;
+        }
+    }
+    return end; // the notes go on into the next line
+}
+
+void LyricsRow::place(DisplayList& list, double bottom, double staffHeight, double end) {
+    if (drawn_.empty()) {
+        syllables_.clear();
+        held_.clear();
+        return;
+    }
+    const double first = std::max(bottom, staffHeight) + kLyricInkGap + kTextAscent * kLyricSize;
+    const double step = (kTextAscent + kTextDescent) * kLyricSize + kLyricLineGap;
+    const auto baseline = [&](std::size_t verse) {
+        return first + static_cast<double>(verse) * step;
+    };
+    const auto line = [&](double from, double to, double y, std::size_t measure) {
+        list.lines.push_back(LineItem{.from = {from, y},
+                                      .to = {to, y},
+                                      .thickness = kLyricLineThickness,
+                                      .role = Role::Lyric,
+                                      .measure = measure,
+                                      .dash = 0.0});
+    };
+    // Hyphens evenly over the room from `from` to `to`, one per kHyphenSpacing.
+    const auto hyphens = [&](double from, double to, double y, std::size_t measure) {
+        const double room = to - from;
+        const double count = std::max(1.0, std::floor(room / kHyphenSpacing));
+        const double length =
+            std::min(kHyphenLength, std::max(room - 2 * kHyphenMinGap, kHyphenMinLength));
+        for (double k = 0.0; k < count; k += 1.0) {
+            const double middle = from + (k + 0.5) * room / count;
+            line(middle - length / 2, middle + length / 2, y, measure);
+        }
+    };
+
+    std::ranges::stable_sort(syllables_, [](const Sung& a, const Sung& b) {
+        return a.verse != b.verse ? a.verse < b.verse : a.left < b.left;
+    });
+    for (std::size_t i = 0; i < syllables_.size(); ++i) {
+        const Sung& sung = syllables_[i];
+        const core::Syllable& syllable = *sung.syllable;
+        const double y = baseline(sung.verse);
+        const double right = sung.left + sung.width;
+        list.texts.push_back(
+            TextItem{.text = syllable.text,
+                     .origin = {syllable.extend ? sung.left : sung.left + sung.width / 2, y},
+                     .size = kLyricSize,
+                     .align = syllable.extend ? TextAlign::Left : TextAlign::Centre,
+                     .italic = false,
+                     .knockout = false,
+                     .role = Role::Lyric,
+                     .measure = sung.measure});
+        if (syllable.hyphen) {
+            const double rise = y - kHyphenRise * kLyricSize;
+            const bool joined = i + 1 < syllables_.size() && syllables_[i + 1].verse == sung.verse;
+            // The word goes on in the next line: a hyphen after the syllable.
+            hyphens(right, joined ? syllables_[i + 1].left : std::min(end, right + kHyphenRoom),
+                    rise, sung.measure);
+        } else if (sung.heldTo) {
+            const double from = right + kExtenderGap;
+            const double to = noteEnd(*sung.heldTo, end);
+            if (to - from >= kMinExtender) {
+                line(from, to, y, sung.measure);
+            }
+        }
+    }
+    // Held over from the line before: from the first note of the line.
+    for (const Held& held : held_) {
+        const std::vector<ColumnPosition>& positions = drawn_.front().positions;
+        if (positions.empty()) {
+            continue;
+        }
+        const double from = positions.front().x;
+        const double to = noteEnd(held.to, end);
+        if (to - from >= kMinExtender) {
+            line(from, to, baseline(held.verse), held.measure);
+        }
+    }
+    syllables_.clear();
+    held_.clear();
+    drawn_.clear();
+}
+
 // ---- StaffWriter ------------------------------------------------------------------------
 
 StaffWriter::StaffWriter(const EngravingFont& font, double height, std::size_t lines)

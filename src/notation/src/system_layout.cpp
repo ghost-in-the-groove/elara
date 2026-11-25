@@ -109,6 +109,13 @@ void merge(const std::vector<std::vector<ColumnInk>>& staves, std::vector<Column
                 into.above ? std::max(into.aboveRight, column.aboveRight) : column.aboveRight;
             into.above = true;
         }
+        if (column.below) {
+            into.belowLeft =
+                into.below ? std::min(into.belowLeft, column.belowLeft) : column.belowLeft;
+            into.belowRight =
+                into.below ? std::max(into.belowRight, column.belowRight) : column.belowRight;
+            into.below = true;
+        }
     }
 }
 
@@ -149,6 +156,28 @@ void spaceChords(const std::vector<ColumnInk>& columns, MeasureWidth& width) {
     }
 }
 
+// Syllables keep apart from each other and from the barlines, not from the
+// notes over them (ADR-0084).
+void spaceLyrics(const std::vector<ColumnInk>& columns, MeasureWidth& width) {
+    std::optional<std::size_t> previous;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        if (!columns[i].below) {
+            continue;
+        }
+        if (previous) {
+            stretchTo(width.springs, *previous, i,
+                      columns[*previous].belowRight + kLyricGap - columns[i].belowLeft);
+        } else {
+            width.lead = std::max(width.lead, -columns[i].belowLeft - kLyricBarlineReach);
+        }
+        previous = i;
+    }
+    if (previous) {
+        stretchTo(width.springs, *previous, width.springs.size(),
+                  columns[*previous].belowRight + kLyricEndGap);
+    }
+}
+
 // The springs of a measure `length` long with these columns: each column gets
 // its ideal space unless the ink of its neighbour needs more.
 void springsOf(const std::vector<ColumnInk>& columns, const Fraction& length, double emptyWidth,
@@ -172,6 +201,7 @@ void springsOf(const std::vector<ColumnInk>& columns, const Fraction& length, do
     width.springs.push_back(Spring{.ideal = idealSpace(std::max(last.longest, length - last.start)),
                                    .ink = last.right + kEndGap});
     spaceChords(columns, width);
+    spaceLyrics(columns, width);
 }
 
 // Positions of the columns of a measure starting at `start` at `stretch`;

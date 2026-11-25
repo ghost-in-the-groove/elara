@@ -82,6 +82,25 @@ of each verse in its voice (`middle` or `end` after a syllable joined to the
 next, `begin` or `single` otherwise), an extender a plain `<extend/>`, which
 readers stretch to the next syllable.
 
+**Drawing.** Lyrics go right under the staff's notes, where the eye looks
+for them, and dynamics and hairpins go under the lyrics. Engraving manuals put
+the dynamics of a vocal staff above it instead; Elara keeps them in one place
+on every staff, and a vocal line in a songbook seldom has many. Each verse has
+its own line, in order, also where only a later verse sings, so a verse is
+read along one line. On a staff shown both ways the syllables go under the
+standard notation; tablature shown alone has them under its rhythm. A syllable
+is centred under its note, in regular type; a held one starts at the notehead,
+as engravers align melismas. A hyphen goes between the syllables of a word, one
+for every six staff spaces of room, and after the last syllable of a line when
+its word goes on in the next (none at the start of that line). A held syllable
+has a line at its baseline under the notes it is held over, to the end of the
+last one: the notes up to the next syllable of its verse, a rest or sixteen
+measures; it runs to the end of the line when they go on, and from the first
+note of the next line. A held syllable joined to the next by a hyphen draws the
+hyphens across instead. Like chord symbols, syllables keep apart from each
+other and from the barlines, with room for their hyphens: the notes under them
+spread when they need to (ADR-0080).
+
 **The native format** writes a beat's verses as strings, a hyphen after a
 syllable joined to the next, an underscore after one held and `""` for a verse
 that sings nothing there: `"lyrics":["be-","","low_"]`. A syllable's text
@@ -92,9 +111,10 @@ of MusicXML, fold them into the joining hyphen and the extender.
 
 - Lyrics come through Guitar Pro 4-8 files, MusicXML both ways and the
   native format, and show in `elara-cli import --json` and `dump`.
-- Drawing under the staff and typing verses at the caret are follow-up work;
-  until MIDI lyric events are read and written, MIDI keeps warning that
-  lyrics are dropped.
+- Lyrics draw in every layout (lines, pages, strips, SVG, PDF and the app);
+  a `lyric` role marks their texts and lines in the display list.
+- Typing verses at the caret is follow-up work; until MIDI lyric events are
+  read and written, MIDI keeps warning that lyrics are dropped.
 - Guitar Pro has no extenders: its lyrics come without them, and a held
   syllable written to MusicXML and read back keeps its line.
 - Tests: the `core.Lyrics text: ...` cases (syllables, blanks, line breaks,
@@ -108,5 +128,8 @@ of MusicXML, fold them into the joining hyphen and the extender.
   staves, voices and drums` (the clarinet's dispatched syllables), `io.MusicXML:
   lyrics give each beat a syllable per verse`, `io.MusicXML: lyrics without a
   number, on chords, hidden or on grace notes`, `io.MusicXML export: lyrics
-  come back with their verses, hyphens and extenders` and the native round trip
-  with `io.song.json uses text forms and omits defaults`.
+  come back with their verses, hyphens and extenders`, the native round trip
+  with `io.song.json uses text forms and omits defaults`, the
+  `notation.Lyrics: ...` layout cases (placement, held syllables, spacing,
+  dynamics, lines that break a word or a melisma, tablature) and the render
+  snapshots of the corpus band, quartet and piano.

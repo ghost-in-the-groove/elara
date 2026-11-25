@@ -16,6 +16,7 @@ constexpr std::array<std::string_view, kRoleCount> kRoleNames{
     "slide",     "vibrato",    "articulation", "measureNumber", "credit",       "trackName",
     "repeat",    "volta",      "tuplet",       "tempo",         "dynamic",      "navigation",
     "section",   "brace",      "arpeggio",     "hairpin",       "chord",        "beatText",
+    "lyric",
 };
 
 // Advance widths in em of a Helvetica-like font for printable ASCII; other
@@ -65,7 +66,10 @@ std::string_view roleName(Role role) noexcept {
 double textWidth(std::string_view text, double size) noexcept {
     double width = 0.0;
     for (const char c : text) {
-        width += advance(c);
+        // A letter written with several UTF-8 bytes ("é", "ñ") counts once.
+        if ((static_cast<unsigned char>(c) & 0xC0U) != 0x80U) {
+            width += advance(c);
+        }
     }
     return width * size;
 }

@@ -124,7 +124,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] In the model, read from Guitar Pro 4-8 and kept by the native format;
         verses typed as text placed on the beats with notes
   - [x] Read and written in MusicXML
-  - [ ] Drawn under the staff
+  - [x] Drawn under the staff
   - [ ] Typed at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
