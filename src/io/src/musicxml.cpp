@@ -651,6 +651,13 @@ struct PendingGrace {
 };
 
 /// A beat a slur starts or stops on (ADR-0086).
+/// A run of measure repeats (ADR-0102): each repeats the `size` measures
+/// before it, from measure `first` on.
+struct RepeatRun {
+    int size = 1;
+    std::size_t first = 0;
+};
+
 struct SlurEnd {
     std::size_t measure = 0;
     std::size_t staff = 0;
@@ -1079,6 +1086,7 @@ public:
           ottavas_(layout_.staves.size(), Ottava::None), pedals_(layout_.staves.size(), false),
           measures_(layout_.staves.size()) {
         nextClefs_.resize(layout_.staves.size());
+        repeatRuns_.resize(layout_.staves.size());
         clefs_.reserve(layout_.staves.size());
         for (const Staff& staff : layout_.staves) {
             clefs_.push_back(staff.clef());
@@ -1304,6 +1312,28 @@ private:
         markChords(index, chords, time.measureLength());
         markTexts(index, texts, time.measureLength());
         markClefs(index, events, time.measureLength());
+        markRepeats(index);
+    }
+
+    /// The measure repeats in force in measure `index` (ADR-0102). The music
+    /// written out under the sign goes: the sign plays the measures before.
+    void markRepeats(std::size_t index) {
+        for (std::size_t s = 0; s < measures_.size(); ++s) {
+            if (!repeatRuns_[s] || measures_[s].empty()) {
+                continue;
+            }
+            const RepeatRun& run = *repeatRuns_[s];
+            Measure& measure = measures_[s].back();
+            if (run.size == 1) {
+                measure.repeat = MeasureRepeat::One;
+            } else {
+                measure.repeat = (index - run.first) % 2 == 0 ? MeasureRepeat::TwoFirst
+                                                              : MeasureRepeat::TwoSecond;
+            }
+            for (Voice& voice : measure.voices) {
+                voice.beats.clear();
+            }
+        }
     }
 
     /// The clef changes read in measure `index` (ADR-0087): one at its start
@@ -1483,6 +1513,33 @@ private:
         if (const pugi::xml_node transpose = attributes.child("transpose");
             transpose && readTranspose(transpose) != layout_.transposition) {
             warn("transposition changes dropped", index);
+        }
+        for (pugi::xml_node style : attributes.children("measure-style")) {
+            readMeasureRepeat(style, index);
+        }
+    }
+
+    /// A measure repeat starts or stops in measure `index`, on the staff the
+    /// style numbers or on all of them (ADR-0102).
+    void readMeasureRepeat(pugi::xml_node style, std::size_t index) {
+        const pugi::xml_node repeat = style.child("measure-repeat");
+        if (!repeat) {
+            return;
+        }
+        std::optional<RepeatRun> run;
+        if (std::string_view(repeat.attribute("type").value()) == "start") {
+            const int size = repeat.text().as_int(1);
+            if (size == 1 || size == 2) {
+                run = RepeatRun{.size = size, .first = index};
+            } else {
+                warn("measure repeats of more than two measures dropped", index);
+            }
+        }
+        const int number = style.attribute("number").as_int(0);
+        if (number <= 0) {
+            std::ranges::fill(repeatRuns_, run);
+        } else {
+            repeatRuns_[staffFor(number).staff] = run;
         }
     }
 
@@ -2849,13 +2906,14 @@ private:
     int divisions_ = 1;
     Fraction oneDivision_{1, 4};
     KeySignature concertKey_{};
-    std::vector<std::optional<ClefInfo>> lastClefs_{}; // per MusicXML staff number
-    std::vector<Clef> clefs_{};                        // per staff, in force when read
-    std::vector<std::optional<Clef>> nextClefs_{};     // per staff, for the next measure
-    std::vector<std::vector<std::string>> voiceIds_;   // per staff, MusicXML voice ids
-    std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
-    std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
-    std::vector<Ottava> ottavas_;                      // per staff, at the end of the last measure
+    std::vector<std::optional<ClefInfo>> lastClefs_{};   // per MusicXML staff number
+    std::vector<Clef> clefs_{};                          // per staff, in force when read
+    std::vector<std::optional<Clef>> nextClefs_{};       // per staff, for the next measure
+    std::vector<std::optional<RepeatRun>> repeatRuns_{}; // per staff, the measure repeats in force
+    std::vector<std::vector<std::string>> voiceIds_;     // per staff, MusicXML voice ids
+    std::vector<Dynamic> dynamics_;      // per staff, at the end of the last measure
+    std::vector<Hairpin> hairpins_;      // per staff, at the end of the last measure
+    std::vector<Ottava> ottavas_;        // per staff, at the end of the last measure
     std::vector<bool> pedals_;           // per staff: down at the end of the last measure
     std::map<int, SlurEnd> openSlurs_{}; // by number: where each open slur starts
     std::vector<std::pair<SlurEnd, SlurEnd>> slurs_{}; // closed slurs, from start to stop

@@ -30,6 +30,7 @@ struct StartupOptions {
     bool continuous = false;    ///< show the continuous view (ADR-0057)
     bool smokeTest = false;     ///< check the window (and the file), then quit
     bool effects = false;       ///< the note effects panel opens at the caret
+    bool tuner = false;         ///< the tuner opens at start
     QString screenshot;         ///< save the window here once shown, then quit
     QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`,
                                 ///< or the included one with `--included-soundfont`)
@@ -70,8 +71,10 @@ private:
     void queueTuning();
     void queueTempo();
     void queueSection();
+    void queueMeasureRepeat();
     void queueEffects();
     void queueContinuous();
+    void queueTunerFollowsTrack();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     void queueKeepPosition();

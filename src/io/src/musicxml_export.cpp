@@ -492,6 +492,9 @@ constexpr std::uint8_t kTupletStart = 1;
 constexpr std::uint8_t kTupletStop = 2;
 
 /// Writes one track as a <part>, mirroring how the importer reads it back.
+/// What a measure of a staff writes in its <measure-style> (ADR-0102).
+enum class RepeatStyle : std::uint8_t { None, StartOne, StartTwo, Stop };
+
 class PartWriter {
 public:
     PartWriter(const Song& song, std::size_t index, const Grid& grid, int channel)
@@ -504,6 +507,7 @@ public:
           dynamics_(track_.staffCount(), Dynamic::MF) {
         transposition_ = transpositionFor();
         words_.resize(track_.staffCount() * Measure::kMaxVoices);
+        collectRepeatStyles();
         if (percussion_) {
             collectDrumKeys();
             if (track_.instrument().name != track_.name()) {
@@ -834,7 +838,11 @@ private:
         for (int s = 0; s < staffCount_ && previous != nullptr; ++s) {
             clefs = clefs || clefChanges(m, s);
         }
-        if (!key && !time && !clefs) {
+        const bool repeats =
+            std::ranges::any_of(repeatStyles_, [m](const std::vector<RepeatStyle>& styles) {
+                return styles[m] != RepeatStyle::None;
+            });
+        if (!key && !time && !clefs && !repeats) {
             return;
         }
         xml.open("attributes");
@@ -883,7 +891,65 @@ private:
                 }
             }
         }
+        for (std::size_t s = 0; s < repeatStyles_.size(); ++s) {
+            writeRepeatStyle(xml, s, repeatStyles_[s][m]);
+        }
         xml.close("attributes");
+    }
+
+    /// Where each staff's runs of measure repeats start and stop (ADR-0102):
+    /// a run goes on while each measure repeats as the one before says.
+    void collectRepeatStyles() {
+        repeatStyles_.assign(track_.staffCount(),
+                             std::vector<RepeatStyle>(song_.measureCount(), RepeatStyle::None));
+        for (std::size_t s = 0; s < track_.staffCount(); ++s) {
+            const Staff& staff = track_.staff(s);
+            int size = 0;          // the run's measures per repeat, 0 out of a run
+            std::size_t first = 0; // its first measure
+            for (std::size_t m = 0; m < staff.measureCount(); ++m) {
+                const MeasureRepeat repeat = staff.measure(m).repeat;
+                MeasureRepeat expected = MeasureRepeat::None;
+                if (size == 1) {
+                    expected = MeasureRepeat::One;
+                } else if (size == 2) {
+                    expected =
+                        (m - first) % 2 == 0 ? MeasureRepeat::TwoFirst : MeasureRepeat::TwoSecond;
+                }
+                if (repeat == expected) {
+                    continue;
+                }
+                if (repeat == MeasureRepeat::None) {
+                    repeatStyles_[s][m] = RepeatStyle::Stop;
+                    size = 0;
+                    continue;
+                }
+                size = repeat == MeasureRepeat::One ? 1 : 2;
+                first = m;
+                repeatStyles_[s][m] = size == 1 ? RepeatStyle::StartOne : RepeatStyle::StartTwo;
+            }
+        }
+    }
+
+    /// A run of measure repeats starting or stopping on staff s, numbered
+    /// when the part has more staves than one; a TAB copy shares its staff's.
+    void writeRepeatStyle(XmlWriter& xml, std::size_t s, RepeatStyle style) const {
+        if (style == RepeatStyle::None) {
+            return;
+        }
+        xml.start("measure-style");
+        if (staffCount_ > 1) {
+            xml.attribute("number", static_cast<std::int64_t>(s + 1));
+        }
+        xml.endOpen();
+        xml.start("measure-repeat");
+        if (style == RepeatStyle::Stop) {
+            xml.attribute("type", "stop");
+            xml.endEmpty();
+        } else {
+            xml.attribute("type", "start");
+            xml.endNumber("measure-repeat", style == RepeatStyle::StartOne ? 1 : 2);
+        }
+        xml.close("measure-style");
     }
 
     /// Whether measure m changes the clef of staff s (ADR-0087); TAB staves
@@ -2049,7 +2115,8 @@ private:
     int xmlStaves_;
     Transposition transposition_{};
     std::vector<int> drumKeys_{};
-    std::vector<Dynamic> dynamics_;          // per model staff, at the end of the last measure
+    std::vector<Dynamic> dynamics_; // per model staff, at the end of the last measure
+    std::vector<std::vector<RepeatStyle>> repeatStyles_{}; // per model staff and measure
     std::vector<std::vector<bool>> words_{}; // BeatPlace::words per model staff and voice
     Warnings warnings_{};
     bool tabPass_ = false;
@@ -2153,10 +2220,42 @@ std::string lowercase(std::string text) {
 
 } // namespace
 
-ExportResult exportMusicXml(const Song& song, const MusicXmlExportOptions& options) {
+/// The song as MusicXML writes it (ADR-0102): each measure repeat that
+/// counts holds the music it plays, written out under its sign; one that does
+/// not count goes, with a warning. Empty when the song has no signs.
+std::optional<Song> writtenOut(const Song& song, Warnings& warnings) {
+    std::optional<Song> written;
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        const Track& track = song.track(t);
+        for (std::size_t s = 0; s < track.staffCount(); ++s) {
+            const Staff& staff = track.staff(s);
+            for (std::size_t m = 0; m < staff.measureCount(); ++m) {
+                if (staff.measure(m).repeat == MeasureRepeat::None) {
+                    continue;
+                }
+                if (!written) {
+                    written.emplace(song);
+                }
+                Measure& measure = written->track(t).staff(s).measure(m);
+                const std::size_t source = repeatSource(song, staff, m);
+                if (source == m) {
+                    measure.repeat = MeasureRepeat::None;
+                    warnings.add(track.name(), "measure repeats that do not count dropped", m);
+                } else {
+                    measure.voices = staff.measure(source).voices;
+                }
+            }
+        }
+    }
+    return written;
+}
+
+ExportResult exportMusicXml(const Song& original, const MusicXmlExportOptions& options) {
+    Warnings scoreWarnings;
+    const std::optional<Song> written = writtenOut(original, scoreWarnings);
+    const Song& song = written ? *written : original;
     const SongScan songScan = scan(song);
     const Grid& grid = songScan.grid;
-    Warnings scoreWarnings;
     if (!grid.exact()) {
         scoreWarnings.add({}, "durations rounded to the MusicXML grid", 0);
     }

@@ -145,12 +145,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Natural harmonics: diamond noteheads on the standard staff (ADR-0100)
 - [x] Tremolo picking: slashes through the stem on the standard staff (ADR-0101)
 - [x] Clef changes: a measure changes its staff's clef, drawn smaller before the barline (ADR-0087)
-- [ ] Measure repeats: a measure plays the measure, or the two measures, before it (ADR-0102)
+- [x] Measure repeats: a measure plays the measure, or the two measures, before it (ADR-0102)
   - [x] In the model and kept by the native format; heard in playback and MIDI export
   - [x] Read from Guitar Pro 6-8 simile marks
   - [x] Drawn on standard notation and tablature
-  - [ ] Read and written in MusicXML
-  - [ ] Set at the caret
+  - [x] Read and written in MusicXML
+  - [x] Set at the caret
 - [x] Tenuto and portato: held notes, drawn by the notehead, beyond the staccato dot (ADR-0088)
 - [x] Staccatissimo: a quarter of the note's length, a wedge in the place of the staccato dot (ADR-0094)
 - [x] Breath marks and caesuras: a little off the end of the beat, drawn after it (ADR-0095)

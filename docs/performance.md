@@ -416,3 +416,41 @@ a page's height either side), each painted into a 32-bit image of about 8 MB
 at this size before it becomes a texture, not the song. Painting pages into
 8-bit images (the ink is one colour) would save the images' share of it;
 not worth doing at these sizes.
+
+**2026-11-25, after tremolo picking on the stem and measure repeats.** Every
+benchmark ran again once tremolo picking through the stem (ADR-0101) and
+measure repeats (ADR-0102), with their MusicXML and caret editing, were in.
+Playback now reads each measure through `repeatSource()`, and the sounding
+notes and the sequence of the 20-track song take what they took. Two parallel
+paths came out slower, the MusicXML export (79 ms) and the GPIF import
+(114 ms), while their one-thread times stayed put. Run again, the export took
+98, 97 and 84 ms; the build of `main` from before these changes, run the same
+way right after, took 98, 56 and 92 ms. On this machine the parallel export
+swings between about 55 and 98 ms from run to run whatever the code, so its
+rows compare best on the one-thread time.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 10.2 ms | 9.7 ms |
+| sequence it; with every four measures repeated | 29.1 ms; 44.2 ms | 29.3 ms; 44.8 ms |
+| render its first 10 s offline; on one thread | 20.9 ms; 111 ms | 19.2 ms; 108 ms |
+| build, copy (shared measures) and validate the 20-track song | 11.0 ms, 74 µs, 3.2 ms | 10.6 ms, 67 µs, 3.2 ms |
+| insert a measure at its start | 22 µs | 23 µs |
+| seconds at its end (tempo map walk) | 0.26 ms | 0.28 ms |
+| MusicXML import; export; export on one thread; `.mxl` | 106 ms; 54 ms; 150 ms; 339 ms | 90 ms; 79 ms (84 to 98 ms again, `main`'s build 56 to 98 ms); 153 ms; 354 ms |
+| MIDI export; import | 28.4 ms; 41.5 ms | 26.1 ms; 41.6 ms |
+| GPIF import; on one thread | 98 ms; 215 ms | 114 ms; 216 ms |
+| 2 tracks from a literal-only `.gpx` | 29.6 ms | 28.7 ms |
+| lay out one 500-measure staff; 8 of its measures | 4.1 ms; 70 µs | 4.0 ms; 69 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.5 ms; 97 µs; 42 ms | 5.4 ms; 94 µs; 42 ms |
+| one track on A4 pages; on one thread | 2.2 ms; 11.0 ms | 2.1 ms; 11.1 ms |
+| the 20 staves on A4 pages; again after an edit | 25.1 ms; 3.9 ms | 24.1 ms; 3.9 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.4, 8.6, 19.5, 11.6 ms | 5.8, 8.5, 18.3, 10.9 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.2, 8.4, 6.0, 4.9 ms | 5.2, 8.3, 6.0, 4.8 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 9.9 ms; 10.8 ms | 9.8 ms; 10.6 ms |
+| read an SFZ of 64 samples | 3.7 ms | 3.8 ms |
+| decode a minute of FLAC; of WAV | 35.7 ms; 16.2 ms | 35.8 ms; 16.1 ms |
+| read the glyph outlines of `Bravura.otf` | 0.71 ms | 0.70 ms |
+| write a track's 21 pages as PDF; compressed; the same on one thread | 1.5 ms; 4.1 ms; 8.5 ms; 44.0 ms | 1.3 ms; 3.8 ms; 8.3 ms; 43.4 ms |
+| one tuner window: low E, high E, noise | 0.39, 0.10, 1.10 ms | 0.39, 0.10, 1.07 ms |
+| find the caret; pick it from a click | 0.38 µs; 1.5 µs | 0.37 µs; 1.5 µs |

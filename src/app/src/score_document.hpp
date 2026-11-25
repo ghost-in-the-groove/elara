@@ -139,6 +139,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QVariantMap caretTempo READ caretTempo NOTIFY caretChanged)
     Q_PROPERTY(QString caretSection READ caretSection NOTIFY caretChanged)
     Q_PROPERTY(int caretClef READ caretClef NOTIFY caretChanged)
+    Q_PROPERTY(int caretRepeat READ caretRepeat NOTIFY caretChanged)
     // Selected measures (ADR-0036).
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY selectionChanged)
     Q_PROPERTY(int selectionFirst READ selectionFirst NOTIFY selectionChanged)
@@ -619,6 +620,13 @@ public:
     /// Changes the clef of the caret's staff from the caret's measure on, `clef`
     /// numbered as caretClef(); the staff keeps its octave (ADR-0087).
     Q_INVOKABLE void setClef(int clef);
+    /// How many measures the sign on the caret's measure repeats: 0 without
+    /// one, 1 or 2 (ADR-0102).
+    [[nodiscard]] int caretRepeat() const;
+    /// Makes the caret's measure repeat the measure before it (1), or it and
+    /// the next the two before them (2); 0 takes the sign away, writing out
+    /// what it played (ADR-0102).
+    Q_INVOKABLE void setMeasureRepeat(int measures);
     /// Inserts an empty measure before the caret's measure, or after it, with
     /// the signatures of the measure before it; the caret goes to it.
     Q_INVOKABLE void insertMeasure(bool after);

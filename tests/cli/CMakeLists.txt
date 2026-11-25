@@ -677,6 +677,28 @@ set_tests_properties(cli.dump_clefs PROPERTIES
   FIXTURES_REQUIRED cli_clefs
   PASS_REGULAR_EXPRESSION "\"clef\":\"treble\",\"clefs\":\\[{\"measure\":1,\"clef\":\"bass\"}\\].*\"C3\".*\"clef\":\"treble-8vb\",.*\"clefs\":\\[{\"measure\":1,\"clef\":\"bass-8vb\"}\\]"
   FAIL_REGULAR_EXPRESSION "tenor")
+# Measure repeats at the caret (ADR-0102): measure 1 repeats measure 0,
+# measures 3 and 4 repeat 1 and 2; then the two-measure sign is written out
+# and undone, and measure 0 refuses a sign.
+set(ELARA_CLI_SIMILE_EDIT "${CMAKE_CURRENT_BINARY_DIR}/cli-simile-edit.elara")
+add_test(NAME cli.edit_sets_measure_repeats
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_SIMILE_EDIT}" "add-track electric-guitar"
+    "append-measures 5" "fret 3" "caret 0 1 0" "simile 1" "caret 0 2 0" "fret 5"
+    "caret 0 3 0" "simile 2" "simile none" undo "caret 0 0 0" "simile 1")
+set_tests_properties(cli.edit_sets_measure_repeats PROPERTIES
+  FIXTURES_SETUP cli_simile_edit
+  PASS_REGULAR_EXPRESSION "\"redo\":{\"count\":1,\"next\":\"Write out measure repeat\"}")
+add_test(NAME cli.dump_measure_repeats COMMAND elara-cli --json dump "${ELARA_CLI_SIMILE_EDIT}")
+set_tests_properties(cli.dump_measure_repeats PROPERTIES
+  FIXTURES_REQUIRED cli_simile_edit
+  PASS_REGULAR_EXPRESSION "\"repeats\":\\[{\"measure\":1,\"repeat\":\"one\"},{\"measure\":3,\"repeat\":\"two-first\"},{\"measure\":4,\"repeat\":\"two-second\"}\\]")
+add_test(NAME cli.sequence_measure_repeats COMMAND elara-cli sequence "${ELARA_CLI_SIMILE_EDIT}")
+set_tests_properties(cli.sequence_measure_repeats PROPERTIES
+  FIXTURES_REQUIRED cli_simile_edit
+  PASS_REGULAR_EXPRESSION "5 measures, 5 notes")
+add_test(NAME cli.edit_rejects_long_measure_repeats
+  COMMAND elara-cli edit "add-track piano" "append-measures 4" "caret 0 3 0" "simile 3")
+set_tests_properties(cli.edit_rejects_long_measure_repeats PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_percussion_clef
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "clef percussion")
 set_tests_properties(cli.edit_rejects_percussion_clef PROPERTIES WILL_FAIL TRUE)
@@ -1393,6 +1415,22 @@ set_tests_properties(cli.import_simile PROPERTIES
 add_test(NAME cli.render_simile
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/simile.gp" --view both)
 set_tests_properties(cli.render_simile PROPERTIES PASS_REGULAR_EXPRESSION "\"repeat\":4,")
+# To MusicXML and back: the signs come back, with no warnings.
+set(ELARA_CLI_SIMILE "${CMAKE_CURRENT_BINARY_DIR}/cli-simile")
+add_test(NAME cli.import_simile_saves_native
+  COMMAND elara-cli import "${ELARA_CORPUS}/gp/simile.gp" --out "${ELARA_CLI_SIMILE}.elara" --force)
+set_tests_properties(cli.import_simile_saves_native PROPERTIES FIXTURES_SETUP cli_simile_native)
+add_test(NAME cli.export_simile_musicxml
+  COMMAND elara-cli --json export "${ELARA_CLI_SIMILE}.elara" "${ELARA_CLI_SIMILE}.musicxml" --force)
+set_tests_properties(cli.export_simile_musicxml PROPERTIES
+  FIXTURES_REQUIRED cli_simile_native
+  FIXTURES_SETUP cli_simile_musicxml
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\]}")
+add_test(NAME cli.import_simile_musicxml
+  COMMAND elara-cli --json import "${ELARA_CLI_SIMILE}.musicxml")
+set_tests_properties(cli.import_simile_musicxml PROPERTIES
+  FIXTURES_REQUIRED cli_simile_musicxml
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\].*\"repeats\":\\[{\"measure\":1,\"repeat\":\"one\"},{\"measure\":4,\"repeat\":\"two-first\"},{\"measure\":5,\"repeat\":\"two-second\"}\\]")
 # Drawn above the staff: the segno and coda signs, "To Coda" and "D.S. al Coda".
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")

@@ -8,6 +8,7 @@
 #include "audio_controller.hpp"
 #include "recent_scores.hpp"
 #include "score_page.hpp"
+#include "tuner_controller.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
@@ -132,10 +133,14 @@ void Startup::queueSteps() {
             queueTuning();
             queueTempo();
             queueSection();
+            queueMeasureRepeat();
             queueEffects();
             queueContinuous();
         }
         return;
+    }
+    if (options_.smokeTest && options_.tuner) {
+        queueTunerFollowsTrack();
     }
     if (options_.smokeTest) {
         // The file opened went to the top of the recent scores (kept only in
@@ -190,6 +195,7 @@ void Startup::queueSteps() {
         queueTuning();
         queueTempo();
         queueSection();
+        queueMeasureRepeat();
         queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -974,6 +980,40 @@ void Startup::queueSection() {
     });
 }
 
+// A measure repeat from the measure popup (ADR-0102): a measure inserted after
+// the caret's repeats it, one undo step; taking the sign away writes out what
+// it played; all undone, the song must end as it started.
+void Startup::queueMeasureRepeat() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("measure repeat check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        score_->insertMeasure(true);
+        score_->setMeasureRepeat(1);
+        check(score_->caretRepeat() == 1 &&
+                  score_->undoName() == ScoreDocument::tr("Repeat measure"),
+              "the new measure does not repeat the one before");
+        score_->setMeasureRepeat(0);
+        check(score_->caretRepeat() == 0 &&
+                  score_->undoName() == ScoreDocument::tr("Write out measure repeat"),
+              "taking the sign away did not write out its music");
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->undo();
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified(), "undoing the measure repeat did not restore the song");
+        return false;
+    });
+}
+
 // A tempo change from the measure popup (ADR-0042): 90 beats per minute from
 // the second measure, one undo step named for it that leaves the first
 // measure's tempo alone, then taken away again; both undone, the song must end
@@ -1033,6 +1073,52 @@ void Startup::queueTempo() {
 // The first track's tuning from the song panel (ADR-0046): a capo a fret
 // higher keeping the frets, then the capo taken off keeping the sound, each
 // one undo step; both undone, the song must end as it started.
+// The tuner open over a track with strings tunes to them: by its preset,
+// or by an entry of the track's own for a tuning no preset has, and back
+// when the tuning comes back. Prints "tuner: <strings>" each time.
+void Startup::queueTunerFollowsTrack() {
+    const auto strings = [this] {
+        const auto* tuner = window_->findChild<TunerController*>();
+        return tuner != nullptr ? tuner->stringNames().join(QLatin1Char(' ')) : QString();
+    };
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("tuner check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, strings, check] {
+        tuningBefore_ = score_->trackTuning(score_->track());
+        std::printf("tuner: %s\n", qPrintable(strings()));
+        check(tuningBefore_.value(QStringLiteral("fretted")).toBool() &&
+                  strings() == tuningBefore_.value(QStringLiteral("notes")).toString(),
+              "the tuner does not tune to the track's strings");
+        // A whole step down, which no preset has.
+        score_->setTrackTuning(score_->track(), QStringLiteral("D1 G1 C2 F2"), 0, false);
+        return true;
+    });
+    steps_.emplace_back([this, strings, check] {
+        const auto* tuner = window_->findChild<TunerController*>();
+        const QString track = score_->trackNames().value(score_->track());
+        std::printf("tuner: %s\n", qPrintable(strings()));
+        check(tuner != nullptr &&
+                  tuner->tuning() == static_cast<int>(tuner->tuningLabels().size()) - 1 &&
+                  tuner->tuningLabels().last() == TunerController::tr("Track: %1").arg(track),
+              "the tuner has no entry for the track's own tuning");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, strings, check] {
+        const auto* tuner = window_->findChild<TunerController*>();
+        std::printf("tuner: %s\n", qPrintable(strings()));
+        check(strings() == tuningBefore_.value(QStringLiteral("notes")).toString(),
+              "the tuner did not follow the tuning back");
+        check(tuner != nullptr && !tuner->tuningLabels().last().startsWith(
+                                      TunerController::tr("Track: %1").arg(QString())),
+              "the track's own entry outlived its tuning");
+        return false;
+    });
+}
+
 void Startup::queueTuning() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {

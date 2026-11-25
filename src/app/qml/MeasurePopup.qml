@@ -161,6 +161,30 @@ Popup {
             }
         }
 
+        // A measure repeat sign (ADR-0102): the measure plays the one, or the
+        // two, before it; taking the sign away writes out what it played.
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Label {
+                Layout.preferredWidth: 112
+                text: qsTr("Repeat")
+                opacity: 0.75
+                elide: Text.ElideRight
+            }
+            ComboBox {
+                Layout.fillWidth: true
+                focusPolicy: Qt.NoFocus
+                model: [qsTr("None"), qsTr("The measure before"), qsTr("The two measures before")]
+                currentIndex: root.document.caretRepeat
+                onActivated: index => root.document.setMeasureRepeat(index)
+                ToolTip.visible: hovered
+                ToolTip.delay: 600
+                ToolTip.text: qsTr("Play the measure, or the two measures, before this one: the sign takes the place of the music here")
+            }
+        }
+
         // The tempo the measure starts with (ADR-0042), in the beat the song
         // counts in there: a new one starts a tempo change, which the cross
         // takes away again. On the first measure it is the song's tempo.
