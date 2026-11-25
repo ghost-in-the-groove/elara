@@ -403,6 +403,9 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "chord") { // chord <name> | chord none: the caret's beat (ADR-0080)
         const std::string name = step.rest(1);
         edit = setChordSymbol(song, entry.caret, name == "none" ? std::string() : name);
+    } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
+        const std::string text = step.rest(1);
+        edit = setBeatText(song, entry.caret, text == "none" ? std::string() : text);
     } else if (verb == "grace") { // grace <semitones> [duration] [on] | grace none
         if (step.word(1) == "none") {
             edit = removeGraceNotes(song, entry.caret);
@@ -864,7 +867,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "<down|up|none>\", "
         "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", "
         "\"whammy <dive|dip|pre-dive|return|none> [cents]\", \"bass <tap|slap|pop|none>\", "
-        "\"hairpin <crescendo|diminuendo|none>\", \"chord <name|none>\", "
+        "\"hairpin <crescendo|diminuendo|none>\", \"chord <name|none>\", \"text <words|none>\", "
         "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
         "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", \"harmonic "

@@ -170,15 +170,22 @@ Item {
     /// symbol above the staff shows as it changes; over it when there is no
     /// room below (ADR-0080).
     function openChordPopupAtCaret() {
+        openWordsPopupAtCaret(chordPopup);
+    }
+    /// Opens the beat text popup the same way (ADR-0081).
+    function openTextPopupAtCaret() {
+        openWordsPopupAtCaret(textPopup);
+    }
+    function openWordsPopupAtCaret(popup) {
         if (document.caretPage < 0)
             return;
         const at = caretPoint();
         const top = at.y - document.caretRect.height * unit * shownZoom;
         const below = at.y + 12;
-        chordPopup.x = Math.max(8, Math.min(width - chordPopup.width - 8, at.x - 24));
-        chordPopup.y = below + chordPopup.implicitHeight <= height - 8
-                ? below : Math.max(8, top - chordPopup.implicitHeight - 12);
-        chordPopup.open();
+        popup.x = Math.max(8, Math.min(width - popup.width - 8, at.x - 24));
+        popup.y = below + popup.implicitHeight <= height - 8
+                ? below : Math.max(8, top - popup.implicitHeight - 12);
+        popup.open();
     }
     function scrollTo(y: real, x: real) {
         scrollY.stop();
@@ -261,6 +268,11 @@ Item {
         }
         if (control && event.key === Qt.Key_K) {
             openChordPopupAtCaret();
+            event.accepted = true;
+            return;
+        }
+        if (control && !shift && event.key === Qt.Key_T) {
+            openTextPopupAtCaret();
             event.accepted = true;
             return;
         }
@@ -620,11 +632,32 @@ Item {
         onClosed: root.forceActiveFocus()
     }
 
-    ChordPopup {
+    WordsPopup {
         id: chordPopup
         objectName: "chordPopup"
 
-        document: root.document
+        title: qsTr("Chord symbol")
+        placeholder: qsTr("Am7, C/G, N.C.…")
+        hint: root.document.caretFretted ? qsTr("Enter names it; the beat's frets draw its diagram.")
+                                         : qsTr("Enter names it; an empty name takes it away.")
+        removeTip: qsTr("Remove the chord symbol")
+        current: root.document.caretChord
+        onOpening: offered = root.document.songChords()
+        onApplied: words => root.document.setChordSymbol(words)
+        onClosed: root.forceActiveFocus()
+    }
+
+    WordsPopup {
+        id: textPopup
+        objectName: "textPopup"
+
+        title: qsTr("Text")
+        placeholder: qsTr("let it ring, ad lib., solo…")
+        hint: qsTr("Enter writes it above the beat; an empty text takes it away.")
+        removeTip: qsTr("Remove the text")
+        current: root.document.caretText
+        onOpening: offered = root.document.songTexts()
+        onApplied: words => root.document.setBeatText(words)
         onClosed: root.forceActiveFocus()
     }
 
@@ -659,6 +692,7 @@ Item {
             document: root.document
             onMeasureRequested: root.openMeasurePopupAtCaret()
             onChordRequested: root.openChordPopupAtCaret()
+            onTextRequested: root.openTextPopupAtCaret()
         }
 
         Rectangle {
