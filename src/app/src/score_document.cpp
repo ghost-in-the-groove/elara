@@ -1925,8 +1925,9 @@ void ScoreDocument::toggleEffect(int effect) {
     } catch (const std::out_of_range&) {
         emit editFailed(tr("That fret has no natural harmonic."));
     } catch (const std::logic_error&) {
-        emit editFailed(which == core::NoteEffect::Tie ? tr("There is no note to tie to.")
-                                                       : tr("Harmonics need strings."));
+        emit editFailed(which == core::NoteEffect::Tie
+                            ? tr("There is no note to tie to.")
+                            : tr("%1 needs strings.").arg(effectName(effect)));
     }
 }
 
@@ -1956,6 +1957,11 @@ QString ScoreDocument::effectKey(int effect) const {
         return {};
     }
     return QString(QChar(kEffects.at(static_cast<std::size_t>(effect)).key));
+}
+
+bool ScoreDocument::effectNeedsStrings(int effect) const {
+    return effect >= 0 && effect < kEffectCount &&
+           core::needsStrings(static_cast<core::NoteEffect>(effect));
 }
 
 int ScoreDocument::effectForKey(const QString& text) const {

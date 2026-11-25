@@ -1089,6 +1089,11 @@ void Startup::queueEffects() {
                       static_cast<int>(core::NoteEffect::PalmMute) &&
                   score_->effectForKey(QStringLiteral("a")) < 0,
               "the keys do not map to the effects");
+        // The panel shows the techniques of strings on fretted staves only.
+        check(score_->effectNeedsStrings(static_cast<int>(core::NoteEffect::PalmMute)) &&
+                  score_->effectNeedsStrings(static_cast<int>(core::NoteEffect::Harmonic)) &&
+                  !score_->effectNeedsStrings(kAccent) && !score_->effectNeedsStrings(-1),
+              "the techniques of strings are not told apart");
         if (score_->caretFretted()) {
             score_->typeDigit(5);
         } else {

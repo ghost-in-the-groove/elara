@@ -662,6 +662,8 @@ Rectangle {
                                 required property int index
                                 readonly property bool active: (root.document.caretEffects & (1 << index)) !== 0
 
+                                // Techniques of strings show only on a fretted staff.
+                                visible: root.document.caretFretted || !root.document.effectNeedsStrings(index)
                                 implicitWidth: chipRow.implicitWidth + 16
                                 implicitHeight: 30
                                 focusPolicy: Qt.NoFocus
@@ -841,7 +843,8 @@ Rectangle {
                     Label {
                         leftPadding: 4
                         topPadding: 4
-                        text: qsTr("Harmonic, vibrato and accent")
+                        text: root.document.caretFretted ? qsTr("Harmonic, vibrato and accent")
+                                                         : qsTr("Vibrato and accent")
                         font.pixelSize: 11
                         color: root.ink
                         opacity: 0.6
@@ -861,13 +864,14 @@ Rectangle {
 
                                 tip: root.document.harmonicName(index + 1)
                                 label: modelData
-                                enabled: root.document.caretFretted
+                                visible: root.document.caretFretted
                                 active: root.document.caretHarmonic === index + 1
                                 onClicked: root.document.setHarmonic(active ? 0 : index + 1)
                             }
                         }
 
                         Item {
+                            visible: root.document.caretFretted
                             width: 9
                             height: 30
 
@@ -955,13 +959,13 @@ Rectangle {
                         spacing: 4
 
                         BeatEffect {
-                            tip: qsTr("Strum down")
+                            tip: root.document.caretFretted ? qsTr("Strum down") : qsTr("Roll upwards")
                             path: "M12 4 L12 20 M7 15 L12 20 L17 15"
                             active: root.document.caretStrum === 1
                             onClicked: root.document.setStrum(active ? 0 : 1)
                         }
                         BeatEffect {
-                            tip: qsTr("Strum up")
+                            tip: root.document.caretFretted ? qsTr("Strum up") : qsTr("Roll downwards")
                             path: "M12 20 L12 4 M7 9 L12 4 L17 9"
                             active: root.document.caretStrum === 2
                             onClicked: root.document.setStrum(active ? 0 : 2)
@@ -1020,6 +1024,7 @@ Rectangle {
                         }
 
                         Item {
+                            visible: root.document.caretFretted
                             width: 9
                             height: 30
 
@@ -1030,7 +1035,7 @@ Rectangle {
                         }
 
                         // Tapping, slap and pop (ADR-0060), lettered as the
-                        // score writes them.
+                        // score writes them; techniques of strings.
                         Repeater {
                             model: ["T", "S", "P"]
 
@@ -1040,6 +1045,7 @@ Rectangle {
 
                                 tip: root.document.bassTechniqueName(index + 1)
                                 label: modelData
+                                visible: root.document.caretFretted
                                 active: root.document.caretBassTechnique === index + 1
                                 onClicked: root.document.setBassTechnique(active ? 0 : index + 1)
                             }
@@ -1047,6 +1053,7 @@ Rectangle {
                     }
 
                     Label {
+                        visible: root.document.caretFretted
                         leftPadding: 4
                         topPadding: 4
                         text: qsTr("Whammy bar")
@@ -1055,8 +1062,10 @@ Rectangle {
                         opacity: 0.6
                     }
 
-                    // The whammy bar's form, then how deep it dives.
+                    // The whammy bar's form, then how deep it dives: a
+                    // guitar's, so only on a fretted staff.
                     Row {
+                        visible: root.document.caretFretted
                         spacing: 4
 
                         WhammyForm {

@@ -80,6 +80,7 @@ one that replaces them.
 | [0072](0072-included-guitar-sfz.md) | A clean electric guitar SFZ comes with the packages | Accepted |
 | [0073](0073-grand-staff.md) | A brace and the barlines join a grand staff | Accepted |
 | [0074](0074-pdf-export.md) | PDF export written by Elara | Accepted |
+| [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
 
 ## Template
 

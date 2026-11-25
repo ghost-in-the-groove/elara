@@ -7,6 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <stdexcept>
 #include <utility>
@@ -158,6 +159,30 @@ TEST_CASE("Effects: a natural harmonic needs strings and a node", "[core][entry]
     CHECK_THROWS_AS(toggleEffect(song, at(1, 0, 3), NoteEffect::Harmonic), std::out_of_range);
     const Song flute = oneBeat("flute", {Note{.pitch = Pitch::fromMidi(72)}});
     CHECK_THROWS_AS(toggleEffect(flute, at(0, 0), NoteEffect::Harmonic), std::logic_error);
+}
+
+TEST_CASE("Effects: techniques of strings go on fretted staves only", "[core][entry][effects]") {
+    constexpr std::array kOfStrings{NoteEffect::Legato, NoteEffect::PalmMute, NoteEffect::DeadNote,
+                                    NoteEffect::Harmonic};
+    for (int e = 0; e <= static_cast<int>(NoteEffect::Staccato); ++e) {
+        const auto effect = static_cast<NoteEffect>(e);
+        CHECK(needsStrings(effect) == (std::ranges::find(kOfStrings, effect) != kOfStrings.end()));
+    }
+
+    // On a piano they do not go on; the others do.
+    Note held{.pitch = Pitch::fromMidi(60)};
+    held.effects.palmMute = true; // as a file may have it
+    Document doc(oneBeat("piano", {held}));
+    for (const NoteEffect effect :
+         {NoteEffect::Legato, NoteEffect::DeadNote, NoteEffect::Harmonic}) {
+        CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 0), effect), std::logic_error);
+    }
+    run(doc, toggleEffect(doc.song(), at(0, 0), NoteEffect::Bend));
+    CHECK_FALSE(notesAt(doc.song(), 0, 0).front().effects.bend.isEmpty());
+    // One already there can still be taken off.
+    run(doc, toggleEffect(doc.song(), at(0, 0), NoteEffect::PalmMute));
+    CHECK_FALSE(notesAt(doc.song(), 0, 0).front().effects.palmMute);
+    CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 0), NoteEffect::PalmMute), std::logic_error);
 }
 
 TEST_CASE("Effects: a tie takes the previous note on the string", "[core][entry][effects]") {
