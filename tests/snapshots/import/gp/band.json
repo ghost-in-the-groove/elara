@@ -131,7 +131,10 @@
            {
             "pitch": "C5"
            }
-          ]
+          ],
+          "effects": {
+           "strum": "down"
+          }
          },
          {
           "duration": "4",
@@ -175,7 +178,10 @@
            {
             "pitch": "C5"
            }
-          ]
+          ],
+          "effects": {
+           "strum": "up"
+          }
          },
          {
           "duration": "4",
