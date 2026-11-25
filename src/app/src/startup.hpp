@@ -79,6 +79,7 @@ private:
     void clickCursor();
     void queueKeepPosition();
     void queuePdf();
+    void queueExport();
     void queuePractice();
     void queueLoop();
     void queueSoundFont();

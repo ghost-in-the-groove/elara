@@ -408,6 +408,26 @@
         <translation>Documentos PDF (*.pdf)</translation>
     </message>
     <message>
+        <source>Export the song as MusicXML</source>
+        <translation>Exportar la canción como MusicXML</translation>
+    </message>
+    <message>
+        <source>MusicXML (*.musicxml *.xml)</source>
+        <translation>MusicXML (*.musicxml *.xml)</translation>
+    </message>
+    <message>
+        <source>Compressed MusicXML (*.mxl)</source>
+        <translation>MusicXML comprimido (*.mxl)</translation>
+    </message>
+    <message>
+        <source>Export the song as MIDI</source>
+        <translation>Exportar la canción como MIDI</translation>
+    </message>
+    <message>
+        <source>MIDI files (*.mid *.midi)</source>
+        <translation>Archivos MIDI (*.mid *.midi)</translation>
+    </message>
+    <message>
         <source>Save the changes?</source>
         <translation>¿Guardar los cambios?</translation>
     </message>
@@ -492,6 +512,14 @@
         <translation>Exportar como PDF…</translation>
     </message>
     <message>
+        <source>Export as MusicXML…</source>
+        <translation>Exportar como MusicXML…</translation>
+    </message>
+    <message>
+        <source>Export as MIDI…</source>
+        <translation>Exportar como MIDI…</translation>
+    </message>
+    <message>
         <source>Opening the SoundFont…</source>
         <translation>Abriendo la SoundFont…</translation>
     </message>
@@ -530,6 +558,10 @@
     <message>
         <source>Use the built-in synthesizer</source>
         <translation>Usar el sintetizador integrado</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Detalles</translation>
     </message>
     <message>
         <source>Page view</source>
@@ -1810,8 +1842,23 @@
         <translation>No se pudo guardar %1: %2</translation>
     </message>
     <message>
+        <source>MusicXML</source>
+        <translation>MusicXML</translation>
+    </message>
+    <message>
         <source>Could not export %1: %2</source>
         <translation>No se pudo exportar %1: %2</translation>
+    </message>
+    <message>
+        <source>MIDI</source>
+        <translation>MIDI</translation>
+    </message>
+    <message numerus="yes">
+        <source>Exported %1. %2 left out %n thing(s).</source>
+        <translation>
+            <numerusform>Exportado %1. %2 dejó fuera %n cosa.</numerusform>
+            <numerusform>Exportado %1. %2 dejó fuera %n cosas.</numerusform>
+        </translation>
     </message>
     <message>
         <source>The music font is missing.</source>

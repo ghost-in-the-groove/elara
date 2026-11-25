@@ -9,6 +9,7 @@
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/song.hpp>
+#include <elara/io/result.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/page_layout.hpp>
 
@@ -380,10 +381,20 @@ public:
     /// view prints as pages too. Returns false, and reports why through
     /// editFailed(), when it cannot.
     Q_INVOKABLE bool exportPdf(const QUrl& file);
-    /// The file Export as PDF… suggests: the song's file with ".pdf" for its
-    /// extension, or the song's title (or "Untitled") in the documents folder
-    /// for a song without a file.
-    Q_INVOKABLE [[nodiscard]] QUrl pdfFile() const;
+    /// Writes the song as MusicXML to `file`: compressed for ".mxl", text for
+    /// ".musicxml" or ".xml" (".musicxml" is added when it has none of them).
+    /// Then report() tells what MusicXML left out. Returns false, and reports
+    /// why through editFailed(), when it cannot.
+    Q_INVOKABLE bool exportMusicXml(const QUrl& file);
+    /// Writes the song as a Standard MIDI File to `file` (".mid" is added when
+    /// it ends in neither ".mid" nor ".midi"), as it plays. Then report()
+    /// tells what MIDI left out. Returns false, and reports why through
+    /// editFailed(), when it cannot.
+    Q_INVOKABLE bool exportMidi(const QUrl& file);
+    /// The file an export suggests for `extension` ("pdf", "musicxml",
+    /// "mid"): the song's file with that extension, or the song's title (or
+    /// "Untitled") in the documents folder for a song without a file.
+    Q_INVOKABLE [[nodiscard]] QUrl exportFile(const QString& extension) const;
 
     // ---- Keyboard entry -----------------------------------------------------
 
@@ -701,6 +712,9 @@ signals:
     void clipboardChanged();
     /// Something done that the window shows for a moment ("Copied measure 3.").
     void notice(const QString& message);
+    /// Something done with details to read on demand, one per line: what an
+    /// export left out ("Exported song.mid. MIDI left out 3 things.").
+    void report(const QString& message, const QStringList& details);
     /// An edit or a save that failed, with the reason to show.
     void editFailed(const QString& message);
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
@@ -709,6 +723,7 @@ signals:
 
 private:
     bool execute(std::unique_ptr<core::Command> command);
+    bool writeExport(const QString& local, const io::ExportResult& result, const QString& format);
     /// Executes an entry's command, if any, and moves the caret. Returns
     /// whether a command ran.
     bool enter(core::Entry entry);
