@@ -15,6 +15,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -851,6 +852,82 @@ Entry removeGraceNotes(const Song& song, const Caret& at) {
 std::size_t graceNotesAt(const Song& song, const Caret& at) {
     const Caret caret = clampCaret(song, at);
     return onFreeSlot(song, caret) ? 0 : voiceAt(song, caret).beats[caret.beat].graces.size();
+}
+
+namespace {
+
+// The diagram the frets of `beat` make on `staff` (ADR-0080): none unless two
+// or more of its notes have a fret.
+std::optional<ChordDiagram> diagramOf(const Staff& staff, const Beat& beat) {
+    if (!staff.isFretted() || isDrumStaff(staff)) {
+        return std::nullopt;
+    }
+    const int strings = staff.tuning()->stringCount();
+    std::vector<std::int8_t> frets(static_cast<std::size_t>(strings), ChordDiagram::kMuted);
+    int fretted = 0;
+    for (const Note& note : beat.notes) {
+        if (!note.position || note.position->string < 1 || note.position->string > strings) {
+            continue;
+        }
+        frets[static_cast<std::size_t>(note.position->string - 1)] = note.position->fret;
+        ++fretted;
+    }
+    if (fretted < 2) {
+        return std::nullopt;
+    }
+    return ChordDiagram::ofFrets(std::move(frets));
+}
+
+std::string_view trimmed(std::string_view text) {
+    const auto space = [](char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    };
+    while (!text.empty() && space(text.front())) {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && space(text.back())) {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
+} // namespace
+
+Entry setChordSymbol(const Song& song, const Caret& at, std::string_view name) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    name = trimmed(name);
+    Measure content = measureAt(song, caret);
+    Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    if (name.empty()) {
+        if (!beat.chord) {
+            return unchanged(caret);
+        }
+        beat.chord.reset();
+        return replace(caret, std::move(content), "Remove chord symbol");
+    }
+    std::optional<ChordDiagram> diagram =
+        diagramOf(song.track(caret.track).staff(caret.staff), beat);
+    if (!diagram && beat.chord) {
+        diagram = beat.chord->diagram;
+    }
+    SharedOptional symbol(ChordSymbol{.name = std::string(name), .diagram = std::move(diagram)});
+    if (beat.chord == symbol) {
+        return unchanged(caret);
+    }
+    beat.chord = std::move(symbol);
+    return replace(caret, std::move(content), "Set chord symbol");
+}
+
+std::string chordNameAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return {};
+    }
+    const Beat& beat = voiceAt(song, caret).beats[caret.beat];
+    return beat.chord ? beat.chord->name : std::string();
 }
 
 Dynamic dynamicAt(const Song& song, const Caret& at) {

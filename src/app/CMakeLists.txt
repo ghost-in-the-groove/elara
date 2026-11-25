@@ -69,6 +69,7 @@ qt_add_qml_module(elara
     qml/ScoreView.qml
     qml/EntryBar.qml
     qml/MeasurePopup.qml
+    qml/ChordPopup.qml
     qml/SignatureFields.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml

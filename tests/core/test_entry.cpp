@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -89,6 +90,77 @@ TEST_CASE("Entry: grace notes lead into the caret's beat", "[core][entry]") {
     CHECK(removeGraceNotes(doc.song(), at(0, 1, 5)).command == nullptr);
     doc.undo();
     CHECK(graceNotesAt(doc.song(), at(0, 1, 5)) == 2);
+}
+
+TEST_CASE("Entry: chord symbols name the caret's beat, with the diagram its frets make",
+          "[core][entry]") {
+    constexpr std::int8_t x = ChordDiagram::kMuted;
+    // An imported chord, its diagram kept when it is renamed.
+    const SharedOptional<ChordSymbol> imported(ChordSymbol{
+        .name = "D", .diagram = ChordDiagram{.firstFret = 1, .frets = {2, 3, 2, 0, x, x}}});
+    Song song = guitarSong();
+    song.track(0).staff(0).measure(1).voices[0].beats[0].chord = imported;
+    Document doc(std::move(song));
+    // One note: a name without a diagram, spaces around it dropped.
+    run(doc, setChordSymbol(doc.song(), at(0, 0), "  G "));
+    CHECK(doc.undoName() == "Set chord symbol");
+    CHECK(*firstVoice(doc.song(), 0).beats[0].chord == ChordSymbol{.name = "G", .diagram = {}});
+    CHECK(chordNameAt(doc.song(), at(0, 0)) == "G");
+    CHECK(setChordSymbol(doc.song(), at(0, 0), "G").command == nullptr);
+
+    // Two or more fretted notes make the diagram, from the nut while they
+    // stay within four frets, otherwise from the lowest fret.
+    Song chords = doc.song();
+    Staff& written = chords.track(0).staff(0);
+    written.measure(2).voices[0].beats = {
+        Beat{.duration = kHalf,
+             .notes = {written.frettedNote(5, 0), written.frettedNote(4, 2),
+                       written.frettedNote(3, 2), written.frettedNote(2, 1),
+                       written.frettedNote(1, 0)}},
+        Beat{.duration = kHalf,
+             .notes = {written.frettedNote(5, 7), written.frettedNote(4, 9),
+                       written.frettedNote(3, 9), written.frettedNote(2, 8)}}};
+    Document both(std::move(chords));
+    run(both, setChordSymbol(both.song(), at(2, 0), "Am"));
+    CHECK(*firstVoice(both.song(), 2).beats[0].chord ==
+          ChordSymbol{.name = "Am",
+                      .diagram = ChordDiagram{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}}});
+    run(both, setChordSymbol(both.song(), at(2, 1), "Em/B"));
+    CHECK(*firstVoice(both.song(), 2).beats[1].chord ==
+          ChordSymbol{.name = "Em/B",
+                      .diagram = ChordDiagram{.firstFret = 7, .frets = {x, 8, 9, 9, 7, x}}});
+
+    // Renaming a beat whose notes make no diagram keeps the one it had; a rest
+    // takes a name; an empty name takes the symbol away; the free slot never.
+    run(doc, setChordSymbol(doc.song(), at(1, 0), "D/F#"));
+    CHECK(firstVoice(doc.song(), 1).beats[0].chord->diagram == imported->diagram);
+    CHECK(firstVoice(doc.song(), 1).beats[0].chord->name == "D/F#");
+    run(both, setChordSymbol(both.song(), at(0, 1), "N.C."));
+    run(doc, setChordSymbol(doc.song(), at(0, 0), " "));
+    CHECK(doc.undoName() == "Remove chord symbol");
+    CHECK_FALSE(firstVoice(doc.song(), 0).beats[0].chord);
+    CHECK(chordNameAt(doc.song(), at(0, 0)).empty());
+    CHECK(setChordSymbol(doc.song(), at(0, 0), "").command == nullptr);
+    CHECK(setChordSymbol(doc.song(), at(0, 2), "C").command == nullptr);
+    CHECK(chordNameAt(doc.song(), at(0, 2)).empty());
+    doc.undo();
+    CHECK(chordNameAt(doc.song(), at(0, 0)) == "G");
+}
+
+TEST_CASE("Entry: chord symbols on staves without frets have no diagram", "[core][entry]") {
+    Song song;
+    song.appendMeasures(1);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    Document doc(std::move(song));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::E, kQuarter, PitchMode::AddToChord));
+    run(doc, setChordSymbol(doc.song(), at(0, 0), "C"));
+    CHECK(*firstVoice(doc.song(), 0).beats[0].chord == ChordSymbol{.name = "C", .diagram = {}});
+    const Caret drums{.track = 1, .string = 2};
+    run(doc, toggleDrum(doc.song(), drums, kQuarter));
+    run(doc, setChordSymbol(doc.song(), drums, "C"));
+    CHECK_FALSE(doc.song().track(1).staff(0).measure(0).voices[0].beats[0].chord->diagram);
 }
 
 TEST_CASE("Entry: a grace note leads from a piano's top note and doubles a drum hit",

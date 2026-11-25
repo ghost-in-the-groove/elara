@@ -24,6 +24,33 @@
     </message>
 </context>
 <context>
+    <name>ChordPopup</name>
+    <message>
+        <source>Chord symbol</source>
+        <translation>Cifrado</translation>
+    </message>
+    <message>
+        <source>Remove the chord symbol</source>
+        <translation>Quitar el cifrado</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+    <message>
+        <source>Am7, C/G, N.C.…</source>
+        <translation>Am7, C/G, N.C.…</translation>
+    </message>
+    <message>
+        <source>Enter names it; the beat&apos;s frets draw its diagram.</source>
+        <translation>Intro lo pone; los trastes del tiempo dibujan su diagrama.</translation>
+    </message>
+    <message>
+        <source>Enter names it; an empty name takes it away.</source>
+        <translation>Intro lo pone; un nombre vacío lo quita.</translation>
+    </message>
+</context>
+<context>
     <name>EntryBar</name>
     <message>
         <source>Whole note</source>
@@ -224,6 +251,10 @@
     <message>
         <source>Whammy bar</source>
         <translation>Palanca de trémolo</translation>
+    </message>
+    <message>
+        <source>Chord symbol (Ctrl+K)</source>
+        <translation>Cifrado (Ctrl+K)</translation>
     </message>
     <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
@@ -1569,6 +1600,10 @@
         <translation>Notas de adorno</translation>
     </message>
     <message>
+        <source>Chord %1</source>
+        <translation>Acorde %1</translation>
+    </message>
+    <message>
         <source>On drums, Enter adds or removes the lane&apos;s hit.</source>
         <translation>En la batería, Intro añade o quita el golpe del carril.</translation>
     </message>
@@ -1763,6 +1798,14 @@
     <message>
         <source>A note would leave the range.</source>
         <translation>Una nota se saldría del rango.</translation>
+    </message>
+    <message>
+        <source>Set chord symbol</source>
+        <translation>Poner cifrado</translation>
+    </message>
+    <message>
+        <source>Remove chord symbol</source>
+        <translation>Quitar cifrado</translation>
     </message>
 </context>
 <context>
