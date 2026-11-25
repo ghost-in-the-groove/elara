@@ -1089,6 +1089,16 @@ Rectangle {
                             active: root.document.caretOttava === 2 || root.document.caretOttava === 4
                             onClicked: root.document.setOttava(root.document.caretOttava === 2 ? 4 : (active ? 0 : 2))
                         }
+
+                        // The sustain pedal under the caret's beat, numbered as
+                        // core::Pedal: down, a second click changes it there, a
+                        // third lifts it (ADR-0092).
+                        BeatEffect {
+                            tip: qsTr("Sustain pedal: again to change it")
+                            path: "M3 9 L3 16 L9.5 16 L12 11.5 L14.5 16 L21 16 L21 10"
+                            active: root.document.caretPedal !== 0
+                            onClicked: root.document.setPedal((root.document.caretPedal + 1) % 3)
+                        }
                     }
 
                     Label {

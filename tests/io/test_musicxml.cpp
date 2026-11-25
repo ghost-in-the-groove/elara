@@ -422,6 +422,42 @@ TEST_CASE("MusicXML: octave shifts become the octave lines of the beats under th
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: pedal marks put the beats under them under the sustain pedal", "[musicxml]") {
+    // ADR-0092: every voice's beats from a start to a stop take the pedal,
+    // which carries on into the next measure; a change, or a stop and a start
+    // together, changes it on the beat there. Sostenuto pedals warn.
+    const auto pedal = [](std::string_view type) {
+        return std::format(R"(<direction placement="below"><direction-type>)"
+                           R"(<pedal type="{}" line="yes"/></direction-type></direction>)",
+                           type);
+    };
+    const std::string lowerVoice =
+        "<backup><duration>16</duration></backup>"
+        "<note><pitch><step>G</step><octave>3</octave></pitch><duration>8</duration>"
+        "<voice>2</voice><type>half</type></note>"
+        "<note><pitch><step>B</step><octave>3</octave></pitch><duration>8</duration>"
+        "<voice>2</voice><type>half</type></note>";
+    const ImportResult result = parse(
+        onePart(quarterNote("C", "") + pedal("start") + quarterNote("D", "") +
+                quarterNote("E", "") + pedal("change") + quarterNote("F", "") + lowerVoice +
+                R"(</measure><measure number="2">)" + quarterNote("G", "") + pedal("stop") +
+                pedal("start") + quarterNote("A", "") + pedal("continue") + quarterNote("B", "") +
+                pedal("stop") + quarterNote("C", "") + pedal("sostenuto")));
+    const auto pedals = [&](std::size_t measure, std::size_t voice) {
+        std::vector<core::Pedal> found;
+        for (const core::Beat& beat : voiceOf(result.song, 0, 0, measure, voice).beats) {
+            found.push_back(beat.effects.pedal);
+        }
+        return found;
+    };
+    using enum core::Pedal;
+    CHECK(pedals(0, 0) == std::vector{None, Down, Down, Change});
+    CHECK(pedals(0, 1) == std::vector{None, Down});
+    CHECK(pedals(1, 0) == std::vector{Down, Change, Down, None});
+    REQUIRE(result.warnings.size() == 1);
+    CHECK(result.warnings[0].find("sostenuto pedal marks dropped") != std::string::npos);
+}
+
 TEST_CASE("MusicXML: lyrics give each beat a syllable per verse", "[musicxml]") {
     // ADR-0084: <lyric number> is the verse; begin and middle syllables join
     // the next one with a hyphen; elided syllables share the beat; <extend/>

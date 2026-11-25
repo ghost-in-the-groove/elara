@@ -244,6 +244,12 @@ enum class Ottava : std::uint8_t {
     return 0;
 }
 
+/// The sustain pedal under the beat (ADR-0092): every note sounding while it
+/// is down rings on until it comes up. Consecutive beats under it, in any
+/// staff and voice of the track, share one pedalling; a change lifts the pedal
+/// and presses it again where its beat starts.
+enum class Pedal : std::uint8_t { None, Down, Change };
+
 /// Effects that apply to every note of a beat.
 struct BeatEffects {
     BendCurve whammyBar{};
@@ -259,6 +265,7 @@ struct BeatEffects {
     // Whole bytes, not bit-fields: GCC 14 cannot copy-list-initialize (`= {}`)
     // a class whose enum bit-field has a default member initializer.
     Ottava ottava = Ottava::None; // ADR-0089
+    Pedal pedal = Pedal::None;    // ADR-0092
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

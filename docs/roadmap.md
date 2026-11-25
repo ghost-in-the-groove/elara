@@ -153,6 +153,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML, read from Guitar Pro 6-8
   - [x] Drawn on standard notation and in a lane over tablature
   - [x] Set at the caret
+- [x] Sustain pedal: beats under the pedal ring on until it comes up (ADR-0092)
+  - [x] In the model, played and kept by the native format
+  - [x] Read and written in MusicXML, written to MIDI files as controller 64
+  - [x] Drawn under standard notation: "Ped.", a line with notches at the changes and a hook
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

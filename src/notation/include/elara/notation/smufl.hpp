@@ -120,6 +120,8 @@ enum class Glyph : std::uint8_t {
     OrnamentShortTrill, ///< the upper mordent
     OrnamentTurn,
     OrnamentTurnInverted,
+    // The sustain pedal (ADR-0092)
+    KeyboardPedalPed,
     // Dynamics
     DynamicPiano,
     DynamicMezzo,
@@ -242,6 +244,7 @@ struct EngravingDefaults {
     double hairpinThickness = 0.16;
     double repeatEndingLineThickness = 0.16;
     double octaveLineThickness = 0.16;
+    double pedalLineThickness = 0.16;
 
     friend bool operator==(const EngravingDefaults&, const EngravingDefaults&) = default;
 };

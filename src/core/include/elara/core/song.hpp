@@ -235,6 +235,22 @@ struct FermataHold {
     friend bool operator==(const FermataHold&, const FermataHold&) = default;
 };
 
+/// A stretch of a measure under a track's sustain pedal (ADR-0092): from
+/// `start` to `end` whole notes into the measure. `change`: the pedal comes up
+/// and goes straight down again at `start`, so the span does not go on from
+/// one ending there.
+struct PedalSpan {
+    Fraction start;
+    Fraction end;
+    bool change = false;
+
+    friend bool operator==(const PedalSpan&, const PedalSpan&) = default;
+};
+
+/// Where the beats of one staff's measure are under the sustain pedal
+/// (ADR-0092), its voices joined as Song::pedalSpans() joins staves.
+[[nodiscard]] std::vector<PedalSpan> pedalSpans(const Measure& measure);
+
 /// The whole document (ADR-0004). Keeps every staff of every track at exactly
 /// measureCount() measures.
 class Song {
@@ -318,6 +334,12 @@ public:
     /// and voice under one, the longest stretch where they overlap, in order and
     /// apart. Throws std::out_of_range for m >= measureCount().
     [[nodiscard]] std::vector<FermataHold> fermataHolds(std::size_t measure) const;
+
+    /// Where measure m of a track is under its sustain pedal (ADR-0092): the
+    /// beats of every staff and voice under it, joined where they overlap or
+    /// meet, cut where a change starts, in order. Throws std::out_of_range for
+    /// a track or a measure out of range.
+    [[nodiscard]] std::vector<PedalSpan> pedalSpans(std::size_t track, std::size_t measure) const;
     [[nodiscard]] double durationSeconds() const { return secondsAt(measureCount()); }
 
     /// Tempo in force at a position (a change exactly there counts).

@@ -226,6 +226,10 @@
         <translation>Línea de octava abajo: 8vb, otra vez para 15mb</translation>
     </message>
     <message>
+        <source>Sustain pedal: again to change it</source>
+        <translation>Pedal de resonancia: otra vez para cambiarlo</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1824,6 +1828,14 @@
     <message>
         <source>Slur</source>
         <translation>Ligadura de expresión</translation>
+    </message>
+    <message>
+        <source>Pedal change</source>
+        <translation>Cambio de pedal</translation>
+    </message>
+    <message>
+        <source>Sustain pedal</source>
+        <translation>Pedal de resonancia</translation>
     </message>
     <message>
         <source>Grace notes</source>

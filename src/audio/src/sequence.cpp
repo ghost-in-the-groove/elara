@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -638,6 +639,63 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
     return result;
 }
 
+// The sustain pedal (ADR-0092): a note whose sound reaches into a pedalling of
+// its track rings until the pedal comes up; never shorter. A pedalling goes on
+// into the next played measure only where that is the next written one: where
+// a repeat or a jump goes back, the pedal comes up and goes down again.
+void sustain(const core::Song& song, const TempoMap& tempo, std::span<const PlayedMeasure> played,
+             std::vector<PlayedNote>& notes) {
+    struct Pedalling {
+        double start = 0.0;
+        double end = 0.0;
+    };
+    const std::size_t measureCount = song.measureCount();
+    std::vector<std::vector<Pedalling>> pedallings(song.trackCount());
+    bool pedalled = false;
+    std::vector<std::vector<core::PedalSpan>> written(measureCount);
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        bool any = false;
+        for (std::size_t m = 0; m < measureCount; ++m) {
+            written[m] = song.pedalSpans(t, m);
+            any = any || !written[m].empty();
+        }
+        if (!any) {
+            continue;
+        }
+        std::vector<Pedalling>& spans = pedallings[t];
+        const PlayedMeasure* before = nullptr;
+        for (const PlayedMeasure& measure : played) {
+            const bool follows = before != nullptr && before->measure + 1 == measure.measure;
+            for (const core::PedalSpan& span : written[measure.measure]) {
+                const Pedalling pedalling{
+                    .start =
+                        measure.start + tempo.secondsInto(measure.measure, span.start.toDouble()),
+                    .end = measure.start + tempo.secondsInto(measure.measure, span.end.toDouble())};
+                constexpr double kMeet = 1e-9;
+                if (!span.change && !spans.empty() && spans.back().end + kMeet >= pedalling.start &&
+                    (follows || !span.start.isZero())) {
+                    spans.back().end = std::max(spans.back().end, pedalling.end);
+                } else {
+                    spans.push_back(pedalling);
+                }
+            }
+            before = &measure;
+        }
+        pedalled = true;
+    }
+    if (!pedalled) {
+        return;
+    }
+    for (PlayedNote& note : notes) {
+        const std::vector<Pedalling>& spans = pedallings[note.track];
+        // The last pedalling to go down before the note ends.
+        const auto after = std::ranges::lower_bound(spans, note.end, {}, &Pedalling::start);
+        if (after != spans.begin() && std::prev(after)->end > note.start) {
+            note.end = std::max(note.end, std::prev(after)->end);
+        }
+    }
+}
+
 } // namespace
 
 Sequence::Sequence(const core::Song& song, SequenceOptions options)
@@ -885,6 +943,8 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             rung.end = std::max(rung.end, duration_);
         }
     }
+
+    sustain(song, tempo, measures_, notes_);
 
     // Hammer-ons, pull-offs and legato slides join a note to the previous
     // note on its string, which keeps sounding; shift and legato slides go

@@ -18,7 +18,9 @@ Three targets with different rules:
   events (ADR-0070), and strums and tremolo picking
   spreading and repeating attacks (ADR-0025), trills repeating them on the
   note and the other note by turns (ADR-0090), and mordents and turns
-  starting their notes with quick notes on the steps of the key (ADR-0091). For practice it plays at 25 % to
+  starting their notes with quick notes on the steps of the key (ADR-0091),
+  and the sustain pedal holding every note of its track on until it comes up
+  (ADR-0092). For practice it plays at 25 % to
   200 % of the written tempo and adds a metronome on a track after the song's
   (`SequenceOptions`, ADR-0024), which `OfflineRenderer` and `Player` play on
   wood blocks at a fixed level. `carriedPosition()` finds where playback

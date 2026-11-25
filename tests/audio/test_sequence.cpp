@@ -36,6 +36,7 @@ using elara::core::InstrumentKind;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Ornament;
+using elara::core::Pedal;
 using elara::core::Pitch;
 using elara::core::SlideIn;
 using elara::core::SlideOut;
@@ -605,6 +606,65 @@ TEST_CASE("Sequence: let ring holds a note until its string is struck again",
     CHECK_THAT(endOf(60), WithinAbs(2.0, kEpsilon)); // string 2 struck again at 2.0
     CHECK_THAT(endOf(57), WithinAbs(1.5, kEpsilon)); // no let ring: as written
     CHECK_THAT(endOf(52), WithinAbs(4.0, kEpsilon)); // never struck again: to the end
+}
+
+TEST_CASE("Sequence: the sustain pedal holds the notes of its track until it comes up",
+          "[audio][sequence][articulation]") {
+    // ADR-0092: two seconds a measure. The right hand's pedal goes down on C4,
+    // changes on E4 at 1 s and comes up at 3 s. The left hand's A3, held over
+    // the change, rings on to 3 s with E4; C4 and D4 stop at the change. F4,
+    // struck as the pedal comes up, and the strings' B4 sound as written.
+    Song song;
+    song.addTrack(Track("Piano", Instrument{.name = "Piano", .kind = InstrumentKind::Keyboard},
+                        {Staff{}, Staff{}}));
+    song.addTrack(Track("Strings", Instrument{.name = "Strings", .kind = InstrumentKind::Pitched},
+                        {Staff{}}));
+    song.appendMeasures(2);
+    const auto pedalled = [](NoteValue value, std::vector<Note> notes, Pedal pedal) {
+        Beat result = beat(value, std::move(notes));
+        result.effects.pedal = pedal;
+        return result;
+    };
+    Track& piano = song.track(0);
+    piano.staff(0).measure(0).voices[0].beats = {
+        pedalled(NoteValue::Quarter, {note(60)}, Pedal::Down),
+        pedalled(NoteValue::Quarter, {note(62)}, Pedal::Down),
+        pedalled(NoteValue::Half, {note(64)}, Pedal::Change)};
+    piano.staff(1).measure(0).voices[0].beats = {
+        beat(NoteValue::Quarter), beat(NoteValue::Half, {note(57)}), beat(NoteValue::Quarter)};
+    piano.staff(0).measure(1).voices[0].beats = {pedalled(NoteValue::Half, {}, Pedal::Down),
+                                                 beat(NoteValue::Half, {note(65)})};
+    song.track(1).staff(0).measure(0).voices[0].beats = {
+        beat(NoteValue::Quarter, {note(71)}), beat(NoteValue::Quarter), beat(NoteValue::Half)};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 6);
+    const auto endOf = [&](int key) {
+        const auto found = std::ranges::find(sequence.notes(), key, &PlayedNote::key);
+        REQUIRE(found != sequence.notes().end());
+        return found->end;
+    };
+    CHECK_THAT(endOf(60), WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(endOf(62), WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(endOf(64), WithinAbs(3.0, kEpsilon));
+    CHECK_THAT(endOf(57), WithinAbs(3.0, kEpsilon));
+    CHECK_THAT(endOf(65), WithinAbs(4.0, kEpsilon));
+    CHECK_THAT(endOf(71), WithinAbs(0.5, kEpsilon));
+
+    // |: 0 :| 1: the pedal comes up where the repeat goes back and goes down
+    // again with the measure; the second time it goes on into measure 1.
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+    const Sequence repeated(song);
+    REQUIRE(repeated.notes().size() == 11);
+    std::vector<double> ends;
+    for (const PlayedNote& played : repeated.notes()) {
+        if (played.key == 64) {
+            ends.push_back(played.end);
+        }
+    }
+    REQUIRE(ends.size() == 2);
+    CHECK_THAT(ends[0], WithinAbs(2.0, kEpsilon));
+    CHECK_THAT(ends[1], WithinAbs(5.0, kEpsilon));
 }
 
 TEST_CASE("Sequence: palm mutes, dead notes and harmonics strike the string their own way",

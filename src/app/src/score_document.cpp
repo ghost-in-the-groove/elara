@@ -1724,6 +1724,10 @@ QString ScoreDocument::caretStatus() const {
     if (caretSlur()) {
         parts.append(tr("Slur"));
     }
+    if (const int pedal = caretPedal(); pedal != 0) {
+        parts.append(pedal == static_cast<int>(core::Pedal::Change) ? tr("Pedal change")
+                                                                    : tr("Sustain pedal"));
+    }
     if (caretGraceNotes() > 0) {
         parts.append(tr("Grace notes"));
     }
@@ -2148,6 +2152,15 @@ void ScoreDocument::setOttava(int ottava) {
     }
     core::BeatEffects effects = beatEffectsAtCaret();
     effects.ottava = static_cast<core::Ottava>(ottava);
+    applyBeatEffects(effects);
+}
+
+void ScoreDocument::setPedal(int pedal) {
+    if (pedal < 0 || pedal > static_cast<int>(core::Pedal::Change)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.pedal = static_cast<core::Pedal>(pedal);
     applyBeatEffects(effects);
 }
 
@@ -2582,6 +2595,10 @@ int ScoreDocument::caretFermata() const {
 
 int ScoreDocument::caretOttava() const {
     return static_cast<int>(beatEffectsAtCaret().ottava);
+}
+
+int ScoreDocument::caretPedal() const {
+    return static_cast<int>(beatEffectsAtCaret().pedal);
 }
 
 bool ScoreDocument::caretSlur() const {

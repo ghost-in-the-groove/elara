@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <bit>
 #include <cstddef>
+#include <functional>
 #include <iterator>
 #include <optional>
 #include <stdexcept>
@@ -409,6 +410,72 @@ double Song::secondsAt(std::size_t measure, const Fraction& offset) const {
         start += headers_[m].timeSignature.measureLength();
     }
     return seconds;
+}
+
+namespace {
+
+// The beats of `measure` under the pedal, each a piece of a span.
+void addPedalPieces(const Measure& measure, std::vector<PedalSpan>& pieces) {
+    const auto isPedalled = [](const Beat& beat) {
+        return beat.effects.pedal != Pedal::None;
+    };
+    for (const Voice& voice : measure.voices) {
+        // As Song::fermataHolds(): look for the last beat under it first.
+        const auto last = std::find_if(voice.beats.rbegin(), voice.beats.rend(), isPedalled);
+        Fraction at;
+        for (auto beat = voice.beats.begin(); beat != last.base(); ++beat) {
+            const Fraction length = beat->duration.length();
+            if (isPedalled(*beat)) {
+                pieces.push_back({.start = at,
+                                  .end = at + length,
+                                  .change = beat->effects.pedal == Pedal::Change});
+            }
+            at += length;
+        }
+    }
+}
+
+// The pieces joined where they overlap or meet, cut where a change starts.
+std::vector<PedalSpan> joinPedalPieces(std::vector<PedalSpan>& pieces) {
+    std::ranges::stable_sort(pieces, std::less<>{}, &PedalSpan::start);
+    std::vector<PedalSpan> spans;
+    for (const PedalSpan& piece : pieces) {
+        if (spans.empty() || spans.back().end < piece.start) {
+            spans.push_back(piece);
+            continue;
+        }
+        PedalSpan& last = spans.back();
+        if (piece.change && last.start < piece.start) {
+            // Cut: what goes on past the change is a new span.
+            const Fraction end = std::max(last.end, piece.end);
+            last.end = piece.start;
+            spans.push_back({.start = piece.start, .end = end, .change = true});
+        } else {
+            last.end = std::max(last.end, piece.end);
+            last.change = last.change || piece.change;
+        }
+    }
+    return spans;
+}
+
+} // namespace
+
+std::vector<PedalSpan> pedalSpans(const Measure& measure) {
+    std::vector<PedalSpan> pieces;
+    addPedalPieces(measure, pieces);
+    return joinPedalPieces(pieces);
+}
+
+std::vector<PedalSpan> Song::pedalSpans(std::size_t track, std::size_t measure) const {
+    if (track >= trackCount() || measure >= measureCount()) {
+        throw std::out_of_range("Song::pedalSpans: track or measure out of range");
+    }
+    std::vector<PedalSpan> pieces;
+    const Track& part = tracks_[track];
+    for (std::size_t s = 0; s < part.staffCount(); ++s) {
+        addPedalPieces(part.staff(s).measure(measure), pieces);
+    }
+    return joinPedalPieces(pieces);
 }
 
 std::vector<FermataHold> Song::fermataHolds(std::size_t measure) const {

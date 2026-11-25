@@ -61,7 +61,8 @@ std::vector<std::pair<std::string_view, double>> defaultsOf(const notation::Engr
             {"tupletBracketThickness", d.tupletBracketThickness},
             {"hairpinThickness", d.hairpinThickness},
             {"repeatEndingLineThickness", d.repeatEndingLineThickness},
-            {"octaveLineThickness", d.octaveLineThickness}};
+            {"octaveLineThickness", d.octaveLineThickness},
+            {"pedalLineThickness", d.pedalLineThickness}};
 }
 
 int printGlyph(bool json, const EngravingFont& font, Glyph glyph) {
