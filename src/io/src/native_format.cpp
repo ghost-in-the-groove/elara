@@ -42,6 +42,8 @@ constexpr std::array kAccentNames = std::to_array<std::string_view>({"none", "ac
 constexpr std::array kDynamicNames =
     std::to_array<std::string_view>({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"});
 constexpr std::array kStrokeNames = std::to_array<std::string_view>({"none", "down", "up"});
+constexpr std::array kHairpinNames =
+    std::to_array<std::string_view>({"none", "crescendo", "diminuendo"});
 constexpr std::array kBassNames = std::to_array<std::string_view>({"none", "tap", "slap", "pop"});
 constexpr std::array kJumpToNames =
     std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
@@ -390,6 +392,7 @@ private:
             addText(object, "tremoloPicking", Duration(*fx.tremoloPicking).toString());
         }
         addEnumIfNot(object, "bassTechnique", kBassNames, fx.bassTechnique, BassTechnique::None);
+        addEnumIfNot(object, "hairpin", kHairpinNames, fx.hairpin, Hairpin::None);
         return object;
     }
 
@@ -976,6 +979,7 @@ private:
             fx.tremoloPicking = speed.value();
         }
         fx.bassTechnique = enumValue(object, "bassTechnique", kBassNames, BassTechnique::None);
+        fx.hairpin = enumValue(object, "hairpin", kHairpinNames, Hairpin::None);
         return fx;
     }
 

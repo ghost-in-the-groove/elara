@@ -163,6 +163,10 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
     CHECK(bar1[5].notes[0].effects.harmonic ==
           core::Harmonic{.kind = core::HarmonicKind::Natural, .fretTenths = 120});
     CHECK(bar1[5].notes[0].effects.letRing);
+    // A crescendo over the last two beats.
+    CHECK(bar1[3].effects.hairpin == core::Hairpin::None);
+    CHECK(bar1[4].effects.hairpin == core::Hairpin::Crescendo);
+    CHECK(bar1[5].effects.hairpin == core::Hairpin::Crescendo);
 
     // Bar 2: a tie, then a dead note with an accent, louder.
     const auto& bar2 = staff.measure(1).voices[0].beats;
@@ -189,6 +193,10 @@ TEST_CASE("Guitar Pro: a guitar keeps its tuning, capo, fret positions and techn
     CHECK(bar3[0].notes[0].effects.slideOut == core::SlideOut::Shift);
     CHECK(bar3[0].notes[0].effects.staccato);
     CHECK(bar3[2].isRest());
+    // A diminuendo (a "decrescendo" in the file) over the two notes.
+    CHECK(bar3[0].effects.hairpin == core::Hairpin::Diminuendo);
+    CHECK(bar3[1].effects.hairpin == core::Hairpin::Diminuendo);
+    CHECK(bar3[2].effects.hairpin == core::Hairpin::None);
 }
 
 TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", "[io][guitarpro]") {

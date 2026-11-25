@@ -1206,8 +1206,13 @@ private:
         if (!beat.graces.empty()) {
             warn("grace notes dropped", place.measure);
         }
+        if (beat.effects.hairpin != Hairpin::None) {
+            warn("hairpins dropped", place.measure);
+        }
         if (beat.isRest()) {
-            if (beat.effects != BeatEffects{}) {
+            BeatEffects others = beat.effects;
+            others.hairpin = Hairpin::None;
+            if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
             xml.open("note");
