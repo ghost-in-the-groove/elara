@@ -33,7 +33,8 @@ struct StartupOptions {
     QString screenshot;         ///< save the window here once shown, then quit
     QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`,
                                 ///< or the included one with `--included-soundfont`)
-    QString guitarSfz;          ///< an SFZ instrument for the guitars (`--guitar-sfz`)
+    QString guitarSfz;          ///< an SFZ instrument for the guitars (`--guitar-sfz`,
+                                ///< or the included one with `--included-guitar-sfz`)
     QString bassSfz;            ///< an SFZ instrument for the basses (`--bass-sfz`)
 };
 

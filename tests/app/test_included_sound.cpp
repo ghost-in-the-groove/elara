@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The SoundFont that comes with Elara's packages and the one the app starts
-// with (ADR-0069).
+// with (ADR-0069), and the guitar SFZ instrument that comes with them
+// (ADR-0072).
 #include "included_sound.hpp"
 #include <QDir>
 #include <QFile>
@@ -12,6 +13,7 @@
 
 namespace {
 
+using elara::app::includedGuitarSfz;
 using elara::app::includedSoundFont;
 using elara::app::startingSoundFont;
 
@@ -63,4 +65,32 @@ TEST_CASE("the app starts with the saved SoundFont, or else the included one", "
     CHECK(startingSoundFont(QString(), included).isEmpty()); // the built-in synthesizer
     // A chosen file since moved or removed: the included one.
     CHECK(startingSoundFont(root.filePath(QStringLiteral("gone.sf2")), included) == included);
+}
+
+TEST_CASE("the included guitar sits in a folder of its own under share/elara/sfz", "[app][sfz]") {
+    const QTemporaryDir root;
+    REQUIRE(root.isValid());
+    const QString bin = root.filePath(QStringLiteral("bin"));
+    REQUIRE(QDir().mkpath(bin));
+    CHECK(includedGuitarSfz(bin).isEmpty());
+
+    // Only SFZ files count, in the instrument's folder with its samples.
+    touch(root.filePath(QStringLiteral("share/elara/sfz/clean/LICENSE.txt")));
+    touch(root.filePath(QStringLiteral("share/elara/sfz/clean/samples/E2.flac")));
+    CHECK(includedGuitarSfz(bin).isEmpty());
+
+    const QString guitar =
+        touch(root.filePath(QStringLiteral("share/elara/sfz/clean/Clean Guitar.sfz")));
+    touch(root.filePath(QStringLiteral("share/elara/sfz/other/Other.sfz")));
+    CHECK(includedGuitarSfz(bin) == guitar); // the first folder by name
+}
+
+TEST_CASE("the included guitar sits in Resources/sfz in the macOS bundle", "[app][sfz]") {
+    const QTemporaryDir root;
+    REQUIRE(root.isValid());
+    const QString macos = root.filePath(QStringLiteral("elara.app/Contents/MacOS"));
+    REQUIRE(QDir().mkpath(macos));
+    const QString guitar =
+        touch(root.filePath(QStringLiteral("elara.app/Contents/Resources/sfz/clean/Clean.SFZ")));
+    CHECK(includedGuitarSfz(macos) == guitar);
 }

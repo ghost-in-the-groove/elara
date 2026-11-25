@@ -62,7 +62,7 @@ their SHA-1 and extracts them to `<outdir>/<version>/<kit>`. CI uses it too.
 | `build/dev/` | Debug build (`dev` preset), `bin/` holds every executable |
 | `build/release/` | RelWithDebInfo build |
 | `build/_downloads/` | Cached third-party downloads (JUCE, the Bravura and Arimo fonts) shared by build trees |
-| `build/downloads/` | Files `elara.py package` downloads and checks once: the included SoundFont and its licence (ADR-0069) |
+| `build/downloads/` | Files `elara.py package` downloads and checks once: the included SoundFont and its licence (ADR-0069), the included guitar SFZ instrument with its samples and licence (ADR-0072) |
 | `build/package/` | `elara.py package` output: the install tree (`stage/`), the packages and installers with their SHA-256, and what the installers' smoke tests unpacked (`msi/`, `Elara.AppDir/`) |
 
 The first configure downloads JUCE (~25 MB), builds JUCE's helper tool and
