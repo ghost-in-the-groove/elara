@@ -55,6 +55,9 @@ constexpr double kTempoNoteLift = 0.35;    // the note's head above the text's b
 constexpr double kTempoDotGap = 0.15;      // between the note and its dot
 constexpr double kTempoTextGap = 0.3;      // between the note (or dot) and "= 120"
 constexpr double kRampWordGap = 0.6;       // between "= 120" and "accel."
+constexpr double kFeelGap = 0.8;           // between a tempo mark and a triplet feel mark
+constexpr double kFeelEqualsGap = 0.3;     // on each side of the triplet feel mark's "="
+constexpr double kFeelNoteGap = 0.15;      // between its unbeamed notes
 constexpr double kRampGap = 0.5;           // around the dashed line of a gradual change
 constexpr double kRampMinLine = 1.0;       // shorter dashed lines are left out
 constexpr double kRampLift = 0.35;         // the dashed line above the baseline
@@ -695,6 +698,84 @@ double drawTempo(DisplayList& system, const EngravingFont& font, const core::Tem
     return end;
 }
 
+// True for a triplet feel of pairs of sixteenths.
+bool sixteenthPairs(core::TripletFeel feel) {
+    return feel == core::TripletFeel::Sixteenth || feel == core::TripletFeel::DottedSixteenth ||
+           feel == core::TripletFeel::ScottishSixteenth;
+}
+
+// Draws a triplet feel mark (ADR-0104) from `x` on `baseline` for measure m:
+// a pair of the feel's note value as written, "=", and the pair as played,
+// in SMuFL's text-based and metronome notes; a straight pair where the feel
+// ends (`feel` None after `before`). Raises `highest` to its top and returns
+// where it ends.
+double drawTripletFeel(DisplayList& system, const EngravingFont& font, core::TripletFeel feel,
+                       core::TripletFeel before, std::size_t m, double x, double baseline,
+                       double& highest) {
+    using core::TripletFeel;
+    const bool sixteenths = sixteenthPairs(feel == TripletFeel::None ? before : feel);
+    const double y = baseline - kTempoNoteLift;
+    double at = x;
+    const auto put = [&](Glyph glyph, double gap = 0.0) {
+        const GlyphMetrics& metrics = font.metrics(glyph);
+        at += gap;
+        system.glyphs.push_back(GlyphItem{.glyph = glyph,
+                                          .origin = {at, y},
+                                          .role = Role::Tempo,
+                                          .measure = m,
+                                          .scale = kTempoNoteScale});
+        highest = std::min(highest, y - metrics.box.northEast.y * kTempoNoteScale);
+        at += metrics.advanceWidth * kTempoNoteScale;
+    };
+    const auto pair = [&] {
+        put(Glyph::TextBlackNoteShortStem);
+        put(sixteenths ? Glyph::TextCont16thBeamShortStem : Glyph::TextCont8thBeamShortStem);
+        put(sixteenths ? Glyph::TextBlackNoteFrac16thShortStem
+                       : Glyph::TextBlackNoteFrac8thShortStem);
+    };
+    pair();
+    at += kFeelEqualsGap;
+    system.texts.push_back(TextItem{.text = "=",
+                                    .origin = {at, baseline},
+                                    .size = kTempoSize,
+                                    .align = TextAlign::Left,
+                                    .role = Role::Tempo,
+                                    .measure = m});
+    at += textWidth("=", kTempoSize) + kFeelEqualsGap;
+    // The notes of a pair played long and short: a triplet's, or a dotted
+    // note's and the note a third its length.
+    const Glyph tripletLong = sixteenths ? Glyph::MetNote8thUp : Glyph::MetNoteQuarterUp;
+    const Glyph tripletShort = sixteenths ? Glyph::MetNote16thUp : Glyph::MetNote8thUp;
+    const Glyph dotted = sixteenths ? Glyph::MetNote16thUp : Glyph::MetNote8thUp;
+    const Glyph third = sixteenths ? Glyph::MetNote32ndUp : Glyph::MetNote16thUp;
+    switch (feel) {
+    case TripletFeel::None:
+        pair();
+        break;
+    case TripletFeel::Eighth:
+    case TripletFeel::Sixteenth:
+        put(Glyph::TextTupletBracketStartShortStem);
+        put(tripletLong);
+        put(Glyph::TextTuplet3ShortStem);
+        put(tripletShort);
+        put(Glyph::TextTupletBracketEndShortStem);
+        break;
+    case TripletFeel::DottedEighth:
+    case TripletFeel::DottedSixteenth:
+        put(dotted);
+        put(Glyph::MetAugmentationDot, kTempoDotGap);
+        put(third, kFeelNoteGap);
+        break;
+    case TripletFeel::ScottishEighth:
+    case TripletFeel::ScottishSixteenth:
+        put(third);
+        put(dotted, kFeelNoteGap);
+        put(Glyph::MetAugmentationDot, kTempoDotGap);
+        break;
+    }
+    return at;
+}
+
 // The tempo change after the `index`th one of measure m, and its measure.
 struct NextChange {
     std::size_t measure = 0;
@@ -730,9 +811,11 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
     struct Mark {
         std::size_t measure = 0;
         double x = 0.0;
-        std::optional<core::Tempo> tempo{}; // none: only a gradual change goes on
-        std::string_view word{};            // "accel.", "rit." or none
-        double rampEnd = 0.0;               // where its dashed line ends, if beyond x
+        std::optional<core::Tempo> tempo{};      // none: only a gradual change goes on
+        std::string_view word{};                 // "accel.", "rit." or none
+        double rampEnd = 0.0;                    // where its dashed line ends, if beyond x
+        std::optional<core::TripletFeel> feel{}; // the triplet feel starting here (ADR-0104)
+        core::TripletFeel feelBefore = core::TripletFeel::None;
     };
     std::vector<Mark> marks;
     if (measures.empty()) {
@@ -818,6 +901,22 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
             }
             current = change.tempo;
         }
+        // A triplet feel mark where the feel changes, after a tempo mark at
+        // the start of the measure (ADR-0104).
+        const core::TripletFeel feelBefore =
+            m == 0 ? core::TripletFeel::None : song.measureHeader(m - 1).tripletFeel;
+        if (header.tripletFeel != feelBefore) {
+            const double start = xAt({});
+            auto at = std::ranges::find_if(marks, [&](const Mark& mark) {
+                return mark.measure == m && std::abs(mark.x - start) < kEpsilon;
+            });
+            if (at == marks.end()) {
+                marks.push_back(Mark{.measure = m, .x = start});
+                at = marks.end() - 1;
+            }
+            at->feel = header.tripletFeel;
+            at->feelBefore = feelBefore;
+        }
     }
     if (marks.empty()) {
         return;
@@ -831,8 +930,12 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         if (mark.tempo) {
             after = drawTempo(system, font, *mark.tempo, mark.measure, mark.x, baseline, highest);
         }
+        if (mark.feel) {
+            after = drawTripletFeel(system, font, *mark.feel, mark.feelBefore, mark.measure,
+                                    mark.tempo ? after + kFeelGap : after, baseline, highest);
+        }
         if (!mark.word.empty()) {
-            if (mark.tempo) {
+            if (mark.tempo || mark.feel) {
                 after += kRampWordGap;
             }
             system.texts.push_back(TextItem{.text = std::string(mark.word),
@@ -845,7 +948,8 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
             after += textWidth(mark.word, kTempoSize);
         }
         // A line going on from an earlier system starts at the measure.
-        const double from = mark.tempo || !mark.word.empty() ? after + kRampGap : after;
+        const double from =
+            mark.tempo || mark.feel || !mark.word.empty() ? after + kRampGap : after;
         const double to = mark.rampEnd - kRampGap;
         if (to - from >= kRampMinLine) {
             const double y = baseline - kRampLift;

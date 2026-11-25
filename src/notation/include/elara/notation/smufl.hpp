@@ -173,6 +173,15 @@ enum class Glyph : std::uint8_t {
     MetNote16thUp,
     MetNote32ndUp,
     MetAugmentationDot,
+    // Text-based notes, for triplet feel marks (ADR-0104)
+    TextBlackNoteShortStem,
+    TextBlackNoteFrac8thShortStem,
+    TextBlackNoteFrac16thShortStem,
+    TextCont8thBeamShortStem,
+    TextCont16thBeamShortStem,
+    TextTupletBracketStartShortStem,
+    TextTuplet3ShortStem,
+    TextTupletBracketEndShortStem,
     // Staff groups
     Brace,
     // Chord diagrams (ADR-0080)
