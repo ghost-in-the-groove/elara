@@ -64,9 +64,13 @@
 <text class="notehead" x="30.407" y="22.45" stroke="none">&#xE0A9;</text>
 <text class="notehead" x="15.079" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="19.801" y="27.45" stroke="none">&#xE0A9;</text>
+<text class="parenthesis" x="19.285" y="27.45" stroke="none">&#xE0F5;</text>
+<text class="parenthesis" x="21.185" y="27.45" stroke="none">&#xE0F6;</text>
 <text class="notehead" x="24.043" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="26.165" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="28.286" y="27.45" stroke="none">&#xE0A9;</text>
+<text class="parenthesis" x="27.77" y="27.45" stroke="none">&#xE0F5;</text>
+<text class="parenthesis" x="29.67" y="27.45" stroke="none">&#xE0F6;</text>
 <text class="notehead" x="33.927" y="22.45" stroke="none">&#xE0A9;</text>
 <text class="notehead" x="36.049" y="22.45" stroke="none">&#xE0A9;</text>
 <text class="notehead" x="38.17" y="22.45" stroke="none">&#xE0A9;</text>
@@ -79,9 +83,13 @@
 <text class="notehead" x="48.777" y="22.45" stroke="none">&#xE0A9;</text>
 <text class="notehead" x="33.927" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="38.17" y="27.45" stroke="none">&#xE0A9;</text>
+<text class="parenthesis" x="37.654" y="27.45" stroke="none">&#xE0F5;</text>
+<text class="parenthesis" x="39.554" y="27.45" stroke="none">&#xE0F6;</text>
 <text class="notehead" x="42.413" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="44.534" y="26.45" stroke="none">&#xE0A4;</text>
 <text class="notehead" x="46.655" y="27.45" stroke="none">&#xE0A9;</text>
+<text class="parenthesis" x="46.139" y="27.45" stroke="none">&#xE0F5;</text>
+<text class="parenthesis" x="48.039" y="27.45" stroke="none">&#xE0F6;</text>
 <text class="dynamic" x="14.413" y="33.226" stroke="none">&#xE522;</text>
 <text class="tempo" x="15.079" y="17.2" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Drums</text>

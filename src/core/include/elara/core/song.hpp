@@ -337,8 +337,9 @@ public:
 
     /// Where measure m of a track is under its sustain pedal (ADR-0092): the
     /// beats of every staff and voice under it, joined where they overlap or
-    /// meet, cut where a change starts, in order. Throws std::out_of_range for
-    /// a track or a measure out of range.
+    /// meet, cut where a change starts, in order; a measure repeat holds those
+    /// of the measure it repeats (ADR-0102). Throws std::out_of_range for a
+    /// track or a measure out of range.
     [[nodiscard]] std::vector<PedalSpan> pedalSpans(std::size_t track, std::size_t measure) const;
     [[nodiscard]] double durationSeconds() const { return secondsAt(measureCount()); }
 
@@ -355,5 +356,13 @@ private:
     std::vector<MeasureHeader> headers_;
     std::vector<Track> tracks_;
 };
+
+/// The measure whose music measure `measure` of `staff`, a staff of `song`,
+/// plays (ADR-0102): the measure itself, or for a measure repeat the measure
+/// it repeats, followed through repeats of repeats. A repeat counts on a
+/// measure with no beats of its own, after enough measures, repeating
+/// measures of its length; otherwise the measure plays its own music.
+/// Throws std::out_of_range for a missing measure.
+[[nodiscard]] std::size_t repeatSource(const Song& song, const Staff& staff, std::size_t measure);
 
 } // namespace elara::core

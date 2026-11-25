@@ -47,6 +47,10 @@ constexpr double kDotSeparation = 0.25;
 constexpr double kStemLength = 3.5;
 constexpr double kExtraFlagStem = 0.75; // per flag beyond the second
 constexpr double kBeamExtraStem = 0.5;  // per beam beyond the first
+// Between tremolo slashes and the notehead, tip, flag or beam (ADR-0101), and
+// the share of a flag's height the slashes keep clear of.
+constexpr double kTremoloGap = 0.4;
+constexpr double kTremoloFlagShare = 0.9;
 constexpr double kMaxBeamSlant = 1.0;
 constexpr double kVoiceRestShift = 2.0;
 constexpr double kMiddleLine = 2.0;
@@ -75,6 +79,7 @@ constexpr double kSlideDrop = 0.75;
 constexpr double kSlideBreak = 0.75;
 constexpr double kSlideThickness = 0.12;
 constexpr double kGraceSlideGap = 0.9;    // between a grace note sliding to its chord and the chord
+constexpr double kParenthesisGap = 0.08;  // between a ghost note's notehead and its parentheses
 constexpr double kClefChangeScale = 0.75; // a clef change against the line's clef (ADR-0087)
 constexpr double kClefChangeGap = 0.5;    // between a clef change and the barline after it
 constexpr double kArticulationGap = 0.3;  // between a notehead and its articulation
@@ -299,6 +304,7 @@ struct Head {
     double accidentalX = 0.0; // accidental origin, from the chord's x
     double dx = 0.0;          // notehead origin, from the chord's x
     const core::Note* note = nullptr;
+    bool ghost = false; // drawn between parentheses (ADR-0099)
     // The finger of a fretting hand, small left of the notehead (ADR-0093).
     std::optional<Glyph> fingering;
     double fingeringX = 0.0; // its origin, from the chord's x
@@ -317,6 +323,9 @@ struct Chord {
     int beamGroup = -1;
     double headLeft = 0.0;
     double headRight = 0.0;
+    // Beside the noteheads, the room the parentheses of its ghost notes take
+    // on each side, gap included; 0 without ghost notes (ADR-0099).
+    double ghostPad = 0.0;
     double left = 0.0; // ink extents from the chord's x
     double right = 0.0;
     double x = 0.0;
@@ -464,7 +473,9 @@ public:
     double changes(std::size_t m, double x) override;
     double ending(std::size_t m, double x) override { return endingAt(m, x); }
     void collect(std::size_t m, std::vector<ColumnInk>& ink) override;
-    [[nodiscard]] double emptyWidth() const override { return widthOf(Glyph::RestWhole); }
+    [[nodiscard]] double emptyWidth() const override {
+        return std::max(widthOf(Glyph::RestWhole), repeatWidth(repeat_));
+    }
     void draw(std::span<const ColumnPosition> positions, double start, double barline) override;
 
 private:
@@ -645,6 +656,7 @@ private:
         fingerings();
         slurs();
         centreMeasureRests(start, barline);
+        measureRepeat(repeat_, start, barline);
         fermatas(start, barline);
         ornaments(positions, barline);
         if (techniques_) {
@@ -789,6 +801,9 @@ private:
     }
 
     void centreMeasureRests(double start, double barline) {
+        if (repeat_ != core::MeasureRepeat::None) { // its sign instead (ADR-0102)
+            return;
+        }
         for (const Chord& chord : chords_) {
             if (chord.measureRest) {
                 const BoundingBox& box = metrics(Glyph::RestWhole).box;
@@ -830,6 +845,7 @@ private:
         const core::Measure& measure = staff_.measure(m);
         const TimeSignature time = song_.measureHeader(m).timeSignature;
         const Fraction length = time.measureLength();
+        repeat_ = shownRepeat(song_, staff_, m);
         voiceCount_ = 0;
         for (const core::Voice& voice : measure.voices) {
             if (!voice.isEmpty()) {
@@ -998,6 +1014,7 @@ private:
         Head head;
         head.note = &note;
         head.tied = note.effects.tiedFromPrevious;
+        head.ghost = note.effects.ghost;
         if (percussion_) {
             const detail::DrumNote drum = detail::drumNote(note.pitch.midiNumber());
             head.step = drum.step;
@@ -1009,8 +1026,13 @@ private:
         head.diatonic = diatonicIndex(written);
         head.step = topLineIndex(clef_) - head.diatonic;
         head.alter = written.alter();
-        head.glyph = noteheadFor(value, note.effects.deadNote ? detail::DrumHead::X
-                                                              : detail::DrumHead::Normal);
+        // A dead note is a cross; a natural harmonic, written where it is
+        // touched, a diamond (ADR-0100).
+        const detail::DrumHead shape = note.effects.deadNote ? detail::DrumHead::X
+                                       : note.effects.harmonic.kind == core::HarmonicKind::Natural
+                                           ? detail::DrumHead::Diamond
+                                           : detail::DrumHead::Normal;
+        head.glyph = noteheadFor(value, shape);
         return head;
     }
 
@@ -1189,11 +1211,16 @@ private:
             chord.headLeft = std::min(chord.headLeft, head.dx + box.southWest.x);
             chord.headRight = std::max(chord.headRight, head.dx + box.northEast.x);
         }
-        chord.left = chord.headLeft - placeAccidentals(chord);
+        chord.ghostPad =
+            std::ranges::any_of(heads, &Head::ghost)
+                ? kParenthesisGap + std::max(metrics(Glyph::NoteheadParenthesisLeft).box.width(),
+                                             metrics(Glyph::NoteheadParenthesisRight).box.width())
+                : 0.0;
+        chord.left = chord.headLeft - chord.ghostPad - placeAccidentals(chord);
         if (fretting_ && !percussion_) {
             chord.left -= placeFingerings(chord, chord.left);
         }
-        chord.right = chord.headRight + dotsWidth(chord.duration.dots());
+        chord.right = chord.headRight + chord.ghostPad + dotsWidth(chord.duration.dots());
         if (stem && chord.beamGroup < 0 && beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
             const Head& base = chord.stemUp ? heads.back() : heads.front();
@@ -1201,7 +1228,69 @@ private:
                 stemAnchor(base, chord.stemUp).x - (chord.stemUp ? stemWidth : 0.0);
             chord.right = std::max(chord.right, stemLeft + metrics(flag).box.northEast.x);
         }
+        if (const auto slashes = tremoloOf(chord)) {
+            const double half = metrics(*slashes).box.width() / 2;
+            double centre = (chord.headLeft + chord.headRight) / 2;
+            if (stem) {
+                const Head& base = chord.stemUp ? heads.back() : heads.front();
+                centre = stemAnchor(base, chord.stemUp).x +
+                         (chord.stemUp ? -stemWidth / 2 : stemWidth / 2);
+            }
+            chord.left = std::min(chord.left, centre - half);
+            chord.right = std::max(chord.right, centre + half);
+        }
         makeRoomForBreath(chord);
+    }
+
+    // The slashes of a chord's tremolo picking (ADR-0101), if any.
+    [[nodiscard]] static std::optional<Glyph> tremoloOf(const Chord& chord) {
+        if (chord.rest || chord.beat == nullptr || !chord.beat->effects.tremoloPicking) {
+            return std::nullopt;
+        }
+        return tremoloGlyph(tremoloStrokes(*chord.beat->effects.tremoloPicking));
+    }
+
+    // The edge of the notehead nearest the stem's tip, or where it would be.
+    [[nodiscard]] double headEdge(const Chord& chord) const {
+        if (chord.stemUp) {
+            const Head& head = chord.heads.front();
+            return yOf(head.step) - metrics(head.glyph).box.northEast.y;
+        }
+        const Head& head = chord.heads.back();
+        return yOf(head.step) - metrics(head.glyph).box.southWest.y;
+    }
+
+    // The stem a chord needs from its notehead nearest the tip for its
+    // tremolo slashes, their gaps and `zone`, the flag or beams at the tip;
+    // 0 without tremolo picking.
+    [[nodiscard]] double tremoloStem(const Chord& chord, double zone) const {
+        const double room = tremoloRoom(chord);
+        if (room == 0.0) {
+            return 0.0;
+        }
+        const Head& head = chord.stemUp ? chord.heads.front() : chord.heads.back();
+        return std::abs(headEdge(chord) - yOf(head.step)) + room + zone;
+    }
+
+    // The height of a chord's tremolo slashes and their gaps; 0 without them.
+    [[nodiscard]] double tremoloRoom(const Chord& chord) const {
+        const auto slashes = tremoloOf(chord);
+        return slashes ? metrics(*slashes).box.height() + 2 * kTremoloGap : 0.0;
+    }
+
+    // A chord's tremolo slashes centred on `x`, midway between its notehead
+    // and `inner`, where the stem's tip or the flag or beams at it begin.
+    void tremolo(Chord& chord, double x, double inner) {
+        const auto slashes = tremoloOf(chord);
+        if (!slashes) {
+            return;
+        }
+        const BoundingBox& box = metrics(*slashes).box;
+        const double y = (headEdge(chord) + inner) / 2;
+        glyph(*slashes, x - (box.southWest.x + box.northEast.x) / 2,
+              y + (box.southWest.y + box.northEast.y) / 2, Role::Technique);
+        chord.inkTop = std::min(chord.inkTop, y - box.height() / 2);
+        chord.inkBottom = std::max(chord.inkBottom, y + box.height() / 2);
     }
 
     // The glyph of the break after a chord's beat, if any (ADR-0095).
@@ -1291,7 +1380,7 @@ private:
             return 0.0;
         }
         std::vector<double> rightEdge(columns.size());
-        double edge = chord.headLeft - kAccidentalGap;
+        double edge = chord.headLeft - chord.ghostPad - kAccidentalGap;
         for (std::size_t c = 0; c < columns.size(); ++c) {
             rightEdge[c] = edge;
             edge -= columns[c].width + kAccidentalColumnGap;
@@ -1303,7 +1392,7 @@ private:
                     rightEdge[columnOf[i]] - metrics(*head.accidental).box.northEast.x;
             }
         }
-        return chord.headLeft - (edge + kAccidentalColumnGap);
+        return chord.headLeft - chord.ghostPad - (edge + kAccidentalColumnGap);
     }
 
     // The glyph of a finger: 1 to 5 from the thumb, or for a fretting hand T
@@ -1391,6 +1480,21 @@ private:
         return left - (edge + kFingeringGap);
     }
 
+    // The parentheses round the notehead of a ghost note (ADR-0099), its
+    // chord at x, at `scale` of their size.
+    void parentheses(const Head& head, double x, double scale) {
+        const BoundingBox& box = metrics(head.glyph).box;
+        const BoundingBox& opening = metrics(Glyph::NoteheadParenthesisLeft).box;
+        const BoundingBox& closing = metrics(Glyph::NoteheadParenthesisRight).box;
+        const double y = yOf(head.step);
+        glyph(Glyph::NoteheadParenthesisLeft,
+              x + (head.dx + box.southWest.x - kParenthesisGap - opening.northEast.x) * scale, y,
+              Role::Parenthesis, scale);
+        glyph(Glyph::NoteheadParenthesisRight,
+              x + (head.dx + box.northEast.x + kParenthesisGap - closing.southWest.x) * scale, y,
+              Role::Parenthesis, scale);
+    }
+
     void draw(Chord& chord) {
         const double x = chord.x;
         if (chord.rest) {
@@ -1412,6 +1516,10 @@ private:
         for (const Head& head : chord.heads) {
             glyph(head.glyph, x + head.dx, yOf(head.step), Role::Notehead);
             ink(metrics(head.glyph).box, yOf(head.step));
+            if (head.ghost) {
+                parentheses(head, x, 1.0);
+                ink(metrics(Glyph::NoteheadParenthesisLeft).box, yOf(head.step));
+            }
             if (head.accidental) {
                 glyph(*head.accidental, x + head.accidentalX, yOf(head.step), Role::Accidental);
                 ink(metrics(*head.accidental).box, yOf(head.step));
@@ -1433,9 +1541,13 @@ private:
                 dotYs.push_back(dotY);
             }
         }
-        dots(x + chord.headRight, dotYs, chord.duration.dots());
+        dots(x + chord.headRight + chord.ghostPad, dotYs, chord.duration.dots());
         ledgerLines(chord, x);
         if (!hasStem(chord.duration.value())) {
+            // Tremolo slashes where its stem would be.
+            const double room = tremoloRoom(chord);
+            tremolo(chord, x + (chord.headLeft + chord.headRight) / 2,
+                    headEdge(chord) + (chord.stemUp ? -room : room));
             return;
         }
         const double stemWidth = defaults_.stemThickness;
@@ -1446,13 +1558,20 @@ private:
         if (chord.beamGroup >= 0) {
             return; // the beam decides where the stem ends
         }
-        const double length = stemLengthFor(chord.duration.value());
+        // Tremolo slashes lengthen the stem to stay clear of the flag.
+        const NoteValue value = chord.duration.value();
+        const double flagZone =
+            beamCount(value) > 0
+                ? metrics(flagFor(value, chord.stemUp)).box.height() * kTremoloFlagShare
+                : 0.0;
+        const double length = std::max(stemLengthFor(value), tremoloStem(chord, flagZone));
         const double tip = chord.stemUp
                                ? std::min(yOf(chord.heads.front().step) - length, kMiddleLine)
                                : std::max(yOf(chord.heads.back().step) + length, kMiddleLine);
         line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
         chord.inkTop = std::min(chord.inkTop, tip);
         chord.inkBottom = std::max(chord.inkBottom, tip);
+        tremolo(chord, chord.stemX, tip + (chord.stemUp ? flagZone : -flagZone));
         if (beamCount(chord.duration.value()) > 0) {
             const Glyph flag = flagFor(chord.duration.value(), chord.stemUp);
             const Point attach = metrics(flag)
@@ -1557,6 +1676,9 @@ private:
             const double x = chord.x + grace.x;
             for (const Head& head : grace.heads) {
                 glyph(head.glyph, x + head.dx * kScale, yOf(head.step), Role::Notehead, kScale);
+                if (head.ghost) {
+                    parentheses(head, x, kScale);
+                }
                 if (head.accidental) {
                     glyph(*head.accidental, x + head.accidentalX * kScale, yOf(head.step),
                           Role::Accidental, kScale);
@@ -1638,12 +1760,13 @@ private:
         if (head.accidental) {
             return chord.x + head.accidentalX + metrics(*head.accidental).box.southWest.x;
         }
-        return chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+        return chord.x + head.dx + metrics(head.glyph).box.southWest.x -
+               (head.ghost ? chord.ghostPad : 0.0);
     }
 
-    // The right of a notehead of the chord, after its dots.
+    // The right of a notehead of the chord, after its parentheses and dots.
     [[nodiscard]] double inkRightOf(const Chord& chord, const Head& head) const {
-        return chord.x + head.dx + metrics(head.glyph).box.northEast.x +
+        return chord.x + head.dx + metrics(head.glyph).box.northEast.x + chord.ghostPad +
                dotsWidth(chord.duration.dots());
     }
 
@@ -1799,13 +1922,20 @@ private:
         }
         const double slope = slant == 0.0 ? 0.0 : slant / span;
         const double minimum = kStemLength + kBeamExtraStem * (levels - 1);
+        // The beams over a chord's stem, from the outer edge of the primary one.
+        const double step = thickness + defaults_.beamSpacing;
+        const auto zone = [&](const Chord& chord) {
+            return thickness + (beamCount(chord.duration.value()) - 1) * step;
+        };
         // The outer edge of the primary beam: y = edge + slope * (x - first.stemX).
         double edge =
             up ? std::numeric_limits<double>::max() : std::numeric_limits<double>::lowest();
         for (const std::size_t c : group) {
             const Chord& chord = chords_[c];
+            // Tremolo slashes lengthen the stem to stay clear of the beams.
+            const double length = std::max(minimum, tremoloStem(chord, zone(chord)));
             const double needed =
-                end(chord) + (up ? -minimum : minimum) - slope * (chord.stemX - first.stemX);
+                end(chord) + (up ? -length : length) - slope * (chord.stemX - first.stemX);
             edge = up ? std::min(edge, needed) : std::max(edge, needed);
         }
         // Notes far outside the staff: the beam still reaches the middle line.
@@ -1825,8 +1955,8 @@ private:
             line({chord.stemX, chord.stemStart}, {chord.stemX, tip}, stemWidth, Role::Stem);
             chord.inkTop = std::min(chord.inkTop, tip);
             chord.inkBottom = std::max(chord.inkBottom, tip);
+            tremolo(chord, chord.stemX, tip + (up ? zone(chord) : -zone(chord)));
         }
-        const double step = thickness + defaults_.beamSpacing;
         for (int level = 1; level <= levels; ++level) {
             const double offset = (up ? 1.0 : -1.0) * (thickness / 2 + (level - 1) * step);
             const auto add = [&](double left, double right) {
@@ -1926,7 +2056,8 @@ private:
                 continue;
             }
             const double left = from == previous.end() ? lineStart_ : from->right;
-            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x;
+            const double right = chord.x + head.dx + metrics(head.glyph).box.southWest.x -
+                                 (head.ghost ? chord.ghostPad : 0.0);
             tie(head.step, tieAbove(chord, i), left + kTieGap, right - kTieGap);
         }
         previous.clear();
@@ -1936,10 +2067,11 @@ private:
         const double dots = dotsWidth(chord.duration.dots());
         for (std::size_t i = 0; i < count; ++i) {
             const Head& head = chord.heads[i];
-            previous.push_back(
-                TieStart{.step = head.step,
-                         .right = chord.x + head.dx + metrics(head.glyph).box.northEast.x + dots,
-                         .above = tieAbove(chord, i)});
+            previous.push_back(TieStart{.step = head.step,
+                                        .right = chord.x + head.dx +
+                                                 metrics(head.glyph).box.northEast.x +
+                                                 chord.ghostPad + dots,
+                                        .above = tieAbove(chord, i)});
         }
     }
 
@@ -2300,6 +2432,7 @@ private:
             if (rolls_) {
                 marks.strum = core::Strum::None; // an arpeggio line instead of an arrow
             }
+            marks.tremoloStrokes = 0; // slashes through the stems instead (ADR-0101)
             if (lanes_.wants(marks)) {
                 const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
                 lanes_.column(marks, column.x + centre, end, measure_);
@@ -2599,6 +2732,7 @@ private:
     AboveRow aboveRow_; // chord symbols and beat text (ADR-0080, ADR-0081)
     LyricsRow lyrics_;  // ADR-0084
     std::size_t measureIndex_ = 0;
+    core::MeasureRepeat repeat_ = core::MeasureRepeat::None; // the sign of the measure read
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
     std::array<bool, core::Measure::kMaxVoices> incoming_{}; // ties from the line before

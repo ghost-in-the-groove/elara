@@ -166,6 +166,12 @@ core::Song richSong() {
     // Clef changes, one on an empty measure at the end (ADR-0087).
     song.track(2).staff(1).measure(1).clef = Clef::Treble;
     song.track(2).staff(1).measure(4).clef = Clef::Tenor;
+    // Measure repeats (ADR-0102): the bass repeats its last measure, the
+    // piano's right hand the two before.
+    using elara::core::MeasureRepeat;
+    bass.measure(4).repeat = MeasureRepeat::One;
+    song.track(2).staff(0).measure(3).repeat = MeasureRepeat::TwoFirst;
+    song.track(2).staff(0).measure(4).repeat = MeasureRepeat::TwoSecond;
     song.track(3).staff(0).measure(4).voices[0].beats = {
         beat("breve", {Note{.pitch = Pitch::fromMidi(36)}, Note{.pitch = Pitch::fromMidi(42)}})};
     return song;
@@ -236,6 +242,12 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
             R"("clef":"bass","clefs":[{"measure":1,"clef":"treble"},{"measure":4,"clef":"tenor"}],)") !=
         std::string::npos);
     CHECK(json.find(R"("clefs":[])") == std::string::npos);
+    CHECK(json.find(R"("repeats":[{"measure":4,"repeat":"one"}])") != std::string::npos);
+    CHECK(
+        json.find(
+            R"("repeats":[{"measure":3,"repeat":"two-first"},{"measure":4,"repeat":"two-second"}])") !=
+        std::string::npos);
+    CHECK(json.find(R"("repeats":[])") == std::string::npos);
     CHECK(json.find(R"("slideIn":"from-below")") != std::string::npos);
     CHECK(json.find(R"("trill":{"semitones":2,"speed":"16"})") != std::string::npos);
     CHECK(json.find(R"("ornament":"inverted-turn")") != std::string::npos);
@@ -334,6 +346,14 @@ TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
         "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","clefs":[{"measure":0,"clef":"soprano"}]}]}]})")
               .starts_with("tracks[0].staves[0].clefs[0].clef:"));
+
+    // A measure repeat past the song's end, or of no kind Elara knows.
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","repeats":[{"measure":1,"repeat":"one"}]}]}]})")
+              .starts_with("tracks[0].staves[0].repeats[0].measure:"));
+    CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
+        "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","repeats":[{"measure":0,"repeat":"three"}]}]}]})")
+              .starts_with("tracks[0].staves[0].repeats[0].repeat:"));
 
     // More measures in a staff than in the song.
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",

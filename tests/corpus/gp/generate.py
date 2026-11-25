@@ -165,7 +165,8 @@ GP8_HEADER = ("<GPVersion>8.0.2</GPVersion><GPRevision>13002</GPRevision>"
 
 def score(*, info, tempos, tracks, master_bars, header=GP8_HEADER) -> str:
     """master_bars: dicts with time, key (fifths, mode), extra XML and one bar per
-    staff of every track: (clef, [voice beats...])."""
+    staff of every track: (clef, [voice beats...]) or (clef, [voice beats...],
+    simile mark)."""
     rhythms: dict = {}
     bars, voices, beats, notes = [], [], [], []
 
@@ -177,7 +178,7 @@ def score(*, info, tempos, tracks, master_bars, header=GP8_HEADER) -> str:
     master_xml = []
     for master in master_bars:
         bar_ids = []
-        for clef, bar_voices in master["bars"]:
+        for clef, bar_voices, *simile in master["bars"]:
             voice_ids = []
             for voice in bar_voices:
                 beat_ids = []
@@ -200,7 +201,8 @@ def score(*, info, tempos, tracks, master_bars, header=GP8_HEADER) -> str:
                               + " ".join(map(str, beat_ids)) + "</Beats></Voice>")
                 voice_ids.append(len(voices) - 1)
             voice_ids += [-1] * (4 - len(voice_ids))
-            bars.append(f'<Bar id="{len(bars)}"><Clef>{clef}</Clef><Voices>'
+            mark = f"<SimileMark>{simile[0]}</SimileMark>" if simile else ""
+            bars.append(f'<Bar id="{len(bars)}"><Clef>{clef}</Clef>{mark}<Voices>'
                         + " ".join(map(str, voice_ids)) + "</Voices></Bar>")
             bar_ids.append(len(bars) - 1)
         fifths, mode = master.get("key", (0, "Major"))
@@ -611,9 +613,33 @@ def double_coda() -> str:
         tempos=[(0, 0, "120 2", False)], tracks=[guitar], master_bars=master_bars)
 
 
+# ---- simile.gp --------------------------------------------------------------------
+
+def simile() -> str:
+    """Measure repeats (ADR-0102): 1 | % | 3 | 4 | %% (two measures) | 7, played
+    1 1 3 4 3 4 7. Guitar Pro keeps a whole rest in a bar with a simile mark."""
+    guitar = Track("Guitar", set_type="electricGuitar", set_name="Electric Guitar", program=27,
+                   transpose=(0, -1), staves=[{"tuning": GUITAR}])
+
+    def riff(*frets):
+        return [[Beat("Quarter", [Note(string=1, fret=f, midi=GUITAR[1] + f)]) for f in frets]]
+
+    rest = [[Beat("Whole")]]
+    bars = [("G2", riff(3, 5, 3, 5)), ("G2", rest, "Simple"), ("G2", riff(7, 5, 3, 5)),
+            ("G2", riff(2, 3, 5, 7)), ("G2", rest, "FirstOfDouble"),
+            ("G2", rest, "SecondOfDouble"),
+            ("G2", [[Beat("Whole", [Note(string=1, fret=3, midi=GUITAR[1] + 3)])]])]
+    return score(
+        info={"Title": "Corpus Simile", "Artist": "Ghost in the Groove",
+              "Copyright": "CC0 1.0", "Tabber": "Elara contributors"},
+        tempos=[(0, 0, "120 2", False)], tracks=[guitar],
+        master_bars=[{"time": "4/4", "bars": [bar]} for bar in bars])
+
+
 FILES = {
     "guitar-techniques.gp": lambda: gp_file(guitar_techniques()),
     "double-coda.gp": lambda: gp_file(double_coda()),
+    "simile.gp": lambda: gp_file(simile()),
         "band.gp": lambda: gp_file(band(), part_configuration(BAND_PARTS)),
     "duet.gpx": duet,
 }

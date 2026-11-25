@@ -206,6 +206,10 @@
         <translation>Diminuendo</translation>
     </message>
     <message>
+        <source>Phrasing and lines</source>
+        <translation>Fraseo y líneas</translation>
+    </message>
+    <message>
         <source>Slur to the next note</source>
         <translation>Ligadura con la nota siguiente</translation>
     </message>

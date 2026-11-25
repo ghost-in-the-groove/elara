@@ -40,7 +40,8 @@ enum class Role : std::uint8_t {
     MeasureNumber, ///< the number of the first measure of a system
     Credit,        ///< title, subtitle, artist, words, music, copyright and page numbers
     TrackName,     ///< the name of a track left of its staves in the first system
-    Repeat,        ///< the dots of repeat barlines and the play count ("x3") above them
+    Repeat,        ///< the dots of repeat barlines, the play count ("x3") above them and
+                   ///< measure repeat signs (ADR-0102)
     Volta,         ///< the bracket and numbers of an alternate ending
     Tuplet,        ///< the number of a tuplet and its bracket
     Tempo,         ///< a tempo mark: its note and "= 120"
@@ -59,9 +60,10 @@ enum class Role : std::uint8_t {
                    ///< ADR-0091)
     Pedal,         ///< the sustain pedal under a staff: "Ped.", its line and hook (ADR-0092)
     Fingering,     ///< the fingers that play or pluck the notes (ADR-0093)
+    Parenthesis,   ///< the parentheses round the notehead of a ghost note (ADR-0099)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Fingering) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Parenthesis) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;
