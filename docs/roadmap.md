@@ -88,7 +88,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         player, `elara-cli soundfont`, `render-audio`/`play --soundfont` (ADR-0043)
   - [x] A SoundFont chosen in the app (any SF2 or SF3, such as MuseScore
         General), kept for the next start, `--soundfont FILE`
-- [ ] sfizz integration and guitar SFZ library selection
+- [ ] SFZ instruments and a guitar SFZ library
+  - [x] SFZ instruments through Elara's own sampler, each note bent on its own:
+        `elara-cli sfz`, `render-audio`/`play --sfz` (ADR-0066)
+  - [ ] An SFZ instrument chosen in the app, and FLAC samples
+  - [ ] Guitar techniques mapped to a library's keyswitches and controllers
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics, strums, tremolo picking; ADR-0022, ADR-0023, ADR-0025)
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
@@ -124,7 +128,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
   - [x] Tuning presets and capo in the song panel
-- [ ] Edit every element of milestone 1 from the UI
+- [x] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
   - [x] Every line of the credits (subtitle, album, words, music, copyright,
@@ -139,6 +143,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         (ADR-0058)
   - [x] Whammy bar (dives, dips, pre-dives, returns) and tapping, slap and pop
         on the caret's beat, in the CLI and the effects panel (ADR-0060)
+  - [x] Dynamics, ppp to fff, from the caret's notes to the next change, in
+        the effects panel (ADR-0047)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)

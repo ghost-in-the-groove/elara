@@ -1075,10 +1075,59 @@ add_test(NAME cli.render_audio_soundfont
           --soundfont "${_test_font}")
 set_tests_properties(cli.render_audio_soundfont PROPERTIES
   FIXTURES_REQUIRED cli_soundfont
-  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
+  PASS_REGULAR_EXPRESSION "\"soundFont\":\"[^\"]*test-soundfont\\.sf2\",\"sfz\":null,\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"Test Bass\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"Test Piano\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"Test Piano\"}\\]")
 add_test(NAME cli.render_audio_rejects_missing_soundfont
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --soundfont missing.sf2)
 set_tests_properties(cli.render_audio_rejects_missing_soundfont PROPERTIES WILL_FAIL TRUE)
+
+# SFZ instruments (ADR-0066), with a test guitar of two plucked samples, a map
+# it includes, a release region and an opcode Elara does not play. It plays
+# band.gp's bass, piano and clarinet; the drums stay on the built-in
+# synthesizer, or on the SoundFont when there is one.
+set(_test_sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz/test-guitar.sfz")
+add_test(NAME cli.sfz_write COMMAND elara_make_test_sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz")
+set_tests_properties(cli.sfz_write PROPERTIES FIXTURES_SETUP cli_sfz)
+add_test(NAME cli.sfz COMMAND elara-cli --json sfz "${_test_sfz}")
+set_tests_properties(cli.sfz PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"name\":\"test-guitar\",\"regions\":3,\"samples\":2,\"sampleBytes\":176400,\"lowestKey\":0,\"highestKey\":127,\"missingSamples\":\\[\\],\"unknownOpcodes\":\\[\"lfoN_pitch_onccN\"\\],\"skippedHeaders\":\\[\\],\"loadSeconds\":[0-9.e-]+}")
+add_test(NAME cli.sfz_text COMMAND elara-cli sfz "${_test_sfz}")
+set_tests_properties(cli.sfz_text PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "^test-guitar: 3 regions over keys 0 to 127, 2 samples \\(0\\.2 MB\\) read in [0-9.]+ s\n  opcodes not played: lfoN_pitch_onccN\n$")
+add_test(NAME cli.sfz_rejects_other_files COMMAND elara-cli sfz "${ELARA_CORPUS}/gp/band.gp")
+set_tests_properties(cli.sfz_rejects_other_files PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.render_audio_sfz
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "${_test_sfz}")
+set_tests_properties(cli.render_audio_sfz PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"soundFont\":null,\"sfz\":\"[^\"]*test-guitar\\.sfz\",\"sampleRate\":48000,.*\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"tracks\":\\[{\"track\":0,\"name\":\"Bass\",\"timbre\":\"bass\",\"sound\":\"test-guitar\"},{\"track\":1,\"name\":\"Piano\",\"timbre\":\"piano\",\"sound\":\"test-guitar\"},{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"drums\"},{\"track\":3,\"name\":\"Clarinet\",\"timbre\":\"wind\",\"sound\":\"test-guitar\"}\\]")
+add_test(NAME cli.render_audio_sfz_and_soundfont
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz "${_test_sfz}"
+          --soundfont "${_test_font}")
+set_tests_properties(cli.render_audio_sfz_and_soundfont PROPERTIES
+  FIXTURES_REQUIRED "cli_sfz;cli_soundfont"
+  PASS_REGULAR_EXPRESSION "{\"track\":2,\"name\":\"Drums\",\"timbre\":\"drums\",\"sound\":\"Test Kit\"}")
+# A song of one D3 played on the test guitar sounds a D3: the sample of A2,
+# read at 22050 Hz, is moved up five semitones and played at 48000 Hz.
+set(_sfz_song "${CMAKE_CURRENT_BINARY_DIR}/sfz-d3.elara")
+set(_sfz_song_wav "${CMAKE_CURRENT_BINARY_DIR}/sfz-d3.wav")
+add_test(NAME cli.sfz_song
+  COMMAND elara-cli edit --out "${_sfz_song}" "add-track electric-guitar" "append-measures 1"
+          "note 0 0 4 0 1")
+set_tests_properties(cli.sfz_song PROPERTIES FIXTURES_SETUP cli_sfz_song)
+add_test(NAME cli.sfz_render_song
+  COMMAND elara-cli render-audio "${_sfz_song}" --sfz "${_test_sfz}" --out "${_sfz_song_wav}")
+set_tests_properties(cli.sfz_render_song PROPERTIES
+  FIXTURES_REQUIRED "cli_sfz;cli_sfz_song"
+  FIXTURES_SETUP cli_sfz_song_wav)
+add_test(NAME cli.sfz_song_pitch COMMAND elara-cli --json tune "${_sfz_song_wav}")
+set_tests_properties(cli.sfz_song_pitch PROPERTIES
+  FIXTURES_REQUIRED cli_sfz_song_wav
+  PASS_REGULAR_EXPRESSION "\"note\":\"D3\",\"cents\":-?0(\\.[0-9]+)?,")
+add_test(NAME cli.render_audio_rejects_missing_sfz
+  COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/band.gp" --sfz missing.sfz)
+set_tests_properties(cli.render_audio_rejects_missing_sfz PROPERTIES WILL_FAIL TRUE)
 # Playing needs an output device, which CI does not have; a missing file fails
 # before the device is opened.
 add_test(NAME cli.play_rejects_missing_file

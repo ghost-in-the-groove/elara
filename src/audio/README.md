@@ -32,6 +32,13 @@ Three targets with different rules:
   `builtinBank()` wraps the built-in `Synth`; `RenderOptions::bank` and
   `Player::setSoundBank()` choose another, such as a SoundFont. The player
   keeps a track's sound across loads while its instrument stays the same;
+- SFZ instruments (ADR-0066): `parseSfz()`/`readSfz()` read the text format
+  into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
+  and `SfzBank` plays them through a sampler of Elara's own: WAV samples read
+  into memory on every core, regions picked by key, velocity, controllers,
+  keyswitch and round robin, the amplitude envelope, loops, release samples
+  and exclusive groups, 64 voices per track, each note glided on its own.
+  Percussion tracks play on another bank;
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from
