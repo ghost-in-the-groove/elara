@@ -563,6 +563,17 @@
         <source>Details</source>
         <translation>Detalles</translation>
     </message>
+    <message numerus="yes">
+        <source>%n change(s) on import</source>
+        <translation>
+            <numerusform>%n cambio al importar</numerusform>
+            <numerusform>%n cambios al importar</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>What opening the file changed or left out</source>
+        <translation>Qué cambió o se dejó fuera al abrir el archivo</translation>
+    </message>
     <message>
         <source>Page view</source>
         <translation>Vista de página</translation>
@@ -1788,6 +1799,13 @@
     <message>
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
+    </message>
+    <message numerus="yes">
+        <source>Opened %1. %n thing(s) changed or left out.</source>
+        <translation>
+            <numerusform>Abierto %1. Se cambió o se dejó fuera %n cosa.</numerusform>
+            <numerusform>Abierto %1. Se cambiaron o se dejaron fuera %n cosas.</numerusform>
+        </translation>
     </message>
     <message>
         <source>Unknown instrument: %1</source>

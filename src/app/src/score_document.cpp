@@ -67,7 +67,8 @@ struct ScoreLayout {
     bool hasTablature = false;
     int milliseconds = 0;
     QString error;
-    bool opened = false; ///< a song just read from `source`, to edit from now on
+    bool opened = false;  ///< a song just read from `source`, to edit from now on
+    QStringList warnings; ///< what reading `source` approximated or dropped
 };
 
 namespace {
@@ -238,6 +239,9 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, boo
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
+        for (const std::string& warning : opened->warnings) {
+            result.warnings.append(qstring(warning));
+        }
     } catch (const std::exception& error) {
         result.error = qstring(error.what());
     }
@@ -783,6 +787,23 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     if (practiceMoved && sequencing_ != song_) {
         resequence();
     }
+    // What the file opened lost goes with it, and is told once.
+    if (layout.opened) {
+        setImportWarnings(layout.warnings);
+        if (!layout.warnings.isEmpty()) {
+            emit report(tr("Opened %1. %n thing(s) changed or left out.", "",
+                           static_cast<int>(layout.warnings.size()))
+                            .arg(QFileInfo(layout.source.toLocalFile()).fileName()),
+                        layout.warnings);
+        }
+    }
+}
+
+void ScoreDocument::setImportWarnings(const QStringList& warnings) {
+    if (warnings != importWarnings_) {
+        importWarnings_ = warnings;
+        emit importWarningsChanged();
+    }
 }
 
 // ---- Practice -----------------------------------------------------------------
@@ -950,6 +971,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     sequence_ = std::make_shared<const audio::Sequence>(*song_, practice_);
     sequenceSong_ = song_;
     source_.clear();
+    setImportWarnings({});
     track_ = 0;
     caret_ = core::Caret{};
     pendingDigit_ = -1;

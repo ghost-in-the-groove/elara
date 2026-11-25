@@ -57,6 +57,7 @@ class ScoreDocument : public QObject {
     // Every line of the credits, in the order of elara::core::Credit (ADR-0059).
     Q_PROPERTY(QStringList credits READ credits NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
+    Q_PROPERTY(QStringList importWarnings READ importWarnings NOTIFY importWarningsChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
     /// The verses a staff sings at most (ADR-0084).
     Q_PROPERTY(int maxVerses READ maxVerses CONSTANT)
@@ -186,6 +187,10 @@ public:
     /// no song is open.
     [[nodiscard]] QStringList credits() const;
     [[nodiscard]] QStringList trackNames() const;
+    /// What opening the song's file approximated or dropped, one line each
+    /// ("Drums: volume changes dropped (measure 2)"); empty for a new song
+    /// and once another file is opened without any.
+    [[nodiscard]] QStringList importWarnings() const { return importWarnings_; }
     [[nodiscard]] int measureCount() const;
     [[nodiscard]] static int maxVerses() { return static_cast<int>(core::kMaxVerses); }
     /// Seconds the song lasts when played, repeats included.
@@ -703,6 +708,7 @@ signals:
     /// Something done with details to read on demand, one per line: what an
     /// export left out ("Exported song.mid. MIDI left out 3 things.").
     void report(const QString& message, const QStringList& details);
+    void importWarningsChanged();
     /// An edit or a save that failed, with the reason to show.
     void editFailed(const QString& message);
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
@@ -712,6 +718,7 @@ signals:
 private:
     bool execute(std::unique_ptr<core::Command> command);
     bool writeExport(const QString& local, const io::ExportResult& result, const QString& format);
+    void setImportWarnings(const QStringList& warnings);
     /// Executes an entry's command, if any, and moves the caret. Returns
     /// whether a command ran.
     bool enter(core::Entry entry);
@@ -747,6 +754,7 @@ private:
     void selectionMoved();
 
     QUrl source_;
+    QStringList importWarnings_;
     Status status_ = Status::Empty;
     QString errorMessage_;
     std::shared_ptr<const core::Song> song_;          ///< what the pages show

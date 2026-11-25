@@ -157,6 +157,9 @@ void Startup::queueSteps() {
                                                   map.value(QStringLiteral("format")).toString()));
             }
             std::printf("recent: %s\n", qPrintable(names.join(QStringLiteral(", "))));
+            // What opening the file changed or left out stays with it.
+            std::printf("import: %lld warnings\n",
+                        static_cast<long long>(score_->importWarnings().size()));
             return false;
         });
         for (const View view : std::array{View::Standard, View::Tablature, View::Both}) {
@@ -2067,8 +2070,12 @@ void Startup::queueKeepPosition() {
         score_->newSong(QStringLiteral("electric-guitar"));
         return true;
     });
-    // Another song plays from its start.
+    // Another song plays from its start, without the warnings of the file
+    // opened before it.
     steps_.emplace_back([this] {
+        if (!score_->importWarnings().isEmpty() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("a new song kept the import warnings");
+        }
         auto* audio = window_->findChild<AudioController*>();
         if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
             editProblem_ =

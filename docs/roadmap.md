@@ -68,6 +68,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] `elara-cli import <file> --json` snapshot tests per corpus file
 - [x] Export as MusicXML… and Export as MIDI… in the app, beside Export as PDF…,
       telling what the format leaves out
+- [x] Import warnings in the app: what opening a file approximated or dropped,
+      told when it opens and listed from the status bar while it is open
 
 ## Milestone 3 - Notation engine (`elara_notation`)  -> usable as a viewer
 
