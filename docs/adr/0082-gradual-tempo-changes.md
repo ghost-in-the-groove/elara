@@ -37,8 +37,26 @@ The count-in takes the speed where its measure starts.
 
 **Formats.** Guitar Pro 6 to 8 read `Linear` points as gradual changes; a
 linear point at the very start is the start tempo and a gradual change there.
-The native format writes `"gradual": true`. MIDI and MusicXML exports write the
-change as a sudden one with that warning, as the importer used to.
+The native format writes `"gradual": true`.
+
+**MusicXML: words and dashes.** MusicXML has no gradual tempo, only words. The
+export writes "rit." or "accel." (by the speeds of the two changes) in italics
+in the direction of the change, then dashes that stop in the direction of the
+next change. The import reads "accel.", "accelerando", "stringendo", "rit.",
+"ritard.", "ritardando", "rall.", "rallentando", "allarg." and "allargando",
+with "poco", "molto" or "poco a poco" before them, as a gradual change at that
+onset: one with the tempo of its direction, else at the tempo in force. Only
+when the part sets a tempo after them, within 64 measures and before "a
+tempo", "tempo primo" or another such word: a ramp needs somewhere to go, and
+words with nowhere to go stay the text of the beat (ADR-0081).
+
+**MIDI: steps.** MIDI holds tempos at points only, so the export writes a ramp
+as a tempo event every sixteenth note, each with the steady tempo that lasts as
+long as that stretch of the ramp (`rampSeconds`). The song keeps its timing, to
+the microsecond a quarter note; read back, the steps are sudden changes.
+
+A gradual change to the same speed, or with no change after it, has nothing
+to write: both formats write it as a sudden one, with no warning.
 
 **Drawing.** After the change's mark, or at its column when it keeps the
 tempo in force (as Guitar Pro writes it), "accel." or "rit." in italics on the
@@ -57,14 +75,16 @@ measures of `elara-cli edit --json` show `"gradual": true`.
 ## Consequences
 
 - Imported accelerandos and ritardandos play as written, with no warning.
-- MusicXML words and MIDI tempo steps are follow-up work.
 - Tests: `core.A gradual tempo change moves to the next tempo along the score`
   (values from the closed form: 4 ln 2 seconds for a whole note from quarter =
   60 to 120), `audio.Sequence: a gradual tempo change speeds the notes up on the
   way`, `io.Guitar Pro: a linear tempo point moves to the next one`, the native
-  round trip, the MIDI and MusicXML warnings, and the `notation.Tempo marks: a
-  gradual change ...` layout tests (which way it goes, what it leaves out, and
-  the line across systems), `core.A tempo change can be made gradual and
-  sudden again`, `cli.edit_gradual_tempo` with `cli.sequence_gradual_tempo`
-  (9.545 s: 8 ln 2 s for the ramp over two measures) and
-  `cli.render_gradual_tempo`, and the app's smoke test.
+  round trip, `io.MusicXML: rit. and accel. make the tempo change there
+  gradual`, `io.MusicXML export: a gradual tempo change is a word with dashes
+  to the next tempo` and `io.MIDI export steps a gradual tempo change along the
+  way` (read back, two quarters from quarter = 100 to 140 last 3 ln 1.4 s), the
+  `notation.Tempo marks: a gradual change ...` layout tests (which way it goes,
+  what it leaves out, and the line across systems), `core.A tempo change can be
+  made gradual and sudden again`, `cli.edit_gradual_tempo` with
+  `cli.sequence_gradual_tempo` (9.545 s: 8 ln 2 s for the ramp over two
+  measures) and `cli.render_gradual_tempo`, and the app's smoke test.
