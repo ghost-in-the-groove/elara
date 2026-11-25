@@ -57,6 +57,13 @@ struct SungSyllable {
     Syllable syllable{};
 };
 
+// The sustain pedal of a channel down (controller 64 at 64 or more) from a
+// tick to a later one (ADR-0092).
+struct Pedalling {
+    std::int64_t down = 0;
+    std::int64_t up = 0;
+};
+
 // The notes of one channel of one MIDI track: one Elara track.
 struct Source {
     int channel = 0;
@@ -67,6 +74,7 @@ struct Source {
     std::optional<int> pan{};    // controller 10 before the first note
     std::vector<RawNote> notes{};
     std::vector<SungSyllable> lyrics{}; // by start
+    std::vector<Pedalling> pedals{};    // by tick
 };
 
 template <typename T>
@@ -210,6 +218,9 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
         std::array<std::optional<int>, 16> volumeOf{};
         std::array<std::optional<int>, 16> panOf{};
         std::array<bool, 16> started{};
+        // The sustain pedal per channel: where it went down while it is down.
+        std::array<std::optional<std::int64_t>, 16> downOf{};
+        std::array<std::vector<Pedalling>, 16> pedalsOf{};
         const std::size_t firstSource = out.sources.size();
         const auto source = [&](int channel) -> Source& {
             auto& index = sourceOf[static_cast<std::size_t>(channel)];
@@ -259,8 +270,17 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
                 } else if (setting != event.data[1]) {
                     warnings.add("", "volume and pan changes dropped");
                 }
-            } else if (kind == detail::kController && event.data[0] == 64 && event.data[1] >= 64) {
-                warnings.add("", "sustain pedal dropped");
+            } else if (kind == detail::kController && event.data[0] == 64) {
+                auto& down = downOf[static_cast<std::size_t>(channel)];
+                if (event.data[1] >= 64 && !down) {
+                    down = event.tick;
+                } else if (event.data[1] < 64 && down) {
+                    if (event.tick > *down) {
+                        pedalsOf[static_cast<std::size_t>(channel)].push_back(
+                            {.down = *down, .up = event.tick});
+                    }
+                    down.reset();
+                }
             } else if (kind == detail::kPitchBend && (event.data[0] != 0 || event.data[1] != 64)) {
                 warnings.add("", "pitch bends dropped");
             }
@@ -270,6 +290,10 @@ Gathered gather(const MidiFile& file, Warnings& warnings) {
                 Source& s = out.sources[*sourceOf[channel]];
                 s.volume = volumeOf[channel];
                 s.pan = panOf[channel];
+                if (downOf[channel] && track.end > *downOf[channel]) { // down to the end
+                    pedalsOf[channel].push_back({.down = *downOf[channel], .up = track.end});
+                }
+                s.pedals = std::move(pedalsOf[channel]);
             }
         }
         // Notes still sounding at the end of the track end there.
@@ -1421,6 +1445,55 @@ void placeLyrics(core::Staff& staff, const std::vector<SungSyllable>& lyrics, co
     }
 }
 
+// A pedalling on the written time line: where the pedal goes down and comes
+// up, on the grids of a staff.
+struct PlacedPedalling {
+    Fraction down;
+    Fraction up;
+};
+
+/// Puts the beats the pedallings reach under the sustain pedal (ADR-0092): in
+/// each measure, the beats of the first voice of the lowest staff with notes
+/// there, which fill the measure. A beat reached by a later pedalling than the
+/// beat before it changes the pedal.
+void markPedals(core::Track& track, const std::vector<std::vector<PlacedPedalling>>& pedals,
+                const std::vector<MeasureInfo>& measures) {
+    std::optional<std::size_t> held; // the last pedalling reaching the beat before
+    for (std::size_t m = 0; m < measures.size(); ++m) {
+        std::optional<std::size_t> carrier;
+        for (std::size_t s = track.staffCount(); s-- > 0;) {
+            if (!track.staff(s).measure(m).voices[0].beats.empty()) {
+                carrier = s;
+                break;
+            }
+        }
+        if (!carrier) {
+            held.reset(); // no beat to hold it: the pedal comes up at the barline
+            continue;
+        }
+        const std::vector<PlacedPedalling>& placed = pedals[*carrier];
+        Fraction start = measures[m].start;
+        for (Beat& beat : track.staff(*carrier).measure(m).voices[0].beats) {
+            const Fraction end = start + beat.duration.length();
+            // The pedallings from the first still down after the beat starts
+            // to the last that goes down before it ends.
+            std::optional<std::size_t> reached;
+            for (auto it = std::ranges::upper_bound(placed, start, {}, &PlacedPedalling::up);
+                 it != placed.end() && it->down < end; ++it) {
+                if (it->down < it->up) { // not snapped to nothing
+                    reached = static_cast<std::size_t>(it - placed.begin());
+                }
+            }
+            if (reached) {
+                beat.effects.pedal =
+                    held && *reached > *held ? core::Pedal::Change : core::Pedal::Down;
+            }
+            held = reached;
+            start = end;
+        }
+    }
+}
+
 void writeNotes(core::Track& result, const Source& source, const std::vector<MeasureInfo>& measures,
                 int division, Warnings& warnings) {
     if (measures.empty()) {
@@ -1443,6 +1516,7 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
     for (const SungSyllable& sung : source.lyrics) {
         lyrics[staffOf(sung.key)].push_back(sung);
     }
+    std::vector<std::vector<PlacedPedalling>> pedals(staffCount);
     bool shortened = false;
     for (std::size_t s = 0; s < staffCount; ++s) {
         Grids grids(measures, division);
@@ -1501,6 +1575,14 @@ void writeNotes(core::Track& result, const Source& source, const std::vector<Mea
             writeVoice(placed[v], v, false, measures, grids, loudness, result.staff(s));
         }
         placeLyrics(result.staff(s), lyrics[s], grids, measures, name, warnings);
+        pedals[s].reserve(source.pedals.size());
+        for (const Pedalling& pedalling : source.pedals) {
+            pedals[s].push_back({.down = grids.snap(pedalling.down),
+                                 .up = std::min(grids.snap(pedalling.up), songEnd)});
+        }
+    }
+    if (!percussion && !source.pedals.empty()) {
+        markPedals(result, pedals, measures);
     }
     if (shortened) {
         warnings.add(name, "notes overlapping more than four voices shortened");

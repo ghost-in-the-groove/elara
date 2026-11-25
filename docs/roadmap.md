@@ -155,7 +155,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Set at the caret
 - [x] Sustain pedal: beats under the pedal ring on until it comes up (ADR-0092)
   - [x] In the model, played and kept by the native format
-  - [x] Read and written in MusicXML, written to MIDI files as controller 64
+  - [x] Read and written in MusicXML and in MIDI files (controller 64)
   - [x] Drawn under standard notation: "Ped.", a line with notches at the changes and a hook
   - [x] Set at the caret
 

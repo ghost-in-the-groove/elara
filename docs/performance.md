@@ -324,3 +324,41 @@ came out within the noise. MIDI import, a little slower at first (44.2 ms
 | write a track's 21 pages as PDF; compressed; the same on one thread | 1.4 ms; 3.9 ms; 8.3 ms; 43.5 ms | 1.4 ms; 4.0 ms; 8.4 ms; 43.0 ms |
 | one tuner window: low E, high E, noise | 0.39, 0.10, 1.07 ms | 0.39, 0.10, 1.06 ms |
 | find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.37 µs; 1.5 µs |
+
+**2026-11-25, after the sustain pedal.** Every benchmark ran again once the
+pedal was read from MIDI files (ADR-0092). As first merged, the sequencer's
+pedal pass sorted every measure of every track, pedal marks or not: 34.8 ms to
+sequence the 20-track song, which has none, against 31.0 ms without the pass.
+It now looks for marks one track per core and stops when there are none:
+31.8 ms. The full run came out up to 15 % slower on paths nothing changed
+(FLAC, the synthesizers, painting), the machine busier than for the last row;
+the groups that ran again alone came back to the last row's times, and the
+table gives the faster of the two runs. Building the 20-track song stayed at
+16.8 ms (± 2.1) against 10.2 ms, though no code it runs has changed since the
+last row: a run on a quiet machine is due before reading anything into it.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 10.0 ms | 10.6 ms |
+| sequence it; with every four measures repeated | 30.6 ms; 45.6 ms | 31.8 ms; 45.4 ms |
+| render its first 10 s offline; on one thread | 20.0 ms; 107 ms | 20.4 ms; 108 ms |
+| build, copy (shared measures) and validate the 20-track song | 10.2 ms, 68 µs, 2.8 ms | 16.8 ms (± 2.1), 64 µs, 3.2 ms |
+| insert a measure at its start | 22 µs | 18 µs |
+| seconds at its end (tempo map walk) | 0.26 ms | 0.26 ms |
+| MusicXML import; export; export on one thread; `.mxl` | 97 ms (± 14); 54 ms; 153 ms; 335 ms | 120 ms (± 26); 55 ms; 164 ms (± 22); 351 ms |
+| MIDI export; import | 30.6 ms (± 4.8); 41.4 ms | 28.7 ms; 42.5 ms |
+| GPIF import; on one thread | 96 ms (± 14); 206 ms (± 16) | 100 ms (± 20); 218 ms (± 36) |
+| 2 tracks from a literal-only `.gpx` | 28.6 ms | 28.8 ms |
+| lay out one 500-measure staff; 8 of its measures | 3.8 ms; 64 µs | 4.1 ms; 69 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.1 ms; 88 µs; 40 ms | 5.4 ms; 95 µs; 43 ms |
+| one track on A4 pages; on one thread | 2.2 ms; 10.0 ms | 2.2 ms; 11.0 ms |
+| the 20 staves on A4 pages; again after an edit | 23.5 ms (± 2.3); 3.5 ms | 24.3 ms (± 3.5); 4.4 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.2, 8.0, 18.4, 10.8 ms | 5.3, 9.0 (± 1.6), 20.9 (± 2.8), 11.0 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.2, 8.4, 5.9, 4.8 ms | 5.9, 8.7, 6.0, 4.9 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 10.0 ms; 10.7 ms | 10.9 ms; 10.8 ms |
+| read an SFZ of 64 samples | 4.2 ms | 3.5 ms |
+| decode a minute of FLAC; of WAV | 35.8 ms; 16.0 ms | 40.8 ms (± 7.8); 17.7 ms |
+| read the glyph outlines of `Bravura.otf` | 0.68 ms | 0.70 ms |
+| write a track's 21 pages as PDF; compressed; the same on one thread | 1.4 ms; 4.0 ms; 8.4 ms; 43.0 ms | 1.5 ms; 3.9 ms; 8.7 ms; 43.7 ms |
+| one tuner window: low E, high E, noise | 0.39, 0.10, 1.06 ms | 0.39, 0.10, 1.07 ms |
+| find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.36 µs; 1.5 µs |

@@ -650,17 +650,20 @@ void sustain(const core::Song& song, const TempoMap& tempo, std::span<const Play
         double end = 0.0;
     };
     const std::size_t measureCount = song.measureCount();
-    std::vector<std::vector<Pedalling>> pedallings(song.trackCount());
-    bool pedalled = false;
-    std::vector<std::vector<core::PedalSpan>> written(measureCount);
-    for (std::size_t t = 0; t < song.trackCount(); ++t) {
-        bool any = false;
+    const std::size_t trackCount = song.trackCount();
+    std::vector<std::vector<Pedalling>> pedallings(trackCount);
+    // Reading every beat for its pedal is most of the work, even for a song
+    // without any: one track per core.
+    const auto pedalsOf = [&](std::size_t t) {
+        std::vector<std::vector<core::PedalSpan>> written; // by measure, when any
         for (std::size_t m = 0; m < measureCount; ++m) {
-            written[m] = song.pedalSpans(t, m);
-            any = any || !written[m].empty();
+            if (std::vector<core::PedalSpan> spans = song.pedalSpans(t, m); !spans.empty()) {
+                written.resize(measureCount);
+                written[m] = std::move(spans);
+            }
         }
-        if (!any) {
-            continue;
+        if (written.empty()) {
+            return;
         }
         std::vector<Pedalling>& spans = pedallings[t];
         const PlayedMeasure* before = nullptr;
@@ -681,9 +684,10 @@ void sustain(const core::Song& song, const TempoMap& tempo, std::span<const Play
             }
             before = &measure;
         }
-        pedalled = true;
-    }
-    if (!pedalled) {
+    };
+    core::forEachIndex(0, trackCount, core::threadsFor(0, notes.size(), kParallelNotes, trackCount),
+                       pedalsOf);
+    if (std::ranges::all_of(pedallings, [](const auto& spans) { return spans.empty(); })) {
         return;
     }
     for (PlayedNote& note : notes) {
