@@ -30,6 +30,7 @@
     "toDoubleCoda": true
    },
    {
+    "doubleBar": true,
     "jump": "dal-segno-segno",
     "jumpThen": "al-double-coda"
    },

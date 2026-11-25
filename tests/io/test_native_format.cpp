@@ -79,6 +79,8 @@ core::Song richSong() {
     song.measureHeader(1).jump = JumpTo::SegnoSegno;
     song.measureHeader(1).jumpThen = JumpThen::DoubleCoda;
     song.measureHeader(2).section = "Chorus";
+    song.measureHeader(4).doubleBar = true;
+    song.measureHeader(4).doubleBar = true;
 
     // Guitar, measure 0: every note effect, a chord, a tuplet and a second voice.
     Staff& lead = song.track(0).staff(0);
@@ -285,6 +287,10 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
           std::string::npos);
     CHECK(json.find(R"("section":"")") == std::string::npos);
     CHECK(json.find(R"({"alternateEndings":[3]})") != std::string::npos);
+    CHECK(json.find(R"({"doubleBar":true})") != std::string::npos);
+    CHECK(json.find(R"("doubleBar":false)") == std::string::npos);
+    CHECK(json.find(R"({"doubleBar":true})") != std::string::npos);
+    CHECK(json.find(R"("doubleBar":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":false)") == std::string::npos);
     CHECK(json.find(R"("segno":true,"segnoSegno":true,"coda":true,"doubleCoda":true})") !=
           std::string::npos);

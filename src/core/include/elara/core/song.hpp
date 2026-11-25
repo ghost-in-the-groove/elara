@@ -158,6 +158,9 @@ struct MeasureHeader {
     /// The measure belongs to the alternate endings of these times through the
     /// repeat: bit n - 1 for the n-th time. 0 for a measure played every time.
     std::uint8_t alternateEndings = 0;
+    /// A double barline closes the measure, the end of a section (ADR-0103);
+    /// an end repeat, or the song's final barline, shows instead of it.
+    bool doubleBar = false;
 
     // Signs that open the measure: where jumps go.
     bool segno = false;

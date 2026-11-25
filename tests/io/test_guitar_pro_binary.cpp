@@ -257,6 +257,9 @@ TEST_CASE("Guitar Pro 5: directions become signs and jumps", "[io][guitarpro]") 
     CHECK(song.measureHeader(3).jumpThen == core::JumpThen::Coda);
     CHECK(song.measureHeader(4).coda);
     CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 3, 1, 2, 4, 5});
+    // A double barline closes the jump's measure (ADR-0103).
+    CHECK(song.measureHeader(3).doubleBar);
+    CHECK_FALSE(song.measureHeader(2).doubleBar);
     // Nothing else: the other measures carry no marks.
     CHECK(song.measureHeader(0) == song.measureHeader(5));
 }

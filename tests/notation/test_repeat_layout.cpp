@@ -195,6 +195,38 @@ TEST_CASE("Repeat layout: repeat barlines with dots in the middle spaces", "[not
     CHECK(texts(list, Role::Repeat).empty()); // played twice: no count
 }
 
+TEST_CASE("Barline layout: a double barline closes a measure unless a repeat or the end does",
+          "[notation][repeats][barline]") {
+    // ADR-0103: 0 || 1 :| 2 |: 3 || 4 |, a double barline asked for on each.
+    Song song = quarters(5);
+    for (std::size_t m = 0; m < 5; ++m) {
+        song.measureHeader(m).doubleBar = true;
+    }
+    song.measureHeader(1).repeatTimes = 2;    // the end repeat shows instead
+    song.measureHeader(3).repeatStart = true; // stands for the double barline before it
+    const DisplayList list = layout(song);
+    const auto& defaults = bravura().defaults();
+    const double thin = defaults.thinBarlineThickness;
+    const double thick = defaults.thickBarlineThickness;
+
+    // thin thin, the end repeat (thin, thick), thin under the start repeat
+    // (thick, thin), thin thin, the final barline (thin, thick).
+    const auto barlines = lines(list, Role::Barline);
+    std::vector<double> thicknesses;
+    for (const LineItem& line : barlines) {
+        thicknesses.push_back(line.thickness);
+    }
+    CHECK(thicknesses ==
+          std::vector<double>{thin, thin, thin, thick, thin, thick, thin, thin, thin, thin, thick});
+    REQUIRE(barlines.size() == 11);
+    CHECK(barlines[0].measure == 0);
+    CHECK(barlines[1].measure == 0);
+    CHECK_THAT(left(barlines[1]) - right(barlines[0]),
+               WithinAbs(defaults.barlineSeparation, kEpsilon));
+    // The next measure starts after both lines.
+    CHECK(list.measures[1].x >= right(barlines[1]) - kEpsilon);
+}
+
 TEST_CASE("Repeat layout: start repeats at the start of a line follow the signatures",
           "[notation][repeats]") {
     // |: 0 :|: 1 :|

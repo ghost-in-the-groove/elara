@@ -795,7 +795,9 @@ private:
         const bool endingStops =
             header.alternateEndings != 0 &&
             (last || song_.measureHeader(m + 1).alternateEndings != header.alternateEndings);
-        if (!last && !header.repeatEnd() && !endingStops) {
+        // A double barline that shows (ADR-0103).
+        const bool doubleBar = header.doubleBar && !last && !header.repeatEnd();
+        if (!last && !header.repeatEnd() && !endingStops && !doubleBar) {
             return;
         }
         xml.start("barline");
@@ -803,6 +805,8 @@ private:
         xml.endOpen();
         if (last || header.repeatEnd()) {
             xml.text("bar-style", "light-heavy");
+        } else if (doubleBar) {
+            xml.text("bar-style", "light-light");
         }
         if (endingStops) {
             xml.start("ending");

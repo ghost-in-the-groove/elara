@@ -222,6 +222,7 @@ private:
             }
             add(object, "alternateEndings", endings);
         }
+        addFlag(object, "doubleBar", value.doubleBar);
         addFlag(object, "segno", value.segno);
         addFlag(object, "segnoSegno", value.segnoSegno);
         addFlag(object, "coda", value.coda);
@@ -857,6 +858,7 @@ private:
                     static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
             });
         }
+        header.doubleBar = flag(object, "doubleBar");
         header.segno = flag(object, "segno");
         header.segnoSegno = flag(object, "segnoSegno");
         header.coda = flag(object, "coda");

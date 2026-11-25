@@ -317,7 +317,8 @@ struct HeaderData {
     bool repeatStart = false;
     std::uint8_t repeatTimes = 0;
     std::uint8_t alternateEndings = 0;
-    std::string section; // the marker's name (ADR-0062)
+    bool doubleBar = false; // ADR-0103
+    std::string section;    // the marker's name (ADR-0062)
 };
 
 struct TempoMark {
@@ -496,6 +497,7 @@ private:
             }
             HeaderData header;
             header.repeatStart = (flags & 0x04U) != 0;
+            header.doubleBar = (flags & 0x80U) != 0;
             if (version_ < 500) {
                 // Guitar Pro 3 and 4 count the times the section is played again,
                 // and name one alternate ending: it takes every time up to its
@@ -1322,6 +1324,7 @@ private:
             header.repeatStart = headers_[m].repeatStart;
             header.repeatTimes = headers_[m].repeatTimes;
             header.alternateEndings = headers_[m].alternateEndings;
+            header.doubleBar = headers_[m].doubleBar;
             header.section = headers_[m].section;
         }
         addDirections(song);
