@@ -611,6 +611,40 @@ TEST_CASE("MusicXML export: beat text comes back as words", "[musicxml][export]"
     CHECK(exportMusicXml(song).warnings.empty());
 }
 
+TEST_CASE("MusicXML export: a gradual tempo change is a word with dashes to the next tempo",
+          "[musicxml][export]") {
+    // ADR-0082: "rit." or "accel." by the speeds, then dashes to the next tempo.
+    using namespace elara::core;
+    Song song;
+    song.setStartTempo(Tempo(100));
+    song.appendMeasures(3);
+    song.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(100), .gradual = true}};
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.tempo = Tempo(60)},
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(80), .gradual = true}};
+    // Half = 60 is faster than quarter = 80.
+    song.measureHeader(2).tempoChanges = {
+        TempoChange{.tempo = Tempo(60, Duration(NoteValue::Half))}};
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    fillVoices(song);
+
+    const Song back = roundTrip(song);
+    requireSame(song, back);
+    const std::string xml = exportMusicXml(song).data;
+    const auto count = [&](std::string_view needle) {
+        std::size_t found = 0;
+        for (auto at = xml.find(needle); at != std::string::npos; at = xml.find(needle, at + 1)) {
+            ++found;
+        }
+        return found;
+    };
+    CHECK(count(R"(<words font-style="italic">rit.</words>)") == 1);
+    CHECK(count(R"(<words font-style="italic">accel.</words>)") == 1);
+    CHECK(count(R"(<dashes type="start"/>)") == 2);
+    CHECK(count(R"(<dashes type="stop"/>)") == 2);
+}
+
 TEST_CASE("MusicXML export: random songs come back unchanged", "[musicxml][export]") {
     for (const std::uint32_t seed : {1U, 2U, 3U, 20261123U}) {
         INFO("seed " << seed);
@@ -805,7 +839,7 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     const auto& warnings = exported.warnings;
     CHECK(hasWarning(warnings, "Electric Guitar: let ring dropped (measure 1)"));
     CHECK(hasWarning(warnings, "whammy bar dropped"));
-    CHECK(hasWarning(warnings, "gradual tempo changes written as sudden ones"));
+    CHECK_FALSE(hasWarning(warnings, "gradual")); // with no tempo after it, nothing to write
     CHECK(hasWarning(warnings, "slap and pop dropped"));
     CHECK(hasWarning(warnings, "pinch, tapped and semi harmonics written as artificial harmonics"));
     CHECK(hasWarning(warnings, "shift slides written as legato slides"));

@@ -47,7 +47,8 @@ that uses every supported feature and for random songs.
   therefore need the same dynamic.
 - Tempo marks go in the first part's first voice: `metronome` with beat unit
   and dots, plus `sound tempo` in quarter notes per minute, with an `offset`
-  when the change falls inside a note.
+  when the change falls inside a note. A gradual change adds "rit." or "accel."
+  and dashes that stop at the next tempo mark (ADR-0082).
 - `divisions` is the least common multiple that makes every duration and tempo
   offset a whole number (capped at 2^20, beyond which durations are rounded
   and reported).

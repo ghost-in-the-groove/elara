@@ -280,6 +280,68 @@ TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]"
     CHECK(hasWarning(result, "text directions dropped", "measure 1"));
 }
 
+TEST_CASE("MusicXML: rit. and accel. make the tempo change there gradual", "[musicxml]") {
+    // ADR-0082: the words start a ramp to the next tempo of the part, at the
+    // tempo in force when they come alone; with no tempo before "a tempo", the
+    // next ramp or the end, they stay the text of the beat.
+    const auto half = [](std::string_view step) {
+        return std::format(R"(<note><pitch><step>{}</step><octave>4</octave></pitch>)"
+                           R"(<duration>8</duration><voice>1</voice><type>half</type></note>)",
+                           step);
+    };
+    const auto metronome = [](int bpm) {
+        return std::format(R"(<direction-type><metronome><beat-unit>quarter</beat-unit>)"
+                           R"(<per-minute>{}</per-minute></metronome></direction-type>)",
+                           bpm);
+    };
+    const auto words = [](std::string_view text) {
+        return std::format(R"(<direction-type><words>{}</words></direction-type>)", text);
+    };
+    const auto measure = [](int number) {
+        return std::format(R"(</measure><measure number="{}">)", number);
+    };
+    const std::string start = R"(<direction-type><dashes type="start"/></direction-type>)";
+    const std::string stop = R"(<direction-type><dashes type="stop"/></direction-type>)";
+    const ImportResult result = parse(onePart(
+        "<direction>" + metronome(100) + "</direction>" + half("A") + "<direction>" +
+        words("rit.") + start + "</direction>" + half("B") + measure(2) + "<direction>" + stop +
+        metronome(60) + "</direction>" + half("C") + "<direction>" + metronome(80) +
+        words("Accelerando") + "</direction>" + half("D") + measure(3) + "<direction>" +
+        metronome(120) + "</direction>" + half("E") + "<direction>" + words("poco rall.") +
+        "</direction>" + half("F") + measure(4) + "<direction>" + words("a tempo") +
+        "</direction>" + half("G") + "<direction>" + metronome(90) + "</direction>" + half("A") +
+        measure(5) + "<direction>" + words("rit.") + "</direction>" + half("B") + half("C")));
+
+    CHECK(result.song.startTempo() == core::Tempo(100));
+    const auto changes = [&](std::size_t m) {
+        return result.song.measureHeader(m).tempoChanges;
+    };
+    REQUIRE(changes(0).size() == 1);
+    CHECK(changes(0)[0] == core::TempoChange{.offset = core::Fraction(1, 2),
+                                             .tempo = core::Tempo(100),
+                                             .gradual = true});
+    REQUIRE(changes(1).size() == 2);
+    CHECK(changes(1)[0] == core::TempoChange{.tempo = core::Tempo(60)});
+    CHECK(changes(1)[1] == core::TempoChange{.offset = core::Fraction(1, 2),
+                                             .tempo = core::Tempo(80),
+                                             .gradual = true});
+    REQUIRE(changes(2).size() == 1);
+    CHECK_FALSE(changes(2)[0].gradual);
+    REQUIRE(changes(3).size() == 1);
+    CHECK_FALSE(changes(3)[0].gradual);
+    CHECK(changes(4).empty());
+
+    const auto text = [&](std::size_t m, std::size_t b) {
+        const auto& beat = voiceOf(result.song, 0, 0, m).beats.at(b);
+        return beat.text ? std::string(*beat.text) : std::string("(none)");
+    };
+    CHECK(text(0, 1) == "(none)");
+    CHECK(text(1, 1) == "(none)");
+    CHECK(text(2, 1) == "poco rall.");
+    CHECK(text(3, 0) == "a tempo");
+    CHECK(text(4, 0) == "rit.");
+}
+
 TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "[musicxml]") {
     // ADR-0080. A frame on a part without a tuning keeps its own strings.
     const ImportResult result = parse(onePart(R"(

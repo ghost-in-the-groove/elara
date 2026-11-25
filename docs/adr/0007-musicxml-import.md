@@ -33,7 +33,8 @@ dependencies. Compressed `.mxl` files are zip archives read with miniz
   part: its `staff-tuning` and `capo` give the staff's `Tuning`, its notes are
   the same notes. A part with only a tablature staff becomes one fretted staff.
 - Measure headers (time and key signature, tempo from `sound/@tempo`) come from
-  the first part, since they are song-wide in Elara.
+  the first part, since they are song-wide in Elara. Words such as "rit." or
+  "accel." with a tempo after them make the change there gradual (ADR-0082).
 - Pitches are converted to sounding pitch with the part's `transpose`
   (`chromatic` + 12 x `octave-change`) and spelled with its `diatonic` steps;
   `clef-octave-change` does not change the sound. The instrument's
