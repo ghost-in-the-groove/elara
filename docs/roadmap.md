@@ -167,6 +167,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         on the caret's beat, in the CLI and the effects panel (ADR-0060)
   - [x] Dynamics, ppp to fff, from the caret's notes to the next change, in
         the effects panel (ADR-0047)
+  - [x] Techniques of strings (hammer-ons, palm mutes, dead notes, harmonics)
+        on fretted staves only; the effects panel shows what the caret's
+        instrument plays (ADR-0077)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)

@@ -614,11 +614,11 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
     if (targets.empty()) {
         return unchanged(caret);
     }
-    if (effect == NoteEffect::Harmonic && !fretted) {
-        throw std::logic_error("toggleEffect: a harmonic needs strings");
-    }
     const bool on = std::ranges::any_of(
         targets, [effect](const Note* note) { return !hasEffect(note->effects, effect); });
+    if (on && !fretted && needsStrings(effect)) {
+        throw std::logic_error("toggleEffect: a technique of strings on a staff without them");
+    }
     const Beat* previous = effect == NoteEffect::Tie && on ? beatBefore(song, caret) : nullptr;
     for (Note* note : targets) {
         NoteEffects& fx = note->effects;

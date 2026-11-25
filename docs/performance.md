@@ -185,3 +185,39 @@ since their rows, so they are watched for the next run rather than chased.
 | 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.4, 8.9, 6.1, 5.1 ms | 5.5, 8.9, 6.3, 5.1 ms |
 | one tuner window: low E, high E, noise | 0.40, 0.10, 1.12 ms | 0.42, 0.10, 1.14 ms |
 | find the caret; pick it from a click | 0.37 µs; 1.6 µs | 0.39 µs; 1.6 µs |
+
+**2026-11-25, after the grand staff, the included guitar SFZ and the
+installers.** Every benchmark ran again on the build of `main` before the PDF
+writer (its rows above were measured with it). Paths whose code did not
+change came out within the noise, and the three that allocate the song's
+measures, watched since the last run, are back at their rows (build: 10.4 ms
+± 2.8). Three others moved without a change to their code: importing GPIF on
+every core (132 ms ± 24, 103 ms last time and 125 ms before), painting a page
+for a high-density screen (11.3 ms ± 2.3) and the tuner's window of noise
+(1.54 ms ± 0.13; its code has not changed since it was measured at 1.07 ms).
+The first two spread as widely as they moved; the third is watched for the
+next run.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 12.9 ms | 12.2 ms |
+| sequence it; with every four measures repeated | 30.2 ms; 44.9 ms | 32.1 ms; 45.5 ms |
+| render its first 10 s offline; on one thread | 23.2 ms; 116 ms | 21.8 ms; 114 ms |
+| build, copy (shared measures) and validate the 20-track song | 18.3 ms (± 4.6), 81 µs, 2.9 ms | 10.4 ms (± 2.8), 68 µs, 4.0 ms (± 1.1) |
+| insert a measure at its start | 32 µs | 21 µs |
+| seconds at its end (tempo map walk) | 12.0 µs | 12.4 µs |
+| MusicXML import; export; export on one thread; `.mxl` | 110 ms; 74 ms; 153 ms; 374 ms | 103 ms; 100 ms; 165 ms; 393 ms |
+| MIDI export; import | 32.2 ms; 42.4 ms | 25.2 ms; 45.4 ms |
+| GPIF import; on one thread | 103 ms; 210 ms | 132 ms (± 24); 220 ms |
+| 2 tracks from a literal-only `.gpx` | 30.9 ms | 29.7 ms |
+| lay out one 500-measure staff; 8 of its measures | 3.7 ms; 61 µs | 4.1 ms (± 0.8); 65 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 5.0 ms; 88 µs; 53 ms | 5.3 ms; 84 µs; 48 ms |
+| one track on A4 pages; on one thread | 2.2 ms; 10.3 ms | 2.1 ms; 10.6 ms |
+| the 20 staves on A4 pages; again after an edit | 21.9 ms; 4.1 ms | 22.1 ms; 4.3 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.5, 8.6, 18.9, 11.4 ms | 5.7, 11.3 (± 2.3), 19.4, 11.5 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.5, 8.9, 6.3, 5.1 ms | 5.4, 8.8, 6.3, 5.1 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 10.3 ms; 11.2 to 11.8 ms | 10.3 ms; 11.8 ms |
+| read an SFZ of 64 samples | 5.1 ms | 4.9 ms |
+| decode a minute of FLAC; of WAV | 37.6 ms; 17.0 ms | 39.1 ms; 17.6 ms |
+| one tuner window: low E, high E, noise | 0.42, 0.10, 1.14 ms | 0.41, 0.10, 1.54 ms |
+| find the caret; pick it from a click | 0.39 µs; 1.6 µs | 0.38 µs; 1.6 µs |

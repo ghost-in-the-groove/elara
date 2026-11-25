@@ -435,6 +435,9 @@ public:
     Q_INVOKABLE QString effectKey(int effect) const;
     /// The effect a typed character toggles, or -1.
     Q_INVOKABLE int effectForKey(const QString& text) const;
+    /// Whether an effect is a technique of strings, which goes only on a
+    /// fretted staff (core::needsStrings): the effects panel shows it there only.
+    Q_INVOKABLE bool effectNeedsStrings(int effect) const;
     /// Sets the bend of the caret's notes (ADR-0055): `form` numbered as
     /// core::BendForm (0 takes the bend off), going up by `cents`.
     Q_INVOKABLE void setBend(int form, int cents);

@@ -141,6 +141,14 @@ enum class NoteEffect : std::uint8_t {
     Staccato, ///< staccato
 };
 
+/// Whether `effect` is a technique of strings (hammer-on or pull-off, palm
+/// mute, dead note, natural harmonic), which toggleEffect() puts only on a
+/// fretted staff.
+[[nodiscard]] constexpr bool needsStrings(NoteEffect effect) noexcept {
+    return effect == NoteEffect::Legato || effect == NoteEffect::PalmMute ||
+           effect == NoteEffect::DeadNote || effect == NoteEffect::Harmonic;
+}
+
 /// Toggles `effect` on the notes the caret is on: the note on its string on a
 /// fretted staff, the lane's hit on a percussion staff, every note of the beat
 /// elsewhere. It goes on when any of them lacks it and off when all have it,
@@ -149,9 +157,9 @@ enum class NoteEffect : std::uint8_t {
 /// continues, in the beat just before: on a fretted staff its note on the same
 /// string, elsewhere its note of the same pitch or its only note. Nothing
 /// changes on a rest, the free slot or a string without a note. Throws
-/// std::logic_error for a tie with nothing to continue or a harmonic on a
-/// staff without strings, and std::out_of_range for a natural harmonic at a
-/// fret without a node.
+/// std::logic_error for a tie with nothing to continue or for a technique of
+/// strings (needsStrings()) going on a staff without them, and
+/// std::out_of_range for a natural harmonic at a fret without a node.
 [[nodiscard]] Entry toggleEffect(const Song& song, const Caret& caret, NoteEffect effect);
 
 /// Sets the bend of the notes the caret is on (as for toggleEffect) to `curve`,
