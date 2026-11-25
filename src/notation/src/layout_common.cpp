@@ -1170,25 +1170,16 @@ bool sings(const core::Beat& beat, std::size_t verse) {
 
 } // namespace
 
-LyricsRow::LyricsRow(const core::Staff& staff) : staff_(staff) {
-    for (std::size_t m = 0; m < staff.measureCount() && !any_; ++m) {
-        for (const core::Voice& voice : staff.measure(m).voices) {
-            for (const core::Beat& beat : voice.beats) {
-                if (beat.lyrics) {
-                    any_ = true;
-                }
-            }
-        }
-    }
-}
-
 void LyricsRow::start(std::size_t m) {
     syllables_.clear();
     held_.clear();
     drawn_.clear();
-    if (!any_) {
-        return;
-    }
+    first_ = m;
+    heldKnown_ = false;
+}
+
+void LyricsRow::findHeld() {
+    const std::size_t m = first_;
     for (std::size_t before = m > kHeldMeasures ? m - kHeldMeasures : 0; before < m; ++before) {
         const core::Measure& measure = staff_.measure(before);
         for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
@@ -1240,10 +1231,15 @@ std::optional<LyricsRow::Spot> LyricsRow::heldTo(std::size_t m, std::size_t voic
 void LyricsRow::collect(std::size_t m, std::vector<ColumnInk>& ink, double centre) {
     read_.clear();
     readMeasure_ = m;
-    if (!any_) {
+    const core::Measure& measure = staff_.measure(m);
+    // Most measures sing nothing: find that before summing lengths.
+    const auto sings = [](const core::Voice& voice) {
+        return std::ranges::any_of(voice.beats,
+                                   [](const core::Beat& beat) { return bool(beat.lyrics); });
+    };
+    if (std::ranges::none_of(measure.voices, sings)) {
         return;
     }
-    const core::Measure& measure = staff_.measure(m);
     for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
         const std::vector<core::Beat>& beats = measure.voices[v].beats;
         core::Fraction at;
@@ -1293,7 +1289,13 @@ void LyricsRow::collect(std::size_t m, std::vector<ColumnInk>& ink, double centr
 }
 
 void LyricsRow::draw(std::span<const ColumnPosition> positions, double centre) {
-    if (!any_) {
+    if (!heldKnown_) {
+        findHeld();
+        heldKnown_ = true;
+    }
+    // Where the line's notes are matters from its first syllable on, or from
+    // its start when a syllable from before is held into it.
+    if (read_.empty() && syllables_.empty() && held_.empty()) {
         return;
     }
     headWidth_ = centre * 2;

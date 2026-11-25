@@ -440,10 +440,11 @@ inline constexpr double kLyricBarlineReach =
 class LyricsRow {
 public:
     /// The lyrics of `staff`.
-    explicit LyricsRow(const core::Staff& staff);
+    explicit LyricsRow(const core::Staff& staff) : staff_(staff) {}
 
-    /// Starts a line at measure m: forgets the syllables, and finds the held
-    /// syllables of the measures before whose notes go on into it.
+    /// Starts a line at measure m: forgets the syllables. The held syllables of
+    /// the measures before, whose notes go on into it, are found when the
+    /// line's first measure is drawn (measuring draws none).
     void start(std::size_t m);
 
     /// Reads the syllables of measure m, one per verse and start, and gives
@@ -510,8 +511,12 @@ private:
     /// The x of the end of the notehead at `spot`, or `end` past the line.
     [[nodiscard]] double noteEnd(const Spot& spot, double end) const;
 
+    /// Finds the held syllables of the measures before the line's first.
+    void findHeld();
+
     const core::Staff& staff_;
-    bool any_ = false; // the staff sings somewhere
+    std::size_t first_ = 0;  // the line's first measure
+    bool heldKnown_ = false; // findHeld() ran for the line
     double headWidth_ = 0.0;
     std::vector<Read> read_{};
     std::size_t readMeasure_ = 0;
