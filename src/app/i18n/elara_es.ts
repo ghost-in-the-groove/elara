@@ -206,6 +206,10 @@
         <translation>Diminuendo</translation>
     </message>
     <message>
+        <source>Phrasing and lines</source>
+        <translation>Fraseo y líneas</translation>
+    </message>
+    <message>
         <source>Slur to the next note</source>
         <translation>Ligadura con la nota siguiente</translation>
     </message>
@@ -1135,6 +1139,10 @@
     <message>
         <source>The audio input&apos;s sample rate is too low for the tuner.</source>
         <translation>La frecuencia de muestreo de la entrada de audio es demasiado baja para el afinador.</translation>
+    </message>
+    <message>
+        <source>Track: %1</source>
+        <translation>Pista: %1</translation>
     </message>
 </context>
 <context>

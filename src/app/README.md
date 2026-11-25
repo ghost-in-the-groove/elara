@@ -38,8 +38,8 @@ Qt Quick / QML user interface.
 
 | File | What it does |
 |---|---|
-| `src/tuner_controller.hpp` | `TunerController` (QML): while `active`, listens to the default input through `elara::audio::MicrophoneInput` and shows what `elara::audio::Tuner` reads: note, cents, nearest string, input level. Tunings are the core presets, or chromatic. |
-| `qml/TunerPane.qml` | The tuner card (toolbar button, Ctrl+Shift+T): the note inside an arc from -50 to +50 cents with a sliding marker, which way to turn, the instrument's strings, the tuning and the reference A4. It listens only while open. |
+| `src/tuner_controller.hpp` | `TunerController` (QML): while `active`, listens to the default input through `elara::audio::MicrophoneInput` and shows what `elara::audio::Tuner` reads: note, cents, nearest string, input level. Tunings are the core presets, chromatic, or (after `showTuning`) a track's tuning that no preset has, listed as "Track: <name>". |
+| `qml/TunerPane.qml` | The tuner card (toolbar button, Ctrl+Shift+T): the note inside an arc from -50 to +50 cents with a sliding marker, which way to turn, the instrument's strings, the tuning and the reference A4. It listens only while open, and tunes to the strings of the score's shown track when it opens and whenever that track or its tuning changes; a tuning picked by hand stays until then. |
 | `Info.plist.in` | The macOS bundle's Info.plist, with the reason the system shows when it asks for the microphone. |
 | `src/app_icon.hpp` | The app icon (ADR-0064): `renderIcon()` draws an SVG image at a size, `icoFile()` and `icnsFile()` pack images as the icon files of Windows and macOS. Built as the `elara_app_icon` library, which the build tool and the tests link. |
 | `tools/icon_files.cpp` | `elara-icon-files`: draws `icons/elara.svg` at build time as the window's PNG images (built into the app under `:/icons`), `elara.ico` (compiled into `elara.exe` by `elara.rc.in`) and `elara.icns` (the macOS bundle's icon). |
@@ -106,7 +106,10 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
   `app.smoke_open_*`, `app.smoke_tuner`), so CI checks the UI without a screen.
 - `--screenshot OUT.png` saves the window once it is shown and quits.
 - `--tuner` opens the tuner at start (`app.smoke_tuner` checks it loads cleanly;
-  without an audio input it says so instead of listening).
+  without an audio input it says so instead of listening). With a file,
+  `app.smoke_tuner_track` checks that it tunes to the shown bass's strings,
+  to an entry of the track's own when the bass is retuned to a tuning no
+  preset has, and back on undo, printing `tuner: <strings>` each time.
 - `--song-pane` opens the song panel at start (`app.smoke_song_pane`).
 - `--measure` opens the caret's measure popup once the score is laid out
   (`app.smoke_measure`), and `--lyrics` the lyrics popup of the caret's staff
