@@ -180,8 +180,7 @@ TEST_CASE("PDF benchmarks", "[benchmark][notation][pdf]") {
     };
     const auto outlines = elara::notation::FontOutlines::fromFile(otf);
     REQUIRE(outlines.has_value());
-    elara::notation::PdfOptions compressed{
-        .compress = [](std::string_view data) { return elara::io::zlibCompress(data); }};
+    elara::notation::PdfOptions compressed{.compress = elara::io::zlibCompress};
     std::printf("%zu A4 pages as PDF: %zu bytes, %zu compressed\n", paged.size(),
                 elara::notation::toPdf(paged, *outlines).size(),
                 elara::notation::toPdf(paged, *outlines, compressed).size());

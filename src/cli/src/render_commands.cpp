@@ -437,11 +437,10 @@ int runRender(bool json, const RenderOptions& options) {
         if (!outlines) {
             return fail(outlines.error());
         }
-        const notation::PdfOptions pdf{
-            .staffSpace = options.staffSpace * 72.0 / 25.4,
-            .margin = paged ? 0.0 : 2.0, // pages have their own
-            .title = song->info().title,
-            .compress = [](std::string_view data) { return io::zlibCompress(data); }};
+        const notation::PdfOptions pdf{.staffSpace = options.staffSpace * 72.0 / 25.4,
+                                       .margin = paged ? 0.0 : 2.0, // pages have their own
+                                       .title = song->info().title,
+                                       .compress = io::zlibCompress};
         const std::string document = notation::toPdf(pages, *outlines, pdf);
         const std::filesystem::path out(options.pdf);
         std::ofstream file(out, std::ios::binary);

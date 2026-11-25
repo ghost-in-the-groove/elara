@@ -1347,11 +1347,10 @@ bool ScoreDocument::exportPdf(const QUrl& file) {
         const auto staves =
             notation::selectTracks(*song_, shownTracks(*song_, track_), trackView(view_));
         const auto pages = notation::layoutPages(*song_, staves, *font, pageOptions());
-        pdf = notation::toPdf(
-            pages, *outlines,
-            {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
-             .title = song_->info().title,
-             .compress = [](std::string_view data) { return io::zlibCompress(data); }});
+        pdf = notation::toPdf(pages, *outlines,
+                              {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
+                               .title = song_->info().title,
+                               .compress = io::zlibCompress});
     } catch (const std::exception& error) {
         emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
         return false;
