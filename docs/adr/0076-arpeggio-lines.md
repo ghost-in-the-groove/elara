@@ -23,7 +23,8 @@ instead of an arrow above the staff.**
 - The line is a run of cubic Bézier half waves (role `arpeggio`), about
   0.4 staff spaces from side to side, from half a space above the column's
   top notehead to half a space below its bottom one, over every voice of the
-  column. It stands 0.25 spaces left of the column's leftmost ink
+  column, and at least two spaces long (a single note, as a grand staff's
+  other hand can leave, gets one centred on it). It stands 0.25 spaces left of the column's leftmost ink
   (accidentals included), in 0.6 spaces of room the column takes for it, so
   spacing keeps it clear of the previous column.
 - A chord rolled upwards (`Strum::Down`, low notes first) has a plain line;

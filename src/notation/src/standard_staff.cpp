@@ -69,8 +69,9 @@ constexpr double kArpeggioWidth = 0.6;  // room the line and its arrowhead take
 constexpr double kArpeggioWave = 0.5;   // length of a half wave
 constexpr double kArpeggioSwing = 0.27; // control points off the line
 constexpr double kArpeggioThickness = 0.12;
-constexpr double kArpeggioOverhang = 0.5; // beyond the outer noteheads' centres
-constexpr double kArpeggioArrow = 0.6;    // length of a downward roll's arrowhead
+constexpr double kArpeggioOverhang = 0.5;  // beyond the outer noteheads' centres
+constexpr double kArpeggioArrow = 0.6;     // length of a downward roll's arrowhead
+constexpr double kArpeggioMinLength = 2.0; // a single note's line, centred on it
 
 // ---- Staff positions ----------------------------------------------------------
 
@@ -587,8 +588,13 @@ private:
             }
         }
         const double x = column.x + column.rollX;
-        const double from = yOf(top) - kArpeggioOverhang;
-        const double to = yOf(bottom) + kArpeggioOverhang;
+        double from = yOf(top) - kArpeggioOverhang;
+        double to = yOf(bottom) + kArpeggioOverhang;
+        if (to - from < kArpeggioMinLength) {
+            const double grow = (kArpeggioMinLength - (to - from)) / 2;
+            from -= grow;
+            to += grow;
+        }
         const bool down = column.roll == core::Strum::Up;
         const double waveEnd = down ? to - kArpeggioArrow * 0.75 : to;
         const int halves =

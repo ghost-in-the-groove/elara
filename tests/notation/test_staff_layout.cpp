@@ -908,6 +908,24 @@ TEST_CASE("Staff layout: a keyboard's strummed chord is rolled with an arpeggio 
     CHECK(glyphs(list, Role::Notehead)[0].origin.x >
           glyphs(plain, Role::Notehead)[0].origin.x + 0.6);
 
+    SECTION("a single note's line is two spaces long, centred on it") {
+        Beat alone = note("F4"); // the other hand's notes on the other staff
+        alone.effects.strum = elara::core::Strum::Down;
+        const DisplayList single = layout(melody({alone}, piano));
+        double highest = std::numeric_limits<double>::max();
+        double lowest = std::numeric_limits<double>::lowest();
+        for (const CurveItem& curve : single.curves) {
+            if (curve.role == Role::Arpeggio) {
+                highest = std::min(highest, curve.from.y);
+                lowest = std::max(lowest, curve.to.y);
+            }
+        }
+        const auto head = glyphs(single, Role::Notehead);
+        REQUIRE(head.size() == 1);
+        CHECK_THAT(highest, WithinAbs(head[0].origin.y - 1.0, 1e-9));
+        CHECK_THAT(lowest, WithinAbs(head[0].origin.y + 1.0, 1e-9));
+    }
+
     SECTION("a fretted instrument keeps its strum arrows") {
         const DisplayList guitar =
             layout(melody({upwards, downwards}, Part{.kind = InstrumentKind::Fretted}));
