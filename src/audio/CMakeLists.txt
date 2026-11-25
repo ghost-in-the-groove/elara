@@ -13,6 +13,7 @@ add_library(elara_audio STATIC
   src/tone_generator.cpp
   src/tuner.cpp
   src/wav_reader.cpp
+  src/flac_reader.cpp
   src/wav_writer.cpp)
 add_library(elara::audio ALIAS elara_audio)
 
