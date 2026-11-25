@@ -78,7 +78,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] In the model, read from Guitar Pro 6-8 and kept by the native format
   - [ ] Read and written in MusicXML
   - [ ] Drawn under the staff
-  - [ ] Played as a velocity ramp
+  - [x] Played as a velocity ramp
   - [ ] Typed at the caret
 - [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
       (ADR-0061)
