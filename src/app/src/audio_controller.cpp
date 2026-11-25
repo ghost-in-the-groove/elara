@@ -7,7 +7,9 @@
 #include <elara/audio/sound_font.hpp>
 #include <elara/audio/system_audio.hpp>
 
+#include "included_sound.hpp"
 #include "when_done.hpp"
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QSettings>
 #include <QUrl>
@@ -15,8 +17,11 @@
 
 #include <algorithm>
 #include <chrono>
+#include <optional>
 
-AudioController::AudioController(QObject* parent) : QObject(parent) {
+AudioController::AudioController(QObject* parent)
+    : QObject(parent),
+      includedSoundFont_(elara::app::includedSoundFont(QCoreApplication::applicationDirPath())) {
     using namespace std::chrono_literals;
     pollTimer_.setInterval(50ms);
     connect(&pollTimer_, &QTimer::timeout, this, &AudioController::pollPlayback);
@@ -421,8 +426,13 @@ void AudioController::restoreSound() {
         const QString file = settings.value(key).toString();
         return !file.isEmpty() && QFileInfo::exists(file) ? file : QString();
     };
-    if (const QString file = saved(kSoundFontKey); !file.isEmpty()) {
-        setSoundFont(file);
+    const QString font = elara::app::startingSoundFont(
+        settings.contains(kSoundFontKey)
+            ? std::optional<QString>(settings.value(kSoundFontKey).toString())
+            : std::nullopt,
+        includedSoundFont_);
+    if (!font.isEmpty()) {
+        setSoundFont(font);
     }
     if (const QString file = saved(kGuitarSfzKey); !file.isEmpty()) {
         setSfz(QStringLiteral("guitars"), file);
