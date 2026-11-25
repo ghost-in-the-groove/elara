@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <initializer_list>
 #include <string>
 #include <utility>
@@ -372,6 +373,34 @@ TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {
         imported->song.track(0).staff(0).measure(0).voices[0].beats[0].notes[0];
     CHECK(note.position == core::FretPosition{.string = 6, .fret = 3});
     CHECK(note.pitch.midiNumber() == 40 + 5 + 3);
+}
+
+TEST_CASE("Guitar Pro: a tapped note taps its beat", "[io][guitarpro]") {
+    // ADR-0060: the model taps beats, Guitar Pro notes, with either hand.
+    const std::string beats = R"(<Beat id="0"><Rhythm ref="0"/><Notes>1</Notes></Beat>)"
+                              R"(<Beat id="1"><Rhythm ref="0"/><Notes>0</Notes></Beat>)"
+                              R"(<Beat id="2"><Rhythm ref="0"/><Notes>2</Notes></Beat>)"
+                              R"(<Beat id="3"><Rhythm ref="0"/><Notes>0</Notes></Beat>)";
+    const std::string quarter = R"(<Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>)";
+    const auto tappedNote = [](int id, const char* property) {
+        return std::format(R"(<Note id="{}"><Properties><Property name="Fret"><Fret>12</Fret>)"
+                           R"(</Property><Property name="String"><String>5</String></Property>)"
+                           R"(<Property name="{}"><Enable /></Property></Properties></Note>)",
+                           id, property);
+    };
+    std::string score = guitarScore(0, "0 1 2 3", beats, quarter);
+    score.insert(score.find("</Notes><Rhythms>"),
+                 tappedNote(1, "Tapped") + tappedNote(2, "LeftHandTapped"));
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() == 4);
+    CHECK(read[0].effects.bassTechnique == core::BassTechnique::Tap);
+    CHECK(read[0].notes.at(0).position == core::FretPosition{.string = 1, .fret = 12});
+    CHECK(read[1].effects.bassTechnique == core::BassTechnique::None);
+    CHECK(read[2].effects.bassTechnique == core::BassTechnique::Tap);
+    CHECK(read[3].effects.bassTechnique == core::BassTechnique::None);
 }
 
 TEST_CASE("Guitar Pro: beats keep their free text", "[io][guitarpro]") {
