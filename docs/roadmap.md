@@ -294,4 +294,5 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         desktop entry, drawn from its SVG at build time (ADR-0064)
   - [x] An MSI installer (Windows) and an AppImage (Linux), built and
         smoke-tested by CI with `elara.py package --installers` (ADR-0065)
+- [x] Packages built with the vcpkg that CI tests, at the manifest's baseline
 - [ ] Release automation and 1.0
