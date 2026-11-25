@@ -23,7 +23,8 @@ class BitWriter {
 public:
     void put(std::uint64_t value, unsigned bits) {
         for (unsigned i = bits; i-- > 0;) {
-            current_ = static_cast<std::uint8_t>((current_ << 1U) | ((value >> i) & 1U));
+            current_ =
+                static_cast<std::uint8_t>((std::uint64_t{current_} << 1U) | ((value >> i) & 1U));
             if (++used_ == 8) {
                 bytes_.push_back(std::byte{current_});
                 current_ = 0;
