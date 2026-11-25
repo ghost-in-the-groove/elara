@@ -523,8 +523,9 @@ std::string_view kindName(core::InstrumentKind kind) {
 // space when it ends (ADR-0084). MIDI has one line of lyrics: each pass through
 // a repeated measure sings the verse of that pass (the first verse on the
 // first pass) when the measure has it, else the first verse.
-std::vector<MidiEvent> lyricEvents(const Track& track, const PlayedMeasures& played,
-                                   const Timing& timing, Warnings& warnings) {
+std::vector<MidiEvent> lyricEvents(const Song& song, const Track& track,
+                                   const PlayedMeasures& played, const Timing& timing,
+                                   Warnings& warnings) {
     const core::Staff* sung = nullptr;
     for (std::size_t s = 0; s < track.staffCount(); ++s) {
         if (core::verseCount(track.staff(s)) == 0) {
@@ -588,10 +589,14 @@ std::vector<MidiEvent> lyricEvents(const Track& track, const PlayedMeasures& pla
             }
         }
         std::ranges::sort(placed, {}, &Placed::start);
+        const core::MeasureHeader& header = song.measureHeader(m);
         for (const Placed& at : placed) {
             const core::Syllable& syllable = *at.syllable;
             extenders = extenders || syllable.extend;
-            events.push_back(meta(timing.ticks(played.start[k] + at.start), detail::kMetaLyric,
+            // Sung with the notes, as the triplet feel plays them (ADR-0104).
+            const Fraction start =
+                core::swung(header.tripletFeel, at.start, header.timeSignature.measureLength());
+            events.push_back(meta(timing.ticks(played.start[k] + start), detail::kMetaLyric,
                                   syllable.text + (syllable.hyphen ? '-' : ' ')));
         }
     }
@@ -683,7 +688,9 @@ void addPedal(MidiTrack& track, int channelNumber, const Song& song, std::size_t
 } // namespace
 
 ExportResult exportMidi(const Song& song, const MidiOptions& options) {
-    const std::vector<SoundingNote> written = core::soundingNotes(song);
+    // As played: with the triplet feel of their measures (ADR-0104).
+    std::vector<SoundingNote> written = core::soundingNotes(song);
+    core::applyTripletFeel(song, written);
     const PlayedMeasures played = playedMeasures(song);
     const std::vector<SoundingNote> moved =
         played.straight ? std::vector<SoundingNote>{} : playedNotes(written, played);
@@ -756,7 +763,8 @@ ExportResult exportMidi(const Song& song, const MidiOptions& options) {
                                              kindName(instrument.kind), kindName(back)));
         }
         // Lyric events go before the notes they start with.
-        const std::vector<MidiEvent> lyrics = lyricEvents(track, played, timing, trackWarnings[t]);
+        const std::vector<MidiEvent> lyrics =
+            lyricEvents(song, track, played, timing, trackWarnings[t]);
         const auto header = static_cast<std::ptrdiff_t>(out.events.size());
         out.events.insert(out.events.end(), lyrics.begin(), lyrics.end());
         const auto notesFrom = static_cast<std::ptrdiff_t>(out.events.size());

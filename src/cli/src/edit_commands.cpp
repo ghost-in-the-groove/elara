@@ -605,6 +605,17 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (change) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "feel") { // feel <m> <none|eighth|sixteenth|dotted-...|scottish-...>
+        // From the measure until the next change of the feel (ADR-0104).
+        const std::size_t measure = step.index(1);
+        const auto found = std::ranges::find(kTripletFeelNames, step.word(2));
+        if (found == kTripletFeelNames.end() || step.has(3)) {
+            throw StepSyntaxError(std::format("not a triplet feel: {}", step.word(2)));
+        }
+        const auto feel = static_cast<core::TripletFeel>(found - kTripletFeelNames.begin());
+        if (auto change = core::changeTripletFeel(song, measure, feel)) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
         core::TrackMix mix{.volume = step.decimal(2), .pan = step.decimal(3)};
         for (std::size_t i = 4; step.has(i); ++i) {

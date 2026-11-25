@@ -31,7 +31,8 @@
    },
    {
     "keySignature": "G major",
-    "repeatStart": true
+    "repeatStart": true,
+    "tripletFeel": "eighth"
    },
    {
     "timeSignature": "3/4",
@@ -39,7 +40,8 @@
     "repeatTimes": 2,
     "alternateEndings": [
      1
-    ]
+    ],
+    "tripletFeel": "sixteenth"
    },
    {
     "keySignature": "D major",

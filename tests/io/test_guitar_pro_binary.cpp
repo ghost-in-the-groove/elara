@@ -80,6 +80,12 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     CHECK(song.measureHeader(2).repeatTimes == 2);
     CHECK(song.measureHeader(2).alternateEndings == 0b01);
     CHECK(song.measureHeader(3).alternateEndings == 0b10);
+    // Each measure header keeps its triplet feel (ADR-0104): eighths in
+    // measure 2, sixteenths in measure 3.
+    CHECK(song.measureHeader(0).tripletFeel == core::TripletFeel::None);
+    CHECK(song.measureHeader(1).tripletFeel == core::TripletFeel::Eighth);
+    CHECK(song.measureHeader(2).tripletFeel == core::TripletFeel::Sixteenth);
+    CHECK(song.measureHeader(3).tripletFeel == core::TripletFeel::None);
     CHECK(song.playOrder() == std::vector<std::size_t>{0, 1, 2, 1, 3});
 
     REQUIRE(song.measureCount() == 4);
@@ -269,10 +275,14 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
     const ImportResult result = load("quartet.gp4");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{"triplet feel dropped",
-                                   "Drums: instrument and volume changes dropped (measure 2)",
+          std::vector<std::string>{"Drums: instrument and volume changes dropped (measure 2)",
                                    "Melody: lyrics after the last note dropped"});
     CHECK(core::validate(song).empty());
+    // Guitar Pro 4's triplet feel is the whole song's (ADR-0104).
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        CAPTURE(m);
+        CHECK(song.measureHeader(m).tripletFeel == core::TripletFeel::Eighth);
+    }
     // Each track reads its own channel: the bass at 12 of 16, balance 4 (half
     // left), the drums full, the others at Guitar Pro's default 13.
     REQUIRE(song.trackCount() == 4);

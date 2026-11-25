@@ -184,6 +184,32 @@ TEST_CASE("Header edits are named for what they change", "[core][document]") {
           }) == "Change measure header");
 }
 
+TEST_CASE("The triplet feel changes from a measure until the next change",
+          "[core][document][feel]") {
+    // ADR-0104, as the signatures change.
+    using elara::core::TripletFeel;
+    Song song = smallSong();
+    song.measureHeader(2).tripletFeel = TripletFeel::Sixteenth;
+    Document doc(song);
+    doc.execute(elara::core::changeTripletFeel(doc.song(), 0, TripletFeel::Eighth));
+    const auto feels = [&doc] {
+        std::vector<TripletFeel> all;
+        for (std::size_t m = 0; m < doc.song().measureCount(); ++m) {
+            all.push_back(doc.song().measureHeader(m).tripletFeel);
+        }
+        return all;
+    };
+    CHECK(feels() == std::vector{TripletFeel::Eighth, TripletFeel::Eighth, TripletFeel::Sixteenth,
+                                 TripletFeel::None});
+    CHECK(doc.undoCount() == 1);
+    CHECK(doc.undoName() == "Change triplet feel");
+    CHECK(elara::core::changeTripletFeel(doc.song(), 1, TripletFeel::Eighth) == nullptr);
+    CHECK_THROWS_AS(elara::core::changeTripletFeel(doc.song(), 4, TripletFeel::None),
+                    std::out_of_range);
+    doc.undo();
+    CHECK(doc.song() == song);
+}
+
 TEST_CASE("A group is one undo step", "[core][document]") {
     const Song original = smallSong();
     Document doc(original);

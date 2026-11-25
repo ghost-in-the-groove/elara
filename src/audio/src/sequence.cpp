@@ -685,11 +685,16 @@ void sustain(const core::Song& song, const TempoMap& tempo, std::span<const Play
         const PlayedMeasure* before = nullptr;
         for (const PlayedMeasure& measure : played) {
             const bool follows = before != nullptr && before->measure + 1 == measure.measure;
+            const core::MeasureHeader& header = song.measureHeader(measure.measure);
+            const auto at = [&](const Fraction& offset) {
+                return measure.start +
+                       tempo.secondsInto(measure.measure,
+                                         core::swung(header.tripletFeel, offset,
+                                                     header.timeSignature.measureLength())
+                                             .toDouble());
+            };
             for (const core::PedalSpan& span : written[measure.measure]) {
-                const Pedalling pedalling{
-                    .start =
-                        measure.start + tempo.secondsInto(measure.measure, span.start.toDouble()),
-                    .end = measure.start + tempo.secondsInto(measure.measure, span.end.toDouble())};
+                const Pedalling pedalling{.start = at(span.start), .end = at(span.end)};
                 constexpr double kMeet = 1e-9;
                 if (!span.change && !spans.empty() && spans.back().end + kMeet >= pedalling.start &&
                     (follows || !span.start.isZero())) {
@@ -733,6 +738,12 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
         written.push_back(position);
         position += lengths.back();
     }
+    // Seconds from the start of measure m to `offset` whole notes into it,
+    // played with its triplet feel (ADR-0104).
+    const auto secondsInto = [&](std::size_t m, const Fraction& offset) {
+        return tempo.secondsInto(
+            m, core::swung(song.measureHeader(m).tripletFeel, offset, lengths[m]).toDouble());
+    };
 
     // The measures as played.
     const std::vector<std::size_t> order = song.playOrder();
@@ -781,12 +792,12 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                                const Fraction end =
                                    offset + heldLength(note.length, articulations[i]);
                                Timing& timing = timings[i];
-                               timing.start = tempo.secondsInto(note.measure, offset.toDouble());
+                               timing.start = secondsInto(note.measure, offset);
                                timing.crosses = end > lengths[note.measure];
                                if (timing.crosses) {
                                    timing.endOffset = end;
                                } else {
-                                   timing.end = tempo.secondsInto(note.measure, end.toDouble());
+                                   timing.end = secondsInto(note.measure, end);
                                }
                            }
                        });
@@ -797,7 +808,7 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
             into -= lengths[measures_[k].measure];
             ++k;
         }
-        return measures_[k].start + tempo.secondsInto(measures_[k].measure, into.toDouble());
+        return measures_[k].start + secondsInto(measures_[k].measure, into);
     };
 
     // The notes of every played measure.

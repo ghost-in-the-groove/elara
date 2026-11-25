@@ -31,6 +31,7 @@ using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::TimeSignature;
 using elara::core::Track;
+using elara::core::TripletFeel;
 
 TEST_CASE("Measures start in 4/4, C major, at 120 quarter notes per minute", "[core][timeline]") {
     Song song;
@@ -97,6 +98,53 @@ TEST_CASE("Seconds follow the tempo map", "[core][timeline]") {
     CHECK(song.tempoAt(3) == Tempo(240));
     CHECK(song.tempoAt(0) == Tempo(120));
     CHECK_THROWS_AS(song.secondsAt(5), std::out_of_range);
+}
+
+TEST_CASE("A triplet feel plays the pairs of its note value long and short",
+          "[core][timeline][feel]") {
+    // ADR-0104, in a 4/4 measure.
+    using elara::core::swung;
+    const Fraction bar(1);
+    // Eighths as a triplet quarter and eighth: the second of each pair comes
+    // two thirds into it.
+    CHECK(swung(TripletFeel::Eighth, Fraction(1, 8), bar) == Fraction(1, 6));
+    CHECK(swung(TripletFeel::Eighth, Fraction(3, 8), bar) == Fraction(5, 12));
+    // The edges of the pairs do not move, so quarters play as written.
+    for (const Fraction at : {Fraction(0), Fraction(1, 4), Fraction(1, 2), Fraction(1)}) {
+        CHECK(swung(TripletFeel::Eighth, at, bar) == at);
+    }
+    // Sixteenths move with the half of the pair they are in.
+    CHECK(swung(TripletFeel::Eighth, Fraction(1, 16), bar) == Fraction(1, 12));
+    CHECK(swung(TripletFeel::Eighth, Fraction(3, 16), bar) == Fraction(5, 24));
+    // Sixteenth pairs, and the dotted and Scottish pairs.
+    CHECK(swung(TripletFeel::Sixteenth, Fraction(1, 16), bar) == Fraction(1, 12));
+    CHECK(swung(TripletFeel::Sixteenth, Fraction(1, 8), bar) == Fraction(1, 8));
+    CHECK(swung(TripletFeel::DottedEighth, Fraction(1, 8), bar) == Fraction(3, 16));
+    CHECK(swung(TripletFeel::ScottishEighth, Fraction(1, 8), bar) == Fraction(1, 16));
+    CHECK(swung(TripletFeel::DottedSixteenth, Fraction(1, 16), bar) == Fraction(3, 32));
+    CHECK(swung(TripletFeel::ScottishSixteenth, Fraction(1, 16), bar) == Fraction(1, 32));
+    // Straight without a feel, and in a pair the end of the measure cuts: the
+    // last eighth of a 7/8 measure.
+    CHECK(swung(TripletFeel::None, Fraction(1, 8), bar) == Fraction(1, 8));
+    CHECK(swung(TripletFeel::Eighth, Fraction(13, 16), Fraction(7, 8)) == Fraction(13, 16));
+    CHECK(swung(TripletFeel::Eighth, Fraction(5, 8), Fraction(7, 8)) == Fraction(2, 3));
+}
+
+TEST_CASE("Seconds follow the triplet feel of their measure", "[core][timeline][feel]") {
+    Song song;
+    song.appendMeasures(2);
+    song.measureHeader(0).tripletFeel = TripletFeel::Eighth;
+    // At quarter = 120 a quarter lasts half a second: its second eighth comes
+    // after a third of a second, the next quarter on time.
+    CHECK_THAT(song.secondsAt(0, Fraction(1, 8)), WithinAbs(1.0 / 3.0, 1e-12));
+    CHECK_THAT(song.secondsAt(0, Fraction(1, 4)), WithinAbs(0.5, 1e-12));
+    CHECK_THAT(song.secondsAt(1, Fraction(1, 8)), WithinAbs(2.25, 1e-12)); // straight
+    CHECK_THAT(song.durationSeconds(), WithinAbs(4.0, 1e-12));
+    // A new measure after a swung one swings too.
+    song.appendMeasures(1);
+    song.insertMeasures(1);
+    CHECK(song.measureHeader(1).tripletFeel == TripletFeel::Eighth);
+    CHECK(song.measureHeader(3).tripletFeel == TripletFeel::None);
 }
 
 TEST_CASE("A gradual tempo change moves to the next tempo along the score", "[core][timeline]") {

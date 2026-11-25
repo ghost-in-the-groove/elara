@@ -39,10 +39,14 @@ inline constexpr std::array kJumpToNames =
     std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
 inline constexpr std::array kJumpThenNames =
     std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
+/// Names of core::TripletFeel, by value (ADR-0104).
+inline constexpr std::array kTripletFeelNames =
+    std::to_array<std::string_view>({"none", "eighth", "sixteenth", "dotted-eighth",
+                                     "dotted-sixteenth", "scottish-eighth", "scottish-sixteenth"});
 
 /// `[{"time":"4/4","key":"C major"}, ...]`, one entry per measure, with
-/// `"signs":["segno","to-coda"]`, `"jump":"dal-segno"` and `"jumpThen":"al-coda"`
-/// where the measure has them.
+/// `"signs":["segno","to-coda"]`, `"jump":"dal-segno"`, `"jumpThen":"al-coda"`
+/// and `"tripletFeel":"eighth"` where the measure has them.
 [[nodiscard]] std::string measuresJson(const core::Song& song);
 
 /// `[{"kind":"voice-incomplete","track":0,...,"beat":null,"note":null}, ...]`

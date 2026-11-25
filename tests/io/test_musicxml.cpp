@@ -1224,6 +1224,52 @@ TEST_CASE("MusicXML: a measure repeat style makes measure repeats", "[musicxml][
     CHECK(hasWarning(result, "measure repeats of more than two measures dropped", "measure 8"));
 }
 
+TEST_CASE("MusicXML: swing is a triplet feel until the next one", "[musicxml][feel]") {
+    // ADR-0104: in a <sound> on its own or in a direction; 2:1, 3:1 and 1:3
+    // pairs of eighths or sixteenths, <straight/> ends it.
+    const auto swing = [](std::string_view inside) {
+        return std::format("<sound><swing>{}</swing></sound>", inside);
+    };
+    const auto ratio = [](int first, int second, std::string_view type) {
+        return std::format("<first>{}</first><second>{}</second>{}", first, second,
+                           type.empty() ? std::string()
+                                        : std::format("<swing-type>{}</swing-type>", type));
+    };
+    const std::string whole =
+        quarterNote("C", "") + quarterNote("D", "") + quarterNote("E", "") + quarterNote("F", "");
+    const std::array<std::string, 8> opening{
+        swing(ratio(2, 1, "")),
+        "",
+        R"(<direction><direction-type><words>Swing</words></direction-type>)" +
+            swing(ratio(3, 1, "16th")) + "</direction>",
+        swing(ratio(1, 3, "eighth")),
+        swing("<straight/>"),
+        swing(ratio(4, 2, "16th")),
+        swing(ratio(3, 2, "eighth")),
+        swing(ratio(2, 1, "quarter")),
+    };
+    std::string measures;
+    for (std::size_t m = 0; m < opening.size(); ++m) {
+        if (m > 0) {
+            measures += std::format(R"(</measure><measure number="{}">)", m + 1);
+        }
+        measures += opening[m] + whole;
+    }
+    const ImportResult result = parse(onePart(measures));
+    REQUIRE(result.song.measureCount() == opening.size());
+    using core::TripletFeel;
+    const std::array expected{
+        TripletFeel::Eighth,         TripletFeel::Eighth,   TripletFeel::DottedSixteenth,
+        TripletFeel::ScottishEighth, TripletFeel::None,     TripletFeel::Sixteenth,
+        TripletFeel::Sixteenth,      TripletFeel::Sixteenth};
+    for (std::size_t m = 0; m < expected.size(); ++m) {
+        CAPTURE(m);
+        CHECK(result.song.measureHeader(m).tripletFeel == expected[m]);
+    }
+    CHECK(result.warnings.size() == 1);
+    CHECK(hasWarning(result, "unusual swing dropped", "2 times, first in measure 7"));
+}
+
 TEST_CASE("MusicXML: a light-light barline is a double barline", "[musicxml][barline]") {
     // ADR-0103: on the right of a measure, or on the left of the next; the
     // other styles change nothing.

@@ -937,6 +937,23 @@ add_test(NAME cli.edit_rejects_tempo_from_first_measure
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90")
 set_tests_properties(cli.edit_rejects_tempo_out_of_range cli.edit_rejects_tempo_from_first_measure
   PROPERTIES WILL_FAIL TRUE)
+# Triplet feel (ADR-0104): swung eighths from measure 1, straight again in
+# measure 2; at quarter = 120 the second eighth starts after a third of a
+# second, saved, read back and played.
+set(ELARA_CLI_FEEL "${CMAKE_CURRENT_BINARY_DIR}/cli-feel.elara")
+add_test(NAME cli.edit_sets_triplet_feel
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_FEEL}" "add-track electric-guitar"
+    "append-measures 2" "note 0 0 1 3 8" "note 0 0 1 5 8" "feel 0 eighth" "feel 1 none")
+set_tests_properties(cli.edit_sets_triplet_feel PROPERTIES
+  FIXTURES_SETUP cli_feel
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\",\"tripletFeel\":\"eighth\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":6,\"next\":\"Change triplet feel\"}")
+add_test(NAME cli.sequence_triplet_feel COMMAND elara-cli sequence "${ELARA_CLI_FEEL}" --events)
+set_tests_properties(cli.sequence_triplet_feel PROPERTIES
+  FIXTURES_REQUIRED cli_feel
+  PASS_REGULAR_EXPRESSION " +0\\.000 on   track 0  key  [0-9]+ velocity +[0-9]+\n +0\\.333 off  track 0  key  [0-9]+ velocity   0\n +0\\.333 on   track 0  key ")
+add_test(NAME cli.edit_rejects_unknown_triplet_feel
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "feel 0 shuffle")
+set_tests_properties(cli.edit_rejects_unknown_triplet_feel PROPERTIES WILL_FAIL TRUE)
 # Repeats and alternate endings (ADR-0016): |: 1 | 2 (1., 2.) :| 3 (3.) | 4, played
 # three times through, saved, read back and played in order.
 set(ELARA_CLI_REPEATS "${CMAKE_CURRENT_BINARY_DIR}/cli-repeats.elara")
