@@ -13,6 +13,7 @@
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/page_layout.hpp>
 
+#include "recovery_store.hpp"
 #include "score_painter.hpp"
 #include "track_list.hpp"
 #include <QElapsedTimer>
@@ -21,6 +22,7 @@
 #include <QSizeF>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
@@ -90,6 +92,10 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString redoName READ redoName NOTIFY historyChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
     Q_PROPERTY(bool savesInPlace READ savesInPlace NOTIFY sourceChanged)
+    /// Where the song is copied while it has unsaved changes (ADR-0106); no
+    /// copies are written while it is empty.
+    Q_PROPERTY(QString recoveryFolder READ recoveryFolder WRITE setRecoveryFolder NOTIFY
+                   recoveryFolderChanged)
     // Keyboard entry (ADR-0021).
     Q_PROPERTY(int caretPage READ caretPage NOTIFY caretChanged)
     Q_PROPERTY(QRectF caretRect READ caretRect NOTIFY caretChanged)
@@ -176,7 +182,18 @@ public:
     /// `track` for every track of the song at once.
     static constexpr int kAllTracks = -1;
 
+    /// How long after the first unsaved change the recovery copy is written,
+    /// and how often while the song goes on changing: what a crash can lose.
+    static constexpr int kRecoveryMilliseconds = 5000;
+
     explicit ScoreDocument(QObject* parent = nullptr);
+    /// Removes the recovery copy: the window closes once the changes are
+    /// saved or discarded.
+    ~ScoreDocument() override;
+    ScoreDocument(const ScoreDocument&) = delete;
+    ScoreDocument& operator=(const ScoreDocument&) = delete;
+    ScoreDocument(ScoreDocument&&) = delete;
+    ScoreDocument& operator=(ScoreDocument&&) = delete;
 
     [[nodiscard]] QUrl source() const { return source_; }
     [[nodiscard]] Status status() const { return status_; }
@@ -223,6 +240,27 @@ public:
 
     /// Opens a file (a file: URL) and lays out its first track.
     Q_INVOKABLE void open(const QUrl& file);
+
+    // ---- Recovery copies (ADR-0106) -------------------------------------------
+
+    [[nodiscard]] QString recoveryFolder() const;
+    void setRecoveryFolder(const QString& folder);
+    /// The copies in recoveryFolder(); null while it is empty.
+    [[nodiscard]] const RecoveryStore* recovery() const { return recovery_.get(); }
+    /// Writes the recovery copy of the song on a worker now, when it has
+    /// unsaved changes the copy does not hold yet; recoveryWritten() follows.
+    /// The copy is otherwise written kRecoveryMilliseconds after a change.
+    void writeRecovery();
+    /// The copies an earlier run of the app left behind, the newest first:
+    /// maps of `file`, `title`, `source` (the song's own file, an empty URL
+    /// for a song never saved) and `written` (a date).
+    Q_INVOKABLE QVariantList recoverable();
+    /// Opens a copy recoverable() offered as the song it was, with unsaved
+    /// changes and its own file, if any, to save to. The copy goes once this
+    /// run's own copy of the song is written.
+    Q_INVOKABLE void recover(const QString& file);
+    /// Removes a copy recoverable() offered.
+    Q_INVOKABLE void discardRecovery(const QString& file);
     /// Lays out the score again (after a track or view change).
     Q_INVOKABLE void relayout();
 
@@ -726,8 +764,16 @@ signals:
     /// previewTrackMix() moved a fader: previewMixes() holds the new mixes.
     void mixPreviewed();
     void practiceChanged();
+    void recoveryFolderChanged();
+    /// The recovery copy of the song is on the disk.
+    void recoveryWritten();
 
 private:
+    /// Opens `file`, recovered from `recovered` when it is a recovery copy.
+    void load(const QUrl& file, std::optional<RecoveryStore::Copy> recovered);
+    /// Keeps the recovery copy in step with the history: written a while
+    /// after an unsaved change, removed once there are none.
+    void keepRecovery();
     bool execute(std::unique_ptr<core::Command> command);
     bool writeExport(const QString& local, const io::ExportResult& result, const QString& format);
     void setImportWarnings(const QStringList& warnings);
@@ -804,8 +850,13 @@ private:
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
     int pending_ = 0;
-    std::uint64_t generation_ = 0;         ///< of layouts: only the latest is shown
-    std::uint64_t sequenceGeneration_ = 0; ///< of sequences: only the latest is played
+    std::uint64_t generation_ = 0;                   ///< of layouts: only the latest is shown
+    std::uint64_t sequenceGeneration_ = 0;           ///< of sequences: only the latest is played
+    std::shared_ptr<RecoveryStore> recovery_;        ///< shared with the write running
+    QTimer recoveryTimer_;                           ///< writes the copy when it fires
+    std::shared_ptr<const core::Song> recoverySong_; ///< the song the copy holds or will
+    bool recoveryWriting_ = false;                   ///< a write is running on a worker
+    QString recoveredFrom_; ///< a recovered copy, to discard once this run's is written
 };
 
 } // namespace elara::app

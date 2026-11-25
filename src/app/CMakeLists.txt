@@ -9,12 +9,13 @@ qt_standard_project_setup(REQUIRES 6.12
 add_library(elara_app_view STATIC
   src/included_sound.cpp
   src/recent_scores.cpp
+  src/recovery_store.cpp
   src/score_painter.cpp
   src/track_list.cpp)
 target_include_directories(elara_app_view PUBLIC src)
-target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
-elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/score_painter.cpp
-  src/track_list.cpp)
+target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation PRIVATE elara::io)
+elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
+  src/score_painter.cpp src/track_list.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
 # its own: PNG images for the window, an .ico file for the Windows executable
@@ -69,6 +70,7 @@ qt_add_qml_module(elara
     qml/ScoreView.qml
     qml/EntryBar.qml
     qml/MeasurePopup.qml
+    qml/RecoveryDialog.qml
     qml/WordsPopup.qml
     qml/LyricsPopup.qml
     qml/SignatureFields.qml

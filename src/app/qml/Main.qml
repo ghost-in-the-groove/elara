@@ -33,6 +33,8 @@ ApplicationWindow {
     /// Whether choices such as the SoundFont are kept for the next start; off
     /// for checks and screenshots.
     property bool rememberSettings: true
+    /// Where unsaved songs are copied while the app runs (ADR-0106).
+    property string recoveryFolder
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
 
@@ -80,6 +82,7 @@ ApplicationWindow {
         } else if (rememberSettings) {
             audio.restoreSound();
         }
+        recoveryDialog.offer(score.recoverable());
     }
 
     onClosing: close => {
@@ -159,6 +162,7 @@ ApplicationWindow {
     ScoreDocument {
         id: score
 
+        recoveryFolder: window.recoveryFolder
         // A new song starts at its top, at paper size when it fits. A file
         // opened or saved goes to the top of the recent scores.
         onSourceChanged: {
@@ -343,6 +347,14 @@ ApplicationWindow {
             text: qsTr("“%1” has changes that are not saved.").arg(score.title)
             wrapMode: Text.Wrap
         }
+    }
+
+    RecoveryDialog {
+        id: recoveryDialog
+
+        objectName: "recoveryDialog"
+        onRecoverRequested: file => window.whenSaved(() => score.recover(file))
+        onDiscardRequested: file => score.discardRecovery(file)
     }
 
     Dialog {
