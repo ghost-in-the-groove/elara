@@ -61,13 +61,22 @@ written. Guitar Pro 6-8 simile marks become signs, dropping the whole rest of
 the bar; a mark Elara does not know keeps the bar's beats, with a warning
 ("simile marks dropped").
 
+**MusicXML** reads a `<measure-repeat type="start">` of one or two measures
+as signs on the staff its `<measure-style>` numbers (or on all of them), from
+that measure until a `type="stop"`, and drops the notes written out under
+them: the sign plays the measures before. Longer repeats warn and stay as
+written. Writing does the reverse: each run of signs that count starts with
+its size and stops in the first measure after it, numbered by staff when the
+part has more than one (a TAB staff written from its staff shares its
+style), and each measure with a sign writes out the music it plays, so that
+readers that ignore the sign still play it. A sign that does not count is
+dropped with a warning, since MusicXML has no sign without its music.
+
 ## Consequences
 
 - Imported drum and riff parts sound as written, and their pages show the
   signs the file has instead of measure rests.
-- MusicXML neither reads nor writes the sign yet: an exported repeat measure
-  is an empty measure. Reading it, and writing the music it repeats with the
-  sign, is the next step; so is setting a sign at the caret.
+- Setting a sign at the caret is the next step.
 - A measure whose sign does not count (nothing before it, another length)
   shows a measure rest and keeps the sign, which counts again when the
   measures around it allow.

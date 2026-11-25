@@ -260,6 +260,7 @@ int main(int argc, char* argv[]) {
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
+    options.tuner = parser.isSet(tunerOption);
     options.screenshot = parser.value(screenshot);
     const bool checking = options.smokeTest || !options.screenshot.isEmpty();
     if (checking) {

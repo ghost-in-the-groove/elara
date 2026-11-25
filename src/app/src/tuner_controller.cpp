@@ -67,12 +67,8 @@ QString spelled(const elara::core::Pitch& pitch) {
     return text;
 }
 
-std::optional<Tuning> presetAt(int index) {
-    const auto names = Tuning::presetNames();
-    if (index < 1 || index > static_cast<int>(names.size())) {
-        return std::nullopt;
-    }
-    return Tuning::preset(names[static_cast<std::size_t>(index - 1)]);
+int presetCount() {
+    return static_cast<int>(Tuning::presetNames().size());
 }
 
 } // namespace
@@ -108,14 +104,54 @@ QStringList TunerController::tuningLabels() const {
     for (const std::string_view preset : Tuning::presetNames()) {
         labels << label(preset);
     }
+    if (trackTuning_) {
+        labels << tr("Track: %1").arg(trackName_);
+    }
     return labels;
 }
 
+std::optional<Tuning> TunerController::tuningAt(int index) const {
+    const auto names = Tuning::presetNames();
+    if (index >= 1 && index <= presetCount()) {
+        return Tuning::preset(names[static_cast<std::size_t>(index - 1)]);
+    }
+    return index == presetCount() + 1 ? trackTuning_ : std::nullopt;
+}
+
 void TunerController::setTuning(int index) {
-    if (tuning_ == index || index < 0 || index > static_cast<int>(Tuning::presetNames().size())) {
+    const int last = presetCount() + (trackTuning_ ? 1 : 0);
+    if (tuning_ == index || index < 0 || index > last) {
         return;
     }
     tuning_ = index;
+    applyOptions();
+    emit tuningChanged();
+}
+
+void TunerController::showTuning(const QString& notes, const QString& track) {
+    const std::optional<Tuning> tuning = Tuning::parse(notes.simplified().toStdString());
+    if (!tuning) {
+        return;
+    }
+    const auto names = Tuning::presetNames();
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        if (Tuning::preset(names[i]) == tuning) {
+            setTuning(static_cast<int>(i) + 1);
+            // The track's own entry goes with the tuning it stood for.
+            if (trackTuning_) {
+                trackTuning_.reset();
+                trackName_.clear();
+                emit tuningLabelsChanged();
+            }
+            return;
+        }
+    }
+    if (trackTuning_ != tuning || trackName_ != track) {
+        trackTuning_ = tuning;
+        trackName_ = track;
+        emit tuningLabelsChanged();
+    }
+    tuning_ = presetCount() + 1;
     applyOptions();
     emit tuningChanged();
 }
@@ -190,7 +226,7 @@ void TunerController::poll() {
 }
 
 void TunerController::applyOptions() {
-    const std::optional<Tuning> tuning = presetAt(tuning_);
+    const std::optional<Tuning> tuning = tuningAt(tuning_);
     QStringList names;
     if (tuning) {
         for (int string = tuning->stringCount(); string >= 1; --string) {
