@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/audio/flac_reader.hpp>
 #include <elara/audio/sfz_bank.hpp>
-#include <elara/audio/wav_reader.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/parallel.hpp>
 
@@ -641,7 +641,7 @@ readSamples(const std::vector<std::filesystem::path>& paths) {
     std::vector<std::expected<WavAudio, std::string>> results(
         paths.size(), std::unexpected(std::string("not read")));
     core::forEachIndex(0, paths.size(), core::threadsFor(0, paths.size(), 2, paths.size()),
-                       [&](std::size_t i) { results[i] = readWav(paths[i]); });
+                       [&](std::size_t i) { results[i] = readAudioFile(paths[i]); });
     return results;
 }
 

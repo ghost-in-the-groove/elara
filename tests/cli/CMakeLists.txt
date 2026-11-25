@@ -1095,6 +1095,18 @@ add_test(NAME cli.sfz_text COMMAND elara-cli sfz "${_test_sfz}")
 set_tests_properties(cli.sfz_text PROPERTIES
   FIXTURES_REQUIRED cli_sfz
   PASS_REGULAR_EXPRESSION "^test-guitar: 3 regions over keys 0 to 127, 2 samples \\(0\\.2 MB\\) read in [0-9.]+ s\n  opcodes not played: lfoN_pitch_onccN\n  palm-mute: controller 70 \"Muting\"\n$")
+# The same pluck as a FLAC sample: as many samples in memory as the WAV.
+add_test(NAME cli.sfz_flac
+  COMMAND elara-cli --json sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz/test-flac.sfz")
+set_tests_properties(cli.sfz_flac PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"name\":\"test-flac\",\"regions\":1,\"samples\":1,\"sampleBytes\":88200,.*\"missingSamples\":\\[\\],")
+add_test(NAME cli.render_audio_sfz_flac
+  COMMAND elara-cli --json render-audio "${ELARA_CORPUS}/gp/band.gp"
+          --sfz "${CMAKE_CURRENT_BINARY_DIR}/test-sfz/test-flac.sfz")
+set_tests_properties(cli.render_audio_sfz_flac PROPERTIES
+  FIXTURES_REQUIRED cli_sfz
+  PASS_REGULAR_EXPRESSION "\"peak\":0\\.[0-9]*[1-9][0-9]*,.*\"sound\":\"test-flac\"")
 add_test(NAME cli.sfz_rejects_other_files COMMAND elara-cli sfz "${ELARA_CORPUS}/gp/band.gp")
 set_tests_properties(cli.sfz_rejects_other_files PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_audio_sfz
