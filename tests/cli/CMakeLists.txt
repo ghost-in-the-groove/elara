@@ -825,14 +825,21 @@ set_tests_properties(cli.render_drums PROPERTIES
 add_test(NAME cli.render_grand_staff
   COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/piano-voices.musicxml" --tracks 0)
 set_tests_properties(cli.render_grand_staff PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
+  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0,\"hairpin\":0\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
 
 # A strummed piano chord is rolled: an arpeggio line left of it on each staff
 # of the grand staff, not an arrow above (ADR-0076).
 add_test(NAME cli.render_arpeggio
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/piano.gp5" --tracks 0 --count 1)
 set_tests_properties(cli.render_arpeggio PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*\}.*\"role\":\"arpeggio\"")
+  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*,\"hairpin\":0\}.*\"role\":\"arpeggio\"")
+
+# Hairpins are wedges under the staff (ADR-0078): the crescendo of bar 1 and the
+# diminuendo of bar 3 of the guitar techniques, two lines each.
+add_test(NAME cli.render_hairpins
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
+set_tests_properties(cli.render_hairpins PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"arpeggio\":0,\"hairpin\":4\}.*\"role\":\"hairpin\",\"measure\":0,.*\"role\":\"hairpin\",\"measure\":2,")
 
 add_test(NAME cli.render_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --first 2 --count 1
@@ -859,7 +866,7 @@ set_tests_properties(cli.render_tab PROPERTIES
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":11,.*\"rest\":1,\"fretNumber\":11,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":4},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -890,13 +897,14 @@ add_test(NAME cli.render_scroll
 set_tests_properties(cli.render_scroll PROPERTIES
   PASS_REGULAR_EXPRESSION "\"layout\":\"scroll\",\"pages\":\\[{\"width\":40,\"top\":0,.*\"measureNumber\":[1-9][0-9]*,\"credit\":0,.*\"systems\":\\[{\"firstMeasure\":0,.*{\"firstMeasure\":[1-9]")
 
-# The endless page cut into strips between systems (ADR-0057): the first strip
-# holds two whole systems, the second the third; one SVG per strip.
+# The endless page cut into strips between systems (ADR-0057): the first system,
+# tall with its hairpin, fills the first strip, and the second strip holds the
+# other two whole; one SVG per strip.
 add_test(NAME cli.render_strips
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
           --width 40 --strip-height 50 --no-credits)
 set_tests_properties(cli.render_strips PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*{\"firstMeasure\":1,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
+  PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":1,[^{]*{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
 add_test(NAME cli.render_strips_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
           --width 40 --strip-height 50 --no-credits
@@ -1017,12 +1025,12 @@ set_tests_properties(cli.sequence_double_coda PROPERTIES
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")
 set_tests_properties(cli.render_navigation PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0}")
+  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":0}")
 # Sections drawn boxed above everything (ADR-0063): two names, four sides each.
 add_test(NAME cli.render_sections
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/double-coda.gp")
 set_tests_properties(cli.render_sections PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0}")
+  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0,\"hairpin\":0}")
 # ... and kept on the way to MusicXML: saved, exported, read back.
 set(ELARA_CLI_DOUBLE_CODA "${CMAKE_CURRENT_BINARY_DIR}/cli-double-coda")
 add_test(NAME cli.import_double_coda COMMAND elara-cli import "${ELARA_CORPUS}/gp/double-coda.gp"
@@ -1047,7 +1055,7 @@ set_tests_properties(cli.sequence_events PROPERTIES
 add_test(NAME cli.sequence_articulations
   COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes --events)
 set_tests_properties(cli.sequence_articulations PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":80,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
+  PASS_REGULAR_EXPRESSION "\"start\":0,\"end\":0\\.6,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}.*\"start\":1\\.8,\"end\":6\\.9,\"key\":73,\"velocity\":88,\"touch\":\"harmonic\"}.*\"start\":4\\.35,\"end\":5\\.1,\"key\":40,\"velocity\":127,\"touch\":\"dead\"}.*\"start\":12\\.6,\"end\":13\\.1625,\"key\":57,\"velocity\":80}.*\"events\":\\[{\"time\":0,\"kind\":\"on\",\"track\":0,\"key\":40,\"velocity\":80,\"touch\":\"palm-mute\"}")
 # Pitch articulations (ADR-0023): the hammer-on in the triplet is not struck
 # but joins the voice of the note before it a whole tone up (ADR-0070), and
 # the shift slide goes up to the next note over the last 0.2 s.
@@ -1066,7 +1074,15 @@ set_tests_properties(cli.sequence_strums PROPERTIES
 add_test(NAME cli.render_audio_touches
   COMMAND elara-cli render-audio "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tail 0 --events)
 set_tests_properties(cli.render_audio_touches PROPERTIES
-  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  80  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
+  PASS_REGULAR_EXPRESSION "\n +0 on   track 0  key  40 velocity  80  palm-mute\n.* on   track 0  key  73 velocity  88  harmonic\n.* on   track 0  key  40 velocity 127  dead\n")
+# Hairpins ramp the velocity (ADR-0078): the crescendo of bar 1 leads from mf
+# (80) to the forte of bar 2 (96), so its second quarter is struck halfway at
+# 88; the diminuendo of bar 3 has no softer dynamic after it and falls one step
+# (16), so its eighth, three quarters of the way, is struck at 68.
+add_test(NAME cli.sequence_hairpins
+  COMMAND elara-cli --json sequence "${ELARA_CORPUS}/gp/guitar-techniques.gp" --notes)
+set_tests_properties(cli.sequence_hairpins PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"start\":1.2,\"end\":1.8,\"key\":59,\"velocity\":80\},\{[^}]*\"start\":1.8,\"end\":6.9,\"key\":73,\"velocity\":88,.*\"pass\":5,\"start\":12.6,[^}]*\"velocity\":80\}.*\"pass\":5,\"start\":13.725,\"end\":14.1,\"key\":59,\"velocity\":68\}")
 add_test(NAME cli.sequence_rejects_missing_file
   COMMAND elara-cli sequence "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.sequence_rejects_missing_file PROPERTIES WILL_FAIL TRUE)

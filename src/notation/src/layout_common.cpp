@@ -40,9 +40,13 @@ constexpr double kWhammyMinWidth = 1.0;  // a curve is at least this wide
 constexpr double kWhammyEndGap = 0.3;    // between a curve and the next column
 
 // Dynamics marks, in staff spaces (ADR-0044).
-constexpr double kDynamicBaseline = 2.8; // the baseline at least this far under the staff
-constexpr double kDynamicInkGap = 0.5;   // at least between the ink above and the marks
-constexpr double kDynamicGap = 0.4;      // at least between neighbouring marks
+constexpr double kDynamicBaseline = 2.8;  // the baseline at least this far under the staff
+constexpr double kDynamicInkGap = 0.5;    // at least between the ink above and the marks
+constexpr double kDynamicGap = 0.4;       // at least between neighbouring marks
+constexpr double kHairpinOpening = 1.0;   // between the lines at the open end of a wedge
+constexpr double kHairpinContinued = 0.5; // where a wedge is cut by the end of a line
+constexpr double kHairpinEndGap = 0.4;    // before the column or barline a wedge ends at
+constexpr double kHairpinMinLength = 1.0;
 
 } // namespace
 
@@ -333,13 +337,131 @@ void DynamicMarks::strike(core::Dynamic dynamic, double centre, std::size_t meas
     }
 }
 
+namespace {
+
+// Whether a voice of `measure` starts (ends) with a beat under `hairpin`.
+bool startsWith(const core::Measure& measure, core::Hairpin hairpin) {
+    return std::ranges::any_of(measure.voices, [hairpin](const core::Voice& voice) {
+        return !voice.beats.empty() && voice.beats.front().effects.hairpin == hairpin;
+    });
+}
+
+bool endsWith(const core::Measure& measure, core::Hairpin hairpin) {
+    return std::ranges::any_of(measure.voices, [hairpin](const core::Voice& voice) {
+        return !voice.beats.empty() && voice.beats.back().effects.hairpin == hairpin;
+    });
+}
+
+} // namespace
+
+void DynamicMarks::hairpins(const core::Measure& measure, std::size_t m,
+                            std::span<const ColumnPosition> positions, double barline) {
+    spans_.clear();
+    for (const core::Voice& voice : measure.voices) {
+        core::Fraction at;
+        for (const core::Beat& beat : voice.beats) {
+            const core::Fraction end = at + beat.duration.length();
+            if (beat.effects.hairpin != core::Hairpin::None) {
+                spans_.push_back({.start = at, .end = end, .hairpin = beat.effects.hairpin});
+            }
+            at = end;
+        }
+    }
+    if (spans_.empty()) {
+        return;
+    }
+    // One wedge per run of the same hairpin, whichever voices hold it.
+    std::ranges::stable_sort(spans_, std::less<>{}, &Span::start);
+    std::size_t kept = 0;
+    for (std::size_t i = 1; i < spans_.size(); ++i) {
+        Span& last = spans_[kept];
+        if (spans_[i].hairpin == last.hairpin && spans_[i].start <= last.end) {
+            last.end = std::max(last.end, spans_[i].end);
+        } else {
+            spans_[++kept] = spans_[i];
+        }
+    }
+    spans_.resize(kept + 1);
+    for (const Span& span : spans_) {
+        const auto after =
+            std::ranges::lower_bound(positions, span.end, std::less<>{}, &ColumnPosition::start);
+        const bool toBarline = after == positions.end();
+        const double right = (toBarline ? barline : after->x) - kHairpinEndGap;
+        if (span.start.isZero() && !wedges_.empty()) {
+            Wedge& last = wedges_.back();
+            if (last.hairpin == span.hairpin && last.toBarline && last.last + 1 == m) {
+                last.right = right; // over the barline
+                last.last = m;
+                last.toBarline = toBarline;
+                continue;
+            }
+        }
+        const bool continued = span.start.isZero() && m == first_ && m > 0 && staff_ != nullptr &&
+                               endsWith(staff_->measure(m - 1), span.hairpin);
+        wedges_.push_back(Wedge{.hairpin = span.hairpin,
+                                .left = columnX(positions, span.start),
+                                .right = right,
+                                .measure = m,
+                                .last = m,
+                                .toBarline = toBarline,
+                                .continued = continued});
+    }
+}
+
+void DynamicMarks::placeWedges(DisplayList& list, double middle, double end) {
+    const double thickness = font_.defaults().hairpinThickness;
+    for (Wedge& wedge : wedges_) {
+        // Clear of the marks: a mark in the first half pushes the start right,
+        // one in the second half pulls the end left.
+        for (std::size_t i = 0; i < marks_.size(); ++i) {
+            const BoundingBox& box = font_.metrics(dynamicGlyph(marks_[i].dynamic)).box;
+            const double markLeft = origins_[i] + box.southWest.x;
+            const double markRight = origins_[i] + box.northEast.x;
+            if (markRight + kDynamicGap <= wedge.left || markLeft - kDynamicGap >= wedge.right) {
+                continue;
+            }
+            if ((markLeft + markRight) / 2 < (wedge.left + wedge.right) / 2) {
+                wedge.left = markRight + kDynamicGap;
+            } else {
+                wedge.right = markLeft - kDynamicGap;
+            }
+        }
+        wedge.right = std::min(wedge.right, end - kHairpinEndGap);
+        if (wedge.right - wedge.left < kHairpinMinLength) {
+            wedge.right = wedge.left + kHairpinMinLength;
+        }
+        const bool continues = wedge.toBarline && staff_ != nullptr &&
+                               wedge.last + 1 < staff_->measureCount() &&
+                               startsWith(staff_->measure(wedge.last + 1), wedge.hairpin);
+        // A crescendo opens from its point, a diminuendo closes to it; a wedge
+        // cut by the end of a line is half open there.
+        const bool crescendo = wedge.hairpin == core::Hairpin::Crescendo;
+        const double open = kHairpinOpening / 2;
+        const double cut = kHairpinContinued / 2;
+        const double atLeft = wedge.continued ? cut : (crescendo ? 0.0 : open);
+        const double atRight = continues ? cut : (crescendo ? open : 0.0);
+        for (const double side : {-1.0, 1.0}) {
+            list.lines.push_back(LineItem{.from = {wedge.left, middle + side * atLeft},
+                                          .to = {wedge.right, middle + side * atRight},
+                                          .thickness = thickness,
+                                          .role = Role::Hairpin,
+                                          .measure = wedge.measure});
+        }
+    }
+}
+
 void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, double end) {
-    if (marks_.empty()) {
+    if (marks_.empty() && wedges_.empty()) {
         return;
     }
     double ascent = 0.0;
     for (const Mark& mark : marks_) {
         ascent = std::max(ascent, font_.metrics(dynamicGlyph(mark.dynamic)).box.northEast.y);
+    }
+    // Wedges are centred on the middle of the letters of the marks.
+    const double rise = font_.metrics(Glyph::DynamicMezzo).box.northEast.y / 2;
+    if (!wedges_.empty()) {
+        ascent = std::max(ascent, rise + kHairpinOpening / 2);
     }
     const double baseline =
         std::max(staffHeight + kDynamicBaseline, bottom + kDynamicInkGap + ascent);
@@ -370,7 +492,9 @@ void DynamicMarks::place(DisplayList& list, double bottom, double staffHeight, d
                                         .role = Role::Dynamic,
                                         .measure = marks_[i].measure});
     }
+    placeWedges(list, baseline - rise, end);
     marks_.clear();
+    wedges_.clear();
 }
 
 std::string whammyLabel(int cents) {
