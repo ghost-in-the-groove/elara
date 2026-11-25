@@ -210,6 +210,21 @@ void Player::seek(double seconds) noexcept {
     seekTo_.store(std::llround(clamped * sampleRate_), std::memory_order_release);
 }
 
+void Player::takeOver(const Player& other) noexcept {
+    seek(other.position());
+    // The loop in seconds, from the frames at the other player's rate.
+    const std::uint64_t loop = other.loop_.load(std::memory_order_acquire);
+    const auto seconds = [&](std::uint64_t frame) {
+        return static_cast<double>(frame) / other.sampleRate_;
+    };
+    setLoop(seconds(loop >> 32U), seconds(loop & 0xFFFF'FFFFU));
+    if (other.isPlaying()) {
+        play();
+    } else {
+        pause();
+    }
+}
+
 bool Player::isPlaying() const noexcept {
     return playing_.load(std::memory_order_acquire);
 }

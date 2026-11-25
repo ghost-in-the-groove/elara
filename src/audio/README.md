@@ -61,8 +61,9 @@ Three targets with different rules:
   `updateMix()` changes the track levels while it plays, from a song or from
   the tracks' mixes alone (a moving fader, ADR-0039). For practice it counts
   in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and
-  loops a passage (`setLoop()`, ADR-0024). It is an `AudioSource`, the
-  interface a device plays;
+  loops a passage (`setLoop()`, ADR-0024). A player made at a device's new
+  sample rate goes on from another's place (`takeOver()`: position, loop,
+  playing or paused). It is an `AudioSource`, the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), `readWav()`/`decodeWav()` for
   PCM and float WAV files, `readFlac()`/`decodeFlac()` for FLAC files, decoded

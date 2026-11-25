@@ -170,6 +170,8 @@ void AudioController::togglePlayback() {
         loadSequence();
         player_->seek(position_);
         audio_->setSource(player_.get());
+    } else {
+        followDeviceRate(); // the device may have restarted while paused
     }
     setErrorMessage({});
     if (player_->isPlaying()) {
@@ -214,6 +216,7 @@ void AudioController::pollTransport() {
     if (!player_) {
         return;
     }
+    followDeviceRate();
     player_->tidy();
     const bool playing = player_->isPlaying();
     const double position = player_->position();
@@ -232,6 +235,27 @@ void AudioController::pollTransport() {
     if (!playing) {
         transportTimer_.stop();
     }
+}
+
+// The player renders at the rate the device had when it was made. A device
+// that restarts at another one (headphones plugged in, Bluetooth switching
+// profiles, the system's format changed) would play the music at the wrong
+// pitch and speed: a player made at the new rate takes over, from the same
+// place in the music.
+void AudioController::followDeviceRate() {
+    const double rate = audio_ ? audio_->sampleRate() : 0.0;
+    if (rate <= 0.0 || rate == player_->sampleRate() || !document_ || !loaded_ ||
+        loaded_ != document_->sequence() || !document_->sequenceSong()) {
+        return;
+    }
+    auto next = std::make_unique<elara::audio::Player>(rate);
+    next->setSoundBank(bank_);
+    next->load(*document_->sequenceSong(), *loaded_);
+    next->updateMix(*document_->song());
+    next->takeOver(*player_);
+    // Once the device plays the new player, the old one is no longer called.
+    audio_->setSource(next.get());
+    player_ = std::move(next);
 }
 
 void AudioController::setCountIn(bool countIn) {
