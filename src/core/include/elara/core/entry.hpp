@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
 
 /// Keyboard entry (ADR-0021): a caret on a beat and a string, the moves of the
 /// arrow keys, and the edits that typing frets, durations and deletes makes.
@@ -239,6 +241,19 @@ enum class NoteEffect : std::uint8_t {
 /// end. The caret stays. Nothing changes when the passage already has the
 /// dynamic or no note follows the caret.
 [[nodiscard]] Entry setDynamic(const Song& song, const Caret& caret, Dynamic dynamic);
+
+/// Chord symbol entry (ADR-0080): names the caret's beat `name` (spaces
+/// around it dropped), rest or not, as one undo step ("Set chord symbol"); an
+/// empty name takes its chord symbol away ("Remove chord symbol"). On a staff
+/// with frets the symbol gets a diagram: the frets of the beat's notes when two
+/// or more have one (strings without a note not played, the grid from the nut
+/// unless a fret lies past the fourth), otherwise the diagram it had. Nothing
+/// changes on the free slot or when the beat has that symbol already.
+[[nodiscard]] Entry setChordSymbol(const Song& song, const Caret& caret, std::string_view name);
+
+/// The name of the chord symbol of the caret's beat; empty without one and on
+/// the free slot.
+[[nodiscard]] std::string chordNameAt(const Song& song, const Caret& caret);
 
 /// Whether the notes the caret is on (as for toggleEffect) all have `effect`,
 /// in any of its forms: what the next toggle turns off. False on a rest, the

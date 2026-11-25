@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -12,6 +13,8 @@
 #include <vector>
 
 using elara::core::Beat;
+using elara::core::ChordDiagram;
+using elara::core::ChordSymbol;
 using elara::core::Document;
 using elara::core::Duration;
 using elara::core::findInstrumentPreset;
@@ -26,11 +29,15 @@ using elara::core::Measure;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pitch;
+using elara::core::SharedOptional;
 using elara::core::Song;
 using elara::core::Step;
 using elara::core::Track;
 using elara::core::transposed;
+using elara::core::transposedChordName;
+using elara::core::transposedDiagram;
 using elara::core::Transposition;
+using elara::core::Tuning;
 
 namespace {
 
@@ -177,6 +184,85 @@ TEST_CASE("Transposing a song moves its pitched notes and keys as one undo step"
     CHECK(doc.song().measureHeader(1).keySignature == key("D major"));
     CHECK(doc.undoName() == "Transpose");
     CHECK(doc.undoCount() == 1);
+
+    doc.undo();
+    CHECK(doc.song() == song);
+}
+
+TEST_CASE("A transposed chord name moves its root and its bass", "[core][transpose]") {
+    const Interval second{.steps = 1, .semitones = 2};
+    CHECK(transposedChordName("G7", second) == "A7");
+    CHECK(transposedChordName("Am", second) == "Bm");
+    CHECK(transposedChordName("Bb7/F", second) == "C7/G");
+    CHECK(transposedChordName("C6/9", second) == "D6/9"); // 9 is no bass
+    CHECK(transposedChordName("F#m7b5", second) == "G#m7b5");
+    CHECK(transposedChordName("N.C.", second) == "N.C.");
+    CHECK(transposedChordName("", second).empty());
+
+    // A diminished fifth: G flat would become D double flat, written C.
+    const Interval fifth{.steps = 4, .semitones = 6};
+    CHECK(transposedChordName("G7", fifth) == "Db7");
+    CHECK(transposedChordName("Gb/Bb", fifth) == "C/E");
+    CHECK(transposedChordName("Bb/D", fifth) == "Fb/Ab"); // spelled as the interval says
+    // An augmented fourth from D sharp would be G double sharp.
+    const Interval fourth{.steps = 3, .semitones = 6};
+    CHECK(transposedChordName("D#m", fourth) == "Am"); // G double sharp, written A
+}
+
+TEST_CASE("A transposed chord diagram moves along the neck", "[core][transpose]") {
+    constexpr std::int8_t x = ChordDiagram::kMuted;
+    const ChordDiagram am{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}};
+
+    CHECK(transposedDiagram(am, 2) == ChordDiagram{.firstFret = 1, .frets = {2, 3, 4, 4, 2, x}});
+    CHECK(transposedDiagram(am, 5) == ChordDiagram{.firstFret = 5, .frets = {5, 6, 7, 7, 5, x}});
+    CHECK(transposedDiagram(am, 12) ==
+          ChordDiagram{.firstFret = 12, .frets = {12, 13, 14, 14, 12, x}});
+    // Below the nut, an octave up instead.
+    CHECK(transposedDiagram(am, -2) ==
+          ChordDiagram{.firstFret = 10, .frets = {10, 11, 12, 12, 10, x}});
+
+    // Past the last fret, an octave down; a capo leaves fewer frets.
+    const ChordDiagram high{.firstFret = 26, .frets = {x, 27, 28, 28, 26, x}};
+    CHECK(transposedDiagram(high, 1) ==
+          ChordDiagram{.firstFret = 27, .frets = {x, 28, 29, 29, 27, x}});
+    CHECK(transposedDiagram(high, 1, Tuning::kMaxFret - 3) ==
+          ChordDiagram{.firstFret = 15, .frets = {x, 16, 17, 17, 15, x}});
+    CHECK(transposedDiagram(high, 5) ==
+          ChordDiagram{.firstFret = 19, .frets = {x, 20, 21, 21, 19, x}});
+
+    // Only muted strings: nothing to move.
+    const ChordDiagram muted{.firstFret = 1, .frets = {x, x, x, x, x, x}};
+    CHECK(transposedDiagram(muted, 3) == muted);
+}
+
+TEST_CASE("Chord symbols move with the notes", "[core][transpose]") {
+    constexpr std::int8_t x = ChordDiagram::kMuted;
+    // A minor: the open A string, frets 2, 2 and 1, the open high E.
+    Song song = band({{5, 0}, {4, 2}, {3, 2}, {2, 1}, {1, 0}});
+    song.track(0).staff(0).measure(0).voices[0].beats[0].chord = SharedOptional(ChordSymbol{
+        .name = "Am", .diagram = ChordDiagram{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}}});
+    // A flute's chord symbol has no diagram.
+    song.track(1).staff(0).measure(1).voices[0].beats[0].chord =
+        SharedOptional(ChordSymbol{.name = "C#dim", .diagram = std::nullopt});
+
+    Document doc = transposedBand(song, {.semitones = 2});
+    const Beat& guitar = doc.song().track(0).staff(0).measure(0).voices[0].beats[0];
+    REQUIRE(guitar.chord);
+    CHECK(guitar.chord->name == "Bm");
+    CHECK(guitar.chord->diagram == ChordDiagram{.firstFret = 1, .frets = {2, 3, 4, 4, 2, x}});
+    CHECK(positionsOf(doc.song()) ==
+          std::vector<FretPosition>{at(5, 2), at(4, 4), at(3, 4), at(2, 3), at(1, 2)});
+    const Beat& flute = doc.song().track(1).staff(0).measure(1).voices[0].beats[0];
+    REQUIRE(flute.chord);
+    CHECK(flute.chord->name == "D#dim");
+    CHECK_FALSE(flute.chord->diagram);
+    CHECK(doc.undoCount() == 1);
+
+    SECTION("not on the tracks that stay") {
+        Document part = transposedBand(song, {.semitones = 2, .tracks = {1}});
+        CHECK(part.song().track(0).staff(0).measure(0).voices[0].beats[0].chord->name == "Am");
+        CHECK(part.song().track(1).staff(0).measure(1).voices[0].beats[0].chord->name == "D#dim");
+    }
 
     doc.undo();
     CHECK(doc.song() == song);

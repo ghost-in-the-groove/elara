@@ -2,6 +2,7 @@
 // MusicXML export (ADR-0008), written from the MusicXML 4.0 specification. It is
 // the reverse of the import mapping: what MusicXML can hold imports back
 // unchanged, the rest is listed in the warnings.
+#include <elara/core/chord_name.hpp>
 #include <elara/core/version.hpp>
 #include <elara/io/musicxml.hpp>
 
@@ -35,57 +36,6 @@ using detail::Warnings;
 
 // ---- XML text -------------------------------------------------------------------
 
-/// Appends indented XML to a string. The caller writes elements in the order
-/// the MusicXML schema requires; the writer only handles the syntax.
-/// A pitch of a chord name: a letter and its sharps (+) or flats (-).
-struct ChordPitch {
-    char step = 'C';
-    int alter = 0;
-};
-
-/// A chord name split as MusicXML writes it (ADR-0080): "Bb7/F" is the root
-/// B flat, the suffix "7" and the bass F.
-struct ChordSpelling {
-    ChordPitch root;
-    std::string_view suffix;
-    std::optional<ChordPitch> bass;
-};
-
-/// The pitch at the start of `text`, and how many characters it takes.
-std::optional<std::pair<ChordPitch, std::size_t>> chordPitch(std::string_view text) {
-    if (text.empty() || text[0] < 'A' || text[0] > 'G') {
-        return std::nullopt;
-    }
-    ChordPitch pitch{.step = text[0], .alter = 0};
-    std::size_t used = 1;
-    for (; used < text.size() && std::abs(pitch.alter) < 2; ++used) {
-        if (text[used] == '#') {
-            ++pitch.alter;
-        } else if (text[used] == 'b') {
-            --pitch.alter;
-        } else {
-            break;
-        }
-    }
-    return std::pair{pitch, used};
-}
-
-std::optional<ChordSpelling> spellChord(std::string_view name) {
-    const auto root = chordPitch(name);
-    if (!root) {
-        return std::nullopt;
-    }
-    ChordSpelling spelling{.root = root->first, .suffix = name.substr(root->second), .bass = {}};
-    if (const std::size_t slash = spelling.suffix.rfind('/'); slash != std::string_view::npos) {
-        const std::string_view after = spelling.suffix.substr(slash + 1);
-        if (const auto bass = chordPitch(after); bass && bass->second == after.size()) {
-            spelling.bass = bass->first;
-            spelling.suffix = spelling.suffix.substr(0, slash);
-        }
-    }
-    return spelling;
-}
-
 /// The MusicXML <kind> for a chord name's suffix; "other" when none says it.
 std::string_view kindFor(std::string_view suffix) {
     if (const auto known =
@@ -112,6 +62,8 @@ std::string_view kindFor(std::string_view suffix) {
     return "other";
 }
 
+/// Appends indented XML to a string. The caller writes elements in the order
+/// the MusicXML schema requires; the writer only handles the syntax.
 class XmlWriter {
 public:
     /// `pretty`: one element per line, indented by depth; otherwise no
@@ -1326,7 +1278,7 @@ private:
             xml.attribute("print-frame", "yes");
         }
         xml.endOpen();
-        const std::optional<ChordSpelling> spelling = spellChord(chord.name);
+        const std::optional<ChordNameParts> spelling = splitChordName(chord.name);
         xml.open("root");
         if (spelling) {
             writeStep(xml, "root-step", "root-alter", spelling->root);
@@ -1369,7 +1321,7 @@ private:
 
     static void writeStep(XmlWriter& xml, std::string_view step, std::string_view alter,
                           const ChordPitch& pitch) {
-        xml.text(step, std::string_view(&pitch.step, 1));
+        xml.text(step, kStepNames[static_cast<std::size_t>(pitch.step)]);
         if (pitch.alter != 0) {
             xml.number(alter, pitch.alter);
         }

@@ -173,7 +173,8 @@ listed ones (ADR-0026). Notes keep the degree of their spelling in the key the
 interval leads to: C# up a semitone in C major is D. Key signatures move when
 every pitched track does; drums never move. A fretted note keeps its string when
 its new fret is on the neck, else takes the nearest free string; a note no
-string can play rejects the step.
+string can play rejects the step. Chord symbols move with the notes: their root
+and bass by the same interval, their diagrams along the neck (ADR-0080).
 
 `tuning` gives a fretted staff (the track's first unless `staff`) another
 tuning, a preset such as `guitar-drop-d` or open strings from the lowest
@@ -219,6 +220,9 @@ neighbouring beats with the same one share a wedge (ADR-0078).
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says
 otherwise, and `grace none` removes the beat's grace notes (ADR-0079).
+`chord <name>` names the caret's beat with a chord symbol, its diagram from the
+beat's frets on a fretted staff when two or more notes have one, and `chord
+none` takes it away (ADR-0080).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.
