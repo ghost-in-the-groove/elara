@@ -215,6 +215,10 @@ notes to any of their kinds (ADR-0058). `whammy <dive|dip|pre-dive|return|none>
 positive cents) and `bass <tap|slap|pop|none>` a bass technique (ADR-0060).
 `hairpin <crescendo|diminuendo|none>` puts the caret's beat under a hairpin;
 neighbouring beats with the same one share a wedge (ADR-0078).
+`grace <semitones> [duration] [on]` adds a grace note that many semitones from
+the caret's note (on its string on a fretted staff, the lane's hit again on a
+drum staff), an eighth before the beat unless a duration or `on` says
+otherwise, and `grace none` removes the beat's grace notes (ADR-0079).
 `dynamic <ppp..fff>` sets a dynamic from the caret's beat until the next change
 of dynamic, over every voice of the staff (ADR-0047); notes typed later take the
 dynamic in force at the caret. The output includes `"caret"` and `"input"`.

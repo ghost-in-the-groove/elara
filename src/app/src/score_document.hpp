@@ -97,6 +97,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
     Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
     Q_PROPERTY(int caretHairpin READ caretHairpin NOTIFY caretChanged)
+    Q_PROPERTY(int caretGraceNotes READ caretGraceNotes NOTIFY caretChanged)
     Q_PROPERTY(int caretPickStroke READ caretPickStroke NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideIn READ caretSlideIn NOTIFY caretChanged)
     Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
@@ -465,6 +466,10 @@ public:
     /// Puts the caret's beat under a crescendo or diminuendo (a core::Hairpin;
     /// 0 for none); neighbouring beats with the same one share a wedge (ADR-0078).
     Q_INVOKABLE void setHairpin(int hairpin);
+    /// Adds a grace note an eighth before the caret's beat, a whole tone below
+    /// its note (above an open string or the first fret), or takes the beat's
+    /// grace notes off when it has some (ADR-0079).
+    Q_INVOKABLE void toggleGraceNote();
     /// "Dive -1", "Dip -1/2", "Inverted dip +1/2"...
     Q_INVOKABLE QString whammyName(int form, int cents) const;
     /// How far the whammy bar goes, in steps with its direction: "-1 1/2", "+1/2".
@@ -476,6 +481,7 @@ public:
     [[nodiscard]] int caretBassTechnique() const;
     [[nodiscard]] int caretStrum() const;
     [[nodiscard]] int caretHairpin() const;
+    [[nodiscard]] int caretGraceNotes() const;
     [[nodiscard]] int caretPickStroke() const;
     [[nodiscard]] int caretTremolo() const;
     /// The kinds of the caret's note effects (ADR-0058), numbered as their

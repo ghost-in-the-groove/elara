@@ -178,6 +178,10 @@
         <translation>Diminuendo</translation>
     </message>
     <message>
+        <source>Grace note</source>
+        <translation>Nota de adorno</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1295,6 +1299,14 @@
         <translation>Cambiar armónico</translation>
     </message>
     <message>
+        <source>Add grace note</source>
+        <translation>Añadir nota de adorno</translation>
+    </message>
+    <message>
+        <source>Remove grace notes</source>
+        <translation>Quitar notas de adorno</translation>
+    </message>
+    <message>
         <source>Tie</source>
         <translation>Ligadura</translation>
     </message>
@@ -1551,6 +1563,10 @@
     <message>
         <source>Diminuendo</source>
         <translation>Diminuendo</translation>
+    </message>
+    <message>
+        <source>Grace notes</source>
+        <translation>Notas de adorno</translation>
     </message>
     <message>
         <source>On drums, Enter adds or removes the lane&apos;s hit.</source>

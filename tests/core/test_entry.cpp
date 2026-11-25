@@ -59,6 +59,64 @@ Caret run(Document& doc, Entry entry) {
 
 // ---- Moves --------------------------------------------------------------------------
 
+TEST_CASE("Entry: grace notes lead into the caret's beat", "[core][entry]") {
+    Document doc(guitarSong());
+    const Duration eighth(NoteValue::Eighth);
+    const Duration sixteenth(NoteValue::Sixteenth);
+    // The A string's second fret: a whole tone below before it, a semitone
+    // above on it (ADR-0079).
+    run(doc, addGraceNote(doc.song(), at(0, 1, 5), -2, eighth, false));
+    CHECK(doc.undoName() == "Add grace note");
+    run(doc, addGraceNote(doc.song(), at(0, 1, 5), 1, sixteenth, true));
+    const Staff& staff = doc.song().track(0).staff(0);
+    const Beat& beat = firstVoice(doc.song(), 0).beats[1];
+    REQUIRE(beat.graces.size() == 2);
+    CHECK(beat.graces[0] == Grace{.duration = eighth, .notes = {staff.frettedNote(5, 0)}});
+    CHECK(beat.graces[1] ==
+          Grace{.duration = sixteenth, .notes = {staff.frettedNote(5, 3)}, .onBeat = true});
+    CHECK(graceNotesAt(doc.song(), at(0, 1, 5)) == 2);
+    CHECK(graceNotesAt(doc.song(), at(0, 0, 6)) == 0);
+    CHECK(graceNotesAt(doc.song(), at(0, 2)) == 0); // the free slot
+
+    // Nothing on a string without a note or the free slot; off the neck throws.
+    CHECK(addGraceNote(doc.song(), at(0, 1, 1), -2, eighth, false).command == nullptr);
+    CHECK(addGraceNote(doc.song(), at(0, 2, 5), -2, eighth, false).command == nullptr);
+    CHECK_THROWS_AS(addGraceNote(doc.song(), at(0, 1, 5), -3, eighth, false), std::out_of_range);
+
+    run(doc, removeGraceNotes(doc.song(), at(0, 1, 5)));
+    CHECK(doc.undoName() == "Remove grace notes");
+    CHECK(firstVoice(doc.song(), 0).beats[1].graces.empty());
+    CHECK(removeGraceNotes(doc.song(), at(0, 1, 5)).command == nullptr);
+    doc.undo();
+    CHECK(graceNotesAt(doc.song(), at(0, 1, 5)) == 2);
+}
+
+TEST_CASE("Entry: a grace note leads from a piano's top note and doubles a drum hit",
+          "[core][entry]") {
+    Song song;
+    song.appendMeasures(1);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    Document doc(std::move(song));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
+    run(doc, enterPitch(doc.song(), at(0, 0), Step::E, kQuarter, PitchMode::AddToChord));
+    run(doc, addGraceNote(doc.song(), at(0, 0), 2, Duration(NoteValue::Eighth), false));
+    const Beat& chord = firstVoice(doc.song(), 0).beats[0];
+    REQUIRE(chord.graces.size() == 1);
+    const int top = std::ranges::max(chord.notes, {}, [](const Note& note) {
+                        return note.pitch.midiNumber();
+                    }).pitch.midiNumber();
+    CHECK(chord.graces[0].notes.front().pitch.midiNumber() == top + 2);
+
+    // On a drum staff the grace note is the lane's hit again: a flam.
+    const Caret drums{.track = 1, .string = 2};
+    run(doc, toggleDrum(doc.song(), drums, kQuarter));
+    run(doc, addGraceNote(doc.song(), drums, 5, Duration(NoteValue::Sixteenth), false));
+    const Beat& hit = doc.song().track(1).staff(0).measure(0).voices[0].beats[0];
+    REQUIRE(hit.graces.size() == 1);
+    CHECK(hit.graces[0].notes == hit.notes);
+}
+
 TEST_CASE("Entry caret: right walks the beats, the free slot of a short measure, then on",
           "[core][entry]") {
     const Song song = guitarSong();

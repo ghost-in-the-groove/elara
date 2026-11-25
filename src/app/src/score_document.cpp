@@ -317,6 +317,9 @@ constexpr std::array kEditNames{
     Translation{"Change accent", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change accent")},
     Translation{"Change harmonic",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change harmonic")},
+    Translation{"Add grace note", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Add grace note")},
+    Translation{"Remove grace notes",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove grace notes")},
 };
 
 // The names of Tuning::presetNames().
@@ -1642,6 +1645,9 @@ QString ScoreDocument::caretStatus() const {
         parts.append(hairpin == static_cast<int>(core::Hairpin::Crescendo) ? tr("Crescendo")
                                                                            : tr("Diminuendo"));
     }
+    if (caretGraceNotes() > 0) {
+        parts.append(tr("Grace notes"));
+    }
     return parts.join(QStringLiteral(" · "));
 }
 
@@ -2042,6 +2048,21 @@ void ScoreDocument::setHairpin(int hairpin) {
     applyBeatEffects(effects);
 }
 
+void ScoreDocument::toggleGraceNote() {
+    if (caretGraceNotes() > 0) {
+        runEntry([this](const core::Song& song) { return core::removeGraceNotes(song, caret_); });
+        return;
+    }
+    runEntry([this](const core::Song& song) {
+        const core::Duration eighth(core::NoteValue::Eighth);
+        try {
+            return core::addGraceNote(song, caret_, -2, eighth, false);
+        } catch (const std::out_of_range&) {
+            return core::addGraceNote(song, caret_, 2, eighth, false); // from above
+        }
+    });
+}
+
 void ScoreDocument::setPickStroke(int direction) {
     if (direction < 0 || direction > 2) {
         return;
@@ -2324,6 +2345,13 @@ int ScoreDocument::caretStrum() const {
 
 int ScoreDocument::caretHairpin() const {
     return static_cast<int>(beatEffectsAtCaret().hairpin);
+}
+
+int ScoreDocument::caretGraceNotes() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    return static_cast<int>(core::graceNotesAt(document_->song(), caret_));
 }
 
 int ScoreDocument::caretPickStroke() const {

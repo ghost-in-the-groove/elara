@@ -203,6 +203,26 @@ enum class NoteEffect : std::uint8_t {
 /// The effects of the caret's beat; none on a rest or the free slot.
 [[nodiscard]] BeatEffects beatEffectsAt(const Song& song, const Caret& caret);
 
+/// Grace note entry (ADR-0079): adds a grace note `semitones` from the caret's
+/// note after the grace notes leading into its beat, `duration` long and
+/// played before the beat or, with `onBeat`, on it, as one undo step ("Add
+/// grace note"). The caret's note is the one on its string on a fretted staff,
+/// where the grace note takes the same string; the lane's hit on a percussion
+/// staff, which the grace note repeats (a flam: `semitones` does not count);
+/// the highest note of the beat elsewhere. It takes that note's dynamic and is
+/// spelled in the measure's key. Nothing changes on a rest, the free slot or a
+/// string without a note. Throws std::out_of_range when the grace note would
+/// leave the neck or MIDI 0..127.
+[[nodiscard]] Entry addGraceNote(const Song& song, const Caret& caret, int semitones,
+                                 Duration duration, bool onBeat);
+
+/// Removes the grace notes leading into the caret's beat, as one undo step
+/// ("Remove grace notes"); nothing changes when it has none.
+[[nodiscard]] Entry removeGraceNotes(const Song& song, const Caret& caret);
+
+/// How many grace notes lead into the caret's beat; none on the free slot.
+[[nodiscard]] std::size_t graceNotesAt(const Song& song, const Caret& caret);
+
 /// The dynamic in force at the caret's beat (ADR-0047): that of the notes struck
 /// at the latest start no later than the beat's, over every voice of the staff
 /// and looking back through earlier measures (the loudest when several are

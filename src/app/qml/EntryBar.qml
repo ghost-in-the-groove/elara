@@ -967,6 +967,13 @@ Rectangle {
                             active: root.document.caretHairpin === 2
                             onClicked: root.document.setHairpin(active ? 0 : 2)
                         }
+                        // A small slashed note leading into the caret's beat (ADR-0079).
+                        BeatEffect {
+                            tip: qsTr("Grace note")
+                            path: "M8 18 A2.5 2 0 1 0 13 18 A2.5 2 0 1 0 8 18 M13 18 L13 5 Q16 7 17 10 M9 12 L17 7"
+                            active: root.document.caretGraceNotes > 0
+                            onClicked: root.document.toggleGraceNote()
+                        }
                     }
 
                     Label {

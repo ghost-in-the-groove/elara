@@ -70,6 +70,16 @@ they are played, left of the chord they lead into:
   them where the beat before leaves too little; they take no time and add no
   column.
 
+**Editing.** `addGraceNote()` adds a grace note to the caret's beat a number
+of semitones from the caret's note: on its string on a fretted staff, the
+lane's hit again on a drum staff (a flam), from the beat's highest note
+elsewhere; `removeGraceNotes()` takes them all off. The command line types
+`grace <semitones> [duration] [on]` and `grace none`; the app's entry bar has
+a button that adds an eighth a whole tone below the caret's note before the
+beat (above an open string or the first fret), or takes the beat's grace notes
+off. Grace notes are not reached by the caret: to change one, take them off
+and add them again.
+
 **Playback.** A grace note sounds for its written value, taken from the beat
 it borrows from:
 
@@ -91,9 +101,8 @@ it borrows from:
 
 - Guitar Pro and MusicXML grace notes survive import, saving and MusicXML
   export, are drawn in notation, tablature, PDF and SVG, and are heard in
-  playback, audio rendering and MIDI export. Typing them at the caret comes
-  next, recorded here when it lands. The caret and selection pass over them:
-  they belong to their beat.
+  playback, audio rendering and MIDI export, and are typed at the caret. The
+  caret and selection pass over them: they belong to their beat.
 - A beat is 24 bytes larger on 64-bit systems: the list, empty for almost
   every beat, allocates nothing.
 - Grace notes after the last beat of a voice have nothing to lead into and
@@ -107,6 +116,10 @@ it borrows from:
   `cli.sequence_grace_before_beat`, `cli.sequence_grace_on_measure_start`,
   `notation.Staff layout: grace notes are drawn small before their chord`,
   `notation.Tablature layout: grace notes are small fret numbers before their note`,
+  `core.Entry: grace notes lead into the caret's beat`,
+  `core.Entry: a grace note leads from a piano's top note and doubles a drum hit`,
+  `cli.edit_adds_grace_notes`, `cli.dump_grace_notes`,
+  `cli.edit_rejects_grace_off_the_neck`, `app.smoke`,
   the render snapshots of the corpus
   and the round trips of the corpus and of a song with every feature (a
   grace before a beat and a chord of them on one).
