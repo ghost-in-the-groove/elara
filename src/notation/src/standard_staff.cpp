@@ -60,6 +60,18 @@ constexpr double kTieMaxHeight = 0.8;
 constexpr double kArticulationGap = 0.3; // between a notehead and its articulation
 constexpr double kRunEndGap = 0.3;       // a technique run ends before the next column
 
+// A rolled chord's wavy line (ADR-0076): half waves kArpeggioWave long whose
+// control points stand kArpeggioSwing off the line, so that it swings about
+// 0.2 staff spaces either side, from half a space above the top notehead to
+// half a space below the bottom one.
+constexpr double kArpeggioGap = 0.25;   // between the line's room and the chord
+constexpr double kArpeggioWidth = 0.6;  // room the line and its arrowhead take
+constexpr double kArpeggioWave = 0.5;   // length of a half wave
+constexpr double kArpeggioSwing = 0.27; // control points off the line
+constexpr double kArpeggioThickness = 0.12;
+constexpr double kArpeggioOverhang = 0.5; // beyond the outer noteheads' centres
+constexpr double kArpeggioArrow = 0.6;    // length of a downward roll's arrowhead
+
 // ---- Staff positions ----------------------------------------------------------
 
 constexpr int kTrebleTopLine = 38; // F5 as octave * 7 + step
@@ -262,6 +274,8 @@ struct Column {
     double left = 0.0;
     double right = 0.0;
     double x = 0.0;
+    core::Strum roll = core::Strum::None; // a strum written as an arpeggio line
+    double rollX = 0.0;                   // the line's centre, from the column's x
 };
 
 class StandardWriter final : public StaffWriter {
@@ -272,6 +286,7 @@ public:
           percussion_(staff.clef() == Clef::Percussion ||
                       track.instrument().kind == core::InstrumentKind::Percussion),
           offset_(percussion_ ? 0 : track.instrument().writtenOffset), techniques_(techniques),
+          rolls_(!percussion_ && track.instrument().kind != core::InstrumentKind::Fretted),
           lanes_(font), dynamics_(font) {}
 
     double header(std::size_t first) override;
@@ -412,6 +427,11 @@ private:
             ties(chord);
             articulations(chord);
         }
+        for (const Column& column : columns_) {
+            if (column.roll != core::Strum::None) {
+                arpeggio(column);
+            }
+        }
         if (voiceCount_ == 0) {
             for (auto& starts : tieStarts_) {
                 starts.clear();
@@ -527,6 +547,69 @@ private:
             column.chords.push_back(c);
             column.left = std::min(column.left, chords_[c].left);
             column.right = std::max(column.right, chords_[c].right);
+        }
+        if (rolls_) {
+            for (Column& column : columns_) {
+                rollRoom(column);
+            }
+        }
+    }
+
+    // A strum of a keyboard or another instrument without frets is a rolled
+    // chord: the column keeps room for its arpeggio line left of the ink of
+    // all its chords (ADR-0076).
+    void rollRoom(Column& column) const {
+        for (const std::size_t c : column.chords) {
+            const Chord& chord = chords_[c];
+            if (!chord.rest && chord.beat->effects.strum != core::Strum::None) {
+                column.roll = chord.beat->effects.strum;
+                break;
+            }
+        }
+        if (column.roll == core::Strum::None) {
+            return;
+        }
+        column.rollX = column.left - kArpeggioGap - kArpeggioWidth / 2;
+        column.left -= kArpeggioGap + kArpeggioWidth;
+    }
+
+    // The arpeggio line of a rolled column, from above its top notehead to
+    // below its bottom one: plain when the chord rolls upwards (the way a
+    // downstroke plays it, ADR-0025), with an arrowhead at the bottom when it
+    // rolls downwards.
+    void arpeggio(const Column& column) {
+        int top = std::numeric_limits<int>::max();
+        int bottom = std::numeric_limits<int>::lowest();
+        for (const std::size_t c : column.chords) {
+            for (const Head& head : chords_[c].heads) {
+                top = std::min(top, head.step);
+                bottom = std::max(bottom, head.step);
+            }
+        }
+        const double x = column.x + column.rollX;
+        const double from = yOf(top) - kArpeggioOverhang;
+        const double to = yOf(bottom) + kArpeggioOverhang;
+        const bool down = column.roll == core::Strum::Up;
+        const double waveEnd = down ? to - kArpeggioArrow * 0.75 : to;
+        const int halves =
+            std::max(2, static_cast<int>(std::lround((waveEnd - from) / kArpeggioWave)));
+        const double length = (waveEnd - from) / halves;
+        for (int i = 0; i < halves; ++i) {
+            const double y = from + length * i;
+            const double swing = i % 2 == 0 ? kArpeggioSwing : -kArpeggioSwing;
+            list_.curves.push_back(CurveItem{.from = {x, y},
+                                             .control1 = {x + swing, y + length / 3},
+                                             .control2 = {x + swing, y + length * 2 / 3},
+                                             .to = {x, y + length},
+                                             .thickness = kArpeggioThickness,
+                                             .endThickness = kArpeggioThickness,
+                                             .role = Role::Arpeggio,
+                                             .measure = measure_});
+        }
+        if (down) {
+            const double half = kArpeggioWidth / 2;
+            polygon({{x - half, to - kArpeggioArrow}, {x + half, to - kArpeggioArrow}, {x, to}},
+                    Role::Arpeggio);
         }
     }
 
@@ -1166,6 +1249,9 @@ private:
                     addTechniques(marks, *chords_[c].beat);
                 }
             }
+            if (rolls_) {
+                marks.strum = core::Strum::None; // an arpeggio line instead of an arrow
+            }
             if (lanes_.wants(marks)) {
                 const double end = nextColumnX(positions, column.start, barline) - kRunEndGap;
                 lanes_.column(marks, column.x + centre, end, measure_);
@@ -1201,6 +1287,7 @@ private:
     bool percussion_;
     int offset_;
     bool techniques_;
+    bool rolls_; // strums are arpeggio lines (ADR-0076), not arrows above the staff
     TechniqueLanes lanes_;
     DynamicMarks dynamics_;
     std::size_t measureIndex_ = 0;

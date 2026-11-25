@@ -79,6 +79,7 @@ one that replaces them.
 | [0071](0071-recent-scores.md) | Recent scores | Accepted |
 | [0072](0072-included-guitar-sfz.md) | A clean electric guitar SFZ comes with the packages | Accepted |
 | [0073](0073-grand-staff.md) | A brace and the barlines join a grand staff | Accepted |
+| [0076](0076-arpeggio-lines.md) | Strums of keyboards are arpeggio lines | Accepted |
 
 ## Template
 
