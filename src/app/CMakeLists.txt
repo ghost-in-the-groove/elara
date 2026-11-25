@@ -8,11 +8,13 @@ qt_standard_project_setup(REQUIRES 6.12
 # of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
   src/included_sound.cpp
+  src/recent_scores.cpp
   src/score_painter.cpp
   src/track_list.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
-elara_source_warnings(src/included_sound.cpp src/score_painter.cpp src/track_list.cpp)
+elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/score_painter.cpp
+  src/track_list.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
 # its own: PNG images for the window, an .ico file for the Windows executable
@@ -81,6 +83,7 @@ qt_add_qml_module(elara
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp
+    src/qml_types.hpp
     src/score_document.hpp
     src/score_document.cpp
     src/score_page.hpp

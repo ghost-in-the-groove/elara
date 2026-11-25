@@ -179,6 +179,42 @@ TEST_CASE("SFZ sampler: round robin takes the regions of a key in turn", "[audio
     CHECK(sounded == std::vector<bool>{true, false, true, false});
 }
 
+TEST_CASE("SFZ sampler: a random round robin plays one take of a key per note", "[audio][sfz]") {
+    // Four takes, each a quarter of the random range, told apart by their
+    // levels.
+    const auto bank = bankOf("<region> sample=*sine amplitude=20 lorand=0 hirand=0.25\n"
+                             "<region> sample=*sine amplitude=40 lorand=0.25 hirand=0.5\n"
+                             "<region> sample=*sine amplitude=60 lorand=0.5 hirand=0.75\n"
+                             "<region> sample=*sine amplitude=80 lorand=0.75 hirand=1\n");
+    const auto sound = bank->sound(kGuitar, kRate);
+    std::vector<int> takes(4, 0);
+    for (int i = 0; i < 64; ++i) {
+        sound->noteOn(60, 127, Touch::Normal);
+        CHECK(sound->activeVoices() == 1);
+        const double level = rms(render(*sound, 0.02));
+        sound->reset();
+        const auto take = static_cast<std::size_t>(std::lround(level / (0.2 / std::sqrt(2.0)))) - 1;
+        REQUIRE(take < takes.size());
+        ++takes[take];
+    }
+    // Each take comes up, none far more often than the others.
+    for (const int count : takes) {
+        CHECK(count >= 6);
+        CHECK(count <= 30);
+    }
+
+    // The same calls play the same takes: the output depends only on them.
+    const auto again = bank->sound(kGuitar, kRate);
+    const auto other = bank->sound(kGuitar, kRate);
+    for (int i = 0; i < 8; ++i) {
+        again->noteOn(60, 127, Touch::Normal);
+        other->noteOn(60, 127, Touch::Normal);
+        CHECK(rms(render(*again, 0.02)) == rms(render(*other, 0.02)));
+        again->reset();
+        other->reset();
+    }
+}
+
 TEST_CASE("SFZ sampler: a key let go releases its note through the envelope", "[audio][sfz]") {
     const auto bank = bankOf("<region> sample=*sine ampeg_release=0.1\n"
                              "<region> sample=*silence trigger=release ampeg_release=0.01\n");

@@ -76,6 +76,7 @@ one that replaces them.
 | [0068](0068-sfz-techniques.md) | Guitar techniques on a library's keyswitches and controllers | Accepted |
 | [0069](0069-included-soundfont.md) | MuseScore General comes with the packages | Accepted |
 | [0070](0070-sfz-legato.md) | Hammer-ons and pull-offs play a library's legato samples | Accepted |
+| [0071](0071-recent-scores.md) | Recent scores | Accepted |
 | [0072](0072-included-guitar-sfz.md) | A clean electric guitar SFZ comes with the packages | Accepted |
 
 ## Template

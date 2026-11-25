@@ -3,7 +3,8 @@
 // tests that play one (ADR-0066): test-guitar.sfz, the map it includes and
 // two plucked-string samples made here, so no sample sits in the repository,
 // test-flac.sfz, whose one sample libFLAC encodes (through libsndfile), and
-// test-legato.sfz, with a keyswitch for hammer-ons and pull-offs (ADR-0070).
+// test-legato.sfz, with a keyswitch for hammer-ons and pull-offs (ADR-0070),
+// and test-takes.sfz, whose two takes play at random (lorand, hirand).
 #include <elara/audio/wav_writer.hpp>
 
 #include <sndfile.h>
@@ -108,6 +109,12 @@ lfo01_pitch_oncc1=50 // vibrato: not played by Elara
 <region> sample=*sine
 <group> sw_last=25 sw_label=Hammer-ons and pull-offs
 <region> sample=*sine transpose=12
+)");
+    ok = ok && writeText(folder / "test-takes.sfz", R"(// A guitar of two takes of each note,
+// one picked at random for every note, as many free libraries do.
+<group> pitch_keycenter=57
+<region> sample=samples/pluck-a3.wav lorand=0 hirand=0.5
+<region> sample=samples/pluck-a3.flac lorand=0.5 hirand=1
 )");
     return ok ? 0 : 1;
 }

@@ -79,6 +79,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       smooth zoom (ADR-0015)
   - [x] Continuous view: the music as one scroll, cut into strips of whole
         systems between them (ADR-0057)
+  - [x] Recent scores on the welcome pane and in an Open recent menu, kept for
+        the next start (ADR-0071)
 
 ## Milestone 4 - Playback  -> usable as a player
 
@@ -97,6 +99,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         kept for the next start, `--guitar-sfz`/`--bass-sfz`, and
         `--sfz guitars=FILE`/`basses=FILE` in `elara-cli`
   - [x] FLAC samples, read by the sampler like WAV ones (ADR-0067)
+  - [x] Takes picked at random for each note (`lorand`/`hirand`), as many
+        free guitar libraries do
   - [x] Guitar techniques mapped to a library's keyswitches and controllers:
         palm mutes, dead notes and harmonics, found by name (ADR-0068)
   - [x] A library's legato samples for hammer-ons and pull-offs: a keyswitch
