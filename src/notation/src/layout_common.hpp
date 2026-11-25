@@ -75,6 +75,12 @@ struct ColumnInk {
     double belowLeft = 0.0;
     double belowRight = 0.0;
     bool below = false;
+    // The sustain pedal under the column (ADR-0092): what "Ped.", a change's
+    // notch or the end of its line reaches, when `pedal`. They keep apart from
+    // each other and the barline, not from the notes over them.
+    double pedalLeft = 0.0;
+    double pedalRight = 0.0;
+    bool pedal = false;
 };
 
 struct ColumnPosition {
@@ -446,6 +452,12 @@ private:
 };
 
 // ---- Lyrics (ADR-0084) -----------------------------------------------------------------
+
+// The sustain pedal under a staff (ADR-0092).
+inline constexpr double kPedalLineGap = 0.3; // between "Ped." and its line
+inline constexpr double kPedalEndGap = 0.3;  // the line ends before the column where it comes up
+inline constexpr double kPedalNotch = 0.4;   // half the width of a change's notch
+inline constexpr double kPedalRoom = 0.5;    // of line at least between two of these
 
 inline constexpr double kLyricGap = 0.6;    // between neighbouring syllables
 inline constexpr double kLyricEndGap = 0.3; // between a syllable and the barline after it

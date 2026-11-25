@@ -201,6 +201,31 @@ TEST_CASE("Pedal: a change notches the line where its beat starts", "[notation][
     CHECK_THAT(slanted[2].from.x, WithinAbs(level[1].to.x, kEpsilon));
 }
 
+TEST_CASE("Pedal: the notes make room for a change or the pedal coming up after Ped.",
+          "[notation][layout][pedal]") {
+    // Eighths: down on C5, changed on D5, up at E5's beat after next. The
+    // notes spread so that the notch and the hook stay clear of "Ped.".
+    const auto eighth = [](std::string_view text, Pedal pedal) {
+        return note(text, pedal, NoteValue::Eighth);
+    };
+    const DisplayList list =
+        layout(pianoOf({{eighth("C5", Pedal::Down), eighth("D5", Pedal::Change),
+                         eighth("E5", Pedal::None), eighth("F5", Pedal::Down),
+                         eighth("G5", Pedal::None), note("A5"), eighth("B5", Pedal::None)}}));
+    const auto marks = glyphs(list, Role::Pedal);
+    REQUIRE(marks.size() == 2);
+    const auto level = pedalLines(list, true);
+    const auto slanted = pedalLines(list, false);
+    REQUIRE(level.size() == 3);   // before and after the notch, then F5's line
+    REQUIRE(slanted.size() == 4); // the notch, its hook, F5's hook
+    CHECK(level[0].from.x > right(marks[0]));
+    CHECK(level[0].to.x > level[0].from.x);
+    CHECK(slanted[1].to.x < level[1].to.x);
+    // F5's pedal comes up at G5, past the end of its "Ped." and some line.
+    CHECK(level[2].from.x > right(marks[1]));
+    CHECK(level[2].to.x > level[2].from.x + 0.4);
+}
+
 TEST_CASE("Pedal: under the dynamics, on its own staff only", "[notation][layout][pedal]") {
     // ff on the left hand's C3, under the pedal: "Ped." goes under the "ff".
     Beat loud = note("C3", Pedal::Down, NoteValue::Whole);

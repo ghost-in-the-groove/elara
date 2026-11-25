@@ -73,11 +73,8 @@ constexpr double kOctaveLineGap = 0.3; // between an octave line's mark and its 
 constexpr double kOctaveDash = 0.4;    // dashes and gaps of an octave line
 constexpr double kOctaveMinLine = 1.0; // the dashes of a line over a single short note
 constexpr double kPedalGap = 0.5;      // between the pedal and the ink above it (ADR-0092)
-constexpr double kPedalLineGap = 0.3;  // between "Ped." and its line
-constexpr double kPedalEndGap = 0.3;   // the line ends before the column where it comes up
 constexpr double kPedalMinLine = 0.5;  // the line of a pedalling over a single short note
 constexpr double kPedalHook = 1.0;     // the hook up at its end
-constexpr double kPedalNotch = 0.4;    // half the width of a change's notch
 constexpr double kPedalNotchHeight = 0.8;
 constexpr double kTrillGap = 0.5;     // between a trill and the ink it clears (ADR-0090)
 constexpr double kTrillWaveGap = 0.2; // between a trill's "tr" and its wavy line
@@ -1930,6 +1927,36 @@ private:
         bool toBarline = false;      // at the barline of `last`
     };
 
+    // What the pedal of measure m reaches under its columns (ADR-0092): "Ped."
+    // and the start of its line right of where it goes down, a notch on both
+    // sides of a change, the end of the line left of where it comes up.
+    void pedalInk(std::size_t m, std::vector<ColumnInk>& ink) const {
+        if (percussion_) {
+            return;
+        }
+        const std::vector<core::PedalSpan> spans = core::pedalSpans(staff_.measure(m));
+        const double mark = widthOf(Glyph::KeyboardPedalPed) + kPedalLineGap;
+        const auto reach = [&ink](const Fraction& start, double left, double right) {
+            const auto column = std::ranges::lower_bound(ink, start, {}, &ColumnInk::start);
+            if (column == ink.end() || column->start != start) {
+                return; // no beat starts there
+            }
+            column->pedalLeft = column->pedal ? std::min(column->pedalLeft, left) : left;
+            column->pedalRight = column->pedal ? std::max(column->pedalRight, right) : right;
+            column->pedal = true;
+        };
+        std::optional<Fraction> end; // of the span before
+        for (const core::PedalSpan& span : spans) {
+            if (span.change && end == span.start) {
+                reach(span.start, -kPedalNotch, kPedalNotch);
+            } else {
+                reach(span.start, 0.0, mark);
+            }
+            reach(span.end, -kPedalEndGap, 0.0);
+            end = span.end;
+        }
+    }
+
     // Whether measure m starts with a beat under the pedal.
     [[nodiscard]] bool startsPedalled(std::size_t m) const {
         if (m >= staff_.measureCount()) {
@@ -2069,6 +2096,7 @@ double StandardWriter::changes(std::size_t m, double x) {
 void StandardWriter::collect(std::size_t m, std::vector<ColumnInk>& ink) {
     read(m);
     columnInk(ink);
+    pedalInk(m, ink);
     aboveRow_.collect(staff_.measure(m), ink, widthOf(Glyph::NoteheadBlack) / 2);
     lyrics_.collect(m, ink, widthOf(Glyph::NoteheadBlack) / 2);
 }

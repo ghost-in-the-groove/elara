@@ -116,6 +116,13 @@ void merge(const std::vector<std::vector<ColumnInk>>& staves, std::vector<Column
                 into.below ? std::max(into.belowRight, column.belowRight) : column.belowRight;
             into.below = true;
         }
+        if (column.pedal) {
+            into.pedalLeft =
+                into.pedal ? std::min(into.pedalLeft, column.pedalLeft) : column.pedalLeft;
+            into.pedalRight =
+                into.pedal ? std::max(into.pedalRight, column.pedalRight) : column.pedalRight;
+            into.pedal = true;
+        }
     }
 }
 
@@ -178,6 +185,26 @@ void spaceLyrics(const std::vector<ColumnInk>& columns, MeasureWidth& width) {
     }
 }
 
+// The marks of the sustain pedal keep a little line between them and before
+// the barline, not apart from the notes over them (ADR-0092).
+void spacePedals(const std::vector<ColumnInk>& columns, MeasureWidth& width) {
+    std::optional<std::size_t> previous;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        if (!columns[i].pedal) {
+            continue;
+        }
+        if (previous) {
+            stretchTo(width.springs, *previous, i,
+                      columns[*previous].pedalRight + kPedalRoom - columns[i].pedalLeft);
+        }
+        previous = i;
+    }
+    if (previous && columns[*previous].pedalRight > 0.0) { // a line on to the barline
+        stretchTo(width.springs, *previous, width.springs.size(),
+                  columns[*previous].pedalRight + kPedalRoom);
+    }
+}
+
 // The springs of a measure `length` long with these columns: each column gets
 // its ideal space unless the ink of its neighbour needs more.
 void springsOf(const std::vector<ColumnInk>& columns, const Fraction& length, double emptyWidth,
@@ -202,6 +229,7 @@ void springsOf(const std::vector<ColumnInk>& columns, const Fraction& length, do
                                    .ink = last.right + kEndGap});
     spaceChords(columns, width);
     spaceLyrics(columns, width);
+    spacePedals(columns, width);
 }
 
 // Positions of the columns of a measure starting at `start` at `stretch`;
