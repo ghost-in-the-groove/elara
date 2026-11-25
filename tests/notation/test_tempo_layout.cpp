@@ -3,6 +3,7 @@
 #include <elara/core/song.hpp>
 #include <elara/core/tempo.hpp>
 #include <elara/notation/display_list.hpp>
+#include <elara/notation/page_layout.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
@@ -13,6 +14,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <iterator>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,9 +37,14 @@ using elara::notation::DisplayList;
 using elara::notation::EngravingFont;
 using elara::notation::Glyph;
 using elara::notation::GlyphItem;
+using elara::notation::layoutPages;
 using elara::notation::layoutStaff;
+using elara::notation::LineItem;
+using elara::notation::PageLayoutOptions;
 using elara::notation::Role;
+using elara::notation::StaffSelection;
 using elara::notation::TextItem;
+using elara::notation::textWidth;
 
 namespace {
 
@@ -92,6 +99,14 @@ std::vector<std::string> contents(const std::vector<TextItem>& items) {
         out.push_back(item.text);
     }
     return out;
+}
+
+std::vector<LineItem> lines(const DisplayList& list, Role role) {
+    std::vector<LineItem> found;
+    std::ranges::copy_if(list.lines, std::back_inserter(found),
+                         [role](const LineItem& item) { return item.role == role; });
+    std::ranges::stable_sort(found, {}, [](const LineItem& item) { return item.from.x; });
+    return found;
 }
 
 double left(const GlyphItem& item) {
@@ -178,4 +193,95 @@ TEST_CASE("Tempo marks: beat units and fractions of a beat", "[notation][layout]
     const DisplayList half = layout(song);
     CHECK(glyphs(half, Role::Tempo).front().glyph == Glyph::MetNoteHalfUp);
     CHECK(contents(texts(half, Role::Tempo)) == std::vector<std::string>{"= 92.5"});
+}
+
+TEST_CASE("Tempo marks: a gradual change says which way it goes", "[notation][layout][tempo]") {
+    // ADR-0082: "accel." or "rit." after the mark, then a dashed line to the
+    // next change.
+    SECTION("a ritardando from the tempo in force, as Guitar Pro writes it") {
+        Song song = quarters(3);
+        song.measureHeader(1).tempoChanges = {
+            TempoChange{.offset = {}, .tempo = Tempo(120), .gradual = true}};
+        song.measureHeader(2).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(90)}};
+        const DisplayList list = layout(song);
+        const auto marks = texts(list, Role::Tempo);
+        REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "rit.", "= 90"});
+        CHECK(marks[1].italic);
+        CHECK_FALSE(marks[2].italic);
+        CHECK(marks[1].measure == 1);
+        CHECK(marks[1].origin.y == marks[0].origin.y);
+        const auto heads = glyphs(list, Role::Notehead);
+        REQUIRE(heads.size() == 12);
+        CHECK_THAT(marks[1].origin.x, WithinAbs(left(heads[4]), kEpsilon));
+        const auto dashes = lines(list, Role::Tempo);
+        REQUIRE(dashes.size() == 1);
+        CHECK(dashes[0].dash > 0.0);
+        CHECK(dashes[0].from.y == dashes[0].to.y);
+        CHECK(dashes[0].from.y < marks[1].origin.y);
+        CHECK(dashes[0].from.x > marks[1].origin.x + textWidth(marks[1].text, marks[1].size));
+        const auto notes = glyphs(list, Role::Tempo);
+        REQUIRE(notes.size() == 2);
+        CHECK(dashes[0].to.x < left(notes[1]));
+        CHECK(dashes[0].to.x > left(heads[6]));
+    }
+    SECTION("an accelerando from a tempo of its own") {
+        Song song = quarters(3);
+        song.measureHeader(1).tempoChanges = {
+            TempoChange{.offset = {}, .tempo = Tempo(100), .gradual = true}};
+        song.measureHeader(2).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(140)}};
+        const auto marks = texts(layout(song), Role::Tempo);
+        REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "= 100", "accel.", "= 140"});
+        CHECK(marks[2].origin.x > marks[1].origin.x + textWidth(marks[1].text, marks[1].size));
+    }
+    SECTION("nothing more with no change to go to, or one at the same speed") {
+        Song song = quarters(3);
+        song.measureHeader(1).tempoChanges = {
+            TempoChange{.offset = {}, .tempo = Tempo(100), .gradual = true}};
+        DisplayList list = layout(song);
+        CHECK(contents(texts(list, Role::Tempo)) == std::vector<std::string>{"= 120", "= 100"});
+        CHECK(lines(list, Role::Tempo).empty());
+        // Half = 50 is quarter = 100.
+        song.measureHeader(2).tempoChanges = {
+            TempoChange{.offset = {}, .tempo = Tempo(50, Duration(NoteValue::Half))}};
+        list = layout(song);
+        CHECK(contents(texts(list, Role::Tempo)) ==
+              std::vector<std::string>{"= 120", "= 100", "= 50"});
+        CHECK(lines(list, Role::Tempo).empty());
+    }
+}
+
+TEST_CASE("Tempo marks: a gradual change goes on into the next systems",
+          "[notation][layout][tempo]") {
+    // Slowing down from the middle of measure 2 to measure 7, two measures a
+    // system: the line runs to the end of its system and across the next two.
+    Song song = quarters(8);
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(120), .gradual = true}};
+    song.measureHeader(6).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(60)}};
+    const StaffSelection selection{};
+    PageLayoutOptions options;
+    options.measuresPerSystem = 2;
+    const auto pages = layoutPages(song, std::span(&selection, 1), bravura(), options);
+    std::vector<LineItem> dashes;
+    std::vector<std::string> words;
+    for (const DisplayList& page : pages) {
+        REQUIRE(page.systems.size() >= 1);
+        for (const LineItem& line : lines(page, Role::Tempo)) {
+            dashes.push_back(line);
+        }
+        for (const TextItem& text : texts(page, Role::Tempo)) {
+            if (text.italic) {
+                words.push_back(text.text);
+            }
+        }
+    }
+    CHECK(words == std::vector<std::string>{"rit."});
+    std::ranges::stable_sort(dashes, {}, &LineItem::measure);
+    REQUIRE(dashes.size() == 3);
+    CHECK(dashes[0].measure == 1);
+    CHECK(dashes[1].measure == 2);
+    CHECK(dashes[2].measure == 4);
+    for (const LineItem& dash : dashes) {
+        CHECK(dash.to.x - dash.from.x > 1.0);
+    }
 }

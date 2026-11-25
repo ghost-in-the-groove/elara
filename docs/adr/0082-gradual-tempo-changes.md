@@ -58,11 +58,17 @@ the microsecond a quarter note; read back, the steps are sudden changes.
 A gradual change to the same speed, or with no change after it, has nothing
 to write: both formats write it as a sudden one, with no warning.
 
+**Drawing.** After the change's mark, or at its column when it keeps the
+tempo in force (as Guitar Pro writes it), "accel." or "rit." in italics on the
+tempo line, as the next change is faster or slower, then a dashed line to that
+change, or to the end of the system; the systems the ramp crosses carry the
+line on from their first measure. A ramp to the same speed, or with no change
+after it, draws nothing more.
+
 ## Consequences
 
 - Imported accelerandos and ritardandos play as written, with no warning.
-- Drawing ("accel.", "rit.") and editing (the CLI and the measure popup) are
-  follow-up work.
+- Editing (the CLI and the measure popup) is follow-up work.
 - Tests: `core.A gradual tempo change moves to the next tempo along the score`
   (values from the closed form: 4 ln 2 seconds for a whole note from quarter =
   60 to 120), `audio.Sequence: a gradual tempo change speeds the notes up on the
@@ -70,4 +76,6 @@ to write: both formats write it as a sudden one, with no warning.
   round trip, `io.MusicXML: rit. and accel. make the tempo change there
   gradual`, `io.MusicXML export: a gradual tempo change is a word with dashes
   to the next tempo` and `io.MIDI export steps a gradual tempo change along the
-  way` (read back, two quarters from quarter = 100 to 140 last 3 ln 1.4 s).
+  way` (read back, two quarters from quarter = 100 to 140 last 3 ln 1.4 s), and
+  the `notation.Tempo marks: a gradual change ...` layout tests (which way it
+  goes, what it leaves out, and the line across systems).

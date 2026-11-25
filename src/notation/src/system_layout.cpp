@@ -18,6 +18,7 @@
 #include <format>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -33,26 +34,32 @@ namespace {
 
 using core::Fraction;
 
-constexpr double kStaffDistance = 4.0;      // at least between the lines of neighbouring staves
-constexpr double kStaffInkGap = 1.0;        // at least between their ink
-constexpr double kMeasureNumberSize = 1.2;  // font size of a system's first measure number
-constexpr double kMeasureNumberY = -2.0;    // its baseline, above the clef
-constexpr double kTrackNameSize = 1.6;      // font size of the track names of the first system
-constexpr double kTrackNameGap = 1.0;       // between a track name and its staves
-constexpr double kVoltaLowest = -3.0;       // the bracket of an alternate ending at least this high
-constexpr double kVoltaHook = 2.0;          // the length of its hooks
-constexpr double kVoltaInset = 0.2;         // between its hooks and the barlines
-constexpr double kVoltaLabelInset = 0.4;    // between its start hook and its numbers
-constexpr double kVoltaSize = 1.4;          // font size of its numbers and of repeat counts
-constexpr double kVoltaTextGap = 0.3;       // between the bracket and its numbers
-constexpr double kVoltaInkGap = 0.5;        // at least between its numbers and the staff's ink
-constexpr double kTempoLowest = -1.5;       // the baseline of a tempo mark at least this high
-constexpr double kTempoInkGap = 0.6;        // at least between a tempo mark and the ink below
-constexpr double kTempoSize = 1.4;          // font size of its text
-constexpr double kTempoNoteScale = 0.65;    // of its note, from the staff's size
-constexpr double kTempoNoteLift = 0.35;     // the note's head above the text's baseline
-constexpr double kTempoDotGap = 0.15;       // between the note and its dot
-constexpr double kTempoTextGap = 0.3;       // between the note (or dot) and "= 120"
+constexpr double kStaffDistance = 4.0;     // at least between the lines of neighbouring staves
+constexpr double kStaffInkGap = 1.0;       // at least between their ink
+constexpr double kMeasureNumberSize = 1.2; // font size of a system's first measure number
+constexpr double kMeasureNumberY = -2.0;   // its baseline, above the clef
+constexpr double kTrackNameSize = 1.6;     // font size of the track names of the first system
+constexpr double kTrackNameGap = 1.0;      // between a track name and its staves
+constexpr double kVoltaLowest = -3.0;      // the bracket of an alternate ending at least this high
+constexpr double kVoltaHook = 2.0;         // the length of its hooks
+constexpr double kVoltaInset = 0.2;        // between its hooks and the barlines
+constexpr double kVoltaLabelInset = 0.4;   // between its start hook and its numbers
+constexpr double kVoltaSize = 1.4;         // font size of its numbers and of repeat counts
+constexpr double kVoltaTextGap = 0.3;      // between the bracket and its numbers
+constexpr double kVoltaInkGap = 0.5;       // at least between its numbers and the staff's ink
+constexpr double kTempoLowest = -1.5;      // the baseline of a tempo mark at least this high
+constexpr double kTempoInkGap = 0.6;       // at least between a tempo mark and the ink below
+constexpr double kTempoSize = 1.4;         // font size of its text
+constexpr double kTempoNoteScale = 0.65;   // of its note, from the staff's size
+constexpr double kTempoNoteLift = 0.35;    // the note's head above the text's baseline
+constexpr double kTempoDotGap = 0.15;      // between the note and its dot
+constexpr double kTempoTextGap = 0.3;      // between the note (or dot) and "= 120"
+constexpr double kRampWordGap = 0.6;       // between "= 120" and "accel."
+constexpr double kRampGap = 0.5;           // around the dashed line of a gradual change
+constexpr double kRampMinLine = 1.0;       // shorter dashed lines are left out
+constexpr double kRampLift = 0.35;         // the dashed line above the baseline
+constexpr double kRampThickness = 0.1;
+constexpr double kRampDash = 0.6;           // length of a dash and of a gap
 constexpr double kNavigationLowest = -1.5;  // the line of signs and jumps at least this high
 constexpr double kNavigationInkGap = 0.6;   // at least between them and the ink below
 constexpr double kNavigationSize = 1.4;     // font size of a jump's text
@@ -595,17 +602,120 @@ std::string bpmText(double bpm) {
     return std::format("{:.1f}", tenths / 10.0);
 }
 
+// Draws "quarter = 120" from `x` on `baseline` for measure m, raising
+// `highest` to its top; returns where its text ends.
+double drawTempo(DisplayList& system, const EngravingFont& font, const core::Tempo& tempo,
+                 std::size_t m, double x, double baseline, double& highest) {
+    const Glyph note = tempoNote(tempo.beatUnit().value());
+    const BoundingBox& box = font.metrics(note).box;
+    const double y = baseline - kTempoNoteLift;
+    const auto place = [&](Glyph which, double at) {
+        system.glyphs.push_back(GlyphItem{.glyph = which,
+                                          .origin = {at, y},
+                                          .role = Role::Tempo,
+                                          .measure = m,
+                                          .scale = kTempoNoteScale});
+    };
+    place(note, x - box.southWest.x * kTempoNoteScale);
+    highest = std::min(highest, y - box.northEast.y * kTempoNoteScale);
+    double end = x + box.width() * kTempoNoteScale;
+    for (int d = 0; d < tempo.beatUnit().dots(); ++d) {
+        const BoundingBox& dot = font.metrics(Glyph::MetAugmentationDot).box;
+        end += kTempoDotGap;
+        place(Glyph::MetAugmentationDot, end - dot.southWest.x * kTempoNoteScale);
+        end += dot.width() * kTempoNoteScale;
+    }
+    TextItem text;
+    text.text = "= " + bpmText(tempo.bpm());
+    text.origin = {end + kTempoTextGap, baseline};
+    text.size = kTempoSize;
+    text.align = TextAlign::Left;
+    text.role = Role::Tempo;
+    text.measure = m;
+    end = text.origin.x + textWidth(text.text, kTempoSize);
+    system.texts.push_back(std::move(text));
+    return end;
+}
+
+// The tempo change after the `index`th one of measure m, and its measure.
+struct NextChange {
+    std::size_t measure = 0;
+    const core::TempoChange* change = nullptr;
+};
+
+std::optional<NextChange> changeAfter(const core::Song& song, std::size_t m, std::size_t index) {
+    for (std::size_t n = m; n < song.measureCount(); ++n) {
+        const auto& changes = song.measureHeader(n).tempoChanges;
+        const std::size_t first = n == m ? index + 1 : 0;
+        if (first < changes.size()) {
+            return NextChange{.measure = n, .change = &changes[first]};
+        }
+    }
+    return std::nullopt;
+}
+
+// "accel." or "rit." for a gradual change from `from` to `to`; empty when the
+// speed stays (ADR-0082).
+std::string_view rampWord(const core::Tempo& from, const core::Tempo& to) {
+    const double before = from.wholesPerSecond();
+    const double after = to.wholesPerSecond();
+    return after > before ? "accel." : after < before ? "rit." : "";
+}
+
 // Tempo marks ("quarter = 120") above everything over the first staff of
 // `system`: the tempo the song starts with, and every change to another tempo
-// over the column where it happens (ADR-0042).
+// over the column where it happens (ADR-0042). A gradual change adds "accel."
+// or "rit." and a dashed line to the next change, or to the end of the system,
+// where the next system goes on with the line (ADR-0082).
 void markTempo(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
                const EngravingFont& font) {
     struct Mark {
         std::size_t measure = 0;
         double x = 0.0;
-        core::Tempo tempo;
+        std::optional<core::Tempo> tempo{}; // none: only a gradual change goes on
+        std::string_view word{};            // "accel.", "rit." or none
+        double rampEnd = 0.0;               // where its dashed line ends, if beyond x
     };
     std::vector<Mark> marks;
+    if (measures.empty()) {
+        return;
+    }
+    const auto boxX = [](const MeasureBox& box, const core::Fraction& offset,
+                         const core::Fraction& length) {
+        const double at = (offset / length).toDouble();
+        const auto onset = std::ranges::find_if(
+            box.onsets, [at](const MeasureOnset& o) { return std::abs(o.at - at) < kEpsilon; });
+        return onset != box.onsets.end() ? onset->x : box.x + at * box.width;
+    };
+    const double systemEnd = measures.back().x + measures.back().width;
+    // Where a gradual change's line ends: at the next change in this system,
+    // or at its end.
+    const auto rampEnd = [&](const NextChange& next) {
+        const auto box = std::ranges::find(measures, next.measure, &MeasureBox::index);
+        if (box == measures.end()) {
+            return systemEnd;
+        }
+        return boxX(*box, next.change->offset,
+                    song.measureHeader(next.measure).timeSignature.measureLength());
+    };
+    // A gradual change from before the system that goes on in it.
+    for (std::size_t m = measures.front().index; m-- > 0;) {
+        const auto& changes = song.measureHeader(m).tempoChanges;
+        if (changes.empty()) {
+            continue;
+        }
+        const core::TempoChange& last = changes.back();
+        const auto next = changeAfter(song, m, changes.size() - 1);
+        const bool goesOn = next && (next->measure > measures.front().index ||
+                                     next->change->offset > core::Fraction());
+        if (last.gradual && goesOn && !rampWord(last.tempo, next->change->tempo).empty()) {
+            const MeasureBox& first = measures.front();
+            marks.push_back(Mark{.measure = first.index,
+                                 .x = boxX(first, {}, core::Fraction(1)),
+                                 .rampEnd = rampEnd(*next)});
+        }
+        break;
+    }
     // The tempo in force before each measure, carried along the system's
     // consecutive measures: looking it up from the start of the song for each
     // made long lines quadratic.
@@ -633,9 +743,20 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         if (m == 0 && !changedAtStart) {
             marks.push_back(Mark{.measure = m, .x = xAt({}), .tempo = current});
         }
-        for (const core::TempoChange& change : header.tempoChanges) {
+        for (std::size_t i = 0; i < header.tempoChanges.size(); ++i) {
+            const core::TempoChange& change = header.tempoChanges[i];
+            Mark mark{.measure = m, .x = xAt(change.offset)};
             if (change.tempo != current || (m == 0 && change.offset == core::Fraction())) {
-                marks.push_back(Mark{.measure = m, .x = xAt(change.offset), .tempo = change.tempo});
+                mark.tempo = change.tempo;
+            }
+            if (change.gradual) {
+                if (const auto after = changeAfter(song, m, i)) {
+                    mark.word = rampWord(change.tempo, after->change->tempo);
+                    mark.rampEnd = mark.word.empty() ? 0.0 : rampEnd(*after);
+                }
+            }
+            if (mark.tempo || !mark.word.empty()) {
+                marks.push_back(mark);
             }
             current = change.tempo;
         }
@@ -648,33 +769,35 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         std::min(kTempoLowest, system.top - kTempoInkGap - kTextDescent * kTempoSize);
     double highest = baseline - kTextAscent * kTempoSize;
     for (const Mark& mark : marks) {
-        const Glyph note = tempoNote(mark.tempo.beatUnit().value());
-        const BoundingBox& box = font.metrics(note).box;
-        const double y = baseline - kTempoNoteLift;
-        const auto place = [&](Glyph which, double x) {
-            system.glyphs.push_back(GlyphItem{.glyph = which,
-                                              .origin = {x, y},
-                                              .role = Role::Tempo,
-                                              .measure = mark.measure,
-                                              .scale = kTempoNoteScale});
-        };
-        place(note, mark.x - box.southWest.x * kTempoNoteScale);
-        highest = std::min(highest, y - box.northEast.y * kTempoNoteScale);
-        double x = mark.x + box.width() * kTempoNoteScale;
-        for (int d = 0; d < mark.tempo.beatUnit().dots(); ++d) {
-            const BoundingBox& dot = font.metrics(Glyph::MetAugmentationDot).box;
-            x += kTempoDotGap;
-            place(Glyph::MetAugmentationDot, x - dot.southWest.x * kTempoNoteScale);
-            x += dot.width() * kTempoNoteScale;
+        double after = mark.x; // where what follows the mark goes
+        if (mark.tempo) {
+            after = drawTempo(system, font, *mark.tempo, mark.measure, mark.x, baseline, highest);
         }
-        TextItem text;
-        text.text = "= " + bpmText(mark.tempo.bpm());
-        text.origin = {x + kTempoTextGap, baseline};
-        text.size = kTempoSize;
-        text.align = TextAlign::Left;
-        text.role = Role::Tempo;
-        text.measure = mark.measure;
-        system.texts.push_back(std::move(text));
+        if (!mark.word.empty()) {
+            if (mark.tempo) {
+                after += kRampWordGap;
+            }
+            system.texts.push_back(TextItem{.text = std::string(mark.word),
+                                            .origin = {after, baseline},
+                                            .size = kTempoSize,
+                                            .align = TextAlign::Left,
+                                            .italic = true,
+                                            .role = Role::Tempo,
+                                            .measure = mark.measure});
+            after += textWidth(mark.word, kTempoSize);
+        }
+        // A line going on from an earlier system starts at the measure.
+        const double from = mark.tempo || !mark.word.empty() ? after + kRampGap : after;
+        const double to = mark.rampEnd - kRampGap;
+        if (to - from >= kRampMinLine) {
+            const double y = baseline - kRampLift;
+            system.lines.push_back(LineItem{.from = {from, y},
+                                            .to = {to, y},
+                                            .thickness = kRampThickness,
+                                            .role = Role::Tempo,
+                                            .measure = mark.measure,
+                                            .dash = kRampDash});
+        }
     }
     system.top = std::min(system.top, highest);
 }
