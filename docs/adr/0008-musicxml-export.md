@@ -57,15 +57,16 @@ that uses every supported feature and for random songs.
   `guitarWideVibratoStroke` (so wide vibrato survives), `scoop`/`plop` for
   slides into a note, `doit`/`falloff` for slides off it, `play/mute` for palm
   mute, `x` and parenthesised noteheads for dead and ghost notes,
-  `arpeggiate` for strums, `up-bow`/`down-bow` for pick strokes and single
-  `tremolo` for tremolo picking. The importer reads all of them.
+  `arpeggiate` for strums, `up-bow`/`down-bow` for pick strokes, `tap` on a
+  tapped beat's first note and single `tremolo` for tremolo picking. The
+  importer reads all of them; a `tap` on any note taps its beat (ADR-0060).
 - Song info: `work-title`, `movement-title` (subtitle), `creator`s
   (`composer`, `lyricist`, `artist`, `transcriber`), `rights`, and
   `miscellaneous-field`s `album` and `notes`. `encoding/supports` tells readers
   to compute accidentals, beams and stems themselves.
 
-**Warnings for what MusicXML cannot hold.** Let ring, whammy bar, bass slap,
-pop and tap, pinch/tapped/semi harmonics (written as artificial), shift slides
+**Warnings for what MusicXML cannot hold.** Let ring, whammy bar, slap and
+pop, pinch/tapped/semi harmonics (written as artificial), shift slides
 (written as legato slides), arbitrary bend curves (the nearest bend, release or
 pre-bend), harmonic nodes away from the fret, effects on rests, tuplet tempo
 beat units (written in quarters), mixed dynamics at one time on a staff and
