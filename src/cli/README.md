@@ -238,6 +238,8 @@ staff `t` and `1` to `4` from the index, `none` for none; `pluck
 `pedal <down|change|none>` puts the caret's beat, a note or a rest, under the
 sustain pedal: beats under it in a row share a pedalling, and `change` lifts
 the pedal and presses it again where the beat starts (ADR-0092).
+`breath <comma|caesura|none>` puts a breath mark or a caesura after the
+caret's beat, whose notes then end a little early (ADR-0095).
 `grace <semitones> [duration] [on]` adds a grace note that many semitones from
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says

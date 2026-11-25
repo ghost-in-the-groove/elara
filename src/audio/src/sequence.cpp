@@ -319,7 +319,7 @@ struct Articulation {
 // How long a note of written length `length` sounds: a quarter of it
 // staccatissimo (ADR-0094), half of it staccato, three quarters portato
 // (ADR-0088), all of it otherwise.
-Fraction heldLength(const Fraction& length, const Articulation& articulation) {
+Fraction articulatedLength(const Fraction& length, const Articulation& articulation) {
     if (articulation.staccatissimo) {
         return length / Fraction(4);
     }
@@ -327,6 +327,19 @@ Fraction heldLength(const Fraction& length, const Articulation& articulation) {
         return length;
     }
     return articulation.tenuto ? length * Fraction(3, 4) : length / Fraction(2);
+}
+
+// The same, less what a breath mark (a sixteenth) or a caesura (an eighth)
+// after the note's beat takes off its end, never more than half of it
+// (ADR-0095).
+Fraction heldLength(const Fraction& length, const Articulation& articulation) {
+    const Fraction held = articulatedLength(length, articulation);
+    if (articulation.beat == nullptr || articulation.beat->breath == core::Breath::None) {
+        return held;
+    }
+    const Fraction cut =
+        articulation.beat->breath == core::Breath::Caesura ? Fraction(1, 8) : Fraction(1, 16);
+    return std::max(held - cut, held / Fraction(2));
 }
 
 // The place of `note` in the order a strum strikes its beat: a downstroke

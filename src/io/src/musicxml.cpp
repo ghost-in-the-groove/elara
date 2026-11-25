@@ -2040,7 +2040,7 @@ private:
                 } else if (name == "technical") {
                     readTechnical(mark, event, fx, string, fret, bends, index);
                 } else if (name == "articulations") {
-                    readArticulations(mark, fx, index);
+                    readArticulations(mark, event, fx, index);
                 } else if (name == "ornaments") {
                     readOrnaments(mark, event, note, index);
                 }
@@ -2115,10 +2115,14 @@ private:
         }
     }
 
-    void readArticulations(pugi::xml_node articulations, NoteEffects& fx, std::size_t index) {
+    void readArticulations(pugi::xml_node articulations, Event& event, NoteEffects& fx,
+                           std::size_t index) {
         for (pugi::xml_node mark : articulations.children()) {
             const std::string_view name = mark.name();
-            if (name == "staccato" || name == "spiccato") {
+            if (name == "breath-mark" || name == "caesura") { // after the beat (ADR-0095)
+                event.beatEffects.breath = std::max(
+                    event.beatEffects.breath, name == "caesura" ? Breath::Caesura : Breath::Comma);
+            } else if (name == "staccato" || name == "spiccato") {
                 fx.staccato = true;
             } else if (name == "staccatissimo") { // ADR-0094
                 fx.staccatissimo = true;
@@ -2142,7 +2146,8 @@ private:
             } else if (name == "falloff") {
                 fx.slideOut = SlideOut::Downwards;
             } else {
-                warn("articulations other than staccato, tenuto and accents dropped", index);
+                warn("articulations other than staccato, tenuto, accents and breaths dropped",
+                     index);
             }
         }
     }

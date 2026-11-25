@@ -161,6 +161,8 @@ core::Song richSong() {
     song.track(2).staff(1).measure(2).voices[0].beats[0].effects.ottava = Ottava::Bassa;
     // The sustain pedal under the left hand (ADR-0092).
     song.track(2).staff(1).measure(2).voices[0].beats[0].effects.pedal = Pedal::Change;
+    song.track(2).staff(1).measure(2).voices[0].beats[0].effects.breath =
+        elara::core::Breath::Caesura; // ADR-0095
     // Clef changes, one on an empty measure at the end (ADR-0087).
     song.track(2).staff(1).measure(1).clef = Clef::Treble;
     song.track(2).staff(1).measure(4).clef = Clef::Tenor;
@@ -247,7 +249,8 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"({"duration":"4","effects":{"fermata":"short"}})") != std::string::npos);
     CHECK(json.find(R"("fermata":"none")") == std::string::npos);
     CHECK(json.find(R"("effects":{"ottava":"15ma"})") != std::string::npos);
-    CHECK(json.find(R"("effects":{"ottava":"8vb","pedal":"change"})") != std::string::npos);
+    CHECK(json.find(R"("effects":{"ottava":"8vb","pedal":"change","breath":"caesura"})") !=
+          std::string::npos);
     CHECK(json.find(R"("pedal":"none")") == std::string::npos);
     CHECK(json.find(R"("ottava":"none")") == std::string::npos);
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default

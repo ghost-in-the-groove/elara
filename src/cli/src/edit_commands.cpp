@@ -213,7 +213,8 @@ constexpr std::array<std::string_view, 5> kOttavas{"none", "8va", "8vb", "15ma",
 constexpr std::array<std::string_view, 6> kClefNames{"treble",   "treble-8vb", "bass",
                                                      "bass-8vb", "alto",       "tenor"};
 constexpr std::array<std::string_view, 2> kSlurs{"none", "on"};
-constexpr std::array<std::string_view, 3> kPedals{"none", "down", "change"}; // ADR-0092
+constexpr std::array<std::string_view, 3> kPedals{"none", "down", "change"};    // ADR-0092
+constexpr std::array<std::string_view, 3> kBreaths{"none", "comma", "caesura"}; // ADR-0095
 
 // Directions `strum` and `pick` take (ADR-0056).
 constexpr std::array<std::string_view, 3> kStrokeDirections{"none", "down", "up"};
@@ -387,13 +388,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         edit = setBend(song, entry.caret, bendCurve(found->second, cents));
     } else if (verb == "strum" || verb == "pick" || verb == "tremolo" || verb == "whammy" ||
                verb == "bass" || verb == "hairpin" || verb == "fermata" || verb == "slur" ||
-               verb == "ottava" || verb == "pedal") {
+               verb == "ottava" || verb == "pedal" || verb == "breath") {
         // strum|pick <down|up|none>, tremolo <8|16|32|none>,
         // whammy <dive|dip|pre-dive|return|none> [cents], bass <tap|slap|pop|none>,
         // hairpin <crescendo|diminuendo|none>, fermata <short|normal|long|none>,
         // slur <on|none> (to the next beat of its voice),
         // ottava <8va|8vb|15ma|15mb|none> (ADR-0089), pedal <down|change|none>
-        // (ADR-0092): the caret's beat
+        // (ADR-0092), breath <comma|caesura|none> (after it, ADR-0095): the
+        // caret's beat
         BeatEffects effects = beatEffectsAt(song, entry.caret);
         if (verb == "strum") {
             effects.strum = static_cast<Strum>(strokeDirection(verb, step.word(1)));
@@ -422,6 +424,8 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             effects.ottava = static_cast<Ottava>(kindOf(verb, step.word(1), kOttavas));
         } else if (verb == "pedal") {
             effects.pedal = static_cast<Pedal>(kindOf(verb, step.word(1), kPedals));
+        } else if (verb == "breath") {
+            effects.breath = static_cast<Breath>(kindOf(verb, step.word(1), kBreaths));
         } else {
             effects.slur = kindOf(verb, step.word(1), kSlurs) != 0;
         }
@@ -990,6 +994,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"whammy <dive|dip|pre-dive|return|none> [cents]\", \"bass <tap|slap|pop|none>\", "
         "\"hairpin <crescendo|diminuendo|none>\", \"fermata <short|normal|long|none>\", "
         "\"slur <on|none>\", \"ottava <8va|8vb|15ma|15mb|none>\", \"pedal <down|change|none>\", "
+        "\"breath <comma|caesura|none>\", "
         "\"chord <name|none>\", \"text <words|none>\", "
         "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "

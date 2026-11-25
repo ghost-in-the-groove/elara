@@ -1123,6 +1123,18 @@ Rectangle {
                             active: root.document.caretPedal !== 0
                             onClicked: root.document.setPedal((root.document.caretPedal + 1) % 3)
                         }
+
+                        // A break after the caret's beat, numbered as core::Breath:
+                        // a breath mark, a second click a caesura, a third none
+                        // (ADR-0095).
+                        BeatEffect {
+                            tip: qsTr("Breath mark: again for a caesura")
+                            path: root.document.caretBreath === 2
+                                  ? "M7 19 L12 5 M12 19 L17 5"
+                                  : "M11 8 A1 1 0 1 1 13 8 A1 1 0 1 1 11 8 M13 8 C13 11.5 12 14 9.5 16"
+                            active: root.document.caretBreath !== 0
+                            onClicked: root.document.setBreath((root.document.caretBreath + 1) % 3)
+                        }
                     }
 
                     Label {

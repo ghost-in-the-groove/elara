@@ -1278,6 +1278,14 @@ void Startup::queueEffects() {
               "the status does not name the pedal change");
         score_->setPedal(0);
         check(score_->caretPedal() == 0, "the pedal did not come up");
+        // A caesura after the beat, then none (ADR-0095).
+        score_->setBreath(static_cast<int>(core::Breath::Caesura));
+        check(score_->caretBreath() == static_cast<int>(core::Breath::Caesura) &&
+                  score_->caretBassTechnique() != 0 &&
+                  score_->caretStatus().contains(ScoreDocument::tr("Caesura")),
+              "the caesura did not join the beat's effects");
+        score_->setBreath(0);
+        check(score_->caretBreath() == 0, "the caesura did not go");
         // Slurs (ADR-0086).
         score_->setSlur(true);
         check(score_->caretSlur() && score_->caretBassTechnique() != 0,

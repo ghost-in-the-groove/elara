@@ -507,6 +507,29 @@ TEST_CASE("Sequence: portato notes sound three quarters of their length, tenuto 
     CHECK_THAT(sequence.notes()[1].end, WithinAbs(1.5, kEpsilon));
 }
 
+TEST_CASE("Sequence: a breath mark or a caesura takes a little off the end of its beat",
+          "[audio][sequence][articulation]") {
+    // ADR-0095: a sixteenth for a breath mark, an eighth for a caesura, never
+    // more than half the note; at 120 BPM a whole note lasts 2 s.
+    Song song = pianoSong(1);
+    voice(song, 0) = {beat(NoteValue::Quarter, {note(60)}), beat(NoteValue::Eighth, {note(62)}),
+                      beat(NoteValue::Eighth, {note(64)}), beat(NoteValue::Half, {note(65)})};
+    auto& beats = voice(song, 0);
+    beats[0].effects.breath = elara::core::Breath::Comma;
+    beats[1].effects.breath = elara::core::Breath::Caesura;
+    beats[3].effects.breath = elara::core::Breath::Caesura;
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 4);
+    const auto length = [&](std::size_t i) {
+        return sequence.notes()[i].end - sequence.notes()[i].start;
+    };
+    CHECK_THAT(length(0), WithinAbs(0.375, kEpsilon));               // 3/16
+    CHECK_THAT(length(1), WithinAbs(0.125, kEpsilon));               // half of an eighth
+    CHECK_THAT(length(2), WithinAbs(0.25, kEpsilon));                // untouched
+    CHECK_THAT(length(3), WithinAbs(0.75, kEpsilon));                // 3/8
+    CHECK_THAT(sequence.notes()[1].start, WithinAbs(0.5, kEpsilon)); // starts on time
+}
+
 TEST_CASE("Sequence: staccatissimo notes sound a quarter of their length",
           "[audio][sequence][articulation]") {
     // ADR-0094: shorter than a staccato, with a tenuto too.

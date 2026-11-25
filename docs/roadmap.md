@@ -135,6 +135,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Clef changes: a measure changes its staff's clef, drawn smaller before the barline (ADR-0087)
 - [x] Tenuto and portato: held notes, drawn by the notehead, beyond the staccato dot (ADR-0088)
 - [x] Staccatissimo: a quarter of the note's length, a wedge in the place of the staccato dot (ADR-0094)
+- [x] Breath marks and caesuras: a little off the end of the beat, drawn after it (ADR-0095)
   - [x] In the model and kept by the native format
   - [x] Read and written in MusicXML
   - [x] Drawn on standard notation, clear of the notes, across lines

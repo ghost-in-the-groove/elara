@@ -627,6 +627,26 @@ add_test(NAME cli.dump_tenuto COMMAND elara-cli --json dump "${ELARA_CLI_TENUTO}
 set_tests_properties(cli.dump_tenuto PROPERTIES
   FIXTURES_REQUIRED cli_tenuto
   PASS_REGULAR_EXPRESSION "\"C5\",\"effects\":{\"tenuto\":true}}.*\"D5\",\"effects\":{\"staccato\":true,\"tenuto\":true}}")
+# Breaks after the caret's beat (ADR-0095): a breath mark after the C, a
+# caesura after the D, both drawn as articulations.
+set(ELARA_CLI_BREATHS "${CMAKE_CURRENT_BINARY_DIR}/cli-breaths.elara")
+add_test(NAME cli.edit_sets_breaths
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_BREATHS}" "add-track flute"
+    "append-measures 1" "pitch C" "breath comma" right "pitch D" "breath caesura")
+set_tests_properties(cli.edit_sets_breaths PROPERTIES
+  FIXTURES_SETUP cli_breaths
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_breaths COMMAND elara-cli --json dump "${ELARA_CLI_BREATHS}")
+set_tests_properties(cli.dump_breaths PROPERTIES
+  FIXTURES_REQUIRED cli_breaths
+  PASS_REGULAR_EXPRESSION "\"breath\":\"comma\".*\"breath\":\"caesura\"")
+add_test(NAME cli.render_breaths COMMAND elara-cli --json render "${ELARA_CLI_BREATHS}")
+set_tests_properties(cli.render_breaths PROPERTIES
+  FIXTURES_REQUIRED cli_breaths
+  PASS_REGULAR_EXPRESSION "\"articulation\":2[,}]")
+add_test(NAME cli.edit_rejects_unknown_breath
+  COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch C" "breath gasp")
+set_tests_properties(cli.edit_rejects_unknown_breath PROPERTIES WILL_FAIL TRUE)
 # Staccatissimo at the caret (ADR-0094): on the C, and in the place of the
 # staccato on the D.
 set(ELARA_CLI_STACCATISSIMO "${CMAKE_CURRENT_BINARY_DIR}/cli-staccatissimo.elara")
@@ -1110,7 +1130,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":138,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":140,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES
