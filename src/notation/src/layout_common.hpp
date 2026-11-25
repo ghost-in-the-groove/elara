@@ -534,6 +534,11 @@ struct LineOptions {
 /// staves of a single track.
 [[nodiscard]] double nameIndent(const core::Song& song, std::span<const StaffSelection> staves);
 
+/// Room for a brace left of every system's staves: 0 unless two or more
+/// staves of one track show standard notation one after the other (a grand
+/// staff, such as a piano's).
+[[nodiscard]] double braceRoom(std::span<const StaffSelection> staves);
+
 /// Lays out measures [first, last) of the selected staves as one system.
 [[nodiscard]] DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> staves,
                                      const EngravingFont& font, std::size_t first, std::size_t last,
