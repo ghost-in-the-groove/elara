@@ -96,8 +96,9 @@ add_subdirectory(cli)
 # never part of CTest or the gate.
 add_executable(elara_benchmarks EXCLUDE_FROM_ALL bench/bench_audio.cpp bench/bench_core.cpp
   bench/bench_io.cpp bench/bench_notation.cpp)
+# libsndfile encodes the sampler's and the FLAC decoder's input, as in the tests.
 target_link_libraries(elara_benchmarks PRIVATE elara::audio elara::core elara::io elara::notation
-  Catch2::Catch2WithMain)
+  SndFile::sndfile Catch2::Catch2WithMain)
 target_compile_definitions(elara_benchmarks PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}")
 elara_target_warnings(elara_benchmarks)
 
