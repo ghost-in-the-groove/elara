@@ -44,6 +44,64 @@ struct OpenNote {
     std::size_t index = 0;
 };
 
+// Appends the grace notes leading into a beat (ADR-0079), whose own notes are
+// `at`: those before the beat take their time from the end of the beat before,
+// which ends where they begin; those on it, and those before the first beat
+// of a measure (`previousLength` 0), from the start of their own beat. The
+// graces of each side take at most half of the beat they borrow from, all
+// shortened alike when they would take more. Returns how much of its own beat
+// they take.
+Fraction addGraces(const Beat& beat, const SoundingNote& at, const Fraction& previousLength,
+                   const std::vector<OpenNote>& open, std::vector<SoundingNote>& out) {
+    const bool canBorrow = previousLength > Fraction(0);
+    const auto isOn = [canBorrow](const Grace& grace) {
+        return grace.onBeat || !canBorrow;
+    };
+    Fraction before;
+    Fraction on;
+    for (const Grace& grace : beat.graces) {
+        (isOn(grace) ? on : before) += grace.duration.length();
+    }
+    const auto share = [](const Fraction& total, const Fraction& room) {
+        return total > room ? room / total : Fraction(1);
+    };
+    const Fraction beforeShare = share(before, previousLength * Fraction(1, 2));
+    const Fraction onShare = share(on, at.length * Fraction(1, 2));
+    const Fraction cut = at.start - before * beforeShare;
+    for (const OpenNote& note : open) {
+        SoundingNote& sounding = out[note.index];
+        if (sounding.start + sounding.length > cut) {
+            sounding.length = cut - sounding.start;
+        }
+    }
+    // Before the beat first, then on it, so the notes stay in start order.
+    Fraction when = cut;
+    for (const bool onBeat : {false, true}) {
+        if (onBeat) {
+            when = at.start;
+        }
+        for (std::size_t g = 0; g < beat.graces.size(); ++g) {
+            const Grace& grace = beat.graces[g];
+            if (isOn(grace) != onBeat) {
+                continue;
+            }
+            const Fraction length = grace.duration.length() * (onBeat ? onShare : beforeShare);
+            for (std::size_t n = 0; n < grace.notes.size(); ++n) {
+                SoundingNote sounding = at;
+                sounding.start = when;
+                sounding.length = length;
+                sounding.key = grace.notes[n].pitch.midiNumber();
+                sounding.velocity = dynamicVelocity(grace.notes[n].effects.dynamic);
+                sounding.note = static_cast<std::uint16_t>(n);
+                sounding.grace = static_cast<std::uint16_t>(g + 1);
+                out.push_back(sounding);
+            }
+            when += length;
+        }
+    }
+    return on * onShare;
+}
+
 // Appends the notes of one voice of one staff, joining ties, and the spans of
 // its hairpins.
 void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t t, std::size_t s,
@@ -58,6 +116,10 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
             continue;
         }
         Fraction position = starts[m];
+        // Of the beat before in the measure, 0 for none: grace notes borrow no
+        // time from the measure before, which repeats and jumps do not always
+        // play before this one.
+        Fraction previousLength;
         for (std::size_t b = 0; b < voice.beats.size(); ++b) {
             const Beat& beat = voice.beats[b];
             const Fraction length = beat.duration.length();
@@ -71,6 +133,22 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
                 }
             }
             next.clear();
+            // Where the beat's own notes start, after grace notes on the beat.
+            Fraction start = position;
+            Fraction own = length;
+            if (!beat.graces.empty()) {
+                const Fraction taken = addGraces(beat,
+                                                 {.track = t,
+                                                  .staff = s,
+                                                  .voice = v,
+                                                  .start = position,
+                                                  .length = length,
+                                                  .beat = static_cast<std::uint32_t>(b),
+                                                  .measure = m},
+                                                 previousLength, open, out);
+                start += taken;
+                own -= taken;
+            }
             for (std::size_t n = 0; n < beat.notes.size(); ++n) {
                 const Note& note = beat.notes[n];
                 const int key = note.pitch.midiNumber();
@@ -80,7 +158,8 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
                            (string == 0 || candidate.string == 0 || candidate.string == string);
                 });
                 if (note.effects.tiedFromPrevious && joined != open.end()) {
-                    out[joined->index].length += length;
+                    SoundingNote& tied = out[joined->index];
+                    tied.length = position + length - tied.start;
                     next.push_back({.key = key, .string = string, .index = joined->index});
                     continue;
                 }
@@ -88,16 +167,17 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
                 out.push_back({.track = t,
                                .staff = s,
                                .voice = v,
-                               .start = position,
-                               .length = length,
+                               .start = start,
+                               .length = own,
                                .key = key,
                                .velocity = dynamicVelocity(note.effects.dynamic),
                                .beat = static_cast<std::uint32_t>(b),
-                               .note = static_cast<std::uint32_t>(n),
+                               .note = static_cast<std::uint16_t>(n),
                                .measure = m});
             }
             std::swap(open, next);
             position += length;
+            previousLength = length;
         }
     }
 }
@@ -217,6 +297,17 @@ void rampHairpins(std::span<std::vector<SoundingNote>> voices,
 }
 
 } // namespace
+
+const Note& noteOf(const Song& song, const SoundingNote& sounding) {
+    const Beat& beat = song.track(sounding.track)
+                           .staff(sounding.staff)
+                           .measure(sounding.measure)
+                           .voices.at(sounding.voice)
+                           .beats.at(sounding.beat);
+    const std::vector<Note>& notes =
+        sounding.grace == 0 ? beat.notes : beat.graces.at(sounding.grace - 1U).notes;
+    return notes.at(sounding.note);
+}
 
 std::vector<SoundingNote> soundingNotes(const Song& song) {
     std::vector<Fraction> starts(song.measureCount());

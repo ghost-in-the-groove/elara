@@ -54,20 +54,41 @@ one, as a guitarist plays it.
   the others on it; export writes `<grace slash="yes"/>` for the first and
   `<grace/>` for the second, with the notes' strings and frets and no
   duration. A grace note's dynamic is the one in force at its beat.
-- The MIDI export reports grace notes as dropped until playback plays them.
+
+**Playback.** A grace note sounds for its written value, taken from the beat
+it borrows from:
+
+- A grace before the beat ends where the beat begins and cuts short the notes
+  of the beat before, which end where the first grace before the beat begins.
+- A grace on the beat starts with it and delays the beat's own notes, which
+  keep their end.
+- The grace notes of each side take at most half of the beat they borrow
+  from: when they would take more, all of them are shortened alike.
+- Grace notes borrow no time from the measure before: repeats and jumps do
+  not always play it just before. A grace before the first beat of a measure
+  is played on it, which is how most notation programs play every grace note.
+- `SoundingNote::grace` says which grace of its beat a note belongs to, so
+  playback finds its effects: a grace note slides, bends and rings like any
+  note, with none of its beat's strum, tremolo picking or whammy bar. The MIDI
+  export writes grace notes as it writes every sounding note.
 
 ## Consequences
 
 - Guitar Pro and MusicXML grace notes survive import, saving and MusicXML
-  export. Drawing them as small notes and fret numbers, playing them by
-  borrowing time and typing them come next, each recorded here as it lands. Until they are
-  drawn and played, a song with grace notes looks and sounds as it did before
-  they were kept.
+  export, and are heard in playback, audio rendering and MIDI export. Drawing
+  them as small notes and fret numbers and typing them come next, each
+  recorded here as it lands. Until they are drawn, a song with grace notes
+  looks as it did before they were kept.
 - A beat is 24 bytes larger on 64-bit systems: the list, empty for almost
   every beat, allocates nothing.
 - Grace notes after the last beat of a voice have nothing to lead into and
   are not kept.
+- A sounding note stays 80 bytes: its note index shrank to 16 bits to make
+  room for its grace's.
 - Tests: `io.MusicXML: grace notes lead into the next note of their voice`,
-  `io.MusicXML export: grace notes on a guitar keep their strings and slides`
+  `io.MusicXML export: grace notes on a guitar keep their strings and slides`,
+  `core.Grace notes borrow their time from the beat before or their own`,
+  `core.A grace note before the first beat of a measure plays on it`,
+  `cli.sequence_grace_before_beat`, `cli.sequence_grace_on_measure_start`
   and the round trips of the corpus and of a song with every feature (a
   grace before a beat and a chord of them on one).
