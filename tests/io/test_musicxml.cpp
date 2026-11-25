@@ -713,6 +713,39 @@ TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "
           std::vector<std::string>{"Test: chord symbols written as functions dropped (measure 1)"});
 }
 
+TEST_CASE("MusicXML: chord symbols over a measure rest write the rest out", "[musicxml]") {
+    // ADR-0096: a lead sheet's intro names chords over measure rests. The
+    // rest becomes a beat filling the measure, split where a chord changes;
+    // a measure rest without marks stays one.
+    const auto chord = [](std::string_view root) {
+        return std::format("<harmony><root><root-step>{}</root-step></root>"
+                           "<kind>major</kind></harmony>",
+                           root);
+    };
+    const std::string rest =
+        R"(<note><rest measure="yes"/><duration>16</duration><voice>1</voice></note>)";
+    const ImportResult result = parse(
+        onePart(chord("C") + rest + R"(<backup><duration>8</duration></backup>)" + chord("G") +
+                R"(<forward><duration>8</duration></forward></measure><measure number="2">)" +
+                rest + R"(</measure><measure number="3">)" + chord("F") + rest));
+    CHECK(result.warnings.empty());
+    const auto& intro = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(intro.size() == 2);
+    CHECK(intro[0].isRest());
+    CHECK(intro[1].isRest());
+    CHECK(intro[0].duration == core::Duration(core::NoteValue::Half));
+    REQUIRE(intro[0].chord);
+    CHECK(intro[0].chord->name == "C");
+    REQUIRE(intro[1].chord);
+    CHECK(intro[1].chord->name == "G");
+    CHECK(voiceOf(result.song, 0, 0, 1).beats.empty());
+    const auto& held = voiceOf(result.song, 0, 0, 2).beats;
+    REQUIRE(held.size() == 1);
+    CHECK(held[0].duration == core::Duration(core::NoteValue::Whole));
+    REQUIRE(held[0].chord);
+    CHECK(held[0].chord->name == "F");
+}
+
 TEST_CASE("MusicXML: chord symbols under a held note split it into tied notes", "[musicxml]") {
     // ADR-0096: a lead sheet holds a note while the chords change. The beat
     // under the change splits into tied notes, so the symbol has a beat to go
@@ -1202,10 +1235,15 @@ TEST_CASE("MusicXML: signs and jumps become measure marks", "[musicxml]") {
         rest + R"(</measure><measure number="6">)" + rest));
     const core::Song& song = result.song;
     REQUIRE(song.measureCount() == 6);
-    // Other text is reported: a measure rest has no beat to hold it
-    // (ADR-0081). Navigation text is not.
-    CHECK(result.warnings.size() == 1);
-    CHECK(hasWarning(result, "text directions dropped", "measure 1"));
+    // Other text goes on the measure rest, written out as a rest so that it
+    // has a beat (ADR-0096). Navigation text is not a beat's.
+    CHECK(result.warnings.empty());
+    const auto& first = voiceOf(song, 0, 0, 0).beats;
+    REQUIRE(first.size() == 1);
+    CHECK(first[0].isRest());
+    REQUIRE(first[0].text);
+    CHECK(*first[0].text == "dolce");
+    CHECK(voiceOf(song, 0, 0, 1).beats.empty()); // the segno is no beat's text
     CHECK(song.measureHeader(1).segno);
     CHECK(song.measureHeader(2).toCoda);
     CHECK_FALSE(song.measureHeader(2).coda); // the glyph decorates "To Coda"

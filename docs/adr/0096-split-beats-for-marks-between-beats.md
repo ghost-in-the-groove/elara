@@ -41,11 +41,19 @@ plays as before.
 **Some beats do not split.** A tuplet, a fermata (ADR-0085, it holds the whole
 beat), a breath mark (ADR-0095, after the whole beat), a whammy bar, or a
 note that bends or slides out belongs to the whole beat; such a beat stays
-whole and the mark is still dropped with its warning. So is a mark where no
-beat sounds (a measure rest written as one, an empty voice).
+whole and the mark is still dropped with its warning.
 
-**MusicXML import** looks for a beat starting at the mark in the voices of its
-staff, in order, then splits the first voice whose beat can be split there.
+**A measure rest is written out.** A measure rest written as one is an empty
+voice, which has no beat; lead sheets name the chords of an introduction over
+such rests, and parts write "solo" or "dolce" over them. When every voice of
+the mark's staff is empty, the first is written out as rests filling the
+measure (one rest in most meters, which the layout still draws as a measure
+rest in the middle of the measure), as a held measure rest is (ADR-0085),
+and then split like any beat.
+
+**MusicXML import** writes out the staff's measure rest if it has one, looks
+for a beat starting at the mark in the voices of its staff, in order, then
+splits the first voice whose beat can be split there.
 Slur ends recorded on later beats of that voice and measure move on with
 them, so a slur keeps its notes (ADR-0086).
 
