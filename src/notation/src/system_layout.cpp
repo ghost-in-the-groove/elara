@@ -67,6 +67,8 @@ constexpr double kSectionSize = 1.5;        // font size of its name
 constexpr double kSectionPad = 0.35;        // between the name and its box
 constexpr double kSectionGap = 0.5;         // between two boxes on one line
 constexpr double kSectionLineGap = 0.4;     // between a line of boxes and the one above
+constexpr double kBraceRoom = 1.8;          // left of a system's staves for a grand staff's brace
+constexpr double kBraceGap = 0.3;           // between the brace and the line starting the system
 constexpr std::size_t kMeasuresPerJob = 32; // measured together on one thread
 constexpr std::size_t kParallelMeasures = 64;
 
@@ -159,6 +161,63 @@ void nameTracks(DisplayList& system, const core::Song& song, std::span<const Sta
             system.texts.push_back(std::move(text));
         }
         s = end;
+    }
+}
+
+// The grand staves among `staves`: runs [first, last) of two or more staves of
+// one track, one after the other, in standard notation.
+std::vector<std::pair<std::size_t, std::size_t>>
+grandStaves(std::span<const StaffSelection> staves) {
+    std::vector<std::pair<std::size_t, std::size_t>> groups;
+    for (std::size_t s = 0; s < staves.size();) {
+        std::size_t end = s + 1;
+        while (end < staves.size() && staves[s].view == StaffView::Standard &&
+               staves[end].view == StaffView::Standard && staves[end].track == staves[s].track &&
+               staves[end].staff != staves[end - 1].staff) {
+            ++end;
+        }
+        if (end - s > 1) {
+            groups.emplace_back(s, end);
+        }
+        s = end;
+    }
+    return groups;
+}
+
+// Joins each grand staff of `system` (its staff boxes are placed): every
+// barline of a staff goes on down to the next staff, and a brace as high as
+// them all stands left of the system's start.
+void braceStaves(DisplayList& system, std::span<const StaffSelection> staves,
+                 const EngravingFont& font) {
+    const BoundingBox& box = font.metrics(Glyph::Brace).box;
+    const double glyphHeight = box.northEast.y - box.southWest.y;
+    for (const auto& [first, last] : grandStaves(staves)) {
+        const std::size_t count = system.lines.size();
+        for (std::size_t s = first; s + 1 < last; ++s) {
+            const StaffBox& upper = system.staves[s];
+            const double bottom = upper.y + upper.height;
+            const double next = system.staves[s + 1].y;
+            for (std::size_t i = 0; i < count; ++i) {
+                const LineItem line = system.lines[i];
+                if (line.role == Role::Barline && line.from.x == line.to.x &&
+                    line.from.y == upper.y && line.to.y == bottom) {
+                    system.lines.push_back(LineItem{.from = {line.from.x, bottom},
+                                                    .to = {line.from.x, next},
+                                                    .thickness = line.thickness,
+                                                    .role = Role::Barline,
+                                                    .measure = line.measure});
+                }
+            }
+        }
+        const double top = system.staves[first].y;
+        const double bottom = system.staves[last - 1].y + system.staves[last - 1].height;
+        const double scale = glyphHeight > 0.0 ? (bottom - top) / glyphHeight : 1.0;
+        system.glyphs.push_back(GlyphItem{
+            .glyph = Glyph::Brace,
+            .origin = {-kBraceGap - box.northEast.x * scale, bottom + box.southWest.y * scale},
+            .role = Role::Brace,
+            .measure = system.measures.empty() ? 0 : system.measures.front().index,
+            .scale = scale});
     }
 }
 
@@ -675,6 +734,10 @@ double nameIndent(const core::Song& song, std::span<const StaffSelection> staves
     return widest > 0.0 ? widest + kTrackNameGap : 0.0;
 }
 
+double braceRoom(std::span<const StaffSelection> staves) {
+    return grandStaves(staves).empty() ? 0.0 : kBraceRoom;
+}
+
 DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> staves,
                        const EngravingFont& font, std::size_t first, std::size_t last,
                        const LineOptions& options) {
@@ -807,11 +870,15 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
     }
     system.measures = std::move(measures);
     system.columns = std::move(columnBoxes);
-    const double indent = options.named ? nameIndent(song, staves) : 0.0;
+    braceStaves(system, staves, font);
+    const double names = options.named ? nameIndent(song, staves) : 0.0;
+    const double indent = names + braceRoom(staves);
     if (indent > 0.0) {
         shift(system, indent, 0.0);
-        nameTracks(system, song, staves, indent);
         system.width += indent;
+    }
+    if (names > 0.0) {
+        nameTracks(system, song, staves, names);
     }
     system.systems.push_back(SystemBox{.firstMeasure = first,
                                        .measureCount = last - first,
