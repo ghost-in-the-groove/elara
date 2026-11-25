@@ -131,7 +131,10 @@
              "vibrato": "slight"
             }
            }
-          ]
+          ],
+          "effects": {
+           "hairpin": "crescendo"
+          }
          },
          {
           "duration": "4",
@@ -148,7 +151,10 @@
              "letRing": true
             }
            }
-          ]
+          ],
+          "effects": {
+           "hairpin": "crescendo"
+          }
          }
         ]
        ],
@@ -214,7 +220,8 @@
            }
           ],
           "effects": {
-           "pickStroke": "down"
+           "pickStroke": "down",
+           "hairpin": "diminuendo"
           }
          },
          {
@@ -225,7 +232,10 @@
             "string": 4,
             "fret": 7
            }
-          ]
+          ],
+          "effects": {
+           "hairpin": "diminuendo"
+          }
          },
          {
           "duration": "4"

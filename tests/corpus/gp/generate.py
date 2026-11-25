@@ -252,6 +252,9 @@ def fretted(string: int, fret: int, **kwargs) -> Note:
     return Note(string=string, fret=fret, midi=DROP_D[string] + CAPO + fret, **kwargs)
 
 
+CRESCENDO, DIMINUENDO = "<Hairpin>Crescendo</Hairpin>", "<Hairpin>Decrescendo</Hairpin>"
+
+
 def guitar_techniques() -> str:
     guitar = Track("Lead Guitar", set_type="electricGuitar", set_name="Electric Guitar",
                    program=27, transpose=(0, -1), staves=[{"tuning": DROP_D, "capo": CAPO}])
@@ -264,10 +267,12 @@ def guitar_techniques() -> str:
         Beat("Eighth", [fretted(1, 0, props=[prop("HopoOrigin")])], tuplet=(3, 2)),
         Beat("Eighth", [fretted(1, 2, props=[prop("HopoDestination")])], tuplet=(3, 2)),
         Beat("Eighth", [fretted(2, 0)], tuplet=(3, 2)),
-        Beat("Quarter", [fretted(3, 2, props=[bend], elements=["<Vibrato>Slight</Vibrato>"])]),
+        # A crescendo over the last two beats leads to the forte of bar 2.
+        Beat("Quarter", [fretted(3, 2, props=[bend], elements=["<Vibrato>Slight</Vibrato>"])],
+             elements=[CRESCENDO]),
         Beat("Quarter", [fretted(4, 12, props=[prop("HarmonicType", "<HType>Natural</HType>"),
                                                prop("HarmonicFret", "<HFret>12</HFret>")],
-                                 elements=["<LetRing />"])]),
+                                 elements=["<LetRing />"])], elements=[CRESCENDO]),
     ]]
     bar2 = [[
         Beat("Half", [fretted(5, 3, tie=(True, False))], dynamic="F"),
@@ -279,8 +284,8 @@ def guitar_techniques() -> str:
         Beat("Eighth", [fretted(2, 7)], elements=["<GraceNotes>BeforeBeat</GraceNotes>"]),
         Beat("Quarter", [fretted(2, 5, props=[prop("Slide", "<Flags>1</Flags>")],
                                  elements=["<Accent>1</Accent>"])], dots=1,
-             props=[prop("PickStroke", "<Direction>Down</Direction>")]),
-        Beat("Eighth", [fretted(2, 7)]),
+             props=[prop("PickStroke", "<Direction>Down</Direction>")], elements=[DIMINUENDO]),
+        Beat("Eighth", [fretted(2, 7)], elements=[DIMINUENDO]),
         Beat("Quarter", [], dynamic="MF"),
     ]]
     return score(

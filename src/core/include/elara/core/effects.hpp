@@ -147,6 +147,9 @@ struct NoteEffects {
 enum class PickStroke : std::uint8_t { None, Down, Up };
 enum class Strum : std::uint8_t { None, Down, Up };
 enum class BassTechnique : std::uint8_t { None, Tap, Slap, Pop };
+/// A wedge under the staff over the beat: the music gets louder or softer
+/// (ADR-0078). Consecutive beats with the same hairpin share one wedge.
+enum class Hairpin : std::uint8_t { None, Crescendo, Diminuendo };
 
 /// Effects that apply to every note of a beat.
 struct BeatEffects {
@@ -155,6 +158,7 @@ struct BeatEffects {
     Strum strum = Strum::None;
     std::optional<NoteValue> tremoloPicking{}; // speed of the repeated notes
     BassTechnique bassTechnique = BassTechnique::None;
+    Hairpin hairpin = Hairpin::None;
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

@@ -1203,8 +1203,13 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
+        if (beat.effects.hairpin != Hairpin::None) {
+            warn("hairpins dropped", place.measure);
+        }
         if (beat.isRest()) {
-            if (beat.effects != BeatEffects{}) {
+            BeatEffects others = beat.effects;
+            others.hairpin = Hairpin::None;
+            if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
             xml.open("note");

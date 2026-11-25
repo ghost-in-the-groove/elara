@@ -82,6 +82,7 @@ one that replaces them.
 | [0074](0074-pdf-export.md) | PDF export written by Elara | Accepted |
 | [0075](0075-guitar-pro-keyboards-grand-staff.md) | Guitar Pro 3-5 keyboards on a grand staff | Accepted |
 | [0077](0077-techniques-of-strings.md) | Techniques of strings go on fretted staves only | Accepted |
+| [0078](0078-hairpins.md) | Hairpins | Accepted |
 
 ## Template
 
