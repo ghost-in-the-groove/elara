@@ -437,6 +437,9 @@ void addPedalPieces(const Measure& measure, std::vector<PedalSpan>& pieces) {
 
 // The pieces joined where they overlap or meet, cut where a change starts.
 std::vector<PedalSpan> joinPedalPieces(std::vector<PedalSpan>& pieces) {
+    if (pieces.empty()) { // most measures: nothing to sort
+        return {};
+    }
     std::ranges::stable_sort(pieces, std::less<>{}, &PedalSpan::start);
     std::vector<PedalSpan> spans;
     for (const PedalSpan& piece : pieces) {
