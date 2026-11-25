@@ -8,6 +8,7 @@ find_package(yyjson CONFIG REQUIRED)
 
 add_library(elara_io STATIC
   src/archive.cpp
+  src/compression.cpp
   src/musicxml.cpp
   src/musicxml_export.cpp
   src/guitar_pro.cpp

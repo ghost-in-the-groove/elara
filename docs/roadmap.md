@@ -76,6 +76,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Only the measures and systems an edit changed are measured and laid out
         again; the rest is reused (ADR-0052)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
+- [x] PDF export: `elara-cli render --pdf` and Export as PDF… in the app, the
+      glyphs drawn from the music font's outlines (ADR-0074)
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)

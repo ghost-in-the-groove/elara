@@ -900,6 +900,33 @@ add_test(NAME cli.render_rejects_bad_tracks
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks 9)
 set_tests_properties(cli.render_rejects_bad_tracks PROPERTIES WILL_FAIL TRUE)
 
+# PDF (ADR-0074): every page in one document, the glyphs drawn from the font's
+# outlines. The text before the first compressed stream is plain.
+add_test(NAME cli.render_pdf
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/band.gp" --tracks all --layout page
+          --staff-space 6 --pdf "${CMAKE_CURRENT_BINARY_DIR}/band-pages.pdf")
+set_tests_properties(cli.render_pdf PROPERTIES FIXTURES_SETUP cli_rendered_pdf
+  PASS_REGULAR_EXPRESSION "\"svg\":null,\"pdf\":\\{\"file\":\"[^\"]*band-pages\\.pdf\",\"pages\":2,\"bytes\":[1-9][0-9]+\\},")
+add_test(NAME cli.render_pdf_content
+  COMMAND ${CMAKE_COMMAND} -E cat "${CMAKE_CURRENT_BINARY_DIR}/band-pages.pdf")
+set_tests_properties(cli.render_pdf_content PROPERTIES FIXTURES_REQUIRED cli_rendered_pdf
+  PASS_REGULAR_EXPRESSION "^%PDF-1\\.7.*/Type /Pages /Kids \\[[0-9]+ 0 R [0-9]+ 0 R\\] /Count 2 >>.*/Title <FEFF0043006F0072007000750073002000420061006E0064>")
+add_test(NAME cli.render_pdf_line
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/melody.gp3" --pdf "${CMAKE_CURRENT_BINARY_DIR}/melody.pdf")
+set_tests_properties(cli.render_pdf_line PROPERTIES
+  PASS_REGULAR_EXPRESSION "saved .*melody\\.pdf \\(1 page, [1-9][0-9]+ bytes\\)")
+add_test(NAME cli.render_pdf_rejects_unwritable
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/melody.gp3"
+          --pdf "${CMAKE_CURRENT_BINARY_DIR}/no-such-folder/melody.pdf")
+set_tests_properties(cli.render_pdf_rejects_unwritable PROPERTIES WILL_FAIL TRUE)
+# Metadata without its OpenType font next to it: SVG still works, PDF cannot.
+file(COPY "${ELARA_FONT_DIR}/Bravura.json" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/metadata-only")
+add_test(NAME cli.render_pdf_needs_the_font
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/melody.gp3"
+          --metadata "${CMAKE_CURRENT_BINARY_DIR}/metadata-only/Bravura.json"
+          --pdf "${CMAKE_CURRENT_BINARY_DIR}/metadata-only.pdf")
+set_tests_properties(cli.render_pdf_needs_the_font PROPERTIES WILL_FAIL TRUE)
+
 # Snapshot tests: every corpus file imported with --json must give what
 # tests/snapshots/import/<folder>/<name>.json holds. To refresh them after an
 # intended change: ELARA_UPDATE_SNAPSHOTS=1 python scripts/elara.py test -R snapshot

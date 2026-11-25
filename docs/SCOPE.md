@@ -22,6 +22,7 @@ guitar tablature and scores, on Windows, macOS and Linux.
 **Files**
 - Import Guitar Pro `.gp3`, `.gp4`, `.gp5`, `.gpx`, `.gp` (7-8).
 - Import and export MusicXML and MIDI.
+- Export the score as PDF (planned for 1.1, written early: ADR-0074).
 - Versioned native project format.
 
 **Sound**
@@ -44,7 +45,6 @@ guitar tablature and scores, on Windows, macOS and Linux.
 - Audio recording, clips, DAW timeline.
 - VST3 plugins, piano roll.
 - Advanced orchestral notation: parts/cues, cue notes, cross-staff beaming, lyrics.
-- PDF export (planned for 1.1).
 
 ## Constraints
 
