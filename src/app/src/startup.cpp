@@ -4,6 +4,8 @@
 #include <elara/audio/sequence.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/io/midi.hpp>
+#include <elara/io/musicxml.hpp>
 
 #include "audio_controller.hpp"
 #include "recent_scores.hpp"
@@ -216,6 +218,7 @@ void Startup::queueSteps() {
             return false;
         });
         queuePdf();
+        queueExport();
         queuePractice();
         queueLoop();
         if (!options_.soundFont.isEmpty()) {
@@ -1935,13 +1938,15 @@ void Startup::queuePdf() {
         // Export as PDF… suggests the song's file with ".pdf" for its extension.
         if (score_->source().isLocalFile()) {
             const QFileInfo source(score_->source().toLocalFile());
-            const QFileInfo suggested(score_->pdfFile().toLocalFile());
+            const QFileInfo suggested(score_->exportFile(QStringLiteral("pdf")).toLocalFile());
             if (suggested.dir() != source.dir() ||
                 suggested.fileName() != source.completeBaseName() + QStringLiteral(".pdf")) {
                 problem(QStringLiteral("%1 suggested for %2")
                             .arg(suggested.filePath(), source.filePath()));
             }
-        } else if (!score_->pdfFile().toLocalFile().endsWith(QStringLiteral(".pdf"))) {
+        } else if (!score_->exportFile(QStringLiteral("pdf"))
+                        .toLocalFile()
+                        .endsWith(QStringLiteral(".pdf"))) {
             problem(QStringLiteral("no PDF file suggested for a song without a file"));
         }
         const QByteArray pdf = written.readAll();
@@ -1954,6 +1959,74 @@ void Startup::queuePdf() {
         }
         std::printf("pdf: %lld %s, %lld bytes\n", static_cast<long long>(pages),
                     pages == 1 ? "page" : "pages", static_cast<long long>(pdf.size()));
+        return false;
+    });
+}
+
+// The song exported as MusicXML and as MIDI, beside Export as PDF…: files that
+// read back, MusicXML with every track, each export reporting what its format
+// left out, and the song still unmodified. Prints "musicxml: <tracks> tracks,
+// <warnings> warnings" and "midi: <bytes> bytes, <warnings> warnings".
+void Startup::queueExport() {
+    steps_.emplace_back([this] {
+        const auto problem = [this](const QString& what) {
+            if (editProblem_.isEmpty()) {
+                editProblem_ = QStringLiteral("export: %1").arg(what);
+            }
+        };
+        const bool modified = score_->modified();
+        QStringList reported;
+        int reports = 0;
+        const auto connection = QObject::connect(
+            score_, &ScoreDocument::report,
+            [&reported, &reports](const QString& /*message*/, const QStringList& details) {
+                reported = details;
+                ++reports;
+            });
+        const QTemporaryDir folder;
+        // ".musicxml" and ".mid" are added.
+        const bool xmlWritten =
+            score_->exportMusicXml(QUrl::fromLocalFile(folder.filePath(QStringLiteral("xml"))));
+        const QStringList xmlWarnings = reported;
+        reported.clear();
+        const bool midiWritten =
+            score_->exportMidi(QUrl::fromLocalFile(folder.filePath(QStringLiteral("midi"))));
+        const QStringList midiWarnings = reported;
+        QObject::disconnect(connection);
+        if (!xmlWritten || !midiWritten || reports != 2) {
+            problem(QStringLiteral("an export failed or reported nothing"));
+            return false;
+        }
+        const auto xml = elara::io::importMusicXmlFile(
+            folder.filePath(QStringLiteral("xml.musicxml")).toStdString());
+        const auto midi =
+            elara::io::importMidiFile(folder.filePath(QStringLiteral("midi.mid")).toStdString());
+        if (!xml || !midi) {
+            problem(QStringLiteral("an exported file does not read back"));
+            return false;
+        }
+        if (xml->song.trackCount() != score_->song()->trackCount()) {
+            problem(QStringLiteral("MusicXML read back with %1 tracks for %2")
+                        .arg(xml->song.trackCount())
+                        .arg(score_->song()->trackCount()));
+        }
+        if (score_->modified() != modified) {
+            problem(QStringLiteral("exporting changed the song's modified state"));
+        }
+        // Each export suggests the song's file with its own extension.
+        for (const QString& extension : {QStringLiteral("musicxml"), QStringLiteral("mid")}) {
+            if (!score_->exportFile(extension).toLocalFile().endsWith(QLatin1Char('.') +
+                                                                      extension)) {
+                problem(QStringLiteral("no .%1 file suggested").arg(extension));
+            }
+        }
+        std::printf("musicxml: %lld tracks, %lld warnings\n",
+                    static_cast<long long>(xml->song.trackCount()),
+                    static_cast<long long>(xmlWarnings.size()));
+        std::printf(
+            "midi: %lld bytes, %lld warnings\n",
+            static_cast<long long>(QFileInfo(folder.filePath(QStringLiteral("midi.mid"))).size()),
+            static_cast<long long>(midiWarnings.size()));
         return false;
     });
 }
