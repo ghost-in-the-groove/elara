@@ -243,10 +243,10 @@ TEST_CASE("FLAC benchmarks", "[benchmark][audio][flac]") {
         const auto pluck = benchPluck(110.0 * (1 + i % 4), 2.0, 44100);
         minute.insert(minute.end(), pluck.begin(), pluck.end());
     }
-    REQUIRE(writeSndFile(folder / "minute.flac", SF_FORMAT_FLAC | SF_FORMAT_PCM_16, minute, 2,
-                         44100));
-    REQUIRE(writeSndFile(folder / "minute.wav", SF_FORMAT_WAV | SF_FORMAT_PCM_16, minute, 2,
-                         44100));
+    REQUIRE(
+        writeSndFile(folder / "minute.flac", SF_FORMAT_FLAC | SF_FORMAT_PCM_16, minute, 2, 44100));
+    REQUIRE(
+        writeSndFile(folder / "minute.wav", SF_FORMAT_WAV | SF_FORMAT_PCM_16, minute, 2, 44100));
     const auto flac = fileBytes(folder / "minute.flac");
     const auto wav = fileBytes(folder / "minute.wav");
     std::filesystem::remove_all(folder);
