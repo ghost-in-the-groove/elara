@@ -24,6 +24,7 @@ using elara::core::NoteValue;
 using elara::core::Ornament;
 using elara::core::ornamentSteps;
 using elara::core::Ottava;
+using elara::core::Pedal;
 using elara::core::ottavaOctaves;
 using elara::core::PickStroke;
 using elara::core::SlideIn;
@@ -225,6 +226,17 @@ TEST_CASE("Octave lines move the written notes one or two octaves", "[core][effe
     CHECK(effects.ottava == Ottava::QuindicesimaBassa);
     CHECK(effects.slur);
     CHECK(effects != BeatEffects{});
+}
+
+TEST_CASE("A beat goes under the sustain pedal or changes it", "[core][effects]") {
+    // ADR-0092: no pedal unless one is set; a change differs from going on.
+    BeatEffects effects;
+    CHECK(effects.pedal == Pedal::None);
+    effects.pedal = Pedal::Down;
+    BeatEffects changed = effects;
+    changed.pedal = Pedal::Change;
+    CHECK(effects != BeatEffects{});
+    CHECK(changed != effects);
 }
 
 TEST_CASE("A trill alternates with another note at its speed", "[core][effects]") {

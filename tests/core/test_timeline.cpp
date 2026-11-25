@@ -22,6 +22,8 @@ using elara::core::KeyMode;
 using elara::core::KeySignature;
 using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Pedal;
+using elara::core::PedalSpan;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
@@ -274,6 +276,52 @@ TEST_CASE("A fermata holds its beat longer", "[core][timeline][fermata]") {
     CHECK_THAT(song.secondsAt(1, Fraction(1, 4)), WithinAbs(8.5, 1e-12));
     CHECK_THAT(song.secondsAt(2), WithinAbs(8.5 + 1.0 + 6.0, 1e-12));
     CHECK_THAT(song.durationSeconds(), WithinAbs(19.5, 1e-12));
+}
+
+namespace {
+
+Beat pedalled(NoteValue value, Pedal pedal, bool rest = false) {
+    Beat beat = held(value, Fermata::None, rest);
+    beat.effects.pedal = pedal;
+    return beat;
+}
+
+} // namespace
+
+TEST_CASE("The sustain pedal of a track goes over the beats of all its staves",
+          "[core][timeline][pedal]") {
+    // ADR-0092: the beats under the pedal in any staff and voice of the track
+    // make one pedalling; a change lifts it and presses it again where its
+    // beat starts, also inside a beat of another staff still under it.
+    Song song;
+    song.addTrack(Track("Voice", Instrument{.kind = InstrumentKind::Pitched}, {Staff{}}));
+    song.addTrack(
+        Track("Piano", Instrument{.kind = InstrumentKind::Keyboard}, {Staff{}, Staff{}}));
+    song.appendMeasures(3);
+    Track& piano = song.track(1);
+    piano.staff(0).measure(0).voices[0].beats = {
+        pedalled(NoteValue::Quarter, Pedal::Down), pedalled(NoteValue::Quarter, Pedal::Change),
+        pedalled(NoteValue::Quarter, Pedal::None), pedalled(NoteValue::Quarter, Pedal::Change)};
+    piano.staff(1).measure(0).voices[0].beats = {pedalled(NoteValue::Half, Pedal::Down),
+                                                 pedalled(NoteValue::Half, Pedal::None)};
+    // A rest goes on under it; beats under it in a row and overlapping join.
+    piano.staff(0).measure(1).voices[0].beats = {pedalled(NoteValue::Quarter, Pedal::None),
+                                                 pedalled(NoteValue::Quarter, Pedal::Down),
+                                                 pedalled(NoteValue::Half, Pedal::None)};
+    piano.staff(1).measure(1).voices[0].beats = {pedalled(NoteValue::Quarter, Pedal::Down, true),
+                                                 pedalled(NoteValue::Quarter, Pedal::Down),
+                                                 pedalled(NoteValue::Half, Pedal::None)};
+
+    CHECK(song.pedalSpans(1, 0) ==
+          std::vector<PedalSpan>{{.start = Fraction(0), .end = Fraction(1, 4), .change = false},
+                                 {.start = Fraction(1, 4), .end = Fraction(1, 2), .change = true},
+                                 {.start = Fraction(3, 4), .end = Fraction(1), .change = true}});
+    CHECK(song.pedalSpans(1, 1) ==
+          std::vector<PedalSpan>{{.start = Fraction(0), .end = Fraction(1, 2), .change = false}});
+    CHECK(song.pedalSpans(1, 2).empty());
+    CHECK(song.pedalSpans(0, 0).empty());
+    CHECK_THROWS_AS(song.pedalSpans(1, 3), std::out_of_range);
+    CHECK_THROWS_AS(song.pedalSpans(2, 0), std::out_of_range);
 }
 
 TEST_CASE("A fermata in a gradual tempo change holds what it takes there",
