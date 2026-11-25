@@ -58,8 +58,8 @@ struct SfzTechniques {
 /// the rest: the built-in synthesizer, a SoundFont or another SFZ instrument.
 ///
 /// Each note plays every region its key, velocity, controllers, keyswitch
-/// and round robin pick, through the region's envelope, at the pitch of the
-/// key, moved by glides of its own: bends, slides and vibrato touch only the
+/// and round robin (in turn, or by a random number per note) pick, through the region's envelope,
+/// at the pitch of the key, moved by glides of its own: bends, slides and vibrato touch only the
 /// notes of their key. A palm mute, a dead note or a harmonic plays on the
 /// library's own keyswitch or controller for it, for that note alone, when
 /// the library names one (techniques()); otherwise the sampler darkens,
