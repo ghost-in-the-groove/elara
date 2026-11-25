@@ -14,6 +14,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -777,6 +778,45 @@ Entry setTrillToNextStep(const Song& song, const Caret& at, NoteValue speed) {
 Entry setOrnament(const Song& song, const Caret& at, Ornament ornament) {
     return changeEffects(song, at, "Change ornament",
                          [ornament](Note& note) { note.effects.ornament = ornament; });
+}
+
+Entry setFingering(const Song& song, const Caret& at, std::span<const Finger> fingers) {
+    const Caret caret = clampCaret(song, at);
+    if (onFreeSlot(song, caret)) {
+        return unchanged(caret);
+    }
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    Measure content = measureAt(song, caret);
+    std::vector<Note*> targets;
+    for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
+        if (isEffectTarget(note, staff, caret.string)) {
+            targets.push_back(&note);
+        }
+    }
+    if (fingers.empty() || (fingers.size() != 1 && fingers.size() != targets.size())) {
+        throw std::invalid_argument("setFingering: one finger for each note, or one for all");
+    }
+    std::ranges::stable_sort(targets, {},
+                             [](const Note* note) { return note->pitch.midiNumber(); });
+    bool changed = false;
+    for (std::size_t i = 0; i < targets.size(); ++i) {
+        const Finger finger = fingers[fingers.size() == 1 ? 0 : i];
+        changed = changed || targets[i]->effects.fingering != finger;
+        targets[i]->effects.fingering = finger;
+    }
+    if (!changed) {
+        return unchanged(caret);
+    }
+    return replace(caret, std::move(content), "Change fingering");
+}
+
+Entry setPluck(const Song& song, const Caret& at, Finger finger) {
+    const Caret caret = clampCaret(song, at);
+    if (!song.track(caret.track).staff(caret.staff).isFretted()) {
+        throw std::logic_error("setPluck: a plucking finger needs strings");
+    }
+    return changeEffects(song, caret, "Change plucking finger",
+                         [finger](Note& note) { note.effects.pluck = finger; });
 }
 
 Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {

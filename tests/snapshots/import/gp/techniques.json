@@ -180,7 +180,10 @@
            {
             "pitch": "D4",
             "string": 3,
-            "fret": 5
+            "fret": 5,
+            "effects": {
+             "fingering": "ring"
+            }
            }
           ]
          },

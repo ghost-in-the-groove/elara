@@ -1198,6 +1198,26 @@ void Startup::queueEffects() {
               "the turn did not go on");
         score_->setOrnament(0);
         check(score_->caretOrnament() == 0, "the turn did not come off");
+        // A finger and a plucking finger, then none (ADR-0093).
+        score_->setFingering(static_cast<int>(core::Finger::Ring));
+        check(score_->caretFingering() == static_cast<int>(core::Finger::Ring) &&
+                  score_->undoName() == ScoreDocument::tr("Change fingering") &&
+                  score_->caretStatus().contains(
+                      ScoreDocument::tr("Finger %1")
+                          .arg(score_->caretFretted() ? QStringLiteral("3") : QStringLiteral("4"))),
+              "the fingering did not go on");
+        score_->setFingering(0);
+        check(score_->caretFingering() == 0, "the fingering did not come off");
+        if (score_->caretFretted()) {
+            score_->setPluck(static_cast<int>(core::Finger::Index));
+            check(score_->caretPluck() == static_cast<int>(core::Finger::Index) &&
+                      score_->undoName() == ScoreDocument::tr("Change plucking finger") &&
+                      score_->caretStatus().contains(
+                          ScoreDocument::tr("Plucked with %1").arg(QStringLiteral("i"))),
+                  "the plucking finger did not go on");
+            score_->setPluck(0);
+            check(score_->caretPluck() == 0, "the plucking finger did not come off");
+        }
         const QString status = score_->caretStatus();
         check(status.contains(ScoreDocument::tr("Wide vibrato")) &&
                   status.contains(ScoreDocument::tr("Marcato")) &&

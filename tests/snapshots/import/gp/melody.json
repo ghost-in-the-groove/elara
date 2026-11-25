@@ -71,6 +71,8 @@
             "string": 2,
             "fret": 1,
             "effects": {
+             "fingering": "index",
+             "pluck": "middle",
              "dynamic": "f"
             }
            }

@@ -2037,7 +2037,7 @@ private:
                             .onset = event.onset, .staff = event.staff, .dynamic = *dynamic});
                     }
                 } else if (name == "technical") {
-                    readTechnical(mark, event, fx, string, fret, bends);
+                    readTechnical(mark, event, fx, string, fret, bends, index);
                 } else if (name == "articulations") {
                     readArticulations(mark, fx, index);
                 } else if (name == "ornaments") {
@@ -2063,12 +2063,31 @@ private:
         }
     }
 
-    static void readTechnical(pugi::xml_node technical, Event& event, NoteEffects& fx,
-                              std::optional<int>& string, std::optional<int>& fret,
-                              std::vector<Bend>& bends) {
+    void readTechnical(pugi::xml_node technical, Event& event, NoteEffects& fx,
+                       std::optional<int>& string, std::optional<int>& fret,
+                       std::vector<Bend>& bends, std::size_t index) {
+        bool fingered = false; // a second fingering is a substitution or an alternative
+        bool plucked = false;
         for (pugi::xml_node mark : technical.children()) {
             const std::string_view name = mark.name();
-            if (name == "string") {
+            if (name == "fingering" || name == "pluck") { // ADR-0093
+                const std::string_view text = textView(mark);
+                const bool fingering = name == "fingering";
+                const std::optional<Finger> finger =
+                    fingering
+                        ? fingerOfText(text, layout_.instrument.kind == InstrumentKind::Fretted)
+                        : pluckOfText(text);
+                if (!finger || (fingering ? fingered : plucked)) {
+                    warn(fingering ? "fingerings other than one finger dropped"
+                                   : "plucking fingers other than p, i, m, a and c dropped",
+                         index);
+                } else if (fingering) {
+                    fx.fingering = *finger;
+                } else {
+                    fx.pluck = *finger;
+                }
+                (fingering ? fingered : plucked) = true;
+            } else if (name == "string") {
                 string = mark.text().as_int(0);
             } else if (name == "fret") {
                 fret = mark.text().as_int(-1);

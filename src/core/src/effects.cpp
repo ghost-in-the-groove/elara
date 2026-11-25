@@ -5,10 +5,59 @@
 #include <cmath>
 #include <cstdlib>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace elara::core {
+
+namespace {
+
+constexpr std::array<std::string_view, 6> kFingeringTexts{"", "1", "2", "3", "4", "5"};
+constexpr std::array<std::string_view, 6> kFrettingTexts{"", "T", "1", "2", "3", "4"};
+constexpr std::array<std::string_view, 6> kPluckTexts{"", "p", "i", "m", "a", "c"};
+
+std::size_t indexOf(Finger finger) noexcept {
+    return static_cast<std::size_t>(finger) % kFingeringTexts.size();
+}
+
+} // namespace
+
+std::string_view fingeringText(Finger finger, bool fretted) noexcept {
+    return (fretted ? kFrettingTexts : kFingeringTexts)[indexOf(finger)];
+}
+
+std::optional<Finger> fingerOfText(std::string_view text, bool fretted) noexcept {
+    if (text == "0") {
+        return Finger::None;
+    }
+    if (fretted && text == "t") {
+        return Finger::Thumb;
+    }
+    const auto& texts = fretted ? kFrettingTexts : kFingeringTexts;
+    for (std::size_t i = 1; i < texts.size(); ++i) {
+        if (texts[i] == text) {
+            return static_cast<Finger>(i);
+        }
+    }
+    return std::nullopt;
+}
+
+std::string_view pluckText(Finger finger) noexcept {
+    return kPluckTexts[indexOf(finger)];
+}
+
+std::optional<Finger> pluckOfText(std::string_view text) noexcept {
+    if (text == "e" || text == "x") {
+        return Finger::Little;
+    }
+    for (std::size_t i = 1; i < kPluckTexts.size(); ++i) {
+        if (kPluckTexts[i] == text) {
+            return static_cast<Finger>(i);
+        }
+    }
+    return std::nullopt;
+}
 
 BendCurve::BendCurve(std::vector<BendPoint> points) : points_(std::move(points)) {
     if (points_.size() > kMaxPoints) {

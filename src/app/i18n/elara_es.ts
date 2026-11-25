@@ -186,6 +186,14 @@
         <translation>Grupeto invertido</translation>
     </message>
     <message>
+        <source>Fingering: again for the next finger</source>
+        <translation>Digitación: otra vez para el dedo siguiente</translation>
+    </message>
+    <message>
+        <source>Plucking finger: again for the next one</source>
+        <translation>Dedo que pulsa: otra vez para el siguiente</translation>
+    </message>
+    <message>
         <source>Dynamics</source>
         <translation>Dinámicas</translation>
     </message>
@@ -1496,6 +1504,14 @@
         <translation>Cambiar adorno</translation>
     </message>
     <message>
+        <source>Change fingering</source>
+        <translation>Cambiar digitación</translation>
+    </message>
+    <message>
+        <source>Change plucking finger</source>
+        <translation>Cambiar dedo que pulsa</translation>
+    </message>
+    <message>
         <source>Change harmonic</source>
         <translation>Cambiar armónico</translation>
     </message>
@@ -1780,6 +1796,14 @@
     <message>
         <source>Inverted turn</source>
         <translation>Grupeto invertido</translation>
+    </message>
+    <message>
+        <source>Finger %1</source>
+        <translation>Dedo %1</translation>
+    </message>
+    <message>
+        <source>Plucked with %1</source>
+        <translation>Pulsada con %1</translation>
     </message>
     <message>
         <source>Strum down</source>

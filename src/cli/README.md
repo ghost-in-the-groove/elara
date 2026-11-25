@@ -229,6 +229,11 @@ the next step up in the key, a number that many semitones up (or down when
 negative, at most 12), at thirty-seconds unless a speed says otherwise
 (ADR-0090). `ornament <mordent|upper-mordent|turn|inverted-turn|none>` gives
 them a mordent or a turn (ADR-0091).
+`fingering <finger...>` gives the caret's notes their fingers, one for all or
+one per note from the lowest up: `1` to `5` from the thumb, or on a fretted
+staff `t` and `1` to `4` from the index, `none` for none; `pluck
+<p|i|m|a|c|none>` gives them the finger that plucks them on a fretted staff
+(ADR-0093).
 `pedal <down|change|none>` puts the caret's beat, a note or a rest, under the
 sustain pedal: beats under it in a row share a pedalling, and `change` lifts
 the pedal and presses it again where the beat starts (ADR-0092).

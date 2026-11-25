@@ -98,6 +98,7 @@ one that replaces them.
 | [0090](0090-trills.md) | Trills | Accepted |
 | [0091](0091-mordents-and-turns.md) | Mordents and turns | Accepted |
 | [0092](0092-pedal-marks.md) | Pedal marks | Accepted |
+| [0093](0093-fingerings.md) | Fingerings | Accepted |
 
 ## Template
 

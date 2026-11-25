@@ -44,6 +44,8 @@ constexpr std::array kHarmonicNames =
 constexpr std::array kVibratoNames = std::to_array<std::string_view>({"none", "slight", "wide"});
 constexpr std::array kOrnamentNames = std::to_array<std::string_view>(
     {"none", "mordent", "upper-mordent", "turn", "inverted-turn"}); // ADR-0091
+constexpr std::array kFingerNames = std::to_array<std::string_view>(
+    {"none", "thumb", "index", "middle", "ring", "little"}); // ADR-0093
 constexpr std::array kAccentNames = std::to_array<std::string_view>({"none", "accent", "marcato"});
 constexpr std::array kDynamicNames =
     std::to_array<std::string_view>({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"});
@@ -450,6 +452,8 @@ private:
         addFlag(object, "tenuto", fx.tenuto);
         addEnumIfNot(object, "accent", kAccentNames, fx.accent, Accent::None);
         addEnumIfNot(object, "ornament", kOrnamentNames, fx.ornament, Ornament::None);
+        addEnumIfNot(object, "fingering", kFingerNames, fx.fingering, Finger::None);
+        addEnumIfNot(object, "pluck", kFingerNames, fx.pluck, Finger::None);
         addEnumIfNot(object, "dynamic", kDynamicNames, fx.dynamic, Dynamic::MF);
         return object;
     }
@@ -1144,6 +1148,8 @@ private:
         fx.tenuto = flag(object, "tenuto");
         fx.accent = enumValue(object, "accent", kAccentNames, Accent::None);
         fx.ornament = enumValue(object, "ornament", kOrnamentNames, Ornament::None);
+        fx.fingering = enumValue(object, "fingering", kFingerNames, Finger::None);
+        fx.pluck = enumValue(object, "pluck", kFingerNames, Finger::None);
         fx.dynamic = enumValue(object, "dynamic", kDynamicNames, Dynamic::MF);
         return fx;
     }

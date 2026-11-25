@@ -453,6 +453,11 @@ private:
 
 // ---- Lyrics (ADR-0084) -----------------------------------------------------------------
 
+// Fingerings (ADR-0093).
+inline constexpr double kFingeringGap = 0.3;       // between a fingering and the ink by it
+inline constexpr double kFingeringStackGap = 0.15; // between fingerings one over the other
+inline constexpr double kFingeringLeftScale = 0.8; // of those left of the noteheads
+
 // The sustain pedal under a staff (ADR-0092).
 inline constexpr double kPedalLineGap = 0.3; // between "Ped." and its line
 inline constexpr double kPedalEndGap = 0.3;  // the line ends before the column where it comes up

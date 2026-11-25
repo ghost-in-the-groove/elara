@@ -14,6 +14,9 @@ using elara::core::BendCurve;
 using elara::core::BendPoint;
 using elara::core::Dynamic;
 using elara::core::dynamicVelocity;
+using elara::core::Finger;
+using elara::core::fingeringText;
+using elara::core::fingerOfText;
 using elara::core::Fraction;
 using elara::core::Harmonic;
 using elara::core::HarmonicKind;
@@ -27,6 +30,8 @@ using elara::core::Ottava;
 using elara::core::ottavaOctaves;
 using elara::core::Pedal;
 using elara::core::PickStroke;
+using elara::core::pluckOfText;
+using elara::core::pluckText;
 using elara::core::SlideIn;
 using elara::core::SlideOut;
 using elara::core::Trill;
@@ -226,6 +231,28 @@ TEST_CASE("Octave lines move the written notes one or two octaves", "[core][effe
     CHECK(effects.ottava == Ottava::QuindicesimaBassa);
     CHECK(effects.slur);
     CHECK(effects != BeatEffects{});
+}
+
+TEST_CASE("Fingerings are written from the thumb, or from the index on strings",
+          "[core][effects]") {
+    // ADR-0093.
+    CHECK(fingeringText(Finger::Thumb, false) == "1");
+    CHECK(fingeringText(Finger::Little, false) == "5");
+    CHECK(fingeringText(Finger::Thumb, true) == "T");
+    CHECK(fingeringText(Finger::Index, true) == "1");
+    CHECK(fingeringText(Finger::Little, true) == "4");
+    CHECK(fingeringText(Finger::None, true).empty());
+    CHECK(fingerOfText("1", false) == Finger::Thumb);
+    CHECK(fingerOfText("1", true) == Finger::Index);
+    CHECK(fingerOfText("t", true) == Finger::Thumb);
+    CHECK(fingerOfText("0", true) == Finger::None); // an open string
+    CHECK(fingerOfText("5", true) == std::nullopt);
+    CHECK(fingerOfText("T", false) == std::nullopt);
+    CHECK(fingerOfText("3-1", false) == std::nullopt);
+    CHECK(pluckText(Finger::Ring) == "a");
+    CHECK(pluckOfText("p") == Finger::Thumb);
+    CHECK(pluckOfText("x") == Finger::Little);
+    CHECK(pluckOfText("q") == std::nullopt);
 }
 
 TEST_CASE("A beat goes under the sustain pedal or changes it", "[core][effects]") {

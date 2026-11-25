@@ -542,6 +542,41 @@ set_tests_properties(cli.render_ottavas PROPERTIES
 add_test(NAME cli.edit_rejects_unknown_ottava
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "ottava 22ma")
 set_tests_properties(cli.edit_rejects_unknown_ottava PROPERTIES WILL_FAIL TRUE)
+# Fingerings at the caret (ADR-0093): a piano's C-E-G fingered 1 3 5, drawn
+# over the notes; a guitar's note fretted with the ring finger and plucked
+# with i, the fingering small left of the notehead and i over it.
+set(ELARA_CLI_FINGERINGS "${CMAKE_CURRENT_BINARY_DIR}/cli-fingerings.elara")
+add_test(NAME cli.edit_sets_fingerings
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_FINGERINGS}" "add-track piano"
+    "append-measures 1" "pitch C" "pitch E add" "pitch G add" "fingering 1 3 5")
+set_tests_properties(cli.edit_sets_fingerings PROPERTIES
+  FIXTURES_SETUP cli_fingerings
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change fingering\"}")
+add_test(NAME cli.dump_fingerings COMMAND elara-cli --json dump "${ELARA_CLI_FINGERINGS}")
+set_tests_properties(cli.dump_fingerings PROPERTIES
+  FIXTURES_REQUIRED cli_fingerings
+  PASS_REGULAR_EXPRESSION "\"fingering\":\"little\".*\"fingering\":\"middle\".*\"fingering\":\"thumb\"")
+add_test(NAME cli.render_fingerings COMMAND elara-cli --json render "${ELARA_CLI_FINGERINGS}")
+set_tests_properties(cli.render_fingerings PROPERTIES
+  FIXTURES_REQUIRED cli_fingerings
+  PASS_REGULAR_EXPRESSION "\"fingering\":3[,}]")
+set(ELARA_CLI_PLUCKS "${CMAKE_CURRENT_BINARY_DIR}/cli-plucks.elara")
+add_test(NAME cli.edit_sets_plucks
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_PLUCKS}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 5" "fret 3" "fingering 3" "pluck i")
+set_tests_properties(cli.edit_sets_plucks PROPERTIES
+  FIXTURES_SETUP cli_plucks
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change plucking finger\"}")
+add_test(NAME cli.render_plucks COMMAND elara-cli --json render "${ELARA_CLI_PLUCKS}")
+set_tests_properties(cli.render_plucks PROPERTIES
+  FIXTURES_REQUIRED cli_plucks
+  PASS_REGULAR_EXPRESSION "\"fingering\":2[,}]")
+add_test(NAME cli.edit_rejects_a_sixth_finger
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fingering 6")
+set_tests_properties(cli.edit_rejects_a_sixth_finger PROPERTIES WILL_FAIL TRUE)
+add_test(NAME cli.edit_rejects_pluck_without_strings
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "pluck i")
+set_tests_properties(cli.edit_rejects_pluck_without_strings PROPERTIES WILL_FAIL TRUE)
 # The sustain pedal at the caret (ADR-0092): down on the C, the D and a rest,
 # changed on the E. Drawn as "Ped.", its line broken by the notch, and the hook.
 set(ELARA_CLI_PEDALS "${CMAKE_CURRENT_BINARY_DIR}/cli-pedals.elara")
@@ -1061,7 +1096,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":125,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":136,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES
@@ -1093,21 +1128,21 @@ set_tests_properties(cli.render_drums PROPERTIES
 add_test(NAME cli.render_grand_staff
   COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/piano-voices.musicxml" --tracks 0)
 set_tests_properties(cli.render_grand_staff PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0,\"hairpin\":0,\"chord\":1,\"beatText\":1,\"lyric\":1,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
+  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0,\"hairpin\":0,\"chord\":1,\"beatText\":1,\"lyric\":1,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
 
 # A strummed piano chord is rolled: an arpeggio line left of it on each staff
 # of the grand staff, not an arrow above (ADR-0076).
 add_test(NAME cli.render_arpeggio
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/piano.gp5" --tracks 0 --count 1)
 set_tests_properties(cli.render_arpeggio PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0\}.*\"role\":\"arpeggio\"")
+  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0\}.*\"role\":\"arpeggio\"")
 
 # Hairpins are wedges under the staff (ADR-0078): the crescendo of bar 1 and the
 # diminuendo of bar 3 of the guitar techniques, two lines each.
 add_test(NAME cli.render_hairpins
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_hairpins PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0\}.*\"role\":\"hairpin\",\"measure\":0,.*\"role\":\"hairpin\",\"measure\":2,")
+  PASS_REGULAR_EXPRESSION "\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0\}.*\"role\":\"hairpin\",\"measure\":0,.*\"role\":\"hairpin\",\"measure\":2,")
 
 add_test(NAME cli.render_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --first 2 --count 1
@@ -1134,7 +1169,7 @@ set_tests_properties(cli.render_tab PROPERTIES
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":12,.*\"rest\":1,\"fretNumber\":12,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":12,.*\"rest\":1,\"fretNumber\":12,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -1294,12 +1329,12 @@ set_tests_properties(cli.sequence_double_coda PROPERTIES
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")
 set_tests_properties(cli.render_navigation PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0}")
+  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0}")
 # Sections drawn boxed above everything (ADR-0063): two names, four sides each.
 add_test(NAME cli.render_sections
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/double-coda.gp")
 set_tests_properties(cli.render_sections PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0}")
+  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0,\"octaveLine\":0,\"ornament\":0,\"pedal\":0,\"fingering\":0}")
 # ... and kept on the way to MusicXML: saved, exported, read back.
 set(ELARA_CLI_DOUBLE_CODA "${CMAKE_CURRENT_BINARY_DIR}/cli-double-coda")
 add_test(NAME cli.import_double_coda COMMAND elara-cli import "${ELARA_CORPUS}/gp/double-coda.gp"

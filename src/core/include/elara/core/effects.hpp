@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace elara::core {
@@ -113,6 +114,24 @@ struct Harmonic {
 /// the note from above (above, note, below, note), an inverted turn from below.
 enum class Ornament : std::uint8_t { None, Mordent, UpperMordent, Turn, InvertedTurn };
 
+/// A finger of a hand (ADR-0093). Written 1 to 5 from the thumb on keyboards
+/// and most instruments; on a fretted one, T and 1 to 4 from the index for the
+/// hand that frets, and p, i, m, a, c for the hand that plucks.
+enum class Finger : std::uint8_t { None, Thumb, Index, Middle, Ring, Little };
+
+/// How a fingering is written: "1" to "5" from the thumb, or on a fretted
+/// instrument "T" and "1" to "4" from the index; "" for none.
+[[nodiscard]] std::string_view fingeringText(Finger finger, bool fretted) noexcept;
+/// The finger a written fingering names, as fingeringText() writes it (a
+/// lowercase "t" too); Finger::None for "0", an open string; nullopt for
+/// anything else.
+[[nodiscard]] std::optional<Finger> fingerOfText(std::string_view text, bool fretted) noexcept;
+/// The letter of a plucking finger: "p", "i", "m", "a", "c"; "" for none.
+[[nodiscard]] std::string_view pluckText(Finger finger) noexcept;
+/// The plucking finger of a letter, as pluckText() writes it ("e" and "x" for
+/// the little finger too); nullopt for anything else.
+[[nodiscard]] std::optional<Finger> pluckOfText(std::string_view text) noexcept;
+
 /// The quick notes an ornament starts its note with, as steps of the key from
 /// the note (+1 the step above, -1 the step below, 0 the note); the note
 /// itself follows them for the rest of its length.
@@ -186,6 +205,8 @@ struct NoteEffects {
     Accent accent = Accent::None;
     Dynamic dynamic = Dynamic::MF;
     Ornament ornament = Ornament::None; // ADR-0091
+    Finger fingering = Finger::None;    // the finger that plays it (ADR-0093)
+    Finger pluck = Finger::None;        // the one that plucks it, on strings
 
     friend bool operator==(const NoteEffects&, const NoteEffects&) = default;
 };

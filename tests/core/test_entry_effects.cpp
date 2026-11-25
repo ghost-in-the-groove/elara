@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -379,6 +380,45 @@ TEST_CASE("Effects: a trill to the next step of the key, each note of a chord it
     CHECK(!onString(guitar.song(), 0, 0, 3).effects.trill.isTrill());
     // A rest has none to trill.
     CHECK(setTrillToNextStep(guitar.song(), at(0, 2), NoteValue::ThirtySecond).command == nullptr);
+}
+
+TEST_CASE("Effects: fingers for the notes of a chord from the lowest up, or one for all",
+          "[core][entry][effects]") {
+    // ADR-0093: C4 E4 G4 written as a chord from the top, fingered 1 3 5.
+    Document doc(
+        oneBeat("piano", {Note{.pitch = *Pitch::parse("G4")}, Note{.pitch = *Pitch::parse("C4")},
+                          Note{.pitch = *Pitch::parse("E4")}}));
+    const std::array chord{Finger::Thumb, Finger::Middle, Finger::Little};
+    run(doc, setFingering(doc.song(), at(0, 0), chord));
+    CHECK(doc.undoName() == "Change fingering");
+    CHECK(notesAt(doc.song(), 0, 0)[0].effects.fingering == Finger::Little); // G4
+    CHECK(notesAt(doc.song(), 0, 0)[1].effects.fingering == Finger::Thumb);  // C4
+    CHECK(notesAt(doc.song(), 0, 0)[2].effects.fingering == Finger::Middle); // E4
+    CHECK(setFingering(doc.song(), at(0, 0), chord).command == nullptr);
+    // One finger for all of them; none takes them off.
+    const std::array none{Finger::None};
+    run(doc, setFingering(doc.song(), at(0, 0), none));
+    CHECK(std::ranges::all_of(notesAt(doc.song(), 0, 0), [](const Note& note) {
+        return note.effects.fingering == Finger::None;
+    }));
+    const std::array two{Finger::Index, Finger::Ring};
+    CHECK_THROWS_AS(setFingering(doc.song(), at(0, 0), two), std::invalid_argument);
+    CHECK_THROWS_AS(setFingering(doc.song(), at(0, 0), std::span<const Finger>{}),
+                    std::invalid_argument);
+    CHECK_THROWS_AS(setPluck(doc.song(), at(0, 0), Finger::Index), std::logic_error);
+
+    // On a fretted staff the note on the caret's string, fretted and plucked.
+    Document guitar(guitarSong());
+    const std::array ring{Finger::Ring};
+    run(guitar, setFingering(guitar.song(), at(0, 0, 3), ring));
+    run(guitar, setPluck(guitar.song(), at(0, 0, 3), Finger::Middle));
+    CHECK(guitar.undoName() == "Change plucking finger");
+    CHECK(onString(guitar.song(), 0, 0, 3).effects.fingering == Finger::Ring);
+    CHECK(onString(guitar.song(), 0, 0, 3).effects.pluck == Finger::Middle);
+    CHECK(onString(guitar.song(), 0, 0, 2).effects == NoteEffects{});
+    CHECK(noteEffectsAt(guitar.song(), at(0, 0, 3)).pluck == Finger::Middle);
+    // A rest has nothing to finger.
+    CHECK(setFingering(guitar.song(), at(0, 2), ring).command == nullptr);
 }
 
 TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the caret's notes",
