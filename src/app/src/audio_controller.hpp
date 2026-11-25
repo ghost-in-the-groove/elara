@@ -51,6 +51,9 @@ class AudioController : public QObject {
     Q_PROPERTY(bool rememberSound MEMBER rememberSound_ NOTIFY rememberSoundChanged)
     // The SoundFont that comes with Elara, empty for none (ADR-0069).
     Q_PROPERTY(QString includedSoundFont READ includedSoundFont CONSTANT)
+    // The guitar SFZ instrument that comes with Elara, empty for none
+    // (ADR-0072).
+    Q_PROPERTY(QString includedGuitarSfz READ includedGuitarSfz CONSTANT)
 
 public:
     explicit AudioController(QObject* parent = nullptr);
@@ -113,6 +116,9 @@ public:
     /// The SoundFont that comes with Elara's packages, which the tracks play
     /// through until another sound is chosen; empty when there is none.
     [[nodiscard]] QString includedSoundFont() const { return includedSoundFont_; }
+    /// The guitar SFZ instrument that comes with Elara's packages, which the
+    /// guitars play through once chosen; empty when there is none.
+    [[nodiscard]] QString includedGuitarSfz() const { return includedGuitarSfz_; }
     /// True while a SoundFont or an SFZ instrument opens.
     [[nodiscard]] bool loadingSoundFont() const { return loading_ > 0; }
     /// Opens the SoundFont at `file` (a path or a file URL) on a worker; once
@@ -201,6 +207,7 @@ private:
     SoundPart guitars_;
     SoundPart basses_;
     QString includedSoundFont_;
+    QString includedGuitarSfz_;
     int loading_ = 0; // SoundFonts and SFZ instruments opening
     bool rememberSound_ = false;
     QString deviceDescription_;

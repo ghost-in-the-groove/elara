@@ -171,6 +171,11 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption includedSoundFontOption(
         QStringLiteral("included-soundfont"),
         QCoreApplication::translate("main", "Play through the SoundFont that comes with Elara."));
+    const QCommandLineOption includedGuitarSfzOption(
+        QStringLiteral("included-guitar-sfz"),
+        QCoreApplication::translate("main",
+                                    "Play the guitars through the SFZ instrument that comes with "
+                                    "Elara."));
     const QCommandLineOption guitarSfzOption(
         QStringLiteral("guitar-sfz"),
         QCoreApplication::translate("main", "Play the guitars through this SFZ instrument."),
@@ -182,7 +187,7 @@ int main(int argc, char* argv[]) {
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
                        songPaneOption, measureOption, effectsOption, tuningOption, continuousOption,
                        languageOption, soundFontOption, includedSoundFontOption, guitarSfzOption,
-                       bassSfzOption});
+                       includedGuitarSfzOption, bassSfzOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -237,6 +242,14 @@ int main(int argc, char* argv[]) {
     }
     if (parser.isSet(guitarSfzOption)) {
         options.guitarSfz = QDir::current().absoluteFilePath(parser.value(guitarSfzOption));
+    }
+    if (parser.isSet(includedGuitarSfzOption)) {
+        options.guitarSfz = elara::app::includedGuitarSfz(QCoreApplication::applicationDirPath());
+        if (options.guitarSfz.isEmpty()) {
+            std::fprintf(stderr,
+                         "elara: no guitar SFZ instrument comes with this build of Elara\n");
+            return EXIT_FAILURE;
+        }
     }
     if (parser.isSet(bassSfzOption)) {
         options.bassSfz = QDir::current().absoluteFilePath(parser.value(bassSfzOption));

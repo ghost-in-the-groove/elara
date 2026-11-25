@@ -90,7 +90,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         General), kept for the next start, `--soundfont FILE`
   - [x] MuseScore General in the packages, played until another sound is
         chosen, `--included-soundfont` (ADR-0069)
-- [ ] SFZ instruments and a guitar SFZ library
+- [x] SFZ instruments and a guitar SFZ library
   - [x] SFZ instruments through Elara's own sampler, each note bent on its own:
         `elara-cli sfz`, `render-audio`/`play --sfz` (ADR-0066)
   - [x] SFZ instruments for the guitars and the basses: chosen in the app and
@@ -101,6 +101,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         palm mutes, dead notes and harmonics, found by name (ADR-0068)
   - [x] A library's legato samples for hammer-ons and pull-offs: a keyswitch
         named for legato or `trigger=legato` regions (ADR-0070)
+  - [x] A clean electric guitar SFZ (FreePats, CC0) in the packages: "Use the
+        included guitar" and `--included-guitar-sfz` (ADR-0072)
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics, strums, tremolo picking; ADR-0022, ADR-0023, ADR-0025)
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)

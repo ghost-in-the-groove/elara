@@ -21,7 +21,8 @@
 
 AudioController::AudioController(QObject* parent)
     : QObject(parent),
-      includedSoundFont_(elara::app::includedSoundFont(QCoreApplication::applicationDirPath())) {
+      includedSoundFont_(elara::app::includedSoundFont(QCoreApplication::applicationDirPath())),
+      includedGuitarSfz_(elara::app::includedGuitarSfz(QCoreApplication::applicationDirPath())) {
     using namespace std::chrono_literals;
     pollTimer_.setInterval(50ms);
     connect(&pollTimer_, &QTimer::timeout, this, &AudioController::pollPlayback);

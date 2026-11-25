@@ -217,6 +217,41 @@ if(TARGET elara)
     TIMEOUT 60
     PASS_REGULAR_EXPRESSION "sfz: guitars none, basses test-guitar[\r\n]+sounds: test-guitar, piano, drums, wind[\r\n]+(.*[\r\n]+)?smoke-test: ok")
 
+  # The guitar SFZ instrument that comes with the packages (ADR-0072), where
+  # they put it around the app: the CLI tests' SFZ folder, there for this test
+  # alone, whose first instrument by name is test-flac.
+  if(APPLE)
+    set(_included_sfz "$<TARGET_BUNDLE_CONTENT_DIR:elara>/Resources/sfz")
+  else()
+    set(_included_sfz "$<TARGET_FILE_DIR:elara>/../share/elara/sfz")
+  endif()
+  add_test(NAME app.included_guitar_sfz_put
+    COMMAND "${CMAKE_COMMAND}" "-DFROM=${CMAKE_CURRENT_BINARY_DIR}/cli/test-sfz"
+      "-DTO=${_included_sfz}" -P "${CMAKE_CURRENT_SOURCE_DIR}/app/included_soundfont.cmake")
+  add_test(NAME app.included_guitar_sfz_remove
+    COMMAND "${CMAKE_COMMAND}" "-DTO=${_included_sfz}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/app/included_soundfont.cmake")
+  # Before the instrument is put there, the option fails with a message.
+  set_tests_properties(app.included_guitar_sfz_put PROPERTIES
+    FIXTURES_REQUIRED cli_sfz FIXTURES_SETUP app_included_guitar_sfz
+    DEPENDS app.included_guitar_sfz_none)
+  set_tests_properties(app.included_guitar_sfz_remove PROPERTIES
+    FIXTURES_CLEANUP app_included_guitar_sfz)
+  add_test(NAME app.smoke_included_guitar_sfz
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp"
+      --included-guitar-sfz)
+  set_tests_properties(app.smoke_included_guitar_sfz PROPERTIES
+    FIXTURES_REQUIRED app_included_guitar_sfz
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60
+    PASS_REGULAR_EXPRESSION "sfz: guitars test-flac, basses none[\r\n]+sounds: test-flac[\r\n]+(.*[\r\n]+)?smoke-test: ok")
+  add_test(NAME app.included_guitar_sfz_none COMMAND elara --included-guitar-sfz)
+  set_tests_properties(app.included_guitar_sfz_none PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    PASS_REGULAR_EXPRESSION "no guitar SFZ instrument comes with this build of Elara")
+
   # A song of several pages: the notes typed on the first page leave the others
   # as they were, so those keep their textures instead of being painted again.
   set(ELARA_APP_LONG_SONG "${CMAKE_CURRENT_BINARY_DIR}/app-long-song.elara")
