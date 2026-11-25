@@ -284,6 +284,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Spanish and English translations (Qt Linguist, ADR-0030)
 - [x] Unsaved changes kept through a crash: a copy written a few seconds after
       each change, offered back at the next start (ADR-0106)
+- [x] Saving and PDF export on workers: the window goes on while they are
+      written, and edits made meanwhile stay unsaved (ADR-0107)
 
 ## Milestone 6 - Practice tools
 

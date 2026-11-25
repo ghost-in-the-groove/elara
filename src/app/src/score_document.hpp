@@ -22,6 +22,7 @@
 #include <QSizeF>
 #include <QString>
 #include <QStringList>
+#include <QThreadPool>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantList>
@@ -92,6 +93,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QString redoName READ redoName NOTIFY historyChanged)
     Q_PROPERTY(bool modified READ modified NOTIFY historyChanged)
     Q_PROPERTY(bool savesInPlace READ savesInPlace NOTIFY sourceChanged)
+    Q_PROPERTY(bool saving READ saving NOTIFY savingChanged)
     /// Where the song is copied while it has unsaved changes (ADR-0106); no
     /// copies are written while it is empty.
     Q_PROPERTY(QString recoveryFolder READ recoveryFolder WRITE setRecoveryFolder NOTIFY
@@ -415,15 +417,21 @@ public:
     [[nodiscard]] std::span<const core::TrackMix> previewMixes() const { return previewMixes_; }
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
-    /// Saves the song as a .elara file (the extension is added when missing).
-    /// Returns false, and reports why through editFailed(), when it cannot.
-    Q_INVOKABLE bool save(const QUrl& file);
+    /// Saves the song as a .elara file (the extension is added when missing)
+    /// on a worker, so that the window goes on while it is written
+    /// (ADR-0107). The state saved is the one the song is in now: edits made
+    /// while it is written stay unsaved. saveFinished() follows, after
+    /// editFailed() with the reason when it could not be saved. Saves are
+    /// written one after the other, in the order asked.
+    Q_INVOKABLE void save(const QUrl& file);
+    /// Whether a save is being written.
+    [[nodiscard]] bool saving() const noexcept { return saving_ > 0; }
     /// Writes the song as the score shows it (its track or all of them, in its
     /// view) on A4 pages to `file`, a PDF document (".pdf" is added when
     /// missing; ADR-0074). The pages are laid out again, so the continuous
-    /// view prints as pages too. Returns false, and reports why through
-    /// editFailed(), when it cannot.
-    Q_INVOKABLE bool exportPdf(const QUrl& file);
+    /// view prints as pages too. Laid out and written on a worker (ADR-0107);
+    /// exportFinished() follows, after notice() or editFailed().
+    Q_INVOKABLE void exportPdf(const QUrl& file);
     /// Writes the song as MusicXML to `file`: compressed for ".mxl", text for
     /// ".musicxml" or ".xml" (".musicxml" is added when it has none of them).
     /// Then report() tells what MusicXML left out. Returns false, and reports
@@ -767,6 +775,11 @@ signals:
     void recoveryFolderChanged();
     /// The recovery copy of the song is on the disk.
     void recoveryWritten();
+    void savingChanged();
+    /// A save() is done: `saved` tells whether `file` holds the song now.
+    void saveFinished(const QUrl& file, bool saved);
+    /// An export on a worker is done: `written` tells whether `file` was.
+    void exportFinished(const QString& file, bool written);
 
 private:
     /// Opens `file`, recovered from `recovered` when it is a recovery copy.
@@ -856,7 +869,13 @@ private:
     QTimer recoveryTimer_;                           ///< writes the copy when it fires
     std::shared_ptr<const core::Song> recoverySong_; ///< the song the copy holds or will
     bool recoveryWriting_ = false;                   ///< a write is running on a worker
-    QString recoveredFrom_; ///< a recovered copy, to discard once this run's is written
+    QString recoveredFrom_;       ///< a recovered copy, to discard once this run's is written
+    std::uint64_t documents_ = 0; ///< documents opened or made so far: a save knows its own
+    int saving_ = 0;              ///< saves being written
+    /// Saves run here, one at a time and in order; exports, one at a time, in
+    /// the other. Destroyed with the document after the jobs left in them.
+    QThreadPool saveQueue_;
+    QThreadPool exportQueue_;
 };
 
 } // namespace elara::app

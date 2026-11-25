@@ -490,6 +490,8 @@ ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {
     recoveryTimer_.setInterval(kRecoveryMilliseconds);
     connect(&recoveryTimer_, &QTimer::timeout, this, &ScoreDocument::writeRecovery);
     connect(this, &ScoreDocument::historyChanged, this, &ScoreDocument::keepRecovery);
+    saveQueue_.setMaxThreadCount(1);
+    exportQueue_.setMaxThreadCount(1);
 }
 
 ScoreDocument::~ScoreDocument() {
@@ -872,6 +874,7 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         ++sequenceGeneration_;
         sequencing_.reset();
         document_.emplace(*layout.song);
+        ++documents_;
         caret_ = core::Caret{.track = static_cast<std::size_t>(std::max(0, layout.track))};
         pendingDigit_ = -1;
         setInput(core::Duration{});
@@ -1115,6 +1118,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     ++sequenceGeneration_; // nor an edit's sequence still being built
     sequencing_.reset();
     document_.emplace(std::move(song));
+    ++documents_;
     song_ = std::make_shared<const core::Song>(document_->song());
     sequence_ = std::make_shared<const audio::Sequence>(*song_, practice_);
     sequenceSong_ = song_;
@@ -1526,29 +1530,54 @@ void ScoreDocument::redo() {
     }
 }
 
-bool ScoreDocument::save(const QUrl& file) {
-    if (!document_) {
-        return false;
+void ScoreDocument::save(const QUrl& file) {
+    if (!document_ || !song_) {
+        emit saveFinished(file, false);
+        return;
     }
     QString local = file.isLocalFile() ? file.toLocalFile() : file.toString();
     if (!local.endsWith(QStringLiteral(".elara"), Qt::CaseInsensitive)) {
         local += QStringLiteral(".elara");
     }
-    try {
-        io::saveNative(document_->song(), std::filesystem::path(local.toStdU16String()));
-    } catch (const std::exception& error) {
-        emit editFailed(tr("Could not save %1: %2").arg(local, qstring(error.what())));
-        return false;
+    if (saving_++ == 0) {
+        emit savingChanged();
     }
-    document_->markSaved();
-    const QUrl saved = QUrl::fromLocalFile(local);
-    if (saved != source_) {
-        source_ = saved;
-        emit sourceChanged();
-        emit songChanged(); // an untitled song is named after its file
-    }
-    emit historyChanged();
-    return true;
+    // The song shown is the song edited (edited()), shared with the worker
+    // instead of copied.
+    whenDone(QtConcurrent::run(&saveQueue_,
+                               [song = song_, local] {
+                                   try {
+                                       io::saveNative(
+                                           *song, std::filesystem::path(local.toStdU16String()));
+                                   } catch (const std::exception& error) {
+                                       return qstring(error.what());
+                                   }
+                                   return QString();
+                               }),
+             this,
+             [this, local, revision = document_->revision(),
+              document = documents_](const QString& error) {
+                 if (--saving_ == 0) {
+                     emit savingChanged();
+                 }
+                 const QUrl saved = QUrl::fromLocalFile(local);
+                 if (!error.isEmpty()) {
+                     emit editFailed(tr("Could not save %1: %2").arg(local, error));
+                     emit saveFinished(saved, false);
+                     return;
+                 }
+                 // Unless another song replaced the one saved meanwhile.
+                 if (document == documents_) {
+                     document_->markSaved(revision);
+                     if (saved != source_) {
+                         source_ = saved;
+                         emit sourceChanged();
+                         emit songChanged(); // an untitled song is named after its file
+                     }
+                     emit historyChanged();
+                 }
+                 emit saveFinished(saved, true);
+             });
 }
 
 QUrl ScoreDocument::exportFile(const QString& extension) const {
@@ -1641,42 +1670,56 @@ bool ScoreDocument::writeExport(const QString& local, const io::ExportResult& re
     return true;
 }
 
-bool ScoreDocument::exportPdf(const QUrl& file) {
-    if (!song_) {
-        return false;
-    }
+void ScoreDocument::exportPdf(const QUrl& file) {
     QString local = file.isLocalFile() ? file.toLocalFile() : file.toString();
     if (!local.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive)) {
         local += QStringLiteral(".pdf");
+    }
+    if (!song_) {
+        emit exportFinished(local, false);
+        return;
     }
     const notation::EngravingFont* font = musicMetrics();
     const notation::FontOutlines* outlines = musicOutlines();
     if (font == nullptr || outlines == nullptr) {
         emit editFailed(tr("Could not export %1: %2").arg(local, tr("The music font is missing.")));
-        return false;
+        emit exportFinished(local, false);
+        return;
     }
-    std::string pdf;
-    try {
-        const auto staves =
-            notation::selectTracks(*song_, shownTracks(*song_, track_), trackView(view_));
-        const auto pages = notation::layoutPages(*song_, staves, *font, pageOptions());
-        pdf = notation::toPdf(pages, *outlines,
-                              {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
-                               .title = song_->info().title,
-                               .compress = io::zlibCompress});
-    } catch (const std::exception& error) {
-        emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
-        return false;
-    }
-    // Written whole or not at all: a failed export leaves no half file behind.
-    QSaveFile out(local);
-    const auto size = static_cast<qint64>(pdf.size());
-    if (!out.open(QIODevice::WriteOnly) || out.write(pdf.data(), size) != size || !out.commit()) {
-        emit editFailed(tr("Could not export %1: %2").arg(local, out.errorString()));
-        return false;
-    }
-    emit notice(tr("Exported %1.").arg(QFileInfo(local).fileName()));
-    return true;
+    whenDone(
+        QtConcurrent::run(&exportQueue_,
+                          [song = song_, tracks = shownTracks(*song_, track_),
+                           view = trackView(view_), font, outlines, local] {
+                              std::string pdf;
+                              try {
+                                  const auto staves = notation::selectTracks(*song, tracks, view);
+                                  const auto pages =
+                                      notation::layoutPages(*song, staves, *font, pageOptions());
+                                  pdf = notation::toPdf(pages, *outlines,
+                                                        {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
+                                                         .title = song->info().title,
+                                                         .compress = io::zlibCompress});
+                              } catch (const std::exception& error) {
+                                  return qstring(error.what());
+                              }
+                              // Written whole or not at all: a failed export leaves no half
+                              // file behind.
+                              QSaveFile out(local);
+                              const auto size = static_cast<qint64>(pdf.size());
+                              if (!out.open(QIODevice::WriteOnly) ||
+                                  out.write(pdf.data(), size) != size || !out.commit()) {
+                                  return out.errorString();
+                              }
+                              return QString();
+                          }),
+        this, [this, local](const QString& error) {
+            if (error.isEmpty()) {
+                emit notice(tr("Exported %1.").arg(QFileInfo(local).fileName()));
+            } else {
+                emit editFailed(tr("Could not export %1: %2").arg(local, error));
+            }
+            emit exportFinished(local, error.isEmpty());
+        });
 }
 
 bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {

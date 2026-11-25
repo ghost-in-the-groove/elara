@@ -8,6 +8,7 @@
 #include <QPointer>
 #include <QQuickWindow>
 #include <QString>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QUrl>
 
@@ -91,6 +92,7 @@ private:
     void queueSoundFont();
     void queueSfz();
     void queueRecoveryCopy();
+    void queueSave();
     void queueCrashAfterRecoveryCopy();
     void queueRecover();
     [[nodiscard]] QString overlappingBars() const;
@@ -118,31 +120,34 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
-    QPointer<QObject> effectsPanel_; ///< the note effects panel, watched for `--effects`
-    bool effectsOpened_ = false;     ///< whether it has opened
-    QPointer<QObject> trackRow_;     ///< a row of the song panel, which a mix change keeps
-    QVariantMap tuningBefore_;       ///< the first track's tuning before it changed
-    QVariantMap repeatsBefore_;      ///< the first measure's repeats before queueRepeats()
-    QVariantMap tempoBefore_;        ///< the second measure's tempo before it changed
-    QString sectionBefore_;          ///< the first measure's section before it changed
-    QString editProblem_;            ///< the first edit check that failed
-    QString failure_;                ///< set by a step that went wrong
-    bool entering_ = false;          ///< whether the shown track takes frets
-    bool tupleting_ = false;         ///< whether the tuplet steps run
-    int measuresBefore_ = 0;         ///< measures when the measure edits start
-    int firstNumerator_ = 0;         ///< the first time signature then
-    double positionBefore_ = 0.0;    ///< playback's position before an edit
-    bool pitching_ = false;          ///< whether the caret takes note names
-    int typedMidi_ = -1;             ///< the note name typed, as a MIDI number
-    bool voicing_ = false;           ///< whether the voice steps run
-    bool drumming_ = false;          ///< whether the drum steps run
-    bool selecting_ = false;         ///< whether the selection steps run
-    int lengthBefore_ = 0;           ///< the song's length before pasting
-    int pasteAt_ = 0;                ///< the measure pasted at
-    bool effecting_ = false;         ///< whether the note effect steps run
-    int effectsBefore_ = 0;          ///< the caret's effects before they were toggled
-    int pagesBefore_ = 0;            ///< pages before the continuous view was shown
-    bool recoveryWritten_ = false;   ///< ScoreDocument::recoveryWritten() came
+    QPointer<QObject> effectsPanel_;       ///< the note effects panel, watched for `--effects`
+    bool effectsOpened_ = false;           ///< whether it has opened
+    QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
+    QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
+    QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()
+    QVariantMap tempoBefore_;              ///< the second measure's tempo before it changed
+    QString sectionBefore_;                ///< the first measure's section before it changed
+    QString editProblem_;                  ///< the first edit check that failed
+    QString failure_;                      ///< set by a step that went wrong
+    bool entering_ = false;                ///< whether the shown track takes frets
+    bool tupleting_ = false;               ///< whether the tuplet steps run
+    int measuresBefore_ = 0;               ///< measures when the measure edits start
+    int firstNumerator_ = 0;               ///< the first time signature then
+    double positionBefore_ = 0.0;          ///< playback's position before an edit
+    bool pitching_ = false;                ///< whether the caret takes note names
+    int typedMidi_ = -1;                   ///< the note name typed, as a MIDI number
+    bool voicing_ = false;                 ///< whether the voice steps run
+    bool drumming_ = false;                ///< whether the drum steps run
+    bool selecting_ = false;               ///< whether the selection steps run
+    int lengthBefore_ = 0;                 ///< the song's length before pasting
+    int pasteAt_ = 0;                      ///< the measure pasted at
+    bool effecting_ = false;               ///< whether the note effect steps run
+    int effectsBefore_ = 0;                ///< the caret's effects before they were toggled
+    int pagesBefore_ = 0;                  ///< pages before the continuous view was shown
+    bool recoveryWritten_ = false;         ///< ScoreDocument::recoveryWritten() came
+    std::optional<QTemporaryDir> scratch_; ///< where checks save and export, made once
+    std::optional<bool> saved_;            ///< what ScoreDocument::saveFinished() last said
+    std::optional<bool> exported_;         ///< what ScoreDocument::exportFinished() last said
 };
 
 } // namespace elara::app

@@ -112,6 +112,7 @@ one that replaces them.
 | [0104](0104-triplet-feel.md) | Triplet feel | Accepted |
 | [0105](0105-sanitizers.md) | Sanitizers | Accepted |
 | [0106](0106-recovery-copies.md) | Recovery copies | Accepted |
+| [0107](0107-saving-on-workers.md) | Saving and PDF export on workers | Accepted |
 
 ## Template
 
