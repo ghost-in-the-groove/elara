@@ -40,6 +40,16 @@ public:
     /// key, in a straight line over `seconds` (at once for 0), as Synth::glide.
     virtual void glide(int key, double cents, double seconds) noexcept = 0;
 
+    /// Sounds the note `cents` above `key` on the string of the notes still
+    /// holding `key`, without picking it: a hammer-on, a pull-off or the end
+    /// of a legato slide, at `velocity` (ADR-0070). The note keeps answering
+    /// to `key`: later glides are from the key, and noteOff(key) releases it.
+    /// A sound with no samples of its own for it moves the notes there at
+    /// once, as glide(key, cents, 0) does.
+    virtual void legato(int key, double cents, [[maybe_unused]] int velocity) noexcept {
+        glide(key, cents, 0.0);
+    }
+
     /// Releases every note.
     virtual void releaseAll() noexcept = 0;
 

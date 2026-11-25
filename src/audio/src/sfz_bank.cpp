@@ -113,6 +113,7 @@ struct Voice {
     double baseStep = 0.0; ///< ...with no glide
     bool periodic = false; ///< a generator: its frames repeat both ways
     double centsTarget = 0.0;
+    double offset = 0.0;     ///< cents it sounds above the key it answers to (a joined note)
     double stepFactor = 1.0; ///< a glide multiplies the step by this each frame
     std::int64_t glide = 0;  ///< frames of glide left
     float gain = 0.0f;
@@ -134,9 +135,9 @@ struct Voice {
 
 class SfzSound final : public TrackSound {
 public:
-    SfzSound(std::shared_ptr<const SfzData> data, double sampleRate)
-        : data_(std::move(data)), rate_(sampleRate), sequence_(data_->program.regions.size(), 0),
-          switch_(data_->defaultSwitch) {
+    SfzSound(std::shared_ptr<const SfzData> data, double sampleRate, bool fretted)
+        : data_(std::move(data)), rate_(sampleRate), fretted_(fretted),
+          sequence_(data_->program.regions.size(), 0), switch_(data_->defaultSwitch) {
         for (std::size_t cc = 0; cc < cc_.size(); ++cc) {
             cc_[cc] = data_->program.ccDefaults[cc];
         }
@@ -200,19 +201,49 @@ public:
             if (voice.stage == Stage::Off || voice.key != key || !voice.held) {
                 continue;
             }
-            voice.centsTarget = cents;
+            // A joined note sounds above the key: the glide is from its own.
+            const double target = cents - voice.offset;
+            voice.centsTarget = target;
             if (frames < 1.0) {
                 voice.glide = 0;
-                voice.step = voice.baseStep * std::exp2(cents / 1200.0);
+                voice.step = voice.baseStep * std::exp2(target / 1200.0);
             } else {
                 // From where the pitch is now, which may be halfway through
                 // another glide: a straight line in cents is a constant factor
                 // on the step each frame.
                 const double now = std::log2(voice.step / voice.baseStep) * 1200.0;
-                voice.stepFactor = std::exp2((cents - now) / 1200.0 / frames);
+                voice.stepFactor = std::exp2((target - now) / 1200.0 / frames);
                 voice.glide = static_cast<std::int64_t>(frames);
             }
         }
+    }
+
+    void legato(int key, double cents, int velocity) noexcept override {
+        const int target = key + static_cast<int>(std::lround(cents / 100.0));
+        if (key < 0 || key > 127 || target < 0 || target > 127) {
+            glide(key, cents, 0.0);
+            return;
+        }
+        // The library's legato keyswitch, else its regions for a key going
+        // down while another is held, played as the picked note was.
+        const Played& picked = keyPlayed_[static_cast<std::size_t>(key)];
+        const SfzTechnique& technique = data_->techniques.legato;
+        std::array<std::uint32_t, kVoices> regions{};
+        if (technique.keyswitch >= 0) {
+            const Played played{
+                .touch = Touch::Normal, .keyswitch = technique.keyswitch, .cc = picked.cc};
+            const std::size_t count = joinedRegions(target, velocity, played, false, regions);
+            if (count > 0) {
+                join(key, target, cents, velocity, played, std::span(regions).first(count));
+                return;
+            }
+        }
+        const std::size_t count = joinedRegions(target, velocity, picked, true, regions);
+        if (count == 0) {
+            glide(key, cents, 0.0);
+            return;
+        }
+        join(key, target, cents, velocity, picked, std::span(regions).first(count));
     }
 
     void releaseAll() noexcept override {
@@ -284,14 +315,60 @@ private:
             if (!matches(r, region, velocity, played)) {
                 continue;
             }
-            if ((region.trigger == SfzTrigger::First && othersHeld) ||
-                (region.trigger == SfzTrigger::Legato && !othersHeld)) {
+            // Every string of a fretted track is picked, chords included:
+            // its notes are first notes, and legato only when joined
+            // (legato()).
+            const bool asLegato = othersHeld && !fretted_;
+            if ((region.trigger == SfzTrigger::First && asLegato) ||
+                (region.trigger == SfzTrigger::Legato && !asLegato)) {
                 continue;
             }
             struck = true;
             start(r, key, velocity, played, 1.0, true);
         }
         return struck;
+    }
+
+    // The regions a note joined on `target` plays, played this way: every
+    // one but the release regions, or only the legato ones. Takes the
+    // regions' turns in their round robins.
+    std::size_t joinedRegions(int target, int velocity, const Played& played, bool legatoOnly,
+                              std::span<std::uint32_t> regions) noexcept {
+        std::size_t count = 0;
+        for (const std::uint32_t r : data_->onKey[static_cast<std::size_t>(target)]) {
+            const SfzRegion& region = data_->program.regions[r];
+            if (count == regions.size() || region.trigger == SfzTrigger::Release ||
+                (legatoOnly && region.trigger != SfzTrigger::Legato) ||
+                !matches(r, region, velocity, played)) {
+                continue;
+            }
+            regions[count++] = r;
+        }
+        return count;
+    }
+
+    // Ends the notes holding `key` at once and starts `regions` on `target`
+    // in their place, answering to `key`, `cents` above it.
+    void join(int key, int target, double cents, int velocity, const Played& played,
+              std::span<const std::uint32_t> regions) noexcept {
+        for (Voice& voice : voices_) {
+            if (voice.stage != Stage::Off && voice.key == key && voice.held) {
+                voice.held = false;
+                voice.releaseCoefficient = coefficient(kSilent, kFastOff * rate_);
+                voice.stage = Stage::Release;
+            }
+        }
+        const double offset = 100.0 * (target - key);
+        for (const std::uint32_t r : regions) {
+            Voice* voice = start(r, target, velocity, played, 1.0, true);
+            if (voice == nullptr) {
+                continue;
+            }
+            voice->key = key;
+            voice->offset = offset;
+            voice->centsTarget = cents - offset;
+            voice->step = voice->baseStep * std::exp2(voice->centsTarget / 1200.0);
+        }
     }
 
     // Whether a region plays a note of this velocity now: its velocity range,
@@ -320,8 +397,10 @@ private:
         return true;
     }
 
-    void start(std::uint32_t r, int key, int velocity, const Played& played, double extraGain,
-               bool follows) noexcept {
+    // Starts a region on a key; the voice it took, or null when the region
+    // is silent.
+    Voice* start(std::uint32_t r, int key, int velocity, const Played& played, double extraGain,
+                 bool follows) noexcept {
         const SfzRegion& region = data_->program.regions[r];
         const Touch touch = played.touch;
         if (region.group != 0) {
@@ -346,7 +425,7 @@ private:
             }
         }
         if (audible <= 0.0 || extraGain <= 0.0) {
-            return;
+            return nullptr;
         }
         const SfzSample& sample = data_->samples[data_->regionSample[r]];
         const auto frames = static_cast<double>(sample.frames.size());
@@ -482,6 +561,7 @@ private:
         if (!follows && voice.loops && !voice.loopsHeld) {
             release(voice);
         }
+        return &voice;
     }
 
     // The voice a new note takes: a silent one, or else the quietest released
@@ -637,6 +717,7 @@ private:
 
     std::shared_ptr<const SfzData> data_;
     double rate_;
+    bool fretted_; ///< every note is picked: legato only when joined
     std::array<Voice, kVoices> voices_{};
     std::vector<std::uint32_t> sequence_; ///< per region: notes it has matched
     std::array<int, 128> cc_{};
@@ -698,6 +779,8 @@ SfzTechniques findTechniques(const SfzProgram& program) {
             technique = &found.dead;
         } else if (names(region.swLabel, {"palm", "mute"})) {
             technique = &found.palmMute;
+        } else if (names(region.swLabel, {"legato", "hammer", "pull", "slur"})) {
+            technique = &found.legato;
         }
         if (technique != nullptr && !technique->found()) {
             *technique = {.keyswitch = region.swLast, .cc = -1, .label = region.swLabel};
@@ -911,7 +994,8 @@ std::unique_ptr<TrackSound> SfzBank::sound(const core::Instrument& instrument,
     if (!plays(instrument)) {
         return others_->sound(instrument, sampleRate);
     }
-    return std::make_unique<SfzSound>(data_, sampleRate);
+    return std::make_unique<SfzSound>(data_, sampleRate,
+                                      instrument.kind == core::InstrumentKind::Fretted);
 }
 
 std::string SfzBank::soundName(const core::Instrument& instrument) const {
