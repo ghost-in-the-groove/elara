@@ -892,8 +892,8 @@ void Startup::queueNavigation() {
 
 // Repeats from the measure popup (ADR-0016): the first measure's start
 // barline toggled with its end repeat played a different number of times,
-// then other endings, each one undo step; both undone, the song must end as it
-// started.
+// then other endings and its double barline (ADR-0103), each one undo step;
+// all undone, the song must end as it started.
 void Startup::queueRepeats() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -924,6 +924,15 @@ void Startup::queueRepeats() {
         check(repeats.value(QStringLiteral("endings")).toList() == endings &&
                   repeats.value(QStringLiteral("times")).toInt() == times,
               "the endings were not set beside the repeat");
+        // The double barline (ADR-0103) toggles on its own.
+        const bool doubleBar = !repeats.value(QStringLiteral("doubleBar")).toBool();
+        score_->setRepeats(0, {{QStringLiteral("doubleBar"), doubleBar}});
+        check(score_->repeatsAt(0).value(QStringLiteral("doubleBar")).toBool() == doubleBar &&
+                  score_->repeatsAt(0).value(QStringLiteral("endings")).toList() == endings,
+              "the double barline was not set beside the endings");
+        check(score_->undoName() == ScoreDocument::tr("Change barline"),
+              "the double barline is not one undo step");
+        score_->undo();
         score_->undo();
         score_->undo();
         return true;
