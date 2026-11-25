@@ -490,6 +490,16 @@ ApplicationWindow {
                         onTriggered: soundFontDialog.open()
                     }
                     MenuItem {
+                        // The SoundFont that comes with Elara (ADR-0069), back
+                        // after another sound was chosen.
+                        visible: audio.includedSoundFont.length > 0
+                        height: visible ? implicitHeight : 0
+                        text: qsTr("Use the included SoundFont")
+                        enabled: audio.soundFont !== audio.includedSoundFont
+                                 && !audio.loadingSoundFont
+                        onTriggered: audio.setSoundFont(audio.includedSoundFont)
+                    }
+                    MenuItem {
                         text: audio.guitarSfzName.length > 0
                               ? qsTr("Guitars: %1").arg(audio.guitarSfzName)
                               : qsTr("Choose an SFZ instrument for the guitars…")

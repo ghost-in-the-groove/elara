@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.request
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 
@@ -481,9 +482,65 @@ def _without_qt_on_path(env: dict[str, str]) -> dict[str, str]:
     return clean
 
 
+# The SoundFont that comes with the packages (ADR-0069): MuseScore General 0.2
+# (MIT) and its licence, from MuseScore's own mirror, checked against these
+# SHA-256 digests.
+SOUNDFONT_URL = "https://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General/"
+SOUNDFONT_FILES = {
+    "MuseScore_General.sf3": "5b85b6c2c61d10b2b91cddd41efcce7b25cd31c8271d511c73afafbef20b6fa3",
+    "MuseScore_General_License.md":
+        "5ad8d737e13c7f01f5b9674872a82a92b4ba253603e8ed14b9db12293550b4b9",
+}
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _fetch_soundfont() -> Path | None:
+    """Downloads the included SoundFont and its licence into build/downloads/
+    soundfont the first time, checks them, and returns that folder; None when
+    a file cannot be downloaded or does not match its digest."""
+    folder = ROOT / "build" / "downloads" / "soundfont"
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, digest in SOUNDFONT_FILES.items():
+        path = folder / name
+        if path.exists() and _sha256(path) == digest:
+            continue
+        partial = folder.parent / (name + ".part")  # outside the installed folder
+        log(f"downloading {SOUNDFONT_URL}{name}")
+        try:
+            with urllib.request.urlopen(SOUNDFONT_URL + name, timeout=300) as response, \
+                    partial.open("wb") as out:
+                shutil.copyfileobj(response, out)
+            if _sha256(partial) != digest:
+                log(f"{name} does not match its SHA-256 digest")
+                return None
+            partial.replace(path)
+        except OSError as error:
+            log(f"could not download {name}: {error}")
+            return None
+        finally:
+            partial.unlink(missing_ok=True)
+    return folder
+
+
+def _included_soundfont(stage: Path) -> Path | None:
+    """The SoundFont `stage` installed, where the app looks for it."""
+    folder = (stage / "elara.app" / "Contents" / "Resources" / "soundfonts" if IS_MAC
+              else stage / "share" / "elara" / "soundfonts")
+    fonts = sorted(folder.glob("*.sf[23]")) if folder.is_dir() else []
+    return fonts[0] if fonts else None
+
+
 def _smoke_test_install(stage: Path) -> int:
-    """Runs what `stage` installed the way a user would: the app's smoke test and
-    a CLI render that needs its fonts, with no Qt kit on PATH."""
+    """Runs what `stage` installed the way a user would: the app's smoke test,
+    a CLI render that needs its fonts and, when the SoundFont came along, the
+    app playing a song through it, with no Qt kit on PATH."""
     tools = stage / "elara.app" / "Contents" / "MacOS" if IS_MAC else stage / "bin"
     app = tools / f"elara{EXE}"
     cli = tools / f"elara-cli{EXE}"
@@ -501,6 +558,8 @@ def _smoke_test_install(stage: Path) -> int:
          "note 0 0 6 3 1"],
         [str(cli), "--json", "render", str(song), "--svg", str(work / "song.svg")],
     ]
+    if _included_soundfont(stage) is not None:
+        steps.append([str(app), "--smoke-test", str(song), "--included-soundfont"])
     for step in steps:
         log("smoke: " + " ".join(Path(step[0]).name if i == 0 else a for i, a in enumerate(step)))
         result = subprocess.run(step, cwd=work, env=env, check=False, capture_output=True,
@@ -581,9 +640,14 @@ def _make_appimage(stage: Path, out: Path, required: bool) -> int:
     env = _without_qt_on_path(build_env())
     env["QT_QPA_PLATFORM"] = "offscreen"
     env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
-    result = subprocess.run([str(appimage), "--smoke-test"], cwd=out, env=env, check=False,
-                            capture_output=True, text=True, encoding="utf-8", errors="replace",
-                            timeout=120)
+    # With the SoundFont that came along, a song (the install's smoke test
+    # made it) plays through it.
+    song = out / "smoke" / "song.elara"
+    extra = ([str(song), "--included-soundfont"]
+             if _included_soundfont(stage) is not None and song.exists() else [])
+    result = subprocess.run([str(appimage), "--smoke-test", *extra], cwd=out, env=env,
+                            check=False, capture_output=True, text=True, encoding="utf-8",
+                            errors="replace", timeout=120)
     if result.returncode != 0:
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
@@ -599,7 +663,14 @@ def cmd_package(args: argparse.Namespace) -> int:
     (ADR-0048), then makes and smoke-tests the installers: the MSI package on
     Windows, the AppImage on Linux (ADR-0065)."""
     preset = "release"
+    soundfont = None
+    if not args.no_soundfont and (soundfont := _fetch_soundfont()) is None:
+        log("no SoundFont to include (pack without one with --no-soundfont)")
+        return 1
     if (code := ensure_configured(preset)) != 0:
+        return code
+    soundfont_dir = soundfont.as_posix() if soundfont else ""
+    if (code := run(["cmake", "--preset", preset, f"-DELARA_SOUNDFONT_DIR={soundfont_dir}"])) != 0:
         return code
     if (code := run(["cmake", "--build", "--preset", preset, "--target", "elara", "elara-cli"])) != 0:
         return code
@@ -702,6 +773,8 @@ def main() -> int:
                          help="pack without running what was installed")
     package.add_argument("--installers", action="store_true",
                          help="fail when an installer cannot be made (MSI, AppImage)")
+    package.add_argument("--no-soundfont", action="store_true",
+                         help="pack without the SoundFont that comes with Elara (no download)")
 
     args = parser.parse_args()
     return args.func(args)

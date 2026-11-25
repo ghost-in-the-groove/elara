@@ -7,12 +7,14 @@ qt_standard_project_setup(REQUIRES 6.12
 # Painting of display lists and the list models the views show, in a library
 # of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
+  src/included_sound.cpp
   src/recent_scores.cpp
   src/score_painter.cpp
   src/track_list.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation)
-elara_source_warnings(src/recent_scores.cpp src/score_painter.cpp src/track_list.cpp)
+elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/score_painter.cpp
+  src/track_list.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
 # its own: PNG images for the window, an .ico file for the Windows executable
@@ -184,6 +186,18 @@ if(NOT WIN32 AND NOT APPLE)
   install(FILES "${ELARA_ICON_DIR}/elara-256.png"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
     RENAME "${_elara_app_id}.png")
+endif()
+# The SoundFont that comes with the packages (ADR-0069): every file of the
+# folder `elara.py package` fetches MuseScore General and its licence into,
+# where the app looks for it (included_sound.hpp). Left empty, there is none.
+set(ELARA_SOUNDFONT_DIR "" CACHE PATH "Folder of the SoundFont installed with the app")
+if(ELARA_SOUNDFONT_DIR)
+  if(APPLE)
+    set(_elara_soundfonts elara.app/Contents/Resources/soundfonts)
+  else()
+    set(_elara_soundfonts "${CMAKE_INSTALL_DATADIR}/elara/soundfonts")
+  endif()
+  install(DIRECTORY "${ELARA_SOUNDFONT_DIR}/" DESTINATION "${_elara_soundfonts}")
 endif()
 qt_generate_deploy_qml_app_script(
   TARGET elara

@@ -31,7 +31,8 @@ struct StartupOptions {
     bool smokeTest = false;     ///< check the window (and the file), then quit
     bool effects = false;       ///< the note effects panel opens at the caret
     QString screenshot;         ///< save the window here once shown, then quit
-    QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`)
+    QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`,
+                                ///< or the included one with `--included-soundfont`)
     QString guitarSfz;          ///< an SFZ instrument for the guitars (`--guitar-sfz`)
     QString bassSfz;            ///< an SFZ instrument for the basses (`--bass-sfz`)
 };
