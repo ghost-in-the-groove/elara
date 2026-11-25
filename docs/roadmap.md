@@ -221,6 +221,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
+  - [x] A device that restarts at another sample rate gets a player made at that
+        rate, from the same place in the music
 - [x] Transport, playback cursor and click-to-seek in the app, `elara-cli render --cursor-at`
   and `--time-at`
 
