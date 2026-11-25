@@ -83,11 +83,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 ## Milestone 4 - Playback  -> usable as a player
 
 - [x] Sequencer: model -> timed events, tempo map, repeats (ADR-0017)
-- [ ] FluidSynth integration, MuseScore General SF3
+- [x] FluidSynth integration, MuseScore General SF3
   - [x] SoundFont playback through FluidSynth: sound banks in the renderer and the
         player, `elara-cli soundfont`, `render-audio`/`play --soundfont` (ADR-0043)
   - [x] A SoundFont chosen in the app (any SF2 or SF3, such as MuseScore
         General), kept for the next start, `--soundfont FILE`
+  - [x] MuseScore General in the packages, played until another sound is
+        chosen, `--included-soundfont` (ADR-0069)
 - [ ] SFZ instruments and a guitar SFZ library
   - [x] SFZ instruments through Elara's own sampler, each note bent on its own:
         `elara-cli sfz`, `render-audio`/`play --sfz` (ADR-0066)

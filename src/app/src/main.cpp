@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/version.hpp>
 
+#include "included_sound.hpp"
 #include "score_document.hpp"
 #include "startup.hpp"
 #include <QByteArray>
@@ -167,6 +168,9 @@ int main(int argc, char* argv[]) {
         QStringLiteral("soundfont"),
         QCoreApplication::translate("main", "Play through this SoundFont (SF2 or SF3)."),
         QStringLiteral("file"));
+    const QCommandLineOption includedSoundFontOption(
+        QStringLiteral("included-soundfont"),
+        QCoreApplication::translate("main", "Play through the SoundFont that comes with Elara."));
     const QCommandLineOption guitarSfzOption(
         QStringLiteral("guitar-sfz"),
         QCoreApplication::translate("main", "Play the guitars through this SFZ instrument."),
@@ -177,7 +181,8 @@ int main(int argc, char* argv[]) {
         QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
                        songPaneOption, measureOption, effectsOption, tuningOption, continuousOption,
-                       languageOption, soundFontOption, guitarSfzOption, bassSfzOption});
+                       languageOption, soundFontOption, includedSoundFontOption, guitarSfzOption,
+                       bassSfzOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -222,6 +227,13 @@ int main(int argc, char* argv[]) {
     }
     if (parser.isSet(soundFontOption)) {
         options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
+    }
+    if (parser.isSet(includedSoundFontOption)) {
+        options.soundFont = elara::app::includedSoundFont(QCoreApplication::applicationDirPath());
+        if (options.soundFont.isEmpty()) {
+            std::fprintf(stderr, "elara: no SoundFont comes with this build of Elara\n");
+            return EXIT_FAILURE;
+        }
     }
     if (parser.isSet(guitarSfzOption)) {
         options.guitarSfz = QDir::current().absoluteFilePath(parser.value(guitarSfzOption));
