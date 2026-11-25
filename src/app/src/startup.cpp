@@ -157,6 +157,9 @@ void Startup::queueSteps() {
                                                   map.value(QStringLiteral("format")).toString()));
             }
             std::printf("recent: %s\n", qPrintable(names.join(QStringLiteral(", "))));
+            // What opening the file changed or left out stays with it.
+            std::printf("import: %lld warnings\n",
+                        static_cast<long long>(score_->importWarnings().size()));
             return false;
         });
         for (const View view : std::array{View::Standard, View::Tablature, View::Both}) {
@@ -1058,6 +1061,16 @@ void Startup::queueTempo() {
         score_->setTempoFrom(1, 0);
         check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
               "the tempo change was not taken away");
+        // The triplet feel (ADR-0104) from the second measure on, one undo
+        // step, leaving the first measure's.
+        const int feelBefore = score_->tripletFeelAt(0);
+        const int feel = score_->tripletFeelAt(1) == 1 ? 3 : 1;
+        score_->setTripletFeelFrom(1, feel);
+        check(score_->tripletFeelAt(1) == feel && score_->tripletFeelAt(0) == feelBefore,
+              "the second measure did not take the triplet feel");
+        check(score_->undoName() == ScoreDocument::tr("Change triplet feel"),
+              "the triplet feel is not one undo step");
+        score_->undo();
         score_->undo();
         score_->undo();
         score_->undo();
@@ -2067,8 +2080,12 @@ void Startup::queueKeepPosition() {
         score_->newSong(QStringLiteral("electric-guitar"));
         return true;
     });
-    // Another song plays from its start.
+    // Another song plays from its start, without the warnings of the file
+    // opened before it.
     steps_.emplace_back([this] {
+        if (!score_->importWarnings().isEmpty() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("a new song kept the import warnings");
+        }
         auto* audio = window_->findChild<AudioController*>();
         if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
             editProblem_ =

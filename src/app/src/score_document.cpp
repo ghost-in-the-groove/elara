@@ -67,7 +67,8 @@ struct ScoreLayout {
     bool hasTablature = false;
     int milliseconds = 0;
     QString error;
-    bool opened = false; ///< a song just read from `source`, to edit from now on
+    bool opened = false;  ///< a song just read from `source`, to edit from now on
+    QStringList warnings; ///< what reading `source` approximated or dropped
 };
 
 namespace {
@@ -238,6 +239,9 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, boo
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
+        for (const std::string& warning : opened->warnings) {
+            result.warnings.append(qstring(warning));
+        }
     } catch (const std::exception& error) {
         result.error = qstring(error.what());
     }
@@ -297,6 +301,8 @@ constexpr std::array kEditNames{
     Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
     Translation{"Change barline", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change barline")},
     Translation{"Change section", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change section")},
+    Translation{"Change triplet feel",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change triplet feel")},
     Translation{"Change time signature",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change time signature")},
     Translation{"Change key signature",
@@ -783,6 +789,23 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     if (practiceMoved && sequencing_ != song_) {
         resequence();
     }
+    // What the file opened lost goes with it, and is told once.
+    if (layout.opened) {
+        setImportWarnings(layout.warnings);
+        if (!layout.warnings.isEmpty()) {
+            emit report(tr("Opened %1. %n thing(s) changed or left out.", "",
+                           static_cast<int>(layout.warnings.size()))
+                            .arg(QFileInfo(layout.source.toLocalFile()).fileName()),
+                        layout.warnings);
+        }
+    }
+}
+
+void ScoreDocument::setImportWarnings(const QStringList& warnings) {
+    if (warnings != importWarnings_) {
+        importWarnings_ = warnings;
+        emit importWarningsChanged();
+    }
 }
 
 // ---- Practice -----------------------------------------------------------------
@@ -950,6 +973,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     sequence_ = std::make_shared<const audio::Sequence>(*song_, practice_);
     sequenceSong_ = song_;
     source_.clear();
+    setImportWarnings({});
     track_ = 0;
     caret_ = core::Caret{};
     pendingDigit_ = -1;
@@ -1191,6 +1215,27 @@ void ScoreDocument::setTempoGradual(int measure, bool gradual) {
     }
     if (auto change = core::changeTempoGradual(document_->song(), static_cast<std::size_t>(measure),
                                                gradual)) {
+        execute(std::move(change));
+    }
+}
+
+int ScoreDocument::tripletFeelAt(int measure) const {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return 0;
+    }
+    return static_cast<int>(
+        document_->song().measureHeader(static_cast<std::size_t>(measure)).tripletFeel);
+}
+
+void ScoreDocument::setTripletFeelFrom(int measure, int feel) {
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount()) || feel < 0 ||
+        feel > static_cast<int>(core::TripletFeel::ScottishSixteenth)) {
+        return;
+    }
+    if (auto change = core::changeTripletFeel(document_->song(), static_cast<std::size_t>(measure),
+                                              static_cast<core::TripletFeel>(feel))) {
         execute(std::move(change));
     }
 }

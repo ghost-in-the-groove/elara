@@ -1072,6 +1072,36 @@ ApplicationWindow {
                 }
                 opacity: 0.75
             }
+            // What opening the file changed or left out, to read again.
+            Rectangle {
+                visible: score.importWarnings.length > 0
+                implicitWidth: 3
+                implicitHeight: 3
+                radius: 1.5
+                color: Theme.ink
+                opacity: 0.35
+            }
+            Label {
+                objectName: "importWarningsLabel"
+                visible: score.importWarnings.length > 0
+                text: qsTr("%n change(s) on import", "", score.importWarnings.length)
+                font.pixelSize: Theme.fontSmall
+                font.underline: importWarningsArea.containsMouse
+                color: Theme.warning
+
+                MouseArea {
+                    id: importWarningsArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        detailsDialog.title = qsTr("What opening the file changed or left out");
+                        detailsDialog.lines = score.importWarnings;
+                        detailsDialog.open();
+                    }
+                }
+            }
             Item {
                 Layout.fillWidth: true
             }
