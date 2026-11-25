@@ -61,6 +61,14 @@ std::size_t lastIndex(const Song& song, const Caret& caret) {
     return voice.beats.empty() || isShort ? voice.beats.size() : voice.beats.size() - 1;
 }
 
+/// The sign of measure `i` of a measure repeat of `measures` measures.
+MeasureRepeat repeatKind(std::size_t measures, std::size_t i) {
+    if (measures == 1) {
+        return MeasureRepeat::One;
+    }
+    return i == 0 ? MeasureRepeat::TwoFirst : MeasureRepeat::TwoSecond;
+}
+
 /// The caret's measure as it is, to edit and put back.
 Measure measureAt(const Song& song, const Caret& caret) {
     return song.track(caret.track).staff(caret.staff).measure(caret.measure);
@@ -1073,6 +1081,108 @@ Entry setClef(const Song& song, const Caret& at, Clef clef) {
     }
     content.clef = wanted;
     return replace(caret, std::move(content), "Change clef");
+}
+
+namespace {
+
+/// The other measure of the two-measure repeat measure m is part of, if any.
+std::optional<std::size_t> repeatPartner(const Staff& staff, std::size_t m) {
+    const MeasureRepeat repeat = staff.measure(m).repeat;
+    if (repeat == MeasureRepeat::TwoFirst && m + 1 < staff.measureCount() &&
+        staff.measure(m + 1).repeat == MeasureRepeat::TwoSecond) {
+        return m + 1;
+    }
+    if (repeat == MeasureRepeat::TwoSecond && m > 0 &&
+        staff.measure(m - 1).repeat == MeasureRepeat::TwoFirst) {
+        return m - 1;
+    }
+    return std::nullopt;
+}
+
+/// Measure m without its sign, holding the music the sign played.
+Measure writtenOut(const Song& song, const Staff& staff, std::size_t m) {
+    Measure content = staff.measure(m);
+    content.voices = staff.measure(repeatSource(song, staff, m)).voices;
+    content.repeat = MeasureRepeat::None;
+    return content;
+}
+
+} // namespace
+
+Entry setMeasureRepeat(const Song& song, const Caret& at, std::size_t measures) {
+    if (measures > 2) {
+        throw std::invalid_argument("a measure repeat repeats one or two measures");
+    }
+    Caret caret = clampCaret(song, at);
+    caret.beat = 0;
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    const std::size_t m = caret.measure;
+    std::vector<std::size_t> writeOut; // measures whose sign goes, music written out
+    std::string name;
+    if (measures == 0) {
+        if (staff.measure(m).repeat == MeasureRepeat::None) {
+            return unchanged(caret);
+        }
+        name = "Write out measure repeat";
+        writeOut.push_back(m);
+        if (const std::optional<std::size_t> partner = repeatPartner(staff, m)) {
+            writeOut.push_back(*partner);
+        }
+    } else {
+        if (m < measures || m + measures > staff.measureCount()) {
+            return unchanged(caret);
+        }
+        const auto length = [&song](std::size_t measure) {
+            return song.measureHeader(measure).timeSignature.measureLength();
+        };
+        bool there = true;
+        for (std::size_t i = 0; i < measures; ++i) {
+            if (length(m + i) != length(m + i - measures)) {
+                return unchanged(caret);
+            }
+            const Measure& measure = staff.measure(m + i);
+            there = there && measure.isEmpty() && measure.repeat == repeatKind(measures, i);
+            if (const std::optional<std::size_t> partner = repeatPartner(staff, m + i);
+                partner && (*partner < m || *partner >= m + measures)) {
+                writeOut.push_back(*partner);
+            }
+        }
+        if (there) {
+            return unchanged(caret);
+        }
+        name = measures == 1 ? "Repeat measure" : "Repeat two measures";
+    }
+    std::vector<std::unique_ptr<Command>> commands;
+    for (const std::size_t measure : writeOut) {
+        commands.push_back(std::make_unique<ReplaceMeasure>(
+            caret.track, caret.staff, measure, writtenOut(song, staff, measure), name));
+    }
+    for (std::size_t i = 0; i < measures; ++i) {
+        Measure content = staff.measure(m + i);
+        content.voices = {};
+        content.repeat = repeatKind(measures, i);
+        commands.push_back(std::make_unique<ReplaceMeasure>(caret.track, caret.staff, m + i,
+                                                            std::move(content), name));
+    }
+    if (commands.size() == 1) {
+        return Entry{.command = std::move(commands.front()), .caret = caret};
+    }
+    return Entry{.command = std::make_unique<CommandGroup>(name, std::move(commands)),
+                 .caret = caret};
+}
+
+std::size_t measureRepeatAt(const Song& song, const Caret& at) {
+    const Caret caret = clampCaret(song, at);
+    switch (song.track(caret.track).staff(caret.staff).measure(caret.measure).repeat) {
+    case MeasureRepeat::None:
+        return 0;
+    case MeasureRepeat::One:
+        return 1;
+    case MeasureRepeat::TwoFirst:
+    case MeasureRepeat::TwoSecond:
+        return 2;
+    }
+    return 0;
 }
 
 std::string beatTextAt(const Song& song, const Caret& at) {
