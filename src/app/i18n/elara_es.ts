@@ -182,6 +182,18 @@
         <translation>Nota de adorno</translation>
     </message>
     <message>
+        <source>Short fermata</source>
+        <translation>Calderón corto</translation>
+    </message>
+    <message>
+        <source>Fermata</source>
+        <translation>Calderón</translation>
+    </message>
+    <message>
+        <source>Long fermata</source>
+        <translation>Calderón largo</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1704,6 +1716,18 @@
     <message>
         <source>Diminuendo</source>
         <translation>Diminuendo</translation>
+    </message>
+    <message>
+        <source>Short fermata</source>
+        <translation>Calderón corto</translation>
+    </message>
+    <message>
+        <source>Fermata</source>
+        <translation>Calderón</translation>
+    </message>
+    <message>
+        <source>Long fermata</source>
+        <translation>Calderón largo</translation>
     </message>
     <message>
         <source>Grace notes</source>

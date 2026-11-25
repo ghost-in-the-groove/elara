@@ -287,6 +287,16 @@ public:
         if (!rhythm_.empty()) {
             drawRhythm();
         }
+        // Fermatas go over the standard notation when the system has it (ADR-0085).
+        if (alone_) {
+            for (const TabColumn& column : columns_) {
+                core::Fermata held = core::Fermata::None;
+                for (const core::Beat* beat : column.beats) {
+                    held = std::max(held, beat->effects.fermata);
+                }
+                fermata(held, column.x + centreOf(column), false);
+            }
+        }
     }
 
 private:

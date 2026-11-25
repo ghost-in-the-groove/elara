@@ -90,6 +90,7 @@ one that replaces them.
 | [0082](0082-gradual-tempo-changes.md) | Gradual tempo changes | Accepted |
 | [0083](0083-midi-export-play-order.md) | MIDI export writes the play order | Accepted |
 | [0084](0084-lyrics.md) | Lyrics | Accepted |
+| [0085](0085-fermatas.md) | Fermatas | Accepted |
 
 ## Template
 

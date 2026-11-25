@@ -186,6 +186,19 @@ std::optional<std::vector<Duration>> restsFor(const Fraction& gap,
     return std::nullopt;
 }
 
+/// The fermata a <fermata> writes by its shape (ADR-0085): angled ones are
+/// short, square ones long, the others (an empty one too) normal.
+Fermata fermataOf(pugi::xml_node fermata) {
+    const std::string_view shape = fermata.child_value();
+    if (shape == "angled" || shape == "double-angled") {
+        return Fermata::Short;
+    }
+    if (shape == "square" || shape == "double-square") {
+        return Fermata::Long;
+    }
+    return Fermata::Normal;
+}
+
 std::optional<Dynamic> dynamicOf(pugi::xml_node dynamics) {
     for (pugi::xml_node mark : dynamics.children()) {
         const std::string_view name = mark.name();
@@ -1624,6 +1637,7 @@ private:
             event.voice = "1";
         }
         readLyrics(parts.lyric, event, index);
+        readFermata(parts.notations, event);
         if (parts.rest) {
             event.measureRest = parts.rest.attribute("measure").as_bool();
             return event;
@@ -1649,6 +1663,16 @@ private:
         readMarks(parts, event, note, index, dynamics);
         event.note = std::move(note);
         return event;
+    }
+
+    /// The longest fermata of the note's or rest's notations (ADR-0085).
+    static void readFermata(pugi::xml_node first, Event& event) {
+        for (pugi::xml_node notations = first; notations;
+             notations = notations.next_sibling("notations")) {
+            for (pugi::xml_node fermata : notations.children("fermata")) {
+                event.beatEffects.fermata = std::max(event.beatEffects.fermata, fermataOf(fermata));
+            }
+        }
     }
 
     // ---- Lyrics (ADR-0084) ----------------------------------------------------------
@@ -1864,8 +1888,6 @@ private:
                     if (isType(mark, "start")) {
                         fx.slideOut = SlideOut::Legato;
                     }
-                } else if (name == "fermata") {
-                    warn("fermatas dropped", index);
                 } else if (name == "arpeggiate") {
                     // Rolled upwards is played like a downstroke (low strings first).
                     event.beatEffects.strum =
@@ -2135,6 +2157,8 @@ private:
                 if (event.note && !lastDropped && !voice.beats.empty()) {
                     Beat& beat = voice.beats.back();
                     addLyrics(beat, event.lyrics);
+                    beat.effects.fermata =
+                        std::max(beat.effects.fermata, event.beatEffects.fermata);
                     placed.push_back(Placed{.staff = event.staff,
                                             .voice = *slot,
                                             .beat = voice.beats.size() - 1,
@@ -2150,8 +2174,8 @@ private:
                 event.length == time.measureLength()) {
                 event.measureRest = true; // a whole-measure rest without the attribute
             }
-            if (event.measureRest) {
-                continue; // an empty voice is a measure rest
+            if (event.measureRest && event.beatEffects.fermata == Fermata::None) {
+                continue; // an empty voice is a measure rest; a held one is written out
             }
 
             const Fraction gap = event.onset - end;

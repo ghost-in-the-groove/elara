@@ -47,7 +47,7 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
-| `effects.hpp` | `NoteEffects` (tie and hammer-on/pull-off from the previous note, slides in/out, `BendCurve` in cents, `Harmonic`, vibrato, palm mute, dead and ghost notes, let ring, staccato, accent, `Dynamic`) and `BeatEffects` (pick stroke, strum, tremolo picking, whammy bar, bass tap/slap/pop, `Hairpin`: consecutive beats with the same crescendo or diminuendo share one wedge, ADR-0078); `naturalHarmonicSemitones()`, `dynamicVelocity()`; `BendForm` with `bendForm()`, read from a curve's shape, and `bendCurve()` (ADR-0055); `whammyForm()`, `whammyCents()` and `whammyCurve()`, the same forms going down or up for the whammy bar (ADR-0060). |
+| `effects.hpp` | `NoteEffects` (tie and hammer-on/pull-off from the previous note, slides in/out, `BendCurve` in cents, `Harmonic`, vibrato, palm mute, dead and ghost notes, let ring, staccato, accent, `Dynamic`) and `BeatEffects` (pick stroke, strum, tremolo picking, whammy bar, bass tap/slap/pop, `Hairpin`: consecutive beats with the same crescendo or diminuendo share one wedge, ADR-0078; `Fermata`, held `fermataStretch()` times as long, on rests too, ADR-0085); `naturalHarmonicSemitones()`, `dynamicVelocity()`; `BendForm` with `bendForm()`, read from a curve's shape, and `bendCurve()` (ADR-0055); `whammyForm()`, `whammyCents()` and `whammyCurve()`, the same forms going down or up for the whammy bar (ADR-0060). |
 | `measure.hpp` | `Note` (`Pitch` + optional `FretPosition` + effects), `Beat` (duration + notes, no notes = rest; the `Grace` notes leading into it, which take no time, ADR-0079; the `ChordSymbol` named above it, a name and an optional `ChordDiagram`, which does not sound, ADR-0080; the `text` written above it, ADR-0081; the `Syllable` of each verse sung on it, ADR-0084), `Voice` (beats; `length()`, `startOf()`), `Measure` (four voices). |
 | `lyrics.hpp` | Verses typed as text in Guitar Pro's syntax (ADR-0084): `syllablesOf()` splits one into syllables (spaces and hyphens, "+" joining words, blank beats, comments in brackets) and `placeVerse()` puts them on a staff's beats with notes from a measure on, past rests and tied notes; "_" after a syllable holds it. `verseText()` gives a verse back as the text that places it, `verseCount()` counts a staff's verses. |
 | `instrument.hpp` | `InstrumentKind`, `Clef`, `Instrument` (GM program, written offset) and data-only `InstrumentPreset`s: guitars, basses, ukulele, mandolin, banjo, drum kit, piano, voice, violin, flute, trumpet, saxophones. `drumPieces()`: the kit pieces of drum entry, top of the staff first (ADR-0035). |
@@ -75,7 +75,9 @@ Each `MeasureHeader` holds the time signature, the concert key and the tempo
 changes of its measure, so they move with it; new measures continue the meter
 and key before them. `Song::measureStart()`, `secondsAt()`, `tempoAt()` and
 `durationSeconds()` give the timeline of the measures as written, gradual
-tempo changes included (ADR-0082); the
+tempo changes included (ADR-0082) and fermatas held: `fermataHolds()` gives
+the spans of a measure that every voice holds, the union of its beats with
+fermatas on all staves (ADR-0085); the
 header's repeats and alternate endings (ADR-0016), signs and jumps
 (ADR-0049) say how they are played, and `playOrder()` lists the measures in
 that order. A header's `section` names the part of the song that starts there

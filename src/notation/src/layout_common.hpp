@@ -138,6 +138,12 @@ struct Extents {
 [[nodiscard]] Extents inkExtents(const DisplayList& list, const EngravingFont& font,
                                  double staffHeight);
 
+/// The same for the ink between x = `left` and `right` only: of the items
+/// that reach into that span, what lies over it (a slanted beam or line where
+/// it crosses it).
+[[nodiscard]] Extents inkExtents(const DisplayList& list, const EngravingFont& font,
+                                 double staffHeight, double left, double right);
+
 /// Sets `list.top` and `list.bottom` from the ink of its items and a staff
 /// `staffHeight` high.
 void measureExtents(DisplayList& list, const EngravingFont& font, double staffHeight);
@@ -611,6 +617,13 @@ protected:
 
     /// The lowest ink drawn so far, never above the bottom line.
     [[nodiscard]] double inkBottom() const;
+
+    /// The highest and lowest ink drawn so far between x = left and right.
+    [[nodiscard]] Extents inkBetween(double left, double right) const;
+
+    /// A fermata centred on x = `centre` (ADR-0085): above the staff and the
+    /// ink drawn over it there, or under them when `below`.
+    void fermata(core::Fermata fermata, double centre, bool below);
 
     /// The digits of a tuplet number with their width and extents (SMuFL y, up).
     struct TupletNumber {

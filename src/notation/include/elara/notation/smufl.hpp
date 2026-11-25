@@ -100,6 +100,13 @@ enum class Glyph : std::uint8_t {
     ArticStaccatoBelow,
     ArticMarcatoAbove,
     ArticMarcatoBelow,
+    // Fermatas (ADR-0085)
+    FermataAbove,
+    FermataBelow,
+    FermataShortAbove,
+    FermataShortBelow,
+    FermataLongAbove,
+    FermataLongBelow,
     // Dynamics
     DynamicPiano,
     DynamicMezzo,

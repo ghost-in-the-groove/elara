@@ -126,6 +126,11 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Read and written in MusicXML
   - [x] Drawn under the staff
   - [x] Typed at the caret
+- [x] Fermatas: short, normal and long holds on notes and rests (ADR-0085)
+  - [x] In the model, held in the timeline, playback and MIDI export
+  - [x] Read and written in MusicXML and kept by the native format
+  - [x] Drawn above the staff, under it for a lower voice
+  - [x] Set at the caret
 
 ## Milestone 4 - Playback  -> usable as a player
 

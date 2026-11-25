@@ -504,6 +504,39 @@ TEST_CASE("MIDI export writes a gradual tempo change with nowhere to go as a sud
     CHECK(imported->song.measureHeader(1).tempoChanges[0].tempo == Tempo(90));
 }
 
+TEST_CASE("MIDI export plays what fermatas hold at a slower tempo", "[io][midi]") {
+    // ADR-0085: MIDI has no fermatas, so the stretch a fermata holds is
+    // written at its tempo divided by the stretch, and the tempo comes back
+    // after it; read back, the song lasts as long.
+    Song song = pianoSong(2);
+    auto& staff = song.track(0).staff(0);
+    Beat held = noteBeat(Duration(NoteValue::Half), 64);
+    held.effects.fermata = elara::core::Fermata::Normal;
+    staff.measure(0).voices[0].beats = {noteBeat(Duration(NoteValue::Quarter), 60),
+                                        noteBeat(Duration(NoteValue::Quarter), 62), held};
+    staff.measure(1).voices[0].beats = {noteBeat(Duration(NoteValue::Whole), 65)};
+    const auto result = exportMidi(song);
+    CHECK(result.warnings.empty());
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    const Song& back = imported->song;
+    REQUIRE(back.measureHeader(0).tempoChanges.size() == 1);
+    CHECK(back.measureHeader(0).tempoChanges[0].offset == Fraction(1, 2));
+    CHECK(back.measureHeader(0).tempoChanges[0].tempo == Tempo(60));
+    REQUIRE(back.measureHeader(1).tempoChanges.size() == 1);
+    CHECK(back.measureHeader(1).tempoChanges[0].tempo == Tempo(120));
+    CHECK_THAT(back.durationSeconds(), WithinAbs(5.0, 1e-9)); // 1 s, 2 s held, 2 s
+
+    // In a gradual tempo change the steps under the fermata are stretched too.
+    song.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = Fraction(0), .tempo = Tempo(100), .gradual = true}};
+    song.measureHeader(1).tempoChanges = {TempoChange{.tempo = Tempo(140)}};
+    const auto ramp = importMidi(bytesOf(exportMidi(song).data));
+    REQUIRE(ramp.has_value());
+    CHECK_THAT(ramp->song.secondsAt(1), WithinAbs(song.secondsAt(1), 1e-4));
+    CHECK_THAT(ramp->song.durationSeconds(), WithinAbs(song.durationSeconds(), 1e-4));
+}
+
 TEST_CASE("MIDI export writes repeats and jumps as they are played", "[io][midi]") {
     // ADR-0083: MIDI has no repeats, so the file holds the measures in play
     // order, the way playback and audio render go through them.

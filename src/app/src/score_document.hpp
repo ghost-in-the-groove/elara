@@ -99,6 +99,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretBendCents READ caretBendCents NOTIFY caretChanged)
     Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
     Q_PROPERTY(int caretHairpin READ caretHairpin NOTIFY caretChanged)
+    Q_PROPERTY(int caretFermata READ caretFermata NOTIFY caretChanged)
     Q_PROPERTY(int caretGraceNotes READ caretGraceNotes NOTIFY caretChanged)
     Q_PROPERTY(QString caretChord READ caretChord NOTIFY caretChanged)
     Q_PROPERTY(QString caretText READ caretText NOTIFY caretChanged)
@@ -475,6 +476,9 @@ public:
     /// Puts the caret's beat under a crescendo or diminuendo (a core::Hairpin;
     /// 0 for none); neighbouring beats with the same one share a wedge (ADR-0078).
     Q_INVOKABLE void setHairpin(int hairpin);
+    /// Holds the caret's beat, a note or a rest, under a fermata (a
+    /// core::Fermata; 0 for none) (ADR-0085).
+    Q_INVOKABLE void setFermata(int fermata);
     /// Adds a grace note an eighth before the caret's beat, a whole tone below
     /// its note (above an open string or the first fret), or takes the beat's
     /// grace notes off when it has some (ADR-0079).
@@ -512,6 +516,7 @@ public:
     [[nodiscard]] int caretBassTechnique() const;
     [[nodiscard]] int caretStrum() const;
     [[nodiscard]] int caretHairpin() const;
+    [[nodiscard]] int caretFermata() const;
     [[nodiscard]] int caretGraceNotes() const;
     [[nodiscard]] QString caretChord() const;
     [[nodiscard]] QString caretText() const;

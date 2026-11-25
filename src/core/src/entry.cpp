@@ -779,10 +779,17 @@ Entry setBeatEffects(const Song& song, const Caret& at, const BeatEffects& effec
     }
     Measure content = measureAt(song, caret);
     Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
-    if (beat.notes.empty() || beat.effects == effects) {
+    BeatEffects changed = effects;
+    if (beat.notes.empty()) {
+        // A rest holds only a hairpin and a fermata (ADR-0078, ADR-0085).
+        changed = beat.effects;
+        changed.hairpin = effects.hairpin;
+        changed.fermata = effects.fermata;
+    }
+    if (beat.effects == changed) {
         return unchanged(caret);
     }
-    beat.effects = effects;
+    beat.effects = changed;
     return replace(caret, std::move(content), "Change beat effects");
 }
 
@@ -792,7 +799,10 @@ BeatEffects beatEffectsAt(const Song& song, const Caret& at) {
         return {};
     }
     const Beat& beat = voiceAt(song, caret).beats[caret.beat];
-    return beat.notes.empty() ? BeatEffects{} : beat.effects;
+    if (beat.notes.empty()) {
+        return BeatEffects{.hairpin = beat.effects.hairpin, .fermata = beat.effects.fermata};
+    }
+    return beat.effects;
 }
 
 Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration duration,

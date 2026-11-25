@@ -980,6 +980,37 @@ Rectangle {
                             active: root.document.caretGraceNotes > 0
                             onClicked: root.document.toggleGraceNote()
                         }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        // The caret's beat held under a fermata, numbered as
+                        // core::Fermata: short, normal and long (ADR-0085).
+                        BeatEffect {
+                            tip: qsTr("Short fermata")
+                            path: "M5 16 L12 8 L19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
+                            active: root.document.caretFermata === 1
+                            onClicked: root.document.setFermata(active ? 0 : 1)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Fermata")
+                            path: "M5 16 A7 7 0 0 1 19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
+                            active: root.document.caretFermata === 2
+                            onClicked: root.document.setFermata(active ? 0 : 2)
+                        }
+                        BeatEffect {
+                            tip: qsTr("Long fermata")
+                            path: "M5 16 L5 9 L19 9 L19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
+                            active: root.document.caretFermata === 3
+                            onClicked: root.document.setFermata(active ? 0 : 3)
+                        }
                     }
 
                     Label {

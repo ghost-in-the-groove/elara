@@ -51,7 +51,8 @@ constexpr int kClickVelocity = 80;
 // The tempo of every written measure, times `speed`, as segments: from an
 // offset (in whole notes, as a double) on, the speed in whole notes a second
 // holds, or moves by a slope per whole note after a gradual change (ADR-0082).
-// Exact offsets are converted once, so equal positions give equal seconds.
+// What a fermata holds runs its stretch times slower (ADR-0085). Exact offsets
+// are converted once, so equal positions give equal seconds.
 class TempoMap {
 public:
     TempoMap(const core::Song& song, double speed) : speed_(speed) {
@@ -112,6 +113,7 @@ public:
                 slope = changes[c].slope;
                 from = changes[c].at;
             }
+            hold(m, song.fermataHolds(m));
         }
         first_.push_back(segments_.size());
     }
@@ -134,6 +136,7 @@ public:
         double seconds = 0.0; // from the start of the measure
         double speed = 0.0;   // whole notes a second at `offset`
         double slope = 0.0;   // change of speed per whole note
+        double stretch = 1.0; // of the fermatas holding it: the written speed is speed * stretch
     };
 
     // The tempo segments of measure m, in order.
@@ -144,6 +147,51 @@ public:
 private:
     [[nodiscard]] double speedOf(const core::Tempo& tempo) const {
         return tempo.wholesPerSecond() * speed_;
+    }
+
+    // Cuts the segments of measure m (the last ones) where its holds start and
+    // end; a held stretch runs slower: speed and slope divided by its stretch.
+    void hold(std::size_t m, const std::vector<core::FermataHold>& holds) {
+        if (holds.empty()) {
+            return;
+        }
+        const std::vector<Segment> written(
+            segments_.begin() + static_cast<std::ptrdiff_t>(first_[m]), segments_.end());
+        std::vector<double> cuts;
+        for (const Segment& segment : written) {
+            cuts.push_back(segment.offset);
+        }
+        for (const core::FermataHold& held : holds) {
+            cuts.push_back(held.start.toDouble());
+            cuts.push_back(held.end.toDouble());
+        }
+        std::ranges::sort(cuts);
+        cuts.erase(std::ranges::unique(cuts).begin(), cuts.end());
+        segments_.resize(first_[m]);
+        std::size_t s = 0; // the written segment in force
+        std::size_t h = 0; // the first hold not ended
+        for (const double cut : cuts) {
+            while (s + 1 < written.size() && written[s + 1].offset <= cut) {
+                ++s;
+            }
+            while (h < holds.size() && holds[h].end.toDouble() <= cut) {
+                ++h;
+            }
+            const double stretch =
+                h < holds.size() && holds[h].start.toDouble() <= cut ? holds[h].stretch : 1.0;
+            const Segment& at = written[s];
+            Segment next{.offset = cut,
+                         .seconds = 0.0,
+                         .speed = (at.speed + at.slope * (cut - at.offset)) / stretch,
+                         .slope = at.slope / stretch,
+                         .stretch = stretch};
+            if (segments_.size() > first_[m]) {
+                const Segment& before = segments_.back();
+                next.seconds = before.seconds +
+                               core::rampSeconds(before.speed, before.slope, cut - before.offset);
+            }
+            segments_.push_back(next);
+        }
     }
 
     double speed_ = 1.0;
@@ -601,9 +649,10 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
         pulses_.push_back({.length = time.pulseLength().toDouble(),
                            .count = static_cast<int>((beats.numerator() + beats.denominator() - 1) /
                                                      beats.denominator())});
+        // A count-in keeps the written tempo, also where a fermata holds.
         for (const TempoMap::Segment& segment : tempo.segments(measure.measure)) {
-            tempi_.push_back(
-                {.time = measure.start + segment.seconds, .perWhole = 1.0 / segment.speed});
+            tempi_.push_back({.time = measure.start + segment.seconds,
+                              .perWhole = 1.0 / (segment.speed * segment.stretch)});
         }
     }
 

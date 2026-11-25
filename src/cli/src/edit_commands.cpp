@@ -205,6 +205,7 @@ constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kWhammyForm
 }};
 constexpr std::array<std::string_view, 4> kBassTechniques{"none", "tap", "slap", "pop"};
 constexpr std::array<std::string_view, 3> kHairpins{"none", "crescendo", "diminuendo"};
+constexpr std::array<std::string_view, 4> kFermatas{"none", "short", "normal", "long"};
 
 // Directions `strum` and `pick` take (ADR-0056).
 constexpr std::array<std::string_view, 3> kStrokeDirections{"none", "down", "up"};
@@ -360,10 +361,11 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         const int cents = step.has(2) ? step.number<int>(2) : kFullStep;
         edit = setBend(song, entry.caret, bendCurve(found->second, cents));
     } else if (verb == "strum" || verb == "pick" || verb == "tremolo" || verb == "whammy" ||
-               verb == "bass" || verb == "hairpin") {
+               verb == "bass" || verb == "hairpin" || verb == "fermata") {
         // strum|pick <down|up|none>, tremolo <8|16|32|none>,
         // whammy <dive|dip|pre-dive|return|none> [cents], bass <tap|slap|pop|none>,
-        // hairpin <crescendo|diminuendo|none>: the caret's beat
+        // hairpin <crescendo|diminuendo|none>, fermata <short|normal|long|none>:
+        // the caret's beat
         BeatEffects effects = beatEffectsAt(song, entry.caret);
         if (verb == "strum") {
             effects.strum = static_cast<Strum>(strokeDirection(verb, step.word(1)));
@@ -384,8 +386,10 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         } else if (verb == "bass") {
             effects.bassTechnique =
                 static_cast<BassTechnique>(kindOf(verb, step.word(1), kBassTechniques));
-        } else {
+        } else if (verb == "hairpin") {
             effects.hairpin = static_cast<Hairpin>(kindOf(verb, step.word(1), kHairpins));
+        } else {
+            effects.fermata = static_cast<Fermata>(kindOf(verb, step.word(1), kFermatas));
         }
         edit = setBeatEffects(song, entry.caret, effects);
     } else if (verb == "slide-in" || verb == "slide-out") {
@@ -902,7 +906,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "<down|up|none>\", "
         "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", "
         "\"whammy <dive|dip|pre-dive|return|none> [cents]\", \"bass <tap|slap|pop|none>\", "
-        "\"hairpin <crescendo|diminuendo|none>\", \"chord <name|none>\", \"text <words|none>\", "
+        "\"hairpin <crescendo|diminuendo|none>\", \"fermata <short|normal|long|none>\", "
+        "\"chord <name|none>\", \"text <words|none>\", "
         "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
         "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", \"harmonic "

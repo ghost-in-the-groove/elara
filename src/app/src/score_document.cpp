@@ -1677,6 +1677,19 @@ QString ScoreDocument::caretStatus() const {
         parts.append(hairpin == static_cast<int>(core::Hairpin::Crescendo) ? tr("Crescendo")
                                                                            : tr("Diminuendo"));
     }
+    switch (static_cast<core::Fermata>(caretFermata())) {
+    case core::Fermata::Short:
+        parts.append(tr("Short fermata"));
+        break;
+    case core::Fermata::Normal:
+        parts.append(tr("Fermata"));
+        break;
+    case core::Fermata::Long:
+        parts.append(tr("Long fermata"));
+        break;
+    case core::Fermata::None:
+        break;
+    }
     if (caretGraceNotes() > 0) {
         parts.append(tr("Grace notes"));
     }
@@ -2080,6 +2093,15 @@ void ScoreDocument::setHairpin(int hairpin) {
     applyBeatEffects(effects);
 }
 
+void ScoreDocument::setFermata(int fermata) {
+    if (fermata < 0 || fermata > static_cast<int>(core::Fermata::Long)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.fermata = static_cast<core::Fermata>(fermata);
+    applyBeatEffects(effects);
+}
+
 void ScoreDocument::toggleGraceNote() {
     if (caretGraceNotes() > 0) {
         runEntry([this](const core::Song& song) { return core::removeGraceNotes(song, caret_); });
@@ -2473,6 +2495,10 @@ int ScoreDocument::caretStrum() const {
 
 int ScoreDocument::caretHairpin() const {
     return static_cast<int>(beatEffectsAtCaret().hairpin);
+}
+
+int ScoreDocument::caretFermata() const {
+    return static_cast<int>(beatEffectsAtCaret().fermata);
 }
 
 QString ScoreDocument::caretText() const {

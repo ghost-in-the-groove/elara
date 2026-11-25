@@ -611,6 +611,32 @@ TEST_CASE("MusicXML export: beat text comes back as words", "[musicxml][export]"
     CHECK(exportMusicXml(song).warnings.empty());
 }
 
+TEST_CASE("MusicXML export: fermatas come back with their lengths", "[musicxml][export]") {
+    // ADR-0085: angled, normal and square fermatas on a note, a chord and a rest.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const auto key = [](int midi) {
+        return core::Note{.pitch = core::Pitch::fromMidi(midi)};
+    };
+    auto& beats = song.track(p).staff(0).measure(0).voices[0].beats;
+    beats = {beatOf(quarter, {key(60)}), beatOf(quarter, {key(64), key(67)}), beatOf(quarter),
+             beatOf(quarter, {key(72)})};
+    beats[0].effects.fermata = core::Fermata::Short;
+    beats[1].effects.fermata = core::Fermata::Normal;
+    beats[2].effects.fermata = core::Fermata::Long;
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    CHECK(exported.data.find(R"(<fermata type="upright">angled</fermata>)") != std::string::npos);
+    CHECK(exported.data.find(R"(<fermata type="upright">normal</fermata>)") != std::string::npos);
+    CHECK(exported.data.find(R"(<fermata type="upright">square</fermata>)") != std::string::npos);
+}
+
 TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
           "[musicxml][export]") {
     // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the

@@ -1426,6 +1426,7 @@ private:
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;
+            others.fermata = Fermata::None;
             if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
@@ -1437,9 +1438,10 @@ private:
             if (xmlStaves_ > 1) {
                 xml.number("staff", place.staff);
             }
-            if (place.tuplet != 0) {
+            if (place.tuplet != 0 || beat.effects.fermata != Fermata::None) {
                 xml.open("notations");
                 writeTupletMarks(xml, place.tuplet);
+                writeFermata(xml, beat.effects.fermata);
                 xml.close("notations");
             }
             writeLyrics(xml, place);
@@ -1469,6 +1471,18 @@ private:
             xml.number("normal-notes", duration.tuplet().normal());
             xml.close("time-modification");
         }
+    }
+
+    /// A fermata above the beat, its shape by its length (ADR-0085).
+    static void writeFermata(XmlWriter& xml, Fermata fermata) {
+        if (fermata == Fermata::None) {
+            return;
+        }
+        xml.start("fermata");
+        xml.attribute("type", "upright");
+        xml.endText("fermata", fermata == Fermata::Short  ? "angled"
+                               : fermata == Fermata::Long ? "square"
+                                                          : "normal");
     }
 
     static void writeTupletMarks(XmlWriter& xml, std::uint8_t marks) {
@@ -1593,8 +1607,9 @@ private:
             fx.staccato || fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
             fx.slideOut == SlideOut::Downwards || fx.slideOut == SlideOut::Upwards;
         const bool arpeggiate = beatFx.strum != Strum::None;
+        const bool fermata = firstNote && beatFx.fermata != Fermata::None;
         if (fx.tiedFromPrevious || tieStart || slideStop || slideStart || tupletMarks ||
-            ornaments || technical || articulations || arpeggiate) {
+            ornaments || technical || articulations || arpeggiate || fermata) {
             xml.open("notations");
             if (fx.tiedFromPrevious) {
                 xml.start("tied");
@@ -1619,6 +1634,9 @@ private:
             }
             if (tupletMarks) {
                 writeTupletMarks(xml, place.tuplet);
+            }
+            if (fermata) {
+                writeFermata(xml, beatFx.fermata);
             }
             if (ornaments) {
                 writeOrnaments(xml, fx, firstNote ? beatFx.tremoloPicking : std::nullopt,

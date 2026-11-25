@@ -333,6 +333,20 @@ TEST_CASE("Effects: strums, pick strokes and tremolo picking on the caret's beat
         CHECK(setBeatEffects(doc.song(), nothing, picked).command == nullptr);
         CHECK(beatEffectsAt(doc.song(), nothing) == BeatEffects{});
     }
+
+    // A rest can be held and fall under a hairpin, nothing else (ADR-0085).
+    const Caret rest = at(0, 2, 1);
+    BeatEffects held = picked;
+    held.fermata = Fermata::Long;
+    held.hairpin = Hairpin::Diminuendo;
+    run(doc, setBeatEffects(doc.song(), rest, held));
+    BeatEffects onRest;
+    onRest.fermata = Fermata::Long;
+    onRest.hairpin = Hairpin::Diminuendo;
+    CHECK(beatEffectsAt(doc.song(), rest) == onRest);
+    CHECK(doc.song().track(0).staff(0).measure(0).voices[0].beats[2].effects == onRest);
+    CHECK(setBeatEffects(doc.song(), rest, onRest).command == nullptr);
+    CHECK(setBeatEffects(doc.song(), at(1, 1, 1), held).command == nullptr); // the free slot
 }
 
 TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the caret's notes",
