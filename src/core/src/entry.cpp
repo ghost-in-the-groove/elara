@@ -787,12 +787,13 @@ Entry setBeatEffects(const Song& song, const Caret& at, const BeatEffects& effec
     Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
     BeatEffects changed = effects;
     if (beat.notes.empty()) {
-        // A rest holds only a hairpin, a fermata and a slur going on over it
-        // (ADR-0078, ADR-0085, ADR-0086).
+        // A rest holds only a hairpin, a fermata, a slur and an octave line
+        // going on over it (ADR-0078, ADR-0085, ADR-0086, ADR-0089).
         changed = beat.effects;
         changed.hairpin = effects.hairpin;
         changed.fermata = effects.fermata;
         changed.slur = effects.slur;
+        changed.ottava = effects.ottava;
     }
     if (beat.effects == changed) {
         return unchanged(caret);
@@ -810,7 +811,8 @@ BeatEffects beatEffectsAt(const Song& song, const Caret& at) {
     if (beat.notes.empty()) {
         return BeatEffects{.hairpin = beat.effects.hairpin,
                            .fermata = beat.effects.fermata,
-                           .slur = beat.effects.slur};
+                           .slur = beat.effects.slur,
+                           .ottava = beat.effects.ottava};
     }
     return beat.effects;
 }

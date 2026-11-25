@@ -200,7 +200,8 @@ enum class NoteEffect : std::uint8_t {
 /// Sets the effects of the caret's beat (ADR-0056): strum, pick stroke,
 /// tremolo picking, whammy bar and bass technique, which apply to all its
 /// notes, as one undo step ("Change beat effects"). Nothing changes when the
-/// beat has them already, on a rest or on the free slot.
+/// beat has them already or on the free slot; a rest takes only a hairpin, a
+/// fermata, a slur and an octave line (ADR-0089).
 [[nodiscard]] Entry setBeatEffects(const Song& song, const Caret& caret,
                                    const BeatEffects& effects);
 

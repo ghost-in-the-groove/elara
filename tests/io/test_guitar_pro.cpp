@@ -432,6 +432,29 @@ TEST_CASE("Guitar Pro: a tenuto note is held, with a staccato portato", "[io][gu
     }
 }
 
+TEST_CASE("Guitar Pro: a beat's Ottavia is its octave line", "[io][guitarpro]") {
+    // ADR-0089: 8va, 8vb, 15ma and 15mb; the notes keep their pitches.
+    const std::string quarter = R"(<Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>)";
+    const std::array names{"8va", "8vb", "15ma", "15mb"};
+    std::string beats;
+    for (std::size_t b = 0; b < names.size(); ++b) {
+        beats += std::format(
+            R"(<Beat id="{}"><Rhythm ref="0"/><Ottavia>{}</Ottavia><Notes>0</Notes></Beat>)", b,
+            names[b]);
+    }
+    const auto imported = importGpif(guitarScore(0, "0 1 2 3", beats, quarter));
+    REQUIRE(imported.has_value());
+    const auto& played = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(played.size() == 4);
+    using enum core::Ottava;
+    CHECK(played[0].effects.ottava == Alta);
+    CHECK(played[1].effects.ottava == Bassa);
+    CHECK(played[2].effects.ottava == QuindicesimaAlta);
+    CHECK(played[3].effects.ottava == QuindicesimaBassa);
+    CHECK(played[0].notes.at(0).pitch == played[3].notes.at(0).pitch);
+    CHECK(imported->warnings.empty());
+}
+
 TEST_CASE("Guitar Pro: a tapped note taps its beat", "[io][guitarpro]") {
     // ADR-0060: the model taps beats, Guitar Pro notes, with either hand.
     const std::string beats = R"(<Beat id="0"><Rhythm ref="0"/><Notes>1</Notes></Beat>)"

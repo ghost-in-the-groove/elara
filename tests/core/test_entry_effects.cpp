@@ -335,18 +335,20 @@ TEST_CASE("Effects: strums, pick strokes and tremolo picking on the caret's beat
         CHECK(beatEffectsAt(doc.song(), nothing) == BeatEffects{});
     }
 
-    // A rest can be held, slurred over and fall under a hairpin, nothing else
-    // (ADR-0085, ADR-0086).
+    // A rest can be held, slurred over and fall under a hairpin or an octave
+    // line, nothing else (ADR-0085, ADR-0086, ADR-0089).
     const Caret rest = at(0, 2, 1);
     BeatEffects held = picked;
     held.fermata = Fermata::Long;
     held.hairpin = Hairpin::Diminuendo;
     held.slur = true;
+    held.ottava = Ottava::Alta;
     run(doc, setBeatEffects(doc.song(), rest, held));
     BeatEffects onRest;
     onRest.fermata = Fermata::Long;
     onRest.hairpin = Hairpin::Diminuendo;
     onRest.slur = true;
+    onRest.ottava = Ottava::Alta;
     CHECK(beatEffectsAt(doc.song(), rest) == onRest);
     CHECK(doc.song().track(0).staff(0).measure(0).voices[0].beats[2].effects == onRest);
     CHECK(setBeatEffects(doc.song(), rest, onRest).command == nullptr);

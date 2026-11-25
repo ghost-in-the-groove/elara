@@ -543,9 +543,8 @@ BendCurve bendOf(pugi::xml_node note) {
 /// one over its properties rather than a search for each.
 struct BeatFields {
     pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
-        hairpin, chord, freeText, lyrics;
-    bool fading = false, wah = false, ottava = false, whammyBar = false, slapped = false,
-         popped = false;
+        hairpin, chord, freeText, lyrics, ottava;
+    bool fading = false, wah = false, whammyBar = false, slapped = false, popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
         for (const pugi::xml_node child : beat.children()) {
@@ -572,10 +571,11 @@ struct BeatFields {
                 freeText = child;
             } else if (name == "Lyrics") {
                 lyrics = child;
+            } else if (name == "Ottavia") {
+                ottava = child;
             } else {
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
-                ottava = ottava || name == "Ottavia";
             }
         }
     }
@@ -893,9 +893,6 @@ private:
         if (fields.wah) {
             warnings_.add(who, "wah dropped", m);
         }
-        if (fields.ottava) {
-            warnings_.add(who, "octave signs dropped", m);
-        }
         if (fields.whammyBar) {
             warnings_.add(who, "whammy bar dropped", m);
         }
@@ -921,6 +918,18 @@ private:
             effects.hairpin = core::Hairpin::Diminuendo;
         } else if (!hairpin.empty()) {
             warnings_.add(who, "unknown hairpins dropped", m);
+        }
+        // The octave line over the beat (ADR-0089).
+        if (const std::string ottava = trimmed(textOf(fields.ottava)); ottava == "8va") {
+            effects.ottava = core::Ottava::Alta;
+        } else if (ottava == "8vb") {
+            effects.ottava = core::Ottava::Bassa;
+        } else if (ottava == "15ma") {
+            effects.ottava = core::Ottava::QuindicesimaAlta;
+        } else if (ottava == "15mb") {
+            effects.ottava = core::Ottava::QuindicesimaBassa;
+        } else if (!ottava.empty()) {
+            warnings_.add(who, "unknown octave lines dropped", m);
         }
         if (fields.slapped) {
             effects.bassTechnique = core::BassTechnique::Slap;

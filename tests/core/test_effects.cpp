@@ -20,6 +20,8 @@ using elara::core::naturalHarmonicSemitones;
 using elara::core::Note;
 using elara::core::NoteEffects;
 using elara::core::NoteValue;
+using elara::core::Ottava;
+using elara::core::ottavaOctaves;
 using elara::core::PickStroke;
 using elara::core::SlideIn;
 using elara::core::SlideOut;
@@ -203,4 +205,20 @@ TEST_CASE("A whammy bar's form and depth go down or up from the written pitch", 
     CHECK_THROWS_AS(whammyCurve(BendForm::Custom, -200), std::invalid_argument);
     CHECK_THROWS_AS(whammyCurve(BendForm::Bend, 0), std::invalid_argument);
     CHECK_THROWS_AS(whammyCurve(BendForm::Bend, -BendCurve::kMaxCents - 1), std::invalid_argument);
+}
+
+TEST_CASE("Octave lines move the written notes one or two octaves", "[core][effects]") {
+    // ADR-0089: notes under 8va sound an octave above where they are written.
+    CHECK(ottavaOctaves(Ottava::None) == 0);
+    CHECK(ottavaOctaves(Ottava::Alta) == 1);
+    CHECK(ottavaOctaves(Ottava::Bassa) == -1);
+    CHECK(ottavaOctaves(Ottava::QuindicesimaAlta) == 2);
+    CHECK(ottavaOctaves(Ottava::QuindicesimaBassa) == -2);
+    BeatEffects effects;
+    CHECK(effects.ottava == Ottava::None);
+    effects.ottava = Ottava::QuindicesimaBassa; // the largest value fits its bits
+    effects.slur = true;
+    CHECK(effects.ottava == Ottava::QuindicesimaBassa);
+    CHECK(effects.slur);
+    CHECK(effects != BeatEffects{});
 }

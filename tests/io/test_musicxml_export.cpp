@@ -639,6 +639,58 @@ TEST_CASE("MusicXML export: fermatas come back with their lengths", "[musicxml][
     CHECK(exported.data.find(R"(<fermata type="upright">square</fermata>)") != std::string::npos);
 }
 
+TEST_CASE("MusicXML export: octave lines come back on every voice of their staff",
+          "[musicxml][export]") {
+    // ADR-0089: one octave-shift per run of the staff's first voice, which the
+    // import gives every voice; 8va over a rest and into the next measure,
+    // 15ma, and 8vb on the left hand.
+    core::Song song;
+    song.appendMeasures(2);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const core::Duration half(core::NoteValue::Half);
+    const core::Duration whole(core::NoteValue::Whole);
+    const auto key = [](int midi) {
+        return core::Note{.pitch = core::Pitch::fromMidi(midi)};
+    };
+    using enum core::Ottava;
+    core::Staff& right = song.track(p).staff(0);
+    auto& first = right.measure(0).voices[0].beats;
+    first = {beatOf(quarter, {key(72)}), beatOf(quarter, {key(76)}), beatOf(quarter, {key(79)}),
+             beatOf(quarter)};
+    first[1].effects.ottava = first[2].effects.ottava = first[3].effects.ottava = Alta;
+    auto& lower = right.measure(0).voices[1].beats;
+    lower = {beatOf(half, {key(69)}), beatOf(half, {key(72)})};
+    lower[1].effects.ottava = Alta;
+    auto& second = right.measure(1).voices[0].beats;
+    second = {beatOf(quarter, {key(84)}), beatOf(quarter, {key(74)}), beatOf(half, {key(88)})};
+    second[0].effects.ottava = Alta;
+    second[2].effects.ottava = QuindicesimaAlta;
+    core::Staff& left = song.track(p).staff(1);
+    for (std::size_t m = 0; m < 2; ++m) {
+        left.measure(m).voices[0].beats = {beatOf(whole, {key(36)})};
+        left.measure(m).voices[0].beats[0].effects.ottava = Bassa;
+    }
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const auto count = [&](std::string_view text) {
+        std::size_t found = 0;
+        for (std::size_t at = exported.data.find(text); at != std::string::npos;
+             at = exported.data.find(text, at + 1)) {
+            ++found;
+        }
+        return found;
+    };
+    CHECK(count(R"(<octave-shift type="down" size="8")") == 1);
+    CHECK(count(R"(<octave-shift type="down" size="15")") == 1);
+    CHECK(count(R"(<octave-shift type="up" size="8")") == 1);
+    CHECK(count(R"(<octave-shift type="stop")") == 3);
+}
+
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
     // ADR-0086: a slur starts on the first beat slurred in a row and stops on
     // the beat after the last, across barlines, numbered by staff and voice; a

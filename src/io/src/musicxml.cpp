@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace elara::io {
@@ -790,11 +791,12 @@ std::optional<ChordDiagram> frameDiagram(pugi::xml_node frame, int strings) {
     return played ? std::optional(std::move(diagram)) : std::nullopt;
 }
 
-/// Where a wedge starts (its hairpin) or stops (None).
-struct HairpinMark {
+/// Where a wedge (ADR-0078) or an octave line (ADR-0089) starts, or stops
+/// (None).
+struct SpanMark {
     Fraction onset{};
     std::optional<std::size_t> staff{}; // nullopt: every staff
-    Hairpin hairpin = Hairpin::None;
+    std::variant<Hairpin, Ottava> value{};
 };
 
 struct Bend {
@@ -1072,7 +1074,8 @@ public:
         : info_(info), layout_(std::move(layout)), first_(first), score_(score),
           warnings_(warnings), voiceIds_(layout_.staves.size()),
           dynamics_(layout_.staves.size(), Dynamic::MF),
-          hairpins_(layout_.staves.size(), Hairpin::None), measures_(layout_.staves.size()) {
+          hairpins_(layout_.staves.size(), Hairpin::None),
+          ottavas_(layout_.staves.size(), Ottava::None), measures_(layout_.staves.size()) {
         nextClefs_.resize(layout_.staves.size());
         clefs_.reserve(layout_.staves.size());
         for (const Staff& staff : layout_.staves) {
@@ -1144,7 +1147,7 @@ private:
         // Buffers reused from measure to measure.
         std::vector<Event>& events = events_;
         std::vector<DynamicMark>& dynamics = dynamicMarks_;
-        std::vector<HairpinMark>& hairpins = hairpinMarks_;
+        std::vector<SpanMark>& hairpins = hairpinMarks_;
         std::vector<TempoMark>& tempos = tempoMarks_;
         std::vector<ChordMark>& chords = chordMarks_;
         std::vector<TextMark>& texts = textMarks_;
@@ -1228,7 +1231,7 @@ private:
                 for (DynamicMark& mark : dynamics) {
                     mark.onset += shift;
                 }
-                for (HairpinMark& mark : hairpins) {
+                for (SpanMark& mark : hairpins) {
                     mark.onset += shift;
                 }
                 for (ChordMark& mark : chords) {
@@ -1523,7 +1526,7 @@ private:
 
     // `header`: the first part's measure, which takes the signs and jumps.
     void readDirection(pugi::xml_node direction, const Fraction& cursor, std::size_t index,
-                       std::vector<DynamicMark>& dynamics, std::vector<HairpinMark>& hairpins,
+                       std::vector<DynamicMark>& dynamics, std::vector<SpanMark>& hairpins,
                        std::vector<TempoMark>& tempos, std::vector<TextMark>& texts,
                        MeasureHeader* header) {
         const Fraction onset = std::max(
@@ -1540,7 +1543,6 @@ private:
         for (pugi::xml_node type : direction.children("direction-type")) {
             for (pugi::xml_node mark : type.children()) {
                 const std::string_view name = mark.name();
-                const bool stop = isType(mark, "stop") || isType(mark, "continue");
                 if (name == "dynamics") {
                     if (const auto dynamic = dynamicOf(mark)) {
                         dynamics.push_back(
@@ -1568,10 +1570,24 @@ private:
                                                                          : Hairpin::None;
                     if (hairpin != Hairpin::None || isType(mark, "stop")) {
                         hairpins.push_back(
-                            HairpinMark{.onset = onset, .staff = staff, .hairpin = hairpin});
+                            SpanMark{.onset = onset, .staff = staff, .value = hairpin});
                     }
-                } else if (name == "octave-shift" && !stop) {
-                    warn("octave lines dropped", index);
+                } else if (name == "octave-shift") {
+                    // From its start to its stop (ADR-0089): "down" writes the
+                    // notes an octave lower than they sound (8va), size 15 two.
+                    const int size = mark.attribute("size").as_int(8);
+                    Ottava ottava = Ottava::None;
+                    if (isType(mark, "down")) {
+                        ottava = size == 15 ? Ottava::QuindicesimaAlta : Ottava::Alta;
+                    } else if (isType(mark, "up")) {
+                        ottava = size == 15 ? Ottava::QuindicesimaBassa : Ottava::Bassa;
+                    }
+                    if (size != 8 && size != 15 && ottava != Ottava::None) {
+                        warn("octave lines of three octaves dropped", index);
+                    } else if (ottava != Ottava::None || isType(mark, "stop")) {
+                        hairpins.push_back(
+                            SpanMark{.onset = onset, .staff = staff, .value = ottava});
+                    }
                 } else if (name == "pedal" && isType(mark, "start")) {
                     warn("pedal marks dropped", index);
                 }
@@ -2271,7 +2287,7 @@ private:
     }
 
     void build(std::size_t index, std::vector<Event>& events, std::vector<DynamicMark>& dynamics,
-               std::vector<HairpinMark>& hairpins, const TimeSignature& time) {
+               std::vector<SpanMark>& hairpins, const TimeSignature& time) {
         const std::size_t staffCount = layout_.staves.size();
         std::vector<Measure> built(staffCount);
         auto& ends = ends_;
@@ -2432,7 +2448,7 @@ private:
         }
 
         mergeTab(index, events, built, placed);
-        std::ranges::stable_sort(hairpins, std::less<>{}, &HairpinMark::onset);
+        std::ranges::stable_sort(hairpins, std::less<>{}, &SpanMark::onset);
         for (std::size_t staff = 0; staff < staffCount; ++staff) {
             if (!isPercussion()) {
                 checkPositions(layout_.staves[staff], built[staff], index);
@@ -2446,6 +2462,7 @@ private:
                 }
             }
             markHairpins(built[staff], staff, hairpins);
+            markOttavas(built[staff], staff, hairpins);
             measures_[staff].push_back(std::move(built[staff]));
         }
         for (const DynamicMark& mark : dynamics) {
@@ -2460,13 +2477,14 @@ private:
     /// The wedges of a measure go on the beats of the staff's first voice that
     /// start under them; the hairpin in force carries over to the next measure.
     /// `marks` are in time order.
-    void markHairpins(Measure& measure, std::size_t staff, const std::vector<HairpinMark>& marks) {
+    void markHairpins(Measure& measure, std::size_t staff, const std::vector<SpanMark>& marks) {
         Hairpin& state = hairpins_[staff];
         auto mark = marks.begin();
         const auto passUntil = [&](const std::optional<Fraction>& at) {
             for (; mark != marks.end() && (!at || mark->onset <= *at); ++mark) {
-                if (!mark->staff || *mark->staff == staff) {
-                    state = mark->hairpin;
+                const auto* hairpin = std::get_if<Hairpin>(&mark->value);
+                if (hairpin != nullptr && (!mark->staff || *mark->staff == staff)) {
+                    state = *hairpin;
                 }
             }
         };
@@ -2481,6 +2499,33 @@ private:
             }
         }
         passUntil(std::nullopt);
+    }
+
+    /// The octave lines of a measure (ADR-0089) go on the beats of every voice
+    /// that start under them, rests too; the line in force carries over to the
+    /// next measure. `marks` are in time order.
+    void markOttavas(Measure& measure, std::size_t staff, const std::vector<SpanMark>& marks) {
+        const auto pass = [staff](const SpanMark& mark, Ottava& state) {
+            const auto* ottava = std::get_if<Ottava>(&mark.value);
+            if (ottava != nullptr && (!mark.staff || *mark.staff == staff)) {
+                state = *ottava;
+            }
+        };
+        for (Voice& voice : measure.voices) {
+            Ottava state = ottavas_[staff];
+            auto mark = marks.begin();
+            Fraction at;
+            for (Beat& beat : voice.beats) {
+                for (; mark != marks.end() && mark->onset <= at; ++mark) {
+                    pass(*mark, state);
+                }
+                beat.effects.ottava = state;
+                at += beat.duration.length();
+            }
+        }
+        for (const SpanMark& mark : marks) {
+            pass(mark, ottavas_[staff]);
+        }
     }
 
     /// A TAB staff repeats the notes of its standard staff: its string, fret and
@@ -2562,6 +2607,7 @@ private:
     std::vector<std::vector<std::string>> voiceIds_;   // per staff, MusicXML voice ids
     std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
     std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
+    std::vector<Ottava> ottavas_;                      // per staff, at the end of the last measure
     std::map<int, SlurEnd> openSlurs_{};               // by number: where each open slur starts
     std::vector<std::pair<SlurEnd, SlurEnd>> slurs_{}; // closed slurs, from start to stop
     std::vector<std::vector<Measure>> measures_;       // per staff
@@ -2571,7 +2617,7 @@ private:
     static constexpr std::size_t kNoSlot = static_cast<std::size_t>(-1);
     std::vector<Event> events_{};
     std::vector<DynamicMark> dynamicMarks_{};
-    std::vector<HairpinMark> hairpinMarks_{};
+    std::vector<SpanMark> hairpinMarks_{};
     std::vector<ChordMark> chordMarks_{};
     std::vector<TextMark> textMarks_{};
     std::vector<TempoMark> tempoMarks_{};

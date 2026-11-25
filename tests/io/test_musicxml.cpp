@@ -328,6 +328,43 @@ TEST_CASE("MusicXML: tenuto marks hold their notes, detached-legato is portato",
     CHECK(result.warnings.empty());
 }
 
+TEST_CASE("MusicXML: octave shifts become the octave lines of the beats under them", "[musicxml]") {
+    // ADR-0089: "down" writes the notes an octave (size 15: two) lower than
+    // their pitch, 8va; every voice's beats from the start to the stop take
+    // the line, which carries on into the next measure; pitches stay.
+    const auto shift = [](std::string_view attributes) {
+        return std::format("<direction><direction-type><octave-shift {}/></direction-type>"
+                           "</direction>",
+                           attributes);
+    };
+    const std::string lowerVoice =
+        "<backup><duration>16</duration></backup>"
+        "<note><pitch><step>G</step><octave>3</octave></pitch><duration>8</duration>"
+        "<voice>2</voice><type>half</type></note>"
+        "<note><pitch><step>B</step><octave>3</octave></pitch><duration>8</duration>"
+        "<voice>2</voice><type>half</type></note>";
+    const ImportResult result = parse(
+        onePart(quarterNote("C", "") + shift(R"(type="down" size="8")") + quarterNote("D", "") +
+                quarterNote("E", "") + quarterNote("F", "") + lowerVoice +
+                R"(</measure><measure number="2">)" + quarterNote("G", "") +
+                shift(R"(type="stop" size="8")") + quarterNote("A", "") +
+                shift(R"(type="up" size="15")") + quarterNote("B", "") + quarterNote("C", "")));
+    const auto lines = [&](std::size_t measure, std::size_t voice) {
+        std::vector<core::Ottava> found;
+        for (const core::Beat& beat : voiceOf(result.song, 0, 0, measure, voice).beats) {
+            found.push_back(beat.effects.ottava);
+        }
+        return found;
+    };
+    using enum core::Ottava;
+    CHECK(lines(0, 0) == std::vector{None, Alta, Alta, Alta});
+    CHECK(lines(0, 1) == std::vector{None, Alta});
+    CHECK(lines(1, 0) == std::vector{Alta, None, QuindicesimaBassa, QuindicesimaBassa});
+    CHECK(voiceOf(result.song, 0, 0, 0).beats[1].notes.at(0).pitch ==
+          core::Pitch(core::Step::D, 0, 4));
+    CHECK(result.warnings.empty());
+}
+
 TEST_CASE("MusicXML: lyrics give each beat a syllable per verse", "[musicxml]") {
     // ADR-0084: <lyric number> is the verse; begin and middle syllables join
     // the next one with a hyphen; elided syllables share the beat; <extend/>
@@ -625,7 +662,7 @@ TEST_CASE("MusicXML: parts read on several threads give the same result as on on
         "<harmony><numeral><numeral-root>5</numeral-root></numeral><kind>major</kind></harmony>",
         "<figured-bass><figure><figure-number>6</figure-number></figure></figured-bass>",
         "",
-        R"(<direction><direction-type><octave-shift type="down" size="8"/></direction-type></direction>)",
+        R"(<direction><direction-type><octave-shift type="down" size="22"/></direction-type></direction>)",
         "<barline><fermata/></barline>"};
     std::string xml = R"(<score-partwise version="4.0"><part-list>)";
     for (std::size_t p = 0; p < kExtras.size(); ++p) {
