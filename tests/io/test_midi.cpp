@@ -33,6 +33,7 @@ using elara::core::KeySignature;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pedal;
+using elara::core::PedalSpan;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
@@ -739,6 +740,14 @@ TEST_CASE("MIDI import gives back a song written the way the importer writes", "
     bass.measure(2).voices[0].beats = {chordBeat(dottedHalf, {k(2, 46)})};
     bass.measure(3).voices[0].beats = {chordBeat(dottedQuarter, {k(3, 41)}),
                                        chordBeat(dottedQuarter, {k(3, 46)})};
+    // The sustain pedal down from measure 2, changed in its middle and held to
+    // the end (ADR-0092).
+    bass.measure(1).voices[0].beats[0].effects.pedal = Pedal::Down;
+    bass.measure(1).voices[0].beats[1].effects.pedal = Pedal::Change;
+    bass.measure(2).voices[0].beats[0].effects.pedal = Pedal::Down;
+    for (Beat& beat : bass.measure(3).voices[0].beats) {
+        beat.effects.pedal = Pedal::Down;
+    }
 
     auto& strings = song.track(guitar).staff(0);
     strings.measure(0).voices[0].beats = {
@@ -1054,20 +1063,72 @@ TEST_CASE("MIDI import rejects what is not a Standard MIDI File", "[io][midi]") 
 
 TEST_CASE("MIDI import lists what the model cannot hold", "[io][midi]") {
     const std::vector<Event> events{
-        program(0, 0, 0),
-        {0, bytes({0xB0, 64, 127})}, // sustain pedal down
-        {0, bytes({0xE0, 0, 0x50})}, // pitch bend up
-        on(0, 0, 60),
-        off(480, 0, 60),
+        program(0, 0, 0),    {0, bytes({0xE0, 0, 0x50})}, // pitch bend up
+        on(0, 0, 60),        off(480, 0, 60),
         program(480, 0, 40), // a second program on the channel
         on(480, 0, 62),      // never released
     };
     const auto imported = importMidi(bytesOf(smf(1, 480, {events})));
     REQUIRE(imported.has_value());
     CHECK(imported->warnings ==
-          std::vector<std::string>{"sustain pedal dropped", "pitch bends dropped",
-                                   "program changes dropped",
+          std::vector<std::string>{"pitch bends dropped", "program changes dropped",
                                    "notes without a note-off end with their track"});
+}
+
+TEST_CASE("MIDI import reads the sustain pedal into the beats it holds", "[io][midi]") {
+    // ADR-0092: a piano played at 480 ticks per quarter, the pedal going down
+    // just after the beats it holds and coming up just before or after the
+    // next. Up and down again together is a change. The beats of the lowest
+    // staff with notes carry it.
+    std::vector<Event> events{program(0, 0, 0)};
+    const auto play = [&events](std::int64_t start, std::int64_t end, int key) {
+        events.push_back(on(start, 0, key));
+        events.push_back(off(end, 0, key));
+    };
+    const auto pedal = [&events](std::int64_t tick, int value) {
+        events.push_back({tick, bytes({0xB0, 64, value})});
+    };
+    // Measure 1: C3 in quarters under E5 in halves; down on the first two,
+    // changed on the third, up for the fourth.
+    for (std::int64_t i = 0; i < 4; ++i) {
+        play(480 * i, 480 * i + 470, 48);
+    }
+    play(0, 950, 76);
+    play(960, 1910, 76);
+    pedal(30, 127);
+    pedal(950, 0);
+    pedal(990, 100);
+    pedal(1420, 10);
+    // Measure 2: E5 alone, under the pedal. Measure 3: C3 alone, the pedal
+    // changed at the barline (up at 3800, down at 3860).
+    play(1920, 3830, 76);
+    pedal(1940, 127);
+    pedal(3800, 0);
+    play(3840, 5750, 48);
+    pedal(3860, 127);
+    pedal(5730, 0);
+    std::ranges::stable_sort(events, {}, &Event::tick);
+
+    const auto imported = importMidi(bytesOf(smf(0, 480, {events})));
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const Song& song = imported->song;
+    REQUIRE(song.measureCount() == 3);
+    REQUIRE(song.track(0).staffCount() == 2);
+    const auto pedals = [&song](std::size_t staff, std::size_t measure) {
+        std::vector<Pedal> found;
+        for (const Beat& beat : song.track(0).staff(staff).measure(measure).voices[0].beats) {
+            found.push_back(beat.effects.pedal);
+        }
+        return found;
+    };
+    CHECK(pedals(1, 0) == std::vector<Pedal>{Pedal::Down, Pedal::Down, Pedal::Change, Pedal::None});
+    CHECK(pedals(0, 0) == std::vector<Pedal>{Pedal::None, Pedal::None});
+    CHECK(pedals(0, 1) == std::vector<Pedal>{Pedal::Down});
+    CHECK(pedals(1, 2) == std::vector<Pedal>{Pedal::Change});
+    CHECK(song.pedalSpans(0, 0) ==
+          std::vector<PedalSpan>{{.start = Fraction(0), .end = Fraction(1, 2)},
+                                 {.start = Fraction(1, 2), .end = Fraction(3, 4), .change = true}});
 }
 
 TEST_CASE("MIDI import of random songs keeps every note, and a second pass changes nothing",

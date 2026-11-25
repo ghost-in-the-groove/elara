@@ -1,9 +1,7 @@
 {
  "format": "midi",
  "out": null,
- "warnings": [
-  "sustain pedal dropped"
- ],
+ "warnings": [],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -241,7 +239,10 @@
              "dynamic": "mp"
             }
            }
-          ]
+          ],
+          "effects": {
+           "pedal": "down"
+          }
          },
          {
           "duration": "2",
@@ -258,7 +259,10 @@
              "dynamic": "mp"
             }
            }
-          ]
+          ],
+          "effects": {
+           "pedal": "down"
+          }
          }
         ]
        ],
@@ -279,7 +283,10 @@
              "dynamic": "mp"
             }
            }
-          ]
+          ],
+          "effects": {
+           "pedal": "down"
+          }
          },
          {
           "duration": "2",
@@ -296,7 +303,10 @@
              "dynamic": "mp"
             }
            }
-          ]
+          ],
+          "effects": {
+           "pedal": "down"
+          }
          }
         ]
        ],

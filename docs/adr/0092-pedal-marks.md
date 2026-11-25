@@ -39,7 +39,12 @@ voice of their staff, the pedal staying down from one measure to the next, and
 writes a line with "Ped." (`line="yes" sign="yes"`) once per staff: start before
 the first beat, change before a changed beat, stop after the last. Sostenuto
 marks warn "sostenuto pedal marks dropped". MIDI export writes controller 64 at
-127 where a pedalling starts and 0 where it ends.
+127 where a pedalling starts and 0 where it ends. MIDI import reads it back, 64
+or more being down: each pedalling, on the grid the notes are quantized to,
+goes on the beats it reaches in the first voice of the lowest staff with notes
+in each measure (rests included, which fill the measure); a beat reached by a
+later pedalling than the beat before changes the pedal, so a pedal lifted and
+pressed again around a beat, as played, becomes a change there.
 
 **Drawn** on standard notation under the staff, below the ink and the dynamics:
 "Ped." at the first beat, a line along its foot to just before the beat where
@@ -60,5 +65,7 @@ entry bar that goes down, changes and comes up on successive clicks.
   effect.
 - The sequencer and MIDI export read the pedallings of every measure of a track
   with pedal marks; tracks without any skip that work.
+- A pedal played in a measure with no notes in its track has no beat to go on:
+  it comes up at the barline before.
 - Not covered: the star style ("Ped." and "*" without a line), half pedalling,
-  the sostenuto and soft pedals, and reading controller 64 back from MIDI files.
+  and the sostenuto and soft pedals.
