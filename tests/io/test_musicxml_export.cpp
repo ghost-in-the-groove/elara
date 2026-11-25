@@ -691,6 +691,38 @@ TEST_CASE("MusicXML export: octave lines come back on every voice of their staff
     CHECK(count(R"(<octave-shift type="stop")") == 3);
 }
 
+TEST_CASE("MusicXML export: trills come back, with an accidental mark for an unusual note",
+          "[musicxml][export]") {
+    // ADR-0090: in F major A trills with Bb unless written otherwise; a trill
+    // to B natural needs an accidental mark. Trills down and other speeds warn.
+    core::Song song;
+    song.appendMeasures(1);
+    song.measureHeader(0).keySignature = core::KeySignature(-1, core::KeyMode::Major);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const auto trilled = [](std::string_view pitch, int semitones) {
+        core::Note note{.pitch = *core::Pitch::parse(pitch)};
+        note.effects.trill = core::Trill{.semitones = static_cast<std::int8_t>(semitones)};
+        return note;
+    };
+    auto& beats = song.track(p).staff(0).measure(0).voices[0].beats;
+    beats = {beatOf(quarter, {trilled("A4", 1)}), beatOf(quarter, {trilled("A4", 2)}),
+             beatOf(quarter, {trilled("E5", 1)}), beatOf(quarter)};
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    CHECK(exported.data.find("<accidental-mark>natural</accidental-mark>") != std::string::npos);
+
+    beats[3] = beatOf(quarter, {trilled("C5", -2)});
+    beats[3].notes[0].effects.trill.speed = core::NoteValue::Sixteenth;
+    const auto warned = exportMusicXml(song);
+    CHECK(hasWarning(warned.warnings,
+                     "trills to a lower note written as trills to the next step up"));
+}
+
 TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
     // ADR-0086: a slur starts on the first beat slurred in a row and stops on
     // the beat after the last, across barlines, numbered by staff and voice; a

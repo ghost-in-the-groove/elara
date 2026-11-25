@@ -266,9 +266,9 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
     const ImportResult result = load("quartet.gp4");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{
-              "triplet feel dropped", "Drums: instrument and volume changes dropped (measure 2)",
-              "Melody: trills dropped (measure 2)", "Melody: lyrics after the last note dropped"});
+          std::vector<std::string>{"triplet feel dropped",
+                                   "Drums: instrument and volume changes dropped (measure 2)",
+                                   "Melody: lyrics after the last note dropped"});
     CHECK(core::validate(song).empty());
     // Each track reads its own channel: the bass at 12 of 16, balance 4 (half
     // left), the drums full, the others at Guitar Pro's default 13.
@@ -360,6 +360,9 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
     CHECK(tune[2].notes[0].effects.bend ==
           core::BendCurve({{.position = 0, .cents = 0}, {.position = 100, .cents = 100}}));
     CHECK(melody.staff(0).measure(1).voices[0].beats[1].notes[0].effects.tiedFromPrevious);
+    // A trill from fret 5 to fret 7 in thirty-seconds (ADR-0090).
+    CHECK(melody.staff(0).measure(1).voices[0].beats[2].notes[0].effects.trill ==
+          core::Trill{.semitones = 2, .speed = NoteValue::ThirtySecond});
 }
 
 TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong to the beat",

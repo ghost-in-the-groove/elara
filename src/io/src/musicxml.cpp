@@ -2024,7 +2024,7 @@ private:
                 } else if (name == "articulations") {
                     readArticulations(mark, fx, index);
                 } else if (name == "ornaments") {
-                    readOrnaments(mark, event, fx, index);
+                    readOrnaments(mark, event, note, index);
                 }
             }
         }
@@ -2108,9 +2108,22 @@ private:
         }
     }
 
-    void readOrnaments(pugi::xml_node ornaments, Event& event, NoteEffects& fx, std::size_t index) {
+    void readOrnaments(pugi::xml_node ornaments, Event& event, Note& note, std::size_t index) {
+        NoteEffects& fx = note.effects;
+        // A trill's wavy line is the trill's, not a vibrato (ADR-0090).
+        const bool trill = static_cast<bool>(ornaments.child("trill-mark"));
+        std::optional<int> otherAlter; // from an accidental mark: the other note's
         for (pugi::xml_node mark : ornaments.children()) {
             const std::string_view name = mark.name();
+            if (name == "trill-mark") {
+                continue;
+            }
+            if (name == "accidental-mark") {
+                if (trill) {
+                    otherAlter = accidentalAlter(textView(mark));
+                }
+                continue;
+            }
             if (name == "tremolo") {
                 const std::string_view type = mark.attribute("type").value();
                 if (type.empty() || type == "single") {
@@ -2122,14 +2135,48 @@ private:
                     warn("tremolos between notes dropped", index);
                 }
             } else if (name == "wavy-line") {
-                if (isType(mark, "start")) {
+                if (isType(mark, "start") && !trill) {
                     const bool wide = mark.attribute("smufl").value() == detail::kWideVibratoGlyph;
                     fx.vibrato = wide ? Vibrato::Wide : Vibrato::Slight;
                 }
-            } else if (name != "accidental-mark") {
+            } else {
                 warn("ornaments dropped", index);
             }
         }
+        if (trill) {
+            // To the next step of the key unless an accidental mark says
+            // otherwise, at thirty-seconds.
+            int semitones = core::semitonesToNextStep(note.pitch, concertKey_);
+            if (otherAlter) {
+                const auto next = static_cast<Step>((static_cast<int>(note.pitch.step()) + 1) % 7);
+                semitones += *otherAlter - concertKey_.alterFor(next);
+            }
+            if (semitones > 0 && semitones <= Trill::kMaxSemitones) {
+                fx.trill = Trill{.semitones = static_cast<std::int8_t>(semitones)};
+            } else {
+                warn("trills to an unusual note dropped", index);
+            }
+        }
+    }
+
+    // The alteration an accidental mark writes; nullopt for one it does not.
+    static std::optional<int> accidentalAlter(std::string_view text) {
+        if (text == "sharp") {
+            return 1;
+        }
+        if (text == "natural") {
+            return 0;
+        }
+        if (text == "flat") {
+            return -1;
+        }
+        if (text == "double-sharp" || text == "sharp-sharp") {
+            return 2;
+        }
+        if (text == "flat-flat") {
+            return -2;
+        }
+        return std::nullopt;
     }
 
     // ---- Building voices ---------------------------------------------------------

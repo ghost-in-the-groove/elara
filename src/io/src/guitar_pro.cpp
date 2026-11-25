@@ -602,7 +602,8 @@ private:
 struct NoteFields {
     pugi::xml_node tie, vibrato, accent, articulation;
     pugi::xml_node string, fret, midi, concertPitch, slide, harmonicType, harmonicFret;
-    bool letRing = false, ghost = false, trill = false, ornament = false;
+    pugi::xml_node trill;
+    bool letRing = false, ghost = false, ornament = false;
     bool palmMuted = false, muted = false, hopoDestination = false, bended = false, tapped = false;
 
     explicit NoteFields(pugi::xml_node note) {
@@ -618,10 +619,11 @@ struct NoteFields {
                 accent = child;
             } else if (name == "InstrumentArticulation") {
                 articulation = child;
+            } else if (name == "Trill") {
+                trill = child;
             } else {
                 letRing = letRing || name == "LetRing";
                 ghost = ghost || name == "AntiAccent";
-                trill = trill || name == "Trill";
                 ornament = ornament || name == "Ornament";
             }
         }
@@ -1020,6 +1022,18 @@ private:
             note.position = position;
         }
         readNoteEffects(node, fields, note.effects, who, m);
+        // A trill names the MIDI key of its other note; Guitar Pro plays it
+        // in sixteenths (ADR-0090).
+        if (fields.trill) {
+            const auto other = intOf(textOf(fields.trill));
+            const int semitones = other ? *other - note.pitch.midiNumber() : 0;
+            if (semitones != 0 && std::abs(semitones) <= core::Trill::kMaxSemitones) {
+                note.effects.trill = core::Trill{.semitones = static_cast<std::int8_t>(semitones),
+                                                 .speed = core::NoteValue::Sixteenth};
+            } else {
+                warnings_.add(who, "trills to an unusual note dropped", m);
+            }
+        }
         return note;
     }
 
@@ -1083,9 +1097,6 @@ private:
             } else if (!kind.empty() && kind != "NoHarmonic") {
                 warnings_.add(who, "feedback harmonics dropped", m);
             }
-        }
-        if (fields.trill) {
-            warnings_.add(who, "trills dropped", m);
         }
         if (fields.ornament) {
             warnings_.add(who, "ornaments dropped", m);

@@ -382,6 +382,17 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     CHECK(setVibrato(doc.song(), caret, Vibrato::Wide).command == nullptr);
     CHECK(setAccent(doc.song(), caret, Accent::Marcato).command == nullptr);
 
+    // Trills to any note, at any speed (ADR-0090).
+    const Trill trill{.semitones = 2, .speed = NoteValue::Sixteenth};
+    run(doc, setTrill(doc.song(), caret, trill));
+    CHECK(doc.undoName() == "Change trill");
+    CHECK(noteEffectsAt(doc.song(), caret).trill == trill);
+    CHECK(noteEffectsAt(doc.song(), caret).vibrato == Vibrato::Wide);
+    CHECK(setTrill(doc.song(), caret, trill).command == nullptr);
+    CHECK_THROWS_AS(setTrill(doc.song(), caret, Trill{.semitones = 13}), std::out_of_range);
+    run(doc, setTrill(doc.song(), caret, Trill{}));
+    CHECK(!noteEffectsAt(doc.song(), caret).trill.isTrill());
+
     // Harmonics: natural at the note's fret, the others an octave above the
     // fretted note; none removes it.
     run(doc, setHarmonic(doc.song(), caret, HarmonicKind::Natural));

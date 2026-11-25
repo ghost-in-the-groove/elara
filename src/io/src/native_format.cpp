@@ -428,6 +428,12 @@ private:
             }
             add(object, "harmonic", harmonic);
         }
+        if (fx.trill.isTrill()) {
+            yyjson_mut_val* trill = yyjson_mut_obj(doc_);
+            addInt(trill, "semitones", fx.trill.semitones);
+            addText(trill, "speed", Duration(fx.trill.speed).toString());
+            add(object, "trill", trill);
+        }
         addFlag(object, "tiedFromPrevious", fx.tiedFromPrevious);
         addFlag(object, "legatoFromPrevious", fx.legatoFromPrevious);
         addEnumIfNot(object, "slideIn", kSlideInNames, fx.slideIn, SlideIn::None);
@@ -1101,6 +1107,23 @@ private:
                     fail(std::format("harmonic fret outside 0..{}", Tuning::kMaxFret));
                 }
                 fx.harmonic.fretTenths = static_cast<std::int16_t>(tenths);
+            }
+        }
+        if (yyjson_val* trill = optionalObject(object, "trill")) {
+            Scope scope(*this, "trill");
+            const auto semitones =
+                integer(trill, "semitones", -Trill::kMaxSemitones, Trill::kMaxSemitones);
+            if (semitones == 0) {
+                fail("a trill needs semitones other than 0");
+            }
+            fx.trill.semitones = static_cast<std::int8_t>(semitones);
+            if (yyjson_obj_get(trill, "speed") != nullptr) {
+                const Duration speed = duration(trill, "speed");
+                if (speed.dots() != 0 || !speed.tuplet().isNone()) {
+                    Scope inner(*this, "speed");
+                    fail("expected a plain note value such as 32");
+                }
+                fx.trill.speed = speed.value();
             }
         }
         fx.tiedFromPrevious = flag(object, "tiedFromPrevious");

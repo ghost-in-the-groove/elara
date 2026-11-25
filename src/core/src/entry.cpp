@@ -756,6 +756,14 @@ Entry setAccent(const Song& song, const Caret& at, Accent accent) {
                          [accent](Note& note) { note.effects.accent = accent; });
 }
 
+Entry setTrill(const Song& song, const Caret& at, Trill trill) {
+    if (std::abs(trill.semitones) > Trill::kMaxSemitones) {
+        throw std::out_of_range("setTrill: a trill goes at most an octave away");
+    }
+    return changeEffects(song, at, "Change trill",
+                         [trill](Note& note) { note.effects.trill = trill; });
+}
+
 Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
     constexpr std::int16_t kOctave = 120; // tenths of a fret above the fretted note
     constexpr int kTenths = 10;

@@ -45,6 +45,7 @@ using elara::core::TempoChange;
 using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::TrackMix;
+using elara::core::Trill;
 using elara::core::Tuning;
 using elara::core::Vibrato;
 
@@ -502,6 +503,38 @@ TEST_CASE("Sequence: portato notes sound three quarters of their length, tenuto 
     CHECK_THAT(sequence.notes()[0].end, WithinAbs(0.75, kEpsilon));
     CHECK_THAT(sequence.notes()[1].start, WithinAbs(1.0, kEpsilon));
     CHECK_THAT(sequence.notes()[1].end, WithinAbs(1.5, kEpsilon));
+}
+
+TEST_CASE("Sequence: a trill alternates with its other note at its speed",
+          "[audio][sequence][articulation]") {
+    // ADR-0090: from the note itself, in sixteenths over a half note (1 s at
+    // 120 BPM); the next note is untouched.
+    Song song = pianoSong(1);
+    Note trilled = note(64);
+    trilled.effects.trill = Trill{.semitones = 1, .speed = NoteValue::Sixteenth};
+    voice(song, 0) = {beat(NoteValue::Half, {trilled}), beat(NoteValue::Half, {note(60)})};
+    const Sequence sequence(song);
+    REQUIRE(sequence.notes().size() == 9);
+    for (std::size_t i = 0; i < 8; ++i) {
+        CAPTURE(i);
+        CHECK(sequence.notes()[i].key == (i % 2 == 0 ? 64 : 65));
+        CHECK_THAT(sequence.notes()[i].start, WithinAbs(0.125 * static_cast<double>(i), kEpsilon));
+        CHECK_THAT(sequence.notes()[i].end,
+                   WithinAbs(0.125 * static_cast<double>(i + 1), kEpsilon));
+    }
+    CHECK(sequence.notes()[8].key == 60);
+    CHECK_THAT(sequence.notes()[8].start, WithinAbs(1.0, kEpsilon));
+
+    // Down to the note below, and at most one alternation for a short note.
+    trilled.effects.trill = Trill{.semitones = -2, .speed = NoteValue::ThirtySecond};
+    voice(song, 0) = {beat(NoteValue::Quarter, {trilled}), beat(NoteValue::SixtyFourth, {trilled})};
+    const Sequence down(song);
+    REQUIRE(down.notes().size() >= 9);
+    CHECK(down.notes()[0].key == 64);
+    CHECK(down.notes()[1].key == 62);
+    CHECK(down.notes()[7].key == 62);
+    CHECK(down.notes()[8].key == 64); // the sixty-fourth: too short to alternate
+    CHECK(down.notes().size() == 9);
 }
 
 TEST_CASE("Sequence: let ring holds a note until its string is struck again",
