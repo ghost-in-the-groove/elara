@@ -1211,6 +1211,15 @@ void Startup::queueEffects() {
               "the status does not name the diminuendo");
         score_->setHairpin(0);
         check(score_->caretHairpin() == 0, "the diminuendo did not go");
+        // Fermatas (ADR-0085).
+        score_->setFermata(static_cast<int>(core::Fermata::Long));
+        check(score_->caretFermata() == static_cast<int>(core::Fermata::Long) &&
+                  score_->caretBassTechnique() != 0,
+              "the long fermata did not join the beat's effects");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Long fermata")),
+              "the status does not name the long fermata");
+        score_->setFermata(0);
+        check(score_->caretFermata() == 0, "the fermata did not go");
         // Grace notes (ADR-0079): the beat may already lead in with some,
         // which the toggle takes away first.
         if (score_->caretGraceNotes() > 0) {

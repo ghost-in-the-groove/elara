@@ -14,6 +14,35 @@ namespace elara::core {
 
 namespace {
 
+// Seconds from the start of the song to `target` whole notes into it at its
+// written tempos, fermatas aside. From one tempo to the next the speed holds,
+// or moves linearly along the score after a gradual change (ADR-0082):
+// seconds add up change by change.
+double writtenSeconds(const Tempo& startTempo, const std::vector<MeasureHeader>& headers,
+                      double target) {
+    double seconds = 0.0;
+    double from = 0.0; // where the tempo in force started
+    double speed = startTempo.wholesPerSecond();
+    bool gradual = false;
+    Fraction start;
+    for (const MeasureHeader& header : headers) {
+        for (const TempoChange& change : header.tempoChanges) {
+            const double at = (start + change.offset).toDouble();
+            const double next = change.tempo.wholesPerSecond();
+            const double slope = gradual && at > from ? (next - speed) / (at - from) : 0.0;
+            seconds += rampSeconds(speed, slope, std::min(at, target) - from);
+            if (at >= target) {
+                return seconds;
+            }
+            from = at;
+            speed = next;
+            gradual = change.gradual;
+        }
+        start += header.timeSignature.measureLength();
+    }
+    return seconds + rampSeconds(speed, 0.0, target - from);
+}
+
 // The field of `info` (const or not) that holds `credit`.
 template <typename Info>
 auto& creditIn(Info& info, Credit credit) {
@@ -351,31 +380,77 @@ std::vector<std::size_t> Song::playOrder() const {
 
 double Song::secondsAt(std::size_t measure, const Fraction& offset) const {
     checkPosition(measure, offset);
-    // From one tempo to the next the speed holds, or moves linearly along the
-    // score after a gradual change (ADR-0082): seconds add up change by change,
-    // up to `target` whole notes into the song.
-    const double target = (measureStart(measure) + offset).toDouble();
-    double seconds = 0.0;
-    double from = 0.0; // where the tempo in force started
-    double speed = startTempo_.wholesPerSecond();
-    bool gradual = false;
+    const Fraction target = measureStart(measure) + offset;
+    const auto written = [this](const Fraction& at) {
+        return writtenSeconds(startTempo_, headers_, at.toDouble());
+    };
+    double seconds = written(target);
+    // A hold before `target` adds stretch - 1 times the time of what it holds.
     Fraction start;
-    for (const MeasureHeader& header : headers_) {
-        for (const TempoChange& change : header.tempoChanges) {
-            const double at = (start + change.offset).toDouble();
-            const double next = change.tempo.wholesPerSecond();
-            const double slope = gradual && at > from ? (next - speed) / (at - from) : 0.0;
-            seconds += rampSeconds(speed, slope, std::min(at, target) - from);
-            if (at >= target) {
-                return seconds;
+    for (std::size_t m = 0; m < measureCount() && start < target; ++m) {
+        for (const FermataHold& hold : fermataHolds(m)) {
+            const Fraction from = start + hold.start;
+            if (from >= target) {
+                break;
             }
-            from = at;
-            speed = next;
-            gradual = change.gradual;
+            const Fraction to = std::min(start + hold.end, target);
+            seconds += (hold.stretch - 1.0) * (written(to) - written(from));
         }
-        start += header.timeSignature.measureLength();
+        start += headers_[m].timeSignature.measureLength();
     }
-    return seconds + rampSeconds(speed, 0.0, target - from);
+    return seconds;
+}
+
+std::vector<FermataHold> Song::fermataHolds(std::size_t measure) const {
+    if (measure >= measureCount()) {
+        throw std::out_of_range("Song::fermataHolds: measure out of range");
+    }
+    std::vector<FermataHold> held;
+    for (const Track& track : tracks_) {
+        for (std::size_t s = 0; s < track.staffCount(); ++s) {
+            for (const Voice& voice : track.staff(s).measure(measure).voices) {
+                Fraction at;
+                for (const Beat& beat : voice.beats) {
+                    const Fraction length = beat.duration.length();
+                    if (beat.effects.fermata != Fermata::None) {
+                        held.push_back({.start = at,
+                                        .end = at + length,
+                                        .stretch = fermataStretch(beat.effects.fermata)});
+                    }
+                    at += length;
+                }
+            }
+        }
+    }
+    if (held.empty()) {
+        return held;
+    }
+    // Cut at every start and end; each piece takes the longest stretch over it.
+    std::vector<Fraction> cuts;
+    for (const FermataHold& hold : held) {
+        cuts.push_back(hold.start);
+        cuts.push_back(hold.end);
+    }
+    std::ranges::sort(cuts);
+    cuts.erase(std::ranges::unique(cuts).begin(), cuts.end());
+    std::vector<FermataHold> holds;
+    for (std::size_t i = 0; i + 1 < cuts.size(); ++i) {
+        double stretch = 1.0;
+        for (const FermataHold& hold : held) {
+            if (hold.start <= cuts[i] && cuts[i + 1] <= hold.end) {
+                stretch = std::max(stretch, hold.stretch);
+            }
+        }
+        if (stretch == 1.0) {
+            continue;
+        }
+        if (!holds.empty() && holds.back().end == cuts[i] && holds.back().stretch == stretch) {
+            holds.back().end = cuts[i + 1];
+        } else {
+            holds.push_back({.start = cuts[i], .end = cuts[i + 1], .stretch = stretch});
+        }
+    }
+    return holds;
 }
 
 Tempo Song::tempoAt(std::size_t measure, const Fraction& offset) const {

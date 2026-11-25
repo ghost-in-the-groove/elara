@@ -28,6 +28,7 @@ using elara::core::Beat;
 using elara::core::BendCurve;
 using elara::core::Duration;
 using elara::core::Dynamic;
+using elara::core::Fermata;
 using elara::core::Fraction;
 using elara::core::HarmonicKind;
 using elara::core::Instrument;
@@ -333,6 +334,42 @@ TEST_CASE("Sequence: a gradual tempo change speeds the notes up on the way", "[a
     // Played at half speed, every time doubles.
     const Sequence slow(song, {.speed = 0.5});
     CHECK_THAT(slow.duration(), WithinAbs(2.0 * sequence.duration(), kEpsilon));
+}
+
+TEST_CASE("Sequence: a fermata holds its beat and what sounds under it", "[audio][sequence]") {
+    // ADR-0085: at quarter = 60, a half note under a fermata lasts 4 s instead
+    // of 2; the music after it comes 2 s later, also on the next pass of a
+    // repeat, and the metronome slows with it; a count-in does not.
+    Song song = pianoSong(2);
+    song.setStartTempo(Tempo(60.0));
+    song.measureHeader(0).repeatStart = true;
+    song.measureHeader(0).repeatTimes = 2;
+    Beat held = beat(NoteValue::Half, {note(64)});
+    held.effects.fermata = Fermata::Normal;
+    voice(song, 0) = {beat(NoteValue::Quarter, {note(60)}), beat(NoteValue::Quarter, {note(62)}),
+                      held};
+    voice(song, 1) = {beat(NoteValue::Whole, {note(65)})};
+    const Sequence sequence(song, {.metronome = true});
+    const auto& notes = sequence.notes();
+    REQUIRE(notes.size() == 7);
+    CHECK_THAT(notes[2].start, WithinAbs(2.0, kEpsilon));
+    CHECK_THAT(notes[2].end, WithinAbs(6.0, kEpsilon));
+    CHECK_THAT(notes[3].start, WithinAbs(6.0, kEpsilon)); // the second pass
+    CHECK_THAT(notes[5].end, WithinAbs(12.0, kEpsilon));
+    CHECK_THAT(notes[6].start, WithinAbs(12.0, kEpsilon));
+    CHECK_THAT(sequence.duration(), WithinAbs(16.0, kEpsilon));
+    CHECK_THAT(sequence.countInAt(3.0).interval, WithinAbs(1.0, kEpsilon));
+    // Clicks on the four beats: the last two 2 s apart.
+    std::vector<double> clicks;
+    for (const NoteEvent& event : sequence.events()) {
+        if (event.kind == EventKind::NoteOn && event.track == sequence.metronomeTrack() &&
+            event.time < 6.0) {
+            clicks.push_back(event.time);
+        }
+    }
+    REQUIRE(clicks.size() == 4);
+    CHECK_THAT(clicks[2], WithinAbs(2.0, kEpsilon));
+    CHECK_THAT(clicks[3], WithinAbs(4.0, kEpsilon));
 }
 
 TEST_CASE("Sequence: tied notes sound for their whole written length", "[audio][sequence]") {

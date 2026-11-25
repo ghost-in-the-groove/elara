@@ -467,8 +467,23 @@ private:
             tuplet(group);
         }
         centreMeasureRests(start, barline);
+        fermatas(start, barline);
         if (techniques_) {
             markTechniques(positions, barline);
+        }
+    }
+
+    // The fermatas of the measure's beats (ADR-0085), centred on the notehead
+    // or the rest: above, or under the staff for the lower voice of two.
+    void fermatas(double start, double barline) {
+        const double centre = widthOf(Glyph::NoteheadBlack) / 2;
+        for (const Chord& chord : chords_) {
+            if (chord.beat == nullptr || chord.beat->effects.fermata == core::Fermata::None) {
+                continue;
+            }
+            const bool below = voiceCount_ > 1 && !voiceUp_[chord.voice];
+            fermata(chord.beat->effects.fermata,
+                    chord.measureRest ? (start + barline) / 2 : chord.x + centre, below);
         }
     }
 

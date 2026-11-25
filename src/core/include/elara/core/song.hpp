@@ -219,6 +219,16 @@ enum class Credit : std::uint8_t {
 [[nodiscard]] const std::string& creditOf(const SongInfo& info, Credit credit);
 [[nodiscard]] std::string& creditOf(SongInfo& info, Credit credit);
 
+/// A stretch of a measure held by fermatas (ADR-0085): from `start` to `end`
+/// whole notes into the measure, time runs `stretch` times slower.
+struct FermataHold {
+    Fraction start;
+    Fraction end;
+    double stretch = 1.0;
+
+    friend bool operator==(const FermataHold&, const FermataHold&) = default;
+};
+
 /// The whole document (ADR-0004). Keeps every staff of every track at exactly
 /// measureCount() measures.
 class Song {
@@ -294,9 +304,14 @@ public:
     /// Length of the whole song in whole notes.
     [[nodiscard]] Fraction length() const { return measureStart(measureCount()); }
 
-    /// Seconds from the start of the song to a position. Throws
-    /// std::out_of_range for a position outside the song.
+    /// Seconds from the start of the song to a position, its fermatas held.
+    /// Throws std::out_of_range for a position outside the song.
     [[nodiscard]] double secondsAt(std::size_t measure, const Fraction& offset = {}) const;
+
+    /// What the fermatas of measure m hold (ADR-0085): the beats of every staff
+    /// and voice under one, the longest stretch where they overlap, in order and
+    /// apart. Throws std::out_of_range for m >= measureCount().
+    [[nodiscard]] std::vector<FermataHold> fermataHolds(std::size_t measure) const;
     [[nodiscard]] double durationSeconds() const { return secondsAt(measureCount()); }
 
     /// Tempo in force at a position (a change exactly there counts).

@@ -65,6 +65,7 @@ constexpr double kBeatTextSize = 1.4;        // font size of a beat's text
 constexpr double kBeatTextInkGap = 0.6;      // between the ink below and the lowest row
 constexpr double kBeatTextSpace = 1.0;       // between two texts on one row
 constexpr double kBeatTextRowGap = 0.2;      // between rows
+constexpr double kFermataGap = 0.5;          // between a fermata and the ink or staff by it
 
 // The frets a diagram shows: from its first fret to its highest, at least
 // kChordMinFrets.
@@ -132,6 +133,90 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
         }
     }
     for (const PolygonItem& item : list.polygons) {
+        for (const Point& point : item.points) {
+            cover(point.y);
+        }
+    }
+    return {.top = top, .bottom = bottom};
+}
+
+Extents inkExtents(const DisplayList& list, const EngravingFont& font, double staffHeight,
+                   double left, double right) {
+    const double half = font.defaults().staffLineThickness / 2;
+    double top = -half;
+    double bottom = staffHeight + half;
+    const auto cover = [&](double y) {
+        top = std::min(top, y);
+        bottom = std::max(bottom, y);
+    };
+    // A straight edge from `from` to `to`: where it lies over [left, right].
+    const auto edge = [&](Point from, Point to, double reach) {
+        if (from.x > to.x) {
+            std::swap(from, to);
+        }
+        if (to.x < left || from.x > right) {
+            return;
+        }
+        const double run = to.x - from.x;
+        if (run <= 0.0) { // upright: all of it lies over the span
+            for (const double y : {from.y, to.y}) {
+                cover(y - reach);
+                cover(y + reach);
+            }
+            return;
+        }
+        const auto at = [&](double x) {
+            return from.y + (to.y - from.y) * (x - from.x) / run;
+        };
+        for (const double x : {std::max(from.x, left), std::min(to.x, right)}) {
+            cover(at(x) - reach);
+            cover(at(x) + reach);
+        }
+    };
+    for (const GlyphItem& item : list.glyphs) {
+        const BoundingBox& box = font.metrics(item.glyph).box;
+        if (item.origin.x + box.northEast.x * item.scale < left ||
+            item.origin.x + box.southWest.x * item.scale > right) {
+            continue;
+        }
+        cover(item.origin.y - box.northEast.y * item.scale);
+        cover(item.origin.y - box.southWest.y * item.scale);
+    }
+    for (const LineItem& item : list.lines) {
+        edge(item.from, item.to, item.thickness / 2);
+    }
+    for (const BeamItem& item : list.beams) {
+        edge(item.left, item.right, item.thickness / 2);
+    }
+    for (const TextItem& item : list.texts) {
+        const double width = textWidth(item.text, item.size);
+        const double from = item.align == TextAlign::Left    ? item.origin.x
+                            : item.align == TextAlign::Right ? item.origin.x - width
+                                                             : item.origin.x - width / 2;
+        if (from + width < left || from > right) {
+            continue;
+        }
+        cover(item.origin.y - kTextAscent * item.size);
+        cover(item.origin.y + kTextDescent * item.size);
+    }
+    for (const CurveItem& item : list.curves) {
+        const auto [low, high] =
+            std::minmax({item.from.x, item.control1.x, item.control2.x, item.to.x});
+        if (high < left || low > right) {
+            continue;
+        }
+        for (const Point& point : {item.from, item.control1, item.control2, item.to}) {
+            cover(point.y);
+        }
+    }
+    for (const PolygonItem& item : list.polygons) {
+        if (item.points.empty()) {
+            continue;
+        }
+        const auto [low, high] = std::ranges::minmax(item.points, {}, &Point::x);
+        if (high.x < left || low.x > right) {
+            continue;
+        }
         for (const Point& point : item.points) {
             cover(point.y);
         }
@@ -1467,6 +1552,30 @@ double StaffWriter::inkTop() const {
 
 double StaffWriter::inkBottom() const {
     return inkExtents(list_, font_, height_).bottom;
+}
+
+Extents StaffWriter::inkBetween(double left, double right) const {
+    return inkExtents(list_, font_, height_, left, right);
+}
+
+void StaffWriter::fermata(core::Fermata fermata, double centre, bool below) {
+    using enum core::Fermata;
+    if (fermata == None) {
+        return;
+    }
+    const Glyph mark =
+        fermata == Short  ? (below ? Glyph::FermataShortBelow : Glyph::FermataShortAbove)
+        : fermata == Long ? (below ? Glyph::FermataLongBelow : Glyph::FermataLongAbove)
+                          : (below ? Glyph::FermataBelow : Glyph::FermataAbove);
+    const BoundingBox& box = metrics(mark).box;
+    const double x = centre - (box.southWest.x + box.northEast.x) / 2;
+    const Extents ink = inkBetween(x + box.southWest.x, x + box.northEast.x);
+    // Its flat side towards the staff, kFermataGap from the ink.
+    if (below) {
+        glyph(mark, x, ink.bottom + kFermataGap + box.northEast.y, Role::Fermata);
+    } else {
+        glyph(mark, x, ink.top - kFermataGap + box.southWest.y, Role::Fermata);
+    }
 }
 
 StaffWriter::TupletNumber StaffWriter::tupletNumber(int count) const {

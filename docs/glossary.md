@@ -92,6 +92,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | vibrato | vibrato | `Vibrato` | |
 | dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()`, `Role::Dynamic` | How loud a note is played, ppp ... fff (mf by default); set at the caret, it holds until the next change (ADR-0047), and a mark under the staff shows where it changes (ADR-0044) |
 | regulador | hairpin (crescendo, diminuendo) | `Hairpin`, `BeatEffects::hairpin`, `Role::Hairpin` | A wedge under the staff over beats that get louder or softer; consecutive beats with the same hairpin share one (ADR-0078) |
+| calderón | fermata | `Fermata`, `BeatEffects::fermata`, `FermataHold`, `Role::Fermata` | A beat, a note or a rest, held longer than written while every voice waits: short (1.5 times), normal (twice) or long (three times) (ADR-0085) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
 | señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
 | sección / marcador / ensayo | section (marker, rehearsal mark) | `MeasureHeader::section`, `changeSection()` | The named part of a song (intro, chorus...) that starts at a measure and runs to the next one that names a section (ADR-0062) |

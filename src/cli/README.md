@@ -216,6 +216,8 @@ notes to any of their kinds (ADR-0058). `whammy <dive|dip|pre-dive|return|none>
 positive cents) and `bass <tap|slap|pop|none>` a bass technique (ADR-0060).
 `hairpin <crescendo|diminuendo|none>` puts the caret's beat under a hairpin;
 neighbouring beats with the same one share a wedge (ADR-0078).
+`fermata <short|normal|long|none>` holds the caret's beat, a note or a rest,
+half as long again, twice or three times as long (ADR-0085).
 `grace <semitones> [duration] [on]` adds a grace note that many semitones from
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says

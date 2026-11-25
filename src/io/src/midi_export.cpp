@@ -16,6 +16,8 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <functional>
+#include <limits>
 #include <numeric>
 #include <string_view>
 #include <tuple>
@@ -218,6 +220,56 @@ double quarterBpm(const core::Tempo& tempo) {
     return tempo.bpm() * tempo.beatUnit().length().toDouble() * 4.0;
 }
 
+/// A tempo written at a tick, in microseconds per quarter note.
+struct TempoAt {
+    std::int64_t tick = 0;
+    long long micros = 0;
+};
+
+/// What a fermata holds, in ticks of the played song (ADR-0085).
+struct HeldTicks {
+    std::int64_t start = 0;
+    std::int64_t end = 0;
+    double stretch = 1.0;
+};
+
+/// The tempos `written` (tick-ordered) with the holds (ordered and apart)
+/// played slower: at a hold's start the tempo in force times its stretch, any
+/// tempo inside it stretched too, and at its end the tempo in force again.
+std::vector<TempoAt> holdTempos(const std::vector<TempoAt>& written,
+                                const std::vector<HeldTicks>& holds) {
+    const auto stretched = [](long long micros, double stretch) {
+        return std::clamp(std::llround(static_cast<double>(micros) * stretch), 1LL, 0xFFFFFFLL);
+    };
+    std::vector<TempoAt> out;
+    out.reserve(written.size() + 2 * holds.size());
+    long long inForce = detail::microsecondsFromBpm(120.0); // the MIDI default
+    std::size_t w = 0;
+    // Writes the tempos before `tick`, stretched by `stretch`.
+    const auto writeUpTo = [&](std::int64_t tick, double stretch) {
+        for (; w < written.size() && written[w].tick < tick; ++w) {
+            inForce = written[w].micros;
+            out.push_back({written[w].tick, stretched(inForce, stretch)});
+        }
+    };
+    for (std::size_t h = 0; h < holds.size(); ++h) {
+        const HeldTicks& hold = holds[h];
+        writeUpTo(hold.start, 1.0);
+        for (; w < written.size() && written[w].tick == hold.start; ++w) {
+            inForce = written[w].micros; // replaced by its stretched tempo
+        }
+        out.push_back({hold.start, stretched(inForce, hold.stretch)});
+        writeUpTo(hold.end, hold.stretch);
+        const bool next = h + 1 < holds.size() && holds[h + 1].start == hold.end;
+        const bool writtenThere = w < written.size() && written[w].tick == hold.end;
+        if (!next && !writtenThere) {
+            out.push_back({hold.end, inForce});
+        }
+    }
+    writeUpTo(std::numeric_limits<std::int64_t>::max(), 1.0);
+    return out;
+}
+
 MidiTrack conductorTrack(const Song& song, const PlayedMeasures& played, const Timing& timing,
                          Warnings& warnings) {
     MidiTrack track;
@@ -235,13 +287,12 @@ MidiTrack conductorTrack(const Song& song, const PlayedMeasures& played, const T
         warnings.add("", "song info other than the title and copyright dropped");
     }
 
-    // Returns the microseconds per quarter note written.
+    // Returns the microseconds per quarter note written. The tempos go into
+    // the track at the end, with what fermatas hold.
+    std::vector<TempoAt> tempos;
     const auto tempoMeta = [&](std::int64_t tick, double bpm) {
         const long long micros = std::clamp(detail::microsecondsFromBpm(bpm), 1LL, 0xFFFFFFLL);
-        track.events.push_back(
-            meta(tick, detail::kMetaTempo,
-                 bytes({static_cast<int>((micros >> 16) & 0xFF),
-                        static_cast<int>((micros >> 8) & 0xFF), static_cast<int>(micros & 0xFF)})));
+        tempos.push_back({tick, micros});
         return micros;
     };
     const auto checkBeatUnit = [&](const core::Tempo& tempo, std::size_t m) {
@@ -370,6 +421,29 @@ MidiTrack conductorTrack(const Song& song, const PlayedMeasures& played, const T
     if (played.order.empty()) {
         tempoEvent(0, song.startTempo(), 0, true);
     }
+
+    // What fermatas hold plays slower (ADR-0085), on every pass.
+    std::vector<HeldTicks> holds;
+    for (std::size_t k = 0; k < played.order.size(); ++k) {
+        for (const core::FermataHold& hold : song.fermataHolds(played.order[k])) {
+            const Fraction start = played.start[k] + hold.start;
+            const HeldTicks held{.start = timing.ticks(start),
+                                 .end = timing.ticks(played.start[k] + hold.end),
+                                 .stretch = hold.stretch};
+            if (held.end > held.start) {
+                holds.push_back(held);
+            }
+        }
+    }
+    std::ranges::stable_sort(tempos, std::less<>{}, &TempoAt::tick);
+    for (const TempoAt& tempo : holdTempos(tempos, holds)) {
+        const long long micros = tempo.micros;
+        track.events.push_back(
+            meta(tempo.tick, detail::kMetaTempo,
+                 bytes({static_cast<int>((micros >> 16) & 0xFF),
+                        static_cast<int>((micros >> 8) & 0xFF), static_cast<int>(micros & 0xFF)})));
+    }
+    std::ranges::stable_sort(track.events, std::less<>{}, &MidiEvent::tick);
     track.end = timing.ticks(played.start.back());
     return track;
 }

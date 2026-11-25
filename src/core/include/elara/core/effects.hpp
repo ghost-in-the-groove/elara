@@ -150,6 +150,24 @@ enum class BassTechnique : std::uint8_t { None, Tap, Slap, Pop };
 /// A wedge under the staff over the beat: the music gets louder or softer
 /// (ADR-0078). Consecutive beats with the same hairpin share one wedge.
 enum class Hairpin : std::uint8_t { None, Crescendo, Diminuendo };
+/// A pause over the beat (ADR-0085): the beat is held longer than written.
+enum class Fermata : std::uint8_t { None, Short, Normal, Long };
+
+/// How many times its written length a beat under `fermata` lasts: a short
+/// fermata half as long again, a normal one twice, a long one three times.
+[[nodiscard]] constexpr double fermataStretch(Fermata fermata) noexcept {
+    switch (fermata) {
+    case Fermata::Short:
+        return 1.5;
+    case Fermata::Normal:
+        return 2.0;
+    case Fermata::Long:
+        return 3.0;
+    case Fermata::None:
+        break;
+    }
+    return 1.0;
+}
 
 /// Effects that apply to every note of a beat.
 struct BeatEffects {
@@ -159,6 +177,7 @@ struct BeatEffects {
     std::optional<NoteValue> tremoloPicking{}; // speed of the repeated notes
     BassTechnique bassTechnique = BassTechnique::None;
     Hairpin hairpin = Hairpin::None;
+    Fermata fermata = Fermata::None;
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

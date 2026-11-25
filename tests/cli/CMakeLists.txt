@@ -505,6 +505,25 @@ add_test(NAME cli.edit_rejects_unknown_hairpin
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "hairpin swell")
 set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES WILL_FAIL TRUE)
 
+# Fermatas at the caret (ADR-0085): a long one on the C, a short one on a rest,
+# and a normal one on the E that undo takes back. The measure lasts 1.25 s
+# longer: the C three times as long, the rest half as long again.
+set(ELARA_CLI_FERMATAS "${CMAKE_CURRENT_BINARY_DIR}/cli-fermatas.elara")
+add_test(NAME cli.edit_sets_fermatas
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_FERMATAS}" "add-track piano"
+    "append-measures 1" "pitch C" "fermata long" right insert-rest "fermata short" right
+    "pitch E" "fermata normal" undo)
+set_tests_properties(cli.edit_sets_fermatas PROPERTIES
+  FIXTURES_SETUP cli_fermatas
+  PASS_REGULAR_EXPRESSION "\"redo\":{\"count\":1,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_fermatas COMMAND elara-cli --json dump "${ELARA_CLI_FERMATAS}")
+set_tests_properties(cli.dump_fermatas PROPERTIES
+  FIXTURES_REQUIRED cli_fermatas
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.250")
+add_test(NAME cli.edit_rejects_unknown_fermata
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fermata endless")
+set_tests_properties(cli.edit_rejects_unknown_fermata PROPERTIES WILL_FAIL TRUE)
+
 # Kinds of note effects at the caret (ADR-0058): fret 12 gets an artificial
 # harmonic, wide vibrato, a marcato and slides in from below and out downwards;
 # fret 7 a natural harmonic, then a pinch harmonic that undo takes back.
@@ -906,7 +925,7 @@ set_tests_properties(cli.import_unicode_path PROPERTIES
 # Notation font (ADR-0011): the SMuFL metadata in fonts/ next to elara-cli.
 add_test(NAME cli.font COMMAND elara-cli --json font)
 set_tests_properties(cli.font PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":107,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bravura\",\"version\":\"1\\.482\",.*\"described\":113,\"missing\":\\[\\],\"defaults\":{\"staffLineThickness\":0\\.13,\"stemThickness\":0\\.12,")
 
 add_test(NAME cli.font_glyph COMMAND elara-cli --json font --glyph noteheadBlack)
 set_tests_properties(cli.font_glyph PROPERTIES
@@ -938,21 +957,21 @@ set_tests_properties(cli.render_drums PROPERTIES
 add_test(NAME cli.render_grand_staff
   COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/piano-voices.musicxml" --tracks 0)
 set_tests_properties(cli.render_grand_staff PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0,\"hairpin\":0,\"chord\":1,\"beatText\":1,\"lyric\":1\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
+  PASS_REGULAR_EXPRESSION "\"section\":0,\"brace\":1,\"arpeggio\":0,\"hairpin\":0,\"chord\":1,\"beatText\":1,\"lyric\":1,\"fermata\":0\}.*\"glyph\":\"brace\",\"role\":\"brace\"")
 
 # A strummed piano chord is rolled: an arpeggio line left of it on each staff
 # of the grand staff, not an arrow above (ADR-0076).
 add_test(NAME cli.render_arpeggio
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/piano.gp5" --tracks 0 --count 1)
 set_tests_properties(cli.render_arpeggio PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0\}.*\"role\":\"arpeggio\"")
+  PASS_REGULAR_EXPRESSION "\"technique\":0,.*\"brace\":1,\"arpeggio\":[1-9][0-9]*,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0\}.*\"role\":\"arpeggio\"")
 
 # Hairpins are wedges under the staff (ADR-0078): the crescendo of bar 1 and the
 # diminuendo of bar 3 of the guitar techniques, two lines each.
 add_test(NAME cli.render_hairpins
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_hairpins PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0\}.*\"role\":\"hairpin\",\"measure\":0,.*\"role\":\"hairpin\",\"measure\":2,")
+  PASS_REGULAR_EXPRESSION "\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0\}.*\"role\":\"hairpin\",\"measure\":0,.*\"role\":\"hairpin\",\"measure\":2,")
 
 add_test(NAME cli.render_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --first 2 --count 1
@@ -979,7 +998,7 @@ set_tests_properties(cli.render_tab PROPERTIES
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
 set_tests_properties(cli.render_both PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"notehead\":12,.*\"rest\":1,\"fretNumber\":12,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
+  PASS_REGULAR_EXPRESSION "\"notehead\":12,.*\"rest\":1,\"fretNumber\":12,\"tie\":1,.*\"articulation\":2,\"measureNumber\":0,\"credit\":0,\"trackName\":0,\"repeat\":9,\"volta\":7,\"tuplet\":1,\"tempo\":4,\"dynamic\":3,\"navigation\":0,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":4,\"chord\":55,\"beatText\":0,\"lyric\":0,\"fermata\":0},\"systems\":\\[{\"firstMeasure\":0,\"measureCount\":3,\"x\":0,\"y\":0,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"standard\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":4,\"lines\":5},{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":[1-9][0-9.]*,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\]")
 
 add_test(NAME cli.render_tab_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both
@@ -1139,12 +1158,12 @@ set_tests_properties(cli.sequence_double_coda PROPERTIES
 add_test(NAME cli.render_navigation
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/dal-segno.gp5")
 set_tests_properties(cli.render_navigation PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0}")
+  PASS_REGULAR_EXPRESSION "\"navigation\":4,\"section\":0,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0}")
 # Sections drawn boxed above everything (ADR-0063): two names, four sides each.
 add_test(NAME cli.render_sections
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/double-coda.gp")
 set_tests_properties(cli.render_sections PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0}")
+  PASS_REGULAR_EXPRESSION "\"section\":10,\"brace\":0,\"arpeggio\":0,\"hairpin\":0,\"chord\":0,\"beatText\":0,\"lyric\":0,\"fermata\":0}")
 # ... and kept on the way to MusicXML: saved, exported, read back.
 set(ELARA_CLI_DOUBLE_CODA "${CMAKE_CURRENT_BINARY_DIR}/cli-double-coda")
 add_test(NAME cli.import_double_coda COMMAND elara-cli import "${ELARA_CORPUS}/gp/double-coda.gp"

@@ -698,6 +698,40 @@ TEST_CASE("MusicXML: wedges become hairpins on the beats under them", "[musicxml
     CHECK(hairpins(2) == std::vector{Crescendo});
 }
 
+TEST_CASE("MusicXML: fermatas hold their beats", "[musicxml]") {
+    // ADR-0085: by shape, on any note of a chord, on a rest and on a whole
+    // measure's rest, which becomes a rest of its length to carry it.
+    const auto fermata = [](const char* shape) {
+        return std::string(R"(<notations><fermata type="upright">)") + shape +
+               "</fermata></notations>";
+    };
+    const ImportResult result = parse(onePart(
+        R"(<note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration>)" +
+        fermata("angled") + "</note>" +
+        R"(<note><pitch><step>E</step><octave>4</octave></pitch><duration>4</duration></note>)"
+        R"(<note><chord/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration>)" +
+        fermata("") + "</note>" + R"(<note><rest/><duration>4</duration>)" + fermata("square") +
+        "</note>" +
+        R"(<note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration>)"
+        R"(<notations><fermata type="inverted">curlew</fermata></notations></note>)"
+        R"(</measure><measure number="2"><note><rest measure="yes"/><duration>16</duration>)" +
+        fermata("double-square") + "</note>"));
+    CHECK(result.warnings.empty());
+    using enum core::Fermata;
+    const auto& first = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(first.size() == 4);
+    CHECK(first[0].effects.fermata == Short);
+    CHECK(first[1].effects.fermata == Normal);
+    CHECK(first[2].effects.fermata == Long);
+    CHECK(first[2].isRest());
+    CHECK(first[3].effects.fermata == Normal);
+    const auto& second = voiceOf(result.song, 0, 0, 1).beats;
+    REQUIRE(second.size() == 1);
+    CHECK(second[0].isRest());
+    CHECK(second[0].duration == core::Duration(core::NoteValue::Whole));
+    CHECK(second[0].effects.fermata == Long);
+}
+
 TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[musicxml]") {
     // |: 1 |1.2. 2 :|3. 3 |, played three times, as notation programs write it.
     const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";

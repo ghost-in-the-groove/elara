@@ -11,15 +11,24 @@
 #include <vector>
 
 using Catch::Matchers::WithinAbs;
+using elara::core::Beat;
 using elara::core::Duration;
+using elara::core::Fermata;
+using elara::core::FermataHold;
 using elara::core::Fraction;
+using elara::core::Instrument;
+using elara::core::InstrumentKind;
 using elara::core::KeyMode;
 using elara::core::KeySignature;
+using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Pitch;
 using elara::core::Song;
+using elara::core::Staff;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::TimeSignature;
+using elara::core::Track;
 
 TEST_CASE("Measures start in 4/4, C major, at 120 quarter notes per minute", "[core][timeline]") {
     Song song;
@@ -216,4 +225,70 @@ TEST_CASE("Endings for a time that never comes are not played", "[core][timeline
     Song song = measures(3);
     song.measureHeader(1).alternateEndings = ending(3);
     CHECK(song.playOrder() == Order{0, 2});
+}
+
+namespace {
+
+Beat held(NoteValue value, Fermata fermata = Fermata::None, bool rest = false) {
+    Beat beat{.duration = Duration(value)};
+    if (!rest) {
+        beat.notes.push_back(Note{.pitch = Pitch::fromMidi(60)});
+    }
+    beat.effects.fermata = fermata;
+    return beat;
+}
+
+} // namespace
+
+TEST_CASE("A fermata holds its beat longer", "[core][timeline][fermata]") {
+    // ADR-0085: at quarter = 60 a quarter note takes a second; under a normal
+    // fermata two, under a short one one and a half, under a long one three.
+    Song song;
+    song.setStartTempo(Tempo(60));
+    song.addTrack(Track("Voice", Instrument{.kind = InstrumentKind::Pitched}, {Staff{}}));
+    song.addTrack(Track("Piano", Instrument{.kind = InstrumentKind::Keyboard}, {Staff{}}));
+    song.appendMeasures(3);
+    auto& voice = song.track(0).staff(0);
+    voice.measure(0).voices[0].beats = {held(NoteValue::Quarter), held(NoteValue::Quarter),
+                                        held(NoteValue::Half, Fermata::Normal)};
+    voice.measure(1).voices[0].beats = {held(NoteValue::Quarter, Fermata::Short),
+                                        held(NoteValue::Quarter, Fermata::None, true),
+                                        held(NoteValue::Half, Fermata::Long, true)};
+    // The piano holds the second half of the half note longer still.
+    song.track(1).staff(0).measure(0).voices[0].beats = {held(NoteValue::Half),
+                                                         held(NoteValue::Quarter, Fermata::Normal),
+                                                         held(NoteValue::Quarter, Fermata::Long)};
+
+    CHECK(song.fermataHolds(0) ==
+          std::vector<FermataHold>{{.start = Fraction(1, 2), .end = Fraction(3, 4), .stretch = 2.0},
+                                   {.start = Fraction(3, 4), .end = Fraction(1), .stretch = 3.0}});
+    CHECK(song.fermataHolds(1) ==
+          std::vector<FermataHold>{{.start = Fraction(0), .end = Fraction(1, 4), .stretch = 1.5},
+                                   {.start = Fraction(1, 2), .end = Fraction(1), .stretch = 3.0}});
+    CHECK(song.fermataHolds(2).empty());
+    CHECK_THROWS_AS(song.fermataHolds(3), std::out_of_range);
+
+    CHECK_THAT(song.secondsAt(0, Fraction(1, 2)), WithinAbs(2.0, 1e-12));
+    CHECK_THAT(song.secondsAt(0, Fraction(5, 8)), WithinAbs(3.0, 1e-12)); // halfway: 2 + 1
+    CHECK_THAT(song.secondsAt(1), WithinAbs(2.0 + 2.0 + 3.0, 1e-12));
+    CHECK_THAT(song.secondsAt(1, Fraction(1, 4)), WithinAbs(8.5, 1e-12));
+    CHECK_THAT(song.secondsAt(2), WithinAbs(8.5 + 1.0 + 6.0, 1e-12));
+    CHECK_THAT(song.durationSeconds(), WithinAbs(19.5, 1e-12));
+}
+
+TEST_CASE("A fermata in a gradual tempo change holds what it takes there",
+          "[core][timeline][fermata]") {
+    // Quarter = 60 to 120 over the first measure (ADR-0082); a fermata over its
+    // second half doubles the time of that half: 4 (ln 2 - ln 1.5) seconds.
+    Song song;
+    song.setStartTempo(Tempo(60));
+    song.addTrack(Track("Voice", Instrument{.kind = InstrumentKind::Pitched}, {Staff{}}));
+    song.appendMeasures(2);
+    song.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = Fraction(0), .tempo = Tempo(60), .gradual = true}};
+    song.measureHeader(1).tempoChanges = {TempoChange{.offset = Fraction(0), .tempo = Tempo(120)}};
+    song.track(0).staff(0).measure(0).voices[0].beats = {held(NoteValue::Half),
+                                                         held(NoteValue::Half, Fermata::Normal)};
+    const double half = 4.0 * (std::log(2.0) - std::log(1.5));
+    CHECK_THAT(song.secondsAt(1), WithinAbs(4.0 * std::log(2.0) + half, 1e-12));
 }
