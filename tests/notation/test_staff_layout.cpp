@@ -9,9 +9,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <filesystem>
 #include <initializer_list>
+#include <limits>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -34,12 +36,14 @@ using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::Tuplet;
 using elara::notation::BeamItem;
+using elara::notation::CurveItem;
 using elara::notation::DisplayList;
 using elara::notation::EngravingFont;
 using elara::notation::Glyph;
 using elara::notation::GlyphItem;
 using elara::notation::layoutStaff;
 using elara::notation::LineItem;
+using elara::notation::PolygonItem;
 using elara::notation::Role;
 using elara::notation::StaffLayoutOptions;
 
@@ -821,5 +825,115 @@ TEST_CASE("Staff layout: drums follow the drum map", "[notation][layout]") {
                 CHECK(top > 3.0); // a bass drum stem goes down from the first space
             }
         }
+    }
+}
+
+TEST_CASE("Staff layout: a keyboard's strummed chord is rolled with an arpeggio line",
+          "[notation][layout]") {
+    const Part piano{.kind = InstrumentKind::Keyboard};
+    Beat upwards = chord({"C4", "E4", "G4"}); // played like a downstroke, low notes first
+    upwards.effects.strum = elara::core::Strum::Down;
+    Beat downwards = chord({"C4", "Eb4", "G4"});
+    downwards.effects.strum = elara::core::Strum::Up;
+    const DisplayList list =
+        layout(melody({upwards, downwards, chord({"C4", "E4", "G4"}, NoteValue::Half)}, piano));
+
+    std::vector<CurveItem> waves;
+    for (const CurveItem& curve : list.curves) {
+        if (curve.role == Role::Arpeggio) {
+            waves.push_back(curve);
+        }
+    }
+    REQUIRE(waves.size() >= 4);
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 9);
+    const double firstX = waves.front().from.x;
+    const auto lineOf = [&](double x) {
+        double top = std::numeric_limits<double>::max();
+        double bottom = std::numeric_limits<double>::lowest();
+        for (const CurveItem& wave : waves) {
+            if (std::abs(wave.from.x - x) < kEpsilon) {
+                CHECK(wave.to.x == wave.from.x); // a vertical line
+                top = std::min(top, wave.from.y);
+                bottom = std::max(bottom, wave.to.y);
+            }
+        }
+        return std::pair{top, bottom};
+    };
+    // One line per rolled chord, left of its noteheads and accidentals.
+    double secondX = firstX;
+    for (const CurveItem& wave : waves) {
+        if (std::abs(wave.from.x - firstX) > kEpsilon) {
+            secondX = wave.from.x;
+        }
+    }
+    REQUIRE(secondX > firstX);
+    CHECK(firstX < left(heads[0]) - 0.3);
+    CHECK(secondX > right(heads[2]));
+    const auto accidentals = glyphs(list, Role::Accidental); // the flat, then a natural
+    REQUIRE(accidentals.size() == 2);
+    CHECK(secondX < left(accidentals[0]) - 0.3);
+
+    // From half a space above the top notehead (G4) to half a space below the
+    // bottom one (C4).
+    const auto [top, bottom] = lineOf(firstX);
+    const auto spanOf = [&](std::size_t first) {
+        const auto ys =
+            ysOf(std::vector<GlyphItem>(heads.begin() + static_cast<std::ptrdiff_t>(first),
+                                        heads.begin() + static_cast<std::ptrdiff_t>(first + 3)));
+        return std::pair{std::ranges::min(ys), std::ranges::max(ys)};
+    };
+    CHECK_THAT(top, WithinAbs(spanOf(0).first - 0.5, 1e-9));
+    CHECK_THAT(bottom, WithinAbs(spanOf(0).second + 0.5, 1e-9));
+    CHECK_THAT(spanOf(0).second - spanOf(0).first, WithinAbs(2.0, 1e-9));
+
+    // The downward roll ends in an arrowhead at the bottom; the upward one has none.
+    std::vector<PolygonItem> arrows;
+    for (const PolygonItem& polygon : list.polygons) {
+        if (polygon.role == Role::Arpeggio) {
+            arrows.push_back(polygon);
+        }
+    }
+    REQUIRE(arrows.size() == 1);
+    const auto tip = std::ranges::max(arrows[0].points, {}, &elara::notation::Point::y);
+    CHECK_THAT(tip.x, WithinAbs(secondX, 1e-9));
+    CHECK_THAT(tip.y, WithinAbs(spanOf(3).second + 0.5, 1e-9));
+    CHECK(lineOf(secondX).second < tip.y);
+
+    // No strum arrows above the staff, and the line takes room of its own.
+    CHECK(glyphs(list, Role::Technique).empty());
+    const DisplayList plain = layout(melody({chord({"C4", "E4", "G4"}), chord({"C4", "Eb4", "G4"}),
+                                             chord({"C4", "E4", "G4"}, NoteValue::Half)},
+                                            piano));
+    CHECK(glyphs(list, Role::Notehead)[0].origin.x >
+          glyphs(plain, Role::Notehead)[0].origin.x + 0.6);
+
+    SECTION("a single note's line is two spaces long, centred on it") {
+        Beat alone = note("F4"); // the other hand's notes on the other staff
+        alone.effects.strum = elara::core::Strum::Down;
+        const DisplayList single = layout(melody({alone}, piano));
+        double highest = std::numeric_limits<double>::max();
+        double lowest = std::numeric_limits<double>::lowest();
+        for (const CurveItem& curve : single.curves) {
+            if (curve.role == Role::Arpeggio) {
+                highest = std::min(highest, curve.from.y);
+                lowest = std::max(lowest, curve.to.y);
+            }
+        }
+        const auto head = glyphs(single, Role::Notehead);
+        REQUIRE(head.size() == 1);
+        CHECK_THAT(highest, WithinAbs(head[0].origin.y - 1.0, 1e-9));
+        CHECK_THAT(lowest, WithinAbs(head[0].origin.y + 1.0, 1e-9));
+    }
+
+    SECTION("a fretted instrument keeps its strum arrows") {
+        const DisplayList guitar =
+            layout(melody({upwards, downwards}, Part{.kind = InstrumentKind::Fretted}));
+        CHECK(std::ranges::none_of(
+            guitar.curves, [](const CurveItem& curve) { return curve.role == Role::Arpeggio; }));
+        const auto arrowsAbove = glyphs(guitar, Role::Technique);
+        REQUIRE(arrowsAbove.size() == 2);
+        CHECK(arrowsAbove[0].glyph == Glyph::ArrowBlackDown);
+        CHECK(arrowsAbove[1].glyph == Glyph::ArrowBlackUp);
     }
 }

@@ -48,6 +48,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Self-made test corpus with `SOURCES.md`
 - [x] Guitar Pro 7-8 (`.gp`) import with `elara-cli import`
 - [x] Guitar Pro 6 (`.gpx`) import
+  - [x] Arpeggios of Guitar Pro 6-8 as rolled chords: a strum spread from the
+        lowest note upwards, from the highest downwards (ADR-0025, ADR-0076)
 - [x] Guitar Pro 3/4/5 (binary) import
   - [x] Keyboards reaching into both clefs on a grand staff, split at middle C
         (ADR-0075)
@@ -65,6 +67,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
   - [x] Grand staves (a piano's treble and bass staves): a brace and barlines
         through both (ADR-0073)
+  - [x] Rolled chords of keyboards and other instruments without frets: an
+        arpeggio line left of the chord (ADR-0076)
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)

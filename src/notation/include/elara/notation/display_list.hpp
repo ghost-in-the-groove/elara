@@ -48,9 +48,10 @@ enum class Role : std::uint8_t {
     Navigation,    ///< segno and coda signs, "Fine", "To Coda" and jumps ("D.S. al Coda")
     Section,       ///< the name of a section of the song ("Chorus") and its box
     Brace,         ///< the brace joining the staves of a piano (a grand staff)
+    Arpeggio,      ///< the wavy line left of a rolled chord, and its arrowhead (ADR-0076)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Brace) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Arpeggio) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;
