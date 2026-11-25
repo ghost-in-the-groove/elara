@@ -4,8 +4,7 @@
  "warnings": [
   "Piano: chord symbols dropped (measure 1)",
   "Piano: text directions dropped (measure 2)",
-  "Piano: lyrics dropped (measure 2)",
-  "Piano: grace notes dropped (measure 2)"
+  "Piano: lyrics dropped (measure 2)"
  ],
  "song": {
   "format": "elara",
@@ -115,6 +114,16 @@
         [
          {
           "duration": "2.",
+          "graces": [
+           {
+            "duration": "8",
+            "notes": [
+             {
+              "pitch": "G3"
+             }
+            ]
+           }
+          ],
           "notes": [
            {
             "pitch": "F3"

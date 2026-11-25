@@ -48,17 +48,26 @@ one, as a guitarist plays it.
 - The native format writes a beat's `"graces"` as a list of
   `{"duration", "notes", "onBeat"}` and omits it when empty; format version 1
   still reads every older file (ADR-0006).
-- MusicXML and MIDI exports report grace notes as dropped until they write
-  them.
+- MusicXML: `<grace>` notes lead into the next note of their voice and staff,
+  a `<chord/>` grace joining the grace before it. A slashed grace (an
+  acciaccatura) or one with `steal-time-previous` is played before the beat,
+  the others on it; export writes `<grace slash="yes"/>` for the first and
+  `<grace/>` for the second, with the notes' strings and frets and no
+  duration. A grace note's dynamic is the one in force at its beat.
+- The MIDI export reports grace notes as dropped until playback plays them.
 
 ## Consequences
 
-- Guitar Pro grace notes survive import and saving. Drawing them as small
-  notes and fret numbers, playing them by borrowing time, MusicXML both ways
-  and typing them come next, each recorded here as it lands. Until they are
+- Guitar Pro and MusicXML grace notes survive import, saving and MusicXML
+  export. Drawing them as small notes and fret numbers, playing them by
+  borrowing time and typing them come next, each recorded here as it lands. Until they are
   drawn and played, a song with grace notes looks and sounds as it did before
   they were kept.
 - A beat is 24 bytes larger on 64-bit systems: the list, empty for almost
   every beat, allocates nothing.
 - Grace notes after the last beat of a voice have nothing to lead into and
   are not kept.
+- Tests: `io.MusicXML: grace notes lead into the next note of their voice`,
+  `io.MusicXML export: grace notes on a guitar keep their strings and slides`
+  and the round trips of the corpus and of a song with every feature (a
+  grace before a beat and a chord of them on one).

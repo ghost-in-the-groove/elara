@@ -678,7 +678,7 @@ set_tests_properties(cli.import_musicxml PROPERTIES
 add_test(NAME cli.import_musicxml_reports_warnings
   COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/piano-voices.musicxml")
 set_tests_properties(cli.import_musicxml_reports_warnings PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"warnings\":\\[[^]]*\"Piano: grace notes dropped \\(measure 2\\)\"")
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[[^]]*\"Piano: lyrics dropped \\(measure 2\\)\"")
 
 add_test(NAME cli.import_musicxml_saves_native
   COMMAND elara-cli import "${ELARA_CORPUS}/musicxml/guitar-tab.musicxml"

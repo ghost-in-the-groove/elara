@@ -279,6 +279,14 @@ core::Song everythingSong() {
         upper.measure(1).voices[1].beats = {
             beatOf(half, {pitched(Pitch(Step::A, 0, 4))}),
             beatOf(half, {pitched(Pitch(Step::B, 0, 4), Dynamic::F)})};
+        // Grace notes (ADR-0079): an eighth before the D, a chord on the F.
+        upper.measure(1).voices[0].beats[1].graces = {
+            Grace{.duration = eighth, .notes = {pitched(Pitch(Step::E, 0, 5))}}};
+        upper.measure(1).voices[0].beats[3].graces = {
+            Grace{.duration = Duration(NoteValue::Sixteenth),
+                  .notes = {pitched(Pitch(Step::G, 0, 5), Dynamic::F),
+                            pitched(Pitch(Step::B, -1, 5), Dynamic::F)},
+                  .onBeat = true}};
         upper.measure(2).voices[0].beats = {
             beatOf(Duration(NoteValue::Half, 1), {pitched(Pitch(Step::E, 0, 5), Dynamic::F)})};
         lower.measure(2).voices[0].beats = {
@@ -495,6 +503,30 @@ TEST_CASE("MusicXML export: a song with every feature MusicXML holds comes back 
     requireSame(song, roundTrip(song));
 }
 
+TEST_CASE("MusicXML export: grace notes on a guitar keep their strings and slides",
+          "[musicxml][export]") {
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    core::Staff& staff = song.track(g).staff(0);
+    core::Note slide = staff.frettedNote(3, 5);
+    slide.effects.slideOut = core::SlideOut::Legato;
+    auto& beats = staff.measure(0).voices[0].beats;
+    beats = {beatOf(core::Duration(core::NoteValue::Half), {staff.frettedNote(3, 7)}),
+             beatOf(core::Duration(core::NoteValue::Half), {staff.frettedNote(2, 5)})};
+    beats[0].graces = {
+        core::Grace{.duration = core::Duration(core::NoteValue::Sixteenth), .notes = {slide}}};
+    beats[1].graces = {core::Grace{.duration = core::Duration(core::NoteValue::Eighth),
+                                   .notes = {staff.frettedNote(2, 3), staff.frettedNote(1, 3)},
+                                   .onBeat = true}};
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    const std::string xml = exportMusicXml(song).data;
+    CHECK(xml.find(R"(<grace slash="yes"/>)") != std::string::npos);
+    CHECK(xml.find("<grace/>") != std::string::npos);
+}
+
 TEST_CASE("MusicXML export: random songs come back unchanged", "[musicxml][export]") {
     for (const std::uint32_t seed : {1U, 2U, 3U, 20261123U}) {
         INFO("seed " << seed);
@@ -686,7 +718,6 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     const ExportResult exported = exportMusicXml(song);
     const auto& warnings = exported.warnings;
     CHECK(hasWarning(warnings, "Electric Guitar: let ring dropped (measure 1)"));
-    CHECK(hasWarning(warnings, "Electric Guitar: grace notes dropped (measure 1)"));
     CHECK(hasWarning(warnings, "whammy bar dropped"));
     CHECK(hasWarning(warnings, "bass techniques (tap, slap, pop) dropped"));
     CHECK(hasWarning(warnings, "pinch, tapped and semi harmonics written as artificial harmonics"));

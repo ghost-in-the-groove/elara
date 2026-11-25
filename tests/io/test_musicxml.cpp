@@ -230,7 +230,8 @@ TEST_CASE("MusicXML: voices are renumbered per staff and late voices padded", "[
     CHECK(summary(voiceOf(song, 0, 1, 0, 0)) == "1=F3");     // voice 5 -> staff 2, voice 1
     CHECK(summary(voiceOf(song, 0, 0, 1, 0)) == "4.=C5 4.=r");
     CHECK(voiceOf(song, 0, 0, 1, 1).isEmpty());
-    CHECK(summary(voiceOf(song, 0, 1, 1, 0)) == "2.=F3"); // the grace note is dropped
+    CHECK(summary(voiceOf(song, 0, 1, 1, 0)) == "2.=F3");
+    CHECK(voiceOf(song, 0, 1, 1, 0).beats[0].graces.size() == 1); // ADR-0079
 }
 
 TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silently", "[musicxml]") {
@@ -239,8 +240,39 @@ TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silent
 
     CHECK(hasWarning(result, "text", "measure 2"));
     CHECK(hasWarning(result, "lyric", "measure 2"));
-    CHECK(hasWarning(result, "grace note", "measure 2"));
-    CHECK(hasWarning(result, "Piano", "grace note"));
+}
+
+TEST_CASE("MusicXML: grace notes lead into the next note of their voice", "[musicxml]") {
+    // A slashed eighth before the beat, an unslashed chord of sixteenths on
+    // it, and one after the last note with nothing to lead into (ADR-0079).
+    const ImportResult result = parse(R"(<score-partwise version="4.0">
+<part-list><score-part id="P1"><part-name>Flute</part-name></score-part></part-list>
+<part id="P1"><measure number="1">
+<attributes><divisions>2</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+<note><grace slash="yes"/><pitch><step>D</step><octave>5</octave></pitch><voice>1</voice><type>eighth</type></note>
+<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>half</type></note>
+<note><grace/><pitch><step>E</step><octave>5</octave></pitch><voice>1</voice><type>16th</type></note>
+<note><grace/><chord/><pitch><step>G</step><octave>5</octave></pitch><voice>1</voice><type>16th</type></note>
+<note><pitch><step>F</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>half</type></note>
+<note><grace slash="yes"/><pitch><step>A</step><octave>5</octave></pitch><voice>1</voice><type>eighth</type></note>
+</measure></part></score-partwise>)");
+    const core::Voice& voice = voiceOf(result.song, 0, 0, 0, 0);
+    CHECK(summary(voice) == "2=C5 2=F5");
+    REQUIRE(voice.beats[0].graces.size() == 1);
+    const core::Grace& before = voice.beats[0].graces[0];
+    CHECK(before.duration == core::Duration(core::NoteValue::Eighth));
+    CHECK_FALSE(before.onBeat);
+    REQUIRE(before.notes.size() == 1);
+    CHECK(before.notes[0].pitch.toString() == "D5");
+    REQUIRE(voice.beats[1].graces.size() == 1);
+    const core::Grace& on = voice.beats[1].graces[0];
+    CHECK(on.duration == core::Duration(core::NoteValue::Sixteenth));
+    CHECK(on.onBeat);
+    REQUIRE(on.notes.size() == 2);
+    CHECK(on.notes[1].pitch.toString() == "G5");
+    CHECK(result.warnings ==
+          std::vector<std::string>{
+              "Flute: grace notes after the last note of a voice dropped (measure 1)"});
 }
 
 // <midi-instrument> holds a part's playback volume, as a percentage, and its pan
@@ -357,7 +389,7 @@ TEST_CASE("MusicXML: parts read on several threads give the same result as on on
     constexpr std::array<std::string_view, 6> kExtras{
         "",
         "<harmony><root><root-step>C</root-step></root><kind>major</kind></harmony>",
-        R"(<note><grace/><pitch><step>D</step><octave>4</octave></pitch><type>eighth</type></note>)",
+        "<figured-bass><figure><figure-number>6</figure-number></figure></figured-bass>",
         "",
         R"(<direction><direction-type><words>dolce</words></direction-type></direction>)",
         "<barline><fermata/></barline>"};

@@ -84,7 +84,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       (ADR-0061)
 - [ ] Grace notes (ADR-0079)
   - [x] In the model, read from Guitar Pro 3-8 and kept by the native format
-  - [ ] Read and written in MusicXML
+  - [x] Read and written in MusicXML
   - [ ] Drawn as small notes and fret numbers
   - [ ] Played by borrowing time
   - [ ] Typed at the caret
