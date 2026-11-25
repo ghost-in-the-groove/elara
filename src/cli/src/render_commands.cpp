@@ -3,9 +3,12 @@
 // notation engine lays them out on one line (ADR-0012) or on pages (ADR-0014),
 // printed as display lists or written as SVG.
 #include <elara/audio/sequence.hpp>
+#include <elara/io/compression.hpp>
 #include <elara/notation/cursor.hpp>
 #include <elara/notation/display_list.hpp>
+#include <elara/notation/font_outlines.hpp>
 #include <elara/notation/page_layout.hpp>
+#include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
@@ -55,6 +58,7 @@ struct RenderOptions {
     std::size_t measuresPerSystem = 0;
     bool noCredits = false;
     std::string svg;
+    std::string pdf;
     std::string metadata;
     double cursorAt = -1.0;     // seconds; negative for no cursor
     std::vector<double> timeAt; // page (from 0), x and y in staff spaces; empty for none
@@ -424,6 +428,28 @@ int runRender(bool json, const RenderOptions& options) {
             written.push_back(utf8(out.generic_u8string()));
         }
     }
+    std::size_t pdfBytes = 0;
+    if (!options.pdf.empty()) {
+        // One document of every page, glyphs drawn from the font's outlines.
+        std::filesystem::path otf = metadata;
+        otf.replace_extension(".otf");
+        const auto outlines = notation::FontOutlines::fromFile(otf);
+        if (!outlines) {
+            return fail(outlines.error());
+        }
+        const notation::PdfOptions pdf{.staffSpace = options.staffSpace * 72.0 / 25.4,
+                                       .margin = paged ? 0.0 : 2.0, // pages have their own
+                                       .title = song->info().title,
+                                       .compress = io::zlibCompress};
+        const std::string document = notation::toPdf(pages, *outlines, pdf);
+        const std::filesystem::path out(options.pdf);
+        std::ofstream file(out, std::ios::binary);
+        file << document;
+        if (!file) {
+            return fail(std::format("cannot write {}", utf8(out.generic_u8string())));
+        }
+        pdfBytes = document.size();
+    }
     std::size_t shown = 0;
     std::size_t systems = 0;
     for (const notation::DisplayList& page : pages) {
@@ -459,6 +485,10 @@ int runRender(bool json, const RenderOptions& options) {
                 svg = std::format("\"{}\"", jsonEscape(options.svg));
             }
         }
+        const std::string pdf = options.pdf.empty()
+                                    ? std::string("null")
+                                    : std::format(R"({{"file":"{}","pages":{},"bytes":{}}})",
+                                                  jsonEscape(options.pdf), pages.size(), pdfBytes);
         std::string body;
         if (options.cursorAt >= 0.0) {
             body =
@@ -478,8 +508,8 @@ int runRender(bool json, const RenderOptions& options) {
         }
         std::cout
             << std::format(
-                   R"({{"file":"{}",{},"first":{},"count":{},"svg":{},"view":"{}","layout":"{}",{}}})",
-                   jsonEscape(options.file), staves, options.first, shown, svg, options.view,
+                   R"({{"file":"{}",{},"first":{},"count":{},"svg":{},"pdf":{},"view":"{}","layout":"{}",{}}})",
+                   jsonEscape(options.file), staves, options.first, shown, svg, pdf, options.view,
                    options.layout, body)
             << '\n';
         return kExitOk;
@@ -516,6 +546,10 @@ int runRender(bool json, const RenderOptions& options) {
     for (const std::string& file : written) {
         std::cout << std::format("saved {}\n", file);
     }
+    if (!options.pdf.empty()) {
+        std::cout << std::format("saved {} ({} {}, {} bytes)\n", options.pdf, pages.size(),
+                                 pages.size() == 1 ? "page" : "pages", pdfBytes);
+    }
     if (options.cursorAt >= 0.0) {
         std::cout << cursorReport(*song, pages, options.cursorAt).text;
     }
@@ -532,7 +566,7 @@ void addRenderCommands(CLI::App& app, Context& context) {
     auto* render = app.add_subcommand(
         "render", "Lay out staves of a song in standard notation, tablature or both, on one line "
                   "or on pages: print the display list (glyphs, lines, beams, text and curves in "
-                  "staff spaces) or write it as SVG");
+                  "staff spaces) or write it as SVG or PDF");
     render->add_option("file", options->file, "A .elara file or any file import reads")->required();
     auto* track = render->add_option("--track", options->track, "Track index (0 = first)")
                       ->capture_default_str();
@@ -591,6 +625,9 @@ void addRenderCommands(CLI::App& app, Context& context) {
     render->add_option("--svg", options->svg,
                        "Also write SVG; with --layout page or strips and several pages or "
                        "strips, one file each (name-1.svg, ...)");
+    render->add_option("--pdf", options->pdf,
+                       "Also write a PDF document of every page (or of the line), the glyphs "
+                       "drawn from the music font next to the metadata (Bravura.otf)");
     render->add_option("--metadata", options->metadata,
                        "SMuFL metadata file (default: fonts/Bravura.json next to elara-cli)");
     render->callback([&context, options] { context.exitCode = runRender(context.json, *options); });

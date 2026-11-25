@@ -75,6 +75,7 @@ private:
     void finish(bool ok, const QString& detail);
     void clickCursor();
     void queueKeepPosition();
+    void queuePdf();
     void queuePractice();
     void queueLoop();
     void queueSoundFont();

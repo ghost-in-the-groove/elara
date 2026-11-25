@@ -62,6 +62,12 @@ constexpr std::size_t kMaxTracks = 128;
 constexpr std::size_t kMaxBeats = 4096; // per voice and measure
 constexpr std::size_t kMaxBendPoints = 1000;
 constexpr int kStrings = 7; // every track has room for seven strings
+// Keyboards on a grand staff (ADR-0075): split at middle C, given to those
+// whose notes reach below F3 (four ledger lines under the treble staff) and
+// above G4 (three over the bass staff).
+constexpr int kMiddleC = 60;
+constexpr int kLowestForTreble = 53;
+constexpr int kHighestForBass = 67;
 
 // ---- Text ------------------------------------------------------------------------
 
@@ -271,6 +277,8 @@ struct TrackData {
     std::array<std::array<StringState, kStrings>, 2> voices{};
     long long pitchSum = 0;
     std::size_t noteCount = 0;
+    int lowest = 127; // MIDI numbers of the track's notes
+    int highest = 0;
 };
 
 struct HeaderData {
@@ -971,6 +979,8 @@ private:
             }
             track.pitchSum += midi;
             ++track.noteCount;
+            track.lowest = std::min(track.lowest, midi);
+            track.highest = std::max(track.highest, midi);
         }
         if (type == 2) {
             // Only a note just before on the same string can be held on.
@@ -1149,11 +1159,9 @@ private:
         }
         for (std::size_t t = 0; t < tracks_.size(); ++t) {
             TrackData& track = tracks_[t];
-            Staff& staff = song.track(t).staff(0);
-            const bool fretted = staff.tuning().has_value();
-            for (std::size_t m = 0; m < track.measures.size(); ++m) {
-                Measure& measure = track.measures[m];
-                if (!fretted) {
+            core::Track& written = song.track(t);
+            if (!written.staff(0).tuning().has_value()) {
+                for (Measure& measure : track.measures) {
                     for (Voice& voice : measure.voices) {
                         for (Beat& beat : voice.beats) {
                             for (Note& note : beat.notes) {
@@ -1162,10 +1170,82 @@ private:
                         }
                     }
                 }
-                staff.measure(m) = std::move(measure);
+            }
+            if (written.staffCount() == 2) {
+                writeGrandStaff(written, track.measures);
+                continue;
+            }
+            for (std::size_t m = 0; m < track.measures.size(); ++m) {
+                written.staff(0).measure(m) = std::move(track.measures[m]);
             }
         }
         return song;
+    }
+
+    // Whether a keyboard's notes reach below F3 and above G4, so that neither
+    // clef holds them all without four ledger lines or more: such a keyboard
+    // gets a grand staff (ADR-0075).
+    static bool needsGrandStaff(const TrackData& track) {
+        return track.noteCount > 0 && track.lowest < kLowestForTreble &&
+               track.highest > kHighestForBass;
+    }
+
+    // The measures of a keyboard written on one staff, on the two staves of
+    // its grand staff (ADR-0075): notes from middle C up on the upper staff,
+    // the others on the lower one. A beat keeps its duration on both staves,
+    // as a rest without its effects where a staff has none of its notes. A
+    // voice without notes on a staff in a measure stays empty there, and the
+    // voices a staff never has notes in are dropped, the others moving down to
+    // fill from the first (the same in every measure, so ties keep their voice).
+    static void writeGrandStaff(core::Track& track, std::vector<Measure>& measures) {
+        std::array<std::vector<Measure>, 2> staves{std::vector<Measure>(measures.size()),
+                                                   std::vector<Measure>(measures.size())};
+        std::array<std::array<bool, Measure::kMaxVoices>, 2> used{};
+        for (std::size_t m = 0; m < measures.size(); ++m) {
+            for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
+                std::array<Voice, 2> parts{};
+                std::array<bool, 2> sounding{};
+                for (Beat& beat : measures[m].voices[v].beats) {
+                    std::array<Beat, 2> halves{Beat{.duration = beat.duration},
+                                               Beat{.duration = beat.duration}};
+                    for (Note& note : beat.notes) {
+                        halves[note.pitch.midiNumber() < kMiddleC ? 1 : 0].notes.push_back(
+                            std::move(note));
+                    }
+                    for (std::size_t s = 0; s < 2; ++s) {
+                        if (!halves[s].notes.empty()) {
+                            halves[s].effects = beat.effects;
+                            sounding[s] = true;
+                        }
+                        parts[s].beats.push_back(std::move(halves[s]));
+                    }
+                }
+                for (std::size_t s = 0; s < 2; ++s) {
+                    if (sounding[s]) {
+                        staves[s][m].voices[v] = std::move(parts[s]);
+                        used[s][v] = true;
+                    }
+                }
+            }
+        }
+        for (std::size_t s = 0; s < 2; ++s) {
+            std::array<std::size_t, Measure::kMaxVoices> to{};
+            std::size_t next = 0;
+            for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
+                if (used[s][v]) {
+                    to[v] = next++;
+                }
+            }
+            for (std::size_t m = 0; m < measures.size(); ++m) {
+                Measure placed;
+                for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
+                    if (used[s][v]) {
+                        placed.voices[to[v]] = std::move(staves[s][m].voices[v]);
+                    }
+                }
+                track.staff(s).measure(m) = std::move(placed);
+            }
+        }
     }
 
     static core::Track trackFor(const TrackData& track) {
@@ -1198,6 +1278,13 @@ private:
         }
         if (kind == InstrumentKind::Fretted) {
             kind = InstrumentKind::Pitched; // no tuning to place the notes with
+        }
+        if (kind == InstrumentKind::Keyboard && needsGrandStaff(track)) {
+            return core::Track(
+                track.name,
+                Instrument{
+                    .name = name, .kind = kind, .midiProgram = track.program, .writtenOffset = 0},
+                {Staff(Clef::Treble), Staff(Clef::Bass)});
         }
         // Other instruments: the clef that suits the notes.
         const bool low =

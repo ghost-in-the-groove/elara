@@ -49,6 +49,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Guitar Pro 7-8 (`.gp`) import with `elara-cli import`
 - [x] Guitar Pro 6 (`.gpx`) import
 - [x] Guitar Pro 3/4/5 (binary) import
+  - [x] Keyboards reaching into both clefs on a grand staff, split at middle C
+        (ADR-0075)
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip
@@ -78,6 +80,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Only the measures and systems an edit changed are measured and laid out
         again; the rest is reused (ADR-0052)
 - [x] `elara-cli render --svg` snapshot tests: every corpus file on pages
+- [x] PDF export: `elara-cli render --pdf` and Export as PDF… in the app, the
+      glyphs drawn from the music font's outlines (ADR-0074)
 - [x] Score view in the app: pages painted on worker threads and shown as scene
       graph textures, open-file dialog and drag and drop, track and view selection,
       smooth zoom (ADR-0015)

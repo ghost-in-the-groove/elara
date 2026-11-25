@@ -2,7 +2,7 @@
 
 The notation engine (ADR-0011): it turns the `elara_core` model into what a
 reader sees. Lengths are in staff spaces; renderers (the app's Qt scene graph,
-`elara-cli`'s SVG) choose how big a staff space is.
+SVG and PDF) choose how big a staff space is.
 
 | Header | What it gives you |
 |---|---|
@@ -11,6 +11,8 @@ reader sees. Lengths are in staff spaces; renderers (the app's Qt scene graph,
 | `page_layout.hpp` | `layoutPages()`: the same staves broken into systems that fill the width of a page, justified, and stacked on pages with the title and credits, measure numbers, track names and page numbers (ADR-0014); `PageLayoutOptions` (page size in staff spaces, margins, measures per system, threads), `pageOptions()` for A4 or Letter (`kA4`, `kLetter`) at a staff space in millimetres. Systems are laid out on every core. `cutIntoStrips()` cuts a page as long as the music into strips of whole systems, no higher than a given height, that stacked without gaps are the page (the continuous view, ADR-0057). |
 | `page_layout.hpp` | `PageLayoutCache`: lays out the versions of a song as it is edited, each as `layoutPages()` would, measuring and laying out again only the measures and systems an edit changed (ADR-0052) |
 | `svg.hpp` | `toSvg()`: a display list as a standalone SVG document. |
+| `pdf.hpp` | `toPdf()`: display lists as the pages of one PDF document (ADR-0074), glyphs drawn from their outlines, text in Helvetica, streams compressed by the compressor the caller passes (`PdfOptions`). |
+| `font_outlines.hpp` | `FontOutlines`: the outline of each `Glyph` (moves, lines and cubic curves in staff spaces) read from an OpenType font with CFF outlines such as `Bravura.otf`, by running its Type 2 charstrings (ADR-0074). |
 | `caret.hpp` | Keyboard entry on a laid-out score (ADR-0032): `caretBox()`, where a caret shows (over the fret number on its string, on a drum lane where the drum map places its kit piece, or across a standard staff; the free slot between the columns around its time), and `caretAt()`, the caret a click picks (the nearest string or drum lane, ADR-0035). |
 | `smufl.hpp` | SMuFL music fonts: `Glyph`, the symbols Elara draws, with their SMuFL names and code points (`glyphName()`, `codepoint()`, `glyphNamed()`); `EngravingFont`, read from a font's SMuFL metadata (`fromMetadata()`, `fromMetadataFile()`), with each glyph's bounding box, advance width and anchors (`metrics()`) and the font's engraving defaults (`defaults()`). |
 
