@@ -554,6 +554,49 @@ Changes changesBetween(const core::Song& before, const core::Song& now,
             }
         }
     }
+    // A gradual tempo change draws its word and dashed line on to the next
+    // change, which picks the word (ADR-0082): where a measure's changes
+    // differ, so do the measures of a ramp running into it or out of it.
+    if (changes.firstHeader != kNone) {
+        const auto changesIn = [](const core::Song& song, std::size_t m) -> const auto& {
+            return song.measureHeader(m).tempoChanges;
+        };
+        const auto rampsOut = [&](std::size_t m) {
+            return (!changesIn(before, m).empty() && changesIn(before, m).back().gradual) ||
+                   (!changesIn(now, m).empty() && changesIn(now, m).back().gradual);
+        };
+        const auto hasChanges = [&](std::size_t m) {
+            return !changesIn(before, m).empty() || !changesIn(now, m).empty();
+        };
+        const std::size_t count = now.measureCount();
+        const auto mark = [&changes](std::size_t from, std::size_t to) { // [from, to)
+            std::fill(changes.measures.begin() + static_cast<std::ptrdiff_t>(from),
+                      changes.measures.begin() + static_cast<std::ptrdiff_t>(to), true);
+        };
+        for (std::size_t m = changes.firstHeader; m < count; ++m) {
+            if (changesIn(before, m) == changesIn(now, m)) {
+                continue;
+            }
+            std::size_t from = m; // just after the measure with changes before m
+            while (from > 0 && !hasChanges(from - 1)) {
+                --from;
+            }
+            std::size_t to = m + 1; // the measure with changes after m
+            while (to < count && !hasChanges(to)) {
+                ++to;
+            }
+            const bool rampIn = from > 0 && rampsOut(from - 1);
+            if (rampIn) {
+                mark(from - 1, m);
+            }
+            // A ramp out of m, or one that ran on through m without a change.
+            const bool through =
+                rampIn && (changesIn(before, m).empty() || changesIn(now, m).empty());
+            if ((rampsOut(m) || through) && to < count) {
+                mark(m, to + 1);
+            }
+        }
+    }
     // The measures whose clef in force differs (ADR-0087): a clef change moves
     // the notes of every measure up to the next change.
     for (std::size_t i = 0; i < staves.size(); ++i) {

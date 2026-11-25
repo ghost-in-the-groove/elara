@@ -256,3 +256,39 @@ TEST_CASE("An edit lays out again only the measures and systems around it",
           layoutPages(*longer, staves, bravura(), options));
     CHECK(cache.lastReuse().measured == 97);
 }
+
+TEST_CASE("An edit to the tempo a gradual change goes to lays out the ramp's systems again",
+          "[notation][pages][incremental]") {
+    // ADR-0082: "rit." at measure 2 runs to the change at measure 40, many
+    // systems later; that change decides the word and where the line ends.
+    Song song;
+    song.addTrack(Track("Lead", {}, {elara::core::Staff{}}));
+    song.appendMeasures(48);
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        auto& voice = song.track(0).staff(0).measure(m).voices[0];
+        for (int beat = 0; beat < 4; ++beat) {
+            voice.beats.push_back(Beat{.duration = Duration(NoteValue::Quarter),
+                                       .notes = {Note{.pitch = Pitch::fromMidi(60 + beat)}}});
+        }
+    }
+    song.measureHeader(2).tempoChanges = {
+        TempoChange{.offset = {}, .tempo = Tempo(120.0), .gradual = true}};
+    song.measureHeader(40).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(60.0)}};
+    const std::vector<StaffSelection> staves = everyStaff(song);
+    const PageLayoutOptions options;
+    PageLayoutCache cache;
+    (void)cache.layout(std::make_shared<const Song>(song), staves, bravura(), options);
+
+    // Faster: "accel."; gone: no ramp at all; back: "rit." again.
+    for (const std::optional<double> bpm : {std::optional(180.0), std::optional<double>(),
+                                            std::optional(60.0)}) {
+        CAPTURE(bpm.value_or(0.0));
+        song.measureHeader(40).tempoChanges.clear();
+        if (bpm) {
+            song.measureHeader(40).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(*bpm)}};
+        }
+        const auto edited = std::make_shared<const Song>(song);
+        CHECK(cache.layout(edited, staves, bravura(), options) ==
+              layoutPages(*edited, staves, bravura(), options));
+    }
+}
