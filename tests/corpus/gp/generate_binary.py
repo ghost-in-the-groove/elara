@@ -643,8 +643,50 @@ def dal_segno_gp5() -> dict:
     }
 
 
+def piano_gp5() -> dict:
+    # Guitar Pro 3-5 keep a piano on one staff, its notes on guitar strings.
+    piano = {
+        "name": "Piano", "channel": 1, "program": 0, "strings": STANDARD,
+        "content": [
+            # Measure 1: a strummed chord across both hands (C5 accented, E4,
+            # F2), A4 alone, then G4 over C3.
+            [[beat(0, [note(1, 8, accent=True), note(2, 5), note(6, 1)],
+                   effects={"strum": (3, 0)}),
+              beat(0, [note(1, 5)]),
+              beat(-1, [note(1, 3), note(5, 3)])],
+             [EMPTY]],
+            # Measure 2: a melody in eighths ending on a tied C5, over a whole
+            # F2 and C3 in the second voice.
+            [[beat(1, [note(1, 0)]), beat(1, [note(1, 1)]), beat(1, [note(1, 3)]),
+              beat(1, [note(1, 5)]), beat(1, [note(1, 7)]), beat(1, [note(1, 8)]),
+              beat(0, [note(1, 8, kind="tie")])],
+             [beat(-2, [note(6, 1), note(5, 3)])]],
+        ],
+    }
+    # The right hand in the first voice, the left hand in the second, always.
+    electric = {
+        "name": "Electric Piano", "channel": 2, "program": 4, "strings": STANDARD,
+        "content": [
+            [[beat(-1, [note(1, 8)]), beat(-1, [note(1, 5)])],
+             [beat(-2, [note(6, 1)])]],
+            [[beat(-2, [note(1, 3)])],
+             [beat(-1, [note(5, 3)]), beat(-1, [note(6, 3)])]],
+        ],
+    }
+    return {
+        "version": 510,
+        "info": {"title": "Corpus Piano", "subtitle": "Guitar Pro 5",
+                 "artist": "Ghost in the Groove", "copyright": "CC0 1.0",
+                 "tab": "Elara contributors"},
+        "tempo": 80, "key": 0,
+        "measures": [{"time": (4, 4)}, {}],
+        "tracks": [piano, electric],
+    }
+
+
 FILES = {
     "techniques.gp5": techniques_gp5,
+    "piano.gp5": piano_gp5,
     "dal-segno.gp5": dal_segno_gp5,
     "quartet.gp4": quartet_gp4,
     "melody.gp3": melody_gp3,

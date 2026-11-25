@@ -49,6 +49,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Guitar Pro 7-8 (`.gp`) import with `elara-cli import`
 - [x] Guitar Pro 6 (`.gpx`) import
 - [x] Guitar Pro 3/4/5 (binary) import
+  - [x] Keyboards reaching into both clefs on a grand staff, split at middle C
+        (ADR-0075)
 - [x] MusicXML import (partwise, `.mxl`) with `elara-cli import`
 - [x] MusicXML export (text and `.mxl`) with `elara-cli export`, tested by round trip
 - [x] MIDI import/export with `elara-cli import`/`export`, tested by round trip

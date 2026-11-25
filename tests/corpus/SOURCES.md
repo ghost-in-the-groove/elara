@@ -44,6 +44,7 @@ neutral values.
 | `quartet.gp4` | Guitar Pro 4.06: bass with slap, pop, slide in and a harmonic; piano and flute programs that keep only their pitches; drums on channel 10; F major; a tempo change from a mix table, a tie, a bend, vibrato; triplet feel, lyrics, a volume change and a trill (reported) |
 | `melody.gp3` | Guitar Pro 3.00: a Windows-1252 title; nylon guitar with a per-beat natural harmonic, hammer-on, slide, tapped quintuplet, wide vibrato with let ring, whammy-bar dip and a downward strum; A minor, 4/4 then 6/8; chord diagrams in both formats and text (reported) |
 | `dal-segno.gp5` | Guitar Pro 5.10 directions (ADR-0049): a segno, "Da Coda", "Da Segno al Coda" and a coda sign; played 1 2 3 4 2 3 5 6 |
+| `piano.gp5` | Guitar Pro 5.10 keyboards on a grand staff (ADR-0075): a piano with an accented upward strum, a melody and a left hand in the second voice, split at middle C; an electric piano whose left hand is always the second voice |
 
 ## MIDI (`midi/`)
 
