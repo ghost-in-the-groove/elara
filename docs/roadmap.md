@@ -91,7 +91,10 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [ ] SFZ instruments and a guitar SFZ library
   - [x] SFZ instruments through Elara's own sampler, each note bent on its own:
         `elara-cli sfz`, `render-audio`/`play --sfz` (ADR-0066)
-  - [ ] An SFZ instrument chosen in the app, and FLAC samples
+  - [x] SFZ instruments for the guitars and the basses: chosen in the app and
+        kept for the next start, `--guitar-sfz`/`--bass-sfz`, and
+        `--sfz guitars=FILE`/`basses=FILE` in `elara-cli`
+  - [ ] FLAC samples
   - [ ] Guitar techniques mapped to a library's keyswitches and controllers
 - [x] Articulation rendering (bends, slides, legato, palm mute, harmonics, strums, tremolo picking; ADR-0022, ADR-0023, ADR-0025)
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)

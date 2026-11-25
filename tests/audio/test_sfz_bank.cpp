@@ -362,3 +362,32 @@ TEST_CASE("SFZ sampler: controllers at their set values move a region", "[audio]
     sound->noteOn(60, 100, Touch::Normal);
     CHECK_THAT(pitchOf(render(*sound, 0.2), kRate), WithinRel(keyFrequency(72), 0.003));
 }
+
+TEST_CASE("SFZ sampler: an instrument for guitars or basses leaves the other tracks",
+          "[audio][sfz]") {
+    using elara::audio::SfzTracks;
+    const Instrument bass{.name = "Bass", .kind = InstrumentKind::Fretted, .midiProgram = 33};
+    const Instrument piano{.name = "Piano", .kind = InstrumentKind::Keyboard, .midiProgram = 0};
+    const auto builtin = elara::audio::builtinBank();
+    const auto pitched = bankOf("<region> sample=*sine\n");
+    CHECK(pitched->tracks() == SfzTracks::Pitched);
+    CHECK(pitched->soundName(piano) == "test");
+
+    const auto guitars = pitched->with(builtin, SfzTracks::Guitars);
+    CHECK(guitars->tracks() == SfzTracks::Guitars);
+    CHECK(guitars->soundName(kGuitar) == "test");
+    CHECK(guitars->soundName(bass) == builtin->soundName(bass));
+    CHECK(guitars->soundName(piano) == builtin->soundName(piano));
+    CHECK(guitars->program().regions.size() == 1); // the same samples, shared
+
+    // A bass instrument under the guitar one: each plays its own tracks.
+    const auto both = guitars->with(pitched->with(builtin, SfzTracks::Basses), SfzTracks::Guitars);
+    CHECK(both->soundName(kGuitar) == "test");
+    CHECK(both->soundName(bass) == "test");
+    CHECK(both->soundName(piano) == builtin->soundName(piano));
+    CHECK(both->soundName(kDrums) == builtin->soundName(kDrums));
+
+    CHECK(elara::audio::sfzTracksName(SfzTracks::Basses) == "basses");
+    CHECK(elara::audio::sfzTracksFromName("guitars") == SfzTracks::Guitars);
+    CHECK_FALSE(elara::audio::sfzTracksFromName("drums").has_value());
+}

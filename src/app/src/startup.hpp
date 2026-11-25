@@ -32,6 +32,8 @@ struct StartupOptions {
     bool effects = false;       ///< the note effects panel opens at the caret
     QString screenshot;         ///< save the window here once shown, then quit
     QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`)
+    QString guitarSfz;          ///< an SFZ instrument for the guitars (`--guitar-sfz`)
+    QString bassSfz;            ///< an SFZ instrument for the basses (`--bass-sfz`)
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -74,6 +76,7 @@ private:
     void queuePractice();
     void queueLoop();
     void queueSoundFont();
+    void queueSfz();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 

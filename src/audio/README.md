@@ -38,7 +38,9 @@ Three targets with different rules:
   into memory on every core, regions picked by key, velocity, controllers,
   keyswitch and round robin, the amplitude envelope, loops, release samples
   and exclusive groups, 64 voices per track, each note glided on its own.
-  Percussion tracks play on another bank;
+  An instrument plays every pitched track, or only the guitars or the basses
+  (`SfzTracks`); the other tracks play on another bank, and `with()` puts the
+  same samples in front of another one;
 - `Player`, the same in real time: songs are handed to the audio thread through
   atomic pointers and the transport is a set of atomics (ADR-0019), and
   `updateMix()` changes the track levels while it plays, from a song or from
