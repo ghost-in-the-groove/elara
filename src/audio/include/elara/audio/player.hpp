@@ -88,6 +88,11 @@ public:
     /// Notes that started earlier are not struck again.
     void seek(double seconds) noexcept;
 
+    /// Goes on from where `other` is: its position and loop, playing or paused
+    /// as it is (a count-in under way is skipped). For a player made at a
+    /// device's new sample rate in place of `other`; call it after load().
+    void takeOver(const Player& other) noexcept;
+
     /// True from play() until pause() or the end of the song.
     [[nodiscard]] bool isPlaying() const noexcept;
 

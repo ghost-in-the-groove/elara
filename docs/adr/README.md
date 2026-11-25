@@ -110,6 +110,7 @@ one that replaces them.
 | [0102](0102-measure-repeats.md) | Measure repeats | Accepted |
 | [0103](0103-double-barlines.md) | Double barlines | Accepted |
 | [0104](0104-triplet-feel.md) | Triplet feel | Accepted |
+| [0105](0105-sanitizers.md) | Sanitizers | Accepted |
 
 ## Template
 

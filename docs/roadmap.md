@@ -10,6 +10,8 @@ one pull request, with a test that proves it. Tick the box in the same PR.
 - [x] Task runner `scripts/elara.py` (doctor, check, build, test, format, guard, cli, app)
 - [x] Architecture guard and clang-format check
 - [x] `elara-cli`: `version`, `render-tone`, `devices`, `tone`
+- [x] Every test but the app's under AddressSanitizer and UndefinedBehaviorSanitizer:
+      the `sanitize` preset and CI job (ADR-0105)
 - [x] Qt Quick window with a test-tone button through JUCE; `--smoke-test`
 - [x] CI workflow for Windows, macOS and Linux
 - [x] First green build on Windows (MSVC 19.44, Qt 6.12.1, JUCE 9.0.6)
@@ -223,6 +225,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Mixer (volume, pan, mute, solo): playback (ADR-0020) and the app, in the song panel (ADR-0039)
 - [x] `elara-cli render-audio` offline render + event-log tests, with a built-in synthesizer (ADR-0018)
 - [x] Real-time playback through the built-in synthesizer, `elara-cli play` (ADR-0019)
+  - [x] A device that restarts at another sample rate gets a player made at that
+        rate, from the same place in the music
 - [x] Transport, playback cursor and click-to-seek in the app, `elara-cli render --cursor-at`
   and `--time-at`
 

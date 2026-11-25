@@ -77,11 +77,58 @@ public:
 
     friend constexpr std::strong_ordering operator<=>(const Fraction& a,
                                                       const Fraction& b) noexcept {
-        // Denominators are positive, so cross-multiplication keeps the order.
-        return a.num_ * b.den_ <=> b.num_ * a.den_;
+        // Denominators are positive, so cross-multiplication keeps the order;
+        // terms under 2^31, every musical value, give products that fit.
+        if (fitsCrossProduct(a) && fitsCrossProduct(b)) {
+            return a.num_ * b.den_ <=> b.num_ * a.den_;
+        }
+        return compareLarge(a.num_, a.den_, b.num_, b.den_);
     }
 
 private:
+    [[nodiscard]] static constexpr bool fitsCrossProduct(const Fraction& f) noexcept {
+        constexpr std::int64_t kLimit = std::int64_t{1} << 31;
+        return f.num_ > -kLimit && f.num_ < kLimit && f.den_ < kLimit;
+    }
+
+    // Orders a/b and c/d (positive denominators) without multiplying, so
+    // terms near the 64-bit limit (a damaged file's) never overflow: compare
+    // the whole parts, then the remainders, whose order flips once inverted.
+    [[nodiscard]] static constexpr std::strong_ordering
+    compareLarge(std::int64_t a, std::int64_t b, std::int64_t c, std::int64_t d) noexcept {
+        bool flipped = false;
+        for (;;) {
+            // Floored division: a remainder in [0, b).
+            std::int64_t wholeAb = a / b;
+            std::int64_t restAb = a % b;
+            if (restAb < 0) {
+                --wholeAb;
+                restAb += b;
+            }
+            std::int64_t wholeCd = c / d;
+            std::int64_t restCd = c % d;
+            if (restCd < 0) {
+                --wholeCd;
+                restCd += d;
+            }
+            std::strong_ordering order = wholeAb <=> wholeCd;
+            if (order == 0 && (restAb == 0 || restCd == 0)) {
+                order = restAb <=> restCd; // 0 is below any other remainder
+            }
+            if (order != 0 || restAb == 0) {
+                return flipped ? 0 <=> order : order;
+            }
+            // restAb/b against restCd/d is d/restCd against b/restAb.
+            const std::int64_t nextB = restAb;
+            const std::int64_t nextD = restCd;
+            a = b;
+            b = nextB;
+            c = d;
+            d = nextD;
+            flipped = !flipped;
+        }
+    }
+
     constexpr void normalise() noexcept {
         if (den_ < 0) {
             num_ = -num_;

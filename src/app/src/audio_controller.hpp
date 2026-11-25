@@ -169,6 +169,7 @@ private:
     void setErrorMessage(const QString& message);
     void pollPlayback();
     void pollTransport();
+    void followDeviceRate();
     void carryLoop(const elara::audio::Sequence& from, const elara::audio::Sequence& to);
     void applyLoop();
 
