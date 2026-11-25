@@ -166,15 +166,15 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 51 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 53 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 63 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071), and the
   # score exports as a PDF document of its one page (ADR-0074).
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 63 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 59 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")

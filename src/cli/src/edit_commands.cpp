@@ -502,6 +502,8 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "clef") { // clef <name>: from the caret's measure on (ADR-0087)
         edit = setClef(song, entry.caret,
                        static_cast<core::Clef>(kindOf(verb, step.word(1), kClefNames)));
+    } else if (verb == "simile") { // simile 1 | simile 2 | simile none: measure repeat (ADR-0102)
+        edit = setMeasureRepeat(song, entry.caret, step.word(1) == "none" ? 0 : step.index(1));
     } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
         const std::string text = step.rest(1);
         edit = setBeatText(song, entry.caret, text == "none" ? std::string() : text);

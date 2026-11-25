@@ -71,6 +71,7 @@ private:
     void queueTuning();
     void queueTempo();
     void queueSection();
+    void queueMeasureRepeat();
     void queueEffects();
     void queueContinuous();
     void queueTunerFollowsTrack();
