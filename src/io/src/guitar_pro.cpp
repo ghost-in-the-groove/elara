@@ -602,8 +602,8 @@ private:
 struct NoteFields {
     pugi::xml_node tie, vibrato, accent, articulation;
     pugi::xml_node string, fret, midi, concertPitch, slide, harmonicType, harmonicFret;
-    pugi::xml_node trill;
-    bool letRing = false, ghost = false, ornament = false;
+    pugi::xml_node trill, ornament;
+    bool letRing = false, ghost = false;
     bool palmMuted = false, muted = false, hopoDestination = false, bended = false, tapped = false;
 
     explicit NoteFields(pugi::xml_node note) {
@@ -621,10 +621,11 @@ struct NoteFields {
                 articulation = child;
             } else if (name == "Trill") {
                 trill = child;
+            } else if (name == "Ornament") {
+                ornament = child;
             } else {
                 letRing = letRing || name == "LetRing";
                 ghost = ghost || name == "AntiAccent";
-                ornament = ornament || name == "Ornament";
             }
         }
     }
@@ -1098,8 +1099,20 @@ private:
                 warnings_.add(who, "feedback harmonics dropped", m);
             }
         }
+        // Mordents and turns (ADR-0091).
         if (fields.ornament) {
-            warnings_.add(who, "ornaments dropped", m);
+            const std::string_view kind = textOf(fields.ornament);
+            if (kind == "LowerMordent") {
+                effects.ornament = core::Ornament::Mordent;
+            } else if (kind == "UpperMordent") {
+                effects.ornament = core::Ornament::UpperMordent;
+            } else if (kind == "Turn") {
+                effects.ornament = core::Ornament::Turn;
+            } else if (kind == "InvertedTurn") {
+                effects.ornament = core::Ornament::InvertedTurn;
+            } else {
+                warnings_.add(who, "ornaments dropped", m);
+            }
         }
     }
 

@@ -774,6 +774,11 @@ Entry setTrillToNextStep(const Song& song, const Caret& at, NoteValue speed) {
     });
 }
 
+Entry setOrnament(const Song& song, const Caret& at, Ornament ornament) {
+    return changeEffects(song, at, "Change ornament",
+                         [ornament](Note& note) { note.effects.ornament = ornament; });
+}
+
 Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
     constexpr std::int16_t kOctave = 120; // tenths of a fret above the fretted note
     constexpr int kTenths = 10;

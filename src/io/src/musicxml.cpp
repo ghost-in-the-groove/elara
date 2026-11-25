@@ -2134,6 +2134,8 @@ private:
                 } else {
                     warn("tremolos between notes dropped", index);
                 }
+            } else if (const auto ornament = ornamentOf(name)) {
+                fx.ornament = *ornament; // ADR-0091
             } else if (name == "wavy-line") {
                 if (isType(mark, "start") && !trill) {
                     const bool wide = mark.attribute("smufl").value() == detail::kWideVibratoGlyph;
@@ -2164,6 +2166,24 @@ private:
                 warn("trills to an unusual note dropped", index);
             }
         }
+    }
+
+    // A mordent or a turn by its MusicXML name (ADR-0091); delayed and vertical
+    // turns are none of them.
+    static std::optional<Ornament> ornamentOf(std::string_view name) {
+        if (name == "mordent") {
+            return Ornament::Mordent;
+        }
+        if (name == "inverted-mordent") {
+            return Ornament::UpperMordent;
+        }
+        if (name == "turn") {
+            return Ornament::Turn;
+        }
+        if (name == "inverted-turn") {
+            return Ornament::InvertedTurn;
+        }
+        return std::nullopt;
     }
 
     // The alteration an accidental mark writes; nullopt for one it does not.

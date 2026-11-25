@@ -171,7 +171,7 @@ enum class Lane : std::uint8_t {
     Bend,
     Whammy,
     Vibrato,
-    Trill, ///< "tr" and the other note's fret (ADR-0090)
+    Ornament, ///< "tr" and the other note's fret (ADR-0090), a mordent or a turn (ADR-0091)
     PalmMute,
     LetRing,
     Harmonic,
@@ -181,6 +181,23 @@ enum class Lane : std::uint8_t {
     Tremolo
 };
 inline constexpr std::size_t kLaneCount = static_cast<std::size_t>(Lane::Tremolo) + 1;
+
+/// The glyph of a mordent or a turn (ADR-0091).
+[[nodiscard]] constexpr Glyph ornamentGlyph(core::Ornament ornament) noexcept {
+    switch (ornament) {
+    case core::Ornament::Mordent:
+        return Glyph::OrnamentMordent;
+    case core::Ornament::UpperMordent:
+        return Glyph::OrnamentShortTrill;
+    case core::Ornament::Turn:
+        return Glyph::OrnamentTurn;
+    case core::Ornament::InvertedTurn:
+        return Glyph::OrnamentTurnInverted;
+    case core::Ornament::None:
+        break;
+    }
+    return Glyph::OrnamentTrill;
+}
 
 /// The marks of one column of notes that go into lanes.
 struct ColumnTechniques {
@@ -194,11 +211,13 @@ struct ColumnTechniques {
     core::BendCurve whammy{}; ///< the whammy bar, empty without it (ADR-0061)
     core::BassTechnique bass = core::BassTechnique::None;
     int trillFret = -1; ///< the fret a trill goes to (ADR-0090), -1 without one
+    core::Ornament ornament = core::Ornament::None; ///< a mordent or a turn (ADR-0091)
 
     [[nodiscard]] bool any() const noexcept {
         return palmMute || letRing || vibrato != core::Vibrato::None || trillFret >= 0 ||
-               pickStroke != core::PickStroke::None || strum != core::Strum::None ||
-               tremoloStrokes > 0 || harmonic != core::HarmonicKind::None || !whammy.isEmpty() ||
+               ornament != core::Ornament::None || pickStroke != core::PickStroke::None ||
+               strum != core::Strum::None || tremoloStrokes > 0 ||
+               harmonic != core::HarmonicKind::None || !whammy.isEmpty() ||
                bass != core::BassTechnique::None;
     }
 };

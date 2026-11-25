@@ -35,6 +35,7 @@ using elara::core::Instrument;
 using elara::core::InstrumentKind;
 using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Ornament;
 using elara::core::Pitch;
 using elara::core::SlideIn;
 using elara::core::SlideOut;
@@ -535,6 +536,48 @@ TEST_CASE("Sequence: a trill alternates with its other note at its speed",
     CHECK(down.notes()[7].key == 62);
     CHECK(down.notes()[8].key == 64); // the sixty-fourth: too short to alternate
     CHECK(down.notes().size() == 9);
+}
+
+TEST_CASE("Sequence: mordents and turns start their notes with quick notes of the key",
+          "[audio][sequence][articulation]") {
+    // ADR-0091: at 120 BPM a thirty-second lasts 1/16 s. In C major E dips to
+    // D for a mordent, goes up to F for an upper mordent; a turn on E plays F,
+    // E, D, then E for the rest of the half note.
+    Song song = pianoSong(1);
+    const auto ornamented = [](int key, Ornament ornament) {
+        Note result = note(key);
+        result.effects.ornament = ornament;
+        return result;
+    };
+    voice(song, 0) = {beat(NoteValue::Half, {ornamented(64, Ornament::Turn)}),
+                      beat(NoteValue::Quarter, {ornamented(64, Ornament::Mordent)}),
+                      beat(NoteValue::Quarter, {ornamented(64, Ornament::UpperMordent)})};
+    const Sequence sequence(song);
+    std::vector<int> keys;
+    for (const auto& played : sequence.notes()) {
+        keys.push_back(played.key);
+    }
+    CHECK(keys == std::vector<int>{65, 64, 62, 64, 64, 62, 64, 64, 65, 64});
+    constexpr double kQuick = 1.0 / 16.0;
+    for (std::size_t i = 0; i < 3; ++i) {
+        CAPTURE(i);
+        CHECK_THAT(sequence.notes()[i].start, WithinAbs(kQuick * static_cast<double>(i), kEpsilon));
+        CHECK_THAT(sequence.notes()[i].end,
+                   WithinAbs(kQuick * static_cast<double>(i + 1), kEpsilon));
+    }
+    CHECK_THAT(sequence.notes()[3].start, WithinAbs(3 * kQuick, kEpsilon));
+    CHECK_THAT(sequence.notes()[3].end, WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(sequence.notes()[4].start, WithinAbs(1.0, kEpsilon));
+    CHECK_THAT(sequence.notes()[6].start, WithinAbs(1.0 + 2 * kQuick, kEpsilon));
+
+    // A sixteenth shares itself out: an inverted turn in four equal notes.
+    voice(song, 0) = {beat(NoteValue::Sixteenth, {ornamented(64, Ornament::InvertedTurn)})};
+    const Sequence shortNote(song);
+    REQUIRE(shortNote.notes().size() == 4);
+    CHECK(shortNote.notes()[0].key == 62);
+    CHECK(shortNote.notes()[2].key == 65);
+    CHECK_THAT(shortNote.notes()[3].start, WithinAbs(3 * 0.125 / 4, kEpsilon));
+    CHECK_THAT(shortNote.notes()[3].end, WithinAbs(0.125, kEpsilon));
 }
 
 TEST_CASE("Sequence: let ring holds a note until its string is struck again",

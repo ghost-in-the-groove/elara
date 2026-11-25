@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <stdexcept>
 #include <vector>
 
@@ -20,6 +21,8 @@ using elara::core::naturalHarmonicSemitones;
 using elara::core::Note;
 using elara::core::NoteEffects;
 using elara::core::NoteValue;
+using elara::core::Ornament;
+using elara::core::ornamentSteps;
 using elara::core::Ottava;
 using elara::core::ottavaOctaves;
 using elara::core::PickStroke;
@@ -234,4 +237,20 @@ TEST_CASE("A trill alternates with another note at its speed", "[core][effects]"
     CHECK(trilled != plain);
     CHECK(Trill{.semitones = 1} != Trill{.semitones = 2});
     CHECK(Trill{.semitones = 1}.speed == NoteValue::ThirtySecond);
+}
+
+TEST_CASE("Effects: an ornament's quick notes go round the note on the steps of the key",
+          "[core][effects]") {
+    // ADR-0091: a mordent dips below and back, an upper mordent goes above
+    // and back, a turn goes round from above and an inverted turn from below.
+    const auto steps = [](Ornament ornament) {
+        const auto found = ornamentSteps(ornament);
+        return std::vector<int>(found.steps.begin(),
+                                found.steps.begin() + static_cast<std::ptrdiff_t>(found.count));
+    };
+    CHECK(steps(Ornament::None).empty());
+    CHECK(steps(Ornament::Mordent) == std::vector<int>{0, -1});
+    CHECK(steps(Ornament::UpperMordent) == std::vector<int>{0, 1});
+    CHECK(steps(Ornament::Turn) == std::vector<int>{1, 0, -1});
+    CHECK(steps(Ornament::InvertedTurn) == std::vector<int>{-1, 0, 1});
 }

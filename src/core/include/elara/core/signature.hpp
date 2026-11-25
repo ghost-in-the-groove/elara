@@ -116,5 +116,8 @@ private:
 /// the accidental the key gives that step: the note a trill alternates with
 /// unless written otherwise (ADR-0090).
 [[nodiscard]] int semitonesToNextStep(const Pitch& pitch, const KeySignature& key);
+/// The semitones from `pitch` down to the step of the scale of `key` below it,
+/// counted positive: where a mordent dips (ADR-0091).
+[[nodiscard]] int semitonesToPreviousStep(const Pitch& pitch, const KeySignature& key);
 
 } // namespace elara::core
