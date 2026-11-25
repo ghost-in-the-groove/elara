@@ -31,7 +31,9 @@ constexpr double kTrillFretGap = 0.15;  // between a trill's "tr" and its fret
 constexpr double kRunHook = 0.4;        // the line's closing hook
 constexpr double kRunLineGap = 0.25;    // between the text and its line
 constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
-constexpr double kLaneHeight[kLaneCount]{1.25, 2.3, 1.2, 1.15, 1.15, 1.05, 1.05, 2.3, 1.9, 1.9};
+// One per lane, in the order of `Lane`.
+constexpr std::array kLaneHeight{1.25, 2.3, 1.2, 1.45, 1.15, 1.15, 1.05, 1.05, 2.3, 1.9, 1.9};
+static_assert(kLaneHeight.size() == kLaneCount);
 // The whammy-bar lane (ADR-0061): its label on top, the curve under it.
 constexpr double kWhammyLow = 0.25;      // the lowest pitch of the curve above the lane's bottom
 constexpr double kWhammyHigh = 1.25;     // its highest
@@ -711,10 +713,10 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
     // A trill: "tr" and, after it, the fret its other note is at (ADR-0090).
     if (marks.trillFret >= 0) {
         const BoundingBox& box = font_.metrics(Glyph::OrnamentTrill).box;
-        mark(Lane::Trill, Glyph::OrnamentTrill, centre, measure);
+        mark(Lane::Trill, Glyph::OrnamentTrill, centre, measure, kLaneGlyphScale);
         TextItem item;
         item.text = std::format("({})", marks.trillFret);
-        item.origin = {centre + box.width() / 2 + kTrillFretGap, -kLaneBaseline};
+        item.origin = {centre + box.width() * kLaneGlyphScale / 2 + kTrillFretGap, -kLaneBaseline};
         item.size = kLaneTextSize;
         item.align = TextAlign::Left;
         item.role = Role::Technique;
