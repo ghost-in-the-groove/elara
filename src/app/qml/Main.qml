@@ -60,6 +60,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        recent.remember = rememberSettings;
         if (initialFile.toString().length > 0)
             score.open(initialFile);
         if (showTuner)
@@ -136,10 +137,13 @@ ApplicationWindow {
     ScoreDocument {
         id: score
 
-        // A new song starts at its top, at paper size when it fits.
+        // A new song starts at its top, at paper size when it fits. A file
+        // opened or saved goes to the top of the recent scores.
         onSourceChanged: {
             scoreView.fitPaper();
             scoreView.toTop();
+            if (source.toString().length > 0)
+                recent.add(source);
         }
         onStatusChanged: {
             if (status === ScoreDocument.Error)
@@ -147,6 +151,10 @@ ApplicationWindow {
         }
         onEditFailed: message => toast.show(message)
         onNotice: message => toast.show(message)
+    }
+
+    RecentScores {
+        id: recent
     }
 
     AudioController {
@@ -447,6 +455,32 @@ ApplicationWindow {
 
                     y: moreButton.height
 
+                    Menu {
+                        id: recentMenu
+
+                        title: qsTr("Open recent")
+                        enabled: recent.scores.length > 0
+
+                        Instantiator {
+                            model: recent.scores
+
+                            delegate: MenuItem {
+                                required property var modelData
+
+                                text: modelData.name
+                                onTriggered: window.whenSaved(() => score.open(modelData.url))
+                            }
+                            onObjectAdded: (index, object) => recentMenu.insertItem(index, object)
+                            onObjectRemoved: (index, object) => recentMenu.removeItem(object)
+                        }
+                        MenuSeparator {}
+                        MenuItem {
+                            text: qsTr("Clear the list")
+                            onTriggered: recent.clear()
+                        }
+                    }
+                    MenuSeparator {}
+
                     MenuItem {
                         text: audio.loadingSoundFont ? qsTr("Opening the SoundFont…")
                                                      : audio.soundFontName.length > 0
@@ -505,8 +539,11 @@ ApplicationWindow {
             anchors.fill: parent
             opacity: window.hasScore ? 0.0 : 1.0
             visible: opacity > 0
+            recentScores: recent.scores
             onOpenRequested: window.openScore()
             onNewRequested: window.newSong()
+            onRecentRequested: file => window.whenSaved(() => score.open(file))
+            onForgetRequested: file => recent.remove(file)
 
             Behavior on opacity {
                 NumberAnimation {

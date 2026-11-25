@@ -104,7 +104,8 @@ elara_target_warnings(elara_benchmarks)
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
-    app/test_when_done.cpp app/test_app_icon.cpp app/bench_score_painter.cpp)
+    app/test_when_done.cpp app/test_app_icon.cpp app/test_recent_scores.cpp
+    app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
     Catch2::Catch2)
   target_compile_definitions(elara_app_tests PRIVATE
@@ -149,8 +150,11 @@ if(TARGET elara)
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 51 layouts\\)")
-  set_tests_properties(app.smoke_open_tracks app.smoke_song_pane PROPERTIES
+  set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
+  # The file opened is the first of the recent scores (ADR-0071).
+  set_tests_properties(app.smoke_open_tracks PROPERTIES
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
