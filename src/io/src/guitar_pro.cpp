@@ -465,9 +465,9 @@ BendCurve bendOf(pugi::xml_node note) {
 /// What the reader uses of a <Beat>, found in one pass over its children and
 /// one over its properties rather than a search for each.
 struct BeatFields {
-    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush;
-    bool text = false, chord = false, fading = false, wah = false, arpeggio = false,
-         hairpin = false, ottava = false, whammyBar = false, slapped = false, popped = false;
+    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio;
+    bool text = false, chord = false, fading = false, wah = false, hairpin = false, ottava = false,
+         whammyBar = false, slapped = false, popped = false;
 
     explicit BeatFields(pugi::xml_node beat) {
         for (const pugi::xml_node child : beat.children()) {
@@ -484,12 +484,13 @@ struct BeatFields {
                 graceNotes = child;
             } else if (name == "Tremolo") {
                 tremolo = child;
+            } else if (name == "Arpeggio") {
+                arpeggio = child;
             } else {
                 text = text || name == "FreeText";
                 chord = chord || name == "Chord";
                 fading = fading || name == "Fadding";
                 wah = wah || name == "Wah";
-                arpeggio = arpeggio || name == "Arpeggio";
                 hairpin = hairpin || name == "Hairpin";
                 ottava = ottava || name == "Ottavia";
             }
@@ -772,9 +773,6 @@ private:
         if (fields.wah) {
             warnings_.add(who, "wah dropped", m);
         }
-        if (fields.arpeggio) {
-            warnings_.add(who, "arpeggios dropped", m);
-        }
         if (fields.hairpin) {
             warnings_.add(who, "crescendos and diminuendos dropped", m);
         }
@@ -795,6 +793,10 @@ private:
         if (const std::string_view brush = textOf(fields.brush.child("Direction"));
             !brush.empty()) {
             effects.strum = brush == "Up" ? core::Strum::Up : core::Strum::Down;
+        } else if (fields.arpeggio) {
+            // A chord rolled upwards sounds from its lowest note, as a downstroke
+            // does (ADR-0025); Guitar Pro writes "Up" or "Down".
+            effects.strum = textOf(fields.arpeggio) == "Down" ? core::Strum::Up : core::Strum::Down;
         }
         if (fields.slapped) {
             effects.bassTechnique = core::BassTechnique::Slap;
