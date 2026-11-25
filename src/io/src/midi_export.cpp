@@ -18,6 +18,7 @@
 #include <numeric>
 #include <string_view>
 #include <tuple>
+#include <vector>
 
 namespace elara::io {
 
@@ -34,6 +35,35 @@ using detail::MidiTrack;
 using detail::Warnings;
 
 constexpr int kBaseDivision = 960; // divisible by 2..6, 8, 10, 12, 15, 16...
+
+// A gradual tempo change goes in steps this long (ADR-0082).
+const Fraction kRampStep(1, 16);
+
+/// A tempo change and where it falls in the song.
+struct PlacedChange {
+    Fraction at{};
+    const core::TempoChange* change = nullptr;
+};
+
+std::vector<PlacedChange> placeChanges(const Song& song) {
+    std::vector<PlacedChange> placed;
+    Fraction start;
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        const core::MeasureHeader& header = song.measureHeader(m);
+        for (const core::TempoChange& change : header.tempoChanges) {
+            placed.push_back(PlacedChange{.at = start + change.offset, .change = &change});
+        }
+        start += header.timeSignature.measureLength();
+    }
+    return placed;
+}
+
+/// Whether the change at `index` ramps to the next one: gradual, and to another speed.
+bool ramps(const std::vector<PlacedChange>& changes, std::size_t index) {
+    return index + 1 < changes.size() && changes[index].change->gradual &&
+           changes[index].change->tempo.wholesPerSecond() !=
+               changes[index + 1].change->tempo.wholesPerSecond();
+}
 
 // Ticks per quarter note: the base, or a multiple of it that makes every time in
 // the song a whole number of ticks while the format allows it.
@@ -66,6 +96,9 @@ Timing chooseTiming(const Song& song, const std::vector<SoundingNote>& notes) {
         add(start);
         for (const core::TempoChange& change : song.measureHeader(m).tempoChanges) {
             add(start + change.offset);
+            if (change.gradual) {
+                add(start + change.offset + kRampStep);
+            }
         }
         start += song.measureHeader(m).timeSignature.measureLength();
     }
@@ -126,21 +159,47 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
         warnings.add("", "song info other than the title and copyright dropped");
     }
 
-    const auto tempoEvent = [&](std::int64_t tick, const core::Tempo& tempo, std::size_t m) {
-        const double bpm = quarterBpm(tempo);
+    // Returns the microseconds per quarter note written.
+    const auto tempoMeta = [&](std::int64_t tick, double bpm) {
         const long long micros = std::clamp(detail::microsecondsFromBpm(bpm), 1LL, 0xFFFFFFLL);
-        if (tempo.beatUnit() != core::Duration{}) {
-            warnings.add(
-                "", "tempos in beat units other than the quarter note written in quarter notes", m);
-        }
-        if (std::abs(detail::bpmFromMicroseconds(micros) - bpm) > 1e-9) {
-            warnings.add("", "tempos rounded to whole microseconds per quarter note", m);
-        }
         track.events.push_back(
             meta(tick, detail::kMetaTempo,
                  bytes({static_cast<int>((micros >> 16) & 0xFF),
                         static_cast<int>((micros >> 8) & 0xFF), static_cast<int>(micros & 0xFF)})));
+        return micros;
     };
+    const auto checkBeatUnit = [&](const core::Tempo& tempo, std::size_t m) {
+        if (tempo.beatUnit() != core::Duration{}) {
+            warnings.add(
+                "", "tempos in beat units other than the quarter note written in quarter notes", m);
+        }
+    };
+    const auto tempoEvent = [&](std::int64_t tick, const core::Tempo& tempo, std::size_t m) {
+        checkBeatUnit(tempo, m);
+        const double bpm = quarterBpm(tempo);
+        const long long micros = tempoMeta(tick, bpm);
+        if (std::abs(detail::bpmFromMicroseconds(micros) - bpm) > 1e-9) {
+            warnings.add("", "tempos rounded to whole microseconds per quarter note", m);
+        }
+    };
+    // A step lasts as long as its stretch of the ramp, so the song keeps its timing
+    // (to the microsecond a quarter note).
+    const auto rampEvents = [&](const PlacedChange& from, const PlacedChange& to, std::size_t m) {
+        checkBeatUnit(from.change->tempo, m);
+        const double speed = from.change->tempo.wholesPerSecond();
+        const double slope =
+            (to.change->tempo.wholesPerSecond() - speed) / (to.at - from.at).toDouble();
+        for (Fraction step = from.at; step < to.at; step += kRampStep) {
+            const Fraction stepEnd = std::min(step + kRampStep, to.at);
+            const double length = (stepEnd - step).toDouble();
+            const double seconds =
+                core::rampSeconds(speed + slope * (step - from.at).toDouble(), slope, length);
+            tempoMeta(timing.ticks(step), length / seconds * 240.0); // wholes/s -> quarters/min
+        }
+    };
+
+    const std::vector<PlacedChange> changes = placeChanges(song);
+    std::size_t placed = 0;
 
     Fraction start;
     for (std::size_t m = 0; m < song.measureCount(); ++m) {
@@ -175,10 +234,12 @@ MidiTrack conductorTrack(const Song& song, const Timing& timing, Warnings& warni
             }
         }
         for (const core::TempoChange& change : header.tempoChanges) {
-            tempoEvent(timing.ticks(start + change.offset), change.tempo, m);
-            if (change.gradual) {
-                warnings.add("", "gradual tempo changes written as sudden ones", m);
+            if (ramps(changes, placed)) {
+                rampEvents(changes[placed], changes[placed + 1], m);
+            } else {
+                tempoEvent(timing.ticks(start + change.offset), change.tempo, m);
             }
+            ++placed;
         }
         start += header.timeSignature.measureLength();
     }

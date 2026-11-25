@@ -456,6 +456,8 @@ struct DynamicMark {
 struct TempoMark {
     Fraction offset{};
     Tempo tempo{};
+    std::string_view word{}; // "accel." or "rit.": a ramp starts here (ADR-0082)
+    bool endsRamp = false;   // the dashes of the ramp before stop here
     bool written = false;
 };
 
@@ -1034,13 +1036,36 @@ private:
                     TempoMark{.offset = Fraction(0), .tempo = writable(song_.startTempo(), m)});
             }
         }
-        for (const TempoChange& change : header.tempoChanges) {
-            if (change.gradual) {
-                warnings_.add({}, "gradual tempo changes written as sudden ones", m);
+        for (std::size_t i = 0; i < header.tempoChanges.size(); ++i) {
+            const TempoChange& change = header.tempoChanges[i];
+            TempoMark mark{.offset = change.offset,
+                           .tempo = writable(change.tempo, m),
+                           .endsRamp = std::exchange(rampOpen_, false)};
+            if (const TempoChange* next = change.gradual ? changeAfter(m, i) : nullptr) {
+                mark.word = rampWord(change.tempo, next->tempo);
+                rampOpen_ = !mark.word.empty();
             }
-            tempoMarks_.push_back(
-                TempoMark{.offset = change.offset, .tempo = writable(change.tempo, m)});
+            tempoMarks_.push_back(mark);
         }
+    }
+
+    /// The tempo change after the `index`th of measure `m`, if any.
+    [[nodiscard]] const TempoChange* changeAfter(std::size_t m, std::size_t index) const {
+        for (std::size_t at = m; at < song_.measureCount(); ++at) {
+            const auto& changes = song_.measureHeader(at).tempoChanges;
+            const std::size_t from = at == m ? index + 1 : 0;
+            if (from < changes.size()) {
+                return &changes[from];
+            }
+        }
+        return nullptr;
+    }
+
+    /// A ramp to the same speed is no ramp: nothing to write.
+    static std::string_view rampWord(const Tempo& from, const Tempo& to) {
+        const double start = from.wholesPerSecond();
+        const double end = to.wholesPerSecond();
+        return end > start ? "accel." : end < start ? "rit." : "";
     }
 
     /// A metronome mark has no tuplets: such beat units become quarter notes.
@@ -1051,6 +1076,14 @@ private:
         warnings_.add({}, "tempos with a tuplet beat unit written in quarter notes", m);
         const double quarters = tempo.bpm() * tempo.beatUnit().length().toDouble() * 4.0;
         return Tempo(std::clamp(quarters, Tempo::kMinBpm, Tempo::kMaxBpm));
+    }
+
+    static void writeDashes(XmlWriter& xml, std::string_view type) {
+        xml.open("direction-type");
+        xml.start("dashes");
+        xml.attribute("type", type);
+        xml.endEmpty();
+        xml.close("direction-type");
     }
 
     /// Tempo marks inside [from, to) are written before the element that starts
@@ -1065,6 +1098,9 @@ private:
             xml.start("direction");
             xml.attribute("placement", "above");
             xml.endOpen();
+            if (mark.endsRamp) {
+                writeDashes(xml, "stop");
+            }
             xml.open("direction-type");
             xml.open("metronome");
             xml.text("beat-unit", kTypeNames[static_cast<std::size_t>(tempo.beatUnit().value())]);
@@ -1074,6 +1110,14 @@ private:
             xml.text("per-minute", decimal(tempo.bpm()));
             xml.close("metronome");
             xml.close("direction-type");
+            if (!mark.word.empty()) {
+                xml.open("direction-type");
+                xml.start("words");
+                xml.attribute("font-style", "italic");
+                xml.endText("words", mark.word);
+                xml.close("direction-type");
+                writeDashes(xml, "start");
+            }
             if (mark.offset != from) {
                 xml.start("offset");
                 xml.attribute("sound", "yes");
@@ -1766,6 +1810,7 @@ private:
 
     // Buffers reused from measure to measure.
     std::vector<TempoMark> tempoMarks_{};
+    bool rampOpen_ = false; // dashes started and not yet stopped
     std::vector<DynamicMark> dynamicMarks_{};
     std::vector<Onset> onsets_{};
     std::vector<std::uint8_t> tuplets_{};

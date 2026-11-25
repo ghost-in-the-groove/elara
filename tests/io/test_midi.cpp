@@ -4,9 +4,11 @@
 #include <elara/io/midi.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -17,6 +19,7 @@
 #include <tuple>
 #include <vector>
 
+using Catch::Matchers::WithinAbs;
 using elara::core::Accent;
 using elara::core::Beat;
 using elara::core::Duration;
@@ -464,19 +467,40 @@ TEST_CASE("MIDI export reports a tempo change at the very start", "[io][midi]") 
     CHECK(imported->song.measureHeader(0).tempoChanges.empty());
 }
 
-TEST_CASE("MIDI export writes a gradual tempo change as a sudden one", "[io][midi]") {
-    // ADR-0082: MIDI holds tempos at points only.
+TEST_CASE("MIDI export steps a gradual tempo change along the way", "[io][midi]") {
+    // ADR-0082: MIDI holds tempos at points only, so the ramp goes in steps of a
+    // sixteenth, each as long as that stretch of the ramp.
     Song song = pianoSong(2);
     song.measureHeader(0).tempoChanges.push_back(
         TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(100), .gradual = true});
     song.measureHeader(1).tempoChanges.push_back(TempoChange{.tempo = Tempo(140)});
     const auto result = exportMidi(song);
-    CHECK(result.warnings ==
-          std::vector<std::string>{"gradual tempo changes written as sudden ones (measure 1)"});
+    CHECK(result.warnings.empty());
     const auto imported = importMidi(bytesOf(result.data));
     REQUIRE(imported.has_value());
-    REQUIRE(imported->song.measureHeader(0).tempoChanges.size() == 1);
-    CHECK_FALSE(imported->song.measureHeader(0).tempoChanges[0].gradual);
+    const auto& steps = imported->song.measureHeader(0).tempoChanges;
+    REQUIRE(steps.size() == 8);
+    CHECK(steps[0].offset == Fraction(1, 2));
+    CHECK(steps[7].offset == Fraction(15, 16));
+    CHECK(steps[0].tempo.bpm() > 100.0);
+    CHECK(steps[7].tempo.bpm() < 140.0);
+    // Two quarters at 120, then quarter = 100 to 140 over two quarters: 3 ln 1.4 s
+    // (to the hundredth of a BPM the importer reads tempos to).
+    CHECK_THAT(imported->song.secondsAt(1), WithinAbs(1.0 + 3.0 * std::log(1.4), 1e-4));
+    CHECK(imported->song.measureHeader(1).tempoChanges.front().tempo == Tempo(140));
+}
+
+TEST_CASE("MIDI export writes a gradual tempo change with nowhere to go as a sudden one",
+          "[io][midi]") {
+    Song song = pianoSong(2);
+    song.measureHeader(1).tempoChanges.push_back(
+        TempoChange{.offset = Fraction(1, 4), .tempo = Tempo(90), .gradual = true});
+    const auto result = exportMidi(song);
+    CHECK(result.warnings.empty());
+    const auto imported = importMidi(bytesOf(result.data));
+    REQUIRE(imported.has_value());
+    REQUIRE(imported->song.measureHeader(1).tempoChanges.size() == 1);
+    CHECK(imported->song.measureHeader(1).tempoChanges[0].tempo == Tempo(90));
 }
 
 TEST_CASE("MIDI export gives drums channel 10 and skips it for other tracks", "[io][midi]") {
