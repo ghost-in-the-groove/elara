@@ -637,6 +637,56 @@ TEST_CASE("MusicXML export: fermatas come back with their lengths", "[musicxml][
     CHECK(exported.data.find(R"(<fermata type="upright">square</fermata>)") != std::string::npos);
 }
 
+TEST_CASE("MusicXML export: slurs come back on their voices", "[musicxml][export]") {
+    // ADR-0086: a slur starts on the first beat slurred in a row and stops on
+    // the beat after the last, across barlines, numbered by staff and voice; a
+    // beat slurred to nothing after it is not written.
+    core::Song song;
+    song.appendMeasures(2);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const core::Duration half(core::NoteValue::Half);
+    const auto key = [](int midi) {
+        return core::Note{.pitch = core::Pitch::fromMidi(midi)};
+    };
+    const auto slurred = [](core::Beat beat) {
+        beat.effects.slur = true;
+        return beat;
+    };
+    core::Staff& upper = song.track(p).staff(0);
+    upper.measure(0).voices[0].beats = {slurred(beatOf(quarter, {key(72)})),
+                                        beatOf(quarter, {key(74)}), beatOf(quarter, {key(76)}),
+                                        slurred(beatOf(quarter, {key(77)}))};
+    upper.measure(0).voices[1].beats = {slurred(beatOf(half, {key(60)})), beatOf(half, {key(62)})};
+    upper.measure(1).voices[0].beats = {
+        beatOf(quarter, {key(79)}), slurred(beatOf(quarter, {key(81)})),
+        slurred(beatOf(quarter, {key(83)})), beatOf(quarter, {key(84)})};
+    core::Staff& lower = song.track(p).staff(1);
+    lower.measure(1).voices[0].beats = {
+        slurred(beatOf(core::Duration(core::NoteValue::Whole), {key(48)}))};
+
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    const auto count = [&](std::string_view text) {
+        std::size_t found = 0;
+        for (auto at = exported.data.find(text); at != std::string::npos;
+             at = exported.data.find(text, at + 1)) {
+            ++found;
+        }
+        return found;
+    };
+    CHECK(count(R"(<slur type="start" number="1"/>)") == 3);
+    CHECK(count(R"(<slur type="stop" number="1"/>)") == 3);
+    CHECK(count(R"(<slur type="start" number="2"/>)") == 1);
+    CHECK(count(R"(<slur type="stop" number="2"/>)") == 1);
+    CHECK(count("<slur ") == 8);
+
+    core::Song expected = song;
+    expected.track(p).staff(1).measure(1).voices[0].beats[0].effects.slur = false;
+    requireSame(expected, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
           "[musicxml][export]") {
     // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the

@@ -477,12 +477,15 @@ struct BeatPlace {
     std::size_t measure = 0;
     std::uint8_t tuplet = 0; // bit 0: bracket starts, bit 1: bracket stops
     std::uint8_t grace = 0;  // a grace note (ADR-0079): 1 before the beat, 2 on it
+    int slurStart = 0;       // the number of the slur it starts (ADR-0086), 0 for none
+    int slurStop = 0;        // the number of the slur it stops
     // Per verse, whether its word goes on from the syllable before (ADR-0084);
     // null: no lyrics written here (the TAB copy, grace notes).
     std::vector<bool>* words = nullptr;
 };
 
 constexpr std::uint8_t kGraceBefore = 1;
+constexpr int kSlurNumbers = 16; // MusicXML's number-level
 constexpr std::uint8_t kGraceOn = 2;
 
 constexpr std::uint8_t kTupletStart = 1;
@@ -1276,6 +1279,13 @@ private:
                 writeWords(xml, *beat.text, s + 1);
             }
             writeGraces(xml, beat, voiceNumber, s + 1, m);
+            // A slur from the first beat slurred in a row to the beat after the
+            // last (ADR-0086), numbered by staff and voice; a beat slurred to
+            // nothing after it starts none.
+            const int slur = (voiceNumber - 1) % kSlurNumbers + 1;
+            const bool slurred = !tabPass_ && previous != nullptr && previous->effects.slur;
+            const bool starts = !tabPass_ && beat.effects.slur && !slurred && next != nullptr;
+            const bool stops = slurred && (!beat.effects.slur || next == nullptr);
             writeBeat(xml, BeatPlace{.beat = &beat,
                                      .previous = previous,
                                      .next = next,
@@ -1283,6 +1293,8 @@ private:
                                      .staff = s + 1,
                                      .measure = m,
                                      .tuplet = tuplets_[i],
+                                     .slurStart = starts ? slur : 0,
+                                     .slurStop = stops ? slur : 0,
                                      .words = words});
             if (hairpin != Hairpin::None && (next == nullptr || next->effects.hairpin != hairpin)) {
                 writeWedge(xml, "stop", v, s + 1);
@@ -1427,6 +1439,7 @@ private:
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;
             others.fermata = Fermata::None;
+            others.slur = false;
             if (others != BeatEffects{}) {
                 warn("effects on rests dropped", place.measure);
             }
@@ -1438,9 +1451,11 @@ private:
             if (xmlStaves_ > 1) {
                 xml.number("staff", place.staff);
             }
-            if (place.tuplet != 0 || beat.effects.fermata != Fermata::None) {
+            if (place.tuplet != 0 || beat.effects.fermata != Fermata::None ||
+                place.slurStart != 0 || place.slurStop != 0) {
                 xml.open("notations");
                 writeTupletMarks(xml, place.tuplet);
+                writeSlurs(xml, place);
                 writeFermata(xml, beat.effects.fermata);
                 xml.close("notations");
             }
@@ -1483,6 +1498,19 @@ private:
         xml.endText("fermata", fermata == Fermata::Short  ? "angled"
                                : fermata == Fermata::Long ? "square"
                                                           : "normal");
+    }
+
+    /// The slur a beat stops and the one it starts (ADR-0086).
+    static void writeSlurs(XmlWriter& xml, const BeatPlace& place) {
+        for (const auto& [number, type] :
+             {std::pair{place.slurStop, "stop"}, std::pair{place.slurStart, "start"}}) {
+            if (number != 0) {
+                xml.start("slur");
+                xml.attribute("type", type);
+                xml.attribute("number", static_cast<std::int64_t>(number));
+                xml.endEmpty();
+            }
+        }
     }
 
     static void writeTupletMarks(XmlWriter& xml, std::uint8_t marks) {
@@ -1608,8 +1636,9 @@ private:
             fx.slideOut == SlideOut::Downwards || fx.slideOut == SlideOut::Upwards;
         const bool arpeggiate = beatFx.strum != Strum::None;
         const bool fermata = firstNote && beatFx.fermata != Fermata::None;
+        const bool slurs = firstNote && (place.slurStart != 0 || place.slurStop != 0);
         if (fx.tiedFromPrevious || tieStart || slideStop || slideStart || tupletMarks ||
-            ornaments || technical || articulations || arpeggiate || fermata) {
+            ornaments || technical || articulations || arpeggiate || fermata || slurs) {
             xml.open("notations");
             if (fx.tiedFromPrevious) {
                 xml.start("tied");
@@ -1634,6 +1663,9 @@ private:
             }
             if (tupletMarks) {
                 writeTupletMarks(xml, place.tuplet);
+            }
+            if (slurs) {
+                writeSlurs(xml, place);
             }
             if (fermata) {
                 writeFermata(xml, beatFx.fermata);

@@ -520,6 +520,21 @@ add_test(NAME cli.dump_fermatas COMMAND elara-cli --json dump "${ELARA_CLI_FERMA
 set_tests_properties(cli.dump_fermatas PROPERTIES
   FIXTURES_REQUIRED cli_fermatas
   PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.250")
+# Slurs at the caret (ADR-0086): the C slurred to the D, the E's slur undone.
+set(ELARA_CLI_SLURS "${CMAKE_CURRENT_BINARY_DIR}/cli-slurs.elara")
+add_test(NAME cli.edit_sets_slurs
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_SLURS}" "add-track piano"
+    "append-measures 1" "pitch C" "slur on" right "pitch D" right "pitch E" "slur on" undo)
+set_tests_properties(cli.edit_sets_slurs PROPERTIES
+  FIXTURES_SETUP cli_slurs
+  PASS_REGULAR_EXPRESSION "\"redo\":{\"count\":1,\"next\":\"Change beat effects\"}")
+add_test(NAME cli.dump_slurs COMMAND elara-cli --json dump "${ELARA_CLI_SLURS}")
+set_tests_properties(cli.dump_slurs PROPERTIES
+  FIXTURES_REQUIRED cli_slurs
+  PASS_REGULAR_EXPRESSION "\"C5\"}\\],\"effects\":{\"slur\":true}},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\"}\\]}")
+add_test(NAME cli.edit_rejects_unknown_slur
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "slur maybe")
+set_tests_properties(cli.edit_rejects_unknown_slur PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_unknown_fermata
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fermata endless")
 set_tests_properties(cli.edit_rejects_unknown_fermata PROPERTIES WILL_FAIL TRUE)

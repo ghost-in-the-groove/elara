@@ -143,6 +143,7 @@ core::Song richSong() {
     Beat softer = beat("2", {bass.frettedNote(1, 3)});
     softer.effects.hairpin = Hairpin::Diminuendo;
     softer.effects.fermata = Fermata::Long; // ADR-0085
+    softer.effects.slur = true;             // ADR-0086
     bass.measure(3).voices[0].beats = {slap, beat("4"), softer};
     bass.measure(3).voices[0].beats[1].effects.fermata = Fermata::Short; // over a rest
     song.track(2).staff(0).measure(2).voices[0].beats = {
@@ -218,7 +219,8 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("hairpin":"crescendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"diminuendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"none")") == std::string::npos);
-    CHECK(json.find(R"("fermata":"long")") != std::string::npos);
+    CHECK(json.find(R"("fermata":"long","slur":true)") != std::string::npos);
+    CHECK(json.find(R"("slur":false)") == std::string::npos);
     CHECK(json.find(R"({"duration":"4","effects":{"fermata":"short"}})") != std::string::npos);
     CHECK(json.find(R"("fermata":"none")") == std::string::npos);
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default

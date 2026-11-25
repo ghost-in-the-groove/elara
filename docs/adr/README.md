@@ -91,6 +91,7 @@ one that replaces them.
 | [0083](0083-midi-export-play-order.md) | MIDI export writes the play order | Accepted |
 | [0084](0084-lyrics.md) | Lyrics | Accepted |
 | [0085](0085-fermatas.md) | Fermatas | Accepted |
+| [0086](0086-slurs.md) | Slurs | Accepted |
 
 ## Template
 

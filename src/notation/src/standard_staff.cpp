@@ -57,8 +57,15 @@ constexpr double kTieGap = 0.12;    // between a tie end and its notehead
 constexpr double kTieRise = 0.1;    // tie height per staff space of length
 constexpr double kTieMinHeight = 0.35;
 constexpr double kTieMaxHeight = 0.8;
-constexpr double kArticulationGap = 0.3; // between a notehead and its articulation
-constexpr double kRunEndGap = 0.3;       // a technique run ends before the next column
+constexpr double kSlurGap = 0.3;       // between a slur end and its notehead or stem
+constexpr double kSlurClearance = 0.4; // between a slur and the notes under it
+constexpr double kSlurRise = 0.08;     // slur height per staff space of length
+constexpr double kSlurMinHeight = 0.5;
+constexpr double kSlurNaturalHeight = 1.5; // the most it rises unless notes are in the way
+constexpr double kSlurMaxHeight = 2.5;     // beyond it the whole slur moves away instead
+constexpr double kSlurLineGap = 0.4;       // between a slur cut by a line and its edge
+constexpr double kArticulationGap = 0.3;   // between a notehead and its articulation
+constexpr double kRunEndGap = 0.3;         // a technique run ends before the next column
 
 // A rolled chord's wavy line (ADR-0076): half waves kArpeggioWave long whose
 // control points stand kArpeggioSwing off the line, so that it swings about
@@ -268,6 +275,24 @@ struct Chord {
     // size around its own x, which is from this chord's x.
     std::vector<Chord> graces;
     bool slash = false; // a grace note before the beat: its stem is slashed
+    // The outer edge of its staccato and accents, on the notehead side.
+    std::optional<double> marks;
+};
+
+// What a slur needs of a beat under it (ADR-0086): where its end goes and
+// what it has to clear.
+struct SlurNote {
+    double x = 0.0; // the middle of its noteheads or rest
+    double halfWidth = 0.0;
+    double stemX = 0.0;
+    double headTop = 0.0; // its noteheads and the marks on their side
+    double headBottom = 0.0;
+    double inkTop = 0.0; // all its ink and marks
+    double inkBottom = 0.0;
+    bool stemUp = true;
+    bool stem = false;
+    bool rest = false;
+    int voiceSide = 0; // -1: the upper voice of several, 1: a lower one, 0: alone
 };
 
 // The outer edge of a beam group's primary beam: y = edge + slope * (x - x0).
@@ -311,6 +336,7 @@ public:
 private:
     void close(double width) override {
         tiesOut(width - defaults_.thinBarlineThickness - kTieGap);
+        slursOut(width - defaults_.thinBarlineThickness - kSlurLineGap);
         if (techniques_ && !lanes_.empty()) {
             lanes_.place(list_, inkTop());
         }
@@ -370,9 +396,17 @@ private:
             x = timeSignature(song_.measureHeader(first).timeSignature, x + kHeaderGap,
                               kMiddleLine);
         }
-        // Ties from the line before start after the header.
+        // Ties from the line before start after the header, and so do the
+        // slurs its last beats were slurred into (ADR-0086).
         lineStart_ = x;
         incoming_.fill(first > 0);
+        for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
+            slurNotes_[v].clear();
+            const bool carried = first > 0 && !staff_.measure(first - 1).voices[v].beats.empty() &&
+                                 staff_.measure(first - 1).voices[v].beats.back().effects.slur;
+            slurOpen_[v] = carried;
+            slurIncoming_[v] = carried;
+        }
         return x;
     }
 
@@ -466,6 +500,7 @@ private:
         for (const TupletSpan& group : tuplets_) {
             tuplet(group);
         }
+        slurs();
         centreMeasureRests(start, barline);
         fermatas(start, barline);
         if (techniques_) {
@@ -1359,7 +1394,7 @@ private:
 
     // Staccato and accents on the notehead side of the chord, the staccato
     // dot in a space when inside the staff.
-    void articulations(const Chord& chord) {
+    void articulations(Chord& chord) {
         if (chord.rest || chord.heads.empty()) {
             return;
         }
@@ -1386,6 +1421,7 @@ private:
             const Glyph dot = above ? Glyph::ArticStaccatoAbove : Glyph::ArticStaccatoBelow;
             glyphCentred(dot, centre, yOf(target), Role::Articulation);
             edge = yOf(target) + direction * (metrics(dot).box.height() / 2 + kArticulationGap);
+            chord.marks = yOf(target) + direction * metrics(dot).box.height() / 2;
         }
         if (accent == core::Accent::None) {
             return;
@@ -1396,6 +1432,198 @@ private:
         const BoundingBox& box = metrics(mark).box;
         glyph(mark, centre - (box.southWest.x + box.northEast.x) / 2,
               edge + (above ? box.southWest.y : box.northEast.y), Role::Articulation);
+        chord.marks = edge + direction * box.height();
+    }
+
+    // ---- Slurs (ADR-0086) ----
+
+    [[nodiscard]] SlurNote slurNote(const Chord& chord) const {
+        SlurNote note;
+        note.voiceSide = voiceCount_ > 1 ? (voiceUp_[chord.voice] ? -1 : 1) : 0;
+        note.rest = chord.rest || chord.heads.empty();
+        if (chord.measureRest) { // drawn later, in the middle of its measure
+            note.x = chord.x;
+            note.headTop = note.inkTop = 1.0;
+            note.headBottom = note.inkBottom = 2.0;
+            return note;
+        }
+        if (note.rest) {
+            note.x = chord.x + (chord.left + chord.right) / 2;
+            note.halfWidth = (chord.right - chord.left) / 2;
+            note.headTop = note.inkTop = chord.inkTop;
+            note.headBottom = note.inkBottom = chord.inkBottom;
+            return note;
+        }
+        note.x = chord.x + (chord.headLeft + chord.headRight) / 2;
+        note.halfWidth = (chord.headRight - chord.headLeft) / 2;
+        note.stemUp = chord.stemUp;
+        note.stem = hasStem(chord.duration.value());
+        note.stemX = chord.stemX;
+        note.headTop = yOf(chord.heads.front().step) - 0.5;
+        note.headBottom = yOf(chord.heads.back().step) + 0.5;
+        note.inkTop = chord.inkTop;
+        note.inkBottom = chord.inkBottom;
+        if (chord.marks) {
+            if (chord.stemUp) {
+                note.headBottom = std::max(note.headBottom, *chord.marks);
+                note.inkBottom = std::max(note.inkBottom, *chord.marks);
+            } else {
+                note.headTop = std::min(note.headTop, *chord.marks);
+                note.inkTop = std::min(note.inkTop, *chord.marks);
+            }
+        }
+        return note;
+    }
+
+    // Gathers the beats of the slur going on in each voice and draws it when
+    // the beat after its last slurred beat comes. A voice without beats in the
+    // measure ends its slur at its last beat.
+    void slurs() {
+        std::array<bool, core::Measure::kMaxVoices> seen{};
+        for (const Chord& chord : chords_) {
+            if (chord.beat == nullptr) {
+                continue; // a measure no voice has notes in
+            }
+            const std::size_t v = chord.voice;
+            seen[v] = true;
+            const bool slurred = chord.beat->effects.slur;
+            if (!slurOpen_[v] && !slurred) {
+                continue;
+            }
+            slurOpen_[v] = true;
+            slurNotes_[v].push_back(slurNote(chord));
+            if (!slurred) {
+                slur(v, std::nullopt);
+            }
+        }
+        for (std::size_t v = 0; v < seen.size(); ++v) {
+            if (slurOpen_[v] && !seen[v]) {
+                slur(v, std::nullopt);
+            }
+        }
+    }
+
+    // At the end of a line: the slurs that go on into the next measure, cut
+    // at `end`; those with nothing after them end at their last beat.
+    void slursOut(double end) {
+        measure_ = measureIndex_;
+        const std::size_t next = measureIndex_ + 1;
+        for (std::size_t v = 0; v < slurOpen_.size(); ++v) {
+            if (!slurOpen_[v]) {
+                continue;
+            }
+            const bool goesOn =
+                next < song_.measureCount() && !staff_.measure(next).voices[v].beats.empty();
+            slur(v, goesOn ? std::optional(end) : std::nullopt);
+        }
+    }
+
+    // How far up its height a curve() is a fraction u of the way across:
+    // 4t(1 - t) at the t where its x reaches u.
+    [[nodiscard]] static double slurBulge(double u) {
+        double low = 0.0;
+        double high = 1.0;
+        for (int i = 0; i < 40; ++i) {
+            const double t = (low + high) / 2;
+            const double s = 1.0 - t;
+            const double x = 0.75 * t * s * s + 2.25 * t * t * s + t * t * t;
+            (x < u ? low : high) = t;
+        }
+        const double t = (low + high) / 2;
+        return 4.0 * t * (1.0 - t);
+    }
+
+    // Draws the slur of voice v over the beats gathered for it, from the start
+    // of the line when it came from the line before and to `lineEnd` when it
+    // goes on in the next. It goes on the notehead side when all its stems go
+    // up, above otherwise, and above (below) for the upper (lower) voice of
+    // several; it arches over the notes between its ends, and when that would
+    // take it too high it moves away from them whole.
+    void slur(std::size_t v, std::optional<double> lineEnd) {
+        const std::vector<SlurNote> notes = std::exchange(slurNotes_[v], {});
+        slurOpen_[v] = false;
+        const bool incoming = std::exchange(slurIncoming_[v], false);
+        const std::size_t ends = notes.size() + (incoming ? 1 : 0) + (lineEnd ? 1 : 0);
+        if (notes.empty() || ends < 2) {
+            return;
+        }
+        bool above = true;
+        if (notes.front().voiceSide != 0) {
+            above = notes.front().voiceSide < 0;
+        } else {
+            bool sounding = false;
+            bool allUp = true;
+            for (const SlurNote& note : notes) {
+                if (!note.rest) {
+                    sounding = true;
+                    allUp = allUp && note.stemUp;
+                }
+            }
+            above = !(sounding && allUp);
+        }
+        const double direction = above ? -1.0 : 1.0;
+        const auto endOf = [&](const SlurNote& note) {
+            if (!note.rest && note.stem && note.stemUp == above) { // at the tip of its stem
+                return Point{note.stemX,
+                             (above ? note.inkTop : note.inkBottom) + direction * kSlurGap};
+            }
+            if (note.rest) {
+                return Point{note.x, (above ? note.inkTop : note.inkBottom) + direction * kSlurGap};
+            }
+            return Point{note.x, (above ? note.headTop : note.headBottom) + direction * kSlurGap};
+        };
+        Point from = endOf(notes.front());
+        Point to = endOf(notes.back());
+        if (incoming) {
+            from.x = lineStart_ + kSlurLineGap;
+        }
+        if (lineEnd) {
+            to.x = *lineEnd;
+        }
+        const double width = to.x - from.x;
+        if (width < kEpsilon) {
+            return;
+        }
+        // What lies between its ends: each note's sides, where the slur has to
+        // clear its ink.
+        struct Clear {
+            double u = 0.0;
+            double y = 0.0;
+        };
+        std::vector<Clear> between;
+        const std::size_t first = incoming ? 0 : 1;
+        const std::size_t last = lineEnd ? notes.size() : notes.size() - 1;
+        for (std::size_t i = first; i < last; ++i) {
+            const SlurNote& note = notes[i];
+            const double y = (above ? note.inkTop : note.inkBottom) + direction * kSlurClearance;
+            for (const double x : {note.x - note.halfWidth, note.x + note.halfWidth}) {
+                const double u = (x - from.x) / width;
+                if (u > 0.0 && u < 1.0) {
+                    between.push_back({.u = u, .y = y});
+                }
+            }
+        }
+        const auto lineAt = [&](double u) {
+            return from.y + (to.y - from.y) * u;
+        };
+        double height =
+            direction * std::clamp(width * kSlurRise, kSlurMinHeight, kSlurNaturalHeight);
+        for (const Clear& clear : between) {
+            const double needed = (clear.y - lineAt(clear.u)) / slurBulge(clear.u);
+            height = above ? std::min(height, needed) : std::max(height, needed);
+        }
+        if (std::abs(height) > kSlurMaxHeight) {
+            height = direction * kSlurMaxHeight;
+            double away = 0.0;
+            for (const Clear& clear : between) {
+                const double curveY = lineAt(clear.u) + height * slurBulge(clear.u);
+                away = std::max(away, direction * (clear.y - curveY));
+            }
+            from.y += direction * away;
+            to.y += direction * away;
+        }
+        curve(from, to, height, defaults_.slurMidpointThickness, defaults_.slurEndpointThickness,
+              Role::Slur);
     }
 
     // Palm mutes, let ring, vibrato and pick strokes of the measure's columns.
@@ -1459,7 +1687,12 @@ private:
     std::size_t voiceCount_ = 0;
     std::array<std::vector<TieStart>, core::Measure::kMaxVoices> tieStarts_{};
     std::array<bool, core::Measure::kMaxVoices> incoming_{}; // ties from the line before
-    double lineStart_ = 0.0;                                 // where the header ends
+    // Per voice, the beats of the slur going on (ADR-0086), whether one is
+    // going on and whether it came from the line before.
+    std::array<std::vector<SlurNote>, core::Measure::kMaxVoices> slurNotes_{};
+    std::array<bool, core::Measure::kMaxVoices> slurOpen_{};
+    std::array<bool, core::Measure::kMaxVoices> slurIncoming_{};
+    double lineStart_ = 0.0; // where the header ends
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
