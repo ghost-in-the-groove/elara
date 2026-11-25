@@ -68,6 +68,10 @@ constexpr double kClefChangeScale = 0.75;  // a clef change against the line's c
 constexpr double kClefChangeGap = 0.5;     // between a clef change and the barline after it
 constexpr double kArticulationGap = 0.3;   // between a notehead and its articulation
 constexpr double kRunEndGap = 0.3;         // a technique run ends before the next column
+constexpr double kOctaveGap = 0.5;     // between an octave line and the ink it clears (ADR-0089)
+constexpr double kOctaveLineGap = 0.3; // between an octave line's mark and its dashes
+constexpr double kOctaveDash = 0.4;    // dashes and gaps of an octave line
+constexpr double kOctaveMinLine = 1.0; // the dashes of a line over a single short note
 
 // A rolled chord's wavy line (ADR-0076): half waves kArpeggioWave long whose
 // control points stand kArpeggioSwing off the line, so that it swings about
@@ -366,6 +370,7 @@ private:
     void close(double width) override {
         tiesOut(width - defaults_.thinBarlineThickness - kTieGap);
         slursOut(width - defaults_.thinBarlineThickness - kSlurLineGap);
+        octaveLinesOut(width);
         if (techniques_ && !lanes_.empty()) {
             lanes_.place(list_, inkTop());
         }
@@ -609,7 +614,7 @@ private:
                 chord.rest = beat.isRest();
                 chord.measureRest = chord.rest && beats.size() == 1 && chord.length >= length;
                 for (const core::Note& note : beat.notes) {
-                    chord.heads.push_back(headOf(note, beat.duration.value()));
+                    chord.heads.push_back(headOf(note, beat.duration.value(), beat.effects.ottava));
                 }
                 std::ranges::sort(chord.heads, {}, &Head::step);
                 for (const core::Grace& grace : beat.graces) {
@@ -621,7 +626,8 @@ private:
                     small.duration = grace.duration;
                     small.slash = !grace.onBeat;
                     for (const core::Note& note : grace.notes) {
-                        small.heads.push_back(headOf(note, grace.duration.value()));
+                        small.heads.push_back(
+                            headOf(note, grace.duration.value(), beat.effects.ottava));
                     }
                     std::ranges::sort(small.heads, {}, &Head::step);
                     chord.graces.push_back(std::move(small));
@@ -741,7 +747,9 @@ private:
         }
     }
 
-    [[nodiscard]] Head headOf(const core::Note& note, NoteValue value) const {
+    // Under an octave line the note is written one or two octaves nearer the
+    // staff (ADR-0089).
+    [[nodiscard]] Head headOf(const core::Note& note, NoteValue value, core::Ottava ottava) const {
         Head head;
         head.note = &note;
         head.tied = note.effects.tiedFromPrevious;
@@ -752,7 +760,7 @@ private:
             head.glyph = noteheadFor(value, drum.head);
             return head;
         }
-        const Pitch written = writtenPitch(note.pitch, offset_);
+        const Pitch written = writtenPitch(note.pitch, offset_ - 12 * core::ottavaOctaves(ottava));
         head.diatonic = diatonicIndex(written);
         head.step = topLineIndex(clef_) - head.diatonic;
         head.alter = written.alter();
@@ -1420,7 +1428,8 @@ private:
                 if (!note.effects.tiedFromPrevious) {
                     continue;
                 }
-                const int step = headOf(note, beats.front().duration.value()).step;
+                const int step =
+                    headOf(note, beats.front().duration.value(), beats.front().effects.ottava).step;
                 const auto from = std::ranges::find(starts, step, &TieStart::step);
                 if (from != starts.end()) {
                     tie(step, from->above, from->right + kTieGap, end);
@@ -1712,6 +1721,127 @@ private:
         }
     }
 
+    // ---- Octave lines (ADR-0089) ----
+
+    struct OctaveSpan {
+        Fraction start;
+        Fraction lastStart; // of its last beat
+        Fraction end;
+        core::Ottava ottava = core::Ottava::None;
+    };
+
+    struct OctaveRun {
+        core::Ottava ottava = core::Ottava::None;
+        double left = 0.0;       // the column of its first beat
+        double right = 0.0;      // the end of the notehead of its last beat
+        std::size_t measure = 0; // where it starts
+        std::size_t last = 0;    // where it ends
+        bool toBarline = false;  // its last beat ends `last`
+    };
+
+    // Whether a voice of measure m starts with a beat under `ottava`.
+    [[nodiscard]] bool startsUnder(std::size_t m, core::Ottava ottava) const {
+        return m < staff_.measureCount() &&
+               std::ranges::any_of(
+                   staff_.measure(m).voices,
+                   [ottava](const core::Voice& voice) {
+                       return !voice.beats.empty() && voice.beats.front().effects.ottava == ottava;
+                   });
+    }
+
+    // The octave lines of the measure drawn last, one per run of beats under
+    // the same line in any voice; a run reaching the barline goes on into the
+    // next measure when it starts under the same line.
+    void octaveLines(std::span<const ColumnPosition> positions) {
+        if (percussion_) {
+            return;
+        }
+        octaveSpans_.clear();
+        for (const core::Voice& voice : staff_.measure(measureIndex_).voices) {
+            Fraction at;
+            for (const Beat& beat : voice.beats) {
+                const Fraction end = at + beat.duration.length();
+                if (beat.effects.ottava != core::Ottava::None) {
+                    octaveSpans_.push_back(OctaveSpan{
+                        .start = at, .lastStart = at, .end = end, .ottava = beat.effects.ottava});
+                }
+                at = end;
+            }
+        }
+        if (octaveSpans_.empty()) {
+            return;
+        }
+        std::ranges::stable_sort(octaveSpans_, std::less<>{}, &OctaveSpan::start);
+        std::size_t kept = 0;
+        for (std::size_t i = 1; i < octaveSpans_.size(); ++i) {
+            OctaveSpan& last = octaveSpans_[kept];
+            if (octaveSpans_[i].ottava == last.ottava && octaveSpans_[i].start <= last.end) {
+                last.end = std::max(last.end, octaveSpans_[i].end);
+                last.lastStart = std::max(last.lastStart, octaveSpans_[i].lastStart);
+            } else {
+                octaveSpans_[++kept] = octaveSpans_[i];
+            }
+        }
+        octaveSpans_.resize(kept + 1);
+        const double headWidth = metrics(Glyph::NoteheadBlack).box.northEast.x;
+        for (const OctaveSpan& span : octaveSpans_) {
+            const double right = columnX(positions, span.lastStart) + headWidth;
+            const bool toBarline =
+                std::ranges::lower_bound(positions, span.end, std::less<>{},
+                                         &ColumnPosition::start) == positions.end();
+            if (span.start.isZero() && !octaveRuns_.empty()) {
+                OctaveRun& last = octaveRuns_.back();
+                if (last.ottava == span.ottava && last.toBarline &&
+                    last.last + 1 == measureIndex_) {
+                    last.right = right; // over the barline
+                    last.last = measureIndex_;
+                    last.toBarline = toBarline;
+                    continue;
+                }
+            }
+            octaveRuns_.push_back(OctaveRun{.ottava = span.ottava,
+                                            .left = columnX(positions, span.start),
+                                            .right = right,
+                                            .measure = measureIndex_,
+                                            .last = measureIndex_,
+                                            .toBarline = toBarline});
+        }
+    }
+
+    // Draws the octave lines of the line ending at `width`: the mark over (or
+    // under) the first beat, clear of the ink, then dashes to the end of the
+    // last note and a hook towards the staff. A line going on into the next
+    // system runs to the end of this one without a hook; the next starts with
+    // the mark again.
+    void octaveLinesOut(double width) {
+        const double thickness = defaults_.octaveLineThickness;
+        for (const OctaveRun& run : octaveRuns_) {
+            using enum core::Ottava;
+            const bool above = run.ottava == Alta || run.ottava == QuindicesimaAlta;
+            const Glyph mark = run.ottava == Alta               ? Glyph::OttavaAlta
+                               : run.ottava == Bassa            ? Glyph::OttavaBassaVb
+                               : run.ottava == QuindicesimaAlta ? Glyph::QuindicesimaAlta
+                                                                : Glyph::QuindicesimaBassaMb;
+            const BoundingBox& box = metrics(mark).box;
+            const bool cut = run.toBarline && startsUnder(run.last + 1, run.ottava);
+            const double from = run.left + box.width() + kOctaveLineGap;
+            const double to = cut ? width : std::max(run.right, from + kOctaveMinLine);
+            const Extents ink = inkBetween(run.left, to);
+            // The mark kOctaveGap off the ink, the dashes through its middle
+            // and the hook back to the level of its edge nearest the staff.
+            const double edge = above ? std::min(ink.top, 0.0) - kOctaveGap
+                                      : std::max(ink.bottom, height()) + kOctaveGap;
+            const double y = above ? edge + box.southWest.y : edge + box.northEast.y;
+            const double middle = y - (box.southWest.y + box.northEast.y) / 2;
+            measure_ = run.measure;
+            glyph(mark, run.left - box.southWest.x, y, Role::OctaveLine);
+            line({from, middle}, {to, middle}, thickness, Role::OctaveLine, kOctaveDash);
+            if (!cut) {
+                line({to, middle}, {to, edge}, thickness, Role::OctaveLine);
+            }
+        }
+    }
+
     struct TieStart {
         int step = 0;
         double right = 0.0; // after the notehead and its dots
@@ -1740,7 +1870,9 @@ private:
     std::array<std::vector<SlurNote>, core::Measure::kMaxVoices> slurNotes_{};
     std::array<bool, core::Measure::kMaxVoices> slurOpen_{};
     std::array<bool, core::Measure::kMaxVoices> slurIncoming_{};
-    double lineStart_ = 0.0; // where the header ends
+    double lineStart_ = 0.0;              // where the header ends
+    std::vector<OctaveSpan> octaveSpans_; // of the measure being drawn
+    std::vector<OctaveRun> octaveRuns_;   // of the line
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
@@ -1753,6 +1885,7 @@ private:
 double StandardWriter::header(std::size_t first) {
     dynamics_.start(staff_, first);
     lyrics_.start(first);
+    octaveRuns_.clear();
     return headerAt(first);
 }
 
@@ -1773,6 +1906,7 @@ void StandardWriter::draw(std::span<const ColumnPosition> positions, double star
     lyrics_.draw(positions, widthOf(Glyph::NoteheadBlack) / 2);
     strikeDynamics();
     dynamics_.hairpins(staff_.measure(measureIndex_), measureIndex_, positions, barline);
+    octaveLines(positions);
 }
 
 } // namespace

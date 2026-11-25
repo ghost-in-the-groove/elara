@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/effects.hpp>
 #include <elara/core/song.hpp>
 #include <elara/io/open.hpp>
 #include <elara/notation/display_list.hpp>
@@ -28,6 +29,7 @@ using elara::core::KeySignature;
 using elara::core::Measure;
 using elara::core::Note;
 using elara::core::NoteValue;
+using elara::core::Ottava;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Tempo;
@@ -106,7 +108,7 @@ void edit(Song& song, std::mt19937& random) {
     Track& track = song.track(t);
     auto& staff = track.staff(pick(random, track.staffCount()));
     auto& header = song.measureHeader(m);
-    switch (pick(random, 11)) {
+    switch (pick(random, 12)) {
     case 0: // another measure's notes, as paste does
         staff.measure(m) = staff.measure(pick(random, song.measureCount()));
         break;
@@ -154,6 +156,16 @@ void edit(Song& song, std::mt19937& random) {
         constexpr Clef kClefs[] = {Clef::Treble, Clef::Bass, Clef::Alto};
         const std::size_t which = pick(random, 4);
         staff.measure(m).clef = which < 3 ? std::optional(kClefs[which]) : std::nullopt;
+        break;
+    }
+    case 10: { // an octave line over the whole measure, running on into its neighbours
+        constexpr Ottava kOttavas[] = {Ottava::None, Ottava::Alta, Ottava::Bassa};
+        const Ottava ottava = kOttavas[pick(random, 3)];
+        for (auto& voice : staff.measure(m).voices) {
+            for (auto& beat : voice.beats) {
+                beat.effects.ottava = ottava;
+            }
+        }
         break;
     }
     default:

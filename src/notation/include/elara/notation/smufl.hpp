@@ -109,6 +109,11 @@ enum class Glyph : std::uint8_t {
     FermataShortBelow,
     FermataLongAbove,
     FermataLongBelow,
+    // Octave lines (ADR-0089)
+    OttavaAlta,
+    OttavaBassaVb,
+    QuindicesimaAlta,
+    QuindicesimaBassaMb,
     // Dynamics
     DynamicPiano,
     DynamicMezzo,
@@ -230,6 +235,7 @@ struct EngravingDefaults {
     double tupletBracketThickness = 0.16;
     double hairpinThickness = 0.16;
     double repeatEndingLineThickness = 0.16;
+    double octaveLineThickness = 0.16;
 
     friend bool operator==(const EngravingDefaults&, const EngravingDefaults&) = default;
 };
