@@ -1377,8 +1377,9 @@ private:
         if (!beat.effects.whammyBar.isEmpty()) {
             warn("whammy bar dropped", place.measure);
         }
-        if (beat.effects.bassTechnique != BassTechnique::None) {
-            warn("bass techniques (tap, slap, pop) dropped", place.measure);
+        if (beat.effects.bassTechnique == BassTechnique::Slap ||
+            beat.effects.bassTechnique == BassTechnique::Pop) {
+            warn("slap and pop dropped", place.measure);
         }
         for (std::size_t n = 0; n < beat.notes.size(); ++n) {
             writeNote(xml, place, n);
@@ -1511,7 +1512,8 @@ private:
         const bool tupletMarks = firstNote && place.tuplet != 0;
         const bool ornaments =
             fx.vibrato != Vibrato::None || (firstNote && beatFx.tremoloPicking.has_value());
-        const bool technical = (firstNote && beatFx.pickStroke != PickStroke::None) ||
+        const bool tapped = firstNote && beatFx.bassTechnique == BassTechnique::Tap;
+        const bool technical = tapped || (firstNote && beatFx.pickStroke != PickStroke::None) ||
                                fx.legatoFromPrevious || legatoStart.has_value() ||
                                (note.position && !percussion_) || !fx.bend.isEmpty() ||
                                fx.harmonic.kind != HarmonicKind::None;
@@ -1554,6 +1556,9 @@ private:
                 xml.open("technical");
                 if (firstNote && beatFx.pickStroke != PickStroke::None) {
                     xml.empty(beatFx.pickStroke == PickStroke::Up ? "up-bow" : "down-bow");
+                }
+                if (tapped) {
+                    xml.text("tap", "T");
                 }
                 if (fx.legatoFromPrevious) {
                     const bool pull =

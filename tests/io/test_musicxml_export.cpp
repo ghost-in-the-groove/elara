@@ -238,6 +238,7 @@ core::Song everythingSong() {
         beats = {beatOf(Duration(NoteValue::Quarter, 1), {scoop, fretted(4, 5, Dynamic::P)}),
                  beatOf(eighth, {artificial}), beatOf(Duration(NoteValue::Sixteenth), {vibrato})};
         beats[0].effects.strum = Strum::Up;
+        beats[1].effects.bassTechnique = BassTechnique::Tap;
     }
 
     // ---- B-flat clarinet: transposed spelling, double accidentals.
@@ -774,7 +775,7 @@ TEST_CASE("MusicXML export: what MusicXML cannot hold is reported and changed pr
     const auto& warnings = exported.warnings;
     CHECK(hasWarning(warnings, "Electric Guitar: let ring dropped (measure 1)"));
     CHECK(hasWarning(warnings, "whammy bar dropped"));
-    CHECK(hasWarning(warnings, "bass techniques (tap, slap, pop) dropped"));
+    CHECK(hasWarning(warnings, "slap and pop dropped"));
     CHECK(hasWarning(warnings, "pinch, tapped and semi harmonics written as artificial harmonics"));
     CHECK(hasWarning(warnings, "shift slides written as legato slides"));
     CHECK(hasWarning(warnings, "natural harmonics written at their fret"));
