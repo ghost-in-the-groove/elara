@@ -160,7 +160,7 @@ TEST_CASE("SFZ: envelope, loop, round robin, triggers, groups and keyswitches", 
   ampeg_sustain=40 ampeg_release=0.3 loop_mode=loop_continuous loop_start=100 loop_end=900
   offset=10 end=1000 seq_length=3 seq_position=2 group=1 off_by=2 off_mode=normal
   sw_lokey=24 sw_hikey=26 sw_last=25 sw_default=24 amp_veltrack=50 amp_velcurve_64=0.3
-  amp_keytrack=-1.5 amp_keycenter=50 pitch_keytrack=0
+  amp_keytrack=-1.5 amp_keycenter=50 pitch_keytrack=0 lorand=0.25 hirand=0.5
 <region> sample=rel.wav trigger=release rt_decay=6 loopmode=one_shot
 <region> sample=leg.wav trigger=legato
 <region> sample=first.wav trigger=first
@@ -196,6 +196,10 @@ TEST_CASE("SFZ: envelope, loop, round robin, triggers, groups and keyswitches", 
     CHECK_THAT(a.ampKeytrack, WithinAbs(-1.5, 1e-12));
     CHECK(a.ampKeycenter == 50);
     CHECK_THAT(a.pitchKeytrack, WithinAbs(0.0, 1e-12));
+    CHECK_THAT(a.loRand, WithinAbs(0.25, 1e-12));
+    CHECK_THAT(a.hiRand, WithinAbs(0.5, 1e-12));
+    CHECK_THAT(program.regions[1].loRand, WithinAbs(0.0, 1e-12));
+    CHECK_THAT(program.regions[1].hiRand, WithinAbs(1.0, 1e-12));
 
     CHECK(program.regions[1].trigger == SfzTrigger::Release);
     CHECK_THAT(program.regions[1].rtDecay, WithinAbs(6.0, 1e-12));
@@ -203,6 +207,7 @@ TEST_CASE("SFZ: envelope, loop, round robin, triggers, groups and keyswitches", 
     CHECK(program.regions[2].trigger == SfzTrigger::Legato);
     CHECK(program.regions[3].trigger == SfzTrigger::First);
     CHECK_FALSE(program.regions[3].loopModeSet);
+    CHECK(program.unknownOpcodes.empty());
 }
 
 TEST_CASE("SFZ: opcodes Elara does not play are listed once, by kind", "[audio][sfz]") {
