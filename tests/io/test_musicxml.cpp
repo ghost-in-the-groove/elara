@@ -732,6 +732,64 @@ TEST_CASE("MusicXML: fermatas hold their beats", "[musicxml]") {
     CHECK(second[0].effects.fermata == Long);
 }
 
+TEST_CASE("MusicXML: slurs join the beats from their start to their stop", "[musicxml]") {
+    // ADR-0086: every beat from a slur's start to the beat before its stop is
+    // slurred to the next, across barlines; a note that ends one slur and
+    // starts the next joins them, and a slur inside another adds nothing.
+    const auto slurs = [](std::string_view marks) {
+        return std::format("<notations>{}</notations>", marks);
+    };
+    const std::string start = R"(<slur type="start" number="1"/>)";
+    const std::string stop = R"(<slur type="stop" number="1"/>)";
+    const ImportResult result = parse(onePart(
+        quarterNote("C", slurs(start)) + quarterNote("D", "") + quarterNote("E", slurs(stop)) +
+        quarterNote("F", slurs(start)) + R"(</measure><measure number="2">)" +
+        quarterNote("G", "") + quarterNote("A", slurs(stop)) + quarterNote("B", slurs(start)) +
+        quarterNote("C", slurs(start + stop)) + R"(</measure><measure number="3">)" +
+        quarterNote("D", slurs(stop)) + quarterNote("E", slurs(start)) +
+        quarterNote("F", slurs(R"(<slur type="start" number="2" placement="below"/>)")) +
+        quarterNote("G", slurs(R"(<slur type="stop" number="2"/>)")) +
+        R"(</measure><measure number="4"><note><pitch><step>A</step><octave>4</octave></pitch>)"
+        R"(<duration>16</duration><voice>1</voice><type>whole</type>)" +
+        slurs(stop) + "</note>"));
+    CHECK(result.warnings.empty());
+    const auto slurred = [&](std::size_t m) {
+        std::vector<bool> flags;
+        for (const core::Beat& beat : voiceOf(result.song, 0, 0, m).beats) {
+            flags.push_back(beat.effects.slur);
+        }
+        return flags;
+    };
+    CHECK(slurred(0) == std::vector{true, true, false, true});
+    CHECK(slurred(1) == std::vector{true, false, true, true});
+    CHECK(slurred(2) == std::vector{false, true, true, true});
+    CHECK(slurred(3) == std::vector{false});
+}
+
+TEST_CASE("MusicXML: slurs from grace notes, between voices or without an end are dropped",
+          "[musicxml]") {
+    const ImportResult result = parse(onePart(
+        R"(<note><grace slash="yes"/><pitch><step>B</step><octave>3</octave></pitch>)"
+        R"(<voice>1</voice><type>eighth</type><notations><slur type="start"/></notations></note>)" +
+        quarterNote("C", R"(<notations><slur type="stop"/></notations>)") +
+        quarterNote("D", R"(<notations><slur type="start" number="3"/></notations>)") +
+        quarterNote("E", "") + quarterNote("F", "") +
+        R"(<backup><duration>16</duration></backup>)"
+        R"(<note><pitch><step>C</step><octave>3</octave></pitch><duration>8</duration>)"
+        R"(<voice>2</voice><type>half</type><notations><slur type="stop" number="3"/>)"
+        R"(</notations></note><note><pitch><step>D</step><octave>3</octave></pitch>)"
+        R"(<duration>8</duration><voice>2</voice><type>half</type><notations>)"
+        R"(<slur type="start" number="4"/></notations></note>)"));
+    CHECK(hasWarning(result, "slurs on grace notes dropped", "measure 1"));
+    CHECK(hasWarning(result, "slurs between voices dropped", "measure 1"));
+    CHECK(hasWarning(result, "slurs without an end dropped", "measure 1"));
+    for (std::size_t v = 0; v < 2; ++v) {
+        for (const core::Beat& beat : voiceOf(result.song, 0, 0, 0, v).beats) {
+            CHECK_FALSE(beat.effects.slur);
+        }
+    }
+}
+
 TEST_CASE("MusicXML: repeats and alternate endings belong to their measures", "[musicxml]") {
     // |: 1 |1.2. 2 :|3. 3 |, played three times, as notation programs write it.
     const std::string rest = R"(<note><rest measure="yes"/><duration>16</duration></note>)";

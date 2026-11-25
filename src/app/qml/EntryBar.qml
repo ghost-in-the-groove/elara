@@ -973,6 +973,13 @@ Rectangle {
                             active: root.document.caretHairpin === 2
                             onClicked: root.document.setHairpin(active ? 0 : 2)
                         }
+                        // The caret's beat slurred to the next (ADR-0086).
+                        BeatEffect {
+                            tip: qsTr("Slur to the next note")
+                            path: "M4 13 Q12 4 20 13 M5 18 A1.6 1.2 0 1 0 8.2 18 A1.6 1.2 0 1 0 5 18 M15.8 18 A1.6 1.2 0 1 0 19 18 A1.6 1.2 0 1 0 15.8 18"
+                            active: root.document.caretSlur
+                            onClicked: root.document.setSlur(!active)
+                        }
                         // A small slashed note leading into the caret's beat (ADR-0079).
                         BeatEffect {
                             tip: qsTr("Grace note")

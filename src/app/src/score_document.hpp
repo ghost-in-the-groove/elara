@@ -100,6 +100,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretStrum READ caretStrum NOTIFY caretChanged)
     Q_PROPERTY(int caretHairpin READ caretHairpin NOTIFY caretChanged)
     Q_PROPERTY(int caretFermata READ caretFermata NOTIFY caretChanged)
+    Q_PROPERTY(bool caretSlur READ caretSlur NOTIFY caretChanged)
     Q_PROPERTY(int caretGraceNotes READ caretGraceNotes NOTIFY caretChanged)
     Q_PROPERTY(QString caretChord READ caretChord NOTIFY caretChanged)
     Q_PROPERTY(QString caretText READ caretText NOTIFY caretChanged)
@@ -479,6 +480,9 @@ public:
     /// Holds the caret's beat, a note or a rest, under a fermata (a
     /// core::Fermata; 0 for none) (ADR-0085).
     Q_INVOKABLE void setFermata(int fermata);
+    /// Slurs the caret's beat to the next beat of its voice, or takes the slur
+    /// off; beats slurred in a row share one slur (ADR-0086).
+    Q_INVOKABLE void setSlur(bool slurred);
     /// Adds a grace note an eighth before the caret's beat, a whole tone below
     /// its note (above an open string or the first fret), or takes the beat's
     /// grace notes off when it has some (ADR-0079).
@@ -517,6 +521,7 @@ public:
     [[nodiscard]] int caretStrum() const;
     [[nodiscard]] int caretHairpin() const;
     [[nodiscard]] int caretFermata() const;
+    [[nodiscard]] bool caretSlur() const;
     [[nodiscard]] int caretGraceNotes() const;
     [[nodiscard]] QString caretChord() const;
     [[nodiscard]] QString caretText() const;

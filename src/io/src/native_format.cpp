@@ -437,6 +437,7 @@ private:
         addEnumIfNot(object, "bassTechnique", kBassNames, fx.bassTechnique, BassTechnique::None);
         addEnumIfNot(object, "hairpin", kHairpinNames, fx.hairpin, Hairpin::None);
         addEnumIfNot(object, "fermata", kFermataNames, fx.fermata, Fermata::None);
+        addFlag(object, "slur", fx.slur);
         return object;
     }
 
@@ -1088,6 +1089,7 @@ private:
         fx.bassTechnique = enumValue(object, "bassTechnique", kBassNames, BassTechnique::None);
         fx.hairpin = enumValue(object, "hairpin", kHairpinNames, Hairpin::None);
         fx.fermata = enumValue(object, "fermata", kFermataNames, Fermata::None);
+        fx.slur = flag(object, "slur");
         return fx;
     }
 

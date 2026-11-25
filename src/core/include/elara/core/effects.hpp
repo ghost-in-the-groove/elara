@@ -178,6 +178,9 @@ struct BeatEffects {
     BassTechnique bassTechnique = BassTechnique::None;
     Hairpin hairpin = Hairpin::None;
     Fermata fermata = Fermata::None;
+    // Slurred to the next beat of its voice (ADR-0086): a slur runs from the
+    // first of the beats slurred in a row to the beat after the last of them.
+    bool slur = false;
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

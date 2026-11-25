@@ -61,7 +61,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | puntillo | dot | `dots` | |
 | grupo irregular / tresillo | tuplet / triplet | `Tuplet` | |
 | ligadura de prolongación | tie | `tiedFromPrevious` | Same pitch, no new attack |
-| ligadura de expresión | slur | `Slur` | |
+| ligadura de expresión | slur | `BeatEffects::slur`, `Role::Slur` | A curve over notes played as one phrase: each beat but the last slurred to the next of its voice (ADR-0086) |
 | plica | stem | `Stem` | |
 | articulación | articulation | `staccato`, `Accent` | Staccato, accent, marcato |
 | barra (de corcheas) | beam | `Beam` | |

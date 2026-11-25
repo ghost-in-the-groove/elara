@@ -21,6 +21,7 @@
 #include <format>
 #include <functional>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -586,6 +587,13 @@ PartLayout layoutPart(pugi::xml_node part, const PartInfo& info, Warnings& warni
 
 /// One <note> on its way into a voice. Onsets are from the start of the measure,
 /// in whole notes.
+/// A slur's start or stop on a note, by its number (ADR-0086).
+struct SlurMark {
+    int number = 1;
+    bool start = false;
+    bool grace = false; // on a grace note of the beat
+};
+
 struct Event {
     Fraction onset{};
     Fraction length{};    // from <duration>: what moves the cursor
@@ -600,6 +608,7 @@ struct Event {
     BeatEffects beatEffects{};
     std::vector<Grace> graces{};    // lead into the beat (ADR-0079)
     std::vector<Syllable> lyrics{}; // verse n + 1 at index n, ending with one sung (ADR-0084)
+    std::vector<SlurMark> slurs{};  // its grace notes' first
 };
 
 /// Grace notes read before the note they lead into (ADR-0079).
@@ -608,6 +617,16 @@ struct PendingGrace {
     bool tab = false;
     std::string voice{};
     Grace grace{};
+    std::vector<SlurMark> slurs{};
+};
+
+/// A beat a slur starts or stops on (ADR-0086).
+struct SlurEnd {
+    std::size_t measure = 0;
+    std::size_t staff = 0;
+    std::size_t voice = 0;
+    std::size_t beat = 0;
+    bool grace = false;
 };
 
 struct DynamicMark {
@@ -1039,6 +1058,7 @@ public:
         if (first_) {
             endOpenJumps();
         }
+        endSlurs();
     }
 
     [[nodiscard]] Track takeTrack() {
@@ -1881,8 +1901,10 @@ private:
                         fx.tiedFromPrevious = true;
                     }
                 } else if (name == "slur") {
-                    if (isType(mark, "start")) {
-                        warn("slurs dropped", index);
+                    // From its start to its stop (ADR-0086); "continue" changes nothing.
+                    if (isType(mark, "start") || isType(mark, "stop")) {
+                        event.slurs.push_back(SlurMark{.number = mark.attribute("number").as_int(1),
+                                                       .start = isType(mark, "start")});
                     }
                 } else if (name == "slide" || name == "glissando") {
                     if (isType(mark, "start")) {
@@ -2045,10 +2067,15 @@ private:
         if (!event->lyrics.empty()) {
             warn("lyrics on grace notes dropped", index);
         }
+        for (SlurMark& slur : event->slurs) {
+            slur.grace = true;
+        }
         auto& pending = pendingGraces_;
         if (parts.chord && !pending.empty() && pending.back().staff == event->staff &&
             pending.back().tab == event->tab && pending.back().voice == event->voice) {
             pending.back().grace.notes.push_back(std::move(*event->note));
+            pending.back().slurs.insert(pending.back().slurs.end(), event->slurs.begin(),
+                                        event->slurs.end());
             return;
         }
         const bool before = parts.grace.attribute("slash").as_string() == "yes"sv ||
@@ -2059,7 +2086,8 @@ private:
             .voice = std::move(event->voice),
             .grace = Grace{.duration = event->written.value_or(Duration(NoteValue::Eighth)),
                            .notes = {std::move(*event->note)},
-                           .onBeat = !before}});
+                           .onBeat = !before},
+            .slurs = std::move(event->slurs)});
     }
 
     /// Moves the grace notes waiting in the event's voice onto it.
@@ -2072,12 +2100,85 @@ private:
             return grace.staff == event.staff && grace.tab == event.tab &&
                    grace.voice == event.voice;
         };
+        std::vector<SlurMark> slurs;
         for (PendingGrace& grace : pending) {
             if (mine(grace)) {
                 event.graces.push_back(std::move(grace.grace));
+                slurs.insert(slurs.end(), grace.slurs.begin(), grace.slurs.end());
             }
         }
         std::erase_if(pending, mine);
+        if (!slurs.empty()) {
+            slurs.insert(slurs.end(), event.slurs.begin(), event.slurs.end());
+            event.slurs = std::move(slurs);
+        }
+    }
+
+    /// Opens and closes the slurs marked on an event placed on `beat` of voice
+    /// `voice` of `staff` in measure `measure` (ADR-0086). The marks of its
+    /// grace notes come first, and stops before starts, so a note that ends
+    /// one slur and starts the next joins them. A slur goes on one voice, and
+    /// one from a grace note to its own beat is dropped.
+    void slurAt(const Event& event, std::size_t staff, std::size_t voice, std::size_t beat,
+                std::size_t measure) {
+        if (event.slurs.empty()) {
+            return;
+        }
+        for (const bool grace : {true, false}) {
+            for (const bool start : {false, true}) {
+                for (const SlurMark& mark : event.slurs) {
+                    if (mark.grace != grace || mark.start != start) {
+                        continue;
+                    }
+                    const SlurEnd here{.measure = measure,
+                                       .staff = staff,
+                                       .voice = voice,
+                                       .beat = beat,
+                                       .grace = grace};
+                    if (start) {
+                        openSlurs_.insert_or_assign(mark.number, here);
+                        continue;
+                    }
+                    const auto open = openSlurs_.find(mark.number);
+                    if (open == openSlurs_.end()) {
+                        continue; // its start was dropped with its note
+                    }
+                    const SlurEnd from = open->second;
+                    openSlurs_.erase(open);
+                    if (from.staff != staff || from.voice != voice) {
+                        warn("slurs between voices dropped", measure);
+                    } else if (from.measure == measure && from.beat == beat) {
+                        if (from.grace || grace) {
+                            warn("slurs on grace notes dropped", measure);
+                        }
+                    } else {
+                        slurs_.emplace_back(from, here);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Slurs every beat from each slur's start to the beat before its stop,
+    /// across barlines, once the part is read (ADR-0086).
+    void endSlurs() {
+        for (const auto& [from, to] : slurs_) {
+            std::vector<Measure>& staff = measures_[from.staff];
+            for (std::size_t m = from.measure; m <= to.measure && m < staff.size(); ++m) {
+                std::vector<Beat>& beats = staff[m].voices[from.voice].beats;
+                const std::size_t first = m == from.measure ? from.beat : 0;
+                const std::size_t last =
+                    m == to.measure ? std::min(to.beat, beats.size()) : beats.size();
+                for (std::size_t b = first; b < last; ++b) {
+                    beats[b].effects.slur = true;
+                }
+            }
+        }
+        for (const auto& [number, open] : openSlurs_) {
+            warn("slurs without an end dropped", open.measure);
+        }
+        slurs_.clear();
+        openSlurs_.clear();
     }
 
     void build(std::size_t index, std::vector<Event>& events, std::vector<DynamicMark>& dynamics,
@@ -2155,6 +2256,7 @@ private:
             }
             if (event.chord) {
                 if (event.note && !lastDropped && !voice.beats.empty()) {
+                    slurAt(event, event.staff, *slot, voice.beats.size() - 1, index);
                     Beat& beat = voice.beats.back();
                     addLyrics(beat, event.lyrics);
                     beat.effects.fermata =
@@ -2207,6 +2309,7 @@ private:
             for (std::size_t p = 0; p < pieces.size(); ++p) {
                 Beat beat{.duration = pieces[p]};
                 if (p == 0) {
+                    slurAt(event, event.staff, *slot, voice.beats.size(), index);
                     beat.effects = event.beatEffects;
                     beat.graces = std::move(event.graces);
                     if (!event.lyrics.empty()) {
@@ -2365,11 +2468,13 @@ private:
     Fraction oneDivision_{1, 4};
     KeySignature concertKey_{};
     std::vector<std::optional<ClefInfo>> lastClefs_{};
-    std::vector<std::vector<std::string>> voiceIds_; // per staff, MusicXML voice ids
-    std::vector<Dynamic> dynamics_;                  // per staff, at the end of the last measure
-    std::vector<Hairpin> hairpins_;                  // per staff, at the end of the last measure
-    std::vector<std::vector<Measure>> measures_;     // per staff
-    detail::ChordPool chordPool_;                    // one symbol for equal chords
+    std::vector<std::vector<std::string>> voiceIds_;   // per staff, MusicXML voice ids
+    std::vector<Dynamic> dynamics_;                    // per staff, at the end of the last measure
+    std::vector<Hairpin> hairpins_;                    // per staff, at the end of the last measure
+    std::map<int, SlurEnd> openSlurs_{};               // by number: where each open slur starts
+    std::vector<std::pair<SlurEnd, SlurEnd>> slurs_{}; // closed slurs, from start to stop
+    std::vector<std::vector<Measure>> measures_;       // per staff
+    detail::ChordPool chordPool_;                      // one symbol for equal chords
 
     // Per-measure buffers, kept to reuse their storage.
     static constexpr std::size_t kNoSlot = static_cast<std::size_t>(-1);

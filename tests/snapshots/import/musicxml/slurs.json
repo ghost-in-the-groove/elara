@@ -1,0 +1,407 @@
+{
+ "format": "musicxml",
+ "out": null,
+ "warnings": [],
+ "song": {
+  "format": "elara",
+  "formatVersion": 1,
+  "generator": "Elara",
+  "info": {
+   "title": "Corpus Slurs"
+  },
+  "tempo": {
+   "bpm": 120
+  },
+  "measures": [
+   {},
+   {},
+   {},
+   {}
+  ],
+  "tracks": [
+   {
+    "name": "Voice",
+    "instrument": {
+     "name": "Voice",
+     "kind": "pitched"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "E4"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4",
+            "effects": {
+             "staccato": true
+            }
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "A4"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "G4"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "4",
+          "notes": [
+           {
+            "pitch": "F4"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "name": "Piano",
+    "instrument": {
+     "name": "Piano",
+     "kind": "keyboard"
+    },
+    "staves": [
+     {
+      "clef": "treble",
+      "measures": [
+       [
+        [
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "G5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "C6"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "B5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "G5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "8",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "E5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "D5"
+           }
+          ]
+         }
+        ],
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C5"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "B4"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     },
+     {
+      "clef": "bass",
+      "measures": [
+       [
+        [
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "C3"
+           }
+          ],
+          "effects": {
+           "slur": true
+          }
+         },
+         {
+          "duration": "2",
+          "notes": [
+           {
+            "pitch": "G2"
+           }
+          ]
+         }
+        ]
+       ],
+       [
+        [
+         {
+          "duration": "1",
+          "notes": [
+           {
+            "pitch": "C3"
+           }
+          ]
+         }
+        ]
+       ]
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "durationSeconds": 8.0,
+ "issues": []
+}

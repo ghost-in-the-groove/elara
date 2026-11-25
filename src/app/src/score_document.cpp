@@ -1690,6 +1690,9 @@ QString ScoreDocument::caretStatus() const {
     case core::Fermata::None:
         break;
     }
+    if (caretSlur()) {
+        parts.append(tr("Slur"));
+    }
     if (caretGraceNotes() > 0) {
         parts.append(tr("Grace notes"));
     }
@@ -2090,6 +2093,12 @@ void ScoreDocument::setHairpin(int hairpin) {
     }
     core::BeatEffects effects = beatEffectsAtCaret();
     effects.hairpin = static_cast<core::Hairpin>(hairpin);
+    applyBeatEffects(effects);
+}
+
+void ScoreDocument::setSlur(bool slurred) {
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.slur = slurred;
     applyBeatEffects(effects);
 }
 
@@ -2499,6 +2508,10 @@ int ScoreDocument::caretHairpin() const {
 
 int ScoreDocument::caretFermata() const {
     return static_cast<int>(beatEffectsAtCaret().fermata);
+}
+
+bool ScoreDocument::caretSlur() const {
+    return beatEffectsAtCaret().slur;
 }
 
 QString ScoreDocument::caretText() const {

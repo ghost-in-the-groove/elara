@@ -178,6 +178,10 @@
         <translation>Diminuendo</translation>
     </message>
     <message>
+        <source>Slur to the next note</source>
+        <translation>Ligadura con la nota siguiente</translation>
+    </message>
+    <message>
         <source>Grace note</source>
         <translation>Nota de adorno</translation>
     </message>
@@ -1724,6 +1728,10 @@
     <message>
         <source>Long fermata</source>
         <translation>Calderón largo</translation>
+    </message>
+    <message>
+        <source>Slur</source>
+        <translation>Ligadura de expresión</translation>
     </message>
     <message>
         <source>Grace notes</source>

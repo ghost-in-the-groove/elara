@@ -87,6 +87,7 @@ elara_add_unit_tests(notation
   notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
   notation/test_incremental_layout.cpp notation/test_pdf.cpp notation/test_chord_layout.cpp notation/test_beat_text_layout.cpp
   notation/test_lyrics_layout.cpp notation/test_fermata_layout.cpp
+  notation/test_slur_layout.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"

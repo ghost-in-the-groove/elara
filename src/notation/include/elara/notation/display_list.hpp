@@ -31,7 +31,7 @@ enum class Role : std::uint8_t {
     Rest,
     FretNumber, ///< a fret (or "X", "(5)", "<12>") on a tablature line
     Tie,
-    Slur,      ///< hammer-on and pull-off arcs, legato slides
+    Slur,      ///< slurs (ADR-0086); on tablature, hammer-on and pull-off arcs, legato slides
     Technique, ///< technique marks: "H", "P", "P.M.", "let ring", pick strokes
     Bend,
     Slide,

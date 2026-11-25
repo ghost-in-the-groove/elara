@@ -1220,6 +1220,14 @@ void Startup::queueEffects() {
               "the status does not name the long fermata");
         score_->setFermata(0);
         check(score_->caretFermata() == 0, "the fermata did not go");
+        // Slurs (ADR-0086).
+        score_->setSlur(true);
+        check(score_->caretSlur() && score_->caretBassTechnique() != 0,
+              "the slur did not join the beat's effects");
+        check(score_->caretStatus().contains(ScoreDocument::tr("Slur")),
+              "the status does not name the slur");
+        score_->setSlur(false);
+        check(!score_->caretSlur(), "the slur did not go");
         // Grace notes (ADR-0079): the beat may already lead in with some,
         // which the toggle takes away first.
         if (score_->caretGraceNotes() > 0) {
