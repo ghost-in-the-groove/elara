@@ -265,6 +265,8 @@ constexpr std::array<std::string_view, 5> kSlideOutKinds{"none", "shift", "legat
                                                          "upwards"};
 constexpr std::array<std::string_view, 3> kVibratoKinds{"none", "slight", "wide"};
 constexpr std::array<std::string_view, 3> kAccentKinds{"none", "accent", "marcato"};
+constexpr std::array<std::string_view, 5> kOrnamentKinds{"none", "mordent", "upper-mordent", "turn",
+                                                         "inverted-turn"}; // ADR-0091
 constexpr std::array<std::string_view, 6> kHarmonicKinds{"none",  "natural", "artificial",
                                                          "pinch", "tapped",  "semi"};
 
@@ -437,6 +439,9 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "accent") { // accent <accent|marcato|none>
         edit = setAccent(song, entry.caret,
                          static_cast<Accent>(kindOf(verb, step.word(1), kAccentKinds)));
+    } else if (verb == "ornament") { // ornament <mordent|upper-mordent|turn|inverted-turn|none>
+        edit = setOrnament(song, entry.caret,
+                           static_cast<Ornament>(kindOf(verb, step.word(1), kOrnamentKinds)));
     } else if (verb == "trill") { // trill <on|semitones|none> [16|32|64] (ADR-0090)
         const std::string_view what = step.word(1);
         const NoteValue speed = step.has(2) ? trillSpeed(step.word(2)) : NoteValue::ThirtySecond;
@@ -960,7 +965,8 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"slide-in "
         "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
         "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", "
-        "\"trill <on|semitones|none> [16|32|64]\", \"harmonic "
+        "\"trill <on|semitones|none> [16|32|64]\", "
+        "\"ornament <mordent|upper-mordent|turn|inverted-turn|none>\", \"harmonic "
         "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "
         "save");
     editCommand->callback(

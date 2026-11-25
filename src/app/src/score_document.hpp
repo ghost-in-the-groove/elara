@@ -111,6 +111,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretVibrato READ caretVibrato NOTIFY caretChanged)
     Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
     Q_PROPERTY(int caretTrill READ caretTrill NOTIFY caretChanged)
+    Q_PROPERTY(int caretOrnament READ caretOrnament NOTIFY caretChanged)
     Q_PROPERTY(int caretDynamic READ caretDynamic NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
@@ -552,6 +553,10 @@ public:
     /// up in the key at thirty-seconds.
     [[nodiscard]] int caretTrill() const;
     Q_INVOKABLE void toggleTrill();
+    /// The mordent or turn of the caret's notes (ADR-0091), numbered as
+    /// core::Ornament (0 none), and the one setOrnament() gives them.
+    [[nodiscard]] int caretOrnament() const;
+    Q_INVOKABLE void setOrnament(int kind);
     /// The dynamic at the caret (ADR-0047), numbered as core::Dynamic (0 ppp
     /// to 7 fff): the notes there, or the last ones struck before them.
     [[nodiscard]] int caretDynamic() const;

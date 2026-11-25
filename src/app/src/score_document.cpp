@@ -317,6 +317,8 @@ constexpr std::array kEditNames{
     Translation{"Change vibrato", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change vibrato")},
     Translation{"Change accent", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change accent")},
     Translation{"Change trill", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change trill")},
+    Translation{"Change ornament",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change ornament")},
     Translation{"Change harmonic",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change harmonic")},
     Translation{"Add grace note", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Add grace note")},
@@ -1663,6 +1665,22 @@ QString ScoreDocument::caretStatus() const {
     if (fx.trill.isTrill()) {
         parts.append(tr("Trill"));
     }
+    switch (fx.ornament) {
+    case core::Ornament::Mordent:
+        parts.append(tr("Mordent"));
+        break;
+    case core::Ornament::UpperMordent:
+        parts.append(tr("Upper mordent"));
+        break;
+    case core::Ornament::Turn:
+        parts.append(tr("Turn"));
+        break;
+    case core::Ornament::InvertedTurn:
+        parts.append(tr("Inverted turn"));
+        break;
+    case core::Ornament::None:
+        break;
+    }
     // Then the beat's own effects.
     if (const int strum = caretStrum(); strum != 0) {
         parts.append(strum == 1 ? tr("Strum down") : tr("Strum up"));
@@ -2440,6 +2458,22 @@ int ScoreDocument::caretAccent() const {
 
 int ScoreDocument::caretTrill() const {
     return noteEffectsAtCaret().trill.semitones;
+}
+
+int ScoreDocument::caretOrnament() const {
+    return static_cast<int>(noteEffectsAtCaret().ornament);
+}
+
+void ScoreDocument::setOrnament(int kind) {
+    if (kind < 0 || kind > static_cast<int>(core::Ornament::InvertedTurn)) {
+        return;
+    }
+    const auto ornament = static_cast<core::Ornament>(kind);
+    changeNoteEffects(
+        [ornament](const core::Song& song, const core::Caret& caret) {
+            return core::setOrnament(song, caret, ornament);
+        },
+        [ornament](const core::NoteEffects& fx) { return fx.ornament == ornament; });
 }
 
 void ScoreDocument::toggleTrill() {

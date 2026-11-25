@@ -849,8 +849,9 @@ Rectangle {
                     Label {
                         leftPadding: 4
                         topPadding: 4
-                        text: root.document.caretFretted ? qsTr("Harmonic, vibrato and accent")
-                                                         : qsTr("Vibrato and accent")
+                        text: root.document.caretFretted
+                              ? qsTr("Harmonic, vibrato, accent and ornaments")
+                              : qsTr("Vibrato, accent and ornaments")
                         font.pixelSize: 11
                         color: root.ink
                         opacity: 0.6
@@ -939,6 +940,32 @@ Rectangle {
                             label: "tr"
                             active: root.document.caretTrill !== 0
                             onClicked: root.document.toggleTrill()
+                        }
+
+                        // Mordents and turns, numbered as core::Ornament (ADR-0091).
+                        EffectKind {
+                            tip: qsTr("Mordent")
+                            path: "M3 14 L7 10 L10 14 L14 10 L17 14 L21 10 M12 6 L12 18"
+                            active: root.document.caretOrnament === 1
+                            onClicked: root.document.setOrnament(active ? 0 : 1)
+                        }
+                        EffectKind {
+                            tip: qsTr("Upper mordent")
+                            path: "M3 14 L7 10 L10 14 L14 10 L17 14 L21 10"
+                            active: root.document.caretOrnament === 2
+                            onClicked: root.document.setOrnament(active ? 0 : 2)
+                        }
+                        EffectKind {
+                            tip: qsTr("Turn")
+                            path: "M4 13 C4 8 10 8 12 12 C14 16 20 16 20 11"
+                            active: root.document.caretOrnament === 3
+                            onClicked: root.document.setOrnament(active ? 0 : 3)
+                        }
+                        EffectKind {
+                            tip: qsTr("Inverted turn")
+                            path: "M4 11 C4 16 10 16 12 12 C14 8 20 8 20 13"
+                            active: root.document.caretOrnament === 4
+                            onClicked: root.document.setOrnament(active ? 0 : 4)
                         }
                     }
 

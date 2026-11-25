@@ -628,6 +628,27 @@ add_test(NAME cli.render_trills COMMAND elara-cli --json render "${ELARA_CLI_TRI
 set_tests_properties(cli.render_trills PROPERTIES
   FIXTURES_REQUIRED cli_trills
   PASS_REGULAR_EXPRESSION "\"ornament\":[1-9]")
+# Mordents and turns at the caret (ADR-0091): a mordent on the E, an upper
+# mordent on the F, and the G's turn changed to an inverted turn.
+set(ELARA_CLI_ORNAMENTS "${CMAKE_CURRENT_BINARY_DIR}/cli-ornaments.elara")
+add_test(NAME cli.edit_sets_ornaments
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_ORNAMENTS}" "add-track piano"
+    "append-measures 1" "pitch E" "ornament mordent" right "pitch F" "ornament upper-mordent"
+    right "pitch G" "ornament turn" "ornament inverted-turn")
+set_tests_properties(cli.edit_sets_ornaments PROPERTIES
+  FIXTURES_SETUP cli_ornaments
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change ornament\"}")
+add_test(NAME cli.dump_ornaments COMMAND elara-cli --json dump "${ELARA_CLI_ORNAMENTS}")
+set_tests_properties(cli.dump_ornaments PROPERTIES
+  FIXTURES_REQUIRED cli_ornaments
+  PASS_REGULAR_EXPRESSION "\"E5\",\"effects\":{\"ornament\":\"mordent\"}}.*\"F5\",\"effects\":{\"ornament\":\"upper-mordent\"}}.*\"G5\",\"effects\":{\"ornament\":\"inverted-turn\"}}")
+add_test(NAME cli.render_ornaments COMMAND elara-cli --json render "${ELARA_CLI_ORNAMENTS}")
+set_tests_properties(cli.render_ornaments PROPERTIES
+  FIXTURES_REQUIRED cli_ornaments
+  PASS_REGULAR_EXPRESSION "\"ornament\":3[,}]")
+add_test(NAME cli.edit_rejects_unknown_ornament
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "ornament shake")
+set_tests_properties(cli.edit_rejects_unknown_ornament PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_trill_past_an_octave
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "trill 13")
 add_test(NAME cli.edit_rejects_unknown_trill_speed
