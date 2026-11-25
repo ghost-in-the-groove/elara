@@ -92,6 +92,7 @@ one that replaces them.
 | [0084](0084-lyrics.md) | Lyrics | Accepted |
 | [0085](0085-fermatas.md) | Fermatas | Accepted |
 | [0086](0086-slurs.md) | Slurs | Accepted |
+| [0087](0087-clef-changes.md) | Clef changes | Accepted |
 
 ## Template
 
