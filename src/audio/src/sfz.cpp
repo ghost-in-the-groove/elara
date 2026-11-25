@@ -486,6 +486,10 @@ private:
             setInt(region.seqLength);
         } else if (name == "seq_position") {
             setInt(region.seqPosition);
+        } else if (name == "lorand") {
+            setReal(region.loRand);
+        } else if (name == "hirand") {
+            setReal(region.hiRand);
         } else if (name == "trigger") {
             const std::string kind = lower(value);
             region.trigger = kind == "release" || kind == "release_key" ? SfzTrigger::Release

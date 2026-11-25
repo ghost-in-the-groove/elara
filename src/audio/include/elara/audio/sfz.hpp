@@ -94,6 +94,8 @@ struct SfzRegion {
     double ampegRelease = 0.001; ///< seconds
     int seqLength = 1;           ///< round robin: the region plays one note in seqLength...
     int seqPosition = 1;         ///< ...the seqPosition-th
+    double loRand = 0.0;         ///< random round robin: the region plays when a note's
+    double hiRand = 1.0;         ///< ...random number in [0, 1) falls in [loRand, hiRand)
     SfzTrigger trigger = SfzTrigger::Attack;
     std::vector<SfzCcRange> ccRanges;
     int swLoKey = -1;       ///< keyswitch range: keys that only switch...
