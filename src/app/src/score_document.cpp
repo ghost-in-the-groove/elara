@@ -338,6 +338,11 @@ constexpr std::array kEditNames{
     Translation{"Set lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Set lyrics")},
     Translation{"Remove lyrics", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Remove lyrics")},
     Translation{"Change clef", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change clef")},
+    Translation{"Repeat measure", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Repeat measure")},
+    Translation{"Repeat two measures",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Repeat two measures")},
+    Translation{"Write out measure repeat",
+                QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Write out measure repeat")},
 };
 
 // The names of Tuning::presetNames().
@@ -2704,6 +2709,22 @@ void ScoreDocument::setClef(int clef) {
     }
     runEntry([this, chosen = kOfferedClefs.at(static_cast<std::size_t>(clef))](
                  const core::Song& song) { return core::setClef(song, caret_, chosen); });
+}
+
+int ScoreDocument::caretRepeat() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return 0;
+    }
+    return static_cast<int>(core::measureRepeatAt(document_->song(), caret_));
+}
+
+void ScoreDocument::setMeasureRepeat(int measures) {
+    if (measures < 0 || measures > 2) {
+        return;
+    }
+    runEntry([this, measures](const core::Song& song) {
+        return core::setMeasureRepeat(song, caret_, static_cast<std::size_t>(measures));
+    });
 }
 
 QString ScoreDocument::caretText() const {

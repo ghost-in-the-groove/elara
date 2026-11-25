@@ -132,6 +132,7 @@ void Startup::queueSteps() {
             queueTuning();
             queueTempo();
             queueSection();
+            queueMeasureRepeat();
             queueEffects();
             queueContinuous();
         }
@@ -190,6 +191,7 @@ void Startup::queueSteps() {
         queueTuning();
         queueTempo();
         queueSection();
+        queueMeasureRepeat();
         queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -961,6 +963,40 @@ void Startup::queueSection() {
     steps_.emplace_back([this, check] {
         check(!score_->modified() && score_->sectionAt(0) == sectionBefore_,
               "undoing the section did not restore the song");
+        return false;
+    });
+}
+
+// A measure repeat from the measure popup (ADR-0102): a measure inserted after
+// the caret's repeats it, one undo step; taking the sign away writes out what
+// it played; all undone, the song must end as it started.
+void Startup::queueMeasureRepeat() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("measure repeat check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        score_->insertMeasure(true);
+        score_->setMeasureRepeat(1);
+        check(score_->caretRepeat() == 1 &&
+                  score_->undoName() == ScoreDocument::tr("Repeat measure"),
+              "the new measure does not repeat the one before");
+        score_->setMeasureRepeat(0);
+        check(score_->caretRepeat() == 0 &&
+                  score_->undoName() == ScoreDocument::tr("Write out measure repeat"),
+              "taking the sign away did not write out its music");
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->undo();
+        score_->undo();
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified(), "undoing the measure repeat did not restore the song");
         return false;
     });
 }

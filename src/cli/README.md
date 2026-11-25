@@ -252,6 +252,11 @@ beat and `text none` takes them away (ADR-0081).
 caret's staff from the caret's measure on; the staff keeps its octave, so `clef
 bass` on a guitar is the octave bass clef, and the clef of the measure before
 removes the change. Drum staves keep their clef (ADR-0087).
+`simile 1` makes the caret's measure repeat the measure before it, `simile 2`
+the caret's measure and the next repeat the two before them; their own music
+goes. `simile none` takes the sign away, from both measures of a two-measure
+repeat, and writes out the music it played. Nothing changes without enough
+measures of the same length before (ADR-0102).
 `lyrics <verse> <measure> <text>` types verse `verse` (0 for the first) of the
 caret's staff from measure `measure` on, a syllable for each note of its first
 voice: spaces and hyphens part the syllables, one more space leaves a note

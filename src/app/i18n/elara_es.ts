@@ -634,6 +634,26 @@
         <translation>La clave de este pentagrama desde este compás</translation>
     </message>
     <message>
+        <source>Repeat</source>
+        <translation>Repetición</translation>
+    </message>
+    <message>
+        <source>None</source>
+        <translation>Ninguna</translation>
+    </message>
+    <message>
+        <source>The measure before</source>
+        <translation>El compás anterior</translation>
+    </message>
+    <message>
+        <source>The two measures before</source>
+        <translation>Los dos compases anteriores</translation>
+    </message>
+    <message>
+        <source>Play the measure, or the two measures, before this one: the sign takes the place of the music here</source>
+        <translation>Tocar el compás, o los dos compases, anteriores a este: el signo ocupa el lugar de la música aquí</translation>
+    </message>
+    <message>
         <source>Tempo</source>
         <translation>Tempo</translation>
     </message>
@@ -1546,6 +1566,18 @@
     <message>
         <source>Change clef</source>
         <translation>Cambiar clave</translation>
+    </message>
+    <message>
+        <source>Repeat measure</source>
+        <translation>Repetir compás</translation>
+    </message>
+    <message>
+        <source>Repeat two measures</source>
+        <translation>Repetir dos compases</translation>
+    </message>
+    <message>
+        <source>Write out measure repeat</source>
+        <translation>Escribir la repetición de compás</translation>
     </message>
     <message>
         <source>Tie</source>

@@ -76,7 +76,13 @@ dropped with a warning, since MusicXML has no sign without its music.
 
 - Imported drum and riff parts sound as written, and their pages show the
   signs the file has instead of measure rests.
-- Setting a sign at the caret is the next step.
+- **Set at the caret** (`setMeasureRepeat()`, the CLI's `simile` and the
+  measure popup): a sign of one measure, or of two from the caret's measure,
+  drops the music of the measures it goes on, as one undo step; taking it away
+  writes out the music it played, so that what is heard stays and can be
+  edited from there. A two-measure repeat that loses one of its measures to a
+  new sign is written out the same way. A sign that would not count (too few
+  measures before, another length) is not set.
 - A measure whose sign does not count (nothing before it, another length)
   shows a measure rest and keeps the sign, which counts again when the
   measures around it allow.
