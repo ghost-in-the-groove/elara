@@ -447,7 +447,11 @@ struct BeatPlace {
     int staff = 1;
     std::size_t measure = 0;
     std::uint8_t tuplet = 0; // bit 0: bracket starts, bit 1: bracket stops
+    std::uint8_t grace = 0;  // a grace note (ADR-0079): 1 before the beat, 2 on it
 };
+
+constexpr std::uint8_t kGraceBefore = 1;
+constexpr std::uint8_t kGraceOn = 2;
 
 constexpr std::uint8_t kTupletStart = 1;
 constexpr std::uint8_t kTupletStop = 2;
@@ -1185,6 +1189,7 @@ private:
                 writeWedge(xml, hairpin == Hairpin::Crescendo ? "crescendo" : "diminuendo", v,
                            s + 1);
             }
+            writeGraces(xml, beat, voiceNumber, s + 1, m);
             writeBeat(xml, BeatPlace{.beat = &beat,
                                      .previous = previous,
                                      .next = next,
@@ -1231,11 +1236,24 @@ private:
         }
     }
 
+    /// The grace notes leading into `beat`, before it and with no duration: a
+    /// slash for those before the beat (acciaccaturas), none for those on it.
+    void writeGraces(XmlWriter& xml, const Beat& beat, int voice, int staff, std::size_t m) {
+        for (const Grace& grace : beat.graces) {
+            const Beat notes{.duration = grace.duration, .notes = grace.notes};
+            const BeatPlace place{.beat = &notes,
+                                  .voice = voice,
+                                  .staff = staff,
+                                  .measure = m,
+                                  .grace = grace.onBeat ? kGraceOn : kGraceBefore};
+            for (std::size_t n = 0; n < notes.notes.size(); ++n) {
+                writeNote(xml, place, n);
+            }
+        }
+    }
+
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
-        if (!beat.graces.empty()) {
-            warn("grace notes dropped", place.measure);
-        }
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;
@@ -1341,6 +1359,13 @@ private:
         }
 
         xml.open("note");
+        if (place.grace == kGraceBefore) {
+            xml.start("grace");
+            xml.attribute("slash", "yes");
+            xml.endEmpty();
+        } else if (place.grace == kGraceOn) {
+            xml.empty("grace");
+        }
         if (n > 0) {
             xml.empty("chord");
         }
@@ -1360,7 +1385,9 @@ private:
             xml.number("octave", spelled.octave);
             xml.close("pitch");
         }
-        xml.number("duration", grid_.toDivisions(beat.duration.length()));
+        if (place.grace == 0) { // a grace note takes no time
+            xml.number("duration", grid_.toDivisions(beat.duration.length()));
+        }
         if (fx.tiedFromPrevious) {
             xml.start("tie");
             xml.attribute("type", "stop");

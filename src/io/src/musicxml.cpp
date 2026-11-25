@@ -582,6 +582,15 @@ struct Event {
     std::string voice{};
     std::optional<Note> note{}; // nullopt: a rest
     BeatEffects beatEffects{};
+    std::vector<Grace> graces{}; // lead into the beat (ADR-0079)
+};
+
+/// Grace notes read before the note they lead into (ADR-0079).
+struct PendingGrace {
+    std::size_t staff = 0;
+    bool tab = false;
+    std::string voice{};
+    Grace grace{};
 };
 
 struct DynamicMark {
@@ -743,7 +752,7 @@ struct NoteParts {
     pugi::xml_node instrument{};
     pugi::xml_node notations{}; // the first; more may follow as siblings
     int dots = 0;
-    bool grace = false;
+    pugi::xml_node grace{};
     bool chord = false;
     bool cue = false;
     bool tieStop = false;
@@ -786,7 +795,7 @@ NoteParts scanNote(pugi::xml_node note) {
         } else if (name == "instrument") {
             parts.instrument = child;
         } else if (name == "grace") {
-            parts.grace = true;
+            parts.grace = child;
         } else if (name == "cue") {
             parts.cue = true;
         } else if (name == "lyric") {
@@ -887,7 +896,7 @@ private:
             } else if (name == "note") {
                 const NoteParts parts = scanNote(child);
                 if (parts.grace) {
-                    warn("grace notes dropped", index);
+                    readGrace(parts, cursor, index, dynamics);
                     continue;
                 }
                 const Fraction length = divisionsToWholes(parts.duration.text().as_int(0));
@@ -903,6 +912,9 @@ private:
                     continue;
                 }
                 if (auto event = readNote(parts, onset, length, index, dynamics)) {
+                    if (!chord) {
+                        takeGraces(*event);
+                    }
                     events.push_back(std::move(*event));
                 }
             } else if (name == "backup") {
@@ -930,6 +942,10 @@ private:
             }
         }
 
+        if (!pendingGraces_.empty()) {
+            warn("grace notes after the last note of a voice dropped", index);
+            pendingGraces_.clear();
+        }
         const TimeSignature time =
             first_ ? header.timeSignature : score_.headers[index].timeSignature;
         const Fraction measureLength = time.measureLength();
@@ -1587,6 +1603,50 @@ private:
         bool merged = false;
     };
 
+    /// A grace note: a new grace of its voice, or a note of the one before it
+    /// when it is a chord. A slashed grace (an acciaccatura) or one taking time
+    /// from the note before is played before the beat; the others on it.
+    void readGrace(const NoteParts& parts, const Fraction& cursor, std::size_t index,
+                   std::vector<DynamicMark>& dynamics) {
+        auto event = readNote(parts, cursor, Fraction(0), index, dynamics);
+        if (!event || !event->note) {
+            return; // a grace rest means nothing
+        }
+        auto& pending = pendingGraces_;
+        if (parts.chord && !pending.empty() && pending.back().staff == event->staff &&
+            pending.back().tab == event->tab && pending.back().voice == event->voice) {
+            pending.back().grace.notes.push_back(std::move(*event->note));
+            return;
+        }
+        const bool before = parts.grace.attribute("slash").as_string() == "yes"sv ||
+                            parts.grace.attribute("steal-time-previous");
+        pending.push_back(PendingGrace{
+            .staff = event->staff,
+            .tab = event->tab,
+            .voice = std::move(event->voice),
+            .grace = Grace{.duration = event->written.value_or(Duration(NoteValue::Eighth)),
+                           .notes = {std::move(*event->note)},
+                           .onBeat = !before}});
+    }
+
+    /// Moves the grace notes waiting in the event's voice onto it.
+    void takeGraces(Event& event) {
+        auto& pending = pendingGraces_;
+        if (pending.empty()) {
+            return;
+        }
+        const auto mine = [&event](const PendingGrace& grace) {
+            return grace.staff == event.staff && grace.tab == event.tab &&
+                   grace.voice == event.voice;
+        };
+        for (PendingGrace& grace : pending) {
+            if (mine(grace)) {
+                event.graces.push_back(std::move(grace.grace));
+            }
+        }
+        std::erase_if(pending, mine);
+    }
+
     void build(std::size_t index, std::vector<Event>& events, std::vector<DynamicMark>& dynamics,
                std::vector<HairpinMark>& hairpins, const TimeSignature& time) {
         const std::size_t staffCount = layout_.staves.size();
@@ -1712,6 +1772,12 @@ private:
                 Beat beat{.duration = pieces[p]};
                 if (p == 0) {
                     beat.effects = event.beatEffects;
+                    beat.graces = std::move(event.graces);
+                    for (Grace& grace : beat.graces) {
+                        for (Note& note : grace.notes) {
+                            note.effects.dynamic = dynamicAt(event.staff, event.onset);
+                        }
+                    }
                 }
                 if (event.note) {
                     beat.notes.reserve(p == 0 ? chordSizes[e] : 1);
@@ -1871,6 +1937,7 @@ private:
     std::vector<DynamicMark> dynamicMarks_{};
     std::vector<HairpinMark> hairpinMarks_{};
     std::vector<TempoMark> tempoMarks_{};
+    std::vector<PendingGrace> pendingGraces_{};
     std::vector<Placed> placed_{};
     std::vector<std::array<Fraction, Measure::kMaxVoices>> ends_{};
     std::vector<std::array<bool, Measure::kMaxVoices>> dropped_{};
