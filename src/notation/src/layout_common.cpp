@@ -657,17 +657,16 @@ std::string bendLabel(int cents) {
     return label;
 }
 
-namespace {
-
-// Slashes of tremolo picking at `speed`: one per beam of the repeated notes.
-int tremoloStrokes(core::NoteValue speed) {
+int tremoloStrokes(core::NoteValue speed) noexcept {
     if (speed >= core::NoteValue::ThirtySecond) {
         return 3;
     }
     return speed == core::NoteValue::Sixteenth ? 2 : 1;
 }
 
-} // namespace
+Glyph tremoloGlyph(int strokes) noexcept {
+    return strokes >= 3 ? Glyph::Tremolo3 : strokes == 2 ? Glyph::Tremolo2 : Glyph::Tremolo1;
+}
 
 void addTechniques(ColumnTechniques& marks, const core::Beat& beat) {
     if (marks.whammy.isEmpty()) {
@@ -739,10 +738,7 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
              measure, kLaneGlyphScale);
     }
     if (marks.tremoloStrokes > 0) {
-        constexpr std::array kSlashes{Glyph::Tremolo1, Glyph::Tremolo2, Glyph::Tremolo3};
-        mark(Lane::Tremolo,
-             kSlashes.at(static_cast<std::size_t>(std::min(marks.tremoloStrokes, 3) - 1)), centre,
-             measure, kLaneGlyphScale);
+        mark(Lane::Tremolo, tremoloGlyph(marks.tremoloStrokes), centre, measure, kLaneGlyphScale);
     }
     if (marks.whammy.isEmpty()) {
         whammyRun_ = false;
@@ -1469,8 +1465,65 @@ double StaffWriter::repeatDots(double x) {
     return x + widthOf(Glyph::RepeatDot);
 }
 
+core::MeasureRepeat StaffWriter::shownRepeat(const core::Song& song, const core::Staff& staff,
+                                             std::size_t m) {
+    const core::MeasureRepeat repeat = staff.measure(m).repeat;
+    return repeat != core::MeasureRepeat::None && core::repeatSource(song, staff, m) != m
+               ? repeat
+               : core::MeasureRepeat::None;
+}
+
+double StaffWriter::repeatWidth(core::MeasureRepeat repeat) const {
+    switch (repeat) {
+    case core::MeasureRepeat::None:
+        return 0.0;
+    case core::MeasureRepeat::One:
+        return widthOf(Glyph::Repeat1Bar);
+    case core::MeasureRepeat::TwoFirst:
+    case core::MeasureRepeat::TwoSecond:
+        break;
+    }
+    // Over a barline the sign takes half of each measure, but a line can end
+    // between them.
+    return widthOf(Glyph::Repeat2Bars);
+}
+
+void StaffWriter::measureRepeat(core::MeasureRepeat repeat, double start, double barline) {
+    const double middle = (start + barline) / 2;
+    if (repeat == core::MeasureRepeat::TwoSecond && halfRepeat_) {
+        glyphCentred(Glyph::Repeat2Bars, halfRepeat_->barline, height_ / 2, Role::Repeat);
+        halfRepeat_.reset();
+        return;
+    }
+    flushRepeat();
+    switch (repeat) {
+    case core::MeasureRepeat::None:
+        break;
+    case core::MeasureRepeat::One:
+        glyphCentred(Glyph::Repeat1Bar, middle, height_ / 2, Role::Repeat);
+        break;
+    case core::MeasureRepeat::TwoFirst:
+        halfRepeat_ = HalfRepeat{.barline = barline, .middle = middle, .measure = measure_};
+        break;
+    case core::MeasureRepeat::TwoSecond: // its first measure ended the line before
+        glyphCentred(Glyph::Repeat2Bars, middle, height_ / 2, Role::Repeat);
+        break;
+    }
+}
+
+void StaffWriter::flushRepeat() {
+    if (!halfRepeat_) {
+        return;
+    }
+    const std::size_t drawing = std::exchange(measure_, halfRepeat_->measure);
+    glyphCentred(Glyph::Repeat2Bars, halfRepeat_->middle, height_ / 2, Role::Repeat);
+    measure_ = drawing;
+    halfRepeat_.reset();
+}
+
 DisplayList StaffWriter::finish(double width) {
     list_.width = width;
+    flushRepeat();
     close(width);
     std::vector<LineItem> staff;
     const double spacing = lines_ > 1 ? height_ / static_cast<double>(lines_ - 1) : 0.0;
@@ -1489,6 +1542,7 @@ DisplayList StaffWriter::finish(double width) {
 }
 
 void StaffWriter::clearItems() {
+    halfRepeat_.reset();
     list_.glyphs.clear();
     list_.lines.clear();
     list_.beams.clear();

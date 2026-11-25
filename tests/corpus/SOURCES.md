@@ -35,6 +35,7 @@ element written by hand following the structure of files saved by Guitar Pro
 | `band.gp` | Four-string bass, two-staff piano with a second voice, a drum kit whose notes name its articulations, a B-flat clarinet given by concert pitches only; F major; a gradual tempo change in dotted quarters, lyrics and a short voice (reported); the piano and the clarinet carry the default tunings Guitar Pro gives every staff, and its part configuration shows them without tablature; a guitar chord diagram over the piano |
 | `duet.gpx` | Guitar Pro 6: a container with three files, compressed with literals and back references; steel-string guitar in E-flat tuning (spelled with flats) with a capo, both on the track; a drum kit from the General MIDI table whose notes give their MIDI keys; E-flat major; a tempo without a beat unit; let ring; a chord diagram on the track; a drum note that names only a kit element (reported) |
 | `double-coda.gp` | Signs and jumps (ADR-0049): segno, segno segno, coda and double coda signs, "Da Coda" and "Da Double Coda" on one bar, "Da Segno Segno al Double Coda"; played 1 2 3 4 5 3 4 7; an "Intro" section (letter A) and a section with only the letter B |
+| `simile.gp` | Measure repeats (ADR-0102): a bar repeating the bar before, two bars repeating the two before, each keeping the whole rest Guitar Pro writes in such a bar; 25 notes played over 7 measures |
 
 ## Guitar Pro 3-5 (`gp/`)
 

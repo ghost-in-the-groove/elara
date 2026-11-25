@@ -10,6 +10,7 @@
 
 namespace elara::core {
 
+struct Beat;
 struct Note;
 class Song;
 
@@ -41,6 +42,10 @@ struct SoundingNote {
 /// (staccato, bends, slides...) are not applied: that is playback's job, which
 /// finds them through each note's measure, beat and note.
 [[nodiscard]] std::vector<SoundingNote> soundingNotes(const Song& song);
+
+/// The beat holding the note `sounding` strikes, as written: in its measure,
+/// or for a measure repeat in the measure repeated (repeatSource(), ADR-0102).
+[[nodiscard]] const Beat& beatOf(const Song& song, const SoundingNote& sounding);
 
 /// The note `sounding` strikes: a note of its beat or of one of the beat's
 /// grace notes.

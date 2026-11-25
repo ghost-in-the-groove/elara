@@ -87,6 +87,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | rasgueo | strum | `Strum` | Down strikes a chord from its lowest string, up from its highest; 0.01 s between strings in playback (ADR-0025) |
 | trémolo de púa | tremolo picking | `BeatEffects::tremoloPicking` | The note struck again and again at that note value (ADR-0025) |
 | nota muerta | dead note | `deadNote` | |
+| nota fantasma | ghost note | `ghost`, `Role::Parenthesis` | Played very softly; its fret number and notehead between parentheses (ADR-0099) |
 | armónico natural / artificial | natural / artificial harmonic | `Harmonic` | Fret in tenths |
 | ataque (de la cuerda) | touch | `audio::Touch` | How playback strikes a string: normal, palm mute, dead, harmonic (ADR-0022) |
 | vibrato | vibrato | `Vibrato` | |
@@ -101,6 +102,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | respiración / cesura | breath mark / caesura | `Breath`, `BeatEffects::breath` | A comma over the staff, or two strokes through its top line, after a beat: its notes end a little early (ADR-0095) |
 | línea de octava | octave line (8va, 8vb, 15ma, 15mb) | `Ottava`, `BeatEffects::ottava`, `ottavaOctaves()`, `Role::OctaveLine` | A dashed line over (or under) beats whose notes sound one or two octaves above (or below) where they are written (ADR-0089) |
 | repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
+| repetición de compás (símil) | measure repeat (simile) | `Measure::repeat`, `MeasureRepeat`, `repeatSource()` | A staff's measure plays the measure, or the two measures, before it (ADR-0102) |
 | señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
 | sección / marcador / ensayo | section (marker, rehearsal mark) | `MeasureHeader::section`, `changeSection()` | The named part of a song (intro, chorus...) that starts at a measure and runs to the next one that names a section (ADR-0062) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
