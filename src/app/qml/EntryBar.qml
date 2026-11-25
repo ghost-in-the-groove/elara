@@ -26,6 +26,15 @@ Rectangle {
         effects.open();
     }
 
+    // A bend or dive amount as printed: quarter steps as fraction characters,
+    // drawn at the size of the digits beside them ("1 1/2" becomes a 1 and a
+    // half sign, which the font's fraction feature would shrink along with
+    // them), and a minus sign for a dive.
+    function amountText(text) {
+        return text.replace(/ ?1\/4/g, "\u00BC").replace(/ ?1\/2/g, "\u00BD")
+                   .replace(/ ?3\/4/g, "\u00BE").replace(/^-/, "\u2212");
+    }
+
     // Note values from the music font's metronome marks, longest first.
     readonly property var values: [
         { value: 1, symbol: "\uECA2", tip: qsTr("Whole note") },
@@ -272,11 +281,10 @@ Rectangle {
         contentItem: Label {
             id: whammyLabel
 
-            text: root.document.whammyAmount(whammyAmount.cents)
+            text: root.amountText(root.document.whammyAmount(whammyAmount.cents))
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 12
-            font.features: { "frac": 1 }
             color: whammyAmount.active ? "white" : root.ink
         }
     }
@@ -300,11 +308,10 @@ Rectangle {
         contentItem: Label {
             id: amountLabel
 
-            text: root.document.bendAmount(bendAmount.cents)
+            text: root.amountText(root.document.bendAmount(bendAmount.cents))
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 12
-            font.features: { "frac": 1 }
             color: bendAmount.active ? "white" : root.ink
         }
     }
@@ -1042,6 +1049,21 @@ Rectangle {
                             active: root.document.caretHairpin === 2
                             onClicked: root.document.setHairpin(active ? 0 : 2)
                         }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Phrasing and lines")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // Slurs, grace notes, fermatas, octave lines, the pedal and breaths.
+                    Row {
+                        spacing: 2
+
                         // The caret's beat slurred to the next (ADR-0086).
                         BeatEffect {
                             tip: qsTr("Slur to the next note")
