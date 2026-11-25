@@ -853,6 +853,7 @@ ApplicationWindow {
         TunerPane {
             id: tunerPane
 
+            document: score
             x: parent.width - width - 16
             y: 12
         }

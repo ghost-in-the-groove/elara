@@ -27,6 +27,27 @@ Popup {
     readonly property color textColor: Theme.ink
     readonly property color faintColor: Theme.faint
 
+    /// The score whose shown track the tuner follows; none without one.
+    property ScoreDocument document: null
+    // The track and tuning followed last, so that a tuning picked by hand
+    // stays until the track or its tuning changes.
+    property string followed
+
+    // Tunes to the shown track's strings, when it has strings and they
+    // changed since the last time.
+    function followTrack() {
+        if (!document || document.track < 0)
+            return;
+        const shown = document.trackTuning(document.track);
+        if (!shown.fretted)
+            return;
+        const key = document.track + " " + shown.notes;
+        if (key === followed)
+            return;
+        followed = key;
+        tuner.showTuning(shown.notes, document.trackNames[document.track]);
+    }
+
     function signedCents(cents: real): string {
         const rounded = Math.round(cents * 10) / 10;
         return (rounded > 0 ? "+" : rounded < 0 ? "−" : "±") + Math.abs(rounded).toFixed(1);
@@ -80,6 +101,20 @@ Popup {
         id: tuner
 
         active: root.visible
+    }
+
+    onAboutToShow: followTrack()
+
+    Connections {
+        target: root.document
+        enabled: root.visible
+
+        function onTrackChanged() {
+            root.followTrack();
+        }
+        function onSongChanged() {
+            root.followTrack();
+        }
     }
 
     contentItem: ColumnLayout {

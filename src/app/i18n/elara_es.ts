@@ -1120,6 +1120,10 @@
         <source>The audio input&apos;s sample rate is too low for the tuner.</source>
         <translation>La frecuencia de muestreo de la entrada de audio es demasiado baja para el afinador.</translation>
     </message>
+    <message>
+        <source>Track: %1</source>
+        <translation>Pista: %1</translation>
+    </message>
 </context>
 <context>
     <name>TunerPane</name>
