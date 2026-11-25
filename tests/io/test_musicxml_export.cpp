@@ -611,6 +611,74 @@ TEST_CASE("MusicXML export: beat text comes back as words", "[musicxml][export]"
     CHECK(exportMusicXml(song).warnings.empty());
 }
 
+TEST_CASE("MusicXML export: lyrics come back with their verses, hyphens and extenders",
+          "[musicxml][export]") {
+    // ADR-0084: each verse sung on a beat is a <lyric> on its first note, the
+    // syllabic following from the hyphens, also across barlines and on rests;
+    // the TAB copy of a guitar sings nothing.
+    using core::Syllable;
+    using Verses = std::vector<Syllable>;
+    core::Song song;
+    song.appendMeasures(2);
+    const std::size_t g =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    core::Staff& staff = song.track(g).staff(0);
+    const core::Duration quarter(core::NoteValue::Quarter);
+    const core::Duration eighth(core::NoteValue::Eighth);
+    auto& first = staff.measure(0).voices[0].beats;
+    first = {beatOf(quarter, {staff.frettedNote(3, 0)}), beatOf(quarter, {staff.frettedNote(3, 2)}),
+             beatOf(quarter, {staff.frettedNote(2, 0)}),
+             beatOf(quarter, {staff.frettedNote(2, 1)})};
+    first[0].lyrics = core::SharedOptional(Verses{{.text = "be", .hyphen = true}, {.text = "oh"}});
+    first[1].lyrics = core::SharedOptional(Verses{{.text = "low", .extend = true}});
+    first[3].lyrics = core::SharedOptional(Verses{{.text = "sha", .hyphen = true}});
+    auto& second = staff.measure(1).voices[0].beats;
+    second = {beatOf(quarter, {staff.frettedNote(2, 3)}), beatOf(quarter),
+              beatOf(eighth, {staff.frettedNote(1, 0)}), beatOf(eighth, {staff.frettedNote(1, 1)}),
+              beatOf(quarter, {staff.frettedNote(1, 3)})};
+    second[0].lyrics = core::SharedOptional(Verses{{.text = "dows"}});
+    second[1].lyrics = core::SharedOptional(Verses{{}, {.text = "ah"}});
+    second[2].lyrics = core::SharedOptional(Verses{{.text = "a", .hyphen = true}});
+    second[3].lyrics = core::SharedOptional(Verses{{.text = "ga", .hyphen = true}});
+    second[4].lyrics = core::SharedOptional(Verses{{.text = "in"}});
+    auto& left = song.track(p).staff(1).measure(0).voices[0].beats;
+    left = {beatOf(core::Duration(core::NoteValue::Whole),
+                   {core::Note{.pitch = core::Pitch::fromMidi(48)}})};
+    left[0].lyrics = core::SharedOptional(Verses{{.text = "lo"}});
+    fillVoices(song);
+
+    const core::Song back = roundTrip(song);
+    requireSame(song, back);
+    // One element per line in the document: joined to find whole lyrics.
+    std::string xml;
+    const std::string pretty = exportMusicXml(song).data;
+    for (std::size_t i = 0; i < pretty.size(); ++i) {
+        if (pretty[i] == '\n') {
+            while (i + 1 < pretty.size() && pretty[i + 1] == ' ') {
+                ++i;
+            }
+        } else {
+            xml += pretty[i];
+        }
+    }
+    CHECK(xml.find(R"(<lyric number="1"><syllabic>begin</syllabic><text>be</text></lyric>)") !=
+          std::string::npos);
+    CHECK(xml.find(R"(<lyric number="2"><syllabic>single</syllabic><text>oh</text></lyric>)") !=
+          std::string::npos);
+    CHECK(xml.find(R"(<syllabic>end</syllabic><text>low</text><extend/></lyric>)") !=
+          std::string::npos);
+    CHECK(xml.find(R"(<syllabic>end</syllabic><text>dows</text>)") != std::string::npos);
+    CHECK(xml.find(R"(<syllabic>middle</syllabic><text>ga</text>)") != std::string::npos);
+    std::size_t lyrics = 0;
+    for (std::size_t at = xml.find("<lyric "); at != std::string::npos;
+         at = xml.find("<lyric ", at + 1)) {
+        ++lyrics;
+    }
+    CHECK(lyrics == 10);
+}
+
 TEST_CASE("MusicXML export: a gradual tempo change is a word with dashes to the next tempo",
           "[musicxml][export]") {
     // ADR-0082: "rit." or "accel." by the speeds, then dashes to the next tempo.

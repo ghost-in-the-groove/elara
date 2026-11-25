@@ -777,9 +777,9 @@ set_tests_properties(cli.import_musicxml PROPERTIES
   PASS_REGULAR_EXPRESSION "\"format\":\"musicxml\",\"out\":null,\"warnings\":\\[\\],\"song\":{.*\"title\":\"Corpus Melody\".*\"issues\":\\[\\]}")
 
 add_test(NAME cli.import_musicxml_reports_warnings
-  COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/piano-voices.musicxml")
+  COMMAND elara-cli --json import "${ELARA_CORPUS}/musicxml/transposing.musicxml")
 set_tests_properties(cli.import_musicxml_reports_warnings PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"warnings\":\\[[^]]*\"Piano: lyrics dropped \\(measure 2\\)\"")
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[[^]]*\"pickup measure filled with leading rests \\(measure 1\\)\"")
 
 add_test(NAME cli.import_musicxml_saves_native
   COMMAND elara-cli import "${ELARA_CORPUS}/musicxml/guitar-tab.musicxml"

@@ -477,6 +477,9 @@ struct BeatPlace {
     std::size_t measure = 0;
     std::uint8_t tuplet = 0; // bit 0: bracket starts, bit 1: bracket stops
     std::uint8_t grace = 0;  // a grace note (ADR-0079): 1 before the beat, 2 on it
+    // Per verse, whether its word goes on from the syllable before (ADR-0084);
+    // null: no lyrics written here (the TAB copy, grace notes).
+    std::vector<bool>* words = nullptr;
 };
 
 constexpr std::uint8_t kGraceBefore = 1;
@@ -497,6 +500,7 @@ public:
           xmlStaves_(staffCount_ + (tabCopy_ ? 1 : 0)),
           dynamics_(track_.staffCount(), Dynamic::MF) {
         transposition_ = transpositionFor();
+        words_.resize(track_.staffCount() * Measure::kMaxVoices);
         if (percussion_) {
             collectDrumKeys();
             if (track_.instrument().name != track_.name()) {
@@ -1245,6 +1249,8 @@ private:
             return measureLength;
         }
         markTuplets(voice);
+        std::vector<bool>* words =
+            tabPass_ ? nullptr : &words_[static_cast<std::size_t>(s) * Measure::kMaxVoices + v];
         Fraction onset;
         for (std::size_t i = 0; i < voice.beats.size(); ++i) {
             const Beat& beat = voice.beats[i];
@@ -1276,7 +1282,8 @@ private:
                                      .voice = voiceNumber,
                                      .staff = s + 1,
                                      .measure = m,
-                                     .tuplet = tuplets_[i]});
+                                     .tuplet = tuplets_[i],
+                                     .words = words});
             if (hairpin != Hairpin::None && (next == nullptr || next->effects.hairpin != hairpin)) {
                 writeWedge(xml, "stop", v, s + 1);
             }
@@ -1435,6 +1442,7 @@ private:
                 writeTupletMarks(xml, place.tuplet);
                 xml.close("notations");
             }
+            writeLyrics(xml, place);
             xml.close("note");
             return;
         }
@@ -1675,12 +1683,47 @@ private:
             }
             xml.close("notations");
         }
+        if (firstNote) {
+            writeLyrics(xml, place);
+        }
         if (fx.palmMute) {
             xml.open("play");
             xml.text("mute", "palm");
             xml.close("play");
         }
         xml.close("note");
+    }
+
+    /// One <lyric> per verse sung on the beat (ADR-0084). The syllabic follows
+    /// from the hyphens: a syllable after one joined to it ends or goes on with
+    /// its word, any other is single or begins one.
+    static void writeLyrics(XmlWriter& xml, const BeatPlace& place) {
+        if (place.words == nullptr || !place.beat->lyrics) {
+            return;
+        }
+        static constexpr std::array<std::array<std::string_view, 2>, 2> kSyllabic{
+            {{"single", "begin"}, {"end", "middle"}}};
+        const std::vector<Syllable>& verses = *place.beat->lyrics;
+        std::vector<bool>& open = *place.words;
+        if (open.size() < verses.size()) {
+            open.resize(verses.size(), false);
+        }
+        for (std::size_t v = 0; v < verses.size(); ++v) {
+            const Syllable& syllable = verses[v];
+            if (syllable.text.empty()) {
+                continue;
+            }
+            xml.start("lyric");
+            xml.attribute("number", static_cast<std::int64_t>(v + 1));
+            xml.endOpen();
+            xml.text("syllabic", kSyllabic[open[v] ? 1 : 0][syllable.hyphen ? 1 : 0]);
+            xml.text("text", syllable.text);
+            if (syllable.extend) {
+                xml.empty("extend");
+            }
+            xml.close("lyric");
+            open[v] = syllable.hyphen;
+        }
     }
 
     void writeNotehead(XmlWriter& xml, const Note& note, std::size_t m) {
@@ -1803,7 +1846,8 @@ private:
     int xmlStaves_;
     Transposition transposition_{};
     std::vector<int> drumKeys_{};
-    std::vector<Dynamic> dynamics_; // per model staff, at the end of the last measure
+    std::vector<Dynamic> dynamics_;          // per model staff, at the end of the last measure
+    std::vector<std::vector<bool>> words_{}; // BeatPlace::words per model staff and voice
     Warnings warnings_{};
     bool tabPass_ = false;
     Fraction cursor_{};

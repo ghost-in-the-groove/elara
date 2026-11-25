@@ -67,10 +67,13 @@ struct ChordSymbol {
 };
 
 /// One syllable sung on a beat (ADR-0084). `hyphen` joins it to the next
-/// syllable of its word, drawn between them. Empty text: nothing is sung there.
+/// syllable of its word, drawn between them; `extend` holds it over the notes
+/// after it that sing nothing in its verse, drawn as a line (a melisma). Empty
+/// text: nothing is sung there.
 struct Syllable {
     std::string text{};
     bool hyphen = false;
+    bool extend = false;
 
     friend bool operator==(const Syllable&, const Syllable&) = default;
 };

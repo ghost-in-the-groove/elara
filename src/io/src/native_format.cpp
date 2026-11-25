@@ -306,10 +306,16 @@ private:
         if (value.text) {
             addText(object, "text", *value.text);
         }
-        if (value.lyrics) { // ADR-0084: a hyphen after a syllable joined to the next
+        if (value.lyrics) { // ADR-0084: "be-" joins the next syllable, "low_" is held
             yyjson_mut_val* verses = yyjson_mut_arr(doc_);
             for (const Syllable& syllable : *value.lyrics) {
-                const std::string text = syllable.hyphen ? syllable.text + '-' : syllable.text;
+                std::string text = syllable.text;
+                if (syllable.hyphen) {
+                    text += '-';
+                }
+                if (syllable.extend) {
+                    text += '_';
+                }
                 yyjson_mut_arr_add_strncpy(doc_, verses, text.data(), text.size());
             }
             add(object, "lyrics", verses);
@@ -896,11 +902,16 @@ private:
                 fail("expected a string");
             }
             std::string_view text(yyjson_get_str(item), yyjson_get_len(item));
+            const bool extend = text.size() > 1 && text.ends_with('_');
+            if (extend) {
+                text.remove_suffix(1);
+            }
             const bool hyphen = text.size() > 1 && text.ends_with('-');
             if (hyphen) {
                 text.remove_suffix(1);
             }
-            verses.push_back(Syllable{.text = std::string(text), .hyphen = hyphen});
+            verses.push_back(
+                Syllable{.text = std::string(text), .hyphen = hyphen, .extend = extend});
         });
         while (!verses.empty() && verses.back().text.empty()) {
             verses.pop_back();

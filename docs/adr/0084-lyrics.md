@@ -32,8 +32,10 @@ How the formats keep them:
 
 **A beat holds a syllable per verse.** `Beat::lyrics` is a
 `SharedOptional<std::vector<Syllable>>`: verse n + 1 at index n. A `Syllable`
-is its text and whether a hyphen joins it to the next syllable of its word. A
-verse that sings nothing on the beat has empty text; the list never ends with
+is its text, whether a hyphen joins it to the next syllable of its word, and
+whether it is held over the notes after it that sing nothing in its verse (an
+extender, drawn as a line to the last of them: a melisma). A verse that sings
+nothing on the beat has empty text; the list never ends with
 one, and a beat that sings nothing holds none, so a beat without lyrics costs a
 null pointer, like its chord symbol and text (ADR-0080, ADR-0081). Lyrics do
 not sound.
@@ -65,20 +67,36 @@ track. Guitar Pro 6-8: the beats' syllables when the lyrics are dispatched,
 otherwise the track's lines on its first staff. Syllables left over after the
 last note are reported: `lyrics after the last note dropped`.
 
+**MusicXML.** Each `<lyric>` of a note is a verse: `number` 1 to 16 is that
+verse, a lyric without one is verse 1, and a name (some programs write
+`part1verse1`) takes its place among the names its part uses; verses after the
+16th are dropped with a warning. `<syllabic>` `begin` or `middle` joins the
+syllable to the next one, `<elision>` joins two texts on one beat with its
+symbol (`‿` when the file leaves it to the reader), and `<extend>` holds the
+syllable; the `continue` and `stop` extenders on the notes after it add
+nothing the model needs. A chord's other notes fill the verses its first note
+leaves empty. Hidden lyrics (`print-object="no"`) are not sung, and lyrics on
+grace notes are dropped with a warning. Written back, a beat's verses are
+`<lyric number>`s on its first note, the syllabic worked out from the hyphens
+of each verse in its voice (`middle` or `end` after a syllable joined to the
+next, `begin` or `single` otherwise), an extender a plain `<extend/>`, which
+readers stretch to the next syllable.
+
 **The native format** writes a beat's verses as strings, a hyphen after a
-syllable joined to the next and `""` for a verse that sings nothing there:
-`"lyrics":["be-","","low"]`. A syllable's text never ends with a hyphen of its
-own: readers fold it into the joining hyphen.
+syllable joined to the next, an underscore after one held and `""` for a verse
+that sings nothing there: `"lyrics":["be-","","low_"]`. A syllable's text
+never ends with a hyphen or an underscore of its own: readers, of song.json and
+of MusicXML, fold them into the joining hyphen and the extender.
 
 ## Consequences
 
-- Lyrics come through Guitar Pro 4-8 files and the native format, and show in
-  `elara-cli import --json` and `dump`.
-- MusicXML (`<lyric>`, `<syllabic>`, `<extend>`), drawing under the staff and
-  typing verses at the caret are follow-up work; until then MusicXML and MIDI
-  keep warning that lyrics are dropped.
-- A syllable held over several notes (MusicXML's extender) has no place in the
-  model yet; it comes with MusicXML.
+- Lyrics come through Guitar Pro 4-8 files, MusicXML both ways and the
+  native format, and show in `elara-cli import --json` and `dump`.
+- Drawing under the staff and typing verses at the caret are follow-up work;
+  until MIDI lyric events are read and written, MIDI keeps warning that
+  lyrics are dropped.
+- Guitar Pro has no extenders: its lyrics come without them, and a held
+  syllable written to MusicXML and read back keeps its line.
 - Tests: the `core.Lyrics text: ...` cases (syllables, blanks, line breaks,
   comments), `core.A verse goes on the beats with notes, past rests and tied
   notes`, `core.A verse starts at its measure and replaces what the verse held
@@ -87,5 +105,8 @@ own: readers fold it into the joining hyphen.
   tied note and a word too many), `io.Guitar Pro: beats keep the syllables
   Guitar Pro dispatched to them`, `io.Guitar Pro: lyrics not yet dispatched go
   on the beats with notes`, `io.Guitar Pro: a band keeps its instruments,
-  staves, voices and drums` (the clarinet's dispatched syllables) and the
-  native round trip with `io.song.json uses text forms and omits defaults`.
+  staves, voices and drums` (the clarinet's dispatched syllables), `io.MusicXML:
+  lyrics give each beat a syllable per verse`, `io.MusicXML: lyrics without a
+  number, on chords, hidden or on grace notes`, `io.MusicXML export: lyrics
+  come back with their verses, hyphens and extenders` and the native round trip
+  with `io.song.json uses text forms and omits defaults`.

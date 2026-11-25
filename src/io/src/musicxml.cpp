@@ -584,7 +584,8 @@ struct Event {
     std::string voice{};
     std::optional<Note> note{}; // nullopt: a rest
     BeatEffects beatEffects{};
-    std::vector<Grace> graces{}; // lead into the beat (ADR-0079)
+    std::vector<Grace> graces{};    // lead into the beat (ADR-0079)
+    std::vector<Syllable> lyrics{}; // verse n + 1 at index n, ending with one sung (ADR-0084)
 };
 
 /// Grace notes read before the note they lead into (ADR-0079).
@@ -943,7 +944,7 @@ struct NoteParts {
     bool cue = false;
     bool tieStop = false;
     bool palmMute = false;
-    bool lyric = false;
+    pugi::xml_node lyric{}; // the first; more may follow as siblings
 };
 
 NoteParts scanNote(pugi::xml_node note) {
@@ -985,7 +986,9 @@ NoteParts scanNote(pugi::xml_node note) {
         } else if (name == "cue") {
             parts.cue = true;
         } else if (name == "lyric") {
-            parts.lyric = true;
+            if (!parts.lyric) {
+                parts.lyric = child;
+            }
         } else if (name == "play") {
             parts.palmMute = parts.palmMute || textView(child.child("mute")) == "palm";
         }
@@ -1619,6 +1622,7 @@ private:
         if (event.voice.empty()) {
             event.voice = "1";
         }
+        readLyrics(parts.lyric, event, index);
         if (parts.rest) {
             event.measureRest = parts.rest.attribute("measure").as_bool();
             return event;
@@ -1644,6 +1648,117 @@ private:
         readMarks(parts, event, note, index, dynamics);
         event.note = std::move(note);
         return event;
+    }
+
+    // ---- Lyrics (ADR-0084) ----------------------------------------------------------
+
+    static constexpr std::size_t kMaxVerses = 16;
+
+    /// The syllable of each verse sung on the note: the first printed <lyric>
+    /// of the verse that has text.
+    void readLyrics(pugi::xml_node first, Event& event, std::size_t index) {
+        for (pugi::xml_node lyric = first; lyric; lyric = lyric.next_sibling("lyric")) {
+            if (!lyric.attribute("print-object").as_bool(true)) {
+                continue;
+            }
+            std::optional<Syllable> syllable = syllableOf(lyric);
+            if (!syllable) {
+                continue;
+            }
+            const std::optional<std::size_t> verse = verseOf(lyric.attribute("number").value());
+            if (!verse) {
+                warn("verses after the 16th dropped", index);
+                continue;
+            }
+            if (*verse >= event.lyrics.size()) {
+                event.lyrics.resize(*verse + 1);
+            }
+            if (event.lyrics[*verse].text.empty()) {
+                event.lyrics[*verse] = std::move(*syllable);
+            }
+        }
+    }
+
+    /// A lyric's verse: number n from 1 to 16 is verse n (index n - 1), no
+    /// number verse 1, a name its place among the names the part uses.
+    std::optional<std::size_t> verseOf(std::string_view number) {
+        if (number.empty()) {
+            return 0;
+        }
+        std::size_t value = 0;
+        const char* end = number.data() + number.size();
+        if (const auto read = std::from_chars(number.data(), end, value);
+            read.ec == std::errc{} && read.ptr == end) {
+            if (value > kMaxVerses) {
+                return std::nullopt;
+            }
+            return std::max<std::size_t>(value, 1) - 1;
+        }
+        const auto found = std::ranges::find(verseNames_, number);
+        if (found != verseNames_.end()) {
+            return static_cast<std::size_t>(found - verseNames_.begin());
+        }
+        if (verseNames_.size() == kMaxVerses) {
+            return std::nullopt;
+        }
+        verseNames_.emplace_back(number);
+        return verseNames_.size() - 1;
+    }
+
+    /// A <lyric>'s syllable: its texts joined by their elisions ("‿" when the
+    /// file leaves the symbol to the reader), joined to the next syllable after
+    /// a begin or middle one or when typed with a hyphen, held by <extend>;
+    /// none without text.
+    static std::optional<Syllable> syllableOf(pugi::xml_node lyric) {
+        Syllable syllable;
+        std::string_view syllabic;
+        for (pugi::xml_node child : lyric.children()) {
+            const std::string_view name = child.name();
+            if (name == "syllabic") {
+                syllabic = textView(child);
+            } else if (name == "text") {
+                syllable.text += textView(child);
+            } else if (name == "elision") {
+                const std::string_view symbol = textView(child);
+                syllable.text += symbol.empty() ? "‿"sv : symbol;
+            } else if (name == "extend") {
+                const std::string_view type = child.attribute("type").value();
+                syllable.extend = type.empty() || type == "start";
+            }
+        }
+        // As in song.json, a syllable's text never ends with its own extender
+        // or hyphen.
+        std::string& text = syllable.text;
+        if (text.size() > 1 && text.ends_with('_')) {
+            text.pop_back();
+            syllable.extend = true;
+        }
+        if (text.size() > 1 && text.ends_with('-')) {
+            text.pop_back();
+            syllable.hyphen = true;
+        }
+        syllable.hyphen = syllable.hyphen || syllabic == "begin" || syllabic == "middle";
+        if (text.empty()) {
+            return std::nullopt;
+        }
+        return syllable;
+    }
+
+    /// A chord note's syllables go on its beat where their verse sings nothing yet.
+    static void addLyrics(Beat& beat, std::vector<Syllable>& lyrics) {
+        if (lyrics.empty()) {
+            return;
+        }
+        std::vector<Syllable> verses = beat.lyrics ? *beat.lyrics : std::vector<Syllable>{};
+        if (verses.size() < lyrics.size()) {
+            verses.resize(lyrics.size());
+        }
+        for (std::size_t v = 0; v < lyrics.size(); ++v) {
+            if (verses[v].text.empty()) {
+                verses[v] = std::move(lyrics[v]);
+            }
+        }
+        beat.lyrics = SharedOptional(std::move(verses));
     }
 
     static std::optional<Duration> writtenDuration(const NoteParts& parts) {
@@ -1728,9 +1843,6 @@ private:
         }
         fx.tiedFromPrevious = parts.tieStop;
         fx.palmMute = parts.palmMute;
-        if (parts.lyric) {
-            warn("lyrics dropped", index);
-        }
 
         std::optional<int> string;
         std::optional<int> fret;
@@ -1907,6 +2019,9 @@ private:
         if (!event || !event->note) {
             return; // a grace rest means nothing
         }
+        if (!event->lyrics.empty()) {
+            warn("lyrics on grace notes dropped", index);
+        }
         auto& pending = pendingGraces_;
         if (parts.chord && !pending.empty() && pending.back().staff == event->staff &&
             pending.back().tab == event->tab && pending.back().voice == event->voice) {
@@ -2018,6 +2133,7 @@ private:
             if (event.chord) {
                 if (event.note && !lastDropped && !voice.beats.empty()) {
                     Beat& beat = voice.beats.back();
+                    addLyrics(beat, event.lyrics);
                     placed.push_back(Placed{.staff = event.staff,
                                             .voice = *slot,
                                             .beat = voice.beats.size() - 1,
@@ -2068,6 +2184,9 @@ private:
                 if (p == 0) {
                     beat.effects = event.beatEffects;
                     beat.graces = std::move(event.graces);
+                    if (!event.lyrics.empty()) {
+                        beat.lyrics = SharedOptional(std::move(event.lyrics));
+                    }
                     for (Grace& grace : beat.graces) {
                         for (Note& note : grace.notes) {
                             note.effects.dynamic = dynamicAt(event.staff, event.onset);
@@ -2236,6 +2355,7 @@ private:
     std::vector<TextMark> textMarks_{};
     std::vector<TempoMark> tempoMarks_{};
     std::vector<PendingGrace> pendingGraces_{};
+    std::vector<std::string> verseNames_{}; // lyric numbers that are names, in order
     std::vector<Placed> placed_{};
     std::vector<std::array<Fraction, Measure::kMaxVoices>> ends_{};
     std::vector<std::array<bool, Measure::kMaxVoices>> dropped_{};

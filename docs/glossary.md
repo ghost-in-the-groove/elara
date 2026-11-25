@@ -34,6 +34,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | letra | lyrics | `Beat::lyrics` | The words sung, a syllable per verse on each beat that sings it (ADR-0084) |
 | estrofa | verse | | One line of lyrics: verse n + 1 is `Beat::lyrics[n]` (ADR-0084) |
 | sílaba | syllable | `Syllable` | The part of a word sung on one beat; a hyphen joins it to the next one of its word (ADR-0084) |
+| extensor (de sílaba) | extender | `Syllable::extend` | The line after a syllable held over the notes after it that sing nothing in its verse (a melisma) (ADR-0084) |
 | diagrama de acorde | chord diagram | `ChordDiagram` | Where a chord's strings are stopped, from string 1 down, with the fret at the top of the grid (ADR-0080) |
 | nota de adorno (apoyatura, mordente) | grace note | `Grace`, `Beat::graces` | Small notes that take no time, leading into the beat that holds them; on the beat or before it (ADR-0079) |
 | compás incompleto / sobrecargado | incomplete / overfull voice | `VoiceFill` | Shorter / longer than its time signature |

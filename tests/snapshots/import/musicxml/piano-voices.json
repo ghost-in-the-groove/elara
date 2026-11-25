@@ -1,9 +1,7 @@
 {
  "format": "musicxml",
  "out": null,
- "warnings": [
-  "Piano: lyrics dropped (measure 2)"
- ],
+ "warnings": [],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -84,6 +82,9 @@
          {
           "duration": "4.",
           "text": "Calmer",
+          "lyrics": [
+           "la"
+          ],
           "notes": [
            {
             "pitch": "C5"
