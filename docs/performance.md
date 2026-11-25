@@ -118,6 +118,8 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-25 | read the outlines of the glyphs Elara draws from `Bravura.otf` | 0.65 ms | first version (ADR-0074): the CFF charstrings of the glyphs run once; the app does it on its first PDF export |
 | 2026-11-25 | write the 21 A4 pages of one 500-measure track (notation and tablature) as PDF; compressed | 60 ms; 89 ms | first version (ADR-0074): every number formatted with `std::format`. 2.1 MB, 0.3 MB compressed |
 | 2026-11-25 | same | 1.7 ms; 4.1 ms (one thread: 8.8 ms; 45 ms) | numbers written with `std::to_chars` straight into the page's content, and each page written and compressed on a core of its own; the document is the same byte for byte. On one thread, zlib at its default level is most of the time left |
+| 2026-11-25 | seconds at the end of the large song | 0.28 ms (1.58 ms before, same machine) | since fermatas (ADR-0085) every beat of every voice was walked to find them, its duration summed on the way: each voice is now looked over for a held beat first, and summing stops at the last one. The sequencer and the MIDI export ask for the same holds measure by measure |
+| 2026-11-25 | lay out notation and tablature of one track on A4 pages, on one thread; all 20 staves, on one thread | 10.7 to 11.0 ms; 152 ms (13.2 ms; 178 ms before; the build before lyrics, run alternately with this one: 10.4 to 10.7 ms; 143 to 150 ms) | each staff writer looked through every beat of its staff for lyrics (ADR-0084) when it was made, and the page layout makes writers for every line: measures without lyrics are now skipped one by one, and the syllables held into a line are found when it is drawn |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
@@ -257,3 +259,36 @@ the optimiser saw); `rampSeconds()` now returns before it.
 | decode a minute of FLAC; of WAV | 39.1 ms; 17.6 ms | 35.6 ms; 16.2 ms |
 | one tuner window: low E, high E, noise | 0.41, 0.10, 1.54 ms | 0.40, 0.10, 1.08 ms |
 | find the caret; pick it from a click | 0.38 µs; 1.6 µs | 0.42 µs; 1.5 µs |
+
+**2026-11-25, after lyrics, fermatas and slurs.** Every benchmark ran again
+on the slurs (ADR-0086). Two paths had moved with their code, and both are
+fixed (rows above): the seconds at the end of the song, 80 times slower since
+fermatas, and laying out pages on one thread, 27 % slower since lyrics, which
+the same layout on every core hid within its noise (2.6 ms ± 1.4 against
+2.4 ms). The other paths came out within the noise.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 10.6 ms | 10.6 ms |
+| sequence it; with every four measures repeated | 30.8 ms; 48.1 ms | 31.0 ms; 45.8 ms |
+| render its first 10 s offline; on one thread | 23.1 ms; 121 ms (± 11) | 21.0 ms; 109 ms |
+| build, copy (shared measures) and validate the 20-track song | 10.6 ms, 68 µs, 3.1 ms | 10.6 ms, 67 µs, 3.1 ms |
+| insert a measure at its start | 22 µs | 22 µs |
+| seconds at its end (tempo map walk) | 19.6 µs | 1.58 ms; 0.28 ms fixed |
+| MusicXML import; export; export on one thread; `.mxl` | 106 ms; 71 ms (± 22); 148 ms; 354 ms | 116 ms (± 16); 55 ms; 152 ms; 338 ms |
+| MIDI export; import | 28.9 ms (± 5.2); 40.3 ms | 28.1 ms; 41.0 ms |
+| GPIF import; on one thread | 94 ms (± 14); 203 ms | 93 ms (± 15); 206 ms |
+| 2 tracks from a literal-only `.gpx` | 27.4 ms | 31.0 ms |
+| lay out one 500-measure staff; 8 of its measures | 3.7 ms; 63 µs | 3.6 ms; 74 µs (± 12) |
+| notation and tablature: the staff; 8 measures; as SVG | 5.1 ms; 92 µs; 43 ms | 4.9 ms; 108 µs (± 13); 43 ms |
+| one track on A4 pages; on one thread | 2.4 ms; 10.4 ms | 2.6 ms (± 1.4); 13.2 ms, 10.7 ms fixed |
+| the 20 staves on A4 pages; again after an edit | 25.9 ms (± 3.0); 4.2 ms | 27.5 ms; 4.7 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.3, 8.5, 19.9, 11.9 ms | 5.3, 8.2, 20.2, 11.0 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.1, 8.3, 6.1, 4.8 ms | 5.2, 8.4, 6.0, 4.8 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 10.6 ms; 11.7 ms | 9.9 ms; 10.7 ms |
+| read an SFZ of 64 samples | 4.8 ms | 4.6 ms |
+| decode a minute of FLAC; of WAV | 35.6 ms; 16.2 ms | 35.8 ms; 16.3 ms |
+| read the glyph outlines of `Bravura.otf` | 0.65 ms | 0.68 ms |
+| write a track's 21 pages as PDF; compressed; the same on one thread | 1.7 ms; 4.1 ms; 8.8 ms; 45 ms | 1.4 ms; 3.9 ms; 8.3 ms; 43.5 ms |
+| one tuner window: low E, high E, noise | 0.40, 0.10, 1.08 ms | 0.39, 0.10, 1.07 ms |
+| find the caret; pick it from a click | 0.42 µs; 1.5 µs | 0.37 µs; 1.5 µs |
