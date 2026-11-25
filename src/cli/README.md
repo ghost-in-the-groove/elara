@@ -242,7 +242,10 @@ read once. `render-audio --json` says `"sfz"`, a list of `{"file", "tracks"}`,
 and the tracks an instrument plays sound as its name. `sfz FILE --json` reads the instrument and its
 samples: `{"file", "name", "regions", "samples", "sampleBytes", "lowestKey",
 "highestKey", "missingSamples", "unknownOpcodes", "skippedHeaders",
-"loadSeconds"}`; it fails when no sample can be read.
+"techniques", "loadSeconds"}`, where `techniques` gives the library's control
+for `"palm-mute"`, `"dead"` and `"harmonic"` notes, `{"keyswitch"` or
+`"cc": N, "label"}` or null when the sampler imitates the touch (ADR-0068);
+it fails when no sample can be read.
 
 Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 
