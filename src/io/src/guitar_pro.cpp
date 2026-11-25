@@ -465,7 +465,8 @@ BendCurve bendOf(pugi::xml_node note) {
 /// What the reader uses of a <Beat>, found in one pass over its children and
 /// one over its properties rather than a search for each.
 struct BeatFields {
-    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio, hairpin;
+    pugi::xml_node graceNotes, rhythm, dynamic, notes, tremolo, pickStroke, brush, arpeggio,
+        hairpin;
     bool text = false, chord = false, fading = false, wah = false, ottava = false,
          whammyBar = false, slapped = false, popped = false;
 
