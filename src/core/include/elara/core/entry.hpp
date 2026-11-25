@@ -4,6 +4,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/effects.hpp>
+#include <elara/core/lyrics.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/song.hpp>
 
@@ -263,6 +264,24 @@ enum class NoteEffect : std::uint8_t {
 
 /// The text above the caret's beat; empty without one and on the free slot.
 [[nodiscard]] std::string beatTextAt(const Song& song, const Caret& caret);
+
+/// Verse `verse` (0 for the first) of the caret's staff as typed (verseText(),
+/// ADR-0084).
+[[nodiscard]] VerseText verseAt(const Song& song, const Caret& caret, std::size_t verse);
+
+/// Typing a verse (ADR-0084): verse `verse` of the caret's staff becomes
+/// `text` placed from measure `first` on the beats of its first voice with
+/// notes (placeVerse()), what the verse held anywhere else taken away, as one
+/// undo step ("Set lyrics"; "Remove lyrics" when no syllable is left). The
+/// caret stays. `leftover` counts the syllables after the last note, which are
+/// dropped. Nothing changes when the verse already reads so. Throws
+/// std::out_of_range for a measure past the song.
+struct VerseEntry {
+    Entry entry{};
+    std::size_t leftover = 0;
+};
+[[nodiscard]] VerseEntry setVerse(const Song& song, const Caret& caret, std::size_t verse,
+                                  std::size_t first, std::string_view text);
 
 /// Whether the notes the caret is on (as for toggleEffect) all have `effect`,
 /// in any of its forms: what the next toggle turns off. False on a rest, the

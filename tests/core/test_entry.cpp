@@ -193,6 +193,37 @@ TEST_CASE("Entry: beat text is written above the caret's beat", "[core][entry]")
     CHECK(beatTextAt(doc.song(), at(0, 0)) == "let ring");
 }
 
+TEST_CASE("Entry: a verse typed as text replaces the verse of the caret's staff", "[core][entry]") {
+    // ADR-0084: one undo step, read back as typed; syllables after the last
+    // note are counted and dropped.
+    Document doc(guitarSong());
+    VerseEntry typed = setVerse(doc.song(), at(0, 1), 0, 0, "Hel-lo world_ a-gain");
+    CHECK(typed.leftover == 2);
+    run(doc, std::move(typed.entry));
+    CHECK(doc.undoName() == "Set lyrics");
+    CHECK(verseAt(doc.song(), at(1, 0), 0) == VerseText{.first = 0, .text = "Hel-lo world_"});
+    REQUIRE(firstVoice(doc.song(), 1).beats[0].lyrics);
+    CHECK((*firstVoice(doc.song(), 1).beats[0].lyrics)[0] ==
+          Syllable{.text = "world", .hyphen = false, .extend = true});
+
+    // Typed from measure 2: what the verse held before it goes; other verses stay.
+    run(doc, setVerse(doc.song(), at(0, 0), 1, 0, "oh").entry);
+    run(doc, setVerse(doc.song(), at(0, 0), 0, 1, "Bye").entry);
+    REQUIRE(firstVoice(doc.song(), 0).beats[0].lyrics);
+    CHECK(firstVoice(doc.song(), 0).beats[0].lyrics->size() == 2);
+    CHECK(verseAt(doc.song(), at(0, 0), 0) == VerseText{.first = 1, .text = "Bye"});
+    CHECK(verseAt(doc.song(), at(0, 0), 1) == VerseText{.first = 0, .text = "oh"});
+
+    // The same verse again changes nothing; an empty one takes it away.
+    CHECK(setVerse(doc.song(), at(0, 0), 0, 1, "Bye").entry.command == nullptr);
+    run(doc, setVerse(doc.song(), at(0, 0), 0, 0, " ").entry);
+    CHECK(doc.undoName() == "Remove lyrics");
+    CHECK(verseAt(doc.song(), at(0, 0), 0) == VerseText{});
+    doc.undo();
+    CHECK(verseAt(doc.song(), at(0, 0), 0) == VerseText{.first = 1, .text = "Bye"});
+    CHECK_THROWS_AS(setVerse(doc.song(), at(0, 0), 0, 3, "x"), std::out_of_range);
+}
+
 TEST_CASE("Entry: a grace note leads from a piano's top note and doubles a drum hit",
           "[core][entry]") {
     Song song;

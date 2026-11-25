@@ -18,6 +18,8 @@ Rectangle {
     signal chordRequested
     /// The text button: the text above the caret's beat (ADR-0081).
     signal textRequested
+    /// The lyrics button: the verses of the caret's staff (ADR-0084).
+    signal lyricsRequested
 
     /// Opens the note effects panel.
     function openEffects() {
@@ -1203,6 +1205,17 @@ Rectangle {
                         }
                     }
                 }
+            }
+        }
+
+        Tool {
+            tip: qsTr("Lyrics (Ctrl+Shift+L)")
+            onClicked: root.lyricsRequested()
+
+            // A microphone.
+            contentItem: Icon {
+                path: "M9.5 6.5 A2.5 2.5 0 0 1 14.5 6.5 L14.5 11 A2.5 2.5 0 0 1 9.5 11 Z M6.5 11 A5.5 5.5 0 0 0 17.5 11 M12 16.5 L12 20 M9 20 L15 20"
+                color: root.ink
             }
         }
 

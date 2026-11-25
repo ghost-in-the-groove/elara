@@ -57,6 +57,8 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QStringList credits READ credits NOTIFY songChanged)
     Q_PROPERTY(QStringList trackNames READ trackNames NOTIFY songChanged)
     Q_PROPERTY(int measureCount READ measureCount NOTIFY songChanged)
+    /// The verses a staff sings at most (ADR-0084).
+    Q_PROPERTY(int maxVerses READ maxVerses CONSTANT)
     Q_PROPERTY(double duration READ duration NOTIFY sequenceChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
@@ -173,6 +175,7 @@ public:
     [[nodiscard]] QStringList credits() const;
     [[nodiscard]] QStringList trackNames() const;
     [[nodiscard]] int measureCount() const;
+    [[nodiscard]] static int maxVerses() { return static_cast<int>(core::kMaxVerses); }
     /// Seconds the song lasts when played, repeats included.
     [[nodiscard]] double duration() const;
     [[nodiscard]] int track() const { return track_; }
@@ -488,6 +491,16 @@ public:
     /// The song's beat texts in the order they first appear, at most 12: what
     /// the text popup offers.
     Q_INVOKABLE QStringList songTexts() const;
+    /// How many verses the caret's staff sings (ADR-0084).
+    Q_INVOKABLE int caretVerseCount() const;
+    /// Verse `verse` (0 for the first) of the caret's staff as typed
+    /// (ADR-0084): "first", the measure it starts at, and "text".
+    Q_INVOKABLE QVariantMap caretVerse(int verse) const;
+    /// Types verse `verse` of the caret's staff from measure `first` on, a
+    /// syllable for each note of its first voice, as one undo step; an empty
+    /// text takes the verse away (ADR-0084). Returns how many syllables after
+    /// the last note were left out.
+    Q_INVOKABLE int setVerse(int verse, int first, const QString& text);
     /// "Dive -1", "Dip -1/2", "Inverted dip +1/2"...
     Q_INVOKABLE QString whammyName(int form, int cents) const;
     /// How far the whammy bar goes, in steps with its direction: "-1 1/2", "+1/2".

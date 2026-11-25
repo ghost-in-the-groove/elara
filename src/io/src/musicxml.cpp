@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // MusicXML import (ADR-0007), written from the MusicXML 4.0 specification.
+#include <elara/core/lyrics.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/musicxml.hpp>
 
@@ -1652,7 +1653,7 @@ private:
 
     // ---- Lyrics (ADR-0084) ----------------------------------------------------------
 
-    static constexpr std::size_t kMaxVerses = 16;
+    static constexpr std::size_t kMaxVerses = core::kMaxVerses;
 
     /// The syllable of each verse sung on the note: the first printed <lyric>
     /// of the verse that has text.

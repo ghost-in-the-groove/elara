@@ -6,6 +6,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/lyrics.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
@@ -120,6 +121,14 @@ public:
             (text += ' ') += words_[j];
         }
         return text;
+    }
+
+    /// The step's text from word `i` to its end as written, spaces between
+    /// words kept.
+    [[nodiscard]] std::string rawRest(std::size_t i) const {
+        const std::string_view from = word(i);
+        const std::string_view last = words_.back();
+        return {from.data(), static_cast<std::size_t>(last.data() + last.size() - from.data())};
     }
 
     /// A note name from C to B.
@@ -406,6 +415,19 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
         const std::string text = step.rest(1);
         edit = setBeatText(song, entry.caret, text == "none" ? std::string() : text);
+    } else if (verb == "lyrics") { // lyrics <verse> <measure> <text> | lyrics <verse> none
+        const std::size_t verse = step.index(1);
+        if (verse >= kMaxVerses) {
+            throw StepSyntaxError(std::format("lyrics: verse {} past the {}th", verse, kMaxVerses));
+        }
+        const bool none = step.word(2) == "none" && !step.has(3);
+        VerseEntry typed = setVerse(song, entry.caret, verse, none ? 0 : step.index(2),
+                                    none ? std::string() : step.rawRest(3));
+        if (typed.leftover > 0) {
+            std::cerr << std::format(
+                "warning: lyrics: {} syllable(s) after the last note dropped\n", typed.leftover);
+        }
+        edit = std::move(typed.entry);
     } else if (verb == "grace") { // grace <semitones> [duration] [on] | grace none
         if (step.word(1) == "none") {
             edit = removeGraceNotes(song, entry.caret);

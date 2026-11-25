@@ -17,6 +17,9 @@ ApplicationWindow {
     property bool showSongPane: false
     /// Open the caret's measure once the score is laid out (from the command line).
     property bool showMeasure: false
+    /// Open the lyrics of the caret's staff once the score is laid out (from
+    /// the command line).
+    property bool showLyrics: false
     // Open the note effects panel once there is a caret (`--effects`).
     property bool showEffects: false
     /// Open the first track's tuning in the song panel once there is a score
@@ -182,7 +185,7 @@ ApplicationWindow {
 
     Connections {
         target: score
-        enabled: window.showMeasure || window.showEffects
+        enabled: window.showMeasure || window.showLyrics || window.showEffects
 
         function onCaretChanged() {
             if (score.caretPage < 0) {
@@ -191,6 +194,10 @@ ApplicationWindow {
             if (window.showMeasure) {
                 window.showMeasure = false;
                 scoreView.openMeasurePopupAtCaret();
+            }
+            if (window.showLyrics) {
+                window.showLyrics = false;
+                scoreView.openLyricsPopupAtCaret();
             }
             if (window.showEffects) {
                 window.showEffects = false;

@@ -463,6 +463,26 @@ set_tests_properties(cli.dump_text PROPERTIES
   FIXTURES_REQUIRED cli_text
   PASS_REGULAR_EXPRESSION "\"text\":\"let it ring\""
   FAIL_REGULAR_EXPRESSION "solo")
+# Lyrics typed as text (ADR-0084): a word over two notes with a blank note
+# before it and the last syllable held, a second verse one syllable too long;
+# then both verses taken away.
+set(ELARA_CLI_LYRICS "${CMAKE_CURRENT_BINARY_DIR}/cli-lyrics.elara")
+add_test(NAME cli.edit_types_lyrics
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_LYRICS}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 5" "fret 2" right "fret 3" right "fret 5" right "fret 7"
+    "lyrics 0 0 Sing  a-long_" "lyrics 1 0 oh oh oh oh oh")
+set_tests_properties(cli.edit_types_lyrics PROPERTIES
+  FIXTURES_SETUP cli_lyrics
+  PASS_REGULAR_EXPRESSION "lyrics: 1 syllable.s. after the last note dropped")
+add_test(NAME cli.dump_lyrics COMMAND elara-cli --json dump "${ELARA_CLI_LYRICS}")
+set_tests_properties(cli.dump_lyrics PROPERTIES
+  FIXTURES_REQUIRED cli_lyrics
+  PASS_REGULAR_EXPRESSION "\"lyrics\":\\[\"Sing\",\"oh\"\\].*\"lyrics\":\\[\"\",\"oh\"\\].*\"lyrics\":\\[\"a-\",\"oh\"\\].*\"lyrics\":\\[\"long_\",\"oh\"\\]")
+add_test(NAME cli.edit_removes_lyrics
+  COMMAND elara-cli --json edit --in "${ELARA_CLI_LYRICS}" "lyrics 0 none" "lyrics 1 none")
+set_tests_properties(cli.edit_removes_lyrics PROPERTIES
+  FIXTURES_REQUIRED cli_lyrics
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Remove lyrics\"}")
 # Grace notes typed at the caret (ADR-0079): two on the 7th fret of the G
 # string, then one on the next note taken off again.
 set(ELARA_CLI_GRACES "${CMAKE_CURRENT_BINARY_DIR}/cli-graces.elara")

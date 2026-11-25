@@ -23,15 +23,19 @@ using elara::core::Staff;
 using elara::core::Syllable;
 using elara::core::syllablesOf;
 using elara::core::Track;
+using elara::core::VerseText;
+using elara::core::verseText;
 
 namespace {
 
-// Syllables as text: a hyphen after a syllable joined to the next one, "_" for
-// a beat left blank.
+// Syllables as text: a hyphen after a syllable joined to the next one, "~"
+// after one held, "_" for a beat left blank.
 std::vector<std::string> spelled(std::string_view text) {
     std::vector<std::string> out;
     for (const std::optional<Syllable>& syllable : syllablesOf(text)) {
-        out.push_back(!syllable ? "_" : syllable->text + (syllable->hyphen ? "-" : ""));
+        out.push_back(!syllable ? "_"
+                                : syllable->text + (syllable->hyphen ? "-" : "") +
+                                      (syllable->extend ? "~" : ""));
     }
     return out;
 }
@@ -110,6 +114,12 @@ TEST_CASE("Lyrics text: words in brackets are comments", "[core][lyrics]") {
     CHECK(spelled("be-[x]hind") == std::vector<std::string>{"be-", "hind"});
 }
 
+TEST_CASE("Lyrics text: an underscore after a syllable holds it", "[core][lyrics]") {
+    // Elara's addition to Guitar Pro's syntax, for typing (ADR-0084).
+    CHECK(spelled("love_ me be_-low") == std::vector<std::string>{"love~", "me", "be-~", "low"});
+    CHECK(spelled("oh__") == std::vector<std::string>{"oh~"});
+}
+
 TEST_CASE("A verse goes on the beats with notes, past rests and tied notes", "[core][lyrics]") {
     Song song = melody();
     Staff& staff = song.track(0).staff(0);
@@ -144,4 +154,27 @@ TEST_CASE("A verse starts at its measure and replaces what the verse held there"
             CHECK(!beat.lyrics);
         }
     }
+}
+
+TEST_CASE("A verse reads back as the text that places it", "[core][lyrics]") {
+    // ADR-0084: from the measure of its first syllable, blanks as spaces.
+    Song song = melody();
+    Staff& staff = song.track(0).staff(0);
+    CHECK(verseText(staff, 0) == VerseText{});
+    CHECK(verseCount(staff) == 0);
+    placeVerse(staff, 1, 0, "one  two_ thr+ee-");
+    CHECK(verseCount(staff) == 2);
+    CHECK(verse(staff, 1) == std::vector<std::string>{"", "one", "", "", "two", "thr ee-"});
+    CHECK(verseText(staff, 1) == VerseText{.first = 0, .text = "one  two_ thr+ee-"});
+    CHECK((*staff.measure(1).voices[0].beats[0].lyrics)[1].extend);
+    placeVerse(staff, 0, 1, " la");
+    CHECK(verseText(staff, 0) == VerseText{.first = 1, .text = " la"});
+
+    // Placed back, the text gives the same lyrics.
+    Song copy = song;
+    Staff& again = copy.track(0).staff(0);
+    placeVerse(again, 1, 0, "");
+    const VerseText typed = verseText(staff, 1);
+    placeVerse(again, 1, typed.first, typed.text);
+    CHECK(again == staff);
 }
