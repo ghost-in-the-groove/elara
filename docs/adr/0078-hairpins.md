@@ -29,16 +29,24 @@ wedges of the same kind that touch become one.
 - The native format writes `"hairpin":"crescendo"` or `"diminuendo"` in a
   beat's effects and omits it otherwise; format version 1 still reads every
   older file (ADR-0006).
-- MusicXML and MIDI exports report hairpins as dropped until they write them.
+- MusicXML: a `<wedge>` that starts (`crescendo`, `diminuendo`) and later
+  stops puts its hairpin on the beats of the staff's first voice that start
+  between the two, carried across measures; export writes a wedge from the
+  first beat of each run to the end of its last, numbered by voice, under the
+  staff it belongs to.
+- The MIDI export reports hairpins as dropped until playback ramps them.
 
 ## Consequences
 
-- Guitar Pro hairpins survive import and saving; they are not yet drawn,
-  played, read from MusicXML or typed. Those come next, each recorded here as
-  it lands: a wedge under the staff on the dynamics baseline, a velocity ramp
-  towards the next dynamic, MusicXML wedges both ways, and editing at the
-  caret.
+- Hairpins from Guitar Pro and MusicXML survive import, saving and MusicXML
+  export; they are not yet drawn, played or typed. Those come next, each
+  recorded here as it lands: a wedge under the staff on the dynamics baseline,
+  a velocity ramp towards the next dynamic, and editing at the caret.
+- A MusicXML wedge in a second voice comes back on the first voice.
 - A wedge that should stop in the middle of a long note cannot: it ends with
   the note. Guitar Pro has the same limit.
 - Tests: `io.Guitar Pro: a guitar keeps ...` (a crescendo over two beats, a
-  diminuendo written as a decrescendo), the native round trip and text forms.
+  diminuendo written as a decrescendo), the native round trip and text forms,
+  `io.MusicXML: wedges become hairpins ...` (across a barline, stopped at the
+  end of the song) and the MusicXML round trip of a song with every feature
+  (a wedge over a barline, one on the upper staff of a piano).
