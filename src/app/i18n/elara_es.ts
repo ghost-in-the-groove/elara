@@ -956,6 +956,29 @@
     </message>
 </context>
 <context>
+    <name>RecoveryDialog</name>
+    <message>
+        <source>Recover unsaved changes?</source>
+        <translation>¿Recuperar los cambios sin guardar?</translation>
+    </message>
+    <message>
+        <source>Elara closed before these changes were saved. Recover a song to go on with it, or discard it.</source>
+        <translation>Elara se cerró antes de guardar estos cambios. Recupera una canción para seguir con ella, o descártala.</translation>
+    </message>
+    <message>
+        <source>Never saved</source>
+        <translation>Nunca guardada</translation>
+    </message>
+    <message>
+        <source>Discard</source>
+        <translation>Descartar</translation>
+    </message>
+    <message>
+        <source>Recover</source>
+        <translation>Recuperar</translation>
+    </message>
+</context>
+<context>
     <name>ScoreView</name>
     <message>
         <source>Chord symbol</source>
@@ -2336,6 +2359,14 @@
     <message>
         <source>Play the basses through this SFZ instrument.</source>
         <translation>Tocar los bajos con este instrumento SFZ.</translation>
+    </message>
+    <message>
+        <source>Keep the copies of unsaved songs in this folder. With --smoke-test, recover the copy a crash left there.</source>
+        <translation>Guardar las copias de las canciones sin guardar en esta carpeta. Con --smoke-test, recuperar la copia que dejó un cierre inesperado.</translation>
+    </message>
+    <message>
+        <source>With --smoke-test, edit a new song and quit as a crash would once its copy is written.</source>
+        <translation>Con --smoke-test, editar una canción nueva y salir como en un cierre inesperado en cuanto se escriba su copia.</translation>
     </message>
 </context>
 </TS>

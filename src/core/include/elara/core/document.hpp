@@ -68,6 +68,9 @@ public:
     /// Marks the current state as saved: isModified() stays false until the song
     /// leaves this state, and is false again whenever undo or redo returns to it.
     void markSaved() noexcept { savedDepth_ = done_.size(); }
+    /// Marks the song as held by no file in its present state, as a song
+    /// recovered after a crash is: isModified() is true until markSaved().
+    void markUnsaved() noexcept { savedDepth_.reset(); }
     [[nodiscard]] bool isModified() const noexcept {
         return !savedDepth_ || *savedDepth_ != done_.size();
     }

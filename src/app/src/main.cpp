@@ -18,8 +18,10 @@
 #include <QQmlError>
 #include <QQuickWindow>
 #include <QSize>
+#include <QStandardPaths>
 #include <QString>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QTranslator>
 #include <QUrl>
 #include <QVariantMap>
@@ -187,10 +189,36 @@ int main(int argc, char* argv[]) {
         QStringLiteral("bass-sfz"),
         QCoreApplication::translate("main", "Play the basses through this SFZ instrument."),
         QStringLiteral("file"));
-    parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       songPaneOption, measureOption, lyricsOption, effectsOption, tuningOption,
-                       continuousOption, languageOption, soundFontOption, includedSoundFontOption,
-                       guitarSfzOption, includedGuitarSfzOption, bassSfzOption});
+    const QCommandLineOption recoveryFolderOption(
+        QStringLiteral("recovery-folder"),
+        QCoreApplication::translate("main", "Keep the copies of unsaved songs in this folder. With "
+                                            "--smoke-test, recover the copy a crash left there."),
+        QStringLiteral("folder"));
+    const QCommandLineOption crashOption(
+        QStringLiteral("crash-after-recovery-copy"),
+        QCoreApplication::translate("main",
+                                    "With --smoke-test, edit a new song and quit as a crash "
+                                    "would once its copy is written."));
+    parser.addOptions({trackOption,
+                       viewOption,
+                       seekOption,
+                       smokeTest,
+                       screenshot,
+                       tunerOption,
+                       songPaneOption,
+                       measureOption,
+                       lyricsOption,
+                       effectsOption,
+                       tuningOption,
+                       continuousOption,
+                       languageOption,
+                       soundFontOption,
+                       includedSoundFontOption,
+                       guitarSfzOption,
+                       includedGuitarSfzOption,
+                       bassSfzOption,
+                       recoveryFolderOption,
+                       crashOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -257,6 +285,11 @@ int main(int argc, char* argv[]) {
     if (parser.isSet(bassSfzOption)) {
         options.bassSfz = QDir::current().absoluteFilePath(parser.value(bassSfzOption));
     }
+    if (parser.isSet(recoveryFolderOption)) {
+        options.recoveryFolder =
+            QDir::current().absoluteFilePath(parser.value(recoveryFolderOption));
+    }
+    options.crashAfterRecoveryCopy = parser.isSet(crashOption);
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
@@ -270,6 +303,21 @@ int main(int argc, char* argv[]) {
 
     // The music font for the logo and the UI's music symbols.
     QFontDatabase::addApplicationFont(QStringLiteral(":/fonts/Bravura.otf"));
+
+    // Where unsaved songs are copied while the app runs (ADR-0106). Checks
+    // use a folder of their own, unless one is named, and leave the copies of
+    // the person using the app alone. Declared before the engine, so that it
+    // outlives the window.
+    std::optional<QTemporaryDir> checkRecovery;
+    QString recoveryFolder = options.recoveryFolder;
+    if (recoveryFolder.isEmpty() && checking) {
+        checkRecovery.emplace();
+        recoveryFolder = checkRecovery->path();
+    } else if (recoveryFolder.isEmpty()) {
+        recoveryFolder =
+            QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+                .filePath(QStringLiteral("recovery"));
+    }
 
     QQmlApplicationEngine engine;
     bool qmlWarnings = false;
@@ -294,6 +342,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("initialSoundFont"), options.soundFont},
                                  {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
                                  {QStringLiteral("initialBassSfz"), options.bassSfz},
+                                 {QStringLiteral("recoveryFolder"), recoveryFolder},
                                  // Checks leave the settings of the person using the app alone.
                                  {QStringLiteral("rememberSettings"), !checking}});
     engine.loadFromModule("Elara.App", "Main");

@@ -37,6 +37,12 @@ struct StartupOptions {
     QString guitarSfz;          ///< an SFZ instrument for the guitars (`--guitar-sfz`,
                                 ///< or the included one with `--included-guitar-sfz`)
     QString bassSfz;            ///< an SFZ instrument for the basses (`--bass-sfz`)
+    /// Where recovery copies go (`--recovery-folder`); the smoke test then
+    /// recovers the copy a crash left there.
+    QString recoveryFolder;
+    /// The smoke test edits a new song and quits as a crash would once its
+    /// recovery copy is written (`--crash-after-recovery-copy`).
+    bool crashAfterRecoveryCopy = false;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -84,6 +90,9 @@ private:
     void queueLoop();
     void queueSoundFont();
     void queueSfz();
+    void queueRecoveryCopy();
+    void queueCrashAfterRecoveryCopy();
+    void queueRecover();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
@@ -133,6 +142,7 @@ private:
     bool effecting_ = false;         ///< whether the note effect steps run
     int effectsBefore_ = 0;          ///< the caret's effects before they were toggled
     int pagesBefore_ = 0;            ///< pages before the continuous view was shown
+    bool recoveryWritten_ = false;   ///< ScoreDocument::recoveryWritten() came
 };
 
 } // namespace elara::app

@@ -113,7 +113,7 @@ if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
     app/test_when_done.cpp app/test_app_icon.cpp app/test_included_sound.cpp
-    app/test_recent_scores.cpp
+    app/test_recent_scores.cpp app/test_recovery_store.cpp
     app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
     Catch2::Catch2)
@@ -166,7 +166,7 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 53 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 55 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 63 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
@@ -180,6 +180,29 @@ if(TARGET elara)
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
+
+  # Recovery copies (ADR-0106): a run edits a new song and, once the song's
+  # copy is written, quits at once as a crash would; the next start offers the
+  # copy back and recovers it as an unsaved song.
+  set(_recovery_folder "${CMAKE_CURRENT_BINARY_DIR}/recovery-check")
+  add_test(NAME app.smoke_recovery_clean
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${_recovery_folder}")
+  add_test(NAME app.smoke_recovery_crash
+    COMMAND elara --smoke-test --recovery-folder "${_recovery_folder}" --crash-after-recovery-copy)
+  add_test(NAME app.smoke_recovery
+    COMMAND elara --smoke-test --recovery-folder "${_recovery_folder}")
+  set_tests_properties(app.smoke_recovery_clean PROPERTIES FIXTURES_SETUP recovery_clean)
+  set_tests_properties(app.smoke_recovery_crash app.smoke_recovery PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60)
+  set_tests_properties(app.smoke_recovery_crash PROPERTIES
+    FIXTURES_REQUIRED recovery_clean
+    FIXTURES_SETUP recovery_left
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(left a recovery copy\\)")
+  set_tests_properties(app.smoke_recovery PROPERTIES
+    FIXTURES_REQUIRED recovery_left
+    PASS_REGULAR_EXPRESSION "recovery: Left by a crash[\r\n]+.*smoke-test: ok")
 
   # A SoundFont from the command line (ADR-0043), the test font of the CLI
   # tests: the window plays through it, keeps it when another file fails to

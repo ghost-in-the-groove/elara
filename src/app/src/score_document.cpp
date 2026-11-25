@@ -486,6 +486,19 @@ QString trackDetail(const core::Track& track) {
 ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {
     // Connected first, so that the list is up to date for whoever else hears it.
     connect(this, &ScoreDocument::songChanged, this, [this] { trackList_.setTracks(tracks()); });
+    recoveryTimer_.setSingleShot(true);
+    recoveryTimer_.setInterval(kRecoveryMilliseconds);
+    connect(&recoveryTimer_, &QTimer::timeout, this, &ScoreDocument::writeRecovery);
+    connect(this, &ScoreDocument::historyChanged, this, &ScoreDocument::keepRecovery);
+}
+
+ScoreDocument::~ScoreDocument() {
+    if (recovery_) {
+        recovery_->remove();
+        if (!recoveredFrom_.isEmpty()) {
+            recovery_->discard(recoveredFrom_);
+        }
+    }
 }
 
 QString ScoreDocument::title() const {
@@ -622,6 +635,10 @@ QStringList ScoreDocument::nameFilters() {
 }
 
 void ScoreDocument::open(const QUrl& file) {
+    load(file, std::nullopt);
+}
+
+void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> recovered) {
     const std::uint64_t generation = ++generation_;
     status_ = Status::Loading;
     errorMessage_.clear();
@@ -631,7 +648,7 @@ void ScoreDocument::open(const QUrl& file) {
                  [file, practice = practice_, continuous = continuous_, cache = layoutCache_] {
                      return openAndLayOut(file, practice, continuous, *cache);
                  }),
-             this, [this, generation](const ScoreLayout& result) {
+             this, [this, generation, recovered = std::move(recovered)](const ScoreLayout& result) {
                  setPending(-1);
                  if (generation != generation_) {
                      return;
@@ -640,8 +657,137 @@ void ScoreDocument::open(const QUrl& file) {
                      fail(result.error);
                      return;
                  }
-                 apply(result);
+                 if (!recovered) {
+                     apply(result);
+                     return;
+                 }
+                 // The song the copy holds, with the file it came from and
+                 // changes no file holds.
+                 ScoreLayout layout = result;
+                 layout.source = recovered->source;
+                 apply(layout);
+                 if (source_ != recovered->source) {
+                     source_ = recovered->source;
+                     emit sourceChanged();
+                     emit songChanged();
+                 }
+                 document_->markUnsaved();
+                 recoveredFrom_ = recovered->file;
+                 emit historyChanged();
+                 writeRecovery();
              });
+}
+
+QString ScoreDocument::recoveryFolder() const {
+    return recovery_ ? recovery_->folder() : QString();
+}
+
+void ScoreDocument::setRecoveryFolder(const QString& folder) {
+    if (folder == recoveryFolder()) {
+        return;
+    }
+    if (recovery_) {
+        recovery_->remove();
+    }
+    recovery_ = folder.isEmpty() ? nullptr : std::make_shared<RecoveryStore>(folder);
+    recoverySong_.reset();
+    recoveredFrom_.clear();
+    emit recoveryFolderChanged();
+    keepRecovery();
+}
+
+void ScoreDocument::keepRecovery() {
+    if (!recovery_) {
+        return;
+    }
+    if (!modified()) {
+        recoveryTimer_.stop();
+        // A write still running is dropped by the removal.
+        if (recoverySong_) {
+            recoverySong_.reset();
+            recovery_->remove();
+        }
+        if (!recoveredFrom_.isEmpty()) {
+            recovery_->discard(recoveredFrom_); // the recovered song is saved
+            recoveredFrom_.clear();
+        }
+        return;
+    }
+    // Started by the first change after a write and not again by the next
+    // ones, so that a song edited without a pause is still copied.
+    if (song_ != recoverySong_ && !recoveryTimer_.isActive()) {
+        recoveryTimer_.start();
+    }
+}
+
+void ScoreDocument::writeRecovery() {
+    if (!recovery_ || !song_ || !modified() || song_ == recoverySong_) {
+        return;
+    }
+    if (recoveryWriting_) {
+        recoveryTimer_.start(); // once the write running is done
+        return;
+    }
+    recoveryWriting_ = true;
+    recoverySong_ = song_;
+    whenDone(QtConcurrent::run([store = recovery_, song = song_, source = source_, title = title(),
+                                removals = recovery_->removals()] {
+                 return store->write(*song, source, title, removals);
+             }),
+             this, [this, store = recovery_, song = song_](bool written) {
+                 recoveryWriting_ = false;
+                 if (store != recovery_) {
+                     return; // written to a folder no longer used
+                 }
+                 // Unless the copy was removed since: the song was saved.
+                 if (written && recoverySong_ == song) {
+                     if (!recoveredFrom_.isEmpty()) {
+                         recovery_->discard(recoveredFrom_); // this run's copy holds it now
+                         recoveredFrom_.clear();
+                     }
+                     emit recoveryWritten();
+                 }
+                 // Changes made while it was written.
+                 keepRecovery();
+             });
+}
+
+QVariantList ScoreDocument::recoverable() {
+    QVariantList copies;
+    if (!recovery_) {
+        return copies;
+    }
+    for (const RecoveryStore::Copy& copy : recovery_->left()) {
+        QString title = copy.title;
+        if (title.isEmpty()) {
+            title = copy.source.isLocalFile()
+                        ? QFileInfo(copy.source.toLocalFile()).completeBaseName()
+                        : tr("Untitled");
+        }
+        copies.append(QVariantMap{{QStringLiteral("file"), copy.file},
+                                  {QStringLiteral("title"), title},
+                                  {QStringLiteral("source"), copy.source},
+                                  {QStringLiteral("written"), copy.written}});
+    }
+    return copies;
+}
+
+void ScoreDocument::recover(const QString& file) {
+    if (!recovery_) {
+        return;
+    }
+    for (RecoveryStore::Copy& copy : recovery_->left()) {
+        if (copy.file == file) {
+            load(QUrl::fromLocalFile(file), std::move(copy));
+            return;
+        }
+    }
+}
+
+void ScoreDocument::discardRecovery(const QString& file) {
+    if (recovery_) {
+        recovery_->discard(file);
+    }
 }
 
 void ScoreDocument::relayout() {

@@ -111,6 +111,7 @@ one that replaces them.
 | [0103](0103-double-barlines.md) | Double barlines | Accepted |
 | [0104](0104-triplet-feel.md) | Triplet feel | Accepted |
 | [0105](0105-sanitizers.md) | Sanitizers | Accepted |
+| [0106](0106-recovery-copies.md) | Recovery copies | Accepted |
 
 ## Template
 

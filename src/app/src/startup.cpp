@@ -6,6 +6,7 @@
 #include <elara/core/instrument.hpp>
 #include <elara/io/midi.hpp>
 #include <elara/io/musicxml.hpp>
+#include <elara/io/native_format.hpp>
 
 #include "audio_controller.hpp"
 #include "recent_scores.hpp"
@@ -32,6 +33,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <optional>
 #include <utility>
 
@@ -45,6 +47,8 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
 constexpr int kSnareKey = 38;
+// The title of the song app.smoke_recovery_crash leaves a copy of.
+constexpr char kCrashedTitle[] = "Left by a crash";
 
 // The drum lane (1 at the top) of the kit piece with General MIDI `key`.
 int laneOf(int key) {
@@ -94,6 +98,7 @@ void Startup::start() {
             ++layouts_;
             layoutSteps_ += QStringLiteral(" %1").arg(stepsRun_);
         });
+        connect(score_, &ScoreDocument::recoveryWritten, this, [this] { recoveryWritten_ = true; });
     }
     if (options_.effects && window_ != nullptr) {
         effectsPanel_ = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
@@ -115,6 +120,14 @@ void Startup::queueSteps() {
         return;
     }
     if (options_.file.isEmpty()) {
+        if (options_.smokeTest && options_.crashAfterRecoveryCopy) {
+            queueCrashAfterRecoveryCopy();
+            return;
+        }
+        if (options_.smokeTest && !options_.recoveryFolder.isEmpty()) {
+            queueRecover();
+            return;
+        }
         // Without a file the smoke test edits a new song.
         if (options_.smokeTest) {
             steps_.emplace_back([this] {
@@ -122,6 +135,7 @@ void Startup::queueSteps() {
                 return true;
             });
             queueEdits();
+            queueRecoveryCopy();
             queueEntry();
             queueTuplets();
             queueMeasures();
@@ -373,6 +387,104 @@ void Startup::queueEdits() {
         }
         score_->setTrack(0);
         return true;
+    });
+}
+
+// The song's recovery copy (ADR-0106): written once the song has unsaved
+// changes, holding the song as it is then, and gone once they are undone.
+void Startup::queueRecoveryCopy() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("recovery check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        recoveryWritten_ = false;
+        score_->setSongTitle(QStringLiteral("Recovery copy"));
+        score_->writeRecovery();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const RecoveryStore* store = score_->recovery();
+        if (store == nullptr) {
+            check(false, "no recovery folder");
+            return false;
+        }
+        if (!recoveryWritten_ || !store->hasCopy()) {
+            again_ = true;
+            return false;
+        }
+        const auto copy = io::loadNative(std::filesystem::path(store->copyFile().toStdU16String()));
+        check(copy && copy->info().title == "Recovery copy", "the copy does not hold the song");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && !score_->recovery()->hasCopy(),
+              "the copy outlived the changes");
+        return false;
+    });
+}
+
+// Edits a new song and, once its recovery copy is written, quits at once as a
+// crash would: the copy stays, with nobody holding its lock, for
+// app.smoke_recovery to find (ADR-0106).
+void Startup::queueCrashAfterRecoveryCopy() {
+    steps_.emplace_back([this] {
+        score_->newSong(QStringLiteral("electric-guitar"));
+        return true;
+    });
+    steps_.emplace_back([this] {
+        recoveryWritten_ = false;
+        score_->setSongTitle(QString::fromLatin1(kCrashedTitle));
+        score_->writeRecovery();
+        return true;
+    });
+    steps_.emplace_back([this] {
+        if (!recoveryWritten_) {
+            again_ = true;
+            return false;
+        }
+        reportSmokeTest(true, QStringLiteral("left a recovery copy"));
+        std::fflush(stdout);
+        std::fflush(stderr);
+        std::_Exit(EXIT_SUCCESS);
+    });
+}
+
+// The copy app.smoke_recovery_crash left (ADR-0106): offered at start,
+// recovered as the song it was with unsaved changes and no file, and offered
+// no more once this run's own copy holds the song. Prints "recovery: <title>".
+void Startup::queueRecover() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("recovery check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this] {
+        auto* dialog = window_->findChild<QObject*>(QStringLiteral("recoveryDialog"));
+        const QVariantList left = score_->recoverable();
+        if (dialog == nullptr || !dialog->property("visible").toBool() ||
+            dialog->property("count").toInt() != 1 || left.size() != 1) {
+            failure_ = QStringLiteral("the recovery copy left is not offered");
+            return false;
+        }
+        std::printf("recovery: %s\n",
+                    qPrintable(left.front().toMap().value(QStringLiteral("title")).toString()));
+        recoveryWritten_ = false;
+        QMetaObject::invokeMethod(dialog, "recover", Q_ARG(int, 0));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!recoveryWritten_) {
+            again_ = true;
+            return false;
+        }
+        check(score_->songTitle() == QString::fromLatin1(kCrashedTitle) && score_->modified() &&
+                  score_->source().isEmpty(),
+              "the song recovered is not the song left");
+        check(score_->recoverable().isEmpty(), "the copy recovered is still offered");
+        return false;
     });
 }
 

@@ -295,6 +295,18 @@ TEST_CASE("The modified flag follows the save point", "[core][document]") {
     CHECK(doc.isModified());
 }
 
+TEST_CASE("A document whose song no file holds is modified until it is saved", "[core][document]") {
+    // A song recovered after a crash: its file, if any, holds an older state.
+    Document doc(smallSong());
+    doc.markUnsaved();
+    CHECK(doc.isModified());
+    doc.execute(std::make_unique<InsertMeasures>(0, 1));
+    doc.undo();
+    CHECK(doc.isModified()); // undo cannot return to a state no file holds
+    doc.markSaved();
+    CHECK_FALSE(doc.isModified());
+}
+
 TEST_CASE("Undoing any sequence of edits restores the original song", "[core][document]") {
     const Song original = smallSong();
     Document doc(original, 10'000);
