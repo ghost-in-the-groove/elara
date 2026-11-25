@@ -1164,6 +1164,13 @@ void Startup::queueEffects() {
         score_->setWhammy(0, 0);
         check(score_->caretWhammyForm() == 0 && score_->caretBassTechnique() != 0,
               "the whammy bar did not go on its own");
+        // A dynamic from the caret's notes on (ADR-0047).
+        constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
+        const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
+        score_->setDynamic(dynamic);
+        check(score_->caretDynamic() == dynamic &&
+                  score_->undoName() == ScoreDocument::tr("Change dynamic"),
+              "the dynamic did not go on as one undo step");
         if (score_->caretFretted()) {
             constexpr int kArtificial = static_cast<int>(core::HarmonicKind::Artificial);
             score_->setHarmonic(kArtificial);

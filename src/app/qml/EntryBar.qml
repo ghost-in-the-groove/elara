@@ -190,6 +190,31 @@ Rectangle {
         }
     }
 
+    // A dynamic (ADR-0047), numbered as core::Dynamic and written as the score
+    // writes it: lit while it is the caret's; a click sets it from the caret's
+    // notes to the next change.
+    component DynamicKind: Pill {
+        id: dynamicKind
+
+        required property int dynamic
+        required property string symbol
+
+        implicitWidth: 40
+        active: root.document.caretDynamic === dynamic
+        Accessible.role: Accessible.RadioButton
+        Accessible.name: root.document.dynamicName(dynamic)
+        onClicked: root.document.setDynamic(dynamic)
+
+        contentItem: Item {
+            MusicSymbol {
+                anchors.centerIn: parent
+                symbol: dynamicKind.symbol
+                size: 26
+                color: dynamicKind.active ? "white" : root.ink
+            }
+        }
+    }
+
     // A whammy-bar form (ADR-0060), numbered as core::BendForm and drawn going
     // down: on the caret's beat at the dive's depth, or off when it has it.
     component WhammyForm: Pill {
@@ -886,6 +911,33 @@ Rectangle {
                             path: "M7 17 L12 7 L17 17"
                             active: root.document.caretAccent === 2
                             onClicked: root.document.setAccent(active ? 0 : 2)
+                        }
+                    }
+
+                    Label {
+                        leftPadding: 4
+                        topPadding: 4
+                        text: qsTr("Dynamics")
+                        font.pixelSize: 11
+                        color: root.ink
+                        opacity: 0.6
+                    }
+
+                    // From the caret's notes to the next change (ADR-0047).
+                    Row {
+                        spacing: 2
+
+                        Repeater {
+                            model: ["\uE52A", "\uE52B", "\uE520", "\uE52C", "\uE52D",
+                                "\uE522", "\uE52F", "\uE530"]
+
+                            DynamicKind {
+                                required property int index
+                                required property string modelData
+
+                                dynamic: index
+                                symbol: modelData
+                            }
                         }
                     }
 
