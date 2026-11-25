@@ -1058,6 +1058,16 @@ void Startup::queueTempo() {
         score_->setTempoFrom(1, 0);
         check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
               "the tempo change was not taken away");
+        // The triplet feel (ADR-0104) from the second measure on, one undo
+        // step, leaving the first measure's.
+        const int feelBefore = score_->tripletFeelAt(0);
+        const int feel = score_->tripletFeelAt(1) == 1 ? 3 : 1;
+        score_->setTripletFeelFrom(1, feel);
+        check(score_->tripletFeelAt(1) == feel && score_->tripletFeelAt(0) == feelBefore,
+              "the second measure did not take the triplet feel");
+        check(score_->undoName() == ScoreDocument::tr("Change triplet feel"),
+              "the triplet feel is not one undo step");
+        score_->undo();
         score_->undo();
         score_->undo();
         score_->undo();

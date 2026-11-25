@@ -710,6 +710,42 @@
         <translation>Acelerar o frenar hasta el siguiente cambio de tempo</translation>
     </message>
     <message>
+        <source>Swing</source>
+        <translation>Swing</translation>
+    </message>
+    <message>
+        <source>Straight</source>
+        <translation>Sin swing</translation>
+    </message>
+    <message>
+        <source>Triplet eighths</source>
+        <translation>Corcheas en tresillo</translation>
+    </message>
+    <message>
+        <source>Triplet sixteenths</source>
+        <translation>Semicorcheas en tresillo</translation>
+    </message>
+    <message>
+        <source>Dotted eighths</source>
+        <translation>Corcheas con puntillo</translation>
+    </message>
+    <message>
+        <source>Dotted sixteenths</source>
+        <translation>Semicorcheas con puntillo</translation>
+    </message>
+    <message>
+        <source>Scottish eighths</source>
+        <translation>Corcheas escocesas</translation>
+    </message>
+    <message>
+        <source>Scottish sixteenths</source>
+        <translation>Semicorcheas escocesas</translation>
+    </message>
+    <message>
+        <source>Play pairs of eighths or sixteenths long and short, as in a shuffle</source>
+        <translation>Tocar los pares de corcheas o semicorcheas largo y corto, como en un shuffle</translation>
+    </message>
+    <message>
         <source>From this measure until the next change.</source>
         <translation>Desde este compás hasta el siguiente cambio.</translation>
     </message>
@@ -1542,6 +1578,10 @@
     <message>
         <source>Change section</source>
         <translation>Cambiar sección</translation>
+    </message>
+    <message>
+        <source>Change triplet feel</source>
+        <translation>Cambiar swing</translation>
     </message>
     <message>
         <source>Transpose</source>

@@ -75,4 +75,5 @@ the CLI's `feel <m> <name>` step; new measures continue the feel before them.
 - Shuffles and swing tunes from Guitar Pro play as they are meant to.
 - The mark is seven to nine staff spaces wide; two feel changes in
   consecutive narrow measures can touch, as two tempo marks can.
-- Setting the feel in the measure popup comes next.
+- The measure popup sets it with a Swing list under the tempo, from the
+  caret's measure until the next change, one undo step.
