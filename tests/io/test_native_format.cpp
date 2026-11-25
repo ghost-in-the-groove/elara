@@ -417,6 +417,20 @@ TEST_CASE("Native files are saved atomically and loaded back", "[io][native]") {
     CHECK_FALSE(std::filesystem::exists(temporary));
     std::filesystem::remove(path);
 
+    // A temporary file a crash left behind, longer than the new one, is
+    // replaced whole.
+    {
+        std::ofstream stale(temporary, std::ios::binary);
+        stale << std::string(std::size_t{1} << 20U, 'x');
+    }
+    saveNative(other, path);
+    loaded = loadNative(path);
+    REQUIRE(loaded.has_value());
+    CHECK(loaded->info().title == "Replaced");
+    CHECK(std::filesystem::file_size(path) < (1U << 16U));
+    CHECK_FALSE(std::filesystem::exists(temporary));
+    std::filesystem::remove(path);
+
     CHECK_FALSE(loadNative(tempFile("elara-test-missing.elara")).has_value());
     CHECK_THROWS_AS(saveNative(other, tempFile("elara-no-such-dir") / "x" / "song.elara"),
                     std::runtime_error);

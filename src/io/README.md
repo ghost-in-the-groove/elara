@@ -37,7 +37,8 @@ MusicXML export writes where it changes; the native format keeps a header's
 Importers are implemented from public documentation only (CONTRIBUTING.md,
 golden rule 6) and tested against the self-made corpus in `tests/corpus/`
 (`SOURCES.md` lists every file).
-`src/archive.hpp` holds the zip and file helpers (including atomic writes)
+`src/archive.hpp` holds the zip and file helpers (including atomic writes,
+which put the data on the disk before the rename)
 the formats share, `src/warnings.hpp` the warning list, and
 `src/musicxml_shared.hpp` the MusicXML vocabulary both directions use; `src/smf.hpp`
 reads and writes Standard MIDI File chunks and events, and `src/midi_shared.hpp`
