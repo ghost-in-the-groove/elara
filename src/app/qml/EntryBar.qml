@@ -16,6 +16,8 @@ Rectangle {
     signal measureRequested
     /// The chord button: the chord symbol of the caret's beat (ADR-0080).
     signal chordRequested
+    /// The text button: the text above the caret's beat (ADR-0081).
+    signal textRequested
 
     /// Opens the note effects panel.
     function openEffects() {
@@ -1162,6 +1164,37 @@ Rectangle {
                     anchors.margins: 5
                     color: Material.accent
                     scale: root.document.caretChord.length > 0 ? 1 : 0
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: 140
+                            easing.type: Easing.OutBack
+                        }
+                    }
+                }
+            }
+        }
+
+        Tool {
+            tip: qsTr("Text (Ctrl+T)")
+            onClicked: root.textRequested()
+
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: "M6 6 L18 6 M12 6 L12 19 M9 19 L15 19"
+                    color: root.ink
+                }
+                // A dot while the caret's beat has a text.
+                Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 5
+                    color: Material.accent
+                    scale: root.document.caretText.length > 0 ? 1 : 0
 
                     Behavior on scale {
                         NumberAnimation {

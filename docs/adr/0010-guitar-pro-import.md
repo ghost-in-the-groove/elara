@@ -66,10 +66,12 @@ notes, dynamic) and notes refer to each other by id. The mapping:
   destination note), slides in and out, bends (100 = a full step; offsets in
   percent of the note), harmonics, palm mutes, dead and ghost notes, let ring,
   vibrato, staccato and accents, dynamics, pick strokes, strums, tremolo
-  picking, slap and pop.
+  picking, slap and pop, and tapping: a note tapped with either hand
+  (`Tapped`, `LeftHandTapped`) taps its beat, where the model keeps it
+  (ADR-0060), unless the beat is slapped or popped.
 - Repeats and alternate endings are kept (ADR-0016).
 - Everything else is listed in the warnings: sections, jumps, fermatas, triplet feel, grace notes, lyrics, chords, text,
-  hairpins, whammy bar, tapping, trills. Short voices are filled with rests.
+  hairpins, whammy bar, trills. Short voices are filled with rests.
 - Missing references (a bar, voice, beat, note or rhythm id that is not there)
   make the file damaged.
 

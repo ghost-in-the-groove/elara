@@ -163,6 +163,36 @@ TEST_CASE("Entry: chord symbols on staves without frets have no diagram", "[core
     CHECK_FALSE(doc.song().track(1).staff(0).measure(0).voices[0].beats[0].chord->diagram);
 }
 
+TEST_CASE("Entry: beat text is written above the caret's beat", "[core][entry]") {
+    // ADR-0081: on a note and on a rest, trimmed, one undo step each.
+    Song song = guitarSong();
+    song.track(0).staff(0).measure(2).voices[0].beats = {Beat{.duration = kWhole}};
+    Document doc(std::move(song));
+    run(doc, setBeatText(doc.song(), at(0, 0), "  let ring\n"));
+    REQUIRE(firstVoice(doc.song(), 0).beats[0].text);
+    CHECK(*firstVoice(doc.song(), 0).beats[0].text == "let ring");
+    CHECK(beatTextAt(doc.song(), at(0, 0)) == "let ring");
+    CHECK(doc.undoName() == "Set beat text");
+    run(doc, setBeatText(doc.song(), at(2, 0), "tacet"));
+    CHECK(beatTextAt(doc.song(), at(2, 0)) == "tacet");
+
+    // The same text again, or any on the free slot, changes nothing.
+    CHECK(setBeatText(doc.song(), at(0, 0), "let ring").command == nullptr);
+    CHECK(setBeatText(doc.song(), at(0, 2), "solo").command == nullptr);
+    CHECK(beatTextAt(doc.song(), at(0, 2)).empty());
+    CHECK(beatTextAt(doc.song(), at(0, 1)).empty());
+
+    // A text does not sound: the beat keeps its note.
+    CHECK(firstVoice(doc.song(), 0).beats[0].notes.size() == 1);
+
+    run(doc, setBeatText(doc.song(), at(0, 0), " "));
+    CHECK_FALSE(firstVoice(doc.song(), 0).beats[0].text);
+    CHECK(doc.undoName() == "Remove beat text");
+    CHECK(setBeatText(doc.song(), at(0, 0), "").command == nullptr);
+    doc.undo();
+    CHECK(beatTextAt(doc.song(), at(0, 0)) == "let ring");
+}
+
 TEST_CASE("Entry: a grace note leads from a piano's top note and doubles a drum hit",
           "[core][entry]") {
     Song song;

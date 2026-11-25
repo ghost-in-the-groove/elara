@@ -837,16 +837,22 @@ private:
         }
         readBeatEffects(fields, beat.effects, who, m);
         const Dynamic dynamic = dynamicFor(trimmed(textOf(fields.dynamic))).value_or(Dynamic::MF);
+        bool tapped = false;
         for (const int noteId : intsOf(textOf(fields.notes))) {
             const pugi::xml_node noteNode = notes_.find(noteId);
             if (!noteNode) {
                 throw FormatError{
                     std::format("Guitar Pro: measure {} refers to missing note {}", m + 1, noteId)};
             }
-            if (auto note = readNote(noteNode, layout, staffIndex, staff, key, m)) {
+            if (auto note = readNote(noteNode, layout, staffIndex, staff, key, m, tapped)) {
                 note->effects.dynamic = dynamic;
                 beat.notes.push_back(std::move(*note));
             }
+        }
+        // Guitar Pro taps notes, the model beats (ADR-0060): one tapped note
+        // taps its beat, unless the beat is slapped or popped.
+        if (tapped && beat.effects.bassTechnique == core::BassTechnique::None) {
+            beat.effects.bassTechnique = core::BassTechnique::Tap;
         }
         return ReadBeat{.beat = std::move(beat), .graceOnBeat = graceOnBeat};
     }
@@ -921,11 +927,13 @@ private:
         }
     }
 
+    /// The note `node` describes; `tapped` becomes true when it is tapped.
     std::optional<Note> readNote(pugi::xml_node node, const TrackLayout& layout,
                                  std::size_t staffIndex, const Staff& staff,
-                                 const KeySignature& key, std::size_t m) {
+                                 const KeySignature& key, std::size_t m, bool& tapped) {
         const std::string& who = layout.name;
         const NoteFields fields(node);
+        tapped = tapped || fields.tapped;
         const auto midiProperty = [&fields]() -> std::optional<int> {
             if (fields.midi) {
                 return intOf(textOf(fields.midi.child("Number")));
@@ -1054,9 +1062,6 @@ private:
             } else if (!kind.empty() && kind != "NoHarmonic") {
                 warnings_.add(who, "feedback harmonics dropped", m);
             }
-        }
-        if (fields.tapped) {
-            warnings_.add(who, "tapping dropped", m);
         }
         if (fields.trill) {
             warnings_.add(who, "trills dropped", m);

@@ -61,6 +61,10 @@ constexpr double kChordLineThickness = 0.1;  // strings and frets
 constexpr double kChordNutThickness = 0.25;  // the nut, at the first fret
 constexpr double kChordFretNumberSize = 0.9; // font size of the first fret's number
 constexpr double kChordFretNumberGap = 0.25; // between that number and the strings
+constexpr double kBeatTextSize = 1.4;        // font size of a beat's text
+constexpr double kBeatTextInkGap = 0.6;      // between the ink below and the lowest row
+constexpr double kBeatTextSpace = 1.0;       // between two texts on one row
+constexpr double kBeatTextRowGap = 0.2;      // between rows
 
 // The frets a diagram shows: from its first fret to its highest, at least
 // kChordMinFrets.
@@ -848,14 +852,23 @@ void TechniqueLanes::place(DisplayList& list, double top) {
 
 // ---- ChordRow ---------------------------------------------------------------------------
 
-void ChordRow::collect(const core::Measure& measure, std::vector<ColumnInk>& ink, double centre) {
+void AboveRow::collect(const core::Measure& measure, std::vector<ColumnInk>& ink, double centre) {
     read_.clear();
     for (const core::Voice& voice : measure.voices) {
         core::Fraction at;
         for (const core::Beat& beat : voice.beats) {
-            if (beat.chord && std::ranges::find(read_, at, &Read::start) == read_.end()) {
-                read_.push_back(
-                    Read{.start = at, .length = beat.duration.length(), .symbol = &*beat.chord});
+            if (beat.chord || beat.text) {
+                auto found = std::ranges::find(read_, at, &Read::start);
+                if (found == read_.end()) {
+                    found = read_.insert(read_.end(),
+                                         Read{.start = at, .length = beat.duration.length()});
+                }
+                if (beat.chord && found->symbol == nullptr) {
+                    found->symbol = &*beat.chord;
+                }
+                if (beat.text && found->text == nullptr) {
+                    found->text = &*beat.text;
+                }
             }
             at += beat.duration.length();
         }
@@ -864,30 +877,36 @@ void ChordRow::collect(const core::Measure& measure, std::vector<ColumnInk>& ink
         return;
     }
     std::ranges::sort(read_, {}, &Read::start);
-    for (const Read& chord : read_) {
-        auto column = std::ranges::lower_bound(ink, chord.start, {}, &ColumnInk::start);
-        if (column == ink.end() || column->start != chord.start) {
-            column = ink.insert(column, ColumnInk{.start = chord.start,
-                                                  .longest = chord.length,
+    for (const Read& item : read_) {
+        auto column = std::ranges::lower_bound(ink, item.start, {}, &ColumnInk::start);
+        if (column == ink.end() || column->start != item.start) {
+            column = ink.insert(column, ColumnInk{.start = item.start,
+                                                  .longest = item.length,
                                                   .left = centre,
                                                   .right = centre});
         }
-        const auto [left, right] = reach(*chord.symbol);
-        column->aboveLeft = centre - left;
-        column->aboveRight = centre + right;
-        column->above = true;
+        if (item.symbol != nullptr) {
+            const auto [left, right] = reach(*item.symbol);
+            column->aboveLeft = centre - left;
+            column->aboveRight = centre + right;
+            column->above = true;
+        }
     }
 }
 
-void ChordRow::draw(std::span<const ColumnPosition> positions, double centre, std::size_t measure) {
-    for (const Read& chord : read_) {
-        marks_.push_back(Mark{.symbol = chord.symbol,
-                              .centre = columnX(positions, chord.start) + centre,
-                              .measure = measure});
+void AboveRow::draw(std::span<const ColumnPosition> positions, double centre, std::size_t measure) {
+    for (const Read& item : read_) {
+        const double x = columnX(positions, item.start);
+        if (item.symbol != nullptr) {
+            marks_.push_back(Mark{.symbol = item.symbol, .centre = x + centre, .measure = measure});
+        }
+        if (item.text != nullptr) {
+            texts_.push_back(TextMark{.text = item.text, .left = x, .measure = measure});
+        }
     }
 }
 
-std::pair<double, double> ChordRow::reach(const core::ChordSymbol& symbol) const {
+std::pair<double, double> AboveRow::reach(const core::ChordSymbol& symbol) const {
     const double name = textWidth(symbol.name, kChordNameSize) / 2;
     double left = name;
     double right = name;
@@ -907,7 +926,12 @@ std::pair<double, double> ChordRow::reach(const core::ChordSymbol& symbol) const
     return {left, right};
 }
 
-void ChordRow::place(DisplayList& list, double top) {
+void AboveRow::place(DisplayList& list, double top) {
+    double ceiling = std::min(top, 0.0); // the highest ink placed so far
+    if (marks_.empty()) {
+        placeTexts(list, ceiling);
+        return;
+    }
     const double markHeight = font_.metrics(Glyph::FretboardO).box.height() * kChordMarkScale;
     double tallest = 0.0;
     for (const Mark& mark : marks_) {
@@ -920,8 +944,10 @@ void ChordRow::place(DisplayList& list, double top) {
     const double diagramTop = std::min(top, 0.0) - kChordInkGap - tallest;
     const double baseline =
         diagramTop - (tallest > 0.0 ? kChordNameGap : 0.0) - kTextDescent * kChordNameSize;
+    ceiling = diagramTop;
     for (const Mark& mark : marks_) {
         if (!mark.symbol->name.empty()) {
+            ceiling = baseline - kTextAscent * kChordNameSize;
             list.texts.push_back(TextItem{.text = mark.symbol->name,
                                           .origin = {mark.centre, baseline},
                                           .size = kChordNameSize,
@@ -936,9 +962,42 @@ void ChordRow::place(DisplayList& list, double top) {
         }
     }
     marks_.clear();
+    placeTexts(list, ceiling);
 }
 
-void ChordRow::diagram(DisplayList& list, const core::ChordDiagram& shape, double centre,
+void AboveRow::placeTexts(DisplayList& list, double top) {
+    if (texts_.empty()) {
+        return;
+    }
+    std::ranges::stable_sort(texts_, {}, &TextMark::left);
+    const double rowHeight = ((kTextAscent + kTextDescent) * kBeatTextSize) + kBeatTextRowGap;
+    const double lowest = top - kBeatTextInkGap - (kTextDescent * kBeatTextSize);
+    std::vector<double> rowEnds; // where each row's last text ends
+    for (const TextMark& mark : texts_) {
+        std::size_t row = 0;
+        while (row < rowEnds.size() && rowEnds[row] + kBeatTextSpace > mark.left) {
+            ++row;
+        }
+        const double right = mark.left + textWidth(*mark.text, kBeatTextSize);
+        if (row == rowEnds.size()) {
+            rowEnds.push_back(right);
+        } else {
+            rowEnds[row] = right;
+        }
+        list.texts.push_back(
+            TextItem{.text = *mark.text,
+                     .origin = {mark.left, lowest - (static_cast<double>(row) * rowHeight)},
+                     .size = kBeatTextSize,
+                     .align = TextAlign::Left,
+                     .italic = true,
+                     .knockout = false,
+                     .role = Role::BeatText,
+                     .measure = mark.measure});
+    }
+    texts_.clear();
+}
+
+void AboveRow::diagram(DisplayList& list, const core::ChordDiagram& shape, double centre,
                        double top, std::size_t measure) const {
     const double markHeight = font_.metrics(Glyph::FretboardO).box.height() * kChordMarkScale;
     const double nut = top + markHeight + kChordMarkGap;

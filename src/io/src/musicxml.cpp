@@ -1706,6 +1706,8 @@ private:
                 fx.harmonic = mark.child("artificial")
                                   ? Harmonic{.kind = HarmonicKind::Artificial, .fretTenths = 120}
                                   : Harmonic{.kind = HarmonicKind::Natural, .fretTenths = 0};
+            } else if (name == "tap") {
+                event.beatEffects.bassTechnique = BassTechnique::Tap; // the beat's (ADR-0060)
             } else if (name == "up-bow") {
                 event.beatEffects.pickStroke = PickStroke::Up;
             } else if (name == "down-bow") {
