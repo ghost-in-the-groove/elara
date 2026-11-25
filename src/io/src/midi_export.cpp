@@ -490,6 +490,7 @@ void reportDropped(const Track& track, Warnings& warnings) {
                         drop(e.staccato, "staccato dropped");
                         drop(e.tenuto, "tenuto dropped");
                         drop(e.trill.isTrill(), "trills dropped");
+                        drop(e.ornament != core::Ornament::None, "mordents and turns dropped");
                         drop(e.accent != core::Accent::None, "accents dropped");
                     };
                     std::ranges::for_each(beat.notes, dropFrom);

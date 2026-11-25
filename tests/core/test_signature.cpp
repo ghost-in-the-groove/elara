@@ -150,3 +150,16 @@ TEST_CASE("Key signature: the next note of the scale is the one a trill goes to"
     // Ab to B in C major is three semitones: the step decides, not the distance.
     CHECK(semitonesToNextStep(Pitch(Step::A, -1, 4), c) == 3);
 }
+
+TEST_CASE("Key signature: the step below is where a mordent dips", "[core][signature]") {
+    // ADR-0091: in C major F dips to E, a semitone, and E to D, a tone.
+    const KeySignature c{};
+    CHECK(semitonesToPreviousStep(Pitch(Step::F, 0, 4), c) == 1);
+    CHECK(semitonesToPreviousStep(Pitch(Step::E, 0, 4), c) == 2);
+    CHECK(semitonesToPreviousStep(Pitch(Step::C, 0, 5), c) == 1); // to B4, under the octave
+    // The key's accidentals: G to F# in G major, C to Bb in F major.
+    CHECK(semitonesToPreviousStep(Pitch(Step::G, 0, 4), KeySignature(1, KeyMode::Major)) == 1);
+    CHECK(semitonesToPreviousStep(Pitch(Step::C, 0, 5), KeySignature(-1, KeyMode::Major)) == 2);
+    // The note's own accidental: C# to B in C major.
+    CHECK(semitonesToPreviousStep(Pitch(Step::C, 1, 5), c) == 2);
+}

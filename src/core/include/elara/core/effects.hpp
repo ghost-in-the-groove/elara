@@ -107,6 +107,36 @@ struct Harmonic {
     friend constexpr bool operator==(const Harmonic&, const Harmonic&) noexcept = default;
 };
 
+/// A short ornament on a note (ADR-0091): a few quick notes on the steps of
+/// the key next to it, then the note. A mordent dips to the step below and
+/// back, an upper mordent goes to the step above and back; a turn goes round
+/// the note from above (above, note, below, note), an inverted turn from below.
+enum class Ornament : std::uint8_t { None, Mordent, UpperMordent, Turn, InvertedTurn };
+
+/// The quick notes an ornament starts its note with, as steps of the key from
+/// the note (+1 the step above, -1 the step below, 0 the note); the note
+/// itself follows them for the rest of its length.
+struct OrnamentSteps {
+    std::array<std::int8_t, 3> steps{};
+    std::size_t count = 0;
+};
+
+[[nodiscard]] constexpr OrnamentSteps ornamentSteps(Ornament ornament) noexcept {
+    switch (ornament) {
+    case Ornament::Mordent:
+        return {.steps = {0, -1, 0}, .count = 2};
+    case Ornament::UpperMordent:
+        return {.steps = {0, 1, 0}, .count = 2};
+    case Ornament::Turn:
+        return {.steps = {1, 0, -1}, .count = 3};
+    case Ornament::InvertedTurn:
+        return {.steps = {-1, 0, 1}, .count = 3};
+    case Ornament::None:
+        break;
+    }
+    return {};
+}
+
 /// A trill (ADR-0090): the note alternates with the note `semitones` above
 /// it (below when negative), starting on itself, in notes of `speed`.
 struct Trill {
@@ -155,6 +185,7 @@ struct NoteEffects {
     bool tenuto : 1 = false; // held its full length; with staccato, portato (ADR-0088)
     Accent accent = Accent::None;
     Dynamic dynamic = Dynamic::MF;
+    Ornament ornament = Ornament::None; // ADR-0091
 
     friend bool operator==(const NoteEffects&, const NoteEffects&) = default;
 };

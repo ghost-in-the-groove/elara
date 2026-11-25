@@ -102,6 +102,7 @@ core::Song richSong() {
     Note hammer = lead.frettedNote(6, 2);
     hammer.effects.legatoFromPrevious = true;
     hammer.effects.trill = Trill{.semitones = 2, .speed = NoteValue::Sixteenth}; // ADR-0090
+    muted.effects.ornament = elara::core::Ornament::InvertedTurn;                // ADR-0091
     Note tied = lead.frettedNote(6, 2);
     tied.effects.tiedFromPrevious = true;
     Note semi = lead.frettedNote(4, 3);
@@ -230,6 +231,7 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("clefs":[])") == std::string::npos);
     CHECK(json.find(R"("slideIn":"from-below")") != std::string::npos);
     CHECK(json.find(R"("trill":{"semitones":2,"speed":"16"})") != std::string::npos);
+    CHECK(json.find(R"("ornament":"inverted-turn")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"crescendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"diminuendo")") != std::string::npos);
     CHECK(json.find(R"("hairpin":"none")") == std::string::npos);

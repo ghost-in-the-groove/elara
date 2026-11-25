@@ -714,7 +714,7 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
     // A trill: "tr" and, after it, the fret its other note is at (ADR-0090).
     if (marks.trillFret >= 0) {
         const BoundingBox& box = font_.metrics(Glyph::OrnamentTrill).box;
-        mark(Lane::Trill, Glyph::OrnamentTrill, centre, measure, kLaneGlyphScale);
+        mark(Lane::Ornament, Glyph::OrnamentTrill, centre, measure, kLaneGlyphScale);
         TextItem item;
         item.text = std::format("({})", marks.trillFret);
         item.origin = {centre + box.width() * kLaneGlyphScale / 2 + kTrillFretGap, -kLaneBaseline};
@@ -722,7 +722,9 @@ void TechniqueLanes::column(const ColumnTechniques& marks, double centre, double
         item.align = TextAlign::Left;
         item.role = Role::Technique;
         item.measure = measure;
-        items(Lane::Trill).texts.push_back(std::move(item));
+        items(Lane::Ornament).texts.push_back(std::move(item));
+    } else if (marks.ornament != core::Ornament::None) {
+        mark(Lane::Ornament, ornamentGlyph(marks.ornament), centre, measure, kLaneGlyphScale);
     }
     if (marks.pickStroke != core::PickStroke::None) {
         mark(Lane::PickStroke,

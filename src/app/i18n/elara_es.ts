@@ -142,12 +142,12 @@
         <translation>Deslizamiento</translation>
     </message>
     <message>
-        <source>Harmonic, vibrato and accent</source>
-        <translation>Armónico, vibrato y acento</translation>
+        <source>Harmonic, vibrato, accent and ornaments</source>
+        <translation>Armónico, vibrato, acento y adornos</translation>
     </message>
     <message>
-        <source>Vibrato and accent</source>
-        <translation>Vibrato y acento</translation>
+        <source>Vibrato, accent and ornaments</source>
+        <translation>Vibrato, acento y adornos</translation>
     </message>
     <message>
         <source>Slight vibrato</source>
@@ -168,6 +168,22 @@
     <message>
         <source>Trill</source>
         <translation>Trino</translation>
+    </message>
+    <message>
+        <source>Mordent</source>
+        <translation>Mordente</translation>
+    </message>
+    <message>
+        <source>Upper mordent</source>
+        <translation>Mordente superior</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>Grupeto</translation>
+    </message>
+    <message>
+        <source>Inverted turn</source>
+        <translation>Grupeto invertido</translation>
     </message>
     <message>
         <source>Dynamics</source>
@@ -1472,6 +1488,10 @@
         <translation>Cambiar trino</translation>
     </message>
     <message>
+        <source>Change ornament</source>
+        <translation>Cambiar adorno</translation>
+    </message>
+    <message>
         <source>Change harmonic</source>
         <translation>Cambiar armónico</translation>
     </message>
@@ -1740,6 +1760,22 @@
     <message>
         <source>Trill</source>
         <translation>Trino</translation>
+    </message>
+    <message>
+        <source>Mordent</source>
+        <translation>Mordente</translation>
+    </message>
+    <message>
+        <source>Upper mordent</source>
+        <translation>Mordente superior</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>Grupeto</translation>
+    </message>
+    <message>
+        <source>Inverted turn</source>
+        <translation>Grupeto invertido</translation>
     </message>
     <message>
         <source>Strum down</source>

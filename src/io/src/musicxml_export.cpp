@@ -1682,6 +1682,7 @@ private:
 
         const bool tupletMarks = firstNote && place.tuplet != 0;
         const bool ornaments = fx.vibrato != Vibrato::None || fx.trill.isTrill() ||
+                               fx.ornament != Ornament::None ||
                                (firstNote && beatFx.tremoloPicking.has_value());
         const bool tapped = firstNote && beatFx.bassTechnique == BassTechnique::Tap;
         const bool technical = tapped || (firstNote && beatFx.pickStroke != PickStroke::None) ||
@@ -1865,6 +1866,13 @@ private:
         xml.open("ornaments");
         if (fx.trill.isTrill()) {
             writeTrill(xml, note, m);
+        }
+        // Mordents and turns (ADR-0091), MusicXML's upper mordent being the
+        // inverted one.
+        static constexpr std::array<std::string_view, 5> kOrnaments{
+            "", "mordent", "inverted-mordent", "turn", "inverted-turn"};
+        if (fx.ornament != Ornament::None) {
+            xml.empty(kOrnaments[static_cast<std::size_t>(fx.ornament) % kOrnaments.size()]);
         }
         if (fx.vibrato != Vibrato::None) {
             xml.start("wavy-line");

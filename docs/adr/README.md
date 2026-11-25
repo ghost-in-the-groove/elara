@@ -96,6 +96,7 @@ one that replaces them.
 | [0088](0088-tenuto.md) | Tenuto and portato | Accepted |
 | [0089](0089-octave-lines.md) | Octave lines | Accepted |
 | [0090](0090-trills.md) | Trills | Accepted |
+| [0091](0091-mordents-and-turns.md) | Mordents and turns | Accepted |
 
 ## Template
 

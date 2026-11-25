@@ -197,6 +197,9 @@ enum class NoteEffect : std::uint8_t {
 /// Trills each of the caret's notes to the next step up in the key of its
 /// measure, at `speed` ("Change trill", ADR-0090).
 [[nodiscard]] Entry setTrillToNextStep(const Song& song, const Caret& caret, NoteValue speed);
+/// A mordent, an upper mordent, a turn, an inverted turn or none
+/// ("Change ornament", ADR-0091).
+[[nodiscard]] Entry setOrnament(const Song& song, const Caret& caret, Ornament ornament);
 /// A harmonic of `kind`, or none ("Change harmonic"): a natural harmonic at the
 /// note's fret, the others an octave above the fretted note. Throws
 /// std::logic_error for a harmonic on a staff without strings, and

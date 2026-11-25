@@ -1190,6 +1190,14 @@ void Startup::queueEffects() {
               "the trill did not go on");
         score_->toggleTrill();
         check(score_->caretTrill() == 0, "the trill did not come off");
+        // A turn, then none (ADR-0091).
+        score_->setOrnament(static_cast<int>(core::Ornament::Turn));
+        check(score_->caretOrnament() == static_cast<int>(core::Ornament::Turn) &&
+                  score_->undoName() == ScoreDocument::tr("Change ornament") &&
+                  score_->caretStatus().contains(ScoreDocument::tr("Turn")),
+              "the turn did not go on");
+        score_->setOrnament(0);
+        check(score_->caretOrnament() == 0, "the turn did not come off");
         const QString status = score_->caretStatus();
         check(status.contains(ScoreDocument::tr("Wide vibrato")) &&
                   status.contains(ScoreDocument::tr("Marcato")) &&

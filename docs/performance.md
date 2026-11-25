@@ -292,3 +292,35 @@ the same layout on every core hid within its noise (2.6 ms ± 1.4 against
 | write a track's 21 pages as PDF; compressed; the same on one thread | 1.7 ms; 4.1 ms; 8.8 ms; 45 ms | 1.4 ms; 3.9 ms; 8.3 ms; 43.5 ms |
 | one tuner window: low E, high E, noise | 0.40, 0.10, 1.08 ms | 0.39, 0.10, 1.07 ms |
 | find the caret; pick it from a click | 0.42 µs; 1.5 µs | 0.37 µs; 1.5 µs |
+
+**2026-11-25, after tenuto, octave lines, trills, mordents and turns.** Every
+benchmark ran again on the mordents and turns (ADR-0091). A beat grew from 136
+to 144 bytes with its octave line (ADR-0089) and no path moved with it: all
+came out within the noise. MIDI import, a little slower at first (44.2 ms
+± 5.7), ran again alone at 41.4 ms.
+
+| Benchmark | Last row | This run |
+|---|---|---|
+| sounding notes of the 20-track song | 10.6 ms | 10.0 ms |
+| sequence it; with every four measures repeated | 31.0 ms; 45.8 ms | 30.6 ms; 45.6 ms |
+| render its first 10 s offline; on one thread | 21.0 ms; 109 ms | 20.0 ms; 107 ms |
+| build, copy (shared measures) and validate the 20-track song | 10.6 ms, 67 µs, 3.1 ms | 10.2 ms, 68 µs, 2.8 ms |
+| insert a measure at its start | 22 µs | 22 µs |
+| seconds at its end (tempo map walk) | 0.28 ms | 0.26 ms |
+| MusicXML import; export; export on one thread; `.mxl` | 116 ms (± 16); 55 ms; 152 ms; 338 ms | 97 ms (± 14); 54 ms; 153 ms; 335 ms |
+| MIDI export; import | 28.1 ms; 41.0 ms | 30.6 ms (± 4.8); 41.4 ms |
+| GPIF import; on one thread | 93 ms (± 15); 206 ms | 96 ms (± 14); 206 ms (± 16) |
+| 2 tracks from a literal-only `.gpx` | 31.0 ms | 28.6 ms |
+| lay out one 500-measure staff; 8 of its measures | 3.6 ms; 74 µs (± 12) | 3.8 ms; 64 µs |
+| notation and tablature: the staff; 8 measures; as SVG | 4.9 ms; 108 µs (± 13); 43 ms | 5.1 ms; 88 µs; 40 ms |
+| one track on A4 pages; on one thread | 2.6 ms (± 1.4); 10.7 ms | 2.2 ms; 10.0 ms |
+| the 20 staves on A4 pages; again after an edit | 27.5 ms; 4.7 ms | 23.5 ms (± 2.3); 3.5 ms |
+| paint an A4 page: 100 %, high density, 200 %, the 20-staff page | 5.3, 8.2, 20.2, 11.0 ms | 5.2, 8.0, 18.4, 10.8 ms |
+| 1 s of 32 voices: plucked, piano, sawtooth, drums | 5.2, 8.4, 6.0, 4.8 ms | 5.2, 8.4, 5.9, 4.8 ms |
+| 1 s of 32 SFZ voices; each bending a whole step | 9.9 ms; 10.7 ms | 10.0 ms; 10.7 ms |
+| read an SFZ of 64 samples | 4.6 ms | 4.2 ms |
+| decode a minute of FLAC; of WAV | 35.8 ms; 16.3 ms | 35.8 ms; 16.0 ms |
+| read the glyph outlines of `Bravura.otf` | 0.68 ms | 0.68 ms |
+| write a track's 21 pages as PDF; compressed; the same on one thread | 1.4 ms; 3.9 ms; 8.3 ms; 43.5 ms | 1.4 ms; 4.0 ms; 8.4 ms; 43.0 ms |
+| one tuner window: low E, high E, noise | 0.39, 0.10, 1.07 ms | 0.39, 0.10, 1.06 ms |
+| find the caret; pick it from a click | 0.37 µs; 1.5 µs | 0.37 µs; 1.5 µs |

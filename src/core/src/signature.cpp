@@ -250,4 +250,15 @@ int semitonesToNextStep(const Pitch& pitch, const KeySignature& key) {
     return upper - pitch.midiNumber();
 }
 
+int semitonesToPreviousStep(const Pitch& pitch, const KeySignature& key) {
+    constexpr int kSteps = 7;
+    const int index = static_cast<int>(pitch.step()) + kSteps - 1;
+    const auto previous = static_cast<Step>(index % kSteps);
+    const int octave = pitch.octave() - 1 + index / kSteps;
+    constexpr std::array<int, kSteps> kNatural{0, 2, 4, 5, 7, 9, 11};
+    const int lower =
+        12 * (octave + 1) + kNatural[static_cast<std::size_t>(previous)] + key.alterFor(previous);
+    return pitch.midiNumber() - lower;
+}
+
 } // namespace elara::core

@@ -307,6 +307,9 @@ struct Articulation {
     int strum = 0;      // place in the order its chord is strummed (ADR-0025)
     Fraction tremolo{}; // whole notes between tremolo-picked attacks; 0 for none
     int trill = 0;      // semitones to a trill's other note, struck every `tremolo`
+    // The semitones from the note of a mordent's or a turn's quick notes (ADR-0091).
+    std::array<int, 3> ornament{};
+    std::size_t ornamentNotes = 0;
     const core::NoteEffects* effects = nullptr;
     const core::BeatEffects* beat = nullptr;
 };
@@ -608,6 +611,17 @@ Articulation articulationOf(const core::Song& song, const core::SoundingNote& so
     if (effects.trill.isTrill()) {
         result.trill = effects.trill.semitones;
         result.tremolo = core::Duration(effects.trill.speed).length();
+    } else if (const core::OrnamentSteps steps = core::ornamentSteps(effects.ornament);
+               steps.count > 0) {
+        // A mordent or a turn starts with quick notes on the steps of the key
+        // next to it (ADR-0091).
+        const core::KeySignature& key = song.measureHeader(sounding.measure).keySignature;
+        const int up = core::semitonesToNextStep(note.pitch, key);
+        const int down = core::semitonesToPreviousStep(note.pitch, key);
+        for (std::size_t i = 0; i < steps.count; ++i) {
+            result.ornament[i] = steps.steps[i] > 0 ? up : (steps.steps[i] < 0 ? -down : 0);
+        }
+        result.ornamentNotes = steps.count;
     }
     result.key = harmonicKey(note, sounding.key);
     result.moves = !effects.bend.isEmpty() || !beatEffects.whammyBar.isEmpty() ||
@@ -764,6 +778,18 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                                                         (2 * fits.denominator()));
                 reorder = reorder || repeats > 1;
             }
+            // A mordent or a turn (ADR-0091): its quick notes, each a
+            // thirty-second or an equal share of a shorter note, then the note.
+            double quick = 0.0;
+            if (repeats == 1 && articulation.ornamentNotes > 0) {
+                const auto quickNotes = static_cast<std::int64_t>(articulation.ornamentNotes);
+                repeats = quickNotes + 1;
+                const Fraction share =
+                    std::min(Fraction(1, 32) / heldLength(note.length, articulation),
+                             Fraction(1, quickNotes + 1));
+                quick = (attack.end - attack.start) * share.toDouble();
+                reorder = true;
+            }
             if (repeats > 1 && !tremolo) {
                 tremolo = true;
                 spans.reserve(notes_.capacity());
@@ -772,7 +798,8 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                 }
             }
             const Span span{.start = attack.start, .end = attack.end};
-            const double step = (span.end - span.start) / static_cast<double>(repeats);
+            const double step =
+                quick > 0.0 ? quick : (span.end - span.start) / static_cast<double>(repeats);
             for (std::int64_t r = 0; r < repeats; ++r) {
                 if (repeats > 1) {
                     attack.end = r + 1 == repeats ? span.end : attack.start + step;
@@ -781,6 +808,12 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
                     attack.key = r % 2 == 0 ? articulation.key
                                             : std::clamp(articulation.key + articulation.trill, 0,
                                                          kKeys - 1);
+                } else if (quick > 0.0) {
+                    const auto at = static_cast<std::size_t>(r);
+                    attack.key =
+                        at < articulation.ornamentNotes
+                            ? std::clamp(articulation.key + articulation.ornament[at], 0, kKeys - 1)
+                            : articulation.key;
                 }
                 notes_.push_back(attack);
                 writtenAs.push_back(i);

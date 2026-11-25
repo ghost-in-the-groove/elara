@@ -528,29 +528,49 @@ private:
         slurs();
         centreMeasureRests(start, barline);
         fermatas(start, barline);
-        trills(positions, barline);
+        ornaments(positions, barline);
         if (techniques_) {
             markTechniques(positions, barline);
         }
     }
 
-    // The trills of the measure's beats (ADR-0090): "tr" centred over the
-    // notehead, clear of the ink, under the staff for the lower voice of two;
-    // then a wavy line on to the next column when there is room for it.
-    void trills(std::span<const ColumnPosition> positions, double barline) {
+    // The mark over a chord: "tr" for a trill (ADR-0090), else the glyph of a
+    // mordent or a turn (ADR-0091); nullopt without either.
+    static std::optional<Glyph> ornamentOf(const Chord& chord) {
+        std::optional<Glyph> found;
+        for (const Head& head : chord.heads) {
+            if (head.note == nullptr) {
+                continue;
+            }
+            if (head.note->effects.trill.isTrill()) {
+                return Glyph::OrnamentTrill;
+            }
+            if (!found && head.note->effects.ornament != core::Ornament::None) {
+                found = ornamentGlyph(head.note->effects.ornament);
+            }
+        }
+        return found;
+    }
+
+    // The trills, mordents and turns of the measure's beats (ADR-0090,
+    // ADR-0091): the mark centred over the notehead, clear of the ink, under
+    // the staff for the lower voice of two; after "tr", a wavy line on to the
+    // next column when there is room for it.
+    void ornaments(std::span<const ColumnPosition> positions, double barline) {
         const double centre = widthOf(Glyph::NoteheadBlack) / 2;
-        const BoundingBox& box = metrics(Glyph::OrnamentTrill).box;
         const BoundingBox& wave = metrics(Glyph::WiggleTrill).box;
         const double advance = metrics(Glyph::WiggleTrill).advanceWidth > 0.0
                                    ? metrics(Glyph::WiggleTrill).advanceWidth
                                    : wave.width();
         for (const Chord& chord : chords_) {
-            if (chord.beat == nullptr || chord.rest ||
-                std::ranges::none_of(chord.heads, [](const Head& head) {
-                    return head.note != nullptr && head.note->effects.trill.isTrill();
-                })) {
+            if (chord.beat == nullptr || chord.rest) {
                 continue;
             }
+            const std::optional<Glyph> mark = ornamentOf(chord);
+            if (!mark) {
+                continue;
+            }
+            const BoundingBox& box = metrics(*mark).box;
             const bool below = voiceCount_ > 1 && !voiceUp_[chord.voice];
             const double x = chord.x + centre - (box.southWest.x + box.northEast.x) / 2;
             const double from = x + box.northEast.x + kTrillWaveGap;
@@ -558,13 +578,15 @@ private:
             // Each wave reaches past its advance into the next: n of them span
             // (n - 1) advances and one wave's width.
             const int waves =
-                static_cast<int>(std::floor((to - from - wave.width()) / advance)) + 1;
+                *mark != Glyph::OrnamentTrill
+                    ? 0
+                    : static_cast<int>(std::floor((to - from - wave.width()) / advance)) + 1;
             const double reach =
                 waves >= 1 ? from + (waves - 1) * advance + wave.width() : x + box.northEast.x;
             const Extents ink = inkBetween(x + box.southWest.x, reach);
             const double y = below ? ink.bottom + kTrillGap + box.northEast.y
                                    : ink.top - kTrillGap + box.southWest.y;
-            glyph(Glyph::OrnamentTrill, x, y, Role::Ornament);
+            glyph(*mark, x, y, Role::Ornament);
             if (waves < 1) {
                 continue;
             }
