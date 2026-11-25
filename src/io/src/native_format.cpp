@@ -306,6 +306,14 @@ private:
         if (value.text) {
             addText(object, "text", *value.text);
         }
+        if (value.lyrics) { // ADR-0084: a hyphen after a syllable joined to the next
+            yyjson_mut_val* verses = yyjson_mut_arr(doc_);
+            for (const Syllable& syllable : *value.lyrics) {
+                const std::string text = syllable.hyphen ? syllable.text + '-' : syllable.text;
+                yyjson_mut_arr_add_strncpy(doc_, verses, text.data(), text.size());
+            }
+            add(object, "lyrics", verses);
+        }
         if (!value.graces.empty()) {
             yyjson_mut_val* graces = yyjson_mut_arr(doc_);
             for (const Grace& g : value.graces) {
@@ -879,6 +887,28 @@ private:
         });
     }
 
+    // One syllable per verse, "" for a verse that sings nothing (ADR-0084).
+    SharedOptional<std::vector<Syllable>> readLyrics(yyjson_val* array) {
+        std::vector<Syllable> verses;
+        verses.reserve(yyjson_arr_size(array));
+        forEach(array, [&](std::size_t, yyjson_val* item) {
+            if (!yyjson_is_str(item)) {
+                fail("expected a string");
+            }
+            std::string_view text(yyjson_get_str(item), yyjson_get_len(item));
+            const bool hyphen = text.size() > 1 && text.ends_with('-');
+            if (hyphen) {
+                text.remove_suffix(1);
+            }
+            verses.push_back(Syllable{.text = std::string(text), .hyphen = hyphen});
+        });
+        while (!verses.empty() && verses.back().text.empty()) {
+            verses.pop_back();
+        }
+        return verses.empty() ? SharedOptional<std::vector<Syllable>>{}
+                              : SharedOptional(std::move(verses));
+    }
+
     Beat readBeat(yyjson_val* object, int strings) {
         if (!yyjson_is_obj(object)) {
             fail("expected an object");
@@ -890,6 +920,10 @@ private:
         }
         if (const auto text = optionalText(object, "text")) {
             beat.text = SharedOptional(std::string(*text)); // ADR-0081
+        }
+        if (yyjson_val* lyrics = optionalArray(object, "lyrics")) {
+            Scope scope(*this, "lyrics");
+            beat.lyrics = readLyrics(lyrics);
         }
         if (yyjson_val* graces = optionalArray(object, "graces")) {
             Scope scope(*this, "graces");

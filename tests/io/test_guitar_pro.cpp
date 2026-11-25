@@ -231,7 +231,6 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     const core::Song& song = result.song;
     CHECK(result.warnings ==
           std::vector<std::string>{"Clarinet: volume and pan changes dropped",
-                                   "Clarinet: lyrics dropped",
                                    "Clarinet: short voices filled with rests (measure 2)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().words == "Ghost in the Groove");
@@ -298,6 +297,12 @@ TEST_CASE("Guitar Pro: a band keeps its instruments, staves, voices and drums", 
     CHECK(horn[0].notes[0].pitch == core::Pitch(core::Step::B, -1, 4));
     CHECK(horn[2].notes[0].pitch == core::Pitch(core::Step::E, -1, 5));
     CHECK(clarinet.staff(0).measure(1).voices[0].beats.back().isRest());
+    // The lyrics Guitar Pro dispatched to the clarinet's beats (ADR-0084).
+    using Verses = std::vector<core::Syllable>;
+    REQUIRE(horn[1].lyrics);
+    CHECK(*horn[1].lyrics == Verses{{.text = "a", .hyphen = true}});
+    REQUIRE(horn[2].lyrics);
+    CHECK(*horn[2].lyrics == Verses{{.text = "long", .hyphen = false}});
 }
 
 TEST_CASE("Guitar Pro: a tuning that is never shown is dropped unless the instrument is fretted",
@@ -417,6 +422,61 @@ TEST_CASE("Guitar Pro: beats keep their free text", "[io][guitarpro]") {
     REQUIRE(read[0].text);
     CHECK(*read[0].text == "let ring");
     CHECK_FALSE(read[1].text);
+}
+
+TEST_CASE("Guitar Pro: beats keep the syllables Guitar Pro dispatched to them", "[io][guitarpro]") {
+    // ADR-0084: once dispatched, the beats hold the lyrics and the track's text
+    // is not placed again.
+    const std::string lyrics =
+        R"(<Lyrics dispatched="true"><Line><Text><![CDATA[not this]]></Text><Offset>0</Offset>)"
+        R"(</Line></Lyrics><InstrumentSet>)";
+    const std::string beats =
+        R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes><Lyrics><Line><![CDATA[be-]]></Line>)"
+        R"(<Line><![CDATA[]]></Line><Line><![CDATA[low]]></Line><Line><![CDATA[]]></Line>)"
+        R"(</Lyrics></Beat>)"
+        R"(<Beat id="1"><Rhythm ref="0"/><Notes>0</Notes><Lyrics><Line><![CDATA[hind]]></Line>)"
+        R"(<Line><![CDATA[]]></Line></Lyrics></Beat>)";
+    const std::string half = R"(<Rhythm id="0"><NoteValue>Half</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0 1", beats, half);
+    score.replace(score.find("<InstrumentSet>"), 15, lyrics);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() == 2);
+    using Verses = std::vector<core::Syllable>;
+    REQUIRE(read[0].lyrics);
+    CHECK(*read[0].lyrics ==
+          Verses{{.text = "be", .hyphen = true}, {}, {.text = "low", .hyphen = false}});
+    REQUIRE(read[1].lyrics);
+    CHECK(*read[1].lyrics == Verses{{.text = "hind", .hyphen = false}});
+}
+
+TEST_CASE("Guitar Pro: lyrics not yet dispatched go on the beats with notes", "[io][guitarpro]") {
+    // ADR-0084: past the rests, from the bar of each line (Offset 0 for the
+    // first). This score has one bar: "late", from the second, finds no beat,
+    // and neither does "three".
+    const std::string lyrics =
+        R"(<Lyrics><Line><Text><![CDATA[[Intro] one two three]]></Text><Offset>0</Offset></Line>)"
+        R"(<Line><Text><![CDATA[late]]></Text><Offset>1</Offset></Line></Lyrics><InstrumentSet>)";
+    const std::string beats = R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>)"
+                              R"(<Beat id="1"><Rhythm ref="0"/></Beat>)";
+    const std::string quarter = R"(<Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>)";
+    std::string score = guitarScore(0, "0 1 0 1", beats, quarter);
+    score.replace(score.find("<InstrumentSet>"), 15, lyrics);
+    const auto imported = importGpif(score);
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings ==
+          std::vector<std::string>{"Gtr: lyrics after the last note dropped"});
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() == 4);
+    using Verses = std::vector<core::Syllable>;
+    REQUIRE(read[0].lyrics);
+    CHECK(*read[0].lyrics == Verses{{.text = "one", .hyphen = false}});
+    CHECK_FALSE(read[1].lyrics);
+    REQUIRE(read[2].lyrics);
+    CHECK(*read[2].lyrics == Verses{{.text = "two", .hyphen = false}});
+    CHECK_FALSE(read[3].lyrics);
 }
 
 TEST_CASE("Guitar Pro: tempo changes sit at their share of the bar", "[io][guitarpro]") {

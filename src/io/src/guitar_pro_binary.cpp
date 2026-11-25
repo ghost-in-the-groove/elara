@@ -5,6 +5,7 @@
 // public specification; this reader follows the structure of the files.
 #include "guitar_pro_binary.hpp"
 
+#include <elara/core/lyrics.hpp>
 #include <elara/core/validation.hpp>
 
 #include "chord_pool.hpp"
@@ -375,7 +376,6 @@ public:
         if (version_ >= 500) {
             in_.skip(version_ == 500 ? 2 : 1);
         }
-        warnLyrics();
         for (std::size_t m = 0; m < measureCount; ++m) {
             for (TrackData& track : tracks_) {
                 readMeasure(track, m);
@@ -445,11 +445,14 @@ private:
         }
     }
 
+    // Guitar Pro 4 and 5 keep the lyrics of one track: five lines, each from
+    // its measure (1 for the first), placed when the track's beats are read
+    // (ADR-0084).
     void readLyrics() {
         lyricsTrack_ = in_.i32();
-        for (int line = 0; line < 5; ++line) {
-            in_.skip(4); // first measure
-            hasLyrics_ = !trimmed(in_.intString()).empty() || hasLyrics_;
+        for (LyricsLine& line : lyrics_) {
+            line.measure = in_.i32();
+            line.text = in_.intString();
         }
     }
 
@@ -642,12 +645,25 @@ private:
         tracks_.push_back(std::move(track));
     }
 
-    void warnLyrics() {
-        if (hasLyrics_) {
-            const bool known =
-                lyricsTrack_ >= 1 && std::cmp_less_equal(lyricsTrack_, tracks_.size());
-            warnings_.add(known ? tracks_[static_cast<std::size_t>(lyricsTrack_ - 1)].name : "",
-                          "lyrics dropped");
+    void placeLyrics(Song& song) {
+        if (std::ranges::all_of(
+                lyrics_, [](const LyricsLine& line) { return trimmed(line.text).empty(); })) {
+            return;
+        }
+        if (lyricsTrack_ < 1 || std::cmp_greater(lyricsTrack_, song.trackCount())) {
+            warnings_.add({}, "lyrics of a missing track dropped");
+            return;
+        }
+        core::Track& track = song.track(static_cast<std::size_t>(lyricsTrack_ - 1));
+        std::size_t left = 0;
+        for (std::size_t verse = 0; verse < lyrics_.size(); ++verse) {
+            const LyricsLine& line = lyrics_[verse];
+            left += core::placeVerse(track.staff(0), verse,
+                                     static_cast<std::size_t>(std::max(line.measure, 1) - 1),
+                                     line.text);
+        }
+        if (left > 0) {
+            warnings_.add(track.name(), "lyrics after the last note dropped");
         }
     }
 
@@ -1316,6 +1332,7 @@ private:
                 written.staff(0).measure(m) = std::move(track.measures[m]);
             }
         }
+        placeLyrics(song);
         return song;
     }
 
@@ -1459,8 +1476,12 @@ private:
     int version_ = 0; // 300, 400, 406, 500, 510
     core::SongInfo info_;
     int startBpm_ = 120;
+    struct LyricsLine {
+        std::int32_t measure = 1;
+        std::string text{};
+    };
     std::int32_t lyricsTrack_ = 0;
-    bool hasLyrics_ = false;
+    std::array<LyricsLine, 5> lyrics_{};
     std::array<ChannelData, 64> channels_{};              // four ports of sixteen MIDI channels
     std::array<int, detail::kGpDirections> directions_{}; // 0: none (Guitar Pro 3 and 4)
     std::vector<HeaderData> headers_;

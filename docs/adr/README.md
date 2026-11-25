@@ -89,6 +89,7 @@ one that replaces them.
 | [0081](0081-beat-text.md) | Beat text | Accepted |
 | [0082](0082-gradual-tempo-changes.md) | Gradual tempo changes | Accepted |
 | [0083](0083-midi-export-play-order.md) | MIDI export writes the play order | Accepted |
+| [0084](0084-lyrics.md) | Lyrics | Accepted |
 
 ## Template
 

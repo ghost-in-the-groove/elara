@@ -24,6 +24,12 @@ def cdata(text: str) -> str:
     return f"<![CDATA[{text}]]>"
 
 
+def sung(*verses: str) -> str:
+    """The syllables of a beat, as Guitar Pro writes the five lines of lyrics."""
+    lines = list(verses) + [""] * (5 - len(verses))
+    return "<Lyrics>" + "".join(f"<Line>{cdata(v)}</Line>" for v in lines) + "</Lyrics>"
+
+
 def pitch_xml(midi: int, spelled: tuple[str, str] | None = None) -> str:
     step, accidental = spelled or STEPS[midi % 12]
     # GPIF octaves count from MIDI 0, so middle C (MIDI 60) is C5.
@@ -356,7 +362,7 @@ def band() -> str:
                   staves=[{}], articulations=[("snare", 38), ("hiHat", 42), ("kickDrum", 36)],
                   volume=0.9)
     clarinet = Track("Clarinet", set_type="clarinet", set_name="Clarinet in Bb", program=71,
-                     transpose=(-2, 0), staves=[{"tuning": GUITAR}], lyrics="la la", pan=0.75,
+                     transpose=(-2, 0), staves=[{"tuning": GUITAR}], lyrics="Sing a-long", pan=0.75,
                      automations=[("DSPParam_12", 0, 0, 0.6), ("DSPParam_12", 1, 0.5, 0.8)])
 
     def bass_note(string, fret):
@@ -386,9 +392,10 @@ def band() -> str:
                                                           else []))
                 for i in range(8)]]
         if measure == 0:
-            horn = [[Beat("Quarter", [Note(concert=flat(70))]),
-                     Beat("Quarter", [Note(concert=(72, None))]),
-                     Beat("Half", [Note(concert=flat(75))])]]
+            # Guitar Pro dispatches the track's lyrics to its beats (ADR-0084).
+            horn = [[Beat("Quarter", [Note(concert=flat(70))], elements=[sung("Sing")]),
+                     Beat("Quarter", [Note(concert=(72, None))], elements=[sung("a-")]),
+                     Beat("Half", [Note(concert=flat(75))], elements=[sung("long")])]]
         else:
             horn = [[Beat("Half", [Note(concert=(77, None))])]]  # filled with rests on import
         bars.append({"time": "4/4", "key": (-1, "Major"),

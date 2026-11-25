@@ -266,9 +266,9 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
     const ImportResult result = load("quartet.gp4");
     const core::Song& song = result.song;
     CHECK(result.warnings ==
-          std::vector<std::string>{"triplet feel dropped", "Melody: lyrics dropped",
-                                   "Drums: instrument and volume changes dropped (measure 2)",
-                                   "Melody: trills dropped (measure 2)"});
+          std::vector<std::string>{
+              "triplet feel dropped", "Drums: instrument and volume changes dropped (measure 2)",
+              "Melody: trills dropped (measure 2)", "Melody: lyrics after the last note dropped"});
     CHECK(core::validate(song).empty());
     // Each track reads its own channel: the bass at 12 of 16, balance 4 (half
     // left), the drums full, the others at Guitar Pro's default 13.
@@ -292,6 +292,25 @@ TEST_CASE("Guitar Pro 4: a band keeps its instruments, drums and tempo changes",
     CHECK(song.measureHeader(1).tempoChanges[0].offset == core::Fraction(0));
     CHECK(song.measureHeader(1).tempoChanges[0].tempo == core::Tempo(120));
     CHECK(song.measureHeader(1).keySignature == core::KeySignature(-1, core::KeyMode::Major));
+
+    // Lyrics (ADR-0084): "[Verse] Sing a-long  hey there" from measure 1 and
+    // "oh" from measure 2. The double space leaves a beat blank, the tied note
+    // takes no syllable, and "there" finds no beat.
+    using Verses = std::vector<core::Syllable>;
+    const core::Staff& singer = song.track(3).staff(0);
+    const auto& first = singer.measure(0).voices[0].beats;
+    const auto& second = singer.measure(1).voices[0].beats;
+    REQUIRE(first.size() == 3);
+    REQUIRE(second.size() == 3);
+    REQUIRE(first[0].lyrics);
+    CHECK(*first[0].lyrics == Verses{{.text = "Sing", .hyphen = false}});
+    CHECK(*first[1].lyrics == Verses{{.text = "a", .hyphen = true}});
+    CHECK(*first[2].lyrics == Verses{{.text = "long", .hyphen = false}});
+    REQUIRE(second[0].lyrics);
+    CHECK(*second[0].lyrics == Verses{{}, {.text = "oh", .hyphen = false}});
+    CHECK_FALSE(second[1].lyrics);
+    REQUIRE(second[2].lyrics);
+    CHECK(*second[2].lyrics == Verses{{.text = "hey", .hyphen = false}});
 
     REQUIRE(song.trackCount() == 4);
     const core::Track& bass = song.track(0);

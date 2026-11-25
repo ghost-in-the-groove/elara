@@ -3,7 +3,6 @@
  "out": null,
  "warnings": [
   "Clarinet: volume and pan changes dropped",
-  "Clarinet: lyrics dropped",
   "Clarinet: short voices filled with rests (measure 2)"
  ],
  "song": {
@@ -461,6 +460,9 @@
         [
          {
           "duration": "4",
+          "lyrics": [
+           "Sing"
+          ],
           "notes": [
            {
             "pitch": "Bb4"
@@ -469,6 +471,9 @@
          },
          {
           "duration": "4",
+          "lyrics": [
+           "a-"
+          ],
           "notes": [
            {
             "pitch": "C5"
@@ -477,6 +482,9 @@
          },
          {
           "duration": "2",
+          "lyrics": [
+           "long"
+          ],
           "notes": [
            {
             "pitch": "Eb5"
