@@ -173,7 +173,8 @@ listed ones (ADR-0026). Notes keep the degree of their spelling in the key the
 interval leads to: C# up a semitone in C major is D. Key signatures move when
 every pitched track does; drums never move. A fretted note keeps its string when
 its new fret is on the neck, else takes the nearest free string; a note no
-string can play rejects the step.
+string can play rejects the step. Chord symbols move with the notes: their root
+and bass by the same interval, their diagrams along the neck (ADR-0080).
 
 `tuning` gives a fretted staff (the track's first unless `staff`) another
 tuning, a preset such as `guitar-drop-d` or open strings from the lowest

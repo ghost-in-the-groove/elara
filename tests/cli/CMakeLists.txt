@@ -434,6 +434,20 @@ set_tests_properties(cli.dump_chords PROPERTIES
   FIXTURES_REQUIRED cli_chords
   PASS_REGULAR_EXPRESSION "\"chord\":{\"name\":\"Em\",\"diagram\":{\"firstFret\":1,\"frets\":\\[-1,-1,-1,2,2,-1\\]}}"
   FAIL_REGULAR_EXPRESSION "G7")
+# Transposing moves chord symbols with the notes (ADR-0080): Em/B up a whole
+# tone in C major is F#m/C#, its diagram two frets higher.
+set(ELARA_CLI_CHORDS_UP "${CMAKE_CURRENT_BINARY_DIR}/cli-chords-up.elara")
+add_test(NAME cli.edit_transposes_chords
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_CHORDS_UP}" "add-track electric-guitar"
+    "append-measures 1" "caret 0 0 0 5" "fret 2" "caret 0 0 0 4" "fret 2" "chord Em/B"
+    "transpose 2")
+set_tests_properties(cli.edit_transposes_chords PROPERTIES
+  FIXTURES_SETUP cli_chords_up
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Transpose\"}")
+add_test(NAME cli.dump_transposed_chords COMMAND elara-cli --json dump "${ELARA_CLI_CHORDS_UP}")
+set_tests_properties(cli.dump_transposed_chords PROPERTIES
+  FIXTURES_REQUIRED cli_chords_up
+  PASS_REGULAR_EXPRESSION "\"chord\":{\"name\":\"F#m/C#\",\"diagram\":{\"firstFret\":1,\"frets\":\\[-1,-1,-1,4,4,-1\\]}}")
 # Beat text typed at the caret (ADR-0081): words with spaces over a note; a
 # second text over the next beat goes again.
 set(ELARA_CLI_TEXT "${CMAKE_CURRENT_BINARY_DIR}/cli-text.elara")

@@ -101,18 +101,30 @@ button opens a popup under the caret's beat (`WordsPopup`, which beat text
 shares, ADR-0081): a name typed and Enter, or one of
 the chords the song already names, sets it; the bin takes it away.
 
+**Transposing.** Chord symbols move with their beats' notes, by the same
+interval (ADR-0026): the root and the bass keep the degree of their spelling,
+so G7 up a whole tone in C major is A7 and Bb7/F is C7/G, and are written with
+one sharp or flat at most: a root that would need two takes the step next to
+it and its bass follows, so Gb/Bb up a diminished fifth is C/E, not Dbb/Fb. The suffix stays as it is; a name that does not start with a pitch
+("N.C.") does not move. A diagram moves along the neck by as many frets, open
+strings included, and frames itself again (from the nut unless a fret lies
+past the fourth); when a fret would fall below the nut or past the last one
+above the capo, it shows the same chord an octave up, else an octave down,
+and is dropped when neither fits. Beats that shared a symbol still do.
+
 ## Consequences
 
 - The model, the native format, the Guitar Pro 3-8 importers and MusicXML
-  both ways keep chord symbols, layout draws them, the caret types them, and
-  `elara-cli dump` and `import --json` show them. Transposing their names
-  with the notes comes next.
+  both ways keep chord symbols, layout draws them, the caret types them,
+  transposition moves them, and `elara-cli dump` and `import --json` show
+  them. Splitting a name into root, suffix and bass lives in `elara_core`
+  (`chord_name.hpp`), shared by the MusicXML writer and transposition.
 - A line with chord symbols is taller by their row (about 2.5 staff spaces
   for names, 6 with diagrams), and measures with many of them on short notes
   grow to keep their names apart.
-- Transposing a song leaves chord names as they are until transposition
-  learns to spell them. Copying, pasting and retuning carry a diagram as it
-  is: it is drawn with its own strings.
+- Copying, pasting and retuning carry a diagram as it is: it is drawn with
+  its own strings. A transposed diagram follows its frets, not the strings the
+  notes under it may have moved to.
 - Tests: `core.Beats share chord symbols and compare them by value`,
   `io.Guitar Pro 3-5: chords keep their names and diagrams`,
   `io.Guitar Pro: chords come from the staff's diagram collection`, the
@@ -125,5 +137,8 @@ the chords the song already names, sets it; the bin takes it away.
   lanes, spacing, measures of rests), the render snapshots of the corpus,
   `core.Entry: chord symbols name the caret's beat, with the diagram its
   frets make`, `core.Entry: chord symbols on staves without frets have no
-  diagram`, `cli.edit_names_chords` with `cli.dump_chords`, and the app's
-  smoke test, which names the caret's beat and takes the name away.
+  diagram`, `cli.edit_names_chords` with `cli.dump_chords`, the app's smoke
+  test, which names the caret's beat and takes the name away, `core.A
+  transposed chord name moves its root and its bass`, `core.A transposed chord
+  diagram moves along the neck`, `core.Chord symbols move with the notes`, and
+  `cli.edit_transposes_chords` with `cli.dump_transposed_chords`.

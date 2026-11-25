@@ -88,12 +88,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Drawn as small notes and fret numbers
   - [x] Played by borrowing time
   - [x] Typed at the caret
-- [ ] Chord symbols: names and diagrams above the staff (ADR-0080)
+- [x] Chord symbols: names and diagrams above the staff (ADR-0080)
   - [x] In the model, read from Guitar Pro 3-8 and kept by the native format
   - [x] Read and written in MusicXML
   - [x] Drawn above the staff, with diagrams on fretted staves
   - [x] Typed at the caret
-  - [ ] Transposed with the notes
+  - [x] Transposed with the notes
 - [x] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being
         painted again
