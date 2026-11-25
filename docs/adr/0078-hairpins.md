@@ -29,7 +29,26 @@ wedges of the same kind that touch become one.
 - The native format writes `"hairpin":"crescendo"` or `"diminuendo"` in a
   beat's effects and omits it otherwise; format version 1 still reads every
   older file (ADR-0006).
-- MusicXML and MIDI exports report hairpins as dropped until they write them.
+- MusicXML: a `<wedge>` that starts (`crescendo`, `diminuendo`) and later
+  stops puts its hairpin on the beats of the staff's first voice that start
+  between the two, carried across measures; export writes a wedge from the
+  first beat of each run to the end of its last, numbered by voice, under the
+  staff it belongs to.
+- The MIDI export writes the velocities hairpins ramp (below).
+
+**Playback ramps the velocity.** `soundingNotes()` turns the hairpins of a
+staff, whichever of its voices hold them, into wedges and moves the velocity
+of every note of the staff struck under one:
+
+- A wedge leads from the loudest notes struck at or before its start (mf when
+  none) to the loudest struck at or after its end, when they are louder for a
+  crescendo or softer for a diminuendo; otherwise to one dynamic further (16
+  velocity), clamped to 1 to 127.
+- A note under the wedge moves by the share of that change its start has
+  reached: the first note keeps its velocity, a note halfway gets half the
+  change, and the note after the wedge plays its own dynamic.
+- Ties only sustain, so a tied note keeps the velocity of its attack. The
+  sequencer, audio rendering and MIDI export all play these velocities.
 
 **The score draws a wedge.** Under the staff, on the baseline of the
 dynamics marks (ADR-0044) and centred on the middle of their letters, as two
@@ -48,16 +67,24 @@ lines `hairpinThickness` thick with `Role::Hairpin` ("hairpin"):
 
 ## Consequences
 
-- Guitar Pro hairpins survive import and saving and are drawn; they are not
-  yet played, read from MusicXML or typed. Those come next, each recorded here
-  as it lands: a velocity ramp towards the next dynamic, MusicXML wedges both
-  ways, and editing at the caret.
+- Hairpins from Guitar Pro and MusicXML survive import, saving and MusicXML
+  export, are drawn and are heard; they are not yet typed. Editing at the
+  caret comes next and will be recorded here.
+- A MusicXML wedge in a second voice comes back on the first voice.
+- A hairpin with no dynamic after it rises or falls one step and the music
+  goes back to its written dynamic after it; writing the dynamic it leads to
+  says how far it goes.
 - A staff with hairpins is taller by its dynamics lane, so lines and strips
   may break differently; the render snapshots of the corpus change.
 - A wedge that should stop in the middle of a long note cannot: it ends with
   the note. Guitar Pro has the same limit.
 - Tests: `io.Guitar Pro: a guitar keeps ...` (a crescendo over two beats, a
   diminuendo written as a decrescendo), the native round trip and text forms,
-  `notation.Hairpins: ...` (a wedge clear of the dynamics, a diminuendo over a
-  barline, cut by the end of a line, under tablature alone) and
-  `cli.render_hairpins`.
+  `io.MusicXML: wedges become hairpins ...` (across a barline, stopped at the
+  end of the song), the MusicXML round trip of a song with every feature
+  (a wedge over a barline, one on the upper staff of a piano),
+  `core.A hairpin ramps the velocity of the notes under it` (to the forte
+  after a crescendo, over two voices; one step down without a softer dynamic),
+  `cli.sequence_hairpins`, `notation.Hairpins: ...` (a wedge clear of the
+  dynamics, a diminuendo over a barline, cut by the end of a line, under
+  tablature alone) and `cli.render_hairpins`.

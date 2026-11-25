@@ -4,7 +4,11 @@
 #include <elara/core/song.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
+#include <functional>
+#include <iterator>
+#include <span>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -16,6 +20,23 @@ namespace {
 // Voices times measures from which the voices are read on several threads.
 constexpr std::size_t kParallelVoiceMeasures = 4096;
 
+// Velocity between two neighbouring dynamics (mf 80, f 96).
+constexpr int kDynamicStep = 16;
+
+// Beats of one voice under one hairpin, in whole notes from the start of the
+// song.
+struct HairpinSpan {
+    Fraction start{};
+    Fraction end{};
+    Hairpin hairpin = Hairpin::None;
+};
+
+// The loudest velocity struck at one start.
+struct Strike {
+    Fraction start{};
+    int velocity = 0;
+};
+
 // A note of the previous beat that a tie can continue.
 struct OpenNote {
     int key = 0;
@@ -23,9 +44,10 @@ struct OpenNote {
     std::size_t index = 0;
 };
 
-// Appends the notes of one voice of one staff, joining ties.
+// Appends the notes of one voice of one staff, joining ties, and the spans of
+// its hairpins.
 void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t t, std::size_t s,
-              std::size_t v, std::vector<SoundingNote>& out) {
+              std::size_t v, std::vector<SoundingNote>& out, std::vector<HairpinSpan>& spans) {
     const Staff& staff = song.track(t).staff(s);
     std::vector<OpenNote> open;
     std::vector<OpenNote> next;
@@ -39,6 +61,15 @@ void addVoice(const Song& song, const std::vector<Fraction>& starts, std::size_t
         for (std::size_t b = 0; b < voice.beats.size(); ++b) {
             const Beat& beat = voice.beats[b];
             const Fraction length = beat.duration.length();
+            if (const Hairpin hairpin = beat.effects.hairpin; hairpin != Hairpin::None) {
+                if (!spans.empty() && spans.back().hairpin == hairpin &&
+                    spans.back().end == position) {
+                    spans.back().end = position + length;
+                } else {
+                    spans.push_back(
+                        {.start = position, .end = position + length, .hairpin = hairpin});
+                }
+            }
             next.clear();
             for (std::size_t n = 0; n < beat.notes.size(); ++n) {
                 const Note& note = beat.notes[n];
@@ -89,6 +120,102 @@ void keyOrderChords(std::vector<SoundingNote>& list) {
     }
 }
 
+// Adds the notes of `notes`, in start order, to `strikes`, in start order,
+// keeping the loudest velocity of each start.
+void addStrikes(const std::vector<SoundingNote>& notes, std::vector<Strike>& strikes,
+                std::vector<Strike>& scratch) {
+    scratch.clear();
+    for (const SoundingNote& note : notes) {
+        if (!scratch.empty() && scratch.back().start == note.start) {
+            scratch.back().velocity = std::max(scratch.back().velocity, note.velocity);
+        } else {
+            scratch.push_back({.start = note.start, .velocity = note.velocity});
+        }
+    }
+    const auto middle = static_cast<std::ptrdiff_t>(strikes.size());
+    strikes.insert(strikes.end(), scratch.begin(), scratch.end());
+    std::ranges::inplace_merge(strikes, strikes.begin() + middle, std::less<>{}, &Strike::start);
+    std::vector<Strike>::iterator out = strikes.begin();
+    for (auto in = strikes.begin(); in != strikes.end(); ++in) {
+        if (in != strikes.begin() && std::prev(out)->start == in->start) {
+            std::prev(out)->velocity = std::max(std::prev(out)->velocity, in->velocity);
+        } else {
+            *out++ = *in;
+        }
+    }
+    strikes.erase(out, strikes.end());
+}
+
+// Ramps the velocities of the notes of one staff (`voices`, one list per
+// voice) under its hairpins (ADR-0078). A wedge leads from the loudest notes
+// struck at or before its start to the loudest struck at or after its end
+// when they are louder (crescendo) or softer (diminuendo), or else one
+// dynamic further; each note under it moves by the share of that change its
+// start has reached.
+void rampHairpins(std::span<std::vector<SoundingNote>> voices,
+                  std::span<const std::vector<HairpinSpan>> spanLists) {
+    std::vector<HairpinSpan> wedges;
+    for (const std::vector<HairpinSpan>& list : spanLists) {
+        wedges.insert(wedges.end(), list.begin(), list.end());
+    }
+    if (wedges.empty()) {
+        return;
+    }
+    // One wedge per run of the same hairpin, whichever voices hold it.
+    std::ranges::stable_sort(wedges, std::less<>{}, &HairpinSpan::start);
+    std::size_t kept = 0;
+    for (std::size_t i = 1; i < wedges.size(); ++i) {
+        HairpinSpan& last = wedges[kept];
+        if (wedges[i].hairpin == last.hairpin && wedges[i].start <= last.end) {
+            last.end = std::max(last.end, wedges[i].end);
+        } else {
+            wedges[++kept] = wedges[i];
+        }
+    }
+    wedges.resize(kept + 1);
+
+    std::vector<Strike> strikes;
+    std::vector<Strike> scratch;
+    for (const std::vector<SoundingNote>& notes : voices) {
+        addStrikes(notes, strikes, scratch);
+    }
+    std::vector<int> changes;
+    changes.reserve(wedges.size());
+    for (const HairpinSpan& wedge : wedges) {
+        const auto upTo =
+            std::ranges::upper_bound(strikes, wedge.start, std::less<>{}, &Strike::start);
+        const auto after =
+            std::ranges::lower_bound(strikes, wedge.end, std::less<>{}, &Strike::start);
+        const int from =
+            upTo == strikes.begin() ? dynamicVelocity(Dynamic::MF) : std::prev(upTo)->velocity;
+        const int direction = wedge.hairpin == Hairpin::Crescendo ? 1 : -1;
+        int to = from + direction * kDynamicStep;
+        if (after != strikes.end() && (after->velocity - from) * direction > 0) {
+            to = after->velocity;
+        }
+        changes.push_back(std::clamp(to, 1, 127) - from);
+    }
+    for (std::vector<SoundingNote>& notes : voices) {
+        std::size_t w = 0;
+        for (SoundingNote& note : notes) {
+            while (w < wedges.size() && wedges[w].end <= note.start) {
+                ++w;
+            }
+            if (w == wedges.size()) {
+                break;
+            }
+            const HairpinSpan& wedge = wedges[w];
+            if (note.start < wedge.start) {
+                continue;
+            }
+            const double share =
+                ((note.start - wedge.start) / (wedge.end - wedge.start)).toDouble();
+            note.velocity = std::clamp(
+                note.velocity + static_cast<int>(std::lround(changes[w] * share)), 1, 127);
+        }
+    }
+}
+
 } // namespace
 
 std::vector<SoundingNote> soundingNotes(const Song& song) {
@@ -114,13 +241,21 @@ std::vector<SoundingNote> soundingNotes(const Song& song) {
         }
     }
     std::vector<std::vector<SoundingNote>> lists(parts.size());
+    std::vector<std::vector<HairpinSpan>> spans(parts.size());
     const std::size_t work = parts.size() * song.measureCount();
     forEachIndex(0, parts.size(), threadsFor(0, work, kParallelVoiceMeasures, parts.size()),
                  [&](std::size_t i) {
                      std::vector<SoundingNote>& list = lists[i];
-                     addVoice(song, starts, parts[i].track, parts[i].staff, parts[i].voice, list);
+                     addVoice(song, starts, parts[i].track, parts[i].staff, parts[i].voice, list,
+                              spans[i]);
                      keyOrderChords(list);
                  });
+    // The voices of a staff are consecutive parts.
+    for (std::size_t first = 0; first < parts.size(); first += Measure::kMaxVoices) {
+        rampHairpins(
+            std::span(lists).subspan(first, Measure::kMaxVoices),
+            std::span<const std::vector<HairpinSpan>>(spans).subspan(first, Measure::kMaxVoices));
+    }
     // Merged pairwise, neighbours first: the lists are in track, staff and
     // voice order, so the result is ordered by start, then track, staff, voice
     // and key.
