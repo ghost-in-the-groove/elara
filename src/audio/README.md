@@ -34,10 +34,11 @@ Three targets with different rules:
   keeps a track's sound across loads while its instrument stays the same;
 - SFZ instruments (ADR-0066): `parseSfz()`/`readSfz()` read the text format
   into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
-  and `SfzBank` plays them through a sampler of Elara's own: WAV samples read
-  into memory on every core, regions picked by key, velocity, controllers,
-  keyswitch and round robin, the amplitude envelope, loops, release samples
-  and exclusive groups, 64 voices per track, each note glided on its own.
+  and `SfzBank` plays them through a sampler of Elara's own: WAV and FLAC
+  samples read into memory on every core, regions picked by key, velocity,
+  controllers, keyswitch and round robin, the amplitude envelope, loops,
+  release samples and exclusive groups, 64 voices per track, each note glided
+  on its own.
   An instrument plays every pitched track, or only the guitars or the basses
   (`SfzTracks`); the other tracks play on another bank, and `with()` puts the
   same samples in front of another one;

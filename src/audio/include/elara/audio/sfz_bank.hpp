@@ -41,8 +41,8 @@ enum class SfzTracks : std::uint8_t {
 /// and round robin pick, through the region's envelope, at the pitch of the
 /// key, moved by glides of its own: bends, slides and vibrato touch only the
 /// notes of their key. Palm mute, dead notes and harmonics darken, shorten or
-/// soften the note as the built-in synthesizer does. Samples are WAV files,
-/// read into memory as mono when the bank is made, on every core.
+/// soften the note as the built-in synthesizer does. Samples are WAV or FLAC
+/// files, read into memory as mono when the bank is made, on every core.
 class SfzBank final : public SoundBank {
 public:
     /// Reads an .sfz file and the samples it names. Samples that cannot be
