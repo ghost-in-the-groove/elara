@@ -1018,6 +1018,32 @@ Rectangle {
                             active: root.document.caretFermata === 3
                             onClicked: root.document.setFermata(active ? 0 : 3)
                         }
+
+                        Item {
+                            width: 9
+                            height: 30
+
+                            Separator {
+                                anchors.centerIn: parent
+                                height: 18
+                            }
+                        }
+
+                        // The caret's beat under an octave line, numbered as
+                        // core::Ottava: a second click makes 8va 15ma and 8vb
+                        // 15mb, a third takes the line off (ADR-0089).
+                        BeatEffect {
+                            tip: qsTr("Octave line up: 8va, again for 15ma")
+                            path: "M4.3 5.5 A1.7 1.7 0 1 0 7.7 5.5 A1.7 1.7 0 1 0 4.3 5.5 M3.9 9.4 A2.1 2.1 0 1 0 8.1 9.4 A2.1 2.1 0 1 0 3.9 9.4 M10.5 7.5 L12.5 7.5 M14.5 7.5 L16.5 7.5 M18.5 7.5 L20 7.5 L20 11.5"
+                            active: root.document.caretOttava === 1 || root.document.caretOttava === 3
+                            onClicked: root.document.setOttava(root.document.caretOttava === 1 ? 3 : (active ? 0 : 1))
+                        }
+                        BeatEffect {
+                            tip: qsTr("Octave line down: 8vb, again for 15mb")
+                            path: "M4.3 14.6 A1.7 1.7 0 1 0 7.7 14.6 A1.7 1.7 0 1 0 4.3 14.6 M3.9 18.5 A2.1 2.1 0 1 0 8.1 18.5 A2.1 2.1 0 1 0 3.9 18.5 M10.5 16.5 L12.5 16.5 M14.5 16.5 L16.5 16.5 M18.5 16.5 L20 16.5 L20 12.5"
+                            active: root.document.caretOttava === 2 || root.document.caretOttava === 4
+                            onClicked: root.document.setOttava(root.document.caretOttava === 2 ? 4 : (active ? 0 : 2))
+                        }
                     }
 
                     Label {

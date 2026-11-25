@@ -1692,6 +1692,13 @@ QString ScoreDocument::caretStatus() const {
     case core::Fermata::None:
         break;
     }
+    if (const int ottava = caretOttava(); ottava != 0) {
+        static constexpr std::array<const char*, 5> kOttavaNames{"", "8va", "8vb", "15ma", "15mb"};
+        parts.append(
+            tr("Octave line %1")
+                .arg(QLatin1StringView(
+                    kOttavaNames[static_cast<std::size_t>(ottava) % kOttavaNames.size()])));
+    }
     if (caretSlur()) {
         parts.append(tr("Slur"));
     }
@@ -2113,6 +2120,15 @@ void ScoreDocument::setFermata(int fermata) {
     applyBeatEffects(effects);
 }
 
+void ScoreDocument::setOttava(int ottava) {
+    if (ottava < 0 || ottava > static_cast<int>(core::Ottava::QuindicesimaBassa)) {
+        return;
+    }
+    core::BeatEffects effects = beatEffectsAtCaret();
+    effects.ottava = static_cast<core::Ottava>(ottava);
+    applyBeatEffects(effects);
+}
+
 void ScoreDocument::toggleGraceNote() {
     if (caretGraceNotes() > 0) {
         runEntry([this](const core::Song& song) { return core::removeGraceNotes(song, caret_); });
@@ -2510,6 +2526,10 @@ int ScoreDocument::caretHairpin() const {
 
 int ScoreDocument::caretFermata() const {
     return static_cast<int>(beatEffectsAtCaret().fermata);
+}
+
+int ScoreDocument::caretOttava() const {
+    return static_cast<int>(beatEffectsAtCaret().ottava);
 }
 
 bool ScoreDocument::caretSlur() const {

@@ -1222,6 +1222,16 @@ void Startup::queueEffects() {
               "the status does not name the long fermata");
         score_->setFermata(0);
         check(score_->caretFermata() == 0, "the fermata did not go");
+        // Octave lines (ADR-0089).
+        score_->setOttava(static_cast<int>(core::Ottava::QuindicesimaAlta));
+        check(score_->caretOttava() == static_cast<int>(core::Ottava::QuindicesimaAlta) &&
+                  score_->caretBassTechnique() != 0,
+              "the octave line did not join the beat's effects");
+        check(score_->caretStatus().contains(
+                  ScoreDocument::tr("Octave line %1").arg(QStringLiteral("15ma"))),
+              "the status does not name the octave line");
+        score_->setOttava(0);
+        check(score_->caretOttava() == 0, "the octave line did not go");
         // Slurs (ADR-0086).
         score_->setSlur(true);
         check(score_->caretSlur() && score_->caretBassTechnique() != 0,

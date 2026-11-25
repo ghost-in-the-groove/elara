@@ -198,6 +198,14 @@
         <translation>Calderón largo</translation>
     </message>
     <message>
+        <source>Octave line up: 8va, again for 15ma</source>
+        <translation>Línea de octava arriba: 8va, otra vez para 15ma</translation>
+    </message>
+    <message>
+        <source>Octave line down: 8vb, again for 15mb</source>
+        <translation>Línea de octava abajo: 8vb, otra vez para 15mb</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1760,6 +1768,10 @@
     <message>
         <source>Long fermata</source>
         <translation>Calderón largo</translation>
+    </message>
+    <message>
+        <source>Octave line %1</source>
+        <translation>Línea de octava %1</translation>
     </message>
     <message>
         <source>Slur</source>
