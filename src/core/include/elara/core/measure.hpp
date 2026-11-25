@@ -69,13 +69,14 @@ struct ChordSymbol {
 /// Notes that start together and share a written duration. No notes = a rest.
 /// `graces` lead into the beat, in the order they are played (ADR-0079);
 /// `chord` names its harmony, shared by the beats that name the same one
-/// (ADR-0080).
+/// (ADR-0080); `text` is written above it (ADR-0081). Neither sounds.
 struct Beat {
     Duration duration{};
     std::vector<Note> notes{};
     BeatEffects effects{};
     std::vector<Grace> graces{};
     SharedOptional<ChordSymbol> chord{};
+    SharedOptional<std::string> text{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 
