@@ -283,6 +283,7 @@ constexpr std::array kEditNames{
     Translation{"Change bend", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change bend")},
     Translation{"Change beat effects",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change beat effects")},
+    Translation{"Change dynamic", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change dynamic")},
     Translation{"Change slide", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change slide")},
     Translation{"Change vibrato", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change vibrato")},
     Translation{"Change accent", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change accent")},
@@ -2128,6 +2129,38 @@ int ScoreDocument::caretVibrato() const {
 
 int ScoreDocument::caretAccent() const {
     return static_cast<int>(noteEffectsAtCaret().accent);
+}
+
+int ScoreDocument::caretDynamic() const {
+    if (!document_ || !hasCaret(document_->song())) {
+        return static_cast<int>(core::Dynamic::MF);
+    }
+    return static_cast<int>(core::dynamicAt(document_->song(), caret_));
+}
+
+void ScoreDocument::setDynamic(int dynamic) {
+    if (!document_ || !hasCaret(document_->song()) || dynamic < 0 ||
+        dynamic > static_cast<int>(core::Dynamic::FFF)) {
+        return;
+    }
+    pendingDigit_ = -1;
+    const auto wanted = static_cast<core::Dynamic>(dynamic);
+    core::Entry entry = core::setDynamic(document_->song(), caret_, wanted);
+    if (!entry.command) {
+        if (core::dynamicAt(document_->song(), caret_) != wanted) {
+            emit editFailed(tr("Dynamics go on notes: put the caret on one."));
+        }
+        return;
+    }
+    enter(std::move(entry));
+}
+
+QString ScoreDocument::dynamicName(int dynamic) const {
+    static constexpr std::array<const char*, 8> kNames{"ppp", "pp", "p",  "mp",
+                                                       "mf",  "f",  "ff", "fff"};
+    return dynamic >= 0 && dynamic < static_cast<int>(kNames.size())
+               ? QString::fromLatin1(kNames.at(static_cast<std::size_t>(dynamic)))
+               : QString();
 }
 
 int ScoreDocument::caretHarmonic() const {

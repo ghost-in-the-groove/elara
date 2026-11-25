@@ -101,6 +101,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretSlideOut READ caretSlideOut NOTIFY caretChanged)
     Q_PROPERTY(int caretVibrato READ caretVibrato NOTIFY caretChanged)
     Q_PROPERTY(int caretAccent READ caretAccent NOTIFY caretChanged)
+    Q_PROPERTY(int caretDynamic READ caretDynamic NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
     // The beat's whammy bar, as a core::BendForm and cents (negative below the
@@ -471,6 +472,14 @@ public:
     [[nodiscard]] int caretSlideOut() const;
     [[nodiscard]] int caretVibrato() const;
     [[nodiscard]] int caretAccent() const;
+    /// The dynamic at the caret (ADR-0047), numbered as core::Dynamic (0 ppp
+    /// to 7 fff): the notes there, or the last ones struck before them.
+    [[nodiscard]] int caretDynamic() const;
+    /// Sets a dynamic from the caret's notes to the next change of dynamic, as
+    /// one undo step ("Change dynamic").
+    Q_INVOKABLE void setDynamic(int dynamic);
+    /// "ppp" to "fff", as the score writes them.
+    Q_INVOKABLE QString dynamicName(int dynamic) const;
     [[nodiscard]] int caretHarmonic() const;
     /// The kinds as the status line names them, translated: "Slide in from
     /// below", "Shift slide", "Artificial harmonic".

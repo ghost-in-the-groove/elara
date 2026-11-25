@@ -657,3 +657,56 @@ TEST_CASE("Tablature layout: whole tracks as notation, tablature or both", "[not
     const std::array<std::size_t, 1> missing{2};
     CHECK_THROWS_AS(selectTracks(song, missing, TrackView::Both), std::out_of_range);
 }
+
+TEST_CASE("Tablature layout: whammy bar and bass techniques above the staff", "[notation][tab]") {
+    using elara::core::BendForm;
+    using elara::core::whammyCurve;
+    Beat dip = play(3, 5);
+    dip.effects.whammyBar = whammyCurve(BendForm::BendRelease, -300);
+    Beat dive = play(3, 7);
+    dive.effects.whammyBar = whammyCurve(BendForm::Bend, -200);
+    Beat slap = play(4, 3);
+    slap.effects.bassTechnique = elara::core::BassTechnique::Slap;
+    Beat pull = play(1, 5);
+    pull.effects.whammyBar = whammyCurve(BendForm::PreBend, 100);
+    pull.effects.bassTechnique = elara::core::BassTechnique::Pop;
+    const Song song = guitar({{dip, dive, slap, pull}});
+    const DisplayList list = tab(song);
+
+    // "w/bar" starts each run of whammy-bar beats; every beat says how far
+    // the bar goes, in steps from the written pitch.
+    const auto labels = texts(list, Role::Bend);
+    CHECK(contents(labels) == std::vector<std::string>{"w/bar -1 1/2", "-1", "w/bar +1/2"});
+    const auto frets = texts(list, Role::FretNumber);
+    REQUIRE(frets.size() == 4);
+    for (const TextItem& label : labels) {
+        CHECK(label.origin.y < 0.0); // above the staff
+        CHECK_THAT(label.origin.y, WithinAbs(labels.front().origin.y, kEpsilon));
+    }
+
+    // The curve, drawn after its beat's number: the dip goes down and comes
+    // back, the dive goes down and holds, and the pre-pull rises from the
+    // written pitch before the attack, then holds.
+    auto lines = byRole(list.lines, Role::Bend);
+    std::ranges::stable_sort(lines, {}, [](const LineItem& line) { return line.from.x; });
+    REQUIRE(lines.size() == 7); // three, two, then a rise and a hold
+    for (const LineItem& line : lines) {
+        CHECK(line.from.y < 0.0);
+        CHECK(line.to.y < 0.0);
+        CHECK(line.from.y > labels.front().origin.y); // under the labels
+    }
+    CHECK(lines[0].to.y > lines[0].from.y);                          // the dip goes down,
+    CHECK_THAT(lines[1].to.y, WithinAbs(lines[1].from.y, kEpsilon)); // holds,
+    CHECK(lines[2].to.y < lines[2].from.y);                          // and comes back
+    CHECK_THAT(lines[2].to.y, WithinAbs(lines[0].from.y, kEpsilon));
+    CHECK(lines[3].from.x > frets[1].origin.x - kEpsilon);
+    CHECK(lines[3].to.y > lines[3].from.y);
+    CHECK_THAT(lines[5].from.x, WithinAbs(lines[5].to.x, kEpsilon)); // the rise is upright
+    CHECK(lines[5].to.y < lines[5].from.y);
+
+    // Slap and pop are lettered over their beats.
+    const auto techniques = texts(list, Role::Technique);
+    REQUIRE(contents(techniques) == std::vector<std::string>{"S", "P"});
+    CHECK_THAT(techniques[0].origin.x, WithinAbs(frets[2].origin.x, kEpsilon));
+    CHECK(techniques[0].origin.y < 0.0);
+}

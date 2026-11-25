@@ -66,6 +66,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
+- [x] Whammy bar curves and depths, and tapping, slap and pop, above the staff
+      (ADR-0061)
 - [x] Incremental relayout (only the systems an edit touches)
   - [x] Pages an edit leaves as they were keep their textures instead of being
         painted again
@@ -129,7 +131,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Tuning and capo changes, keeping the pitches or the frets
   - [x] `makeRetune()` and the CLI `tuning` step (ADR-0046)
   - [x] Tuning presets and capo in the song panel
-- [ ] Edit every element of milestone 1 from the UI
+- [x] Edit every element of milestone 1 from the UI
   - [x] Song panel: new song, title, artist, tempo, time and key signatures,
         length, tracks of any instrument, undo and redo, saving (ADR-0031)
   - [x] Every line of the credits (subtitle, album, words, music, copyright,
@@ -144,6 +146,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         (ADR-0058)
   - [x] Whammy bar (dives, dips, pre-dives, returns) and tapping, slap and pop
         on the caret's beat, in the CLI and the effects panel (ADR-0060)
+  - [x] Dynamics, ppp to fff, from the caret's notes to the next change, in
+        the effects panel (ADR-0047)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)

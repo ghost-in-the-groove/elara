@@ -162,6 +162,10 @@
         <translation>Marcato</translation>
     </message>
     <message>
+        <source>Dynamics</source>
+        <translation>Dinámicas</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1211,6 +1215,10 @@
         <translation>Cambiar efectos del tiempo</translation>
     </message>
     <message>
+        <source>Change dynamic</source>
+        <translation>Cambiar dinámica</translation>
+    </message>
+    <message>
         <source>Change slide</source>
         <translation>Cambiar deslizamiento</translation>
     </message>
@@ -1557,6 +1565,10 @@
         <translation>Pop</translation>
     </message>
     <message>
+        <source>Dynamics go on notes: put the caret on one.</source>
+        <translation>Las dinámicas van en notas: pon el cursor en una.</translation>
+    </message>
+    <message>
         <source>Slide in from below</source>
         <translation>Deslizamiento de entrada desde abajo</translation>
     </message>
@@ -1698,6 +1710,10 @@
     <message>
         <source>Open the first track&apos;s tuning in the song panel at start.</source>
         <translation>Abrir al inicio la afinación de la primera pista en el panel de canción.</translation>
+    </message>
+    <message>
+        <source>Open the note effects panel at the caret at start.</source>
+        <translation>Abrir el panel de efectos de nota en el cursor al iniciar.</translation>
     </message>
     <message>
         <source>Show the score as one continuous scroll.</source>

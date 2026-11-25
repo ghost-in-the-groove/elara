@@ -153,6 +153,9 @@ int main(int argc, char* argv[]) {
         QStringLiteral("tuning"),
         QCoreApplication::translate("main",
                                     "Open the first track's tuning in the song panel at start."));
+    const QCommandLineOption effectsOption(
+        QStringLiteral("effects"),
+        QCoreApplication::translate("main", "Open the note effects panel at the caret at start."));
     const QCommandLineOption continuousOption(
         QStringLiteral("continuous"),
         QCoreApplication::translate("main", "Show the score as one continuous scroll."));
@@ -173,7 +176,7 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main", "Play the basses through this SFZ instrument."),
         QStringLiteral("file"));
     parser.addOptions({trackOption, viewOption, seekOption, smokeTest, screenshot, tunerOption,
-                       songPaneOption, measureOption, tuningOption, continuousOption,
+                       songPaneOption, measureOption, effectsOption, tuningOption, continuousOption,
                        languageOption, soundFontOption, guitarSfzOption, bassSfzOption});
     parser.process(app);
 
@@ -228,6 +231,7 @@ int main(int argc, char* argv[]) {
     }
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
+    options.effects = parser.isSet(effectsOption);
     options.screenshot = parser.value(screenshot);
     const bool checking = options.smokeTest || !options.screenshot.isEmpty();
     if (checking) {
@@ -255,6 +259,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
                                  {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
+                                 {QStringLiteral("showEffects"), options.effects},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},
                                  {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
