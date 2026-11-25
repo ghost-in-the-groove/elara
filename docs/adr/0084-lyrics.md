@@ -120,6 +120,16 @@ pass, the first verse on the first pass, when the measure has it and the first
 verse otherwise; other verses, a second staff's lyrics and extenders are
 dropped with a warning.
 
+Many files end each word with a space, or start the next word with one or
+with a new line, and leave the syllables of a word bare ("Twin" "kle "). When
+most of a track's syllables that no hyphen joins are parted from the next
+that way, a syllable that is not joins the next. Karaoke files (.kar, marked
+by a text event "@KMIDI KARAOKE FILE") keep their words in text events after
+a header of "@" lines: their words are the lyrics unless the file also has
+Lyric events, and the first two "@T" lines are the song's title and artist.
+Elara does not write .kar files: its MIDI lyrics are Lyric events, which
+karaoke players read too.
+
 **Drawing.** Lyrics go right under the staff's notes, where the eye looks
 for them, and dynamics and hairpins go under the lyrics. Engraving manuals put
 the dynamics of a vocal staff above it instead; Elara keeps them in one place
@@ -178,4 +188,7 @@ of MusicXML, fold them into the joining hyphen and the extender.
   snapshots of the corpus band, quartet and piano, `io.MIDI import puts lyric
   events on the notes they start with`, `io.MIDI import gives a lyrics track
   without notes to the melody it sings`, `io.MIDI export sings each pass of a
-  repeat with its verse` and the corpus MIDI band snapshots.
+  repeat with its verse`, `io.MIDI import reads words parted by spaces
+  instead of hyphens`, `io.MIDI import reads a karaoke file's words, title and
+  artist`, `io.MIDI import leaves the text events of other files alone`,
+  `cli.import_karaoke` and the corpus MIDI band snapshots.

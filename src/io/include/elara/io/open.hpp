@@ -12,7 +12,7 @@
 namespace elara::io {
 
 /// Reads a song from a native .elara file (no warnings) or imports it from
-/// MusicXML (.musicxml, .xml, .mxl), MIDI (.mid, .midi, .smf) or Guitar Pro
+/// MusicXML (.musicxml, .xml, .mxl), MIDI (.mid, .midi, .smf, .kar) or Guitar Pro
 /// (.gp, .gpx, .gp5, .gp4, .gp3), by the file's extension in any case. An
 /// unknown extension is an "unsupported file type" error.
 [[nodiscard]] std::expected<ImportResult, FormatError> openFile(const std::filesystem::path& path);

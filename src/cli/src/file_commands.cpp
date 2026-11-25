@@ -122,7 +122,7 @@ std::optional<Foreign> foreignFormat(const std::filesystem::path& path) {
     if (extension == ".musicxml" || extension == ".xml" || extension == ".mxl") {
         return Foreign::MusicXml;
     }
-    if (extension == ".mid" || extension == ".midi" || extension == ".smf") {
+    if (extension == ".mid" || extension == ".midi" || extension == ".smf" || extension == ".kar") {
         return Foreign::Midi;
     }
     if (extension == ".gp" || extension == ".gpx" || extension == ".gp5" || extension == ".gp4" ||
@@ -133,7 +133,7 @@ std::optional<Foreign> foreignFormat(const std::filesystem::path& path) {
 }
 
 constexpr std::string_view kImportTypes =
-    ".musicxml, .xml, .mxl, .mid, .midi, .smf, .gp, .gpx, .gp5, .gp4 and .gp3";
+    ".musicxml, .xml, .mxl, .mid, .midi, .smf, .kar, .gp, .gpx, .gp5, .gp4 and .gp3";
 constexpr std::string_view kExportTypes = ".musicxml, .xml, .mxl, .mid, .midi and .smf";
 
 // How the JSON output and the text output name a format.
@@ -225,7 +225,9 @@ struct ExportOptions {
 int runExport(bool json, const ExportOptions& options) {
     const std::filesystem::path out(options.out);
     const auto format = foreignFormat(out);
-    if (!format || *format == Foreign::GuitarPro) {
+    // Karaoke files are read for their words; Elara writes lyrics as plain MIDI.
+    if (!format || *format == Foreign::GuitarPro ||
+        lowercase(displayPath(out.extension())) == ".kar") {
         return usageError(
             std::format("cannot export to {}: supported files are {}", options.out, kExportTypes));
     }
