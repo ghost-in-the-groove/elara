@@ -1234,6 +1234,24 @@ void Startup::queueEffects() {
         if (!chordBefore.isEmpty()) {
             score_->setChordSymbol(chordBefore);
         }
+        // Beat text (ADR-0081): written, offered again, taken away.
+        const QString textBefore = score_->caretText();
+        score_->setBeatText(QStringLiteral("let ring"));
+        check(score_->caretText() == QStringLiteral("let ring"),
+              "the caret's beat did not get its text");
+        check(score_->undoName() == ScoreDocument::tr("Set beat text"),
+              "writing a text was not one undo step");
+        check(score_->caretStatus().contains(QStringLiteral("let ring")),
+              "the status does not show the text");
+        check(score_->songTexts().contains(QStringLiteral("let ring")),
+              "the popup does not offer the text");
+        score_->setBeatText(QString());
+        check(score_->caretText().isEmpty() &&
+                  score_->undoName() == ScoreDocument::tr("Remove beat text"),
+              "the text did not go");
+        if (!textBefore.isEmpty()) {
+            score_->setBeatText(textBefore);
+        }
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
         const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
@@ -1379,7 +1397,7 @@ void Startup::clickCursor() {
     // panel open at the caret can: they close first, and the click waits until
     // they are gone.
     for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel"),
-                                QStringLiteral("chordPopup")}) {
+                                QStringLiteral("chordPopup"), QStringLiteral("textPopup")}) {
         if (auto* popup = window_->findChild<QObject*>(name);
             popup != nullptr && popup->property("visible").toBool()) {
             QMetaObject::invokeMethod(popup, "close");
