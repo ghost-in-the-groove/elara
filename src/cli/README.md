@@ -221,6 +221,9 @@ neighbouring beats with the same one share a wedge (ADR-0078).
 runs over the beats slurred in a row to the beat after the last (ADR-0086).
 `fermata <short|normal|long|none>` holds the caret's beat, a note or a rest,
 half as long again, twice or three times as long (ADR-0085).
+`ottava <8va|8vb|15ma|15mb|none>` puts the caret's beat under an octave line:
+standard notation writes its notes one or two octaves nearer the staff, and
+neighbouring beats with the same one share a line (ADR-0089).
 `grace <semitones> [duration] [on]` adds a grace note that many semitones from
 the caret's note (on its string on a fretted staff, the lane's hit again on a
 drum staff), an eighth before the beat unless a duration or `on` says
