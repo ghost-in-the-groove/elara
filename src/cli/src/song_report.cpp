@@ -87,6 +87,9 @@ std::string measuresJson(const core::Song& song) {
         for (const core::TempoChange& change : header.tempoChanges) {
             if (change.offset == core::Fraction{}) {
                 out += std::format(R"(,"tempo":{})", jsonNumber(change.tempo.bpm()));
+                if (change.gradual) {
+                    out += R"(,"gradual":true)"; // ADR-0082
+                }
             }
         }
         if (!header.section.empty()) {

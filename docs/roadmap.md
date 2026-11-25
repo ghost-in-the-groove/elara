@@ -30,7 +30,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
     - [x] In the model and playback, read from Guitar Pro 6-8, kept by the
           native format
     - [x] Drawn after the tempo mark
-    - [ ] Typed in the CLI and the measure popup
+    - [x] Typed in the CLI and the measure popup
     - [ ] Written in MusicXML and MIDI
 - [x] Signs and jumps (segno, coda, D.C., D.S., Fine, To Coda) in the play order,
       `.elara` and the CLI (ADR-0049)

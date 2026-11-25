@@ -303,12 +303,16 @@ public:
     /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
     /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,
     /// 8 eighth...) and "dotted"; "own" when the measure starts a tempo
-    /// change, and "first" for the first measure, whose tempo is the song's.
+    /// change, "gradual" when that change moves to the next one's tempo
+    /// (ADR-0082), and "first" for the first measure, whose tempo is the song's.
     Q_INVOKABLE QVariantMap tempoAt(int measure) const;
     /// Sets the tempo from `measure` until the next change as one undo step
     /// ("Change tempo"), or with a bpm of 0 takes the measure's change away. On
     /// the first measure it sets the song's tempo.
     Q_INVOKABLE void setTempoFrom(int measure, int bpm);
+    /// Makes the tempo change that starts `measure` gradual or sudden again, as
+    /// one undo step ("Change tempo"); not on the first measure (ADR-0082).
+    Q_INVOKABLE void setTempoGradual(int measure, bool gradual);
     /// The name of the section that starts at `measure` (ADR-0062), empty when
     /// none does.
     Q_INVOKABLE QString sectionAt(int measure) const;

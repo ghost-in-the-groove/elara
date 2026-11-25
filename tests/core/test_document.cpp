@@ -357,6 +357,34 @@ TEST_CASE("A time signature change runs until the next change", "[core][document
                     std::out_of_range);
 }
 
+TEST_CASE("A tempo change can be made gradual and sudden again", "[core][document]") {
+    // ADR-0082: a measure without a change starts one at the tempo in force.
+    const Song original = smallSong();
+    Document doc(original);
+    doc.execute(elara::core::changeTempoGradual(doc.song(), 1, true));
+    CHECK(
+        doc.song().measureHeader(1).tempoChanges ==
+        std::vector<TempoChange>{TempoChange{.offset = {}, .tempo = Tempo(120), .gradual = true}});
+    CHECK(doc.undoName() == "Change tempo");
+    CHECK(elara::core::changeTempoGradual(doc.song(), 1, true) == nullptr);
+
+    // Another tempo keeps it gradual; it can be sudden again.
+    doc.execute(elara::core::changeTempo(doc.song(), 1, 90));
+    CHECK(doc.song().measureHeader(1).tempoChanges.front() ==
+          TempoChange{.offset = {}, .tempo = Tempo(90), .gradual = true});
+    doc.execute(elara::core::changeTempoGradual(doc.song(), 1, false));
+    CHECK_FALSE(doc.song().measureHeader(1).tempoChanges.front().gradual);
+    CHECK(doc.song().tempoAt(1) == Tempo(90));
+    CHECK(elara::core::changeTempoGradual(doc.song(), 2, false) == nullptr);
+    doc.undo();
+    doc.undo();
+    doc.undo();
+    CHECK(doc.song() == original);
+
+    CHECK_THROWS_AS(elara::core::changeTempoGradual(original, 0, true), std::invalid_argument);
+    CHECK_THROWS_AS(elara::core::changeTempoGradual(original, 4, true), std::out_of_range);
+}
+
 TEST_CASE("A tempo change starts a measure and holds until the next one", "[core][document]") {
     Song original = smallSong();
     // A change halfway through measure 1 is not the one that starts it.

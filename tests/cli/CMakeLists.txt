@@ -624,6 +624,27 @@ add_test(NAME cli.render_tempo COMMAND elara-cli --json render "${ELARA_CLI_TEMP
 set_tests_properties(cli.render_tempo PROPERTIES
   FIXTURES_REQUIRED cli_tempo
   PASS_REGULAR_EXPRESSION "\"tempo\":6,")
+# Gradual tempo changes (ADR-0082): measure 1 speeds up from 60 to measure 2's
+# 120, so it lasts 4 ln 2 s instead of 4 (2 s + 2.773 s + 2 s); drawn as the
+# marks of tempo-from with "accel." and a dashed line after the second.
+set(ELARA_CLI_GRADUAL "${CMAKE_CURRENT_BINARY_DIR}/cli-gradual.elara")
+add_test(NAME cli.edit_gradual_tempo
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_GRADUAL}" "add-track electric-guitar"
+    "append-measures 4" "tempo-from 1 60" "tempo-gradual 1 on" "tempo-from 3 120")
+set_tests_properties(cli.edit_gradual_tempo PROPERTIES
+  FIXTURES_SETUP cli_gradual
+  PASS_REGULAR_EXPRESSION "{[^}]*\"tempo\":60,\"gradual\":true},{[^}]*},{[^}]*\"tempo\":120}\\],.*\"undo\":{\"count\":5,\"next\":\"Change tempo\"}")
+add_test(NAME cli.sequence_gradual_tempo COMMAND elara-cli sequence "${ELARA_CLI_GRADUAL}")
+set_tests_properties(cli.sequence_gradual_tempo PROPERTIES
+  FIXTURES_REQUIRED cli_gradual
+  PASS_REGULAR_EXPRESSION "4 measures, 0 notes, [0-9]+ events in 9\\.545 s")
+add_test(NAME cli.render_gradual_tempo COMMAND elara-cli --json render "${ELARA_CLI_GRADUAL}")
+set_tests_properties(cli.render_gradual_tempo PROPERTIES
+  FIXTURES_REQUIRED cli_gradual
+  PASS_REGULAR_EXPRESSION "\"tempo\":8,")
+add_test(NAME cli.edit_rejects_gradual_word
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-gradual 1 maybe")
+set_tests_properties(cli.edit_rejects_gradual_word PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_clears_tempo
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 60"
     "tempo-from 1 none")

@@ -526,6 +526,14 @@
         <translation>Quitar el cambio de tempo</translation>
     </message>
     <message>
+        <source>Gradual</source>
+        <translation>Gradual</translation>
+    </message>
+    <message>
+        <source>Speed up or slow down to the next tempo change</source>
+        <translation>Acelerar o frenar hasta el siguiente cambio de tempo</translation>
+    </message>
+    <message>
         <source>From this measure until the next change.</source>
         <translation>Desde este compás hasta el siguiente cambio.</translation>
     </message>
