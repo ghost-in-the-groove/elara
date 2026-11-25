@@ -1,9 +1,7 @@
 {
  "format": "guitarpro",
  "out": null,
- "warnings": [
-  "Lead Guitar: grace notes dropped (measure 3)"
- ],
+ "warnings": [],
  "song": {
   "format": "elara",
   "formatVersion": 1,
@@ -208,6 +206,18 @@
         [
          {
           "duration": "4.",
+          "graces": [
+           {
+            "duration": "8",
+            "notes": [
+             {
+              "pitch": "B3",
+              "string": 4,
+              "fret": 7
+             }
+            ]
+           }
+          ],
           "notes": [
            {
             "pitch": "A3",

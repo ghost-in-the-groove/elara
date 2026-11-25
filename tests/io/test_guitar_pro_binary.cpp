@@ -63,7 +63,6 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     const core::Song& song = result.song;
     CHECK(result.warnings ==
           std::vector<std::string>{"Lead Guitar: chord names and diagrams dropped (measure 3)",
-                                   "Lead Guitar: grace notes dropped (measure 3)",
                                    "Lead Guitar: text dropped (measure 3)"});
     CHECK(core::validate(song).empty());
     CHECK(song.info().title == "Corpus Techniques");
@@ -147,9 +146,21 @@ TEST_CASE("Guitar Pro 5: a guitar keeps its tuning, capo, fret positions and tec
     CHECK(midiOf(low[0]) == std::vector<int>{42});
     CHECK(low[1].isRest());
 
-    // Measure 3: the grace note is gone, its main note stays.
+    // Measure 3: an on-beat sixteenth grace note at fret 1 of the main note's
+    // string slides into it (ADR-0079).
     const auto& bar3 = staff.measure(2).voices[0].beats;
     REQUIRE(bar3.size() == 3);
+    REQUIRE(bar3[0].graces.size() == 1);
+    const core::Grace& grace = bar3[0].graces[0];
+    CHECK(grace.duration == Duration(NoteValue::Sixteenth));
+    CHECK(grace.onBeat);
+    REQUIRE(grace.notes.size() == 1);
+    CHECK(grace.notes[0].position == core::FretPosition{.string = 2, .fret = 1});
+    CHECK(grace.notes[0].pitch.midiNumber() == 62);
+    CHECK(grace.notes[0].effects.slideOut == core::SlideOut::Legato);
+    CHECK(grace.notes[0].effects.dynamic == core::Dynamic::F);
+    CHECK_FALSE(bar3[0].notes[0].effects.legatoFromPrevious);
+    CHECK(bar3[1].graces.empty());
     CHECK(bar3[0].duration == Duration(NoteValue::Quarter, 1));
     CHECK(bar3[0].effects.pickStroke == core::PickStroke::Down);
     CHECK(bar3[0].notes[0].effects.slideOut == core::SlideOut::Shift);
@@ -371,6 +382,15 @@ TEST_CASE("Guitar Pro 3: text is Windows-1252, harmonics and whammy dips belong 
                                                         {.position = 50, .cents = -100},
                                                         {.position = 100, .cents = 0}}));
     CHECK(bar2[2].effects.strum == core::Strum::Down);
+    // A thirty-second grace note at fret 3, before the beat, pulled off to the
+    // open string (ADR-0079).
+    REQUIRE(bar2[2].graces.size() == 1);
+    CHECK(bar2[2].graces[0].duration == Duration(NoteValue::ThirtySecond));
+    CHECK_FALSE(bar2[2].graces[0].onBeat);
+    REQUIRE(bar2[2].graces[0].notes.size() == 1);
+    CHECK(bar2[2].graces[0].notes[0].position == core::FretPosition{.string = 6, .fret = 3});
+    CHECK(bar2[2].graces[0].notes[0].pitch.midiNumber() == 43);
+    CHECK(bar2[2].notes[0].effects.legatoFromPrevious);
 }
 
 TEST_CASE("Guitar Pro 3-5: other versions and damaged files are errors with a reason",

@@ -26,11 +26,24 @@ struct Note {
     friend bool operator==(const Note&, const Note&) = default;
 };
 
+/// Small notes played just before a beat, or on it, that take no time in the
+/// rhythm (ADR-0079). `duration` is the written value; an on-beat grace borrows
+/// its time from its own beat, the others from the beat before.
+struct Grace {
+    Duration duration{};
+    std::vector<Note> notes{};
+    bool onBeat = false;
+
+    friend bool operator==(const Grace&, const Grace&) = default;
+};
+
 /// Notes that start together and share a written duration. No notes = a rest.
+/// `graces` lead into the beat, in the order they are played (ADR-0079).
 struct Beat {
     Duration duration{};
     std::vector<Note> notes{};
     BeatEffects effects{};
+    std::vector<Grace> graces{};
 
     [[nodiscard]] bool isRest() const noexcept { return notes.empty(); }
 

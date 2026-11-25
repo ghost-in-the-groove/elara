@@ -114,6 +114,15 @@ core::Song richSong() {
     first = {strummed,   beat("8*3:2", {muted}), beat("8*3:2", {hammer}), beat("8*3:2", {tied}),
              beat("4."), beat("16..", {semi})};
     lead.measure(0).voices[2].beats = {beat("2"), beat("2")}; // voice 1 empty, voice 2 not
+    // Grace notes (ADR-0079): a slide into the semi-harmonic beat's string,
+    // then an on-beat dead note.
+    Note graceSlide = lead.frettedNote(4, 1);
+    graceSlide.effects.slideOut = SlideOut::Legato;
+    Note graceDead = lead.frettedNote(4, 2);
+    graceDead.effects.deadNote = true;
+    first.back().graces = {
+        Grace{.duration = Duration(NoteValue::Sixteenth), .notes = {graceSlide}},
+        Grace{.duration = *Duration::parse("16*3:2"), .notes = {graceDead}, .onBeat = true}};
 
     // Bass with techniques, piano on both staves, drums by key; a breve somewhere.
     Staff& bass = song.track(1).staff(0);
@@ -172,6 +181,12 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(json.find(R"("hairpin":"none")") == std::string::npos);
     CHECK(json.find(R"("dynamic":"mf")") == std::string::npos); // the default
     CHECK(json.find(R"("tiedFromPrevious":false)") == std::string::npos);
+    CHECK(
+        json.find(
+            R"({"duration":"16..","graces":[{"duration":"16","notes":[{"pitch":"F3","string":4,"fret":1,"effects":{"slideOut":"legato"}}]},{"duration":"16*3:2","notes":[{"pitch":"F#3","string":4,"fret":2,"effects":{"deadNote":true}}],"onBeat":true}],"notes":)") !=
+        std::string::npos);
+    CHECK(json.find(R"("graces":[])") == std::string::npos);
+    CHECK(json.find(R"("onBeat":false)") == std::string::npos);
     CHECK(json.find(R"("repeatStart":true)") != std::string::npos);
     CHECK(json.find(R"("repeatTimes":3,"alternateEndings":[1,2],"section":"Chorus"})") !=
           std::string::npos);

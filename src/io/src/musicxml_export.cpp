@@ -1233,6 +1233,9 @@ private:
 
     void writeBeat(XmlWriter& xml, const BeatPlace& place) {
         const Beat& beat = *place.beat;
+        if (!beat.graces.empty()) {
+            warn("grace notes dropped", place.measure);
+        }
         if (beat.isRest()) {
             BeatEffects others = beat.effects;
             others.hairpin = Hairpin::None;

@@ -87,6 +87,11 @@ std::unique_ptr<Command> makePaste(const Song& song, const MeasureClip& clip, st
                             for (Note& note : beat.notes) {
                                 note.position.reset();
                             }
+                            for (Grace& grace : beat.graces) {
+                                for (Note& note : grace.notes) {
+                                    note.position.reset();
+                                }
+                            }
                         }
                     }
                 } else if (place) {

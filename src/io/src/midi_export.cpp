@@ -203,6 +203,7 @@ void reportDropped(const Track& track, Warnings& warnings) {
                             warnings.add(who, what, m);
                         }
                     };
+                    drop(!beat.graces.empty(), "grace notes dropped");
                     if (!beat.notes.empty()) {
                         drop(!be.whammyBar.isEmpty(), "whammy bar dropped");
                         drop(be.pickStroke != core::PickStroke::None, "pick strokes dropped");

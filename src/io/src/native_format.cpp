@@ -295,6 +295,13 @@ private:
     yyjson_mut_val* beat(const Beat& value) {
         yyjson_mut_val* object = yyjson_mut_obj(doc_);
         addText(object, "duration", value.duration.toString());
+        if (!value.graces.empty()) {
+            yyjson_mut_val* graces = yyjson_mut_arr(doc_);
+            for (const Grace& g : value.graces) {
+                yyjson_mut_arr_append(graces, grace(g));
+            }
+            add(object, "graces", graces);
+        }
         if (!value.notes.empty()) {
             yyjson_mut_val* notes = yyjson_mut_arr(doc_);
             for (const Note& n : value.notes) {
@@ -305,6 +312,20 @@ private:
         if (value.effects != BeatEffects{}) {
             add(object, "effects", beatEffects(value.effects));
         }
+        return object;
+    }
+
+    yyjson_mut_val* grace(const Grace& value) {
+        yyjson_mut_val* object = yyjson_mut_obj(doc_);
+        addText(object, "duration", value.duration.toString());
+        if (!value.notes.empty()) {
+            yyjson_mut_val* notes = yyjson_mut_arr(doc_);
+            for (const Note& n : value.notes) {
+                yyjson_mut_arr_append(notes, note(n));
+            }
+            add(object, "notes", notes);
+        }
+        addFlag(object, "onBeat", value.onBeat);
         return object;
     }
 
@@ -836,6 +857,13 @@ private:
             fail("expected an object");
         }
         Beat beat{.duration = duration(object, "duration"), .notes = {}};
+        if (yyjson_val* graces = optionalArray(object, "graces")) {
+            Scope scope(*this, "graces");
+            beat.graces.reserve(yyjson_arr_size(graces));
+            forEach(graces, [&](std::size_t, yyjson_val* grace) {
+                beat.graces.push_back(readGrace(grace, strings));
+            });
+        }
         if (yyjson_val* notes = optionalArray(object, "notes")) {
             Scope scope(*this, "notes");
             beat.notes.reserve(yyjson_arr_size(notes));
@@ -848,6 +876,22 @@ private:
             beat.effects = readBeatEffects(effects);
         }
         return beat;
+    }
+
+    Grace readGrace(yyjson_val* object, int strings) {
+        if (!yyjson_is_obj(object)) {
+            fail("expected an object");
+        }
+        Grace grace{.duration = duration(object, "duration"), .notes = {}};
+        if (yyjson_val* notes = optionalArray(object, "notes")) {
+            Scope scope(*this, "notes");
+            grace.notes.reserve(yyjson_arr_size(notes));
+            forEach(notes, [&](std::size_t, yyjson_val* note) {
+                grace.notes.push_back(readNote(note, strings));
+            });
+        }
+        grace.onBeat = flag(object, "onBeat");
+        return grace;
     }
 
     Note readNote(yyjson_val* object, int strings) {

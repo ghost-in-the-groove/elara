@@ -233,6 +233,29 @@ Dynamic dynamicFor(int code) {
     return static_cast<Dynamic>(std::clamp(code, 1, 8) - 1);
 }
 
+/// The written value of a grace note: 1 a thirty-second, 2 a twenty-fourth
+/// (a sixteenth triplet), 3 a sixteenth.
+Duration graceDuration(int code) {
+    switch (code) {
+    case 2:
+        return Duration(NoteValue::Sixteenth, 0, core::Tuplet(3, 2));
+    case 3:
+        return Duration(NoteValue::Sixteenth);
+    default:
+        return Duration(NoteValue::ThirtySecond);
+    }
+}
+
+/// A grace note as Guitar Pro 3-5 store it, on the note it leads into.
+struct GraceRead {
+    int fret = 0;
+    int dynamic = 6;
+    int transition = 0; // 0 none, 1 slide, 2 bend, 3 hammer
+    Duration duration;
+    bool dead = false;
+    bool onBeat = false;
+};
+
 std::optional<NoteValue> tremoloSpeed(int code) {
     switch (code) {
     case 1:
@@ -933,8 +956,9 @@ private:
         }
         effects.vibrato = defaults.vibrato;
         bool legatoToNext = false;
+        std::optional<GraceRead> grace;
         if ((flags & 0x08U) != 0) {
-            readNoteEffects(effects, beat.effects, legatoToNext, fret, track.name, m);
+            readNoteEffects(effects, beat.effects, legatoToNext, grace, fret, track.name, m);
         }
         if (defaults.harmonic == HarmonicKind::Natural) {
             effects.harmonic = {.kind = HarmonicKind::Natural,
@@ -995,11 +1019,80 @@ private:
                 warnings_.add(track.name, "ties after a rest played as new notes", m);
             }
         }
+        if (grace) {
+            addGrace(track, beat, note, string, *grace, m);
+        }
         return note;
     }
 
+    /// Puts a note's grace note on the note's string in the grace leading into
+    /// its beat, one grace for all of the beat's grace notes (ADR-0079).
+    void addGrace(const TrackData& track, Beat& beat, Note& note, int string, const GraceRead& read,
+                  std::size_t m) {
+        Note grace;
+        grace.effects.dynamic = dynamicFor(read.dynamic);
+        grace.effects.deadNote = read.dead;
+        const int fret = std::max(read.fret, 0);
+        if (track.percussion) {
+            grace.pitch = fret <= 127 ? Pitch::fromMidi(fret) : note.pitch; // a flam
+        } else {
+            const int midi =
+                track.strings[static_cast<std::size_t>(string - 1)] + track.capo + fret;
+            if (midi > 127) {
+                warnings_.add(track.name, "notes without a pitch dropped", m);
+                return;
+            }
+            grace.pitch = headers_[m].key.spell(midi);
+            if (track.capo + fret <= Tuning::kMaxFret) {
+                grace.position = core::FretPosition{.string = static_cast<std::int8_t>(string),
+                                                    .fret = static_cast<std::int8_t>(fret)};
+            }
+        }
+        switch (read.transition) {
+        case 1:
+            grace.effects.slideOut = SlideOut::Legato;
+            break;
+        case 2:
+            warnings_.add(track.name, "bends from grace notes dropped", m);
+            break;
+        case 3:
+            note.effects.legatoFromPrevious = true;
+            break;
+        default:
+            break;
+        }
+        if (beat.graces.empty()) {
+            beat.graces.push_back(
+                core::Grace{.duration = read.duration, .notes = {}, .onBeat = read.onBeat});
+        }
+        beat.graces.front().notes.push_back(std::move(grace));
+    }
+
+    GraceRead readGrace() {
+        GraceRead grace;
+        if (version_ >= 500) {
+            grace.fret = in_.u8();
+            grace.dynamic = in_.u8();
+            grace.transition = in_.u8();
+            grace.duration = graceDuration(in_.u8());
+            const std::uint8_t flags = in_.u8();
+            grace.dead = (flags & 0x01U) != 0;
+            grace.onBeat = (flags & 0x02U) != 0;
+        } else {
+            // Guitar Pro 3-4: the duration comes before the transition, and a
+            // dead grace note has fret -1.
+            grace.fret = in_.i8();
+            grace.dynamic = in_.u8();
+            grace.duration = graceDuration(in_.u8());
+            grace.transition = in_.i8();
+            grace.dead = grace.fret < 0;
+        }
+        return grace;
+    }
+
     void readNoteEffects(core::NoteEffects& effects, core::BeatEffects& beatEffects,
-                         bool& legatoToNext, int fret, const std::string& who, std::size_t m) {
+                         bool& legatoToNext, std::optional<GraceRead>& grace, int fret,
+                         const std::string& who, std::size_t m) {
         const std::uint8_t first = in_.u8();
         const std::uint8_t second = version_ >= 400 ? in_.u8() : std::uint8_t{0};
         if ((first & 0x01U) != 0) {
@@ -1011,8 +1104,7 @@ private:
         }
         effects.letRing = (first & 0x08U) != 0;
         if ((first & 0x10U) != 0) {
-            in_.skip(version_ >= 500 ? 5 : 4);
-            warnings_.add(who, "grace notes dropped", m);
+            grace = readGrace();
         }
         if (version_ < 400) {
             return;
