@@ -3,8 +3,23 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 namespace elara::core {
+
+ChordDiagram ChordDiagram::ofFrets(std::vector<std::int8_t> frets) {
+    constexpr int kFretsFromNut = 4; // a diagram shows four frets at least
+    int lowest = Tuning::kMaxFret;
+    int highest = 0;
+    for (const std::int8_t fret : frets) {
+        if (fret > 0) {
+            lowest = std::min<int>(lowest, fret);
+            highest = std::max<int>(highest, fret);
+        }
+    }
+    return {.firstFret = static_cast<std::uint8_t>(highest > kFretsFromNut ? lowest : 1),
+            .frets = std::move(frets)};
+}
 
 Fraction Voice::length() const {
     Fraction total;

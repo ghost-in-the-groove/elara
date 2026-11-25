@@ -862,33 +862,20 @@ std::optional<ChordDiagram> diagramOf(const Staff& staff, const Beat& beat) {
     if (!staff.isFretted() || isDrumStaff(staff)) {
         return std::nullopt;
     }
-    constexpr int kFretsFromNut = 4; // a diagram shows four frets at least
     const int strings = staff.tuning()->stringCount();
-    ChordDiagram diagram{
-        .firstFret = 1,
-        .frets = std::vector<std::int8_t>(static_cast<std::size_t>(strings), ChordDiagram::kMuted)};
+    std::vector<std::int8_t> frets(static_cast<std::size_t>(strings), ChordDiagram::kMuted);
     int fretted = 0;
-    int lowest = Tuning::kMaxFret;
-    int highest = 0;
     for (const Note& note : beat.notes) {
         if (!note.position || note.position->string < 1 || note.position->string > strings) {
             continue;
         }
-        const int fret = note.position->fret;
-        diagram.frets[static_cast<std::size_t>(note.position->string - 1)] = note.position->fret;
+        frets[static_cast<std::size_t>(note.position->string - 1)] = note.position->fret;
         ++fretted;
-        if (fret > 0) {
-            lowest = std::min(lowest, fret);
-            highest = std::max(highest, fret);
-        }
     }
     if (fretted < 2) {
         return std::nullopt;
     }
-    if (highest > kFretsFromNut) {
-        diagram.firstFret = static_cast<std::uint8_t>(lowest);
-    }
-    return diagram;
+    return ChordDiagram::ofFrets(std::move(frets));
 }
 
 std::string_view trimmed(std::string_view text) {

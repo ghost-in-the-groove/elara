@@ -5,14 +5,18 @@
 #pragma once
 
 #include <elara/core/commands.hpp>
+#include <elara/core/measure.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/song.hpp>
+#include <elara/core/tuning.hpp>
 
 #include <cstddef>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace elara::core {
@@ -41,6 +45,22 @@ struct Interval {
 /// mode; its enharmonic twin when that would need more than seven accidentals.
 [[nodiscard]] KeySignature transposed(const KeySignature& key, Interval interval);
 
+/// `name` with its root and bass moved by `interval`, each spelled with one
+/// sharp or flat at most (ADR-0080): G7 up a major second is A7, Bb7/F is
+/// C7/G. A root that would need a double sharp or flat takes the step next
+/// to it, and the bass moves with it: Gb/Bb up a diminished fifth is C/E
+/// rather than Dbb/Fb. A name that does not start with a pitch ("N.C.") stays
+/// as it is.
+[[nodiscard]] std::string transposedChordName(std::string_view name, Interval interval);
+
+/// `diagram` moved `semitones` along the neck: every played string's fret
+/// moves, and the grid starts at the nut unless a fret lies past the fourth.
+/// When a fret would fall below the nut or past `maxFret` (frets counted from
+/// the capo), the same chord an octave up, else an octave down; std::nullopt
+/// when neither fits.
+[[nodiscard]] std::optional<ChordDiagram>
+transposedDiagram(const ChordDiagram& diagram, int semitones, int maxFret = Tuning::kMaxFret);
+
 /// What to transpose: `semitones` up (down when negative) over measures
 /// [first, first + count) of `tracks`, every track when empty. Percussion
 /// tracks never move.
@@ -53,7 +73,9 @@ struct Transposition {
 
 /// One undo step that transposes as `what` says (ADR-0026). The interval comes
 /// from the key at the first measure (Interval::fromSemitones). Key
-/// signatures move only when every pitched track moves. A fretted note keeps
+/// signatures move only when every pitched track moves. Chord symbols move
+/// with their beats' notes (transposedChordName, transposedDiagram). A
+/// fretted note keeps
 /// its string when its new fret is on the neck; otherwise it moves to the
 /// nearest free string that can play it. Throws std::out_of_range for a
 /// missing track or measure, and std::invalid_argument when a note would leave
