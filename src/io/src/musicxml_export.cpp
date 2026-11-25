@@ -1721,10 +1721,11 @@ private:
                                (note.position && !percussion_) || !fx.bend.isEmpty() ||
                                fx.harmonic.kind != HarmonicKind::None ||
                                fx.fingering != Finger::None || fx.pluck != Finger::None;
+        const bool breath = firstNote && beatFx.breath != Breath::None; // ADR-0095
         const bool articulations = fx.staccato || fx.staccatissimo || fx.tenuto ||
                                    fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
                                    fx.slideOut == SlideOut::Downwards ||
-                                   fx.slideOut == SlideOut::Upwards;
+                                   fx.slideOut == SlideOut::Upwards || breath;
         const bool arpeggiate = beatFx.strum != Strum::None;
         const bool fermata = firstNote && beatFx.fermata != Fermata::None;
         const bool slurs = firstNote && (place.slurStart != 0 || place.slurStop != 0);
@@ -1826,6 +1827,9 @@ private:
                     xml.empty("doit");
                 } else if (fx.slideOut == SlideOut::Downwards) {
                     xml.empty("falloff");
+                }
+                if (breath) {
+                    xml.empty(beatFx.breath == Breath::Caesura ? "caesura" : "breath-mark");
                 }
                 xml.close("articulations");
             }

@@ -453,6 +453,10 @@ private:
 
 // ---- Lyrics (ADR-0084) -----------------------------------------------------------------
 
+// Breath marks and caesuras after a beat (ADR-0095).
+inline constexpr double kBreathGap = 0.4;   // between the beat's ink and the mark
+inline constexpr double kBreathRaise = 0.5; // between the staff or the notes and a comma
+
 // Fingerings (ADR-0093).
 inline constexpr double kFingeringGap = 0.3;       // between a fingering and the ink by it
 inline constexpr double kFingeringStackGap = 0.15; // between fingerings one over the other

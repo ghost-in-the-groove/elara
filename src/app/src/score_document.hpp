@@ -102,6 +102,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(int caretFermata READ caretFermata NOTIFY caretChanged)
     Q_PROPERTY(int caretOttava READ caretOttava NOTIFY caretChanged)
     Q_PROPERTY(int caretPedal READ caretPedal NOTIFY caretChanged)
+    Q_PROPERTY(int caretBreath READ caretBreath NOTIFY caretChanged)
     Q_PROPERTY(bool caretSlur READ caretSlur NOTIFY caretChanged)
     Q_PROPERTY(int caretGraceNotes READ caretGraceNotes NOTIFY caretChanged)
     Q_PROPERTY(QString caretChord READ caretChord NOTIFY caretChanged)
@@ -494,6 +495,9 @@ public:
     /// Puts the caret's beat, a note or a rest, under the sustain pedal (a
     /// core::Pedal: 1 down, 2 changed there; 0 up) (ADR-0092).
     Q_INVOKABLE void setPedal(int pedal);
+    /// The break after the caret's beat (ADR-0095), numbered as core::Breath:
+    /// 0 none, 1 a breath mark, 2 a caesura.
+    Q_INVOKABLE void setBreath(int breath);
     /// Slurs the caret's beat to the next beat of its voice, or takes the slur
     /// off; beats slurred in a row share one slur (ADR-0086).
     Q_INVOKABLE void setSlur(bool slurred);
@@ -537,6 +541,7 @@ public:
     [[nodiscard]] int caretFermata() const;
     [[nodiscard]] int caretOttava() const;
     [[nodiscard]] int caretPedal() const;
+    [[nodiscard]] int caretBreath() const;
     [[nodiscard]] bool caretSlur() const;
     [[nodiscard]] int caretGraceNotes() const;
     [[nodiscard]] QString caretChord() const;

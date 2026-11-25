@@ -306,6 +306,25 @@ std::string quarterNote(std::string_view step, std::string_view rest) {
                        step, rest);
 }
 
+TEST_CASE("MusicXML: breath marks and caesuras go after their beats", "[musicxml]") {
+    // ADR-0095: on any note of the beat; a caesura wins over a breath mark.
+    const auto marked = [](std::string_view step, std::string_view marks) {
+        return quarterNote(step, std::format("<notations><articulations>{}</articulations>"
+                                             "</notations>",
+                                             marks));
+    };
+    const ImportResult result =
+        parse(onePart(marked("C", "<breath-mark/>") + marked("D", "<caesura/>") +
+                      marked("E", "<breath-mark/><caesura/>") + quarterNote("F", "")));
+    const std::vector<core::Beat>& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    CHECK(beats[0].effects.breath == core::Breath::Comma);
+    CHECK(beats[1].effects.breath == core::Breath::Caesura);
+    CHECK(beats[2].effects.breath == core::Breath::Caesura);
+    CHECK(beats[3].effects.breath == core::Breath::None);
+    CHECK(result.warnings.empty());
+}
+
 TEST_CASE("MusicXML: staccatissimo is its own mark, spiccato a staccato", "[musicxml]") {
     // ADR-0094.
     const auto marked = [](std::string_view step, std::string_view marks) {

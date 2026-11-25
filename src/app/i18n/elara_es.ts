@@ -238,6 +238,10 @@
         <translation>Pedal de resonancia: otra vez para cambiarlo</translation>
     </message>
     <message>
+        <source>Breath mark: again for a caesura</source>
+        <translation>Respiración: otra vez para una cesura</translation>
+    </message>
+    <message>
         <source>Beat</source>
         <translation>Tiempo</translation>
     </message>
@@ -1864,6 +1868,14 @@
     <message>
         <source>Sustain pedal</source>
         <translation>Pedal de resonancia</translation>
+    </message>
+    <message>
+        <source>Caesura</source>
+        <translation>Cesura</translation>
+    </message>
+    <message>
+        <source>Breath mark</source>
+        <translation>Respiración</translation>
     </message>
     <message>
         <source>Grace notes</source>

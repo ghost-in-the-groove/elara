@@ -57,6 +57,8 @@ constexpr std::array kFermataNames =
 constexpr std::array kOttavaNames =
     std::to_array<std::string_view>({"none", "8va", "8vb", "15ma", "15mb"});
 constexpr std::array kPedalNames = std::to_array<std::string_view>({"none", "down", "change"});
+constexpr std::array kBreathNames =
+    std::to_array<std::string_view>({"none", "comma", "caesura"}); // ADR-0095
 constexpr std::array kBassNames = std::to_array<std::string_view>({"none", "tap", "slap", "pop"});
 constexpr std::array kJumpToNames =
     std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
@@ -475,6 +477,7 @@ private:
         addFlag(object, "slur", fx.slur);
         addEnumIfNot(object, "ottava", kOttavaNames, fx.ottava, Ottava::None);
         addEnumIfNot(object, "pedal", kPedalNames, fx.pedal, Pedal::None);
+        addEnumIfNot(object, "breath", kBreathNames, fx.breath, Breath::None);
         return object;
     }
 
@@ -1175,6 +1178,7 @@ private:
         fx.slur = flag(object, "slur");
         fx.ottava = enumValue(object, "ottava", kOttavaNames, Ottava::None);
         fx.pedal = enumValue(object, "pedal", kPedalNames, Pedal::None);
+        fx.breath = enumValue(object, "breath", kBreathNames, Breath::None);
         return fx;
     }
 

@@ -707,6 +707,34 @@ TEST_CASE("MusicXML export: octave lines come back on every voice of their staff
     CHECK(count(R"(<octave-shift type="stop")") == 3);
 }
 
+TEST_CASE("MusicXML export: breath marks and caesuras come back after their beats",
+          "[musicxml][export]") {
+    // ADR-0095: written once, on the beat's first note.
+    core::Song song;
+    song.appendMeasures(1);
+    const std::size_t p =
+        song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("piano")));
+    const core::Duration half(core::NoteValue::Half);
+    const auto key = [](int midi) {
+        return core::Note{.pitch = core::Pitch::fromMidi(midi)};
+    };
+    core::Beat comma = beatOf(half, {key(60), key(64)});
+    comma.effects.breath = core::Breath::Comma;
+    core::Beat caesura = beatOf(half, {key(67)});
+    caesura.effects.breath = core::Breath::Caesura;
+    song.track(p).staff(0).measure(0).voices[0].beats = {comma, caesura};
+    const auto exported = exportMusicXml(song);
+    CHECK(exported.warnings.empty());
+    std::size_t marks = 0;
+    for (std::size_t at = exported.data.find("<breath-mark/>"); at != std::string::npos;
+         at = exported.data.find("<breath-mark/>", at + 1)) {
+        ++marks;
+    }
+    CHECK(marks == 1);
+    CHECK(exported.data.find("<caesura/>") != std::string::npos);
+    requireSame(song, roundTrip(song));
+}
+
 TEST_CASE("MusicXML export: the sustain pedal comes back under its staff", "[musicxml][export]") {
     // ADR-0092: a start where it goes down, a change, a stop after the last
     // beat under it; over a rest and on into the next measure.

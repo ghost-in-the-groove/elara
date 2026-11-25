@@ -319,6 +319,7 @@ struct Chord {
     bool slash = false; // a grace note before the beat: its stem is slashed
     // The outer edge of its staccato and accents, on the notehead side.
     std::optional<double> marks;
+    double breathX = 0.0; // a breath mark's or a caesura's left, from x (ADR-0095)
 };
 
 // What a slur needs of a beat under it (ADR-0086): where its end goes and
@@ -516,6 +517,7 @@ private:
             drawGraces(chord);
             ties(chord);
             articulations(chord);
+            breath(chord);
         }
         for (const Column& column : columns_) {
             if (column.roll != core::Strum::None) {
@@ -1045,6 +1047,7 @@ private:
             chord.headRight = box.width();
             chord.left = 0.0;
             chord.right = box.width() + dotsWidth(chord.duration.dots());
+            makeRoomForBreath(chord);
             return;
         }
         auto& heads = chord.heads;
@@ -1092,6 +1095,52 @@ private:
                 stemAnchor(base, chord.stemUp).x - (chord.stemUp ? stemWidth : 0.0);
             chord.right = std::max(chord.right, stemLeft + metrics(flag).box.northEast.x);
         }
+        makeRoomForBreath(chord);
+    }
+
+    // The glyph of the break after a chord's beat, if any (ADR-0095).
+    [[nodiscard]] static std::optional<Glyph> breathGlyph(const Chord& chord) {
+        if (chord.beat == nullptr) {
+            return std::nullopt;
+        }
+        switch (chord.beat->effects.breath) {
+        case core::Breath::Comma:
+            return Glyph::BreathMarkComma;
+        case core::Breath::Caesura:
+            return Glyph::Caesura;
+        case core::Breath::None:
+            break;
+        }
+        return std::nullopt;
+    }
+
+    // A breath mark or a caesura goes right of the chord's ink, which then
+    // reaches over it so that the next beat makes room.
+    void makeRoomForBreath(Chord& chord) {
+        if (const std::optional<Glyph> mark = breathGlyph(chord)) {
+            chord.breathX = chord.right + kBreathGap;
+            chord.right = chord.breathX + metrics(*mark).box.width();
+        }
+    }
+
+    // Draws it: a comma over the staff, clear of the chord's notes and marks;
+    // a caesura through the top line, from the space under it.
+    void breath(const Chord& chord) {
+        const std::optional<Glyph> mark = breathGlyph(chord);
+        if (!mark) {
+            return;
+        }
+        const BoundingBox& box = metrics(*mark).box;
+        const double x = chord.x + chord.breathX - box.southWest.x;
+        if (*mark == Glyph::Caesura) {
+            glyph(*mark, x, yOf(2) + box.southWest.y, Role::Articulation);
+            return;
+        }
+        double bottom = std::min(yOf(0), chord.rest ? yOf(0) : chord.inkTop);
+        if (chord.marks && *chord.marks < bottom) {
+            bottom = *chord.marks;
+        }
+        glyph(*mark, x, bottom - kBreathRaise + box.southWest.y, Role::Articulation);
     }
 
     [[nodiscard]] double dotsWidth(int dots) const {

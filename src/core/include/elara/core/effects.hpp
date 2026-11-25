@@ -272,6 +272,11 @@ enum class Ottava : std::uint8_t {
 /// and presses it again where its beat starts.
 enum class Pedal : std::uint8_t { None, Down, Change };
 
+/// A break after the beat (ADR-0095): a breath mark (a comma over the staff)
+/// takes a little off the end of its notes, a caesura (two strokes through
+/// the top line) a little more.
+enum class Breath : std::uint8_t { None, Comma, Caesura };
+
 /// Effects that apply to every note of a beat.
 struct BeatEffects {
     BendCurve whammyBar{};
@@ -288,6 +293,7 @@ struct BeatEffects {
     // a class whose enum bit-field has a default member initializer.
     Ottava ottava = Ottava::None; // ADR-0089
     Pedal pedal = Pedal::None;    // ADR-0092
+    Breath breath = Breath::None; // after the beat (ADR-0095)
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };

@@ -591,6 +591,53 @@ TEST_CASE("Tablature layout: a staccatissimo wedge in the place of a staccato do
     }
 }
 
+TEST_CASE("Standard notation: a breath mark over the staff and a caesura through it",
+          "[notation][tab]") {
+    // ADR-0095: right of their beats, which make room for them among sixteenths.
+    Note note = fretted(3, 2); // A3, written A4
+    Beat comma = beatOf({note}, NoteValue::Sixteenth);
+    comma.effects.breath = elara::core::Breath::Comma;
+    Beat caesura = beatOf({note}, NoteValue::Sixteenth);
+    caesura.effects.breath = elara::core::Breath::Caesura;
+    const StaffSelection standard{};
+    const auto headsOf = [&](const Song& song) {
+        const DisplayList list = layoutSystem(song, std::span(&standard, 1), bravura());
+        auto heads = byRole(list.glyphs, Role::Notehead);
+        std::ranges::stable_sort(heads, {}, [](const GlyphItem& item) { return item.origin.x; });
+        return std::pair(list, heads);
+    };
+    const auto [plain, plainHeads] = headsOf(
+        guitar({{beatOf({note}, NoteValue::Sixteenth), beatOf({note}, NoteValue::Sixteenth),
+                 beatOf({note}, NoteValue::Sixteenth), beatOf({note}, NoteValue::Sixteenth)}}));
+    const auto [marked, heads] = headsOf(guitar({{comma, beatOf({note}, NoteValue::Sixteenth),
+                                                  caesura, beatOf({note}, NoteValue::Sixteenth)}}));
+    REQUIRE(heads.size() == 4);
+    REQUIRE(plainHeads.size() == 4);
+    const auto marks = byRole(marked.glyphs, Role::Articulation);
+    REQUIRE(marks.size() == 2);
+    const auto find = [&](Glyph glyph) {
+        const auto found = std::ranges::find(marks, glyph, &GlyphItem::glyph);
+        REQUIRE(found != marks.end());
+        return *found;
+    };
+    const GlyphItem breath = find(Glyph::BreathMarkComma);
+    const GlyphItem cut = find(Glyph::Caesura);
+    const auto& headBox = bravura().metrics(heads[0].glyph).box;
+    // Between their beat and the next one.
+    CHECK(breath.origin.x > heads[0].origin.x + headBox.northEast.x);
+    CHECK(breath.origin.x + bravura().metrics(Glyph::BreathMarkComma).box.northEast.x <
+          heads[1].origin.x);
+    CHECK(cut.origin.x > heads[2].origin.x + headBox.northEast.x);
+    CHECK(cut.origin.x < heads[3].origin.x);
+    // The comma over the top line (y 0), the caesura across it.
+    CHECK(breath.origin.y - bravura().metrics(Glyph::BreathMarkComma).box.southWest.y < 0.0);
+    const auto& cutBox = bravura().metrics(Glyph::Caesura).box;
+    CHECK(cut.origin.y - cutBox.northEast.y < 0.0);
+    CHECK(cut.origin.y - cutBox.southWest.y > 0.0);
+    // The beats after them moved right to make room.
+    CHECK(heads[1].origin.x - heads[0].origin.x > plainHeads[1].origin.x - plainHeads[0].origin.x);
+}
+
 TEST_CASE("Tablature layout: techniques go above the notation without tablature",
           "[notation][tab]") {
     Note muted = fretted(6, 0);
