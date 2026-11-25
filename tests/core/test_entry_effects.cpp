@@ -355,6 +355,30 @@ TEST_CASE("Effects: strums, pick strokes and tremolo picking on the caret's beat
     CHECK(setBeatEffects(doc.song(), at(1, 1, 1), held).command == nullptr); // the free slot
 }
 
+TEST_CASE("Effects: a trill to the next step of the key, each note of a chord its own",
+          "[core][entry][effects]") {
+    // ADR-0090: in D major E trills with F#, two semitones up, C# with D, one.
+    Song song =
+        oneBeat("piano", {Note{.pitch = *Pitch::parse("E4")}, Note{.pitch = *Pitch::parse("C#5")}});
+    song.measureHeader(0).keySignature = KeySignature(2, KeyMode::Major);
+    Document doc(std::move(song));
+    run(doc, setTrillToNextStep(doc.song(), at(0, 0), NoteValue::Sixteenth));
+    CHECK(doc.undoName() == "Change trill");
+    CHECK(notesAt(doc.song(), 0, 0)[0].effects.trill ==
+          Trill{.semitones = 2, .speed = NoteValue::Sixteenth});
+    CHECK(notesAt(doc.song(), 0, 0)[1].effects.trill ==
+          Trill{.semitones = 1, .speed = NoteValue::Sixteenth});
+    CHECK(setTrillToNextStep(doc.song(), at(0, 0), NoteValue::Sixteenth).command == nullptr);
+
+    // On a fretted staff the caret's string only: fret 5 on string 2 is E4.
+    Document guitar(guitarSong());
+    run(guitar, setTrillToNextStep(guitar.song(), at(0, 0, 2), NoteValue::ThirtySecond));
+    CHECK(onString(guitar.song(), 0, 0, 2).effects.trill.semitones == 1); // to F in C major
+    CHECK(!onString(guitar.song(), 0, 0, 3).effects.trill.isTrill());
+    // A rest has none to trill.
+    CHECK(setTrillToNextStep(guitar.song(), at(0, 2), NoteValue::ThirtySecond).command == nullptr);
+}
+
 TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the caret's notes",
           "[core][entry][effects]") {
     Document doc(guitarSong());

@@ -610,6 +610,30 @@ add_test(NAME cli.dump_effect_kinds COMMAND elara-cli --json dump "${ELARA_CLI_E
 set_tests_properties(cli.dump_effect_kinds PROPERTIES
   FIXTURES_REQUIRED cli_effect_kinds
   PASS_REGULAR_EXPRESSION "\"string\":1,\"fret\":12,\"effects\":{\"harmonic\":{\"kind\":\"artificial\",\"fret\":12},\"slideIn\":\"from-below\",\"slideOut\":\"downwards\",\"vibrato\":\"wide\",\"accent\":\"marcato\"}}.*\"string\":1,\"fret\":7,\"effects\":{\"harmonic\":{\"kind\":\"natural\",\"fret\":7}}")
+# Trills at the caret (ADR-0090): in D major the E trills with F# by the
+# key, the G down two semitones in sixty-fourths, and the A's trill comes off.
+set(ELARA_CLI_TRILLS "${CMAKE_CURRENT_BINARY_DIR}/cli-trills.elara")
+add_test(NAME cli.edit_sets_trills
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_TRILLS}" "add-track piano"
+    "append-measures 1" "key 0 D major" "pitch E" "trill on" right "pitch G" "trill -2 64" right
+    "pitch A" "trill on 16" "trill none")
+set_tests_properties(cli.edit_sets_trills PROPERTIES
+  FIXTURES_SETUP cli_trills
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":[0-9]+,\"next\":\"Change trill\"}")
+add_test(NAME cli.dump_trills COMMAND elara-cli --json dump "${ELARA_CLI_TRILLS}")
+set_tests_properties(cli.dump_trills PROPERTIES
+  FIXTURES_REQUIRED cli_trills
+  PASS_REGULAR_EXPRESSION "\"E5\",\"effects\":{\"trill\":{\"semitones\":2,\"speed\":\"32\"}}}.*\"G5\",\"effects\":{\"trill\":{\"semitones\":-2,\"speed\":\"64\"}}}.*\"A5\"}\\]")
+add_test(NAME cli.render_trills COMMAND elara-cli --json render "${ELARA_CLI_TRILLS}")
+set_tests_properties(cli.render_trills PROPERTIES
+  FIXTURES_REQUIRED cli_trills
+  PASS_REGULAR_EXPRESSION "\"ornament\":[1-9]")
+add_test(NAME cli.edit_rejects_trill_past_an_octave
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "trill 13")
+add_test(NAME cli.edit_rejects_unknown_trill_speed
+  COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "trill on 128")
+set_tests_properties(cli.edit_rejects_trill_past_an_octave cli.edit_rejects_unknown_trill_speed
+  PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_rejects_unknown_vibrato
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "vibrato huge")
 add_test(NAME cli.edit_rejects_natural_harmonic_off_node

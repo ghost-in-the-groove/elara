@@ -764,6 +764,16 @@ Entry setTrill(const Song& song, const Caret& at, Trill trill) {
                          [trill](Note& note) { note.effects.trill = trill; });
 }
 
+Entry setTrillToNextStep(const Song& song, const Caret& at, NoteValue speed) {
+    const Caret caret = clampCaret(song, at);
+    const KeySignature& key = song.measureHeader(caret.measure).keySignature;
+    return changeEffects(song, caret, "Change trill", [&key, speed](Note& note) {
+        note.effects.trill =
+            Trill{.semitones = static_cast<std::int8_t>(semitonesToNextStep(note.pitch, key)),
+                  .speed = speed};
+    });
+}
+
 Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
     constexpr std::int16_t kOctave = 120; // tenths of a fret above the fretted note
     constexpr int kTenths = 10;
