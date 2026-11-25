@@ -31,8 +31,12 @@ ledger lines. Elara dropped them:
 (`None`, `Alta`, `Bassa`, `QuindicesimaAlta`, `QuindicesimaBassa`).
 `ottavaOctaves()` gives how many octaves the written notes move: 1, -1, 2,
 -2 or 0. Like a hairpin (ADR-0078), the line runs over the beats that have it,
-whichever voice they are in. The field takes three bits next to `slur`, so
-`Beat` stays 136 bytes.
+whichever voice they are in. The field takes a byte of its own, which pads
+`BeatEffects` from 32 to 40 bytes and `Beat` from 136 to 144: packing it into
+three bits next to `slur` saves those eight bytes, but GCC 14 then rejects
+`BeatEffects x = {}` (an enum bit-field with a default member initializer
+breaks copy-list-initialization), and a bit-field without one would leave
+`BeatEffects x;` holding garbage.
 
 **Pitches stay the sounding ones.** The model, playback, MIDI export and the
 tablature are unchanged: only standard notation writes the notes under the

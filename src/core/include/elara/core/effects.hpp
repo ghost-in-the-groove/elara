@@ -211,9 +211,10 @@ struct BeatEffects {
     Fermata fermata = Fermata::None;
     // Slurred to the next beat of its voice (ADR-0086): a slur runs from the
     // first of the beats slurred in a row to the beat after the last of them.
-    // With the octave line, bits of one byte (a Beat stays 136 bytes).
-    bool slur : 1 = false;
-    Ottava ottava : 3 = Ottava::None; // ADR-0089
+    bool slur = false;
+    // Whole bytes, not bit-fields: GCC 14 cannot copy-list-initialize (`= {}`)
+    // a class whose enum bit-field has a default member initializer.
+    Ottava ottava = Ottava::None; // ADR-0089
 
     friend bool operator==(const BeatEffects&, const BeatEffects&) = default;
 };
