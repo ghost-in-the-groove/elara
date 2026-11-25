@@ -20,6 +20,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace elara::core {
@@ -63,6 +64,11 @@ struct ColumnInk {
     core::Fraction longest; // longest note starting here
     double left = 0.0;
     double right = 0.0;
+    // A chord symbol above the column (ADR-0080): what it reaches, when `above`.
+    // Chord symbols keep apart from each other, not from the notes under them.
+    double aboveLeft = 0.0;
+    double aboveRight = 0.0;
+    bool above = false;
 };
 
 struct ColumnPosition {
@@ -330,6 +336,66 @@ private:
     std::vector<double> origins_; // of the marks being placed
     std::vector<Span> spans_;     // of the measure being read
     std::vector<Wedge> wedges_;
+};
+
+// ---- Chord symbols (ADR-0080) -----------------------------------------------------------
+
+inline constexpr double kChordGap = 0.8; // between neighbouring chord symbols
+inline constexpr double kChordBarlineReach =
+    0.6;                                    // how far one reaches into the gap after a barline
+inline constexpr double kChordEndGap = 0.3; // between one and the barline after it
+
+/// Chord symbols above a staff: each name centred over its column with its
+/// diagram under it on staves with frets, all of a line on one baseline above
+/// the technique lanes.
+class ChordRow {
+public:
+    /// `diagrams`: the staff has frets, so diagrams show.
+    ChordRow(const EngravingFont& font, bool diagrams) : font_(font), diagrams_(diagrams) {}
+
+    /// Reads the chord symbols of `measure`, one per start (the first voice's),
+    /// and gives the columns of `ink` (in time order) their reach; a column with
+    /// no ink is added where one starts and no notes do. `centre` is where a
+    /// symbol's middle lies from its column's x.
+    void collect(const core::Measure& measure, std::vector<ColumnInk>& ink, double centre);
+
+    /// The chord symbols read last, with their columns at `positions`.
+    void draw(std::span<const ColumnPosition> positions, double centre, std::size_t measure);
+
+    [[nodiscard]] bool empty() const noexcept { return marks_.empty(); }
+
+    /// Places the line's chord symbols above `top` (the highest ink of the
+    /// staff, negative above it), draws them into `list` and forgets them.
+    void place(DisplayList& list, double top);
+
+private:
+    struct Read {
+        core::Fraction start;
+        core::Fraction length; // of its beat
+        const core::ChordSymbol* symbol = nullptr;
+    };
+
+    struct Mark {
+        const core::ChordSymbol* symbol = nullptr;
+        double centre = 0.0;
+        std::size_t measure = 0;
+    };
+
+    [[nodiscard]] bool showsDiagram(const core::ChordSymbol& symbol) const noexcept {
+        return diagrams_ && symbol.diagram && !symbol.diagram->frets.empty();
+    }
+
+    // How far `symbol` reaches left and right of its middle (both positive).
+    [[nodiscard]] std::pair<double, double> reach(const core::ChordSymbol& symbol) const;
+
+    // The diagram centred at `centre` from `top` down.
+    void diagram(DisplayList& list, const core::ChordDiagram& diagram, double centre, double top,
+                 std::size_t measure) const;
+
+    const EngravingFont& font_;
+    bool diagrams_;
+    std::vector<Read> read_;  // of the measure read last
+    std::vector<Mark> marks_; // of the line
 };
 
 // ---- Staff writers --------------------------------------------------------------------

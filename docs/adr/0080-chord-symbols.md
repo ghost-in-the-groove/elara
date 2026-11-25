@@ -75,14 +75,30 @@ name as its text. A diagram is a `<frame>` with `print-frame="yes"`.
 {"firstFret": 1, "frets": [0, 1, 2, 2, 0, -1]}}`, the diagram left out when
 there is none. Older files without chords read as before.
 
+**Drawing.** A chord symbol is drawn above its staff over its beat's column:
+its name centred and, on a staff with frets, its diagram under the name. A
+diagram shows its strings (string 1 on the right) and at least four frets,
+the nut thick when it starts at the first fret and otherwise that fret's
+number left of the grid; a dot (SMuFL `fretboardFilledCircle`) where a string
+is stopped, `fretboardO` above an open string and `fretboardX` above one not
+played. The chord symbols of a line hang from one line above the technique
+lanes, their names on one baseline. They are drawn once: over the standard
+notation of their staff when the system shows it, otherwise over its
+tablature. They keep apart from each other and from the barlines, never from
+the notes under them: the springs between two of them share the room they
+need by their ideal spaces, and one on a beat where no notes start (a
+measure of rests) gets a column of its own. Barres and fingerings are not
+drawn: a dot on each stopped string says what a barre says.
+
 ## Consequences
 
 - The model, the native format, the Guitar Pro 3-8 importers and MusicXML
-  both ways keep chord symbols; `elara-cli dump` and `import --json` show
-  them. Drawing names and diagrams above the staff, typing them at the
-  caret and transposing their names with the notes come next, each recorded
-  here as it lands. Until
-  they are drawn, a song with chord symbols looks as it did before.
+  both ways keep chord symbols, layout draws them, and `elara-cli dump` and
+  `import --json` show them. Typing them at the caret and transposing their
+  names with the notes come next, each recorded here as it lands.
+- A line with chord symbols is taller by their row (about 2.5 staff spaces
+  for names, 6 with diagrams), and measures with many of them on short notes
+  grow to keep their names apart.
 - Transposing a song leaves chord names as they are until transposition
   learns to spell them. Copying, pasting and retuning carry a diagram as it
   is: it is drawn with its own strings.
@@ -92,5 +108,7 @@ there is none. Older files without chords read as before.
   Guitar Pro 6 duet, `io.Beats naming the same chord share one symbol once
   read`, `io.Chord diagrams outside the neck are rejected`, the native round
   trip, `io.MusicXML: chord symbols are named by root, kind, degrees and
-  bass`, `io.MusicXML export: chord symbols keep their names and diagrams`
-  and the import snapshots of the corpus.
+  bass`, `io.MusicXML export: chord symbols keep their names and diagrams`,
+  the import snapshots of the corpus, the `notation.Chord symbols: ...`
+  layout tests (names, diagrams, frets up the neck, tablature, technique
+  lanes, spacing, measures of rests) and the render snapshots of the corpus.

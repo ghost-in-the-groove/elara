@@ -48,6 +48,35 @@ constexpr double kHairpinContinued = 0.5; // where a wedge is cut by the end of 
 constexpr double kHairpinEndGap = 0.4;    // before the column or barline a wedge ends at
 constexpr double kHairpinMinLength = 1.0;
 
+// Chord symbols, in staff spaces (ADR-0080).
+constexpr double kChordNameSize = 1.5;       // font size of a name
+constexpr double kChordInkGap = 0.6;         // between the ink below and the row
+constexpr double kChordNameGap = 0.3;        // between a name and its diagram
+constexpr double kChordStringSpace = 0.6;    // between the strings of a diagram
+constexpr double kChordFretSpace = 0.7;      // between its frets
+constexpr int kChordMinFrets = 4;            // a diagram shows at least this many frets
+constexpr double kChordMarkScale = 0.75;     // of the dots and the open and muted marks
+constexpr double kChordMarkGap = 0.15;       // between the open and muted marks and the nut
+constexpr double kChordLineThickness = 0.1;  // strings and frets
+constexpr double kChordNutThickness = 0.25;  // the nut, at the first fret
+constexpr double kChordFretNumberSize = 0.9; // font size of the first fret's number
+constexpr double kChordFretNumberGap = 0.25; // between that number and the strings
+
+// The frets a diagram shows: from its first fret to its highest, at least
+// kChordMinFrets.
+int fretsShown(const core::ChordDiagram& diagram) {
+    int highest = diagram.firstFret;
+    for (const std::int8_t fret : diagram.frets) {
+        highest = std::max<int>(highest, fret);
+    }
+    return std::max(kChordMinFrets, highest - diagram.firstFret + 1);
+}
+
+// The width of the strings of a diagram, from the lowest to the highest.
+double stringsWidth(const core::ChordDiagram& diagram) {
+    return static_cast<double>(diagram.frets.size() - 1) * kChordStringSpace;
+}
+
 } // namespace
 
 double idealSpace(const core::Fraction& length) {
@@ -814,6 +843,161 @@ void TechniqueLanes::place(DisplayList& list, double top) {
         append(list, std::move(items_[lane]));
         items_[lane] = DisplayList{};
         base -= kLaneHeight[lane];
+    }
+}
+
+// ---- ChordRow ---------------------------------------------------------------------------
+
+void ChordRow::collect(const core::Measure& measure, std::vector<ColumnInk>& ink, double centre) {
+    read_.clear();
+    for (const core::Voice& voice : measure.voices) {
+        core::Fraction at;
+        for (const core::Beat& beat : voice.beats) {
+            if (beat.chord && std::ranges::find(read_, at, &Read::start) == read_.end()) {
+                read_.push_back(
+                    Read{.start = at, .length = beat.duration.length(), .symbol = &*beat.chord});
+            }
+            at += beat.duration.length();
+        }
+    }
+    if (read_.empty()) {
+        return;
+    }
+    std::ranges::sort(read_, {}, &Read::start);
+    for (const Read& chord : read_) {
+        auto column = std::ranges::lower_bound(ink, chord.start, {}, &ColumnInk::start);
+        if (column == ink.end() || column->start != chord.start) {
+            column = ink.insert(column, ColumnInk{.start = chord.start,
+                                                  .longest = chord.length,
+                                                  .left = centre,
+                                                  .right = centre});
+        }
+        const auto [left, right] = reach(*chord.symbol);
+        column->aboveLeft = centre - left;
+        column->aboveRight = centre + right;
+        column->above = true;
+    }
+}
+
+void ChordRow::draw(std::span<const ColumnPosition> positions, double centre, std::size_t measure) {
+    for (const Read& chord : read_) {
+        marks_.push_back(Mark{.symbol = chord.symbol,
+                              .centre = columnX(positions, chord.start) + centre,
+                              .measure = measure});
+    }
+}
+
+std::pair<double, double> ChordRow::reach(const core::ChordSymbol& symbol) const {
+    const double name = textWidth(symbol.name, kChordNameSize) / 2;
+    double left = name;
+    double right = name;
+    if (showsDiagram(symbol)) {
+        const core::ChordDiagram& shape = *symbol.diagram;
+        const double strings = stringsWidth(shape) / 2;
+        const double half =
+            strings + font_.metrics(Glyph::FretboardX).box.width() * kChordMarkScale / 2;
+        right = std::max(right, half);
+        left = std::max(left, half);
+        if (shape.firstFret > 1) {
+            left = std::max(left,
+                            strings + kChordFretNumberGap +
+                                textWidth(std::to_string(shape.firstFret), kChordFretNumberSize));
+        }
+    }
+    return {left, right};
+}
+
+void ChordRow::place(DisplayList& list, double top) {
+    const double markHeight = font_.metrics(Glyph::FretboardO).box.height() * kChordMarkScale;
+    double tallest = 0.0;
+    for (const Mark& mark : marks_) {
+        if (showsDiagram(*mark.symbol)) {
+            tallest = std::max(tallest, markHeight + kChordMarkGap +
+                                            fretsShown(*mark.symbol->diagram) * kChordFretSpace);
+        }
+    }
+    // Diagrams hang from one line, the names on one baseline above them.
+    const double diagramTop = std::min(top, 0.0) - kChordInkGap - tallest;
+    const double baseline =
+        diagramTop - (tallest > 0.0 ? kChordNameGap : 0.0) - kTextDescent * kChordNameSize;
+    for (const Mark& mark : marks_) {
+        if (!mark.symbol->name.empty()) {
+            list.texts.push_back(TextItem{.text = mark.symbol->name,
+                                          .origin = {mark.centre, baseline},
+                                          .size = kChordNameSize,
+                                          .align = TextAlign::Centre,
+                                          .italic = false,
+                                          .knockout = false,
+                                          .role = Role::Chord,
+                                          .measure = mark.measure});
+        }
+        if (showsDiagram(*mark.symbol)) {
+            diagram(list, *mark.symbol->diagram, mark.centre, diagramTop, mark.measure);
+        }
+    }
+    marks_.clear();
+}
+
+void ChordRow::diagram(DisplayList& list, const core::ChordDiagram& shape, double centre,
+                       double top, std::size_t measure) const {
+    const double markHeight = font_.metrics(Glyph::FretboardO).box.height() * kChordMarkScale;
+    const double nut = top + markHeight + kChordMarkGap;
+    const int frets = fretsShown(shape);
+    const double half = stringsWidth(shape) / 2;
+    const auto line = [&](Point from, Point to, double thickness) {
+        list.lines.push_back(LineItem{.from = from,
+                                      .to = to,
+                                      .thickness = thickness,
+                                      .role = Role::Chord,
+                                      .measure = measure,
+                                      .dash = 0.0});
+    };
+    // String 1, the highest, on the right.
+    const auto stringX = [&](std::size_t i) {
+        return centre + half - static_cast<double>(i) * kChordStringSpace;
+    };
+    const double bottom = nut + frets * kChordFretSpace;
+    for (std::size_t i = 0; i < shape.frets.size(); ++i) {
+        line({stringX(i), nut}, {stringX(i), bottom}, kChordLineThickness);
+    }
+    for (int fret = 0; fret <= frets; ++fret) {
+        const double y = nut + fret * kChordFretSpace;
+        const double ends = kChordLineThickness / 2;
+        line({centre - half - ends, y}, {centre + half + ends, y},
+             fret == 0 && shape.firstFret == 1 ? kChordNutThickness : kChordLineThickness);
+    }
+    if (shape.firstFret > 1) {
+        list.texts.push_back(
+            TextItem{.text = std::to_string(shape.firstFret),
+                     .origin = {centre - half - kChordFretNumberGap,
+                                nut + kChordFretSpace / 2 + capHeight(kChordFretNumberSize) / 2},
+                     .size = kChordFretNumberSize,
+                     .align = TextAlign::Right,
+                     .italic = false,
+                     .knockout = false,
+                     .role = Role::Chord,
+                     .measure = measure});
+    }
+    const auto mark = [&](Glyph glyph, double x, double y) {
+        const BoundingBox& box = font_.metrics(glyph).box;
+        list.glyphs.push_back(
+            GlyphItem{.glyph = glyph,
+                      .origin = {x - (box.southWest.x + box.northEast.x) / 2 * kChordMarkScale,
+                                 y + (box.southWest.y + box.northEast.y) / 2 * kChordMarkScale},
+                      .role = Role::Chord,
+                      .measure = measure,
+                      .scale = kChordMarkScale});
+    };
+    for (std::size_t i = 0; i < shape.frets.size(); ++i) {
+        const int fret = shape.frets[i];
+        if (fret == core::ChordDiagram::kMuted) {
+            mark(Glyph::FretboardX, stringX(i), top + markHeight / 2);
+        } else if (fret == 0) {
+            mark(Glyph::FretboardO, stringX(i), top + markHeight / 2);
+        } else if (fret >= shape.firstFret && fret < shape.firstFret + frets) {
+            mark(Glyph::FretboardFilledCircle, stringX(i),
+                 nut + (fret - shape.firstFret + 0.5) * kChordFretSpace);
+        }
     }
 }
 

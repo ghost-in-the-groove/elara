@@ -50,9 +50,10 @@ enum class Role : std::uint8_t {
     Brace,         ///< the brace joining the staves of a piano (a grand staff)
     Arpeggio,      ///< the wavy line left of a rolled chord, and its arrowhead (ADR-0076)
     Hairpin,       ///< a crescendo or diminuendo wedge under a staff (ADR-0078)
+    Chord,         ///< a chord symbol above a staff: its name and diagram (ADR-0080)
 };
 
-inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Hairpin) + 1;
+inline constexpr std::size_t kRoleCount = static_cast<std::size_t>(Role::Chord) + 1;
 
 /// The role's name in JSON and SVG output ("staffLine", "fretNumber").
 [[nodiscard]] std::string_view roleName(Role role) noexcept;

@@ -95,6 +95,50 @@ void merge(const std::vector<std::vector<ColumnInk>>& staves, std::vector<Column
         into.left = std::min(into.left, column.left);
         into.right = std::max(into.right, column.right);
         into.longest = std::max(into.longest, column.longest);
+        if (column.above) {
+            into.aboveLeft =
+                into.above ? std::min(into.aboveLeft, column.aboveLeft) : column.aboveLeft;
+            into.aboveRight =
+                into.above ? std::max(into.aboveRight, column.aboveRight) : column.aboveRight;
+            into.above = true;
+        }
+    }
+}
+
+// Makes springs [from, to) together at least `need` long at any stretch: each
+// takes its share by its ideal space.
+void stretchTo(std::vector<Spring>& springs, std::size_t from, std::size_t to, double need) {
+    double ideal = 0.0;
+    for (std::size_t k = from; k < to; ++k) {
+        ideal += springs[k].ideal;
+    }
+    if (need <= 0.0 || ideal <= 0.0) {
+        return;
+    }
+    for (std::size_t k = from; k < to; ++k) {
+        springs[k].ink = std::max(springs[k].ink, need * springs[k].ideal / ideal);
+    }
+}
+
+// Chord symbols keep apart from each other and from the barlines, not from the
+// notes under them (ADR-0080).
+void spaceChords(const std::vector<ColumnInk>& columns, MeasureWidth& width) {
+    std::optional<std::size_t> previous;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+        if (!columns[i].above) {
+            continue;
+        }
+        if (previous) {
+            stretchTo(width.springs, *previous, i,
+                      columns[*previous].aboveRight + kChordGap - columns[i].aboveLeft);
+        } else {
+            width.lead = std::max(width.lead, -columns[i].aboveLeft - kChordBarlineReach);
+        }
+        previous = i;
+    }
+    if (previous) {
+        stretchTo(width.springs, *previous, width.springs.size(),
+                  columns[*previous].aboveRight + kChordEndGap);
     }
 }
 
@@ -120,6 +164,7 @@ void springsOf(const std::vector<ColumnInk>& columns, const Fraction& length, do
     const ColumnInk& last = columns.back();
     width.springs.push_back(Spring{.ideal = idealSpace(std::max(last.longest, length - last.start)),
                                    .ink = last.right + kEndGap});
+    spaceChords(columns, width);
 }
 
 // Positions of the columns of a measure starting at `start` at `stretch`;
