@@ -67,6 +67,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Systems and pages: line breaking, justification, multi-track scores
   - [x] Grand staves (a piano's treble and bass staves): a brace and barlines
         through both (ADR-0073)
+  - [x] Rolled chords of keyboards and other instruments without frets: an
+        arpeggio line left of the chord (ADR-0076)
 - [x] Repeat barlines, repeat counts and alternate endings (ADR-0016)
 - [x] Tuplet numbers, with a bracket when no beam shows the group (ADR-0040)
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
@@ -167,6 +169,9 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         on the caret's beat, in the CLI and the effects panel (ADR-0060)
   - [x] Dynamics, ppp to fff, from the caret's notes to the next change, in
         the effects panel (ADR-0047)
+  - [x] Techniques of strings (hammer-ons, palm mutes, dead notes, harmonics)
+        on fretted staves only; the effects panel shows what the caret's
+        instrument plays (ADR-0077)
   - [x] Repeats and alternate endings at the caret's measure
     - [x] One undo step, "Change repeats", and the CLI `repeat` and `ending`
           steps (ADR-0016)

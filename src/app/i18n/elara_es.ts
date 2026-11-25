@@ -146,6 +146,10 @@
         <translation>Armónico, vibrato y acento</translation>
     </message>
     <message>
+        <source>Vibrato and accent</source>
+        <translation>Vibrato y acento</translation>
+    </message>
+    <message>
         <source>Slight vibrato</source>
         <translation>Vibrato ligero</translation>
     </message>
@@ -174,8 +178,16 @@
         <translation>Rasgueo abajo</translation>
     </message>
     <message>
+        <source>Roll upwards</source>
+        <translation>Arpegio hacia arriba</translation>
+    </message>
+    <message>
         <source>Strum up</source>
         <translation>Rasgueo arriba</translation>
+    </message>
+    <message>
+        <source>Roll downwards</source>
+        <translation>Arpegio hacia abajo</translation>
     </message>
     <message>
         <source>Down stroke</source>
@@ -1563,6 +1575,10 @@
     <message>
         <source>There is no note to tie to.</source>
         <translation>No hay ninguna nota a la que ligar.</translation>
+    </message>
+    <message>
+        <source>%1 needs strings.</source>
+        <translation>%1 necesita cuerdas.</translation>
     </message>
     <message>
         <source>Harmonics need strings.</source>
