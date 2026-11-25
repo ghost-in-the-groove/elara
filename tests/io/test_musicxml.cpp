@@ -241,8 +241,43 @@ TEST_CASE("MusicXML: what the model cannot hold yet is reported, not lost silent
     REQUIRE(first.chord);
     CHECK(first.chord->name == "F");
 
-    CHECK(hasWarning(result, "text", "measure 2"));
+    // Words are the beat's text (ADR-0081); lyrics are not kept.
+    CHECK_FALSE(hasWarning(result, "text", "measure 2"));
+    REQUIRE(voiceOf(result.song, 0, 0, 1).beats.at(0).text);
+    CHECK(*voiceOf(result.song, 0, 0, 1).beats[0].text == "Calmer");
     CHECK(hasWarning(result, "lyric", "measure 2"));
+}
+
+TEST_CASE("MusicXML: words are the text of the beat they start on", "[musicxml]") {
+    // ADR-0081: words of one direction join; two directions on one beat join
+    // with a space; words next to a tempo name it; words between beats are
+    // dropped.
+    const std::string quarter =
+        R"(<duration>4</duration><voice>1</voice><type>quarter</type></note>)";
+    const ImportResult result = parse(onePart(
+        R"(<direction placement="above"><direction-type><words>let </words></direction-type>)"
+        R"(<direction-type><words>ring</words></direction-type></direction>)"
+        R"(<note><pitch><step>A</step><octave>4</octave></pitch>)" +
+        quarter +
+        R"(<direction><direction-type><words>Allegro</words></direction-type>)"
+        R"(<direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>132</per-minute>)"
+        R"(</metronome></direction-type></direction>)"
+        R"(<direction placement="below"><direction-type><words>dolce</words></direction-type></direction>)"
+        R"(<note><pitch><step>B</step><octave>4</octave></pitch>)" +
+        quarter + R"(<note><rest/>)" + quarter +
+        R"(<direction><direction-type><words>late</words></direction-type><offset>2</offset></direction>)"
+        R"(<note><pitch><step>C</step><octave>5</octave></pitch>)" +
+        quarter));
+    const auto& beats = voiceOf(result.song, 0, 0, 0).beats;
+    REQUIRE(beats.size() == 4);
+    REQUIRE(beats[0].text);
+    CHECK(*beats[0].text == "let ring");
+    REQUIRE(beats[1].text);
+    CHECK(*beats[1].text == "Allegro dolce");
+    CHECK(result.song.tempoAt(0, core::Fraction(1, 4)) == core::Tempo(132));
+    CHECK_FALSE(beats[2].text);
+    CHECK_FALSE(beats[3].text);
+    CHECK(hasWarning(result, "text directions dropped", "measure 1"));
 }
 
 TEST_CASE("MusicXML: chord symbols are named by root, kind, degrees and bass", "[musicxml]") {
@@ -430,7 +465,7 @@ TEST_CASE("MusicXML: parts read on several threads give the same result as on on
         "<harmony><numeral><numeral-root>5</numeral-root></numeral><kind>major</kind></harmony>",
         "<figured-bass><figure><figure-number>6</figure-number></figure></figured-bass>",
         "",
-        R"(<direction><direction-type><words>dolce</words></direction-type></direction>)",
+        R"(<direction><direction-type><octave-shift type="down" size="8"/></direction-type></direction>)",
         "<barline><fermata/></barline>"};
     std::string xml = R"(<score-partwise version="4.0"><part-list>)";
     for (std::size_t p = 0; p < kExtras.size(); ++p) {
@@ -575,7 +610,8 @@ TEST_CASE("MusicXML: signs and jumps become measure marks", "[musicxml]") {
         rest + R"(</measure><measure number="6">)" + rest));
     const core::Song& song = result.song;
     REQUIRE(song.measureCount() == 6);
-    // Other text is still reported; navigation text is not.
+    // Other text is reported: a measure rest has no beat to hold it
+    // (ADR-0081). Navigation text is not.
     CHECK(result.warnings.size() == 1);
     CHECK(hasWarning(result, "text directions dropped", "measure 1"));
     CHECK(song.measureHeader(1).segno);

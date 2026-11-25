@@ -374,6 +374,22 @@ TEST_CASE("Guitar Pro: frets count from the capo", "[io][guitarpro]") {
     CHECK(note.pitch.midiNumber() == 40 + 5 + 3);
 }
 
+TEST_CASE("Guitar Pro: beats keep their free text", "[io][guitarpro]") {
+    // ADR-0081: the text as written; an empty one is none.
+    const std::string beats =
+        R"(<Beat id="0"><Rhythm ref="0"/><Notes>0</Notes><FreeText><![CDATA[let ring]]></FreeText></Beat>)"
+        R"(<Beat id="1"><Rhythm ref="0"/><FreeText><![CDATA[]]></FreeText></Beat>)";
+    const std::string half = R"(<Rhythm id="0"><NoteValue>Half</NoteValue></Rhythm>)";
+    const auto imported = importGpif(guitarScore(0, "0 1", beats, half));
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings.empty());
+    const auto& read = imported->song.track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(read.size() == 2);
+    REQUIRE(read[0].text);
+    CHECK(*read[0].text == "let ring");
+    CHECK_FALSE(read[1].text);
+}
+
 TEST_CASE("Guitar Pro: tempo changes sit at their share of the bar", "[io][guitarpro]") {
     const std::string beat = R"(<Beat id="0"><Rhythm ref="0"/></Beat>)";
     const std::string whole = R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm>)";
