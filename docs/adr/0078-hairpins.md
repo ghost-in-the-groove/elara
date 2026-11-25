@@ -29,16 +29,36 @@ wedges of the same kind that touch become one.
 - The native format writes `"hairpin":"crescendo"` or `"diminuendo"` in a
   beat's effects and omits it otherwise; format version 1 still reads every
   older file (ADR-0006).
-- MusicXML and MIDI exports report hairpins as dropped until they write them.
+- The MusicXML export reports hairpins as dropped until it writes them; the
+  MIDI export writes the velocities they ramp (below).
+
+**Playback ramps the velocity.** `soundingNotes()` turns the hairpins of a
+staff, whichever of its voices hold them, into wedges and moves the velocity
+of every note of the staff struck under one:
+
+- A wedge leads from the loudest notes struck at or before its start (mf when
+  none) to the loudest struck at or after its end, when they are louder for a
+  crescendo or softer for a diminuendo; otherwise to one dynamic further (16
+  velocity), clamped to 1 to 127.
+- A note under the wedge moves by the share of that change its start has
+  reached: the first note keeps its velocity, a note halfway gets half the
+  change, and the note after the wedge plays its own dynamic.
+- Ties only sustain, so a tied note keeps the velocity of its attack. The
+  sequencer, audio rendering and MIDI export all play these velocities.
 
 ## Consequences
 
-- Guitar Pro hairpins survive import and saving; they are not yet drawn,
-  played, read from MusicXML or typed. Those come next, each recorded here as
-  it lands: a wedge under the staff on the dynamics baseline, a velocity ramp
-  towards the next dynamic, MusicXML wedges both ways, and editing at the
-  caret.
+- Guitar Pro hairpins survive import and saving and are heard; they are not
+  yet drawn, read from MusicXML or typed. Those come next, each recorded here
+  as it lands: a wedge under the staff on the dynamics baseline, MusicXML
+  wedges both ways, and editing at the caret.
+- A hairpin with no dynamic after it rises or falls one step and the music
+  goes back to its written dynamic after it; writing the dynamic it leads to
+  says how far it goes.
 - A wedge that should stop in the middle of a long note cannot: it ends with
   the note. Guitar Pro has the same limit.
 - Tests: `io.Guitar Pro: a guitar keeps ...` (a crescendo over two beats, a
-  diminuendo written as a decrescendo), the native round trip and text forms.
+  diminuendo written as a decrescendo), the native round trip and text forms,
+  `core.A hairpin ramps the velocity of the notes under it` (to the forte
+  after a crescendo, over two voices; one step down without a softer dynamic)
+  and `cli.sequence_hairpins`.
