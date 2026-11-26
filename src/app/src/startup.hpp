@@ -32,7 +32,8 @@ struct StartupOptions {
     bool continuous = false;    ///< show the continuous view (ADR-0057)
     std::optional<QSize> size;  ///< the window's size, in place of its own
     bool smokeTest = false;     ///< check the window (and the file), then quit
-    bool effects = false;       ///< the note effects panel opens at the caret
+    bool effects = false;       ///< the note effects palette opens at the caret
+    QString menu;               ///< a menu opens as the window shows (`--menu`)
     bool tuner = false;         ///< the tuner opens at start
     QString screenshot;         ///< save the window here once shown, then quit
     QString soundFont;          ///< a SoundFont the window plays through (`--soundfont`,
@@ -123,8 +124,9 @@ private:
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
-    QPointer<QObject> effectsPanel_;       ///< the note effects panel, watched for `--effects`
+    QPointer<QObject> effectsPanel_;       ///< the note effects palette, watched for `--effects`
     bool effectsOpened_ = false;           ///< whether it has opened
+    bool menuOpened_ = false;              ///< whether the menu `--menu` names has opened
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
     QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
     QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()

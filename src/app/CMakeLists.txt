@@ -79,6 +79,7 @@ qt_add_qml_module(elara
     qml/Elevation.qml
     qml/ScoreView.qml
     qml/EntryBar.qml
+    qml/EffectsPalette.qml
     qml/MeasurePopup.qml
     qml/RecoveryDialog.qml
     qml/WordsPopup.qml

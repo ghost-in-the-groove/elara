@@ -17,12 +17,14 @@ Rectangle {
     property bool hasScore: false
     /// The menus: an AppMenuBar, placed beside the mark.
     property alias menus: menuSlot.data
-    /// Whether the song and tracks panel shows.
+    /// Whether the song and tracks panel shows, and the note effects palette.
     property bool songPaneShown: false
+    property bool paletteShown: false
 
     signal openRequested
     signal saveRequested
     signal songPaneToggled
+    signal paletteToggled
     signal tunerRequested
 
     /// The measure playing, from 1, or the caret's while nothing plays.
@@ -287,6 +289,14 @@ Rectangle {
             objectName: "panelTools"
             spacing: 2
 
+            IconButton {
+                nightBar: true
+                visible: root.hasScore
+                iconPath: Icons.panelLeft
+                tip: qsTr("Note effects (F2)")
+                checked: root.paletteShown
+                onClicked: root.paletteToggled()
+            }
             IconButton {
                 nightBar: true
                 visible: root.hasScore

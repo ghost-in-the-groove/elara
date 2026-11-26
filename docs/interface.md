@@ -29,12 +29,12 @@ a long stretch. So:
 |=====[12]=======o==========================o==============================|  song string
 | note values . 3 V1 | rest delete effects chord text lyrics measure       |
 |                                                    [track] [Not|Tab|Both]|  tool row
-+----------------------------------------------------------+---------------+
-|                                                          |               |
-|                        the page                          | song and      |
-|                      on the desk                         | tracks        |
-|                                                          |               |
-+----------------------------------------------------------+---------------+
++-----------+----------------------------------------------+---------------+
+| note      |                                              |               |
+| effects,  |                  the page                    | song and      |
+| in groups |                on the desk                   | tracks        |
+|           |                                              |               |
++-----------+----------------------------------------------+---------------+
 | Measure 12 . Beat 2 . String 3   Page 1 of 4 . 64 measures    view  zoom |  status bar
 +--------------------------------------------------------------------------+
 ```
@@ -44,13 +44,15 @@ a long stretch. So:
 | Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, the panels and the tuner. Dark in both themes. |
 | Song string | `SongString.qml` | The lower edge of the command bar: the song as one line, lit as far as it has played, the measure playing riding it, the A-B loop as a band, the sections as inlays. Click or drag to move playback. |
 | Tool row | in `Main.qml`, `EntryBar.qml` | What typing uses at the left; the track and the staff view at the right. |
+| Note effects | `EffectsPalette.qml` | Every technique, articulation, dynamic and line the caret's note or beat can take, in named groups that fold (F2, ADR-0109). A tile is lit while the caret has what it sets. |
 | Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the popups the caret opens. |
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
 | Status bar | `StatusBar.qml` | Where the caret is, the page and the measures; the layout and the zoom. |
 
 Narrow windows drop what is offered elsewhere, never overlap: the command bar
 gives up the file tools, then the tempo, the time and the measure readings; the
-tool row gives up the view switch.
+tool row gives up the view switch. The page keeps fitting the room between the
+panels until its zoom is chosen by hand.
 
 ## Colours
 
@@ -99,6 +101,7 @@ change never moves what is beside them.
 | `Picker` | One choice from a list. |
 | `AppMenuBar`, `AppMenu`, `AppMenuItem`, `AppMenuSeparator` | Menus. `keys: KeyNames.native("Ctrl+S")` writes the keys the platform's way; `chosen` marks the current choice or a switch that is on. |
 | `Readout` | A reading on the command bar. |
+| Tiles of `EffectsPalette` (`IconTile`, `LabelTile`, `SymbolTile`) | A sign the caret's note or beat can take: drawn as the score draws it, lit while the caret has it, with its key in the corner when it has one. |
 | `Elevation` | The shadow under what floats. |
 
 Rules that keep the parts one family:
@@ -111,6 +114,10 @@ Rules that keep the parts one family:
   while the window is at rest, and no animation runs for longer than `calm`.
 - A new command goes into a menu first, then, if it is used all the time,
   onto a bar.
+- An icon is a shape, and a shape costs about a millisecond to make. What
+  shows many of them only now and then makes them when it shows: the check
+  marks and arrows of the menus, the tiles of the palette. Measure the start
+  (`--screenshot` timed against `main`) after adding a panel.
 
 ## Checking a change
 
@@ -124,5 +131,5 @@ python scripts/elara.py app -- song.gp --screenshot shot.png [--size 760x480]
 ```
 
 `--tuner`, `--song-pane`, `--measure`, `--lyrics`, `--effects` and `--tuning`
-open a panel at start, for screenshots of each. Set
+open a panel at start, and `--menu view` a menu, for screenshots of each. Set
 `QT_QUICK_CONTROLS_MATERIAL_THEME=Dark` or `Light` to see a theme; look at both.

@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 using Catch::Matchers::WithinAbs;
@@ -93,6 +94,21 @@ TEST_CASE("A WAV file written by Elara reads back", "[audio][wav]") {
     }
     CHECK(decoded->mono().size() == 3);
     CHECK_THAT(decoded->mono()[2], WithinAbs(-0.375, 1e-4)); // (-1 + 0.25) / 2
+}
+
+TEST_CASE("A WAV file's channels averaged in place keep no room for the others", "[audio][wav]") {
+    const std::vector<float> samples{0.0f, 0.5f, -0.5f, 1.0f, -1.0f, 0.25f};
+    auto stereo = decodeWav(encodeWavPcm16(samples, WavFormat{.sampleRate = 48000, .channels = 2}));
+    REQUIRE(stereo);
+    const std::vector<float> averaged = stereo->mono();
+    const std::vector<float> inPlace = std::move(*stereo).intoMono();
+    CHECK(inPlace == averaged);
+    CHECK(inPlace.capacity() == inPlace.size());
+
+    auto mono = decodeWav(encodeWavPcm16(samples, WavFormat{.sampleRate = 48000, .channels = 1}));
+    REQUIRE(mono);
+    const std::vector<float> read = mono->samples;
+    CHECK(std::move(*mono).intoMono() == read);
 }
 
 TEST_CASE("WAV sample formats decode to the same scale", "[audio][wav]") {
