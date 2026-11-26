@@ -34,12 +34,11 @@ namespace {
 using core::Fraction;
 
 constexpr int kKeys = 128;
-constexpr std::size_t kParallelNotes = 20'000;  // notes from which work goes on several threads
-constexpr std::size_t kParallelEvents = 40'000; // events from which merges go on several threads
-constexpr std::size_t kNotesPerBlock = 8192;    // written notes timed together on one thread
-constexpr int kDynamicStep = 16;                // velocity between two dynamics (mf 80, f 96)
-constexpr double kVibratoRate = 5.5;            // Hz
-constexpr double kSlightVibrato = 20.0;         // cents either side
+constexpr std::size_t kParallelNotes = 20'000; // notes from which work goes on several threads
+constexpr std::size_t kNotesPerBlock = 8192;   // written notes timed together on one thread
+constexpr int kDynamicStep = 16;               // velocity between two dynamics (mf 80, f 96)
+constexpr double kVibratoRate = 5.5;           // Hz
+constexpr double kSlightVibrato = 20.0;        // cents either side
 constexpr double kWideVibrato = 50.0;
 constexpr double kSlideCents = 500.0; // slides in and off the string span five frets
 constexpr double kSlideIn = 0.1;      // seconds a slide into a note takes at most
@@ -216,9 +215,9 @@ bool earlier(const NoteEvent& a, const NoteEvent& b) {
 // its last note ends (`ends`: a struck note's end, or that of the last note
 // joined to it; empty when no note is joined). Notes that are not struck have
 // no events. Releases at a time come before attacks. Ordered as events() are.
-std::vector<NoteEvent> trackEvents(const std::vector<PlayedNote>& notes,
-                                   std::span<const double> ends, std::span<const std::size_t> mine,
-                                   std::size_t track) {
+std::vector<NoteEvent> noteEventsOf(const std::vector<PlayedNote>& notes,
+                                    std::span<const double> ends, std::span<const std::size_t> mine,
+                                    std::size_t track) {
     struct Release {
         double time = 0.0;
         int key = 60;
@@ -1061,7 +1060,7 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
         [&](std::size_t t) {
             const auto mine =
                 std::span(byTrack).subspan(trackStart[t], trackStart[t + 1] - trackStart[t]);
-            std::vector<NoteEvent> events = trackEvents(notes_, ends, mine, t);
+            std::vector<NoteEvent> events = noteEventsOf(notes_, ends, mine, t);
             if (!moves) {
                 tracks[t] = std::move(events);
                 return;
@@ -1113,31 +1112,29 @@ Sequence::Sequence(const core::Song& song, SequenceOptions options)
     if (metronome_) {
         tracks.push_back(metronomeEvents(song, measures_, tempo, metronomeTrack_));
     }
-    // Every list is ordered, so is every merge of two: neighbours merged
-    // pairwise, each round on all cores, leave one ordered list.
-    std::size_t total = 0;
+    // Kept by track, as playback reads them: no single list is made unless
+    // asked for (events()).
     for (const std::vector<NoteEvent>& track : tracks) {
-        total += track.size();
+        eventCount_ += track.size();
     }
-    while (tracks.size() > 1) {
-        std::vector<std::vector<NoteEvent>> merged((tracks.size() + 1) / 2);
-        core::forEachIndex(0, merged.size(),
-                           core::threadsFor(0, total, kParallelEvents, merged.size()),
-                           [&](std::size_t i) {
-                               if (2 * i + 1 == tracks.size()) {
-                                   merged[i] = std::move(tracks[2 * i]);
-                                   return;
-                               }
-                               const std::vector<NoteEvent>& a = tracks[2 * i];
-                               const std::vector<NoteEvent>& b = tracks[2 * i + 1];
-                               merged[i].resize(a.size() + b.size());
-                               std::ranges::merge(a, b, merged[i].begin(), earlier);
-                           });
-        tracks = std::move(merged);
+    trackEvents_ = std::move(tracks);
+}
+
+std::span<const NoteEvent> Sequence::trackEvents(std::size_t track) const noexcept {
+    return track < trackEvents_.size() ? std::span<const NoteEvent>(trackEvents_[track])
+                                       : std::span<const NoteEvent>();
+}
+
+std::vector<NoteEvent> Sequence::events() const {
+    // Each list is ordered and holds one track: a stable sort of them laid
+    // end to end in track order is the merge, ties going to the lower track.
+    std::vector<NoteEvent> all;
+    all.reserve(eventCount_);
+    for (const std::vector<NoteEvent>& track : trackEvents_) {
+        all.insert(all.end(), track.begin(), track.end());
     }
-    if (!tracks.empty()) {
-        events_ = std::move(tracks.front());
-    }
+    std::ranges::stable_sort(all, earlier);
+    return all;
 }
 
 CountIn Sequence::countInAt(double seconds) const noexcept {
@@ -1153,11 +1150,6 @@ CountIn Sequence::countInAt(double seconds) const noexcept {
     const auto tempo = std::ranges::upper_bound(tempi_, seconds, {}, &TempoPoint::time);
     const TempoPoint& point = tempo == tempi_.begin() ? tempi_.front() : *(tempo - 1);
     return {.clicks = pulses_[k].count, .interval = pulses_[k].length * point.perWhole};
-}
-
-std::size_t Sequence::eventAt(double seconds) const noexcept {
-    return static_cast<std::size_t>(
-        std::ranges::lower_bound(events_, seconds, {}, &NoteEvent::time) - events_.begin());
 }
 
 std::optional<double> Sequence::secondsAt(std::size_t measure, double fraction) const noexcept {

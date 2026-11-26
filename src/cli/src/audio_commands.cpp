@@ -242,7 +242,7 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
                             measure.measure, jsonNumber(measure.start), jsonNumber(measure.end));
     }
     json += std::format(R"(],"noteCount":{},"eventCount":{})", sequence.notes().size(),
-                        sequence.events().size());
+                        sequence.eventCount());
     if (options.notes) {
         json += R"(,"notes":[)";
         for (std::size_t i = 0; i < sequence.notes().size(); ++i) {
@@ -257,8 +257,9 @@ std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions&
     }
     if (options.events) {
         json += R"(,"events":[)";
-        for (std::size_t i = 0; i < sequence.events().size(); ++i) {
-            const audio::NoteEvent& event = sequence.events()[i];
+        const std::vector<audio::NoteEvent> events = sequence.events();
+        for (std::size_t i = 0; i < events.size(); ++i) {
+            const audio::NoteEvent& event = events[i];
             json += std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},{}}})",
                                 i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
                                 event.track, event.key, eventJson(event));
@@ -284,7 +285,7 @@ int runSequence(bool json, const SequenceOptions& options) {
     }
     std::cout << std::format("played measures:{}\n{} measures, {} notes, {} events in {:.3f} s\n",
                              order, sequence.measures().size(), sequence.notes().size(),
-                             sequence.events().size(), sequence.duration());
+                             sequence.eventCount(), sequence.duration());
     if (options.practice.speed != 100 || sequence.metronome()) {
         std::cout << std::format(
             "at {} % speed{}\n", options.practice.speed,

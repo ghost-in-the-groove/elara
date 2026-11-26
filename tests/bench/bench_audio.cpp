@@ -39,7 +39,7 @@ TEST_CASE("sequencer benchmarks", "[benchmark][audio]") {
         return elara::core::soundingNotes(song).size();
     };
     BENCHMARK("sequence the large song (500 measures, 160k notes)") {
-        return elara::audio::Sequence(song).events().size();
+        return elara::audio::Sequence(song).eventCount();
     };
     // Every four measures repeated: 1000 measures and 320k notes played.
     for (std::size_t m = 0; m < song.measureCount(); m += 4) {
@@ -47,7 +47,7 @@ TEST_CASE("sequencer benchmarks", "[benchmark][audio]") {
         song.measureHeader(m + 3).repeatTimes = 2;
     }
     BENCHMARK("sequence the large song with every four measures repeated") {
-        return elara::audio::Sequence(song).events().size();
+        return elara::audio::Sequence(song).eventCount();
     };
 }
 
@@ -123,6 +123,16 @@ TEST_CASE("player benchmarks", "[benchmark][audio][player]") {
             player.render(left, right);
         }
         return left[0];
+    };
+
+    // What adopting a new sequence costs once the sounds are made: the
+    // events put on each track, in frames.
+    const elara::audio::Sequence sequence(song);
+    elara::audio::Player loading(48000.0);
+    loading.load(song, sequence);
+    BENCHMARK("load the large song's sequence into a player, its sounds kept") {
+        loading.load(song, sequence);
+        return loading.isPlaying();
     };
 }
 

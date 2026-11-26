@@ -35,15 +35,17 @@ struct FrameEvent {
 [[nodiscard]] inline std::vector<std::vector<FrameEvent>>
 eventsByTrack(const Sequence& sequence, std::size_t tracks, double rate) {
     std::vector<std::vector<FrameEvent>> result(tracks);
-    for (const NoteEvent& event : sequence.events()) {
-        if (event.track < tracks) {
-            result[event.track].push_back({.frame = std::llround(event.time * rate),
-                                           .kind = event.kind,
-                                           .touch = event.touch,
-                                           .cents = event.cents,
-                                           .glide = event.glide,
-                                           .key = event.key,
-                                           .velocity = event.velocity});
+    for (std::size_t t = 0; t < tracks; ++t) {
+        const std::span<const NoteEvent> events = sequence.trackEvents(t);
+        result[t].reserve(events.size());
+        for (const NoteEvent& event : events) {
+            result[t].push_back({.frame = std::llround(event.time * rate),
+                                 .kind = event.kind,
+                                 .touch = event.touch,
+                                 .cents = event.cents,
+                                 .glide = event.glide,
+                                 .key = event.key,
+                                 .velocity = event.velocity});
         }
     }
     return result;
