@@ -11,6 +11,7 @@
 #include <format>
 #include <fstream>
 #include <string_view>
+#include <utility>
 
 namespace elara::audio {
 
@@ -82,6 +83,30 @@ std::vector<float> WavAudio::mono() const {
         }
         out[f] = sum / static_cast<float>(channels);
     }
+    return out;
+}
+
+std::vector<float> WavAudio::intoMono() && {
+    const std::size_t channels = format.channels;
+    std::vector<float> out = std::move(samples);
+    if (channels == 0) {
+        return {};
+    }
+    if (channels == 1) {
+        return out;
+    }
+    // Frame f is written where frame f's first sample was or before, after
+    // that frame is read.
+    const std::size_t count = out.size() / channels;
+    for (std::size_t f = 0; f < count; ++f) {
+        float sum = 0.0f;
+        for (std::size_t c = 0; c < channels; ++c) {
+            sum += out[(f * channels) + c];
+        }
+        out[f] = sum / static_cast<float>(channels);
+    }
+    out.resize(count);
+    out.shrink_to_fit();
     return out;
 }
 

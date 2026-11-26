@@ -42,7 +42,10 @@ Three targets with different rules:
 - SFZ instruments (ADR-0066): `parseSfz()`/`readSfz()` read the text format
   into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
   and `SfzBank` plays them through a sampler of Elara's own: WAV and FLAC
-  samples read into memory on every core, regions picked by key, velocity,
+  samples read into memory on every core, each averaged to one channel in
+  place by the task that read it (`WavAudio::intoMono()`), so that loading
+  holds the final samples and only the files in flight, regions picked by
+  key, velocity,
   controllers, keyswitch and round robin (in turn, or at random with
   `lorand`/`hirand` from a generator of each sound's own, the same sequence
   every time), the amplitude envelope, loops,

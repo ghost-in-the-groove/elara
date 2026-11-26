@@ -364,6 +364,33 @@ TEST_CASE("SFZ sampler: WAV samples play at their key's pitch, whatever their ra
     CHECK(sound->activeVoices() == 1);
 }
 
+TEST_CASE("SFZ sampler: a stereo sample plays its channels averaged, held as one", "[audio][sfz]") {
+    const TempFolder folder("elara-sfz-stereo-test");
+    constexpr std::uint32_t rate = 44100;
+    writeSine(folder.path / "mono.wav", 220.0, 0.3, rate);
+    // The same sine on the left, silence on the right.
+    std::vector<float> stereo(static_cast<std::size_t>(0.3 * rate) * 2, 0.0f);
+    for (std::size_t i = 0; i < stereo.size() / 2; ++i) {
+        stereo[i * 2] = static_cast<float>(
+            0.5 * std::sin(2.0 * std::numbers::pi * 220.0 * static_cast<double>(i) / rate));
+    }
+    REQUIRE(elara::audio::writeWavPcm16(folder.path / "stereo.wav", stereo,
+                                        {.sampleRate = rate, .channels = 2}));
+    writeText(folder.path / "guitar.sfz", "<region> sample=mono.wav pitch_keycenter=57 key=57\n"
+                                          "<region> sample=stereo.wav pitch_keycenter=59 key=59\n");
+    const auto bank = SfzBank::open(folder.path / "guitar.sfz");
+    REQUIRE(bank.has_value());
+    CHECK((*bank)->sampleCount() == 2);
+    CHECK((*bank)->sampleBytes() == 2 * static_cast<std::size_t>(0.3 * rate) * sizeof(float));
+
+    const auto sound = (*bank)->sound(kGuitar, kRate);
+    sound->noteOn(57, 100, Touch::Normal);
+    const double mono = rms(render(*sound, 0.2));
+    sound->reset();
+    sound->noteOn(59, 100, Touch::Normal);
+    CHECK_THAT(rms(render(*sound, 0.2)) / mono, WithinRel(0.5, 0.01));
+}
+
 TEST_CASE("SFZ sampler: an instrument with no sample read is an error", "[audio][sfz]") {
     const TempFolder folder("elara-sfz-missing-test");
     writeText(folder.path / "empty.sfz", "<region> sample=nothing.wav\n");
