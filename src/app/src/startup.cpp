@@ -1830,6 +1830,19 @@ void Startup::tick() {
                      .arg(layouts_);
     }
     finish(true, detail);
+    if (score_ != nullptr) {
+        // What the edits asked of the workers and what they ran (ADR-0110),
+        // after the outcome, which the checks read beside the lines before it.
+        for (const auto& [name, work] : {std::pair{"layouts", score_->layoutWork()},
+                                         std::pair{"sequences", score_->sequenceWork()}}) {
+            std::printf("%s: %llu asked, %llu run, %llu skipped, %llu stale\n", name,
+                        static_cast<unsigned long long>(work.asked),
+                        static_cast<unsigned long long>(work.run),
+                        static_cast<unsigned long long>(work.skipped),
+                        static_cast<unsigned long long>(work.stale));
+        }
+        std::fflush(stdout);
+    }
 }
 
 // Clicks in the middle of the playback cursor, as a user would on the score:
