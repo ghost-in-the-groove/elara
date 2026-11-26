@@ -68,7 +68,9 @@ Three targets with different rules:
   in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and
   loops a passage (`setLoop()`, ADR-0024). A player made at a device's new
   sample rate goes on from another's place (`takeOver()`: position, loop,
-  playing or paused). It is an `AudioSource`, the interface a device plays;
+  playing or paused). Paused with no voice sounding, it fills its blocks
+  with silence without running any track's sound. It is an `AudioSource`,
+  the interface a device plays;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), `readWav()`/`decodeWav()` for
   PCM and float WAV files, `readFlac()`/`decodeFlac()` for FLAC files, decoded

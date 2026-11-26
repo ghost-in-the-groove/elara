@@ -364,7 +364,16 @@ void renderClicks(Synth& synth, std::int64_t from, std::span<float> out, std::in
 } // namespace
 
 void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept {
-    if (current_ == nullptr) {
+    // Paused with nothing ringing, the block is silent and no sound needs to
+    // run for it: an idle player costs next to nothing. The sounds' own
+    // clocks stand still meanwhile; no voice of theirs is there to follow them.
+    const auto ringing = [this] {
+        return current_->countIn.activeVoices() > 0 ||
+               std::ranges::any_of(current_->tracks, [](const Loaded::Track& track) {
+                   return track.sound->activeVoices() > 0;
+               });
+    };
+    if (current_ == nullptr || (!wasPlaying_ && !ringing())) {
         std::ranges::fill(left, 0.0f);
         std::ranges::fill(right, 0.0f);
         return;

@@ -59,7 +59,9 @@ public:
     /// Adds the next `out.size()` mono frames to `out`.
     virtual void render(std::span<float> out) noexcept = 0;
 
-    /// Voices still sounding, released ones included.
+    /// Voices still sounding, released ones included, and anything else
+    /// render() would still add: a paused player stops running a sound once
+    /// it has none.
     [[nodiscard]] virtual std::size_t activeVoices() const noexcept = 0;
 };
 
