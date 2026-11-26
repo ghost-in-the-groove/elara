@@ -206,5 +206,29 @@ TEST_CASE("model memory footprint", "[benchmark][core][memory]") {
                 "BeatEffects %zu, Voice %zu, Measure %zu\n",
                 sizeof(Note), sizeof(NoteEffects), sizeof(BendCurve), sizeof(Harmonic),
                 sizeof(Beat), sizeof(BeatEffects), sizeof(Voice), sizeof(Measure));
+    // What a song holds, vectors by capacity (approximateBytes, ADR-0121).
+    const Song song = elara::bench::largeSong();
+    std::size_t bytes = 0;
+    std::size_t beats = 0;
+    std::size_t notes = 0;
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        const Track& track = song.track(t);
+        bytes += approximateBytes(track);
+        for (std::size_t s = 0; s < track.staffCount(); ++s) {
+            for (std::size_t m = 0; m < track.staff(s).measureCount(); ++m) {
+                for (const Voice& voice : track.staff(s).measure(m).voices) {
+                    beats += voice.beats.size();
+                    for (const Beat& beat : voice.beats) {
+                        notes += beat.notes.size();
+                    }
+                }
+            }
+        }
+    }
+    std::printf("large song: %zu tracks, %zu measures, %zu beats, %zu notes: %.1f MB of tracks, "
+                "%.0f bytes per note\n",
+                song.trackCount(), song.measureCount(), beats, notes,
+                static_cast<double>(bytes) / 1e6,
+                static_cast<double>(bytes) / static_cast<double>(std::max<std::size_t>(notes, 1)));
     SUCCEED();
 }
