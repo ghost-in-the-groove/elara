@@ -13,6 +13,19 @@
 
 namespace elara::core {
 
+/// What an edit changes (ADR-0111), so that what is derived from the song,
+/// its pages and the sequence playback plays, is made again only when the
+/// edit can have changed it. Both are true when that is not known.
+struct Changes {
+    bool notation = true; ///< what the pages show
+    bool sound = true;    ///< what playback plays
+
+    [[nodiscard]] constexpr Changes operator|(Changes other) const noexcept {
+        return {.notation = notation || other.notation, .sound = sound || other.sound};
+    }
+    friend constexpr bool operator==(Changes, Changes) noexcept = default;
+};
+
 /// One reversible edit of a song (ADR-0005). Commands exchange data with the
 /// song (swap, move) instead of copying it, so the history only holds what the
 /// song no longer holds.
@@ -34,6 +47,10 @@ public:
 
     /// Short English name for the Edit menu, e.g. "Insert measures".
     [[nodiscard]] virtual std::string_view name() const noexcept = 0;
+
+    /// What apply() and revert() change, valid once apply() ran: everything
+    /// unless the command knows better.
+    [[nodiscard]] virtual Changes changes() const noexcept { return {}; }
 };
 
 /// A song being edited: the song, its undo and redo history and its save point.
@@ -65,6 +82,10 @@ public:
     /// Throw std::logic_error when there is nothing to undo or redo.
     void undo();
     void redo();
+
+    /// What the last execute(), undo() or redo() changed; everything before
+    /// any of them.
+    [[nodiscard]] Changes lastChanges() const noexcept { return lastChanges_; }
 
     /// Names the song's present state: undo and redo return to a state and to
     /// its revision, and no other state ever has it. A save running on a
@@ -98,6 +119,7 @@ private:
     std::uint64_t base_ = 0;                 ///< the state before the oldest step kept
     std::uint64_t next_ = 1;                 ///< the revision of the next command executed
     std::optional<std::uint64_t> saved_ = 0; ///< the state saved; none when no state is
+    Changes lastChanges_;
 };
 
 } // namespace elara::core

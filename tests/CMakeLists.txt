@@ -172,17 +172,17 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 59 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 63 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
   # things its import dropped, and the
   # score exports as a PDF document of its one page (ADR-0074), as MusicXML
   # with its four tracks and as MIDI, each telling what it left out.
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 63 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 59 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
   set_tests_properties(app.smoke_narrow PROPERTIES PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.smoke_tuner_track PROPERTIES

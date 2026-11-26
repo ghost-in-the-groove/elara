@@ -22,6 +22,7 @@ void Document::execute(std::unique_ptr<Command> command) {
     }
     // A saved state on the redo branch discarded here is out of reach for
     // good: no state takes its revision again.
+    lastChanges_ = command->changes();
     done_.back() = Step{.command = std::move(command), .revision = next_++};
     undone_.clear();
     while (done_.size() > undoLimit_) {
@@ -44,6 +45,7 @@ void Document::undo() {
     }
     undone_.reserve(undone_.size() + 1);
     done_.back().command->revert(song_);
+    lastChanges_ = done_.back().command->changes();
     undone_.push_back(std::move(done_.back()));
     done_.pop_back();
 }
@@ -59,6 +61,7 @@ void Document::redo() {
         done_.pop_back();
         throw;
     }
+    lastChanges_ = undone_.back().command->changes();
     done_.back() = std::move(undone_.back());
     undone_.pop_back();
 }
