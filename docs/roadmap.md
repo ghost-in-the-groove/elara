@@ -286,6 +286,10 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       each change, offered back at the next start (ADR-0106)
 - [x] Saving and PDF export on workers: the window goes on while they are
       written, and edits made meanwhile stay unsaved (ADR-0107)
+- [x] One layout and one sequence at a time, only the newest request waiting,
+      with counts the smoke test prints (ADR-0110)
+- [x] Edits say what they change: a mix change runs no layout or sequence,
+      credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 
 ## The interface
 

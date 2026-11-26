@@ -114,6 +114,7 @@ private:
     qint64 againSince_ = -1; ///< when that step first asked to run again
     bool laidOut_ = false;
     int paintsBefore_ = 0;
+    std::uint64_t layoutsAskedBefore_ = 0; ///< by the step that runs: one waits only for those
     int layouts_ = 0;
     int stepsRun_ = 0;    ///< steps started so far, retries not counted
     QString layoutSteps_; ///< the steps after which each layout came, for the report

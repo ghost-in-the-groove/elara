@@ -340,9 +340,12 @@ void Startup::queueEdits() {
         }
     };
     // A line of the credits (ADR-0059) is one edit, and undo takes it back.
-    steps_.emplace_back([this] {
+    steps_.emplace_back([this, check] {
+        const std::uint64_t sequences = score_->sequenceWork().asked;
         score_->setCredit(static_cast<int>(core::Credit::Subtitle),
                           QStringLiteral("Smoke credits"));
+        // Drawn, but not heard (ADR-0111).
+        check(score_->sequenceWork().asked == sequences, "a credit was sequenced");
         return true;
     });
     steps_.emplace_back([this, check] {
@@ -481,9 +484,14 @@ void Startup::queueSave() {
     steps_.emplace_back([this, check] {
         check(score_->songTitle() == QStringLiteral("Saved") && !score_->modified(),
               "undoing the edit made while saving did not return to the state saved");
+        score_->setSongTitle(QStringLiteral("Waiting"));
+        return true;
+    });
+    steps_.emplace_back([this] {
         // A new song asked for while a save is written waits for it, and is
         // made without asking once the save holds every change (ADR-0107).
-        score_->setSongTitle(QStringLiteral("Waiting"));
+        // The edit before was laid out first, so that the new song's layout
+        // never takes the place of the edit's, whenever the save ends.
         saved_.reset();
         score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("waiting"))));
         QMetaObject::invokeMethod(window_, "newSong");
@@ -491,7 +499,9 @@ void Startup::queueSave() {
         return true;
     });
     steps_.emplace_back([this, check] {
-        if (!saved_) {
+        // The save has ended and the new song made then is laid out, so that
+        // the next edit does not take the place of its layout.
+        if (!saved_ || score_->busy()) {
             again_ = true;
             return false;
         }
@@ -1042,7 +1052,12 @@ void Startup::queueMix() {
         check(score_->previewMixes().size() == tracks &&
                   score_->previewMixes().front().volume == 0.25 && !score_->modified(),
               "the fader preview changed the song");
+        const std::uint64_t layouts = score_->layoutWork().asked;
+        const std::uint64_t sequences = score_->sequenceWork().asked;
         score_->setTrackMix(0, 0.25, -0.5, false, true);
+        // Neither drawn nor part of the sequence (ADR-0111).
+        check(score_->layoutWork().asked == layouts && score_->sequenceWork().asked == sequences,
+              "a mix change was laid out or sequenced");
         const QVariantMap first = score_->tracks().front().toMap();
         check(first.value(QStringLiteral("volume")).toDouble() == 0.25 &&
                   first.value(QStringLiteral("pan")).toDouble() == -0.5 &&
@@ -1746,9 +1761,13 @@ void Startup::tick() {
         return;
     }
     if (waiting_) {
-        const bool settled = score_ != nullptr && laidOut_ && !score_->busy() &&
-                             score_->status() == ScoreDocument::Status::Ready &&
-                             (score_->pageCount() == 0 || pagesUpdated() > paintsBefore_);
+        // An edit that changes nothing drawn asks for no layout (ADR-0111).
+        const bool laidOut =
+            score_ != nullptr &&
+            (score_->layoutWork().asked == layoutsAskedBefore_ ||
+             (laidOut_ && (score_->pageCount() == 0 || pagesUpdated() > paintsBefore_)));
+        const bool settled =
+            laidOut && !score_->busy() && score_->status() == ScoreDocument::Status::Ready;
         if (!settled) {
             if (clock_.elapsed() - stepStarted_ > kStepTimeoutMilliseconds) {
                 finish(false, QStringLiteral("timed out"));
@@ -1773,6 +1792,7 @@ void Startup::tick() {
         steps_.pop_front();
         laidOut_ = false;
         paintsBefore_ = pagesUpdated();
+        layoutsAskedBefore_ = score_ != nullptr ? score_->layoutWork().asked : 0;
         if (againSince_ < 0) {
             ++stepsRun_;
         }

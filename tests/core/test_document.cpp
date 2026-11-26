@@ -572,3 +572,54 @@ TEST_CASE("A section is named at the measure it starts and only there", "[core][
     CHECK(doc.song() == original);
     CHECK_THROWS_AS(elara::core::changeSection(original, 4, "Outro"), std::out_of_range);
 }
+
+TEST_CASE("Edits say whether they change what the pages show and what plays", "[core][document]") {
+    using elara::core::Changes;
+    const Song original = smallSong();
+    Document doc(original);
+    const auto last = [&doc] {
+        return doc.lastChanges();
+    };
+
+    doc.execute(std::make_unique<SetSongInfo>(SongInfo{.title = "Etude"}));
+    CHECK(last() == Changes{.notation = true, .sound = false});
+    doc.execute(std::make_unique<SetTrackMix>(1, TrackMix{.volume = 0.5}));
+    CHECK(last() == Changes{.notation = false, .sound = false});
+
+    // Text written above a beat does not sound; a fret does.
+    Measure written = doc.song().track(0).staff(0).measure(1);
+    written.voices[0].beats[0].text = elara::core::SharedOptional<std::string>("riff");
+    doc.execute(std::make_unique<ReplaceMeasure>(0, 0, 1, written));
+    CHECK(last() == Changes{.notation = true, .sound = false});
+    doc.execute(std::make_unique<ReplaceMeasure>(0, 0, 1, wholeNote(doc.song(), 0, 9)));
+    CHECK(last() == Changes{});
+
+    // A section's name does not sound; a tempo change does.
+    MeasureHeader named = doc.song().measureHeader(0);
+    named.section = "Intro";
+    doc.execute(std::make_unique<SetMeasureHeader>(0, named));
+    CHECK(last() == Changes{.notation = true, .sound = false});
+    MeasureHeader faster = doc.song().measureHeader(1);
+    faster.tempoChanges = {TempoChange{.tempo = Tempo(140)}};
+    doc.execute(std::make_unique<SetMeasureHeader>(1, faster));
+    CHECK(last() == Changes{});
+
+    // A group changes what any of its edits changes.
+    std::vector<std::unique_ptr<elara::core::Command>> quiet;
+    quiet.push_back(std::make_unique<SetTrackMix>(0, TrackMix{.volume = 0.25}));
+    quiet.push_back(std::make_unique<SetSongInfo>(SongInfo{.title = "Study"}));
+    doc.execute(std::make_unique<CommandGroup>("Quiet", std::move(quiet)));
+    CHECK(last() == Changes{.notation = true, .sound = false});
+
+    // Undo and redo change what the edit changed.
+    doc.undo();
+    CHECK(last() == Changes{.notation = true, .sound = false});
+    doc.undo();
+    CHECK(last() == Changes{});
+    doc.redo();
+    CHECK(last() == Changes{});
+    // Anything else, or nothing done yet, may change everything.
+    CHECK(Document(original).lastChanges() == Changes{});
+    doc.execute(std::make_unique<InsertMeasures>(0, 1));
+    CHECK(last() == Changes{});
+}
