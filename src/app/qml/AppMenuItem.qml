@@ -27,26 +27,34 @@ MenuItem {
     bottomPadding: 0
     spacing: 0
 
-    indicator: Icon {
+    // The check mark and the arrow are made only for the items that show
+    // one: a window has some sixty items, and a shape for each adds up.
+    indicator: Loader {
         x: 8
         y: (root.height - height) / 2
         width: 16
         height: 16
-        visible: root.chosen || (root.checkable && root.checked)
-        path: Icons.check
-        lineWidth: 2.2
-        color: Theme.accentInk
+        active: root.chosen || (root.checkable && root.checked)
+
+        sourceComponent: Icon {
+            path: Icons.check
+            lineWidth: 2.2
+            color: Theme.accentInk
+        }
     }
 
-    arrow: Icon {
+    arrow: Loader {
         x: root.width - width - 8
         y: (root.height - height) / 2
         width: 14
         height: 14
-        visible: root.subMenu !== null
-        path: Icons.chevronRight
-        color: Theme.inkSoft
-        opacity: root.enabled ? 1.0 : 0.38
+        active: root.subMenu !== null
+
+        sourceComponent: Icon {
+            path: Icons.chevronRight
+            color: Theme.inkSoft
+            opacity: root.enabled ? 1.0 : 0.38
+        }
     }
 
     contentItem: Item {

@@ -84,13 +84,20 @@ Item {
         return pageY(page) + (pages - page) * (pageExtent(page) + gap);
     }
 
+    /// What the zoom follows as the room for the pages changes: the paper's
+    /// size ("paper", as a song opens), the page's width ("width"), or nothing
+    /// once it was chosen by hand ("").
+    property string fit: "paper"
+
     function setZoom(value: real) {
         zoom = Math.max(minZoom, Math.min(maxZoom, value));
     }
     function zoomIn() {
+        fit = "";
         setZoom(zoom * 1.25);
     }
     function zoomOut() {
+        fit = "";
         setZoom(zoom / 1.25);
     }
     /// The zoom at which a page fills the width of the view.
@@ -98,11 +105,31 @@ Item {
         return (list.width - 2 * sideMargin) / (document.pageSize.width * unit);
     }
     function fitWidth() {
+        fit = "width";
         setZoom(widthZoom());
     }
     /// Paper size, or smaller when the view is narrower.
     function fitPaper() {
+        fit = "paper";
         setZoom(Math.min(1.0, widthZoom()));
+    }
+    /// Fits again once the view has its new width: a panel that slides in or
+    /// out changes it on every frame, and each zoom paints the pages again.
+    onWidthChanged: {
+        if (fit.length > 0 && document.pageCount > 0)
+            refit.restart();
+    }
+
+    Timer {
+        id: refit
+
+        interval: 90
+        onTriggered: {
+            if (root.fit === "width")
+                root.setZoom(root.widthZoom());
+            else if (root.fit === "paper")
+                root.setZoom(Math.min(1.0, root.widthZoom()));
+        }
     }
     function toTop() {
         list.contentY = list.originY - list.topMargin;
@@ -714,7 +741,10 @@ Item {
     WheelHandler {
         target: null
         acceptedModifiers: Qt.ControlModifier
-        onWheel: event => root.setZoom(root.zoom * Math.pow(1.0015, event.angleDelta.y))
+        onWheel: event => {
+            root.fit = "";
+            root.setZoom(root.zoom * Math.pow(1.0015, event.angleDelta.y));
+        }
     }
     PinchHandler {
         target: null
@@ -723,6 +753,9 @@ Item {
             if (active)
                 startZoom = root.zoom;
         }
-        onActiveScaleChanged: root.setZoom(startZoom * activeScale)
+        onActiveScaleChanged: {
+            root.fit = "";
+            root.setZoom(startZoom * activeScale);
+        }
     }
 }
