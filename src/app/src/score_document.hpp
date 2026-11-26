@@ -35,6 +35,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -375,7 +376,8 @@ public:
     /// "jumpThen" (0 to the end, 1 al Fine, 2 al Coda, 3 al Double Coda).
     Q_INVOKABLE QVariantMap navigationAt(int measure) const;
     /// Changes the marks of `measure` named in `marks`, keyed as navigationAt()
-    /// gives them, as one undo step ("Change navigation marks").
+    /// gives them, as one undo step ("Change navigation marks",
+    /// core::changeNavigation()); taking the jump away also resets how it ends.
     Q_INVOKABLE void setNavigation(int measure, const QVariantMap& marks);
     /// The repeats of `measure` (ADR-0016): "start" (it opens a repeated
     /// section), "times" (how often the section it closes plays, 2 to 255, or
@@ -384,8 +386,10 @@ public:
     /// it, ADR-0103).
     Q_INVOKABLE QVariantMap repeatsAt(int measure) const;
     /// Changes the repeats of `measure` named in `repeats`, keyed as
-    /// repeatsAt() gives them, as one undo step ("Change repeats", or "Change
-    /// barline" for the double barline alone).
+    /// repeatsAt() gives them: the repeats and endings as one undo step
+    /// ("Change repeats", core::changeRepeats()), the double barline as
+    /// another ("Change barline", core::changeBarline()). Times or endings out
+    /// of range change nothing and say so through editFailed().
     Q_INVOKABLE void setRepeats(int measure, const QVariantMap& repeats);
     /// The tempo `measure` starts with (ADR-0042): "bpm", in beats per minute of
     /// the beat the song counts in there, "beat" (1 whole, 2 half, 4 quarter,
@@ -823,15 +827,17 @@ private:
     bool enter(core::Entry entry);
     /// The effects of the caret's beat, none without a caret.
     [[nodiscard]] core::BeatEffects beatEffectsAtCaret() const;
-    /// Gives the caret's beat `effects`, or says why it cannot.
-    void applyBeatEffects(const core::BeatEffects& effects);
+    /// Gives the caret's beat `value` in `field` (core::setBeatEffect()), or
+    /// says why it cannot when nothing there takes it.
+    template <typename Value>
+    void setBeatEffect(Value core::BeatEffects::* field, std::type_identity_t<Value> value);
     /// The effects of the caret's first note, none without a caret.
     [[nodiscard]] core::NoteEffects noteEffectsAtCaret() const;
-    /// Enters what `make` makes for the caret's notes, or says why it cannot;
-    /// silent when `has` says the notes have it already.
-    void
-    changeNoteEffects(const std::function<core::Entry(const core::Song&, const core::Caret&)>& make,
-                      const std::function<bool(const core::NoteEffects&)>& has);
+    /// Enters what `make` makes for the caret's notes, or says why it cannot
+    /// when no note there takes it (core::Entry::missed); silent when they
+    /// have it already. What `make` throws goes on to the caller.
+    void changeNoteEffects(
+        const std::function<core::Entry(const core::Song&, const core::Caret&)>& make);
     /// Makes an entry from the song being edited and enters it, reporting
     /// what it throws through editFailed().
     void runEntry(const std::function<core::Entry(const core::Song&)>& make);

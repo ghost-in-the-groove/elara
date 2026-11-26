@@ -101,10 +101,10 @@ base speaks one vocabulary. American terms follow MusicXML.
 | digitación | fingering; plucking finger | `Finger`, `NoteEffects::fingering`, `NoteEffects::pluck`, `Role::Fingering` | The finger that plays a note: 1 to 5 from the thumb, or on a fretted instrument T and 1 to 4 from the index; the plucking hand's p, i, m, a, c (ADR-0093) |
 | respiración / cesura | breath mark / caesura | `Breath`, `BeatEffects::breath` | A comma over the staff, or two strokes through its top line, after a beat: its notes end a little early (ADR-0095) |
 | línea de octava | octave line (8va, 8vb, 15ma, 15mb) | `Ottava`, `BeatEffects::ottava`, `ottavaOctaves()`, `Role::OctaveLine` | A dashed line over (or under) beats whose notes sound one or two octaves above (or below) where they are written (ADR-0089) |
-| repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings` | `Song::playOrder()` unrolls them (ADR-0016) |
+| repetición / casilla | repeat / alternate ending (volta) | `MeasureHeader::repeatStart`, `repeatTimes`, `alternateEndings`; `RepeatMarks` | `Song::playOrder()` unrolls them (ADR-0016); `changeRepeats()` sets them (ADR-0123) |
 | doble barra | double barline | `MeasureHeader::doubleBar` | Two thin lines closing a section (ADR-0103) |
 | repetición de compás (símil) | measure repeat (simile) | `Measure::repeat`, `MeasureRepeat`, `repeatSource()` | A staff's measure plays the measure, or the two measures, before it (ADR-0102) |
-| señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda`, `jump` (`JumpTo`), `jumpThen` (`JumpThen`) | Navigation marks; `Song::playOrder()` follows them (ADR-0049) |
+| señal / coda / salto | sign (segno, coda) / jump (D.C., D.S., al Fine, al Coda) | `MeasureHeader::segno`, `coda`, `fine`, `toCoda` (each a `NavigationSign`), `jump` (`JumpTo`), `jumpThen` (`JumpThen`); `NavigationMarks` | Navigation marks; `Song::playOrder()` follows them (ADR-0049); `changeNavigation()` sets them (ADR-0123) |
 | sección / marcador / ensayo | section (marker, rehearsal mark) | `MeasureHeader::section`, `changeSection()` | The named part of a song (intro, chorus...) that starts at a measure and runs to the next one that names a section (ADR-0062) |
 | tempo | tempo | `Tempo`, `TempoChange` | bpm of a beat unit; changes live in `MeasureHeader` |
 | cambio gradual de tempo | gradual tempo change | `TempoChange::gradual` | Accelerando or ritardando to the next change's tempo (ADR-0082) |

@@ -16,6 +16,8 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 /// Keyboard entry (ADR-0021): a caret on a beat and a string, the moves of the
 /// arrow keys, and the edits that typing frets, durations and deletes makes.
@@ -64,6 +66,10 @@ enum class CaretMove : std::uint8_t {
 struct Entry {
     std::unique_ptr<Command> command; ///< nullptr when nothing changes
     Caret caret;
+    /// Why nothing changed, for the effect edits (ADR-0123): true when nothing
+    /// at the caret takes the edit (no note there for a note's effect, the free
+    /// slot, or a rest for what only notes take), false when it is so already.
+    bool missed = false;
 };
 
 /// Typing a fret: the note at `fret` (from the capo) on the caret's string,
@@ -194,10 +200,14 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 /// Each of these sets one effect of the notes the caret is on (as for
 /// toggleEffect) to any of its kinds, as one undo step (ADR-0058). Nothing
 /// changes when they all have it already, on a rest, the free slot or a string
-/// without a note.
+/// without a note (`missed`, ADR-0123).
 ///
 /// setSlides() sets how the notes slide in and out ("Change slide").
 [[nodiscard]] Entry setSlides(const Song& song, const Caret& caret, SlideIn in, SlideOut out);
+/// How the notes slide in, each keeping how it slides out ("Change slide").
+[[nodiscard]] Entry setSlideIn(const Song& song, const Caret& caret, SlideIn in);
+/// How the notes slide out, each keeping how it slides in ("Change slide").
+[[nodiscard]] Entry setSlideOut(const Song& song, const Caret& caret, SlideOut out);
 /// Slight, wide or no vibrato ("Change vibrato").
 [[nodiscard]] Entry setVibrato(const Song& song, const Caret& caret, Vibrato vibrato);
 /// An accent, a marcato or neither ("Change accent").
@@ -229,12 +239,25 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 /// tremolo picking, whammy bar and bass technique, which apply to all its
 /// notes, as one undo step ("Change beat effects"). Nothing changes when the
 /// beat has them already or on the free slot; a rest takes only a hairpin, a
-/// fermata, a slur and an octave line (ADR-0089).
+/// fermata, a slur, an octave line and the pedal (ADR-0089, ADR-0092). It is
+/// `missed` (ADR-0123) on the free slot, and on a rest asked for more.
 [[nodiscard]] Entry setBeatEffects(const Song& song, const Caret& caret,
                                    const BeatEffects& effects);
 
-/// The effects of the caret's beat; none on a rest or the free slot.
+/// The effects of the caret's beat; on a rest only those a rest takes, none on
+/// the free slot.
 [[nodiscard]] BeatEffects beatEffectsAt(const Song& song, const Caret& caret);
+
+/// Sets one effect of the caret's beat, `field` of its BeatEffects, to
+/// `value`, its others staying as they are: setBeatEffects() with
+/// beatEffectsAt() changed in that field (ADR-0123).
+template <typename Value>
+[[nodiscard]] Entry setBeatEffect(const Song& song, const Caret& caret, Value BeatEffects::* field,
+                                  std::type_identity_t<Value> value) {
+    BeatEffects effects = beatEffectsAt(song, caret);
+    effects.*field = std::move(value);
+    return setBeatEffects(song, caret, effects);
+}
 
 /// Grace note entry (ADR-0079): adds a grace note `semitones` from the caret's
 /// note after the grace notes leading into its beat, `duration` long and

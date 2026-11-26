@@ -165,7 +165,10 @@ repeat that play it (1 to 8); each is one undo step, "Change repeats"
 (ADR-0016). The measures list them as `"repeatStart":true`, `"repeatTimes":3`
 and `"endings":[1,2]`. `barline` closes measure `m` with a double barline or
 a single one, one undo step, "Change barline" (ADR-0103); the measures list
-the double one as `"doubleBar":true`. `section` names the section that starts at measure `m`
+the double one as `"doubleBar":true`. These steps go through the core edits that
+check each group of marks (`changeNavigation()`, `changeRepeats()`,
+`changeBarline()`, ADR-0123): a number of times or an ending core refuses is a
+malformed step, with core's reason. `section` names the section that starts at measure `m`
 (no name takes it off), one undo step, "Change section" (ADR-0062); the
 measures list it as `"section":"Chorus"`.
 

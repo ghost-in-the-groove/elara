@@ -191,13 +191,11 @@ private:
         }
         addFlag(object, "doubleBar", value.doubleBar);
         addEnumIfNot(object, "tripletFeel", value.tripletFeel, TripletFeel::None);
-        addFlag(object, "segno", value.segno);
-        addFlag(object, "segnoSegno", value.segnoSegno);
-        addFlag(object, "coda", value.coda);
-        addFlag(object, "doubleCoda", value.doubleCoda);
-        addFlag(object, "fine", value.fine);
-        addFlag(object, "toCoda", value.toCoda);
-        addFlag(object, "toDoubleCoda", value.toDoubleCoda);
+        // Each sign as the flag MeasureHeader names it ("segnoSegno"); the
+        // names are literals, so their views end in a null.
+        for (const NavigationSign sign : enumValues<NavigationSign>()) {
+            addFlag(object, signField(sign).data(), value.*signFlag(sign));
+        }
         addEnumIfNot(object, "jump", value.jump, JumpTo::None);
         if (value.jump != JumpTo::None) {
             addEnumIfNot(object, "jumpThen", value.jumpThen, JumpThen::End);
@@ -827,13 +825,9 @@ private:
         }
         header.doubleBar = flag(object, "doubleBar");
         header.tripletFeel = enumValue(object, "tripletFeel", TripletFeel::None);
-        header.segno = flag(object, "segno");
-        header.segnoSegno = flag(object, "segnoSegno");
-        header.coda = flag(object, "coda");
-        header.doubleCoda = flag(object, "doubleCoda");
-        header.fine = flag(object, "fine");
-        header.toCoda = flag(object, "toCoda");
-        header.toDoubleCoda = flag(object, "toDoubleCoda");
+        for (const NavigationSign sign : enumValues<NavigationSign>()) {
+            header.*signFlag(sign) = flag(object, signField(sign).data());
+        }
         header.jump = enumValue(object, "jump", JumpTo::None);
         if (header.jump != JumpTo::None) {
             header.jumpThen = enumValue(object, "jumpThen", JumpThen::End);

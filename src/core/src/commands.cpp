@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/commands.hpp>
+#include <elara/core/names.hpp>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -129,6 +134,16 @@ bool soundTheSame(const Measure& a, const Measure& b) {
     return true;
 }
 
+// `header` with the signs and the jump of `marks`.
+MeasureHeader withNavigation(MeasureHeader header, const NavigationMarks& marks) {
+    for (const NavigationSign sign : enumValues<NavigationSign>()) {
+        header.*signFlag(sign) = marks.has(sign);
+    }
+    header.jump = marks.jump;
+    header.jumpThen = marks.jumpThen;
+    return header;
+}
+
 } // namespace
 
 void ReplaceMeasure::apply(Song& song) {
@@ -149,16 +164,7 @@ void SetMeasureHeader::apply(Song& song) {
     const bool tempo = target.tempoChanges != header_.tempoChanges;
     // The target with the new signs and jumps: equal to the new header when
     // nothing else changes.
-    MeasureHeader marks = target;
-    marks.segno = header_.segno;
-    marks.segnoSegno = header_.segnoSegno;
-    marks.coda = header_.coda;
-    marks.doubleCoda = header_.doubleCoda;
-    marks.fine = header_.fine;
-    marks.toCoda = header_.toCoda;
-    marks.toDoubleCoda = header_.toDoubleCoda;
-    marks.jump = header_.jump;
-    marks.jumpThen = header_.jumpThen;
+    const MeasureHeader marks = withNavigation(target, navigationOf(header_));
     const bool navigation = marks != target;
     // The same with the new repeats and alternate endings (ADR-0016).
     MeasureHeader repeats = target;
@@ -406,6 +412,56 @@ std::unique_ptr<Command> changeSection(const Song& song, std::size_t measure, st
     std::vector<std::unique_ptr<Command>> steps;
     steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
     return std::make_unique<CommandGroup>("Change section", std::move(steps));
+}
+
+// ---- Measure marks (ADR-0123) ----------------------------------------------------
+
+namespace {
+
+// `header` as one undo step named `name` for measure `measure`, null when the
+// song has that header there already.
+std::unique_ptr<Command> changeHeader(const Song& song, std::size_t measure, MeasureHeader header,
+                                      std::string name) {
+    if (header == song.measureHeader(measure)) {
+        return nullptr;
+    }
+    std::vector<std::unique_ptr<Command>> steps;
+    steps.push_back(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    return std::make_unique<CommandGroup>(std::move(name), std::move(steps));
+}
+
+} // namespace
+
+std::unique_ptr<Command> changeNavigation(const Song& song, std::size_t measure,
+                                          const NavigationMarks& marks) {
+    const MeasureHeader& header = song.measureHeader(measure); // throws first
+    if (!enumFromIndex<JumpTo>(std::to_underlying(marks.jump)) ||
+        !enumFromIndex<JumpThen>(std::to_underlying(marks.jumpThen))) {
+        throw std::invalid_argument("not a jump");
+    }
+    NavigationMarks wanted = marks;
+    if (wanted.jump == JumpTo::None) {
+        wanted.jumpThen = JumpThen::End; // nothing to end the music after
+    }
+    return changeHeader(song, measure, withNavigation(header, wanted), "Change navigation marks");
+}
+
+std::unique_ptr<Command> changeRepeats(const Song& song, std::size_t measure,
+                                       const RepeatMarks& marks) {
+    MeasureHeader header = song.measureHeader(measure); // throws first
+    if (marks.times != 0) {
+        checkRepeatTimes(marks.times);
+    }
+    header.repeatStart = marks.start;
+    header.repeatTimes = static_cast<std::uint8_t>(marks.times);
+    header.alternateEndings = marks.endings;
+    return changeHeader(song, measure, std::move(header), "Change repeats");
+}
+
+std::unique_ptr<Command> changeBarline(const Song& song, std::size_t measure, bool doubleBar) {
+    MeasureHeader header = song.measureHeader(measure); // throws first
+    header.doubleBar = doubleBar;
+    return changeHeader(song, measure, std::move(header), "Change barline");
 }
 
 } // namespace elara::core
