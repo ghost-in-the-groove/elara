@@ -204,33 +204,11 @@ Fermata fermataOf(pugi::xml_node fermata) {
 
 std::optional<Dynamic> dynamicOf(pugi::xml_node dynamics) {
     for (pugi::xml_node mark : dynamics.children()) {
-        const std::string_view name = mark.name();
-        if (name.starts_with("ppp")) {
-            return Dynamic::PPP;
-        }
-        if (name.starts_with("fff")) {
-            return Dynamic::FFF;
-        }
-        if (name == "pp") {
-            return Dynamic::PP;
-        }
-        if (name == "p") {
-            return Dynamic::P;
-        }
-        if (name == "mp") {
-            return Dynamic::MP;
-        }
-        if (name == "mf") {
-            return Dynamic::MF;
-        }
-        if (name == "f") {
-            return Dynamic::F;
-        }
-        if (name == "ff") {
-            return Dynamic::FF;
+        if (const auto dynamic = detail::dynamicNamed(mark.name())) {
+            return dynamic;
         }
     }
-    return std::nullopt; // sf, sfz, fp...: accents rather than levels
+    return std::nullopt;
 }
 
 /// Number at the start of text such as "100" or "c. 92".
@@ -2288,10 +2266,8 @@ private:
                                   : Harmonic{.kind = HarmonicKind::Natural, .fretTenths = 0};
             } else if (name == "tap") {
                 event.beatEffects.bassTechnique = BassTechnique::Tap; // the beat's (ADR-0060)
-            } else if (name == "up-bow") {
-                event.beatEffects.pickStroke = PickStroke::Up;
-            } else if (name == "down-bow") {
-                event.beatEffects.pickStroke = PickStroke::Down;
+            } else if (const auto stroke = detail::valueNamed(detail::kPickStrokes, name)) {
+                event.beatEffects.pickStroke = *stroke;
             }
         }
     }
@@ -2299,33 +2275,8 @@ private:
     void readArticulations(pugi::xml_node articulations, Event& event, NoteEffects& fx,
                            std::size_t index) {
         for (pugi::xml_node mark : articulations.children()) {
-            const std::string_view name = mark.name();
-            if (name == "breath-mark" || name == "caesura") { // after the beat (ADR-0095)
-                event.beatEffects.breath = std::max(
-                    event.beatEffects.breath, name == "caesura" ? Breath::Caesura : Breath::Comma);
-            } else if (name == "staccato" || name == "spiccato") {
-                fx.staccato = true;
-            } else if (name == "staccatissimo") { // ADR-0094
-                fx.staccatissimo = true;
-            } else if (name == "tenuto") {
-                fx.tenuto = true;
-            } else if (name == "detached-legato") { // portato (ADR-0088)
-                fx.tenuto = true;
-                fx.staccato = true;
-            } else if (name == "accent") {
-                if (fx.accent == Accent::None) {
-                    fx.accent = Accent::Accent;
-                }
-            } else if (name == "strong-accent") {
-                fx.accent = Accent::Marcato;
-            } else if (name == "scoop") {
-                fx.slideIn = SlideIn::FromBelow;
-            } else if (name == "plop") {
-                fx.slideIn = SlideIn::FromAbove;
-            } else if (name == "doit") {
-                fx.slideOut = SlideOut::Upwards;
-            } else if (name == "falloff") {
-                fx.slideOut = SlideOut::Downwards;
+            if (const detail::ArticulationMark* known = detail::articulationNamed(mark.name())) {
+                detail::addMark(*known, fx, event.beatEffects.breath);
             } else {
                 warn("articulations other than staccato, tenuto, accents and breaths dropped",
                      index);
@@ -2352,14 +2303,11 @@ private:
             if (name == "tremolo") {
                 const std::string_view type = mark.attribute("type").value();
                 if (type.empty() || type == "single") {
-                    const int marks = mark.text().as_int(3);
-                    event.beatEffects.tremoloPicking = marks <= 1   ? NoteValue::Eighth
-                                                       : marks == 2 ? NoteValue::Sixteenth
-                                                                    : NoteValue::ThirtySecond;
+                    event.beatEffects.tremoloPicking = detail::tremoloSpeed(mark.text().as_int(3));
                 } else {
                     warn("tremolos between notes dropped", index);
                 }
-            } else if (const auto ornament = ornamentOf(name)) {
+            } else if (const auto ornament = detail::valueNamed(detail::kOrnaments, name)) {
                 fx.ornament = *ornament; // ADR-0091
             } else if (name == "wavy-line") {
                 if (isType(mark, "start") && !trill) {
@@ -2391,24 +2339,6 @@ private:
                 warn("trills to an unusual note dropped", index);
             }
         }
-    }
-
-    // A mordent or a turn by its MusicXML name (ADR-0091); delayed and vertical
-    // turns are none of them.
-    static std::optional<Ornament> ornamentOf(std::string_view name) {
-        if (name == "mordent") {
-            return Ornament::Mordent;
-        }
-        if (name == "inverted-mordent") {
-            return Ornament::UpperMordent;
-        }
-        if (name == "turn") {
-            return Ornament::Turn;
-        }
-        if (name == "inverted-turn") {
-            return Ornament::InvertedTurn;
-        }
-        return std::nullopt;
     }
 
     // The alteration an accidental mark writes; nullopt for one it does not.

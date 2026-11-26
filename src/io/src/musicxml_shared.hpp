@@ -2,9 +2,14 @@
 // Internal: MusicXML vocabulary shared by the reader (ADR-0007) and the writer (ADR-0008).
 #pragma once
 
+#include <elara/core/duration.hpp>
+#include <elara/core/effects.hpp>
 #include <elara/core/signature.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
+#include <optional>
 #include <string_view>
 
 namespace elara::io::detail {
@@ -85,5 +90,179 @@ inline constexpr std::string_view kMusicXmlMediaType = "application/vnd.recordar
 /// one is "guitarVibratoStroke".
 inline constexpr std::string_view kWideVibratoGlyph = "guitarWideVibratoStroke";
 inline constexpr std::string_view kVibratoGlyph = "guitarVibratoStroke";
+
+// ---- Marks ----------------------------------------------------------------------
+// One table per kind of mark pairs each MusicXML element with what it means in
+// the model. The writer writes a table's marks in its order and the reader
+// takes them back; aliases are other names for the same marks that only the
+// reader accepts.
+
+/// A MusicXML element and the model's value for it.
+template <typename Value>
+struct Named {
+    std::string_view name;
+    Value value;
+};
+
+/// The value `name` stands for in `table`; nullopt when it is not there.
+template <typename Value, std::size_t N>
+[[nodiscard]] constexpr std::optional<Value> valueNamed(const std::array<Named<Value>, N>& table,
+                                                        std::string_view name) noexcept {
+    const auto found = std::ranges::find(table, name, &Named<Value>::name);
+    return found == table.end() ? std::nullopt : std::optional<Value>(found->value);
+}
+
+/// The element `table` names `value` with; empty when it is not there.
+template <typename Value, std::size_t N>
+[[nodiscard]] constexpr std::string_view nameOf(const std::array<Named<Value>, N>& table,
+                                                Value value) noexcept {
+    const auto found = std::ranges::find(table, value, &Named<Value>::value);
+    return found == table.end() ? std::string_view() : found->name;
+}
+
+/// A mark in <articulations> and what it gives its note, or the beat it ends
+/// for a breath mark or a caesura (ADR-0095). Each mark the writer writes sets
+/// one thing; an alias may set more.
+struct ArticulationMark {
+    std::string_view name;
+    bool staccato = false;
+    bool staccatissimo = false; // ADR-0094
+    bool tenuto = false;        // ADR-0088
+    core::Accent accent = core::Accent::None;
+    core::SlideIn slideIn = core::SlideIn::None;    // a slide into the note
+    core::SlideOut slideOut = core::SlideOut::None; // a slide off it
+    core::Breath breath = core::Breath::None;       // after the beat
+};
+
+inline constexpr std::array<ArticulationMark, 11> kArticulations{{
+    {.name = "accent", .accent = core::Accent::Accent},
+    {.name = "strong-accent", .accent = core::Accent::Marcato},
+    {.name = "staccato", .staccato = true},
+    {.name = "staccatissimo", .staccatissimo = true},
+    {.name = "tenuto", .tenuto = true},
+    {.name = "scoop", .slideIn = core::SlideIn::FromBelow},
+    {.name = "plop", .slideIn = core::SlideIn::FromAbove},
+    {.name = "doit", .slideOut = core::SlideOut::Upwards},
+    {.name = "falloff", .slideOut = core::SlideOut::Downwards},
+    {.name = "breath-mark", .breath = core::Breath::Comma},
+    {.name = "caesura", .breath = core::Breath::Caesura},
+}};
+
+/// Read only: a spiccato is a staccato, a detached legato (portato) a staccato
+/// with a tenuto (ADR-0088).
+inline constexpr std::array<ArticulationMark, 2> kArticulationAliases{{
+    {.name = "spiccato", .staccato = true},
+    {.name = "detached-legato", .staccato = true, .tenuto = true},
+}};
+
+/// The articulation the reader takes `name` for, aliases included; nullptr for
+/// one the model does not have.
+[[nodiscard]] constexpr const ArticulationMark* articulationNamed(std::string_view name) noexcept {
+    for (const ArticulationMark& mark : kArticulations) {
+        if (mark.name == name) {
+            return &mark;
+        }
+    }
+    for (const ArticulationMark& mark : kArticulationAliases) {
+        if (mark.name == name) {
+            return &mark;
+        }
+    }
+    return nullptr;
+}
+
+/// Whether a note, on a beat with `breath` after it, has `mark`.
+[[nodiscard]] inline bool hasMark(const ArticulationMark& mark, const core::NoteEffects& fx,
+                                  core::Breath breath) noexcept {
+    return (!mark.staccato || fx.staccato) && (!mark.staccatissimo || fx.staccatissimo) &&
+           (!mark.tenuto || fx.tenuto) &&
+           (mark.accent == core::Accent::None || fx.accent == mark.accent) &&
+           (mark.slideIn == core::SlideIn::None || fx.slideIn == mark.slideIn) &&
+           (mark.slideOut == core::SlideOut::None || fx.slideOut == mark.slideOut) &&
+           (mark.breath == core::Breath::None || breath == mark.breath);
+}
+
+/// Gives a note, and the breath after its beat, `mark`: a strong accent wins
+/// over an accent and a caesura over a breath mark, in any order; a later
+/// slide replaces an earlier one.
+inline void addMark(const ArticulationMark& mark, core::NoteEffects& fx,
+                    core::Breath& breath) noexcept {
+    fx.staccato = fx.staccato || mark.staccato;
+    fx.staccatissimo = fx.staccatissimo || mark.staccatissimo;
+    fx.tenuto = fx.tenuto || mark.tenuto;
+    fx.accent = std::max(fx.accent, mark.accent);
+    if (mark.slideIn != core::SlideIn::None) {
+        fx.slideIn = mark.slideIn;
+    }
+    if (mark.slideOut != core::SlideOut::None) {
+        fx.slideOut = mark.slideOut;
+    }
+    breath = std::max(breath, mark.breath);
+}
+
+/// The marks in <ornaments> that are a note's ornament (ADR-0091), MusicXML's
+/// inverted mordent being the upper one. Delayed and vertical turns are none
+/// of them.
+inline constexpr std::array<Named<core::Ornament>, 4> kOrnaments{{
+    {"mordent", core::Ornament::Mordent},
+    {"inverted-mordent", core::Ornament::UpperMordent},
+    {"turn", core::Ornament::Turn},
+    {"inverted-turn", core::Ornament::InvertedTurn},
+}};
+
+/// Pick strokes, the bowing marks of <technical> (ADR-0008).
+inline constexpr std::array<Named<core::PickStroke>, 2> kPickStrokes{{
+    {"down-bow", core::PickStroke::Down},
+    {"up-bow", core::PickStroke::Up},
+}};
+
+/// Tremolo picking (ADR-0025) as the strokes of a single <tremolo> through the
+/// stem: one for eighths, two for sixteenths, three for thirty-seconds
+/// (index = strokes - 1).
+inline constexpr std::array<core::NoteValue, 3> kTremoloSpeeds{
+    core::NoteValue::Eighth, core::NoteValue::Sixteenth, core::NoteValue::ThirtySecond};
+
+/// The speed `strokes` write, fewer than one counting as one and more than
+/// three as three.
+[[nodiscard]] constexpr core::NoteValue tremoloSpeed(int strokes) noexcept {
+    const int count = std::clamp(strokes, 1, static_cast<int>(kTremoloSpeeds.size()));
+    return kTremoloSpeeds[static_cast<std::size_t>(count - 1)];
+}
+
+/// The strokes of `speed`, or of the nearest speed strokes write when it is
+/// slower than eighths or faster than thirty-seconds.
+[[nodiscard]] constexpr int tremoloStrokes(core::NoteValue speed) noexcept {
+    if (const auto found = std::ranges::find(kTremoloSpeeds, speed);
+        found != kTremoloSpeeds.end()) {
+        return static_cast<int>(found - kTremoloSpeeds.begin()) + 1;
+    }
+    return speed < kTremoloSpeeds.front() ? 1 : static_cast<int>(kTremoloSpeeds.size());
+}
+
+/// The marks in <dynamics> of the model's levels (ADR-0044), in core::Dynamic
+/// order.
+inline constexpr std::array<Named<core::Dynamic>, 8> kDynamics{{
+    {"ppp", core::Dynamic::PPP},
+    {"pp", core::Dynamic::PP},
+    {"p", core::Dynamic::P},
+    {"mp", core::Dynamic::MP},
+    {"mf", core::Dynamic::MF},
+    {"f", core::Dynamic::F},
+    {"ff", core::Dynamic::FF},
+    {"fff", core::Dynamic::FFF},
+}};
+
+/// The level a mark in <dynamics> sets. Read only, softer than ppp ("pppp"...)
+/// is ppp and louder than fff fff. Nullopt for sf, sfz, fp...: accents rather
+/// than levels.
+[[nodiscard]] constexpr std::optional<core::Dynamic> dynamicNamed(std::string_view name) noexcept {
+    if (name.starts_with("ppp")) {
+        return core::Dynamic::PPP;
+    }
+    if (name.starts_with("fff")) {
+        return core::Dynamic::FFF;
+    }
+    return valueNamed(kDynamics, name);
+}
 
 } // namespace elara::io::detail

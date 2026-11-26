@@ -75,10 +75,13 @@ target_link_libraries(elara_make_test_sfz PRIVATE elara::audio SndFile::sndfile)
 elara_target_warnings(elara_make_test_sfz)
 
 elara_add_unit_tests(io
-  SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp io/test_midi.cpp io/test_guitar_pro.cpp
+  SOURCES io/test_native_format.cpp io/test_musicxml.cpp io/test_musicxml_export.cpp
+          io/test_musicxml_marks.cpp io/test_midi.cpp io/test_guitar_pro.cpp
           io/test_guitar_pro_binary.cpp io/test_guitar_pro_gpx.cpp io/test_open.cpp
   LIBRARIES elara::io miniz::miniz)
 target_compile_definitions(elara_io_tests PRIVATE ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
+# The MusicXML marks test walks the tables both directions share (musicxml_shared.hpp).
+target_include_directories(elara_io_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/io/src")
 
 elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
