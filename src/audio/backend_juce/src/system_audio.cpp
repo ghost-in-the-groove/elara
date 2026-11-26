@@ -6,12 +6,25 @@
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_events/juce_events.h>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <objbase.h> // CoIncrementMTAUsage()
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <span>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace elara::audio {
@@ -126,14 +139,23 @@ private:
     std::vector<float> right_ = std::vector<float>(512, 0.0f);
 };
 
-} // namespace
+// JUCE opens Windows devices through COM, which it starts only on its message
+// thread, the main thread. Keeping the process's multithreaded apartment alive
+// lets any other thread use COM without joining an apartment itself, so that
+// a device can open on a worker (ADR-0122). Elsewhere there is nothing to do.
+void letOtherThreadsUseCom() {
+#ifdef _WIN32
+    static const bool kept = [] {
+        CO_MTA_USAGE_COOKIE cookie{};
+        return SUCCEEDED(CoIncrementMTAUsage(&cookie)); // never released: for the process's life
+    }();
+    static_cast<void>(kept);
+#endif
+}
 
-std::vector<OutputDeviceInfo> listOutputDevices() {
-    const juce::ScopedJuceInitialiser_GUI juceInit;
-    juce::AudioDeviceManager manager;
-    juce::OwnedArray<juce::AudioIODeviceType> types;
-    manager.createAudioDeviceTypes(types);
-
+// Every output device of every type `types` holds, scanned again so that a
+// device plugged in since shows up.
+std::vector<OutputDeviceInfo> outputsOf(const juce::OwnedArray<juce::AudioIODeviceType>& types) {
     std::vector<OutputDeviceInfo> devices;
     for (auto* type : types) {
         type->scanForDevices();
@@ -148,38 +170,113 @@ std::vector<OutputDeviceInfo> listOutputDevices() {
     return devices;
 }
 
+std::string describe(const OutputDeviceChoice& device) {
+    return device.type.empty() ? device.name : std::format("{} / {}", device.type, device.name);
+}
+
+// The type and the name of the device `device` stands for among `types`: the
+// first type's default device for the default.
+std::optional<std::pair<juce::String, juce::String>>
+findOutput(const juce::OwnedArray<juce::AudioIODeviceType>& types,
+           const OutputDeviceChoice& device) {
+    for (auto* type : types) {
+        const auto names = type->getDeviceNames(false);
+        if (device.isDefault()) {
+            if (!names.isEmpty()) {
+                return std::pair{type->getTypeName(),
+                                 names[std::max(0, type->getDefaultDeviceIndex(false))]};
+            }
+        } else if ((device.type.empty() || type->getTypeName() == juce::String(device.type)) &&
+                   names.contains(juce::String(device.name))) {
+            return std::pair{type->getTypeName(), juce::String(device.name)};
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+OutputDeviceChoice parseOutputDeviceChoice(std::string_view text) {
+    constexpr std::string_view kSeparator = " / ";
+    if (const auto at = text.find(kSeparator); at != std::string_view::npos) {
+        return {.type = std::string(text.substr(0, at)),
+                .name = std::string(text.substr(at + kSeparator.size()))};
+    }
+    return {.type = {}, .name = std::string(text)};
+}
+
+std::vector<OutputDeviceInfo> listOutputDevices() {
+    const juce::ScopedJuceInitialiser_GUI juceInit;
+    juce::AudioDeviceManager manager;
+    juce::OwnedArray<juce::AudioIODeviceType> types;
+    manager.createAudioDeviceTypes(types);
+    return outputsOf(types);
+}
+
 struct SystemAudio::Impl {
     // Declaration order is destruction order in reverse: the JUCE runtime must
     // outlive the device manager, and the callback must outlive both.
     juce::ScopedJuceInitialiser_GUI juceInit;
     ToneCallback callback;
     juce::AudioDeviceManager deviceManager;
+    OutputDeviceChoice device; // the one open
     bool isOpen = false;
+    bool hasCallback = false; // added on the first open, kept across devices
 };
 
 SystemAudio::SystemAudio() : impl_(std::make_unique<Impl>()) {}
 
 SystemAudio::~SystemAudio() {
-    if (impl_->isOpen) {
+    if (impl_->hasCallback) {
         impl_->deviceManager.removeAudioCallback(&impl_->callback);
-        impl_->deviceManager.closeAudioDevice();
     }
+    impl_->deviceManager.closeAudioDevice();
 }
 
-std::expected<void, std::string> SystemAudio::open() {
-    if (impl_->isOpen) {
+std::expected<void, std::string> SystemAudio::open(const OutputDeviceChoice& device) {
+    if (impl_->isOpen && impl_->device == device) {
         return {};
     }
-    const auto error = impl_->deviceManager.initialiseWithDefaultDevices(0, 2);
-    if (error.isNotEmpty()) {
+    letOtherThreadsUseCom();
+    auto& manager = impl_->deviceManager;
+    impl_->isOpen = false;
+    manager.closeAudioDevice();
+    const auto& types = manager.getAvailableDeviceTypes();
+    auto found = findOutput(types, device);
+    if (!found) {
+        outputsOf(types); // plugged in since the last scan?
+        found = findOutput(types, device);
+    }
+    if (!found) {
+        return std::unexpected(device.isDefault()
+                                   ? std::string("no audio output device is available")
+                                   : std::format("no output device \"{}\"", describe(device)));
+    }
+    // A saved setup names the type and the device; without falling back to
+    // the default, a device that does not open leaves none open.
+    juce::XmlElement setup("DEVICESETUP");
+    setup.setAttribute("deviceType", found->first);
+    setup.setAttribute("audioOutputDeviceName", found->second);
+    if (const auto error = manager.initialise(0, 2, &setup, false); error.isNotEmpty()) {
         return std::unexpected(error.toStdString());
     }
-    if (impl_->deviceManager.getCurrentAudioDevice() == nullptr) {
-        return std::unexpected(std::string("no audio output device is available"));
+    if (manager.getCurrentAudioDevice() == nullptr) {
+        return std::unexpected(std::format("the output device \"{} / {}\" did not open",
+                                           found->first.toStdString(),
+                                           found->second.toStdString()));
     }
-    impl_->deviceManager.addAudioCallback(&impl_->callback);
+    if (!impl_->hasCallback) {
+        manager.addAudioCallback(&impl_->callback);
+        impl_->hasCallback = true;
+    }
+    impl_->device = device;
     impl_->isOpen = true;
     return {};
+}
+
+std::vector<OutputDeviceInfo> SystemAudio::outputDevices() {
+    letOtherThreadsUseCom();
+    return outputsOf(impl_->deviceManager.getAvailableDeviceTypes());
 }
 
 std::string SystemAudio::deviceDescription() const {
@@ -198,12 +295,12 @@ double SystemAudio::sampleRate() const {
 }
 
 void SystemAudio::setSource(AudioSource* source) {
-    if (impl_->isOpen) {
+    if (impl_->hasCallback) {
         // removeAudioCallback() waits for a callback in progress to finish.
         impl_->deviceManager.removeAudioCallback(&impl_->callback);
     }
     impl_->callback.setSource(source);
-    if (impl_->isOpen) {
+    if (impl_->hasCallback) {
         impl_->deviceManager.addAudioCallback(&impl_->callback);
     }
 }

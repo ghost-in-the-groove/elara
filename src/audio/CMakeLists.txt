@@ -37,7 +37,9 @@ target_link_libraries(elara_audio_juce
     juce::juce_audio_basics
     juce::juce_events
     juce::juce_core
-    juce::juce_recommended_config_flags)
+    juce::juce_recommended_config_flags
+    # CoIncrementMTAUsage(), so that a device can open on a worker (ADR-0122).
+    $<$<PLATFORM_ID:Windows>:ole32>)
 target_compile_definitions(elara_audio_juce PRIVATE
   JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1
   JUCE_STANDALONE_APPLICATION=1
