@@ -47,6 +47,9 @@ ApplicationWindow {
     }
     /// What to do once unsaved changes are saved or discarded.
     property var pendingAction: null
+    /// What waits for the saves being written, asked for again once they are
+    /// all on the disk.
+    property var savedAction: null
     property bool closing: false
 
     width: 1280
@@ -86,19 +89,13 @@ ApplicationWindow {
     }
 
     onClosing: close => {
-        if (closing)
+        if (closing || (!score.saving && !score.modified))
             return;
-        if (score.saving) {
-            // Asked again once the save being written is on the disk.
-            close.accepted = false;
-            pendingAction = () => window.close();
-        } else if (score.modified) {
-            close.accepted = false;
-            whenSaved(() => {
-                window.closing = true;
-                window.close();
-            });
-        }
+        close.accepted = false;
+        whenSaved(() => {
+            window.closing = true;
+            window.close();
+        });
     }
 
     function toggleTuner() {
@@ -109,7 +106,12 @@ ApplicationWindow {
     }
 
     /// Runs `action` at once, or after asking whether to save the changes.
+    /// While a save is written, decides once it is on the disk.
     function whenSaved(action) {
+        if (score.saving) {
+            savedAction = action;
+            return;
+        }
         if (!score.modified) {
             action();
             return;
@@ -136,8 +138,13 @@ ApplicationWindow {
         });
     }
 
-    /// Saves to the song's own file, or asks where when it has none. What was
-    /// waiting for the save runs once it is written.
+    /// Saves, then runs `action` once the song is on the disk.
+    function saveThen(action) {
+        savedAction = action;
+        save();
+    }
+
+    /// Saves to the song's own file, or asks where when it has none.
     function save() {
         if (score.savesInPlace)
             score.save(score.source);
@@ -181,13 +188,17 @@ ApplicationWindow {
                 toast.show(errorMessage);
         }
         onEditFailed: message => toast.show(message)
-        // What waited for the save runs, unless the song changed again while
-        // it was written; a failed save drops it.
+        // What waited for the saves runs once the last one is written,
+        // after asking again if the song changed meanwhile. A failed save
+        // drops it.
         onSaveFinished: (file, saved) => {
-            const action = window.pendingAction;
-            window.pendingAction = null;
-            if (saved && action)
-                window.whenSaved(action);
+            if (!saved)
+                window.savedAction = null;
+            if (score.saving || !window.savedAction)
+                return;
+            const action = window.savedAction;
+            window.savedAction = null;
+            window.whenSaved(action);
         }
         onNotice: message => toast.inform(message, [])
         onReport: (message, details) => toast.inform(message, details)
@@ -273,7 +284,7 @@ ApplicationWindow {
         nameFilters: [qsTr("Elara (*.elara)")]
         defaultSuffix: "elara"
         onAccepted: score.save(selectedFile)
-        onRejected: window.pendingAction = null
+        onRejected: window.savedAction = null
     }
 
     FileDialog {
@@ -339,13 +350,18 @@ ApplicationWindow {
     Dialog {
         id: unsavedDialog
 
+        objectName: "unsavedDialog"
         anchors.centerIn: parent
         // A fixed width: three buttons and a label would size each other.
         width: Math.min(460, window.width - 48)
         modal: true
         title: qsTr("Save the changes?")
         standardButtons: Dialog.Save | Dialog.Discard | Dialog.Cancel
-        onAccepted: window.save()
+        onAccepted: {
+            const action = window.pendingAction;
+            window.pendingAction = null;
+            window.saveThen(action);
+        }
         onDiscarded: {
             close();
             window.runPendingAction();
