@@ -542,7 +542,7 @@ public:
     Q_INVOKABLE void toggleDrum();
     /// The note effects typing toggles, numbered as core::NoteEffect
     /// (ADR-0037, ADR-0038).
-    static constexpr int kEffectCount = 14;
+    static constexpr int kEffectCount = static_cast<int>(core::kEnumCount<core::NoteEffect>);
     /// Toggles note effect `effect` on the caret's notes.
     Q_INVOKABLE void toggleEffect(int effect);
     /// The effects the caret's notes all have: bit `effect` for each.

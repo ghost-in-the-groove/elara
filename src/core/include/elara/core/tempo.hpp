@@ -3,10 +3,13 @@
 
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
+#include <elara/core/names.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
+#include <string_view>
 
 namespace elara::core {
 
@@ -71,6 +74,13 @@ enum class TripletFeel : std::uint8_t {
     ScottishEighth,    ///< pairs of eighths, 1:3
     ScottishSixteenth, ///< pairs of sixteenths, 1:3
 };
+template <>
+struct EnumNames<TripletFeel> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"none", "eighth", "sixteenth", "dotted-eighth", "dotted-sixteenth", "scottish-eighth",
+         "scottish-sixteenth"});
+};
+static_assert(namesEnd(TripletFeel::ScottishSixteenth));
 
 /// Where `offset` whole notes into a measure `length` long is played under
 /// `feel`: the first half of each pair, counted from the start of the measure,

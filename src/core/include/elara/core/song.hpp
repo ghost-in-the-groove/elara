@@ -3,16 +3,19 @@
 
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/shared_value.hpp>
 #include <elara/core/signature.hpp>
 #include <elara/core/tempo.hpp>
 #include <elara/core/tuning.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -145,6 +148,12 @@ enum class JumpTo : std::uint8_t {
     Segno,      ///< dal segno (D.S.): the nearest segno before the jump
     SegnoSegno, ///< dal segno segno (D.S.S.): the nearest segno segno before it
 };
+template <>
+struct EnumNames<JumpTo> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
+};
+static_assert(namesEnd(JumpTo::SegnoSegno));
 
 /// Where the music ends, or leaves for a coda, once a jump was taken.
 enum class JumpThen : std::uint8_t {
@@ -153,6 +162,30 @@ enum class JumpThen : std::uint8_t {
     Coda,       ///< al Coda: leaves the measure marked to coda for the coda sign
     DoubleCoda, ///< al Double Coda: the same with the double coda signs
 };
+template <>
+struct EnumNames<JumpThen> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
+};
+static_assert(namesEnd(JumpThen::DoubleCoda));
+
+/// A navigation sign of a measure (ADR-0049), each a flag of MeasureHeader
+/// (signFlag()): the signs that open it, where jumps go, then what closes it.
+enum class NavigationSign : std::uint8_t {
+    Segno,
+    SegnoSegno,
+    Coda,
+    DoubleCoda,
+    Fine,
+    ToCoda,
+    ToDoubleCoda,
+};
+template <>
+struct EnumNames<NavigationSign> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"segno", "segno-segno", "coda", "double-coda", "fine", "to-coda", "to-double-coda"});
+};
+static_assert(namesEnd(NavigationSign::ToDoubleCoda));
 
 /// Song-wide information about one measure, shared by every staff. Tempo changes,
 /// repeats (ADR-0016), signs and jumps (ADR-0049) live here so they move with
@@ -215,6 +248,27 @@ struct MeasureHeader {
     friend bool operator==(const MeasureHeader&, const MeasureHeader&) = default;
 };
 
+/// The flag of MeasureHeader that holds `sign`: `header.*signFlag(sign)`.
+[[nodiscard]] constexpr bool MeasureHeader::* signFlag(NavigationSign sign) noexcept {
+    switch (sign) {
+    case NavigationSign::Segno:
+        return &MeasureHeader::segno;
+    case NavigationSign::SegnoSegno:
+        return &MeasureHeader::segnoSegno;
+    case NavigationSign::Coda:
+        return &MeasureHeader::coda;
+    case NavigationSign::DoubleCoda:
+        return &MeasureHeader::doubleCoda;
+    case NavigationSign::Fine:
+        return &MeasureHeader::fine;
+    case NavigationSign::ToCoda:
+        return &MeasureHeader::toCoda;
+    case NavigationSign::ToDoubleCoda:
+        break;
+    }
+    return &MeasureHeader::toDoubleCoda;
+}
+
 struct SongInfo {
     std::string title{};
     std::string subtitle{};
@@ -241,6 +295,13 @@ enum class Credit : std::uint8_t {
     Transcriber,
     Notes,
 };
+template <>
+struct EnumNames<Credit> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"title", "subtitle", "artist", "album", "words", "music",
+                                         "copyright", "transcriber", "notes"});
+};
+static_assert(namesEnd(Credit::Notes));
 
 /// The text of `credit` in `info`.
 [[nodiscard]] const std::string& creditOf(const SongInfo& info, Credit credit);

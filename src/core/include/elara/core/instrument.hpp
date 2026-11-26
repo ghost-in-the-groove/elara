@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
+#include <elara/core/names.hpp>
+
 #include <array>
 #include <cstdint>
 #include <span>
@@ -17,6 +19,12 @@ enum class InstrumentKind : std::uint8_t {
     Keyboard,   // usually two staves
     Pitched,    // any other melodic instrument or voice
 };
+template <>
+struct EnumNames<InstrumentKind> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"fretted", "percussion", "keyboard", "pitched"});
+};
+static_assert(namesEnd(InstrumentKind::Pitched));
 
 enum class Clef : std::uint8_t {
     Treble,
@@ -27,6 +35,12 @@ enum class Clef : std::uint8_t {
     Tenor,
     Percussion,
 };
+template <>
+struct EnumNames<Clef> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"treble", "treble-8vb", "bass", "bass-8vb", "alto", "tenor", "percussion"});
+};
+static_assert(namesEnd(Clef::Percussion));
 
 struct Instrument {
     std::string name{};

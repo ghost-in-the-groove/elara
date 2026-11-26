@@ -3,6 +3,7 @@
 
 #include <elara/core/duration.hpp>
 #include <elara/core/fraction.hpp>
+#include <elara/core/names.hpp>
 
 #include <array>
 #include <cstddef>
@@ -91,12 +92,30 @@ enum class BendForm : std::uint8_t { None, Bend, BendRelease, PreBend, PreBendRe
 [[nodiscard]] BendCurve whammyCurve(BendForm form, int cents);
 
 enum class SlideIn : std::uint8_t { None, FromBelow, FromAbove };
+template <>
+struct EnumNames<SlideIn> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "from-below", "from-above"});
+};
+static_assert(namesEnd(SlideIn::FromAbove));
 
 /// Shift: slide to the next note and pick it. Legato: slide to the next note
 /// without picking it. Downwards/Upwards: slide off the note.
 enum class SlideOut : std::uint8_t { None, Shift, Legato, Downwards, Upwards };
+template <>
+struct EnumNames<SlideOut> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "shift", "legato", "downwards", "upwards"});
+};
+static_assert(namesEnd(SlideOut::Upwards));
 
 enum class HarmonicKind : std::uint8_t { None, Natural, Artificial, Pinch, Tapped, Semi };
+template <>
+struct EnumNames<HarmonicKind> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"none", "natural", "artificial", "pinch", "tapped", "semi"});
+};
+static_assert(namesEnd(HarmonicKind::Semi));
 
 /// Natural: `fretTenths` is the touched node in tenths of a fret (120 = fret 12,
 /// 32 = "3.2"). Artificial and tapped: how far above the fretted note the node
@@ -113,11 +132,25 @@ struct Harmonic {
 /// back, an upper mordent goes to the step above and back; a turn goes round
 /// the note from above (above, note, below, note), an inverted turn from below.
 enum class Ornament : std::uint8_t { None, Mordent, UpperMordent, Turn, InvertedTurn };
+template <>
+struct EnumNames<Ornament> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"none", "mordent", "upper-mordent", "turn", "inverted-turn"});
+};
+static_assert(namesEnd(Ornament::InvertedTurn));
 
 /// A finger of a hand (ADR-0093). Written 1 to 5 from the thumb on keyboards
 /// and most instruments; on a fretted one, T and 1 to 4 from the index for the
-/// hand that frets, and p, i, m, a, c for the hand that plucks.
+/// hand that frets, and p, i, m, a, c for the hand that plucks. Its name says
+/// which finger ("thumb"), as files keep it; fingeringText() and pluckText()
+/// are how it is written on the staff.
 enum class Finger : std::uint8_t { None, Thumb, Index, Middle, Ring, Little };
+template <>
+struct EnumNames<Finger> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "thumb", "index", "middle", "ring", "little"});
+};
+static_assert(namesEnd(Finger::Little));
 
 /// How a fingering is written: "1" to "5" from the thumb, or on a fretted
 /// instrument "T" and "1" to "4" from the index; "" for none.
@@ -169,8 +202,27 @@ struct Trill {
 };
 
 enum class Vibrato : std::uint8_t { None, Slight, Wide };
+template <>
+struct EnumNames<Vibrato> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "slight", "wide"});
+};
+static_assert(namesEnd(Vibrato::Wide));
+
 enum class Accent : std::uint8_t { None, Accent, Marcato };
+template <>
+struct EnumNames<Accent> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "accent", "marcato"});
+};
+static_assert(namesEnd(Accent::Marcato));
+
+/// Named as it is written: "ppp" to "fff".
 enum class Dynamic : std::uint8_t { PPP, PP, P, MP, MF, F, FF, FFF };
+template <>
+struct EnumNames<Dynamic> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"});
+};
+static_assert(namesEnd(Dynamic::FFF));
 
 /// MIDI velocity used to play a dynamic (ppp 16 ... fff 127).
 [[nodiscard]] constexpr int dynamicVelocity(Dynamic dynamic) noexcept {
@@ -213,13 +265,44 @@ struct NoteEffects {
 };
 
 enum class PickStroke : std::uint8_t { None, Down, Up };
+template <>
+struct EnumNames<PickStroke> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "down", "up"});
+};
+static_assert(namesEnd(PickStroke::Up));
+
 enum class Strum : std::uint8_t { None, Down, Up };
+template <>
+struct EnumNames<Strum> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "down", "up"});
+};
+static_assert(namesEnd(Strum::Up));
+
 enum class BassTechnique : std::uint8_t { None, Tap, Slap, Pop };
+template <>
+struct EnumNames<BassTechnique> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "tap", "slap", "pop"});
+};
+static_assert(namesEnd(BassTechnique::Pop));
+
 /// A wedge under the staff over the beat: the music gets louder or softer
 /// (ADR-0078). Consecutive beats with the same hairpin share one wedge.
 enum class Hairpin : std::uint8_t { None, Crescendo, Diminuendo };
+template <>
+struct EnumNames<Hairpin> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "crescendo", "diminuendo"});
+};
+static_assert(namesEnd(Hairpin::Diminuendo));
+
 /// A pause over the beat (ADR-0085): the beat is held longer than written.
 enum class Fermata : std::uint8_t { None, Short, Normal, Long };
+template <>
+struct EnumNames<Fermata> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "short", "normal", "long"});
+};
+static_assert(namesEnd(Fermata::Long));
 
 /// How many times its written length a beat under `fermata` lasts: a short
 /// fermata half as long again, a normal one twice, a long one three times.
@@ -247,6 +330,12 @@ enum class Ottava : std::uint8_t {
     QuindicesimaAlta,  ///< 15ma: two octaves above
     QuindicesimaBassa, ///< 15mb: two octaves below
 };
+template <>
+struct EnumNames<Ottava> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "8va", "8vb", "15ma", "15mb"});
+};
+static_assert(namesEnd(Ottava::QuindicesimaBassa));
 
 /// How many octaves above its written note a note under `ottava` sounds:
 /// 1 for 8va, -1 for 8vb, 2 for 15ma, -2 for 15mb, 0 without a line.
@@ -271,11 +360,21 @@ enum class Ottava : std::uint8_t {
 /// staff and voice of the track, share one pedalling; a change lifts the pedal
 /// and presses it again where its beat starts.
 enum class Pedal : std::uint8_t { None, Down, Change };
+template <>
+struct EnumNames<Pedal> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "down", "change"});
+};
+static_assert(namesEnd(Pedal::Change));
 
 /// A break after the beat (ADR-0095): a breath mark (a comma over the staff)
 /// takes a little off the end of its notes, a caesura (two strokes through
 /// the top line) a little more.
 enum class Breath : std::uint8_t { None, Comma, Caesura };
+template <>
+struct EnumNames<Breath> {
+    static constexpr auto kNames = std::to_array<std::string_view>({"none", "comma", "caesura"});
+};
+static_assert(namesEnd(Breath::Caesura));
 
 /// Effects that apply to every note of a beat.
 struct BeatEffects {

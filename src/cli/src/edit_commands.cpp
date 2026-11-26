@@ -7,6 +7,7 @@
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/lyrics.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
@@ -62,10 +63,6 @@ std::vector<std::string_view> splitWords(std::string_view text) {
     }
     return words;
 }
-
-// The lines of the credits, in the order of core::Credit (ADR-0059).
-constexpr std::array<std::string_view, 9> kCreditNames{
-    "title", "subtitle", "artist", "album", "words", "music", "copyright", "transcriber", "notes"};
 
 class Step {
 public:
@@ -169,24 +166,6 @@ struct EntryState {
     core::Duration input{core::NoteValue::Quarter};
 };
 
-// The names `effect <name>` takes (ADR-0037).
-constexpr std::array<std::pair<std::string_view, core::NoteEffect>, 14> kEffectNames{{
-    {"tie", core::NoteEffect::Tie},
-    {"legato", core::NoteEffect::Legato},
-    {"slide", core::NoteEffect::Slide},
-    {"bend", core::NoteEffect::Bend},
-    {"vibrato", core::NoteEffect::Vibrato},
-    {"palm-mute", core::NoteEffect::PalmMute},
-    {"dead-note", core::NoteEffect::DeadNote},
-    {"let-ring", core::NoteEffect::LetRing},
-    {"harmonic", core::NoteEffect::Harmonic},
-    {"ghost", core::NoteEffect::Ghost},
-    {"accent", core::NoteEffect::Accent},
-    {"staccato", core::NoteEffect::Staccato},
-    {"tenuto", core::NoteEffect::Tenuto},
-    {"staccatissimo", core::NoteEffect::Staccatissimo}, // ADR-0094
-}};
-
 // The forms `bend <form> [cents]` takes (ADR-0055).
 constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kBendForms{{
     {"none", core::BendForm::None},
@@ -205,19 +184,6 @@ constexpr std::array<std::pair<std::string_view, core::BendForm>, 5> kWhammyForm
     {"pre-dive", core::BendForm::PreBend},
     {"return", core::BendForm::PreBendRelease},
 }};
-constexpr std::array<std::string_view, 4> kBassTechniques{"none", "tap", "slap", "pop"};
-constexpr std::array<std::string_view, 3> kHairpins{"none", "crescendo", "diminuendo"};
-constexpr std::array<std::string_view, 4> kFermatas{"none", "short", "normal", "long"};
-constexpr std::array<std::string_view, 5> kOttavas{"none", "8va", "8vb", "15ma", "15mb"};
-// The clefs `clef` takes, in the order of core::Clef; drums keep theirs (ADR-0087).
-constexpr std::array<std::string_view, 6> kClefNames{"treble",   "treble-8vb", "bass",
-                                                     "bass-8vb", "alto",       "tenor"};
-constexpr std::array<std::string_view, 2> kSlurs{"none", "on"};
-constexpr std::array<std::string_view, 3> kPedals{"none", "down", "change"};    // ADR-0092
-constexpr std::array<std::string_view, 3> kBreaths{"none", "comma", "caesura"}; // ADR-0095
-
-// Directions `strum` and `pick` take (ADR-0056).
-constexpr std::array<std::string_view, 3> kStrokeDirections{"none", "down", "up"};
 
 // The repeated notes' value `tremolo` takes, or none.
 std::optional<core::NoteValue> tremoloSpeed(std::string_view word) {
@@ -237,13 +203,14 @@ std::optional<core::NoteValue> tremoloSpeed(std::string_view word) {
     return found->second;
 }
 
-// The index of a stroke direction: 0 none, 1 down, 2 up.
-std::uint8_t strokeDirection(std::string_view verb, std::string_view word) {
-    const auto found = std::ranges::find(kStrokeDirections, word);
-    if (found == kStrokeDirections.end()) {
+// A direction `strum` and `pick` take (ADR-0056): down, up or none.
+template <core::NamedEnum Direction>
+Direction strokeDirection(std::string_view verb, std::string_view word) {
+    const std::optional<Direction> direction = core::parseName<Direction>(word);
+    if (!direction) {
         throw StepSyntaxError(std::format("{}: down, up or none, not {}", verb, word));
     }
-    return static_cast<std::uint8_t>(found - kStrokeDirections.begin());
+    return *direction;
 }
 
 // The speed a trill alternates its notes at (ADR-0090).
@@ -261,43 +228,36 @@ core::NoteValue trillSpeed(std::string_view word) {
     return found->second;
 }
 
-// The kinds of note effects their steps take, in the order of their enums
-// (ADR-0058): slide-in, slide-out, vibrato, accent and harmonic.
-constexpr std::array<std::string_view, 3> kSlideInKinds{"none", "from-below", "from-above"};
-constexpr std::array<std::string_view, 5> kSlideOutKinds{"none", "shift", "legato", "downwards",
-                                                         "upwards"};
-constexpr std::array<std::string_view, 3> kVibratoKinds{"none", "slight", "wide"};
-constexpr std::array<std::string_view, 3> kAccentKinds{"none", "accent", "marcato"};
-constexpr std::array<std::string_view, 5> kOrnamentKinds{"none", "mordent", "upper-mordent", "turn",
-                                                         "inverted-turn"}; // ADR-0091
-constexpr std::array<std::string_view, 6> kHarmonicKinds{"none",  "natural", "artificial",
-                                                         "pinch", "tapped",  "semi"};
-
-// The index of `word` among the kinds `verb` takes.
-template <std::size_t N>
-std::uint8_t kindOf(std::string_view verb, std::string_view word,
-                    const std::array<std::string_view, N>& kinds) {
-    const auto found = std::ranges::find(kinds, word);
-    if (found == kinds.end()) {
+// The kind `word` names among those `verb` takes: the values of `Kind` by
+// their names in the model (core::EnumNames), but `leftOut`, which the step
+// does not take.
+template <core::NamedEnum Kind>
+Kind kindOf(std::string_view verb, std::string_view word,
+            std::optional<Kind> leftOut = std::nullopt) {
+    const std::optional<Kind> kind = core::parseName<Kind>(word);
+    if (!kind || kind == leftOut) {
         std::string all;
-        for (const std::string_view kind : kinds) {
-            all += std::format("{}{}", all.empty() ? "" : ", ", kind);
+        for (const Kind value : core::enumValues<Kind>()) {
+            if (value != leftOut) {
+                all += std::format("{}{}", all.empty() ? "" : ", ", core::nameOf(value));
+            }
         }
         throw StepSyntaxError(std::format("{}: {}, not {}", verb, all, word));
     }
-    return static_cast<std::uint8_t>(found - kinds.begin());
+    return *kind;
 }
 
-constexpr std::array<std::pair<std::string_view, core::Dynamic>, 8> kDynamicNames{{
-    {"ppp", core::Dynamic::PPP},
-    {"pp", core::Dynamic::PP},
-    {"p", core::Dynamic::P},
-    {"mp", core::Dynamic::MP},
-    {"mf", core::Dynamic::MF},
-    {"f", core::Dynamic::F},
-    {"ff", core::Dynamic::FF},
-    {"fff", core::Dynamic::FFF},
-}};
+// The names of `Kind` as a choice: "a, b or c".
+template <core::NamedEnum Kind>
+std::string choiceOf() {
+    std::string all;
+    const auto values = core::enumValues<Kind>();
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        all += i == 0 ? "" : i + 1 == values.size() ? " or " : ", ";
+        all += core::nameOf(values[i]);
+    }
+    return all;
+}
 
 /// Runs a keyboard entry step; false when `step` is not one.
 bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
@@ -370,12 +330,11 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         edit = toggleDrum(song, entry.caret, entry.input);
     } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
         const std::string_view name = step.word(1);
-        const auto found = std::ranges::find_if(
-            kEffectNames, [name](const auto& effect) { return effect.first == name; });
-        if (found == kEffectNames.end()) {
+        const std::optional<NoteEffect> effect = parseName<NoteEffect>(name);
+        if (!effect) {
             throw StepSyntaxError(std::format("not an effect: {}", name));
         }
-        edit = toggleEffect(song, entry.caret, found->second);
+        edit = toggleEffect(song, entry.caret, *effect);
     } else if (verb == "bend") { // bend <form> [cents]: on the caret's notes, a step by default
         constexpr int kFullStep = 200;
         const std::string_view name = step.word(1);
@@ -398,9 +357,9 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         // caret's beat
         BeatEffects effects = beatEffectsAt(song, entry.caret);
         if (verb == "strum") {
-            effects.strum = static_cast<Strum>(strokeDirection(verb, step.word(1)));
+            effects.strum = strokeDirection<Strum>(verb, step.word(1));
         } else if (verb == "pick") {
-            effects.pickStroke = static_cast<PickStroke>(strokeDirection(verb, step.word(1)));
+            effects.pickStroke = strokeDirection<PickStroke>(verb, step.word(1));
         } else if (verb == "tremolo") {
             effects.tremoloPicking = tremoloSpeed(step.word(1));
         } else if (verb == "whammy") {
@@ -414,20 +373,23 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             effects.whammyBar =
                 whammyCurve(found->second, step.has(2) ? step.number<int>(2) : kStepDown);
         } else if (verb == "bass") {
-            effects.bassTechnique =
-                static_cast<BassTechnique>(kindOf(verb, step.word(1), kBassTechniques));
+            effects.bassTechnique = kindOf<BassTechnique>(verb, step.word(1));
         } else if (verb == "hairpin") {
-            effects.hairpin = static_cast<Hairpin>(kindOf(verb, step.word(1), kHairpins));
+            effects.hairpin = kindOf<Hairpin>(verb, step.word(1));
         } else if (verb == "fermata") {
-            effects.fermata = static_cast<Fermata>(kindOf(verb, step.word(1), kFermatas));
+            effects.fermata = kindOf<Fermata>(verb, step.word(1));
         } else if (verb == "ottava") {
-            effects.ottava = static_cast<Ottava>(kindOf(verb, step.word(1), kOttavas));
+            effects.ottava = kindOf<Ottava>(verb, step.word(1));
         } else if (verb == "pedal") {
-            effects.pedal = static_cast<Pedal>(kindOf(verb, step.word(1), kPedals));
+            effects.pedal = kindOf<Pedal>(verb, step.word(1));
         } else if (verb == "breath") {
-            effects.breath = static_cast<Breath>(kindOf(verb, step.word(1), kBreaths));
+            effects.breath = kindOf<Breath>(verb, step.word(1));
         } else {
-            effects.slur = kindOf(verb, step.word(1), kSlurs) != 0;
+            const std::string_view word = step.word(1);
+            if (word != "none" && word != "on") {
+                throw StepSyntaxError(std::format("{}: none, on, not {}", verb, word));
+            }
+            effects.slur = word == "on";
         }
         edit = setBeatEffects(song, entry.caret, effects);
     } else if (verb == "slide-in" || verb == "slide-out") {
@@ -437,20 +399,17 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         SlideIn in = now.slideIn;
         SlideOut out = now.slideOut;
         if (verb == "slide-in") {
-            in = static_cast<SlideIn>(kindOf(verb, step.word(1), kSlideInKinds));
+            in = kindOf<SlideIn>(verb, step.word(1));
         } else {
-            out = static_cast<SlideOut>(kindOf(verb, step.word(1), kSlideOutKinds));
+            out = kindOf<SlideOut>(verb, step.word(1));
         }
         edit = setSlides(song, entry.caret, in, out);
     } else if (verb == "vibrato") { // vibrato <slight|wide|none>
-        edit = setVibrato(song, entry.caret,
-                          static_cast<Vibrato>(kindOf(verb, step.word(1), kVibratoKinds)));
+        edit = setVibrato(song, entry.caret, kindOf<Vibrato>(verb, step.word(1)));
     } else if (verb == "accent") { // accent <accent|marcato|none>
-        edit = setAccent(song, entry.caret,
-                         static_cast<Accent>(kindOf(verb, step.word(1), kAccentKinds)));
+        edit = setAccent(song, entry.caret, kindOf<Accent>(verb, step.word(1)));
     } else if (verb == "ornament") { // ornament <mordent|upper-mordent|turn|inverted-turn|none>
-        edit = setOrnament(song, entry.caret,
-                           static_cast<Ornament>(kindOf(verb, step.word(1), kOrnamentKinds)));
+        edit = setOrnament(song, entry.caret, kindOf<Ornament>(verb, step.word(1)));
     } else if (verb == "fingering") {
         // fingering <finger...> (ADR-0093): one per note from the lowest up, or
         // one for all; 1-5 from the thumb, or t and 1-4 on a fretted instrument.
@@ -494,14 +453,13 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
                          Trill{.semitones = static_cast<std::int8_t>(semitones), .speed = speed});
         }
     } else if (verb == "harmonic") { // harmonic <natural|artificial|pinch|tapped|semi|none>
-        edit = setHarmonic(song, entry.caret,
-                           static_cast<HarmonicKind>(kindOf(verb, step.word(1), kHarmonicKinds)));
+        edit = setHarmonic(song, entry.caret, kindOf<HarmonicKind>(verb, step.word(1)));
     } else if (verb == "chord") { // chord <name> | chord none: the caret's beat (ADR-0080)
         const std::string name = step.rest(1);
         edit = setChordSymbol(song, entry.caret, name == "none" ? std::string() : name);
     } else if (verb == "clef") { // clef <name>: from the caret's measure on (ADR-0087)
-        edit = setClef(song, entry.caret,
-                       static_cast<core::Clef>(kindOf(verb, step.word(1), kClefNames)));
+        // Drums keep their clef.
+        edit = setClef(song, entry.caret, kindOf<Clef>(verb, step.word(1), Clef::Percussion));
     } else if (verb == "simile") { // simile 1 | simile 2 | simile none: measure repeat (ADR-0102)
         edit = setMeasureRepeat(song, entry.caret, step.word(1) == "none" ? 0 : step.index(1));
     } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
@@ -537,12 +495,11 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         }
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
-        const auto found = std::ranges::find_if(
-            kDynamicNames, [name](const auto& dynamic) { return dynamic.first == name; });
-        if (found == kDynamicNames.end()) {
+        const std::optional<Dynamic> dynamic = parseName<Dynamic>(name);
+        if (!dynamic) {
             throw StepSyntaxError(std::format("not a dynamic: {}", name));
         }
-        edit = setDynamic(song, entry.caret, found->second);
+        edit = setDynamic(song, entry.caret, *dynamic);
     } else {
         return false;
     }
@@ -608,12 +565,11 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
     } else if (verb == "feel") { // feel <m> <none|eighth|sixteenth|dotted-...|scottish-...>
         // From the measure until the next change of the feel (ADR-0104).
         const std::size_t measure = step.index(1);
-        const auto found = std::ranges::find(kTripletFeelNames, step.word(2));
-        if (found == kTripletFeelNames.end() || step.has(3)) {
+        const std::optional<TripletFeel> feel = parseName<TripletFeel>(step.word(2));
+        if (!feel || step.has(3)) {
             throw StepSyntaxError(std::format("not a triplet feel: {}", step.word(2)));
         }
-        const auto feel = static_cast<core::TripletFeel>(found - kTripletFeelNames.begin());
-        if (auto change = core::changeTripletFeel(song, measure, feel)) {
+        if (auto change = core::changeTripletFeel(song, measure, *feel)) {
             doc.execute(std::move(change));
         }
     } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
@@ -675,15 +631,11 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         doc.execute(std::make_unique<SetSongInfo>(std::move(info)));
     } else if (verb == "credit") { // credit <line> [text]: no text clears the line
         const std::string_view line = step.word(1);
-        const auto found = std::ranges::find(kCreditNames, line);
-        if (found == kCreditNames.end()) {
-            throw StepSyntaxError(std::format(
-                "credit: title, subtitle, artist, album, words, music, copyright, transcriber "
-                "or notes, not {}",
-                line));
+        const std::optional<Credit> credit = parseName<Credit>(line);
+        if (!credit) {
+            throw StepSyntaxError(std::format("credit: {}, not {}", choiceOf<Credit>(), line));
         }
-        const auto credit = static_cast<core::Credit>(found - kCreditNames.begin());
-        if (auto change = core::changeCredit(song, credit, step.has(2) ? step.rest(2) : "")) {
+        if (auto change = core::changeCredit(song, *credit, step.has(2) ? step.rest(2) : "")) {
             doc.execute(std::move(change));
         }
     } else if (verb == "note") { // note <track> <measure> <string> <fret> <duration>
@@ -792,19 +744,19 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
     } else if (verb == "sign") { // sign <m> <segno|coda|fine|to-coda|...>... | none
         const std::size_t measure = step.index(1);
         MeasureHeader header = song.measureHeader(measure);
-        for (const SignName& sign : kSignNames) {
-            header.*sign.flag = false;
+        for (const NavigationSign sign : enumValues<NavigationSign>()) {
+            header.*signFlag(sign) = false;
         }
         if (!step.has(2)) {
             throw StepSyntaxError("sign: expected signs or none");
         }
         if (step.word(2) != "none" || step.has(3)) {
             for (std::size_t i = 2; step.has(i); ++i) {
-                const auto found = std::ranges::find(kSignNames, step.word(i), &SignName::name);
-                if (found == kSignNames.end()) {
+                const std::optional<NavigationSign> sign = parseName<NavigationSign>(step.word(i));
+                if (!sign) {
                     throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
                 }
-                header.*found->flag = true;
+                header.*signFlag(*sign) = true;
             }
         }
         if (header != song.measureHeader(measure)) {
@@ -869,20 +821,20 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
     } else if (verb == "jump") { // jump <m> <da-capo|dal-segno|dal-segno-segno|none> [al-...]
         const std::size_t measure = step.index(1);
         MeasureHeader header = song.measureHeader(measure);
-        const auto to = std::ranges::find(kJumpToNames, step.word(2));
-        if (to == kJumpToNames.end()) {
+        const std::optional<JumpTo> to = parseName<JumpTo>(step.word(2));
+        if (!to) {
             throw StepSyntaxError(std::format("not a jump: {}", step.word(2)));
         }
-        header.jump = static_cast<JumpTo>(to - kJumpToNames.begin());
+        header.jump = *to;
         header.jumpThen = JumpThen::End;
         if (step.has(3)) {
-            const auto then = std::ranges::find(kJumpThenNames, step.word(3));
-            if (then == kJumpThenNames.end() || header.jump == JumpTo::None || step.has(4)) {
+            const std::optional<JumpThen> then = parseName<JumpThen>(step.word(3));
+            if (!then || header.jump == JumpTo::None || step.has(4)) {
                 throw StepSyntaxError(std::format("jump: not al-fine, al-coda or "
                                                   "al-double-coda: {}",
                                                   step.word(3)));
             }
-            header.jumpThen = static_cast<JumpThen>(then - kJumpThenNames.begin());
+            header.jumpThen = *then;
         }
         if (header != song.measureHeader(measure)) {
             doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));

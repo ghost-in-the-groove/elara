@@ -7,6 +7,7 @@
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/lyrics.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/io/compression.hpp>
@@ -396,7 +397,9 @@ constexpr std::array<EffectKey, ScoreDocument::kEffectCount> kEffects{{
     {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tenuto"), u'_'},        // ADR-0088
     {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccatissimo"), u'"'}, // ADR-0094
 }};
-static_assert(static_cast<int>(core::NoteEffect::Staccatissimo) + 1 == ScoreDocument::kEffectCount);
+static_assert(std::ranges::none_of(kEffects,
+                                   [](const EffectKey& effect) { return effect.name == nullptr; }),
+              "every core::NoteEffect needs a name and a key here");
 
 // The kit pieces of drum entry, by their names in elara_core.
 constexpr std::array kDrumPieceNames{
@@ -540,7 +543,7 @@ QString ScoreDocument::artist() const {
 }
 
 QStringList ScoreDocument::credits() const {
-    constexpr int kLines = static_cast<int>(core::Credit::Notes) + 1;
+    constexpr int kLines = static_cast<int>(core::kEnumCount<core::Credit>);
     QStringList lines;
     lines.reserve(kLines);
     for (int line = 0; line < kLines; ++line) {
@@ -1195,11 +1198,11 @@ void ScoreDocument::setArtist(const QString& artist) {
 }
 
 void ScoreDocument::setCredit(int line, const QString& text) {
-    if (!document_ || line < 0 || line > static_cast<int>(core::Credit::Notes)) {
+    const std::optional<core::Credit> credit = core::enumFromIndex<core::Credit>(line);
+    if (!document_ || !credit) {
         return;
     }
-    if (auto change = core::changeCredit(document_->song(), static_cast<core::Credit>(line),
-                                         text.toStdString())) {
+    if (auto change = core::changeCredit(document_->song(), *credit, text.toStdString())) {
         execute(std::move(change));
     }
 }
@@ -1292,14 +1295,12 @@ void ScoreDocument::setNavigation(int measure, const QVariantMap& marks) {
             header.*item.flag = found->toBool();
         }
     }
-    const auto choice = [&marks](const QString& key, int current) {
-        const int value = marks.value(key, current).toInt();
-        return value >= 0 && value <= 3 ? value : current;
+    const auto choice = [&marks]<typename Enum>(const QString& key, Enum current) {
+        const int value = marks.value(key, static_cast<int>(current)).toInt();
+        return core::enumFromIndex<Enum>(value).value_or(current);
     };
-    header.jump =
-        static_cast<core::JumpTo>(choice(QStringLiteral("jump"), static_cast<int>(header.jump)));
-    header.jumpThen = static_cast<core::JumpThen>(
-        choice(QStringLiteral("jumpThen"), static_cast<int>(header.jumpThen)));
+    header.jump = choice(QStringLiteral("jump"), header.jump);
+    header.jumpThen = choice(QStringLiteral("jumpThen"), header.jumpThen);
     if (header.jump == core::JumpTo::None) {
         header.jumpThen = core::JumpThen::End;
     }
@@ -1415,13 +1416,13 @@ int ScoreDocument::tripletFeelAt(int measure) const {
 }
 
 void ScoreDocument::setTripletFeelFrom(int measure, int feel) {
+    const std::optional<core::TripletFeel> wanted = core::enumFromIndex<core::TripletFeel>(feel);
     if (!document_ || measure < 0 ||
-        measure >= static_cast<int>(document_->song().measureCount()) || feel < 0 ||
-        feel > static_cast<int>(core::TripletFeel::ScottishSixteenth)) {
+        measure >= static_cast<int>(document_->song().measureCount()) || !wanted) {
         return;
     }
     if (auto change = core::changeTripletFeel(document_->song(), static_cast<std::size_t>(measure),
-                                              static_cast<core::TripletFeel>(feel))) {
+                                              *wanted)) {
         execute(std::move(change));
     }
 }
@@ -2117,12 +2118,9 @@ QString ScoreDocument::caretStatus() const {
     case core::Fermata::None:
         break;
     }
-    if (const int ottava = caretOttava(); ottava != 0) {
-        static constexpr std::array<const char*, 5> kOttavaNames{"", "8va", "8vb", "15ma", "15mb"};
-        parts.append(
-            tr("Octave line %1")
-                .arg(QLatin1StringView(
-                    kOttavaNames[static_cast<std::size_t>(ottava) % kOttavaNames.size()])));
+    if (const auto ottava = core::enumFromIndex<core::Ottava>(caretOttava());
+        ottava && *ottava != core::Ottava::None) {
+        parts.append(tr("Octave line %1").arg(latin(core::nameOf(*ottava)))); // "8va"...
     }
     if (caretSlur()) {
         parts.append(tr("Slur"));
@@ -2521,20 +2519,22 @@ void ScoreDocument::applyBeatEffects(const core::BeatEffects& effects) {
 }
 
 void ScoreDocument::setStrum(int direction) {
-    if (direction < 0 || direction > 2) {
+    const std::optional<core::Strum> strum = core::enumFromIndex<core::Strum>(direction);
+    if (!strum) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.strum = static_cast<core::Strum>(direction);
+    effects.strum = *strum;
     applyBeatEffects(effects);
 }
 
 void ScoreDocument::setHairpin(int hairpin) {
-    if (hairpin < 0 || hairpin > static_cast<int>(core::Hairpin::Diminuendo)) {
+    const std::optional<core::Hairpin> wedge = core::enumFromIndex<core::Hairpin>(hairpin);
+    if (!wedge) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.hairpin = static_cast<core::Hairpin>(hairpin);
+    effects.hairpin = *wedge;
     applyBeatEffects(effects);
 }
 
@@ -2545,38 +2545,42 @@ void ScoreDocument::setSlur(bool slurred) {
 }
 
 void ScoreDocument::setFermata(int fermata) {
-    if (fermata < 0 || fermata > static_cast<int>(core::Fermata::Long)) {
+    const std::optional<core::Fermata> pause = core::enumFromIndex<core::Fermata>(fermata);
+    if (!pause) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.fermata = static_cast<core::Fermata>(fermata);
+    effects.fermata = *pause;
     applyBeatEffects(effects);
 }
 
 void ScoreDocument::setOttava(int ottava) {
-    if (ottava < 0 || ottava > static_cast<int>(core::Ottava::QuindicesimaBassa)) {
+    const std::optional<core::Ottava> line = core::enumFromIndex<core::Ottava>(ottava);
+    if (!line) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.ottava = static_cast<core::Ottava>(ottava);
+    effects.ottava = *line;
     applyBeatEffects(effects);
 }
 
 void ScoreDocument::setPedal(int pedal) {
-    if (pedal < 0 || pedal > static_cast<int>(core::Pedal::Change)) {
+    const std::optional<core::Pedal> mark = core::enumFromIndex<core::Pedal>(pedal);
+    if (!mark) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.pedal = static_cast<core::Pedal>(pedal);
+    effects.pedal = *mark;
     applyBeatEffects(effects);
 }
 
 void ScoreDocument::setBreath(int breath) {
-    if (breath < 0 || breath > static_cast<int>(core::Breath::Caesura)) {
+    const std::optional<core::Breath> mark = core::enumFromIndex<core::Breath>(breath);
+    if (!mark) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.breath = static_cast<core::Breath>(breath);
+    effects.breath = *mark;
     applyBeatEffects(effects);
 }
 
@@ -2692,11 +2696,12 @@ int ScoreDocument::setVerse(int verse, int first, const QString& text) {
 }
 
 void ScoreDocument::setPickStroke(int direction) {
-    if (direction < 0 || direction > 2) {
+    const std::optional<core::PickStroke> stroke = core::enumFromIndex<core::PickStroke>(direction);
+    if (!stroke) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.pickStroke = static_cast<core::PickStroke>(direction);
+    effects.pickStroke = *stroke;
     applyBeatEffects(effects);
 }
 
@@ -2730,11 +2735,13 @@ void ScoreDocument::setWhammy(int form, int cents) {
 }
 
 void ScoreDocument::setBassTechnique(int technique) {
-    if (technique < 0 || technique > static_cast<int>(core::BassTechnique::Pop)) {
+    const std::optional<core::BassTechnique> bass =
+        core::enumFromIndex<core::BassTechnique>(technique);
+    if (!bass) {
         return;
     }
     core::BeatEffects effects = beatEffectsAtCaret();
-    effects.bassTechnique = static_cast<core::BassTechnique>(technique);
+    effects.bassTechnique = *bass;
     applyBeatEffects(effects);
 }
 
@@ -2810,10 +2817,11 @@ void ScoreDocument::changeNoteEffects(
 }
 
 void ScoreDocument::setSlideIn(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::SlideIn::FromAbove)) {
+    const std::optional<core::SlideIn> wanted = core::enumFromIndex<core::SlideIn>(kind);
+    if (!wanted) {
         return;
     }
-    const auto in = static_cast<core::SlideIn>(kind);
+    const core::SlideIn in = *wanted;
     changeNoteEffects(
         [in](const core::Song& song, const core::Caret& caret) {
             return core::setSlides(song, caret, in, core::noteEffectsAt(song, caret).slideOut);
@@ -2822,10 +2830,11 @@ void ScoreDocument::setSlideIn(int kind) {
 }
 
 void ScoreDocument::setSlideOut(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::SlideOut::Upwards)) {
+    const std::optional<core::SlideOut> wanted = core::enumFromIndex<core::SlideOut>(kind);
+    if (!wanted) {
         return;
     }
-    const auto out = static_cast<core::SlideOut>(kind);
+    const core::SlideOut out = *wanted;
     changeNoteEffects(
         [out](const core::Song& song, const core::Caret& caret) {
             return core::setSlides(song, caret, core::noteEffectsAt(song, caret).slideIn, out);
@@ -2834,10 +2843,11 @@ void ScoreDocument::setSlideOut(int kind) {
 }
 
 void ScoreDocument::setVibrato(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::Vibrato::Wide)) {
+    const std::optional<core::Vibrato> wanted = core::enumFromIndex<core::Vibrato>(kind);
+    if (!wanted) {
         return;
     }
-    const auto vibrato = static_cast<core::Vibrato>(kind);
+    const core::Vibrato vibrato = *wanted;
     changeNoteEffects(
         [vibrato](const core::Song& song, const core::Caret& caret) {
             return core::setVibrato(song, caret, vibrato);
@@ -2846,10 +2856,11 @@ void ScoreDocument::setVibrato(int kind) {
 }
 
 void ScoreDocument::setAccent(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::Accent::Marcato)) {
+    const std::optional<core::Accent> wanted = core::enumFromIndex<core::Accent>(kind);
+    if (!wanted) {
         return;
     }
-    const auto accent = static_cast<core::Accent>(kind);
+    const core::Accent accent = *wanted;
     changeNoteEffects(
         [accent](const core::Song& song, const core::Caret& caret) {
             return core::setAccent(song, caret, accent);
@@ -2858,10 +2869,11 @@ void ScoreDocument::setAccent(int kind) {
 }
 
 void ScoreDocument::setHarmonic(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::HarmonicKind::Semi)) {
+    const std::optional<core::HarmonicKind> wanted = core::enumFromIndex<core::HarmonicKind>(kind);
+    if (!wanted) {
         return;
     }
-    const auto harmonic = static_cast<core::HarmonicKind>(kind);
+    const core::HarmonicKind harmonic = *wanted;
     changeNoteEffects(
         [harmonic](const core::Song& song, const core::Caret& caret) {
             return core::setHarmonic(song, caret, harmonic);
@@ -2894,10 +2906,11 @@ int ScoreDocument::caretOrnament() const {
 }
 
 void ScoreDocument::setOrnament(int kind) {
-    if (kind < 0 || kind > static_cast<int>(core::Ornament::InvertedTurn)) {
+    const std::optional<core::Ornament> wanted = core::enumFromIndex<core::Ornament>(kind);
+    if (!wanted) {
         return;
     }
-    const auto ornament = static_cast<core::Ornament>(kind);
+    const core::Ornament ornament = *wanted;
     changeNoteEffects(
         [ornament](const core::Song& song, const core::Caret& caret) {
             return core::setOrnament(song, caret, ornament);
@@ -2914,10 +2927,11 @@ int ScoreDocument::caretPluck() const {
 }
 
 void ScoreDocument::setFingering(int finger) {
-    if (finger < 0 || finger > static_cast<int>(core::Finger::Little)) {
+    const std::optional<core::Finger> wanted = core::enumFromIndex<core::Finger>(finger);
+    if (!wanted) {
         return;
     }
-    const auto chosen = static_cast<core::Finger>(finger);
+    const core::Finger chosen = *wanted;
     changeNoteEffects(
         [chosen](const core::Song& song, const core::Caret& caret) {
             return core::setFingering(song, caret, std::span(&chosen, 1));
@@ -2926,10 +2940,11 @@ void ScoreDocument::setFingering(int finger) {
 }
 
 void ScoreDocument::setPluck(int finger) {
-    if (finger < 0 || finger > static_cast<int>(core::Finger::Little) || !caretFretted()) {
+    const std::optional<core::Finger> wanted = core::enumFromIndex<core::Finger>(finger);
+    if (!wanted || !caretFretted()) {
         return;
     }
-    const auto chosen = static_cast<core::Finger>(finger);
+    const core::Finger chosen = *wanted;
     changeNoteEffects(
         [chosen](const core::Song& song, const core::Caret& caret) {
             return core::setPluck(song, caret, chosen);
@@ -2955,15 +2970,14 @@ int ScoreDocument::caretDynamic() const {
 }
 
 void ScoreDocument::setDynamic(int dynamic) {
-    if (!document_ || !hasCaret(document_->song()) || dynamic < 0 ||
-        dynamic > static_cast<int>(core::Dynamic::FFF)) {
+    const std::optional<core::Dynamic> wanted = core::enumFromIndex<core::Dynamic>(dynamic);
+    if (!document_ || !hasCaret(document_->song()) || !wanted) {
         return;
     }
     pendingDigit_ = -1;
-    const auto wanted = static_cast<core::Dynamic>(dynamic);
-    core::Entry entry = core::setDynamic(document_->song(), caret_, wanted);
+    core::Entry entry = core::setDynamic(document_->song(), caret_, *wanted);
     if (!entry.command) {
-        if (core::dynamicAt(document_->song(), caret_) != wanted) {
+        if (core::dynamicAt(document_->song(), caret_) != *wanted) {
             emit editFailed(tr("Dynamics go on notes: put the caret on one."));
         }
         return;
@@ -2972,11 +2986,12 @@ void ScoreDocument::setDynamic(int dynamic) {
 }
 
 QString ScoreDocument::dynamicName(int dynamic) const {
-    static constexpr std::array<const char*, 8> kNames{"ppp", "pp", "p",  "mp",
-                                                       "mf",  "f",  "ff", "fff"};
-    return dynamic >= 0 && dynamic < static_cast<int>(kNames.size())
-               ? QString::fromLatin1(kNames.at(static_cast<std::size_t>(dynamic)))
-               : QString();
+    const std::optional<core::Dynamic> value = core::enumFromIndex<core::Dynamic>(dynamic);
+    if (!value) {
+        return {};
+    }
+    const std::string_view name = core::nameOf(*value); // as it is written: "ppp" to "fff"
+    return QString::fromLatin1(name.data(), static_cast<qsizetype>(name.size()));
 }
 
 int ScoreDocument::caretHarmonic() const {

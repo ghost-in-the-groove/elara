@@ -31,6 +31,7 @@ elara_add_unit_tests(core
     core/test_jumps.cpp
     core/test_document.cpp
     core/test_effects.cpp
+    core/test_names.cpp
     core/test_entry.cpp
     core/test_drum_entry.cpp
     core/test_entry_effects.cpp
