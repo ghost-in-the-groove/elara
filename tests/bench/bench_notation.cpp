@@ -44,6 +44,39 @@ const EngravingFont& bravura() {
     return font;
 }
 
+// The bytes a display list holds: its vectors by capacity, with what their
+// items hold (onsets, text beyond the small-string buffer, polygon points).
+template <class T>
+std::size_t heldBytes(const std::vector<T>& items) {
+    return items.capacity() * sizeof(T);
+}
+
+std::size_t geometryBytes(const elara::notation::DisplayList& list) {
+    std::size_t bytes = sizeof(list) + heldBytes(list.systems) + heldBytes(list.staves) +
+                        heldBytes(list.measures) + heldBytes(list.columns) +
+                        heldBytes(list.glyphs) + heldBytes(list.lines) + heldBytes(list.beams) +
+                        heldBytes(list.texts) + heldBytes(list.curves) + heldBytes(list.polygons);
+    for (const auto& measure : list.measures) {
+        bytes += heldBytes(measure.onsets);
+    }
+    const std::size_t small = std::string().capacity();
+    for (const auto& text : list.texts) {
+        bytes += text.text.capacity() > small ? text.text.capacity() + 1 : 0;
+    }
+    for (const auto& polygon : list.polygons) {
+        bytes += heldBytes(polygon.points);
+    }
+    return bytes;
+}
+
+std::size_t geometryBytes(const std::vector<elara::notation::DisplayList>& pages) {
+    std::size_t bytes = 0;
+    for (const auto& page : pages) {
+        bytes += geometryBytes(page);
+    }
+    return bytes;
+}
+
 } // namespace
 
 TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
@@ -101,7 +134,8 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     for (const auto& page : paged) {
         systems += page.systems.size();
     }
-    std::printf("notation and tablature on A4: %zu systems on %zu pages\n", systems, paged.size());
+    std::printf("notation and tablature on A4: %zu systems on %zu pages, %.1f MB of geometry\n",
+                systems, paged.size(), static_cast<double>(geometryBytes(paged)) / 1e6);
     BENCHMARK("lay out notation and tablature of one track on A4 pages") {
         return layoutPages(song, both, font, pages);
     };
@@ -145,6 +179,11 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
     std::vector<StaffSelection> score;
     for (std::size_t t = 0; t < song.trackCount(); ++t) {
         score.push_back({.track = t});
+    }
+    {
+        const auto all = layoutPages(song, score, font, pages);
+        std::printf("all 20 staves on A4: %zu pages, %.1f MB of geometry\n", all.size(),
+                    static_cast<double>(geometryBytes(all)) / 1e6);
     }
     pages.threads = 0;
     BENCHMARK("lay out all 20 staves of the large song on A4 pages") {
