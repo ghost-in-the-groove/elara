@@ -39,16 +39,24 @@ that outlived its song.
   - `showTrack()` names the track shown alone, which the caret stays on.
 - It has the digit waiting for a second one (ADR-0032). `typeDigit()` takes
   the time, so a test types the second digit as late as it wants without
-  waiting. Every other action of the session ends the wait, and so does
-  `songChanged()`, which the document calls for the edits, undos and redos it
-  makes itself. An edit at the caret that may turn out to change nothing and
-  never be entered ends it with `endTyping()`.
+  waiting. Every action that moves the caret or edits the song ends the wait,
+  and so does `songChanged()`, which the document calls for the edits, undos
+  and redos it makes itself. An edit at the caret that may turn out to change
+  nothing and never be entered ends it with `endTyping()`.
+- It has the selection and the clipboard (ADR-0027). A selection runs from the
+  measure it started at to the caret's, so `extendSelection()` and
+  `selectAll()` move the caret, an arrow or a click ends it, and `selection()`
+  is what an edit of measures acts on: the selected measures, or the caret's
+  alone. `copy()` takes them from the track shown alone or from every track;
+  `paste()` puts them at the selection's first measure and selects what it
+  pasted; `transpose()` moves their notes (ADR-0026). What was copied outlives
+  the song, to be pasted into another; the selection does not.
 - `ScoreDocument` has a session and delegates to it. It keeps what is Qt's:
   the properties and invokables QML binds to, the signals, the caret's box on
   the pages, the translated messages. QML does not change.
-- The selection and the clipboard move to the session next, with their
-  tests; the CLI's steps can then use the same session instead of their own
-  state.
+- The CLI's steps keep a caret, a duration and a clipboard of their own for
+  now. They can use the session instead: the one difference to settle is that
+  the app's input duration follows the caret and a step's does not.
 
 ## Consequences
 

@@ -42,7 +42,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | documento | document | `Document` | A song being edited: song + undo/redo history + save point |
 | orden / acción de edición | command | `Command` | One reversible edit (`apply`/`revert`), ADR-0005 |
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
-| sesión de edición | editing session | `EditSession` | What keyboard entry keeps from one action to the next: the caret, the input duration and the digit waiting for a second one, kept inside the song they edit (ADR-0127) |
+| sesión de edición | editing session | `EditSession` | What keyboard entry keeps from one action to the next: the caret, the input duration, the digit waiting for a second one, the selection and the measures copied, kept inside the song they edit (ADR-0127) |
 | cursor de edición | caret | `Caret` | Beat and string where typing enters notes; the free slot follows the last beat of a short measure (ADR-0021) |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |

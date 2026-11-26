@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/edit_session.hpp>
 #include <elara/core/measure.hpp>
+#include <elara/core/transpose.hpp>
 
 #include <algorithm>
 #include <exception>
+#include <memory>
+#include <stdexcept>
 #include <utility>
 
 namespace elara::core {
@@ -12,6 +15,7 @@ void EditSession::start(std::size_t track) noexcept {
     caret_ = Caret{.track = track};
     input_ = Duration{};
     typed_.reset();
+    anchor_.reset();
 }
 
 void EditSession::showTrack(const Song& song, std::optional<std::size_t> track) {
@@ -29,6 +33,7 @@ void EditSession::move(const Song& song, CaretMove move) {
         return;
     }
     typed_.reset();
+    anchor_.reset();
     caret_ = moveCaret(song, caret_, move);
     followBeat(song);
 }
@@ -48,9 +53,97 @@ void EditSession::place(const Song& song, const Caret& caret) {
     if (!hasCaret(song)) {
         return;
     }
+    anchor_.reset();
+    moveTo(song, caret);
+}
+
+void EditSession::moveTo(const Song& song, const Caret& caret) {
     typed_.reset();
     caret_ = clampCaret(song, caret);
     followBeat(song);
+}
+
+EditSession::Measures EditSession::selection() const noexcept {
+    if (!anchor_) {
+        return {.first = caret_.measure, .count = 1};
+    }
+    const std::size_t first = std::min(*anchor_, caret_.measure);
+    return {.first = first, .count = std::max(*anchor_, caret_.measure) - first + 1};
+}
+
+void EditSession::extendSelection(const Song& song, long long measures) {
+    if (!hasCaret(song) || measures == 0) {
+        return;
+    }
+    if (!anchor_) {
+        anchor_ = caret_.measure;
+    }
+    const auto last = static_cast<long long>(song.measureCount()) - 1;
+    Caret caret = caret_;
+    caret.measure = static_cast<std::size_t>(
+        std::clamp(static_cast<long long>(caret_.measure) + measures, 0LL, last));
+    caret.beat = 0;
+    moveTo(song, caret);
+}
+
+void EditSession::selectAll(const Song& song) {
+    if (!hasCaret(song)) {
+        return;
+    }
+    anchor_ = song.measureCount() - 1;
+    Caret caret = caret_;
+    caret.measure = 0;
+    caret.beat = 0;
+    moveTo(song, caret);
+}
+
+bool EditSession::clearSelection() noexcept {
+    const bool had = anchor_.has_value();
+    anchor_.reset();
+    return had;
+}
+
+EditSession::Measures EditSession::copy(const Song& song) {
+    const Measures range = selection();
+    // The track shown alone, or every track from the first.
+    clip_ = copyMeasures(song, range.first, range.count, shown_ ? caret_.track : 0, shown_ ? 1 : 0);
+    return range;
+}
+
+bool EditSession::paste(Document& document, PasteMode mode) {
+    if (!clip_) {
+        throw std::logic_error("paste: nothing was copied");
+    }
+    const std::size_t at = selection().first;
+    // One copied track goes to the caret's; several to the tracks they came from.
+    const std::size_t track = clip_->tracks.size() == 1 ? caret_.track : 0;
+    std::unique_ptr<Command> command = makePaste(document.song(), *clip_, at, track, mode);
+    Caret caret = caret_;
+    caret.measure = at + clip_->measureCount() - 1;
+    caret.beat = 0;
+    anchor_ = at;
+    try {
+        return enter(document, Entry{.command = std::move(command), .caret = caret});
+    } catch (...) {
+        anchor_.reset();
+        throw;
+    }
+}
+
+bool EditSession::transpose(Document& document, int semitones) {
+    if (semitones == 0 || !hasCaret(document.song())) {
+        return false;
+    }
+    const Measures range = selection();
+    Transposition what{.semitones = semitones, .first = range.first, .count = range.count};
+    if (shown_) {
+        what.tracks.push_back(caret_.track);
+    }
+    std::unique_ptr<Command> command = makeTranspose(document.song(), what);
+    typed_.reset();
+    document.execute(std::move(command));
+    fit(document.song());
+    return true;
 }
 
 bool EditSession::enter(Document& document, Entry entry) {
@@ -119,6 +212,9 @@ void EditSession::fit(const Song& song) {
         caret_.track = *shown_;
     }
     caret_ = clampCaret(song, caret_);
+    if (anchor_) {
+        anchor_ = std::min(*anchor_, song.measureCount() - 1);
+    }
 }
 
 void EditSession::followBeat(const Song& song) {

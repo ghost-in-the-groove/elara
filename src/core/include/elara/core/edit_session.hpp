@@ -4,6 +4,7 @@
 // (ADR-0021); this is the state they are entered with.
 #pragma once
 
+#include <elara/core/clipboard.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
@@ -17,8 +18,9 @@
 
 namespace elara::core {
 
-/// The caret, the duration typing uses and the digit waiting for a second
-/// one, kept inside the song they edit.
+/// The caret, the duration typing uses, the digit waiting for a second one,
+/// the selected measures and the measures copied; all but the last kept
+/// inside the song they edit.
 ///
 /// The session holds no song: each action takes the song, or the document it
 /// edits, and leaves the caret on a place that song has. A song without
@@ -46,12 +48,21 @@ public:
     /// The clock typeDigit() is told the time by.
     using Clock = std::chrono::steady_clock;
 
+    /// Measures of the song: the first and how many.
+    struct Measures {
+        std::size_t first = 0;
+        std::size_t count = 0;
+
+        [[nodiscard]] std::size_t last() const noexcept { return first + count - 1; }
+        friend bool operator==(const Measures&, const Measures&) = default;
+    };
+
     [[nodiscard]] const Caret& caret() const noexcept { return caret_; }
     /// The duration typing gives a new beat.
     [[nodiscard]] Duration input() const noexcept { return input_; }
 
     /// Another song: the caret on the first beat of `track`, a quarter note to
-    /// type.
+    /// type, nothing selected. What was copied stays, to paste into this one.
     void start(std::size_t track = 0) noexcept;
 
     /// The track shown alone, which the caret stays on, or none when every
@@ -59,14 +70,14 @@ public:
     void showTrack(const Song& song, std::optional<std::size_t> track);
 
     /// The song changed otherwise than through the session (another edit, an
-    /// undo, a redo): the caret goes back inside it, and a digit no longer
-    /// waits for a second one.
+    /// undo, a redo): the caret and the selection go back inside it, and a
+    /// digit no longer waits for a second one.
     void songChanged(const Song& song);
 
     // ---- The caret ----------------------------------------------------------
 
     /// An arrow key (moveCaret()). The input duration follows the beat the
-    /// caret lands on.
+    /// caret lands on, and the selection ends.
     void move(const Song& song, CaretMove move);
 
     /// Typing goes into voice `voice` (0 to 3) from now on: the caret moves to
@@ -75,8 +86,53 @@ public:
     /// caret is in.
     bool setVoice(const Song& song, std::size_t voice);
 
-    /// A click: the caret goes to `caret`, or the nearest place the song has.
+    /// A click: the caret goes to `caret`, or the nearest place the song has,
+    /// and the selection ends.
     void place(const Song& song, const Caret& caret);
+
+    // ---- The selection (ADR-0027) -------------------------------------------
+
+    /// Whether measures are selected: from where the selection started to the
+    /// caret's measure, whichever comes first.
+    [[nodiscard]] bool hasSelection() const noexcept { return anchor_.has_value(); }
+
+    /// The measures an edit of measures acts on: the selected ones, or the
+    /// caret's alone.
+    [[nodiscard]] Measures selection() const noexcept;
+
+    /// Shift and an arrow: the selection, started at the caret's measure when
+    /// there is none, reaches `measures` further (back when negative, and no
+    /// further than the ends of the song). The caret goes to the first beat of
+    /// the measure it reaches.
+    void extendSelection(const Song& song, long long measures);
+
+    /// Every measure, the caret on the first.
+    void selectAll(const Song& song);
+
+    /// Returns whether there was a selection to end.
+    bool clearSelection() noexcept;
+
+    // ---- The clipboard (ADR-0027) and transposing (ADR-0026) ----------------
+
+    [[nodiscard]] bool canPaste() const noexcept { return clip_.has_value(); }
+
+    /// Copies selection() from the track shown alone, or from every track,
+    /// and returns the measures copied.
+    Measures copy(const Song& song);
+
+    /// Pastes what was copied at the first measure of selection(): over the
+    /// measures from it, or into new ones before it (makePaste()). One copied
+    /// track goes to the caret's, several to the tracks they came from. What
+    /// was pasted is selected, the caret on its last measure. Throws
+    /// std::logic_error when nothing was copied and what makePaste() throws
+    /// for measures that do not fit; nothing changes then.
+    bool paste(Document& document, PasteMode mode);
+
+    /// Moves the notes of selection() by `semitones`, on the track shown
+    /// alone or on every track (makeTranspose()). Returns whether the song
+    /// changed; what makeTranspose() throws goes on to the caller, and
+    /// nothing changes then.
+    bool transpose(Document& document, int semitones);
 
     // ---- Edits --------------------------------------------------------------
 
@@ -106,8 +162,12 @@ public:
     bool setInput(Document& document, Duration duration);
 
 private:
-    /// The caret back on the track shown and inside `song`.
+    /// The caret back on the track shown and inside `song`, and the selection
+    /// inside it.
     void fit(const Song& song);
+    /// The caret on `caret`, or the nearest place the song has; the input
+    /// duration follows its beat.
+    void moveTo(const Song& song, const Caret& caret);
     /// The input duration takes the caret beat's, when typing offers it.
     void followBeat(const Song& song);
 
@@ -124,6 +184,8 @@ private:
     Duration input_;
     std::optional<std::size_t> shown_; ///< the track shown alone
     std::optional<Typed> typed_;
+    std::optional<std::size_t> anchor_; ///< the measure the selection started at
+    std::optional<MeasureClip> clip_;   ///< the measures copied
 };
 
 } // namespace elara::core
