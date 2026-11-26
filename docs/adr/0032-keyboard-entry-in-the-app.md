@@ -69,3 +69,6 @@ caret does not blink and costs no frames when nothing moves.
 - `--smoke-test` types on the first fretted track shown: a click on the caret
   keeps it, two digits make fret 12 as one undo step, a duration, a rest
   inserted and deleted, then everything undone back to the original song.
+  `tests/app/test_fret_entry.cpp` checks the rules for the second digit
+  through the document: off the neck, after a 0, after the caret moved or an
+  undo, too late, and on a track without strings.
