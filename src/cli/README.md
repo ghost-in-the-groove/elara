@@ -327,5 +327,10 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 - New features add a subcommand here *and* a CTest in `tests/cli/`.
 - Subcommands are grouped in `src/*_commands.cpp` (audio, theory); each registers
   itself with a callback that stores its exit code in the shared `Context`.
+- The steps of `edit` are parsed and run in `src/edit_steps.cpp`, the
+  `elara_cli_steps` library: `runStep()` throws `StepSyntaxError` for a step that
+  is not well formed (exit 2) and lets what the song refuses through (exit 1).
+  `tests/cli/test_edit_steps.cpp` runs steps against a song with Catch2; the
+  `cli.edit_rejects_*` CTests check the message each step fails with.
 
 - **May depend on:** every Elara module except `app`. **Must not include:** Qt.

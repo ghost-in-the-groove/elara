@@ -225,7 +225,8 @@ set_tests_properties(cli.dump_credits PROPERTIES
   FIXTURES_REQUIRED cli_credits
   PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\",\"subtitle\":\"for two guitars\",\"album\":\"Studies\",\"words\":\"A. Poet\",\"copyright\":\"CC0\",\"transcriber\":\"Someone\"}")
 add_test(NAME cli.edit_rejects_unknown_credit COMMAND elara-cli edit "credit composer Someone")
-set_tests_properties(cli.edit_rejects_unknown_credit PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_credit PROPERTIES
+  PASS_REGULAR_EXPRESSION "credit: title, subtitle, artist, album, words, music, copyright, transcriber or notes, not composer")
 
 # Sections (ADR-0062): named where they start; no name takes one off.
 set(ELARA_CLI_SECTIONS "${CMAKE_CURRENT_BINARY_DIR}/cli-sections.elara")
@@ -242,7 +243,8 @@ set_tests_properties(cli.dump_sections PROPERTIES
   PASS_REGULAR_EXPRESSION "\"section\":\"Intro\"},{[^}]*},{[^}]*\"section\":\"First chorus\"},{[^}]*}\\]")
 add_test(NAME cli.edit_rejects_section_past_the_end
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "section 5 Outro")
-set_tests_properties(cli.edit_rejects_section_past_the_end PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_section_past_the_end PROPERTIES
+  PASS_REGULAR_EXPRESSION "section: no measure 5")
 
 add_test(NAME cli.edit_sets_track_mix
   COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
@@ -251,7 +253,8 @@ set_tests_properties(cli.edit_sets_track_mix PROPERTIES
 
 add_test(NAME cli.edit_rejects_mix_out_of_range
   COMMAND elara-cli edit "add-track electric-bass" "mix 0 1.5 0")
-set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_mix_out_of_range PROPERTIES
+  PASS_REGULAR_EXPRESSION "Track: volume must be from 0 to 1")
 
 # Keyboard entry at a caret (ADR-0021).
 add_test(NAME cli.edit_types_frets_at_the_caret
@@ -306,8 +309,10 @@ add_test(NAME cli.edit_rejects_note_name_on_drums
   COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "pitch C")
 add_test(NAME cli.edit_rejects_unknown_note_name
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch H")
-set_tests_properties(cli.edit_rejects_note_name_on_drums cli.edit_rejects_unknown_note_name
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_note_name_on_drums PROPERTIES
+  PASS_REGULAR_EXPRESSION "enterPitch: a percussion staff has no note names")
+set_tests_properties(cli.edit_rejects_unknown_note_name PROPERTIES
+  PASS_REGULAR_EXPRESSION "pitch: not a note name \\(C to B\\): H")
 
 # Drum entry (ADR-0035): a bass drum, a closed hi-hat and a snare on the first
 # beat, the hi-hat toggled off from its lane, then a snare on the second beat.
@@ -326,8 +331,10 @@ add_test(NAME cli.edit_rejects_drum_on_guitar
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" drum)
 add_test(NAME cli.edit_rejects_drum_without_lane
   COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
-set_tests_properties(cli.edit_rejects_drum_on_guitar cli.edit_rejects_drum_without_lane
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_drum_on_guitar PROPERTIES
+  PASS_REGULAR_EXPRESSION "toggleDrum: the staff is not a percussion staff")
+set_tests_properties(cli.edit_rejects_drum_without_lane PROPERTIES
+  PASS_REGULAR_EXPRESSION "drum: no lane for key 56")
 
 # Note effects (ADR-0037): palm mute and let ring on fret 5, let ring off again;
 # a tie on fret 7 after it takes fret 5; a natural harmonic on fret 12.
@@ -347,8 +354,10 @@ add_test(NAME cli.edit_rejects_unknown_effect
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect wah")
 add_test(NAME cli.edit_rejects_tie_without_note
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "effect tie")
-set_tests_properties(cli.edit_rejects_unknown_effect cli.edit_rejects_tie_without_note
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_effect PROPERTIES
+  PASS_REGULAR_EXPRESSION "not an effect: wah")
+set_tests_properties(cli.edit_rejects_tie_without_note PROPERTIES
+  PASS_REGULAR_EXPRESSION "toggleEffect: no note to tie to")
 
 # Bends of any form (ADR-0055): a half-step bend and release on fret 7, then a
 # pre-bend of a step and a half on fret 9, taken off and put back by undo.
@@ -367,8 +376,10 @@ add_test(NAME cli.edit_rejects_unknown_bend
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "bend wobble")
 add_test(NAME cli.edit_rejects_flat_bend
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "bend bend 0")
-set_tests_properties(cli.edit_rejects_unknown_bend cli.edit_rejects_flat_bend
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_bend PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a bend form: wobble")
+set_tests_properties(cli.edit_rejects_flat_bend PROPERTIES
+  PASS_REGULAR_EXPRESSION "bendCurve: the bend must go up by 1 to 2400 cents")
 
 # Beat effects (ADR-0056): a chord strummed down, then fret 9 tremolo-picked
 # at sixteenths with an up stroke; the strum taken off and put back by undo.
@@ -388,8 +399,10 @@ add_test(NAME cli.edit_rejects_unknown_strum
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "strum sideways")
 add_test(NAME cli.edit_rejects_unknown_tremolo
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "tremolo 12")
-set_tests_properties(cli.edit_rejects_unknown_strum cli.edit_rejects_unknown_tremolo
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_strum PROPERTIES
+  PASS_REGULAR_EXPRESSION "strum: down, up or none, not sideways")
+set_tests_properties(cli.edit_rejects_unknown_tremolo PROPERTIES
+  PASS_REGULAR_EXPRESSION "tremolo: 8, 16, 32 or none, not 12")
 
 # Whammy bar and bass techniques (ADR-0060): fret 5 dips 300 cents and is
 # slapped; fret 7 pulls up 100 cents and returns, and is popped, and taking the
@@ -412,8 +425,12 @@ add_test(NAME cli.edit_rejects_whammy_of_nothing
   COMMAND elara-cli edit "add-track electric-bass" "append-measures 1" "fret 5" "whammy dive 0")
 add_test(NAME cli.edit_rejects_unknown_bass_technique
   COMMAND elara-cli edit "add-track electric-bass" "append-measures 1" "fret 5" "bass thumb")
-set_tests_properties(cli.edit_rejects_unknown_whammy cli.edit_rejects_whammy_of_nothing
-  cli.edit_rejects_unknown_bass_technique PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_whammy PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a whammy-bar form: wobble")
+set_tests_properties(cli.edit_rejects_whammy_of_nothing PROPERTIES
+  PASS_REGULAR_EXPRESSION "whammyCurve: the bar must go 1 to 2400 cents down or up")
+set_tests_properties(cli.edit_rejects_unknown_bass_technique PROPERTIES
+  PASS_REGULAR_EXPRESSION "bass: none, tap, slap, pop, not thumb")
 
 # Hairpins at the caret (ADR-0078): the first two beats get a crescendo, the
 # third a diminuendo that undo takes back.
@@ -510,10 +527,12 @@ set_tests_properties(cli.dump_grace_notes PROPERTIES
 add_test(NAME cli.edit_rejects_grace_off_the_neck
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 3"
     "fret 1" "grace -2")
-set_tests_properties(cli.edit_rejects_grace_off_the_neck PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_grace_off_the_neck PROPERTIES
+  PASS_REGULAR_EXPRESSION "addGraceNote: the grace note leaves the neck")
 add_test(NAME cli.edit_rejects_unknown_hairpin
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "hairpin swell")
-set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES
+  PASS_REGULAR_EXPRESSION "hairpin: none, crescendo, diminuendo, not swell")
 
 # Fermatas at the caret (ADR-0085): a long one on the C, a short one on a rest,
 # and a normal one on the E that undo takes back. The measure lasts 1.25 s
@@ -551,7 +570,8 @@ set_tests_properties(cli.render_ottavas PROPERTIES
   PASS_REGULAR_EXPRESSION "\"octaveLine\":9[,}]")
 add_test(NAME cli.edit_rejects_unknown_ottava
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "ottava 22ma")
-set_tests_properties(cli.edit_rejects_unknown_ottava PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_ottava PROPERTIES
+  PASS_REGULAR_EXPRESSION "ottava: none, 8va, 8vb, 15ma, 15mb, not 22ma")
 # Fingerings at the caret (ADR-0093): a piano's C-E-G fingered 1 3 5, drawn
 # over the notes; a guitar's note fretted with the ring finger and plucked
 # with i, the fingering small left of the notehead and i over it.
@@ -583,10 +603,12 @@ set_tests_properties(cli.render_plucks PROPERTIES
   PASS_REGULAR_EXPRESSION "\"fingering\":2[,}]")
 add_test(NAME cli.edit_rejects_a_sixth_finger
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fingering 6")
-set_tests_properties(cli.edit_rejects_a_sixth_finger PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_a_sixth_finger PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a finger: 6")
 add_test(NAME cli.edit_rejects_pluck_without_strings
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "pluck i")
-set_tests_properties(cli.edit_rejects_pluck_without_strings PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_pluck_without_strings PROPERTIES
+  PASS_REGULAR_EXPRESSION "setPluck: a plucking finger needs strings")
 # The sustain pedal at the caret (ADR-0092): down on the C, the D and a rest,
 # changed on the E. Drawn as "Ped.", its line broken by the notch, and the hook.
 set(ELARA_CLI_PEDALS "${CMAKE_CURRENT_BINARY_DIR}/cli-pedals.elara")
@@ -607,7 +629,8 @@ set_tests_properties(cli.render_pedals PROPERTIES
   PASS_REGULAR_EXPRESSION "\"pedal\":6[,}]")
 add_test(NAME cli.edit_rejects_unknown_pedal
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "pedal half")
-set_tests_properties(cli.edit_rejects_unknown_pedal PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_pedal PROPERTIES
+  PASS_REGULAR_EXPRESSION "pedal: none, down, change, not half")
 # Slurs at the caret (ADR-0086): the C slurred to the D, the E's slur undone.
 set(ELARA_CLI_SLURS "${CMAKE_CURRENT_BINARY_DIR}/cli-slurs.elara")
 add_test(NAME cli.edit_sets_slurs
@@ -622,7 +645,8 @@ set_tests_properties(cli.dump_slurs PROPERTIES
   PASS_REGULAR_EXPRESSION "\"C5\"}\\],\"effects\":{\"slur\":true}},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\"}\\]}")
 add_test(NAME cli.edit_rejects_unknown_slur
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "slur maybe")
-set_tests_properties(cli.edit_rejects_unknown_slur PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_slur PROPERTIES
+  PASS_REGULAR_EXPRESSION "slur: none, on, not maybe")
 # Tenuto at the caret (ADR-0088): on the C, and with a staccato (portato) on
 # the D, which plays three quarters of its length.
 set(ELARA_CLI_TENUTO "${CMAKE_CURRENT_BINARY_DIR}/cli-tenuto.elara")
@@ -656,7 +680,8 @@ set_tests_properties(cli.render_breaths PROPERTIES
   PASS_REGULAR_EXPRESSION "\"articulation\":2[,}]")
 add_test(NAME cli.edit_rejects_unknown_breath
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch C" "breath gasp")
-set_tests_properties(cli.edit_rejects_unknown_breath PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_breath PROPERTIES
+  PASS_REGULAR_EXPRESSION "breath: none, comma, caesura, not gasp")
 # Staccatissimo at the caret (ADR-0094): on the C, and in the place of the
 # staccato on the D.
 set(ELARA_CLI_STACCATISSIMO "${CMAKE_CURRENT_BINARY_DIR}/cli-staccatissimo.elara")
@@ -708,13 +733,16 @@ set_tests_properties(cli.sequence_measure_repeats PROPERTIES
   PASS_REGULAR_EXPRESSION "5 measures, 5 notes")
 add_test(NAME cli.edit_rejects_long_measure_repeats
   COMMAND elara-cli edit "add-track piano" "append-measures 4" "caret 0 3 0" "simile 3")
-set_tests_properties(cli.edit_rejects_long_measure_repeats PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_long_measure_repeats PROPERTIES
+  PASS_REGULAR_EXPRESSION "a measure repeat repeats one or two measures")
 add_test(NAME cli.edit_rejects_percussion_clef
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "clef percussion")
-set_tests_properties(cli.edit_rejects_percussion_clef PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_percussion_clef PROPERTIES
+  PASS_REGULAR_EXPRESSION "clef: treble, treble-8vb, bass, bass-8vb, alto, tenor, not percussion")
 add_test(NAME cli.edit_rejects_unknown_fermata
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "fermata endless")
-set_tests_properties(cli.edit_rejects_unknown_fermata PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_fermata PROPERTIES
+  PASS_REGULAR_EXPRESSION "fermata: none, short, normal, long, not endless")
 
 # Kinds of note effects at the caret (ADR-0058): fret 12 gets an artificial
 # harmonic, wide vibrato, a marcato and slides in from below and out downwards;
@@ -770,20 +798,25 @@ set_tests_properties(cli.render_ornaments PROPERTIES
   PASS_REGULAR_EXPRESSION "\"ornament\":3[,}]")
 add_test(NAME cli.edit_rejects_unknown_ornament
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "ornament shake")
-set_tests_properties(cli.edit_rejects_unknown_ornament PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_ornament PROPERTIES
+  PASS_REGULAR_EXPRESSION "ornament: none, mordent, upper-mordent, turn, inverted-turn, not shake")
 add_test(NAME cli.edit_rejects_trill_past_an_octave
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "trill 13")
 add_test(NAME cli.edit_rejects_unknown_trill_speed
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "trill on 128")
-set_tests_properties(cli.edit_rejects_trill_past_an_octave cli.edit_rejects_unknown_trill_speed
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_trill_past_an_octave PROPERTIES
+  PASS_REGULAR_EXPRESSION "trill: on, none or 1 to 12 semitones up or down, not 13")
+set_tests_properties(cli.edit_rejects_unknown_trill_speed PROPERTIES
+  PASS_REGULAR_EXPRESSION "trill: 16, 32 or 64, not 128")
 add_test(NAME cli.edit_rejects_unknown_vibrato
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 5" "vibrato huge")
 add_test(NAME cli.edit_rejects_natural_harmonic_off_node
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "fret 6"
     "harmonic natural")
-set_tests_properties(cli.edit_rejects_unknown_vibrato cli.edit_rejects_natural_harmonic_off_node
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_vibrato PROPERTIES
+  PASS_REGULAR_EXPRESSION "vibrato: none, slight, wide, not huge")
+set_tests_properties(cli.edit_rejects_natural_harmonic_off_node PROPERTIES
+  PASS_REGULAR_EXPRESSION "setHarmonic: no natural harmonic at that fret")
 
 # Dynamics at the caret (ADR-0047): f from the second note holds to the end,
 # and a note typed after it is f too.
@@ -800,20 +833,25 @@ set_tests_properties(cli.dump_dynamics PROPERTIES
   PASS_REGULAR_EXPRESSION "{\"pitch\":\"C5\"}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"D5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\",\"effects\":{\"dynamic\":\"f\"}}\\]},{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"F5\",\"effects\":{\"dynamic\":\"f\"}}\\]}")
 add_test(NAME cli.edit_rejects_unknown_dynamic
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch C" "dynamic loud")
-set_tests_properties(cli.edit_rejects_unknown_dynamic PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_dynamic PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a dynamic: loud")
 
 add_test(NAME cli.edit_rejects_caret_outside_song
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 3 0")
-set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_caret_outside_song PROPERTIES
+  PASS_REGULAR_EXPRESSION "the song has no such caret position")
 
 add_test(NAME cli.edit_rejects_fret_without_track COMMAND elara-cli edit "fret 3")
-set_tests_properties(cli.edit_rejects_fret_without_track PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_fret_without_track PROPERTIES
+  PASS_REGULAR_EXPRESSION "clampCaret: a song without tracks or measures has no caret")
 
 add_test(NAME cli.edit_rejects_unknown_step COMMAND elara-cli edit "explode 2")
-set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_step PROPERTIES
+  PASS_REGULAR_EXPRESSION "unknown step: explode")
 
 add_test(NAME cli.edit_rejects_undo_without_history COMMAND elara-cli edit undo)
-set_tests_properties(cli.edit_rejects_undo_without_history PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_undo_without_history PROPERTIES
+  PASS_REGULAR_EXPRESSION "Document: nothing to undo")
 
 # Transposition (ADR-0026): the open high E down a semitone is D#4 on the B
 # string, and the keys follow to B major.
@@ -835,7 +873,8 @@ set_tests_properties(cli.edit_transpose_measures_and_tracks PROPERTIES
   PASS_REGULAR_EXPRESSION "\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\].*\"undo\":{\"count\":4,\"next\":\"Transpose\"}")
 add_test(NAME cli.edit_rejects_unplayable_transpose
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1" "transpose -1")
-set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unplayable_transpose PROPERTIES
+  PASS_REGULAR_EXPRESSION "measure 1: no free string can play D#2")
 # Retuning (ADR-0046): A2 at the fifth fret of the low string moves to the
 # seventh in drop D; with a capo and the frets kept, G2 at the third fret
 # sounds A2.
@@ -863,11 +902,13 @@ set_tests_properties(cli.dump_capo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"notes\":\\[{\"pitch\":\"A2\",\"string\":6,\"fret\":3}\\]")
 add_test(NAME cli.edit_rejects_unknown_tuning
   COMMAND elara-cli edit "add-track electric-guitar" "tuning 0 guitar-banjo-x")
-set_tests_properties(cli.edit_rejects_unknown_tuning PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_tuning PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a tuning: guitar-banjo-x")
 add_test(NAME cli.edit_rejects_unplayable_tuning
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "note 0 0 6 0 1"
     "tuning 0 capo 2")
-set_tests_properties(cli.edit_rejects_unplayable_tuning PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unplayable_tuning PROPERTIES
+  PASS_REGULAR_EXPRESSION "measure 1: no free string can play E2")
 # Signs and jumps (ADR-0049): 0 | 1 segno | 2 to coda | 3 D.S. al Coda | 4 coda | 5,
 # saved, read back and played in order.
 set(ELARA_CLI_JUMPS "${CMAKE_CURRENT_BINARY_DIR}/cli-jumps.elara")
@@ -894,8 +935,10 @@ add_test(NAME cli.edit_rejects_unknown_sign
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "sign 0 dolce")
 add_test(NAME cli.edit_rejects_unknown_jump
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "jump 0 da-capo al-segno")
-set_tests_properties(cli.edit_rejects_unknown_sign cli.edit_rejects_unknown_jump
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_sign PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a sign: dolce")
+set_tests_properties(cli.edit_rejects_unknown_jump PROPERTIES
+  PASS_REGULAR_EXPRESSION "jump: not al-fine, al-coda or al-double-coda: al-segno")
 # Tempo changes (ADR-0042): 0 at the song's 120 | 1 from 60 | 2 from 240. Each
 # 4/4 measure of rests lasts 2 s, then 4 s, then 1 s.
 set(ELARA_CLI_TEMPO "${CMAKE_CURRENT_BINARY_DIR}/cli-tempo.elara")
@@ -935,7 +978,8 @@ set_tests_properties(cli.render_gradual_tempo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"tempo\":8,")
 add_test(NAME cli.edit_rejects_gradual_word
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-gradual 1 maybe")
-set_tests_properties(cli.edit_rejects_gradual_word PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_gradual_word PROPERTIES
+  PASS_REGULAR_EXPRESSION "tempo-gradual: on or off, not maybe")
 add_test(NAME cli.edit_clears_tempo
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 60"
     "tempo-from 1 none")
@@ -945,8 +989,10 @@ add_test(NAME cli.edit_rejects_tempo_out_of_range
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 5")
 add_test(NAME cli.edit_rejects_tempo_from_first_measure
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90")
-set_tests_properties(cli.edit_rejects_tempo_out_of_range cli.edit_rejects_tempo_from_first_measure
-  PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_tempo_out_of_range PROPERTIES
+  PASS_REGULAR_EXPRESSION "tempo-from: 10 to 999 beats per minute, not 5")
+set_tests_properties(cli.edit_rejects_tempo_from_first_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "tempo-from: the first measure plays at the song's tempo \\(\"tempo <bpm>\"\\)")
 # Triplet feel (ADR-0104): swung eighths from measure 1, straight again in
 # measure 2; at quarter = 120 the second eighth starts after a third of a
 # second, saved, read back and played.
@@ -963,7 +1009,8 @@ set_tests_properties(cli.sequence_triplet_feel PROPERTIES
   PASS_REGULAR_EXPRESSION " +0\\.000 on   track 0  key  [0-9]+ velocity +[0-9]+\n +0\\.333 off  track 0  key  [0-9]+ velocity   0\n +0\\.333 on   track 0  key ")
 add_test(NAME cli.edit_rejects_unknown_triplet_feel
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "feel 0 shuffle")
-set_tests_properties(cli.edit_rejects_unknown_triplet_feel PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_triplet_feel PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a triplet feel: shuffle")
 # Repeats and alternate endings (ADR-0016): |: 1 | 2 (1., 2.) :| 3 (3.) | 4, played
 # three times through, saved, read back and played in order.
 set(ELARA_CLI_REPEATS "${CMAKE_CURRENT_BINARY_DIR}/cli-repeats.elara")
@@ -994,8 +1041,14 @@ add_test(NAME cli.edit_rejects_ending_past_eight
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "ending 0 9")
 add_test(NAME cli.edit_rejects_ending_zero
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "ending 0 0")
-set_tests_properties(cli.edit_rejects_single_repeat cli.edit_rejects_unknown_repeat
-  cli.edit_rejects_ending_past_eight cli.edit_rejects_ending_zero PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_single_repeat PROPERTIES
+  PASS_REGULAR_EXPRESSION "repeat: a section plays 2 to 255 times, not 1")
+set_tests_properties(cli.edit_rejects_unknown_repeat PROPERTIES
+  PASS_REGULAR_EXPRESSION "not a repeat: twice")
+set_tests_properties(cli.edit_rejects_ending_past_eight PROPERTIES
+  PASS_REGULAR_EXPRESSION "ending: times through are 1 to 8, not 9")
+set_tests_properties(cli.edit_rejects_ending_zero PROPERTIES
+  PASS_REGULAR_EXPRESSION "ending: times through are 1 to 8, not 0")
 # Double barlines (ADR-0103): two set and one taken off again, each one undo
 # step, saved and read back.
 set(ELARA_CLI_DOUBLE_BARS "${CMAKE_CURRENT_BINARY_DIR}/cli-double-bars.elara")
@@ -1011,7 +1064,8 @@ set_tests_properties(cli.dump_double_barlines PROPERTIES
   PASS_REGULAR_EXPRESSION "\"doubleBar\":true")
 add_test(NAME cli.edit_rejects_unknown_barline
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "barline 0 triple")
-set_tests_properties(cli.edit_rejects_unknown_barline PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_unknown_barline PROPERTIES
+  PASS_REGULAR_EXPRESSION "barline: expected double or single, not triple")
 # Copy and paste (ADR-0027): a measure pasted over the next, and a 3/4 measure
 # pasted into a new measure before the first, bringing its time signature.
 add_test(NAME cli.edit_copy_paste
@@ -1026,13 +1080,16 @@ set_tests_properties(cli.edit_paste_insert PROPERTIES
   PASS_REGULAR_EXPRESSION "\"name\":\"Electric Guitar\",.*\"beats\":2,\"notes\":2}.*\"measureCount\":3,\"measures\":\\[{\"time\":\"3/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"3/4\",\"key\":\"C major\"}\\]")
 add_test(NAME cli.edit_rejects_paste_without_copy
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "paste 0")
-set_tests_properties(cli.edit_rejects_paste_without_copy PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_paste_without_copy PROPERTIES
+  PASS_REGULAR_EXPRESSION "Paste: nothing to paste")
 add_test(NAME cli.edit_rejects_malformed_copy
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "copy 0 1 tracks 0")
-set_tests_properties(cli.edit_rejects_malformed_copy PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_malformed_copy PROPERTIES
+  PASS_REGULAR_EXPRESSION "copy: expected track: tracks")
 add_test(NAME cli.edit_rejects_malformed_transpose
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "transpose 2 bars 1")
-set_tests_properties(cli.edit_rejects_malformed_transpose PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(cli.edit_rejects_malformed_transpose PROPERTIES
+  PASS_REGULAR_EXPRESSION "transpose: expected measures or tracks: bars")
 
 # Song files: create, edit, dump (ADR-0006). The cases share files through fixtures.
 set(ELARA_CLI_SONG "${CMAKE_CURRENT_BINARY_DIR}/cli-song.elara")

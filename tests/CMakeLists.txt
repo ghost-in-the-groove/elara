@@ -102,6 +102,9 @@ elara_add_unit_tests(notation
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
   ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
+# The steps of `elara-cli edit` against a song, without the executable.
+elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp LIBRARIES elara_cli_steps)
+
 add_subdirectory(cli)
 
 # Benchmarks: built on demand (`python scripts/elara.py bench`, release preset),
