@@ -235,6 +235,26 @@ TEST_CASE("editing: the caret and the selection stay inside the song when measur
     CHECK(editing.measures() == 1);
 }
 
+TEST_CASE("editing: a track takes another name, as one undo step") {
+    Editing editing;
+    const QString preset = editing.score.trackNames().at(0);
+    editing.score.setTrackName(0, QStringLiteral("  Lead guitar "));
+    CHECK(editing.score.trackNames().at(0) == QStringLiteral("Lead guitar"));
+    CHECK(editing.score.undoName() == QStringLiteral("Rename track"));
+    // The name it has, a track the song lacks: nothing to undo.
+    editing.score.undo();
+    CHECK(editing.score.trackNames().at(0) == preset);
+    CHECK_FALSE(editing.score.modified());
+    editing.score.setTrackName(0, preset);
+    editing.score.setTrackName(3, QStringLiteral("Nobody"));
+    editing.score.setTrackName(-1, QStringLiteral("Nobody"));
+    CHECK_FALSE(editing.score.modified());
+    // Without a name the song has none, and the lists call the track by its number.
+    editing.score.setTrackName(0, QString());
+    CHECK(editing.score.song()->track(0).name().empty());
+    CHECK(editing.score.trackNames().at(0) == QStringLiteral("Track 1"));
+}
+
 TEST_CASE("editing: the caret stays on the track shown") {
     Editing editing;
     editing.score.addTrack(QStringLiteral("electric-bass"));

@@ -403,6 +403,17 @@ Rectangle {
                                                            && modelData.fretted === true
                         /// The track's hue, the same wherever it shows.
                         readonly property color hue: Theme.trackHue(index)
+                        /// While its name is being typed.
+                        property bool renaming: false
+
+                        // A double click on the name types another: Enter keeps
+                        // it, Escape leaves the name as it was.
+                        function rename() {
+                            nameField.text = modelData.name;
+                            renaming = true;
+                            nameField.forceActiveFocus();
+                            nameField.selectAll();
+                        }
 
                         Layout.fillWidth: true
                         Layout.preferredHeight: 76 + (tuningOpen ? tuning.implicitHeight + 14 : 0)
@@ -470,14 +481,35 @@ Rectangle {
 
                                 Label {
                                     Layout.fillWidth: true
+                                    visible: !row.renaming
                                     text: row.modelData.name
                                     font.pixelSize: Theme.fontBody
                                     font.weight: Font.DemiBold
                                     color: Theme.ink
                                     elide: Text.ElideRight
+
+                                    TapHandler {
+                                        onDoubleTapped: row.rename()
+                                    }
+                                }
+                                Field {
+                                    id: nameField
+
+                                    objectName: "trackNameField"
+                                    Layout.fillWidth: true
+                                    visible: row.renaming
+                                    Accessible.name: qsTr("Track name")
+                                    onEditingFinished: {
+                                        if (row.renaming) {
+                                            row.renaming = false;
+                                            root.document.setTrackName(row.index, text);
+                                        }
+                                    }
+                                    Keys.onEscapePressed: row.renaming = false
                                 }
                                 Label {
                                     Layout.fillWidth: true
+                                    visible: !row.renaming
                                     text: row.modelData.detail
                                     font.pixelSize: Theme.fontCaption
                                     color: Theme.inkSoft

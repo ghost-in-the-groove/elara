@@ -126,7 +126,9 @@ validation issues and the undo/redo state:
 elara-cli --json edit "add-track electric-guitar" "append-measures 4" \n    "time 2 6/8" "note 0 0 6 3 4" "fill 0 0" undo redo save
 ```
 
-Steps: `add-track <preset> [at]`, `remove-track <i>`, `insert-measures <at> [n]`,
+Steps: `add-track <preset> [at]`, `remove-track <i>`, `rename-track <i> [name]`
+(the name to the end of the step; none leaves the track without one),
+`insert-measures <at> [n]`,
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`

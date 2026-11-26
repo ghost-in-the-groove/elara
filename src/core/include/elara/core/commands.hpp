@@ -172,6 +172,26 @@ private:
     TrackMix mix_;
 };
 
+/// Gives a track another name, as it is written left of its staves and in
+/// the lists of tracks. An empty name leaves the track without one.
+class SetTrackName final : public Command {
+public:
+    SetTrackName(std::size_t track, std::string name) : track_(track), name_(std::move(name)) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return "Rename track"; }
+    /// The name is drawn; it is not part of the sequence.
+    [[nodiscard]] Changes changes() const noexcept override {
+        return {.notation = true, .sound = false};
+    }
+
+private:
+    void swapWith(Song& song);
+
+    std::size_t track_;
+    std::string name_;
+};
+
 /// Gives a staff another tuning and capo, its notes staying where they are
 /// (makeRetune moves them with it, ADR-0046).
 class SetStaffTuning final : public Command {

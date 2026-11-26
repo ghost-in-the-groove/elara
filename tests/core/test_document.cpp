@@ -37,6 +37,7 @@ using elara::core::SetMeasureHeader;
 using elara::core::SetSongInfo;
 using elara::core::SetStartTempo;
 using elara::core::SetTrackMix;
+using elara::core::SetTrackName;
 using elara::core::Song;
 using elara::core::SongInfo;
 using elara::core::Tempo;
@@ -316,6 +317,20 @@ TEST_CASE("Content, header, info and tempo edits are undoable", "[core][document
     CHECK_THROWS_AS(doc.execute(std::make_unique<SetTrackMix>(0, TrackMix{.volume = 2.0})),
                     std::invalid_argument);
     CHECK(doc.undoName() == "Change mix"); // refused commands are not recorded
+
+    const std::string named = doc.song().track(1).name();
+    doc.execute(std::make_unique<SetTrackName>(1, "Lead guitar"));
+    CHECK(doc.song().track(1).name() == "Lead guitar");
+    CHECK(doc.song().track(0).name() == original.track(0).name());
+    CHECK(doc.undoName() == "Rename track");
+    doc.execute(std::make_unique<SetTrackName>(1, "")); // a track may have no name
+    CHECK(doc.song().track(1).name().empty());
+    doc.undo();
+    doc.undo();
+    CHECK(doc.song().track(1).name() == named);
+    doc.redo();
+    CHECK(doc.song().track(1).name() == "Lead guitar");
+    CHECK_THROWS_AS(doc.execute(std::make_unique<SetTrackName>(2, "Nobody")), std::out_of_range);
 
     while (doc.canUndo()) {
         doc.undo();

@@ -283,6 +283,7 @@ constexpr std::array kEditNames{
     Translation{"Edit song info", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Edit song info")},
     Translation{"Change tempo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change tempo")},
     Translation{"Change mix", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change mix")},
+    Translation{"Rename track", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Rename track")},
     Translation{"Change navigation marks",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change navigation marks")},
     Translation{"Change repeats", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Change repeats")},
@@ -1736,6 +1737,19 @@ void ScoreDocument::edited() {
     } else if (!sequencing_) {
         sequenceSong_ = song_; // the sequence plays this song as it played the one before
     }
+}
+
+void ScoreDocument::setTrackName(int track, const QString& name) {
+    if (!document_ || track < 0 ||
+        static_cast<std::size_t>(track) >= document_->song().trackCount()) {
+        return;
+    }
+    const auto index = static_cast<std::size_t>(track);
+    std::string wanted = name.trimmed().toStdString();
+    if (wanted == document_->song().track(index).name()) {
+        return;
+    }
+    execute(std::make_unique<core::SetTrackName>(index, std::move(wanted)));
 }
 
 void ScoreDocument::setTrackMix(int track, double volume, double pan, bool mute, bool solo) {

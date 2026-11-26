@@ -123,7 +123,8 @@ void addEditCommands(CLI::App& app, Context& context) {
     editCommand->add_option(
         "steps", options->steps,
         "Steps in order, each quoted: \"add-track <preset> [at]\", "
-        "\"remove-track <i>\", \"insert-measures <at> [n]\", \"append-measures <n>\", "
+        "\"remove-track <i>\", \"rename-track <i> [name]\", \"insert-measures <at> [n]\", "
+        "\"append-measures <n>\", "
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"tempo-gradual <m> <on|off>\", "

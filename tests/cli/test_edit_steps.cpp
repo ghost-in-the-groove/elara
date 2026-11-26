@@ -183,3 +183,18 @@ TEST_CASE("Edit steps: a song with no place for a caret refuses the entry steps"
     }
     CHECK_FALSE(run.doc.canUndo());
 }
+
+TEST_CASE("Edit steps: a track takes another name, or none", "[cli][edit]") {
+    Run run = runSteps({"add-track electric-guitar", "add-track electric-bass",
+                        "rename-track 1 Bass, with a pick"});
+    CHECK(run.doc.song().track(1).name() == "Bass, with a pick");
+    CHECK(run.doc.undoName() == "Rename track");
+    // The name it has adds no undo step.
+    const std::size_t steps = run.doc.undoCount();
+    runStep(run.doc, "rename-track 1 Bass, with a pick", run.state);
+    CHECK(run.doc.undoCount() == steps);
+    runStep(run.doc, "rename-track 1", run.state);
+    CHECK(run.doc.song().track(1).name().empty());
+    CHECK(failureOf(run, "rename-track 2 Nobody") == Failure::Rejected);
+    CHECK(failureOf(run, "rename-track") == Failure::Syntax);
+}

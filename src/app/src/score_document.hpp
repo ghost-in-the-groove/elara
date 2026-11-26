@@ -395,6 +395,9 @@ public:
     Q_INVOKABLE void addTrack(const QString& presetId);
     /// Removes a track; the last track of a song cannot be removed.
     Q_INVOKABLE void removeTrack(int index);
+    /// Gives a track another name, with the spaces round it taken off, as one
+    /// undo step ("Rename track"). An empty name leaves the track without one.
+    Q_INVOKABLE void setTrackName(int track, const QString& name);
     /// Sets a track's mix as one undo step ("Change mix"); playback carries on
     /// with it (ADR-0039).
     Q_INVOKABLE void setTrackMix(int track, double volume, double pan, bool mute, bool solo);
