@@ -33,7 +33,7 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
-        ScrollIndicator.vertical: ScrollIndicator {}
+        ScrollBar.vertical: Scroll {}
 
         GridLayout {
             id: home
@@ -65,7 +65,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     Layout.bottomMargin: 14
-                    text: qsTr("Tablature, score and music studio")
+                    text: qsTr("Tablature and score editor")
                     font.pixelSize: Theme.fontTitle
                     color: Theme.inkSoft
                     wrapMode: Text.Wrap

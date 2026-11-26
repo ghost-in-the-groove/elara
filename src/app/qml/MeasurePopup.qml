@@ -74,7 +74,7 @@ Sheet {
         boundsBehavior: Flickable.StopAtBounds
         clip: contentHeight > height
 
-        ScrollIndicator.vertical: ScrollIndicator {}
+        ScrollBar.vertical: Scroll {}
 
         ColumnLayout {
             id: fields

@@ -196,7 +196,7 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             clip: true
 
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: Scroll {}
 
             ColumnLayout {
                 id: fields

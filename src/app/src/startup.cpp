@@ -1977,6 +1977,20 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("the transport does not read measure %1").arg(playing);
     } else if (string == nullptr || string->property("marker").toString() != playing) {
         failure_ = QStringLiteral("the song string does not carry measure %1").arg(playing);
+    } else {
+        // It has a tick where the measures start, every one or one in so
+        // many, and a taller one where the caret's measure does.
+        const int starts = static_cast<int>(score_->measureStarts().size());
+        const int step = string->property("tickStep").toInt();
+        const double caret = score_->measureStart(score_->caretMeasure());
+        if (starts == 0 || step < 1 ||
+            string->property("tickCount").toInt() != (starts - 1) / step) {
+            failure_ = QStringLiteral("the song string has %1 ticks for %2 measures played")
+                           .arg(string->property("tickCount").toInt())
+                           .arg(starts);
+        } else if (std::abs(string->property("caretSeconds").toDouble() - caret) > 1e-9) {
+            failure_ = QStringLiteral("the song string does not mark the caret's measure");
+        }
     }
 }
 
@@ -2472,6 +2486,13 @@ QString Startup::overlappingBars() const {
                      QStringLiteral("transport"), QStringLiteral("panelTools")});
         !problem.isEmpty()) {
         return problem;
+    }
+    // The bar gives up the metronome before the measure it reads.
+    const auto* measure = window_->findChild<QQuickItem*>(QStringLiteral("measureReadout"));
+    const auto* metronome = window_->findChild<QQuickItem*>(QStringLiteral("metronomeButton"));
+    if (measure != nullptr && metronome != nullptr && metronome->isVisible() &&
+        !measure->isVisible()) {
+        return QStringLiteral("the command bar shows the metronome and not the measure");
     }
     return crowded(
         {QStringLiteral("entryBar"), QStringLiteral("trackPicker"), QStringLiteral("viewSwitch")});

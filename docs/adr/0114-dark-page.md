@@ -24,9 +24,10 @@ unless told otherwise; the boxes that clear the lines behind a text take the
 paper. `ScorePage` has a `paper` and an `ink` and paints again when they
 change, and a page whose colours did not change keeps its texture as before.
 
-- The dark page is `Theme.nightPage` (#1c1b21), one step above the desk, with a
-  hairline round it instead of a shadow; its ink is `Theme.nightInk` (#e7e5ec),
-  nearly fourteen to one against it.
+- The dark page is `Theme.nightPage` (#27262e), lighter than the desk, the bars
+  and the fields so that it stays the brightest surface, with a hairline round
+  it instead of a shadow; its ink is `Theme.nightInk` (#e7e5ec), twelve to one
+  against it.
 - View > "Dark page in the dark theme" turns it off: the page is then white
   under its veil, as before. The light theme always shows black on white.
 - What leaves the program is never dark: PDF, SVG and print stay black on
