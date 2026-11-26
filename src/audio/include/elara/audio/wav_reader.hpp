@@ -22,6 +22,9 @@ struct WavAudio {
     }
     /// The channels averaged into one.
     [[nodiscard]] std::vector<float> mono() const;
+    /// mono() made in the place of the samples, which it takes: nothing
+    /// holds the channels besides the result once it returns.
+    [[nodiscard]] std::vector<float> intoMono() &&;
 };
 
 /// Decodes a RIFF/WAVE file: PCM of 8, 16, 24 or 32 bits, or 32- or 64-bit
