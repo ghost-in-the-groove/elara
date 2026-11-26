@@ -70,6 +70,8 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
   source strings wrapped in `tr()`/`qsTr()`, translated into Spanish in
   `src/app/i18n/` (refresh with `elara.py translations`; ADR-0030).
 - Musical vocabulary: use the names in `docs/glossary.md` (e.g. `Measure`, not `Bar`).
+- The interface follows `docs/interface.md`: colours and sizes come from
+  `Theme.qml`, icons from `Icons.qml`, and every command has a name in a menu.
 - C++23 without modules. Allowed: `std::expected`, `std::span`, `std::format`,
   designated initializers. Avoid `std::print` (not yet on the macOS toolchain).
 - Naming: types `CamelCase`, functions/variables `camelBack`, private members

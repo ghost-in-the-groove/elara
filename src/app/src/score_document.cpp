@@ -573,6 +573,34 @@ QVariantMap ScoreDocument::cursorAt(double seconds) const {
             {QStringLiteral("height"), cursor->height}};
 }
 
+int ScoreDocument::measureAt(double seconds) const {
+    if (!sequence_) {
+        return -1;
+    }
+    const std::size_t played = sequence_->playedMeasureAt(seconds);
+    return played < sequence_->measures().size()
+               ? static_cast<int>(sequence_->measures()[played].measure)
+               : -1;
+}
+
+QVariantList ScoreDocument::sectionMarks() const {
+    QVariantList marks;
+    if (!sequence_ || !sequenceSong_) {
+        return marks;
+    }
+    for (std::size_t measure = 0; measure < sequenceSong_->measureCount(); ++measure) {
+        const std::string& name = sequenceSong_->measureHeader(measure).section;
+        if (name.empty()) {
+            continue;
+        }
+        if (const auto seconds = sequence_->secondsAt(measure, 0.0)) {
+            marks.append(QVariantMap{{QStringLiteral("name"), QString::fromStdString(name)},
+                                     {QStringLiteral("seconds"), *seconds}});
+        }
+    }
+    return marks;
+}
+
 double ScoreDocument::secondsAt(int page, double x, double y) const {
     if (!sequence_ || !pages_ || page < 0 || static_cast<std::size_t>(page) >= pages_->size()) {
         return -1.0;
@@ -808,11 +836,6 @@ void ScoreDocument::relayout() {
             }
             apply(result);
         });
-    // An edit's sequence is built beside its layout, on another worker: the
-    // pages show as soon as they are laid out instead of waiting for it.
-    if (sequenceSong_ != song_ && sequencing_ != song_) {
-        resequence();
-    }
 }
 
 // Builds the edited song's sequence off the interface thread: copying the song
@@ -830,15 +853,17 @@ void ScoreDocument::resequence() {
             }
             return result;
         },
-        [this, song = song_](const SequenceResult& result) {
+        [this](const SequenceResult& result) {
             sequencing_.reset();
             if (!result.error.isEmpty()) {
                 fail(result.error);
                 return;
             }
             // The song and its sequence change together, so whoever hears
-            // sequenceChanged sees them as a pair.
-            sequenceSong_ = song;
+            // sequenceChanged sees them as a pair. The song is the one edited
+            // now: the lane delivers only the newest request, and the edits
+            // made since changed no sound (edited()).
+            sequenceSong_ = song_;
             if (result.sequence != sequence_) {
                 sequence_ = result.sequence;
                 emit sequenceChanged();
@@ -1745,8 +1770,9 @@ bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {
 // it is still there.
 void ScoreDocument::edited() {
     ++edits_;
-    // Playback hears the edit once its layout is done (relayout()); until then
-    // it plays on as before, with the new mix.
+    const core::Changes changes = document_->lastChanges();
+    // Playback hears the edit once its sequence is built (resequence()); until
+    // then it plays on as before, with the new mix.
     song_ = std::make_shared<const core::Song>(document_->song());
     const auto tracks = static_cast<int>(song_->trackCount());
     if (track_ >= tracks) {
@@ -1760,7 +1786,17 @@ void ScoreDocument::edited() {
     emit caretChanged();
     emit songChanged();
     emit historyChanged();
-    relayout();
+    // Only what the edit can have changed is made again (ADR-0111): the
+    // sequence is built beside the layout, on another worker, so the pages
+    // show as soon as they are laid out instead of waiting for it.
+    if (changes.notation) {
+        relayout();
+    }
+    if (changes.sound) {
+        resequence();
+    } else if (!sequencing_) {
+        sequenceSong_ = song_; // the sequence plays this song as it played the one before
+    }
 }
 
 void ScoreDocument::setTrackMix(int track, double volume, double pan, bool mute, bool solo) {
