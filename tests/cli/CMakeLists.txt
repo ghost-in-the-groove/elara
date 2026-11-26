@@ -175,7 +175,17 @@ set_tests_properties(cli.rests_rejects_bad_duration PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_undo_and_redo_history
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8" undo)
 set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
+  PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"historyBytes\":[0-9]+,\"modified\":true")
+
+# The history says how much it holds: a removed track is kept to undo (ADR-0121).
+add_test(NAME cli.edit_history_bytes
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "remove-track 0")
+set_tests_properties(cli.edit_history_bytes PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"historyBytes\":[1-9][0-9]+,")
+add_test(NAME cli.edit_history_bytes_none
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4")
+set_tests_properties(cli.edit_history_bytes_none PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"historyBytes\":0,")
 
 # A signature change runs until the next change, as in the app.
 add_test(NAME cli.edit_signature_runs_to_next_change
@@ -1051,7 +1061,7 @@ add_test(NAME cli.edit_file_and_save
 set_tests_properties(cli.edit_file_and_save PROPERTIES
   FIXTURES_REQUIRED cli_song
   FIXTURES_SETUP cli_edited
-  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Edit measure\"},\"redo\":{\"count\":0,\"next\":null},\"modified\":false}")
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Edit measure\"},\"redo\":{\"count\":0,\"next\":null},\"historyBytes\":[0-9]+,\"modified\":false}")
 
 add_test(NAME cli.dump_reads_edited_song COMMAND elara-cli --json dump "${ELARA_CLI_EDITED}")
 set_tests_properties(cli.dump_reads_edited_song PROPERTIES
@@ -1300,12 +1310,12 @@ set_tests_properties(cli.render_scroll PROPERTIES
 # other two whole; one SVG per strip.
 add_test(NAME cli.render_strips
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 60 --no-credits)
+          --width 40 --strip-height 63 --no-credits)
 set_tests_properties(cli.render_strips PROPERTIES
   PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":1,[^{]*{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
 add_test(NAME cli.render_strips_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 60 --no-credits
+          --width 40 --strip-height 63 --no-credits
           --svg "${CMAKE_CURRENT_BINARY_DIR}/strips.svg")
 set_tests_properties(cli.render_strips_svg PROPERTIES
   PASS_REGULAR_EXPRESSION "measures 0 to 2 of 3: 3 systems on 2 strips.*saved .*strips-1\\.svg.*saved .*strips-2\\.svg")
@@ -1751,9 +1761,9 @@ set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
 # starts playback on the same column the first time through: at 1 s.
 add_test(NAME cli.render_time_at_a_note
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --time-at 0 27.7 38)
+          --layout page --time-at 0 28.5 41.8)
 set_tests_properties(cli.render_time_at_a_note PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":27.7,\"y\":38,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":28.5,\"y\":41.8,\"measure\":0,\"seconds\":1},\"pages\":\\[")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES

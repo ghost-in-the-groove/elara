@@ -914,12 +914,12 @@ void printJson(const Document& doc, const EntryState& entry) {
     const Song& song = doc.song();
     std::cout
         << std::format(
-               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"caret":{},"input":"{}","undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"modified":{}}})",
+               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"caret":{},"input":"{}","undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"historyBytes":{},"modified":{}}})",
                jsonEscape(song.info().title), song.startTempo().bpm(), tracksJson(song),
                song.measureCount(), measuresJson(song), issuesJson(core::validate(song)),
                caretJson(song, entry.caret), entry.input.toString(), doc.undoCount(),
                jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
-               doc.isModified())
+               doc.historyBytes(), doc.isModified())
         << '\n';
 }
 

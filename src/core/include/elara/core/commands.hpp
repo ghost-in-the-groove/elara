@@ -37,6 +37,7 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override;
     [[nodiscard]] std::string_view name() const noexcept override { return "Remove measures"; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
 
 private:
     std::size_t at_;
@@ -53,6 +54,7 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override;
     [[nodiscard]] std::string_view name() const noexcept override { return "Add track"; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
 
 private:
     std::size_t at_;
@@ -66,6 +68,7 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override;
     [[nodiscard]] std::string_view name() const noexcept override { return "Remove track"; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
 
 private:
     std::size_t index_;
@@ -83,6 +86,7 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override { swapWith(song); }
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
     /// Sound unchanged when the measures differ only in what does not sound:
     /// chord symbols, beat texts and lyrics.
     [[nodiscard]] Changes changes() const noexcept override { return changes_; }
@@ -196,6 +200,7 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override;
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
     /// What any of its commands changes.
     [[nodiscard]] Changes changes() const noexcept override;
 

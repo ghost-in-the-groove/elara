@@ -52,7 +52,7 @@ Rectangle {
     }
 
     // The keyed effects, in the order of core::NoteEffect: each drawn as the
-    // score writes it, or lettered as it does.
+    // score writes it, lettered as it does, or its sign in the music font.
     readonly property var keyed: [
         { path: Icons.tie },
         { label: "H/P" },
@@ -64,10 +64,10 @@ Rectangle {
         { path: Icons.letRing },
         { path: Icons.harmonic },
         { path: Icons.ghostNote },
-        { path: Icons.accent },
-        { path: Icons.staccato },
-        { path: Icons.tenuto },
-        { path: Icons.staccatissimo }
+        { symbol: "\uE4A0", size: 36 },
+        { symbol: "\uE4A2", size: 64 },
+        { symbol: "\uE4A4", size: 36 },
+        { symbol: "\uE4A6", size: 48 }
     ]
 
     color: Theme.bar
@@ -79,7 +79,7 @@ Rectangle {
 
         property bool active: false
         property string tip
-        readonly property color ink: active ? Theme.accentText : Theme.ink
+        readonly property color ink: active ? Theme.accentInk : Theme.ink
 
         implicitWidth: Theme.tool
         implicitHeight: root.tileHeight
@@ -92,8 +92,10 @@ Rectangle {
 
         background: Rectangle {
             radius: Theme.radiusSmall
-            color: tile.active ? Theme.accent
-                               : tile.pressed ? Theme.pressed : tile.hovered ? Theme.hover : "transparent"
+            color: tile.pressed ? Theme.pressed : tile.active ? Theme.accentWash
+                                                               : tile.hovered ? Theme.hover : "transparent"
+            border.width: tile.active ? 1 : 0
+            border.color: Qt.alpha(Theme.accentInk, 0.4)
         }
 
         ToolTip.visible: hovered && tip.length > 0
@@ -322,7 +324,7 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             clip: true
 
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: Scroll {}
 
             Column {
                 id: groups
@@ -333,7 +335,7 @@ Rectangle {
                 spacing: 6
                 // Tools for the caret: dimmed while there is none.
                 enabled: root.document.caretPage >= 0
-                opacity: enabled ? 1.0 : 0.4
+                opacity: enabled ? 1.0 : 0.38
 
                 Group {
                     title: qsTr("Note effects")
@@ -372,17 +374,24 @@ Rectangle {
                                         font.weight: Font.Bold
                                         color: keyedTile.ink
                                     }
-                                    // The key that does the same.
+                                    MusicSymbol {
+                                        anchors.centerIn: parent
+                                        visible: keyedTile.drawn.symbol !== undefined
+                                        symbol: keyedTile.drawn.symbol ?? ""
+                                        size: keyedTile.drawn.size ?? 24
+                                        color: keyedTile.ink
+                                    }
+                                    // The key that does the same, when it is a letter: a comma or
+                                    // a quote in a corner is a speck, and the tooltip names it.
                                     Label {
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         anchors.rightMargin: 3
-                                        anchors.topMargin: 1
+                                        visible: /^[A-Za-z0-9]$/.test(keyedTile.key)
                                         text: keyedTile.key
-                                        font.pixelSize: 9
+                                        font.pixelSize: 10
                                         font.weight: Font.DemiBold
-                                        color: keyedTile.active ? Qt.alpha(Theme.accentText, 0.85)
-                                                                : Theme.inkSoft
+                                        color: keyedTile.active ? Theme.accentInk : Theme.inkSoft
                                     }
                                 }
                             }
@@ -514,15 +523,17 @@ Rectangle {
                             active: root.document.caretVibrato === 2
                             onClicked: root.document.setVibrato(active ? 0 : 2)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Accent")
-                            path: Icons.accent
+                            symbol: "\uE4A0"
+                            size: 36
                             active: root.document.caretAccent === 1
                             onClicked: root.document.setAccent(active ? 0 : 1)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Marcato")
-                            path: Icons.marcato
+                            symbol: "\uE4AC"
+                            size: 36
                             active: root.document.caretAccent === 2
                             onClicked: root.document.setAccent(active ? 0 : 2)
                         }
@@ -553,34 +564,39 @@ Rectangle {
                     }
                     Tiles {
                         // To the next step of the key (ADR-0090).
-                        LabelTile {
+                        SymbolTile {
                             tip: qsTr("Trill")
-                            label: "tr"
+                            symbol: "\uE566"
+                            size: 28
                             active: root.document.caretTrill !== 0
                             onClicked: root.document.toggleTrill()
                         }
                         // Mordents and turns, numbered as core::Ornament (ADR-0091).
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Mordent")
-                            path: Icons.mordent
+                            symbol: "\uE56D"
+                            size: 28
                             active: root.document.caretOrnament === 1
                             onClicked: root.document.setOrnament(active ? 0 : 1)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Upper mordent")
-                            path: Icons.upperMordent
+                            symbol: "\uE56C"
+                            size: 28
                             active: root.document.caretOrnament === 2
                             onClicked: root.document.setOrnament(active ? 0 : 2)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Turn")
-                            path: Icons.turn
+                            symbol: "\uE567"
+                            size: 28
                             active: root.document.caretOrnament === 3
                             onClicked: root.document.setOrnament(active ? 0 : 3)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Inverted turn")
-                            path: Icons.invertedTurn
+                            symbol: "\uE568"
+                            size: 28
                             active: root.document.caretOrnament === 4
                             onClicked: root.document.setOrnament(active ? 0 : 4)
                         }
@@ -641,21 +657,24 @@ Rectangle {
                         Gap {}
                         // The caret's beat held under a fermata, numbered as
                         // core::Fermata: short, normal and long (ADR-0085).
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Short fermata")
-                            path: Icons.fermataShort
+                            symbol: "\uE4C4"
+                            size: 28
                             active: root.document.caretFermata === 1
                             onClicked: root.document.setFermata(active ? 0 : 1)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Fermata")
-                            path: Icons.fermata
+                            symbol: "\uE4C0"
+                            size: 28
                             active: root.document.caretFermata === 2
                             onClicked: root.document.setFermata(active ? 0 : 2)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Long fermata")
-                            path: Icons.fermataLong
+                            symbol: "\uE4C6"
+                            size: 28
                             active: root.document.caretFermata === 3
                             onClicked: root.document.setFermata(active ? 0 : 3)
                         }
@@ -664,16 +683,18 @@ Rectangle {
                         // The caret's beat under an octave line, numbered as
                         // core::Ottava: a second click makes 8va 15ma and 8vb
                         // 15mb, a third takes the line off (ADR-0089).
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Octave line up: 8va, again for 15ma")
-                            path: Icons.ottavaUp
+                            symbol: "\uE511"
+                            size: 22
                             active: root.document.caretOttava === 1 || root.document.caretOttava === 3
                             onClicked: root.document.setOttava(root.document.caretOttava === 1
                                                                ? 3 : (active ? 0 : 1))
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Octave line down: 8vb, again for 15mb")
-                            path: Icons.ottavaDown
+                            symbol: "\uE51C"
+                            size: 22
                             active: root.document.caretOttava === 2 || root.document.caretOttava === 4
                             onClicked: root.document.setOttava(root.document.caretOttava === 2
                                                                ? 4 : (active ? 0 : 2))
@@ -681,18 +702,20 @@ Rectangle {
                         // The sustain pedal under the caret's beat, numbered as
                         // core::Pedal: down, a second click changes it there, a
                         // third lifts it (ADR-0092).
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Sustain pedal: again to change it")
-                            path: Icons.pedal
+                            symbol: "\uE650"
+                            size: 18
                             active: root.document.caretPedal !== 0
                             onClicked: root.document.setPedal((root.document.caretPedal + 1) % 3)
                         }
                         // A break after the caret's beat, numbered as core::Breath:
                         // a breath mark, a second click a caesura, a third none
                         // (ADR-0095).
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Breath mark: again for a caesura")
-                            path: root.document.caretBreath === 2 ? Icons.caesura : Icons.breath
+                            symbol: root.document.caretBreath === 2 ? "\uE4D1" : "\uE4CE"
+                            size: root.document.caretBreath === 2 ? 24 : 44
                             active: root.document.caretBreath !== 0
                             onClicked: root.document.setBreath((root.document.caretBreath + 1) % 3)
                         }
@@ -717,15 +740,17 @@ Rectangle {
                             onClicked: root.document.setStrum(active ? 0 : 2)
                         }
                         Gap {}
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Down stroke")
-                            path: Icons.pickDown
+                            symbol: "\uE610"
+                            size: 32
                             active: root.document.caretPickStroke === 1
                             onClicked: root.document.setPickStroke(active ? 0 : 1)
                         }
-                        IconTile {
+                        SymbolTile {
                             tip: qsTr("Up stroke")
-                            path: Icons.pickUp
+                            symbol: "\uE612"
+                            size: 30
                             active: root.document.caretPickStroke === 2
                             onClicked: root.document.setPickStroke(active ? 0 : 2)
                         }

@@ -5,6 +5,7 @@
 #include "score_document.hpp"
 #include <QElapsedTimer>
 #include <QObject>
+#include <QPointF>
 #include <QPointer>
 #include <QQuickWindow>
 #include <QSize>
@@ -127,6 +128,8 @@ private:
     QPointer<QObject> effectsPanel_;       ///< the note effects palette, watched for `--effects`
     bool effectsOpened_ = false;           ///< whether it has opened
     bool menuOpened_ = false;              ///< whether the menu `--menu` names has opened
+    QString popupProblem_;                 ///< a popup of the caret that left its view
+    std::optional<QPointF> cursorRest_;    ///< where the playback cursor stood a tick ago
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
     QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
     QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()

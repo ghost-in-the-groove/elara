@@ -141,4 +141,9 @@ struct Measure {
     friend bool operator==(const Measure&, const Measure&) = default;
 };
 
+/// Roughly how many bytes `measure` holds: the object and what its vectors,
+/// strings and shared values hold, by capacity, without the allocator's own.
+/// For choosing what to let go of (ADR-0121), not an exact count.
+[[nodiscard]] std::size_t approximateBytes(const Measure& measure) noexcept;
+
 } // namespace elara::core

@@ -6,7 +6,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Elara.App
 
-Dialog {
+AppDialog {
     id: root
 
     /// The copies on offer (ScoreDocument.recoverable()), the newest first.
@@ -40,20 +40,19 @@ Dialog {
 
     anchors.centerIn: parent
     width: Math.min(520, parent.width - 48)
-    modal: true
     title: qsTr("Recover unsaved changes?")
     // Closing keeps the copies for the next start.
     standardButtons: Dialog.Close
 
     ColumnLayout {
         width: root.availableWidth
-        spacing: 14
+        spacing: 12
 
         Label {
             Layout.fillWidth: true
             text: qsTr("Elara closed before these changes were saved. Recover a song to go on with it, or discard it.")
             wrapMode: Text.Wrap
-            opacity: 0.85
+            color: Theme.inkSoft
         }
 
         Repeater {
@@ -70,12 +69,13 @@ Dialog {
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 2
+                    spacing: 1
 
                     Label {
                         Layout.fillWidth: true
                         text: row.modelData.title
                         font.weight: Font.DemiBold
+                        color: Theme.ink
                         elide: Text.ElideRight
                     }
                     Label {
@@ -88,18 +88,18 @@ Dialog {
                             return file + " · " + row.modelData.written.toLocaleString(Qt.locale(), Locale.ShortFormat);
                         }
                         elide: Text.ElideRight
-                        opacity: 0.6
-                        font.pixelSize: 12
+                        color: Theme.inkSoft
+                        font.pixelSize: Theme.fontSmall
                     }
                 }
-                Button {
+                TextButton {
+                    kind: "danger"
                     text: qsTr("Discard")
-                    flat: true
                     onClicked: root.discard(row.index)
                 }
-                Button {
+                TextButton {
+                    kind: "main"
                     text: qsTr("Recover")
-                    highlighted: true
                     onClicked: root.recover(row.index)
                 }
             }

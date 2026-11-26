@@ -1512,6 +1512,22 @@ TEST_CASE("MusicXML export: parts written on several threads give the same docum
     }
 }
 
+TEST_CASE("MusicXML export: an .mxl packed from parts written on several threads holds the score",
+          "[musicxml][export]") {
+    // The parts are packed one after the other without being joined first.
+    const core::Song song = everythingSong();
+    const ExportResult serial = exportMusicXml(song, {.compressed = true, .threads = 1});
+    requireSame(song, reimport(serial).song);
+    for (const unsigned threads : {2U, 3U, 8U}) {
+        INFO(threads << " threads");
+        const ExportResult parallel =
+            exportMusicXml(song, {.compressed = true, .threads = threads});
+        CHECK(parallel.warnings == serial.warnings);
+        CHECK(parallel.data.size() == serial.data.size());
+        requireSame(song, reimport(parallel).song);
+    }
+}
+
 TEST_CASE("MusicXML export: songs without tracks or measures", "[musicxml][export]") {
     core::Song empty;
     const ExportResult nothing = exportMusicXml(empty);

@@ -53,12 +53,21 @@ private:
 struct ZipEntry {
     std::string_view name{};
     std::string_view content{};
+    /// The file's text in pieces, one after the other, in place of `content`:
+    /// a file written in parts is packed without joining them first.
+    std::span<const std::string_view> pieces{};
     /// Deflate level: 0 stores the entry, 1 is the fastest, 6 the default.
     int level = 6;
 };
 
-/// A zip archive holding `entries`, in that order. Throws std::runtime_error.
-[[nodiscard]] std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
+/// A zip archive holding `entries`, in that order, as `Bytes`
+/// (std::vector<std::uint8_t> or std::string): written straight into the
+/// result, with no copy of the archive. Throws std::runtime_error.
+template <class Bytes = std::vector<std::uint8_t>>
+[[nodiscard]] Bytes writeZip(std::span<const ZipEntry> entries);
+
+extern template std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
+extern template std::string writeZip(std::span<const ZipEntry> entries);
 
 /// Writes `content` to a temporary file next to `path`, waits until the system
 /// has put it on the disk, then renames it over `path` (and on POSIX syncs the

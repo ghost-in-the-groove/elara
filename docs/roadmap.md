@@ -99,6 +99,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tablature read from arm's length: larger fret numbers and technique
       texts; the time signature only on a tablature that stands alone (ADR-0113)
+- [x] Chord diagrams large enough to read at 100 %: wider strings and frets,
+      larger dots and marks (ADR-0113)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
 - [x] Hairpins (crescendo, diminuendo; ADR-0078)
@@ -306,12 +308,19 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The note effects as a palette docked at the left of the score, lit with
       the caret's note, each key in the corner of its tile; the zoom keeps
       fitting when a panel opens (ADR-0109)
-- [ ] The song panel, the popups and the tuner in the interface's own controls;
-      the measure popup fits a short window
-- [ ] The welcome pane as a home: what to do at the left, the recent scores
+- [x] The song panel, the popups, the tuner and the dialogs in the interface's
+      own controls, each track in its own hue; the measure popup fits a short
+      window
+- [x] The welcome pane as a home: what to do at the left, the recent scores
       beside it
-- [ ] The page in the dark theme, and the score's own signs: the tablature clef,
-      the fret numbers and the texts of the techniques
+- [x] The page in the dark theme: dark paper and light ink, black on white
+      when it leaves the program (ADR-0114)
+- [x] After a review of the whole window: one look for whatever is chosen, the
+      paper the brightest surface, the palette's signs from the music font, the
+      tuner docked beside the score, measure ticks on the song string, one side
+      panel at a time in a narrow window
+- [ ] The window remembers its size, its panels, its zoom and the dark page
+      from one run to the next
 - [ ] A command palette: every command by name, with its keys
 
 ## Milestone 6 - Practice tools

@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <utility>
 
+using elara::app::ScoreColours;
 using elara::app::ScoreFonts;
 using elara::app::ScorePainter;
 using elara::notation::BeamItem;
@@ -181,6 +182,36 @@ TEST_CASE("Score painter: knocked-out text interrupts the line under it", "[app]
     // The zero itself: ink at its top, nothing above it.
     CHECK(inkIn(image, list, kScale, 9.6, 1.4, 10.4, 1.7));
     CHECK_FALSE(inkIn(image, list, kScale, 9.0, 0.5, 11.0, 0.9));
+}
+
+TEST_CASE("Score painter: a dark page has its paper, its ink and knockouts of its paper", "[app]") {
+    DisplayList list = blank();
+    list.lines.push_back(LineItem{.from = {0.0, 2.0}, .to = {20.0, 2.0}, .thickness = 0.13});
+    const double size = 1.6;
+    list.texts.push_back(TextItem{.text = "0",
+                                  .origin = {10.0, 2.0 + elara::notation::capHeight(size) / 2},
+                                  .size = size,
+                                  .align = TextAlign::Centre,
+                                  .knockout = true,
+                                  .role = Role::FretNumber});
+    constexpr double kScale = 20.0;
+    const ScoreColours night{.paper = QColor(0x1c, 0x1b, 0x21), .ink = QColor(0xe7, 0xe5, 0xec)};
+    const QImage image = painter().render(list, kScale, 1.0, night);
+    const auto colourAt = [&](double x, double y) {
+        return image.pixelColor(static_cast<int>(std::floor(x * kScale)),
+                                static_cast<int>(std::floor((y - list.top) * kScale)));
+    };
+
+    // The paper where nothing is drawn, the ink on the line.
+    CHECK(colourAt(1.0, 0.0) == night.paper);
+    CHECK(colourAt(3.0, 2.0) == night.ink);
+    // The zero's hole shows the paper of the knockout, not white: the line
+    // stops there and nothing lighter than the paper is left behind it.
+    CHECK(colourAt(10.0, 2.0) == night.paper);
+    // By default a page is black on white, as it is printed.
+    const QImage day = painter().render(list, kScale);
+    CHECK(day.pixelColor(20, 0) == QColor(Qt::white));
+    CHECK(inkAt(day, list, kScale, 3.0, 2.0));
 }
 
 TEST_CASE("Score painter: ties are lenses, thick in the middle", "[app]") {

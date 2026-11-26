@@ -6,8 +6,8 @@
 
 namespace elara::core {
 
-Document::Document(Song song, std::size_t undoLimit)
-    : song_(std::move(song)), undoLimit_(undoLimit) {}
+Document::Document(Song song, std::size_t undoLimit, std::size_t undoBytes)
+    : song_(std::move(song)), undoLimit_(undoLimit), undoBytes_(undoBytes) {}
 
 void Document::execute(std::unique_ptr<Command> command) {
     if (!command) {
@@ -23,12 +23,26 @@ void Document::execute(std::unique_ptr<Command> command) {
     // A saved state on the redo branch discarded here is out of reach for
     // good: no state takes its revision again.
     lastChanges_ = command->changes();
-    done_.back() = Step{.command = std::move(command), .revision = next_++};
+    const std::size_t bytes = command->heldBytes();
+    done_.back() = Step{.command = std::move(command), .revision = next_++, .bytes = bytes};
+    for (const Step& step : undone_) {
+        historyBytes_ -= step.bytes;
+    }
     undone_.clear();
-    while (done_.size() > undoLimit_) {
+    historyBytes_ += bytes;
+    // The newest step stays however much it holds: the last edit can always
+    // be undone.
+    while (done_.size() > undoLimit_ || (historyBytes_ > undoBytes_ && done_.size() > 1)) {
         base_ = done_.front().revision; // what undoing every step now returns to
+        historyBytes_ -= done_.front().bytes;
         done_.pop_front();
     }
+}
+
+void Document::remeasure(Step& step) noexcept {
+    historyBytes_ -= step.bytes;
+    step.bytes = step.command->heldBytes();
+    historyBytes_ += step.bytes;
 }
 
 std::string_view Document::undoName() const noexcept {
@@ -46,6 +60,7 @@ void Document::undo() {
     undone_.reserve(undone_.size() + 1);
     done_.back().command->revert(song_);
     lastChanges_ = done_.back().command->changes();
+    remeasure(done_.back());
     undone_.push_back(std::move(done_.back()));
     done_.pop_back();
 }
@@ -62,6 +77,7 @@ void Document::redo() {
         throw;
     }
     lastChanges_ = undone_.back().command->changes();
+    remeasure(undone_.back());
     done_.back() = std::move(undone_.back());
     undone_.pop_back();
 }
