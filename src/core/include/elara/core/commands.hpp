@@ -78,9 +78,12 @@ public:
                    std::string name = "Edit measure")
         : track_(track), staff_(staff), measure_(measure), content_(std::move(content)),
           name_(std::move(name)) {}
-    void apply(Song& song) override { swapWith(song); }
+    void apply(Song& song) override;
     void revert(Song& song) override { swapWith(song); }
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    /// Sound unchanged when the measures differ only in what does not sound:
+    /// chord symbols, beat texts and lyrics.
+    [[nodiscard]] Changes changes() const noexcept override { return changes_; }
 
 private:
     void swapWith(Song& song);
@@ -90,6 +93,7 @@ private:
     std::size_t measure_;
     Measure content_; // the new content before apply(), the old one after
     std::string name_;
+    Changes changes_;
 };
 
 /// Replaces a measure header: time signature, key signature, tempo changes.
@@ -101,11 +105,14 @@ public:
     void revert(Song& song) override;
     /// Names what changed, e.g. "Change time signature", once applied.
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    /// Sound unchanged when only the section name or the double barline did.
+    [[nodiscard]] Changes changes() const noexcept override { return changes_; }
 
 private:
     std::size_t measure_;
     MeasureHeader header_;
     std::string_view name_ = "Change measure header";
+    Changes changes_;
 };
 
 /// Replaces the title, artist and other song information.
@@ -115,6 +122,10 @@ public:
     void apply(Song& song) override { std::swap(song.info(), info_); }
     void revert(Song& song) override { std::swap(song.info(), info_); }
     [[nodiscard]] std::string_view name() const noexcept override { return "Edit song info"; }
+    /// The credits are drawn; none of it sounds.
+    [[nodiscard]] Changes changes() const noexcept override {
+        return {.notation = true, .sound = false};
+    }
 
 private:
     SongInfo info_;
@@ -141,6 +152,10 @@ public:
     void apply(Song& song) override { swapWith(song); }
     void revert(Song& song) override { swapWith(song); }
     [[nodiscard]] std::string_view name() const noexcept override { return "Change mix"; }
+    /// The mix is neither drawn nor part of the sequence: the player applies it.
+    [[nodiscard]] Changes changes() const noexcept override {
+        return {.notation = false, .sound = false};
+    }
 
 private:
     void swapWith(Song& song);
@@ -177,6 +192,8 @@ public:
     void apply(Song& song) override;
     void revert(Song& song) override;
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    /// What any of its commands changes.
+    [[nodiscard]] Changes changes() const noexcept override;
 
 private:
     std::string name_;

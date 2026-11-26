@@ -88,6 +88,31 @@ void RemoveTrack::revert(Song& song) {
 
 // ---- Content -----------------------------------------------------------------
 
+namespace {
+
+// Whether `a` and `b` play the same: they differ at most in what does not
+// sound, chord symbols, beat texts and lyrics (measure.hpp).
+bool soundTheSame(Measure a, Measure b) {
+    for (Measure* measure : {&a, &b}) {
+        for (Voice& voice : measure->voices) {
+            for (Beat& beat : voice.beats) {
+                beat.chord.reset();
+                beat.text.reset();
+                beat.lyrics.reset();
+            }
+        }
+    }
+    return a == b;
+}
+
+} // namespace
+
+void ReplaceMeasure::apply(Song& song) {
+    const Measure& target = song.track(track_).staff(staff_).measure(measure_); // throws first
+    changes_ = {.notation = true, .sound = !soundTheSame(target, content_)};
+    swapWith(song);
+}
+
 void ReplaceMeasure::swapWith(Song& song) {
     Measure& target = song.track(track_).staff(staff_).measure(measure_); // throws first
     std::swap(target, content_);
@@ -135,6 +160,12 @@ void SetMeasureHeader::apply(Song& song) {
     } else if (!marked && tempo && !time && !key) {
         name_ = "Change tempo";
     }
+    // The same with the new section name and double barline, which do not
+    // sound.
+    MeasureHeader silent = target;
+    silent.section = header_.section;
+    silent.doubleBar = header_.doubleBar;
+    changes_ = {.notation = true, .sound = silent != header_};
     std::swap(target, header_);
 }
 
@@ -173,6 +204,14 @@ CommandGroup::CommandGroup(std::string name, std::vector<std::unique_ptr<Command
             throw std::invalid_argument("CommandGroup: null command");
         }
     }
+}
+
+Changes CommandGroup::changes() const noexcept {
+    Changes changes{.notation = false, .sound = false};
+    for (const auto& command : commands_) {
+        changes = changes | command->changes();
+    }
+    return changes;
 }
 
 void CommandGroup::apply(Song& song) {
