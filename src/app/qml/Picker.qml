@@ -10,6 +10,13 @@ ComboBox {
 
     /// A click never takes the keyboard from the score when off.
     property bool takesFocus: true
+    /// A colour for each choice, drawn as a dot before it; none by default,
+    /// and none for a choice whose colour is transparent.
+    property var swatches: []
+
+    function swatch(index: int): color {
+        return index >= 0 && index < swatches.length ? swatches[index] : "transparent";
+    }
 
     implicitWidth: 160
     implicitHeight: Theme.control
@@ -32,13 +39,34 @@ ComboBox {
         border.color: root.visualFocus ? Theme.accentInk : Theme.line
     }
 
-    contentItem: Label {
-        text: root.displayText
-        font: root.font
-        color: Theme.ink
+    contentItem: Item {
+        implicitWidth: chosenDot.width + chosenText.implicitWidth
         opacity: root.enabled ? 1.0 : 0.38
-        elide: Text.ElideRight
-        verticalAlignment: Text.AlignVCenter
+
+        Rectangle {
+            id: chosenDot
+
+            readonly property bool shown: root.swatch(root.currentIndex).a > 0
+
+            anchors.verticalCenter: parent.verticalCenter
+            visible: shown
+            width: shown ? 8 : 0
+            height: 8
+            radius: 4
+            color: root.swatch(root.currentIndex)
+        }
+        Label {
+            id: chosenText
+
+            x: chosenDot.shown ? 14 : 0
+            width: parent.width - x
+            height: parent.height
+            text: root.displayText
+            font: root.font
+            color: Theme.ink
+            elide: Text.ElideRight
+            verticalAlignment: Text.AlignVCenter
+        }
     }
 
     indicator: Icon {
@@ -64,12 +92,29 @@ ComboBox {
         bottomPadding: 0
         highlighted: root.highlightedIndex === index
 
-        contentItem: Label {
-            text: root.textAt(option.index)
-            font.pixelSize: Theme.fontBody
-            color: Theme.ink
-            elide: Text.ElideRight
-            verticalAlignment: Text.AlignVCenter
+        contentItem: Item {
+            implicitWidth: optionText.implicitWidth + (root.swatches.length > 0 ? 14 : 0)
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: root.swatch(option.index).a > 0
+                width: 8
+                height: 8
+                radius: 4
+                color: root.swatch(option.index)
+            }
+            Label {
+                id: optionText
+
+                x: root.swatches.length > 0 ? 14 : 0
+                width: parent.width - x
+                height: parent.height
+                text: root.textAt(option.index)
+                font.pixelSize: Theme.fontBody
+                color: Theme.ink
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
+            }
         }
 
         background: Rectangle {
@@ -121,7 +166,7 @@ ComboBox {
             currentIndex: root.highlightedIndex
             boundsBehavior: Flickable.StopAtBounds
 
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: Scroll {}
         }
 
         background: Rectangle {

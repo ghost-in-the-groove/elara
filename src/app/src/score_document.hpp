@@ -70,6 +70,10 @@ class ScoreDocument : public QObject {
     /// Where each named section first plays (ADR-0062), in song order: maps
     /// with "name" and "seconds". A section that never plays is left out.
     Q_PROPERTY(QVariantList sectionMarks READ sectionMarks NOTIFY sequenceChanged)
+    /// When each measure played starts, in seconds, in the order played. It
+    /// changes when the measures played or their times do, not with every
+    /// edit of the notes.
+    Q_PROPERTY(QVariantList measureStarts READ measureStarts NOTIFY measureStartsChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
@@ -287,7 +291,12 @@ public:
     /// The measure playing `seconds` into the song, from 0; negative before a
     /// song is sequenced and past its end.
     Q_INVOKABLE int measureAt(double seconds) const;
+    /// When measure `measure`, from 0, starts the first time it plays, in
+    /// seconds; negative before a song is sequenced and for a measure that
+    /// never plays.
+    Q_INVOKABLE double measureStart(int measure) const;
     [[nodiscard]] QVariantList sectionMarks() const;
+    [[nodiscard]] QVariantList measureStarts() const { return measureStarts_; }
 
     /// The song and the sequence it plays as; null before a song is open.
     /// After an edit the sequence follows when the edit's layout is done: it
@@ -766,6 +775,7 @@ signals:
     /// The sequence playback plays changed: a song was opened, or an edit
     /// sounds different and its layout is done.
     void sequenceChanged();
+    void measureStartsChanged();
     void trackChanged();
     void viewChanged();
     void continuousChanged();
@@ -849,6 +859,8 @@ private:
     std::shared_ptr<const core::Song> song_;          ///< what the pages show
     std::shared_ptr<const audio::Sequence> sequence_; ///< song_ as playback plays it
     std::shared_ptr<const core::Song> sequenceSong_;  ///< the song sequence_ was built from
+    std::vector<audio::PlayedMeasure> played_;        ///< the measures of sequence_
+    QVariantList measureStarts_;                      ///< when each of played_ starts
     std::shared_ptr<const core::Song> sequencing_;    ///< the song a sequence is being built for
     audio::SequenceOptions practice_;                 ///< speed() and metronome()
     std::vector<core::TrackMix> previewMixes_;        // previewTrackMix()

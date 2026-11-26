@@ -313,6 +313,10 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       beside it
 - [x] The page in the dark theme: dark paper and light ink, black on white
       when it leaves the program (ADR-0114)
+- [x] After a review of the whole window: one look for whatever is chosen, the
+      paper the brightest surface, the palette's signs from the music font, the
+      tuner docked beside the score, measure ticks on the song string, one side
+      panel at a time in a narrow window
 - [ ] The window remembers its size, its panels, its zoom and the dark page
       from one run to the next
 - [ ] A command palette: every command by name, with its keys

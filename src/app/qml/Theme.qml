@@ -25,10 +25,11 @@ QtObject {
     readonly property color desk: dark ? "#111015" : "#e5e2dc"
     /// The tool row, the panels and the status bar.
     readonly property color bar: dark ? "#1b1a20" : "#f5f3ef"
-    /// Fields, cards and whatever floats over the score.
-    readonly property color surface: dark ? "#25242b" : "#ffffff"
+    /// Fields, cards and whatever floats over the score: a step under the
+    /// paper, which stays the brightest surface in both themes.
+    readonly property color surface: dark ? "#222127" : "#fbfaf7"
     /// The page of the score in the dark theme, and the ink on it (ADR-0114).
-    readonly property color nightPage: "#1c1b21"
+    readonly property color nightPage: "#27262e"
     readonly property color nightInk: "#e7e5ec"
     /// Hairlines between and around surfaces.
     readonly property color line: dark ? "#35333d" : "#d8d4cc"
@@ -57,16 +58,17 @@ QtObject {
     readonly property color dangerInk: dark ? "#ffb4b4" : "#a12622"
     readonly property color dangerSurface: dark ? "#3a2328" : "#fdecee"
     readonly property color success: dark ? "#5fd38d" : "#1e9e57"
-    readonly property color warning: dark ? "#ffb454" : "#b86a14"
+    readonly property color warning: dark ? "#ffb454" : "#925408"
     readonly property color solo: "#f5a524"
 
     /// The shadow under what floats.
     readonly property color shadow: Qt.rgba(0, 0, 0, dark ? 0.5 : 0.18)
 
-    /// A hue for each track, the same wherever the track shows.
+    /// A hue for each track, the same wherever the track shows. None is the
+    /// accent's violet, which says chosen or playing.
     readonly property list<color> trackHues: dark
-        ? ["#a99bff", "#5fc9c0", "#f0a35e", "#e98bb0", "#8fc56a", "#6fb1ee", "#e0c35a", "#c79be8"]
-        : ["#6c4cf5", "#178f86", "#c26a1a", "#c2457d", "#4f8a26", "#2374c4", "#9a7b10", "#8a4fc0"]
+        ? ["#5fc9c0", "#f0a35e", "#e98bb0", "#8fc56a", "#6fb1ee", "#e0c35a", "#e58f7f", "#a9b6c8"]
+        : ["#178f86", "#c26a1a", "#c2457d", "#4f8a26", "#2374c4", "#9a7b10", "#b0483a", "#5f6f86"]
 
     function trackHue(index: int): color {
         return trackHues[((index % trackHues.length) + trackHues.length) % trackHues.length];

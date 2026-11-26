@@ -134,7 +134,9 @@ Sheet {
                     readonly property bool added: index === root.verseCount
 
                     implicitWidth: Math.max(28, implicitContentWidth + 18)
-                    text: added ? "+" : String(index + 1)
+                    // The verse being added wears its number once it is the
+                    // one written in.
+                    text: added && !on ? "+" : String(index + 1)
                     on: index === root.verse
                     tip: added ? qsTr("New verse") : ""
                     onClicked: root.pickVerse(index)
@@ -157,7 +159,7 @@ Sheet {
             boundsBehavior: Flickable.StopAtBounds
             clip: true
 
-            ScrollIndicator.vertical: ScrollIndicator {}
+            ScrollBar.vertical: Scroll {}
 
             // Keeps the line being typed in sight.
             function follow(caret: rect) {

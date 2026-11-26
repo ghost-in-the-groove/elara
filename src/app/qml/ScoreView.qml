@@ -91,6 +91,9 @@ Item {
     /// Whether the view is still moving by itself: scrolling after the caret
     /// or the playback cursor, or zooming to fit.
     readonly property bool settling: scrollY.running || scrollX.running || followY.running
+    /// Whether one of the sheets at the caret is open.
+    readonly property bool sheetOpen: measurePopup.visible || chordPopup.visible || textPopup.visible
+                                      || lyricsPopup.visible
                                      || followX.running || refit.running || shownZoom !== zoom
     /// What the zoom follows as the room for the pages changes: the paper's
     /// size ("paper", as a song opens), the page's width ("width"), or nothing

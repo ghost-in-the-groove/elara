@@ -30,9 +30,9 @@ a long stretch. So:
 | note values . 3 V1 | rest delete effects chord text lyrics measure       |
 |                                                    [track] [Not|Tab|Both]|  tool row
 +-----------+----------------------------------------------+---------------+
-| note      |                                              |               |
-| effects,  |                  the page                    | song and      |
-| in groups |                on the desk                   | tracks        |
+| note      |                                              | song and      |
+| effects,  |                  the page                    | tracks,       |
+| in groups |                on the desk                   | or the tuner  |
 |           |                                              |               |
 +-----------+----------------------------------------------+---------------+
 | Measure 12 . Beat 2 . String 3   Page 1 of 4 . 64 measures    view  zoom |  status bar
@@ -41,18 +41,26 @@ a long stretch. So:
 
 | Part | File | What it holds |
 |---|---|---|
-| Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, the panels and the tuner. Dark in both themes. |
-| Song string | `SongString.qml` | The lower edge of the command bar: the song as one line, lit as far as it has played, the measure playing riding it, the A-B loop as a band, the sections as inlays. Click or drag to move playback. |
+| Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, and the buttons of the palette, the song panel and the tuner, each lit while its panel shows. Dark in both themes. |
+| Song string | `SongString.qml` | The lower edge of the command bar: the song as one line with a tick where measures start, lit as far as it has played, the measure at the position riding it (outlined at the start, filled once playback has moved), a taller tick at the caret's measure, the A-B loop as a band, the sections as inlays. Click or drag to move playback. |
 | Tool row | in `Main.qml`, `EntryBar.qml` | What typing uses at the left; the track and the staff view at the right. |
 | Note effects | `EffectsPalette.qml` | Every technique, articulation, dynamic and line the caret's note or beat can take, in named groups that fold (F2, ADR-0109). A tile is lit while the caret has what it sets. |
 | Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the popups the caret opens. |
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
+| Tuner | `TunerPane.qml` | The note heard, how far it is from in tune and the strings of the shown track (Ctrl+Shift+T). It docks where the song panel does, one of the two at a time, and listens only while it shows. |
 | Status bar | `StatusBar.qml` | Where the caret is, the page and the measures; the layout and the zoom. |
 
 Narrow windows drop what is offered elsewhere, never overlap: the command bar
-gives up the file tools, then the tempo, the time and the measure readings; the
-tool row gives up the view switch. The page keeps fitting the room between the
-panels until its zoom is chosen by hand.
+gives up the file tools, then the tempo and the time readings, then the
+metronome and the count-in, which the Sound menu has, and the measure reading
+last; the tool row gives up the view switch. Under 1040 px the score keeps a
+panel at one side only: opening the palette closes the panel at the right, and
+opening that one closes the palette. The page keeps fitting the room between
+the panels until its zoom is chosen by hand.
+
+Nothing floats over the music but what the caret opened. A panel docks and the
+score makes room; an error slides up over the foot of the score and goes; what
+an import changed stays in the status bar for as long as the song is open.
 
 ## Colours
 
@@ -64,18 +72,20 @@ All in `Theme.qml`; a QML file never writes a colour of its own.
 | `desk` | What the pages lie on. |
 | `nightPage`, `nightInk` | The page of the score in the dark theme and the ink on it (ADR-0114). In the light theme, and whenever the score leaves the program, it is black on white. |
 | `bar` | The tool row, the panels and the status bar. |
-| `surface` | Fields, cards and what floats. |
+| `surface` | Fields, cards and what floats: a step under the paper, which is the brightest surface of the window in both themes. |
 | `line` | Hairlines between and around surfaces. |
 | `ink`, `inkSoft`, `faint` | Text and icons; text that explains or counts; ticks and outlines that only hint. |
 | `hover`, `pressed` | A control under the pointer, and pressed. |
 | `accent`, `accentInk`, `accentWash`, `accentText` | The accent as a fill, as text or an icon, as a wash behind what is chosen, and what is written on the fill. |
 | `danger…`, `success`, `warning`, `solo` | States, each only where it means that. |
-| `trackHue(index)` | A hue per track, the same wherever the track shows. |
+| `trackHue(index)` | A hue per track, the same wherever the track shows: its card and its faders in the song panel, the dot before its name in the track picker. None of them is the accent's violet. |
 
 The accent says one of three things: this plays, this is chosen, or this is
-the main action. It never decorates. Secondary text uses `inkSoft`, not a
-lowered opacity; disabled controls drop to 38 %, never further, so that they
-stay readable.
+the main action. It never decorates. Only Play and the main button of a dialog
+are filled with it; whatever is chosen (a tile, a note value, a choice of a
+switch, a chip) wears `accentWash` with `accentInk` on it and a hairline of
+the same. Secondary text uses `inkSoft`, not a lowered opacity; disabled
+controls drop to 38 %, never further, so that they stay readable.
 
 ## Sizes and timings
 
@@ -96,18 +106,19 @@ change never moves what is beside them.
 
 | Part | Use it for |
 |---|---|
-| `Icon` with a path from `Icons` | Every icon: one family of line drawings on a 24 grid, round ends, one width. Add a new one to `Icons.qml`; never write a path where it is used. Signs of notation (note values, dynamics) are glyphs of the music font through `MusicSymbol`. |
+| `Icon` with a path from `Icons` | Every icon: one family of line drawings on a 24 grid, round ends, one width. Add a new one to `Icons.qml`; never write a path where it is used. A sign the page prints from the music font (note values, dynamics, articulations, ornaments, fermatas, the pedal, the ottavas, the pick strokes) is that glyph, through `MusicSymbol`, so that a tool looks like what it writes. |
 | `IconButton` | A tool with an icon and a tooltip. `nightBar` on the command bar; `takesFocus: false` for tools of the score. |
 | `SegmentedControl` | A few choices of which one is always chosen. |
-| `Picker` | One choice from a list. |
+| `Picker` | One choice from a list; `swatches` puts a dot of colour before each. |
 | `Field`, `Stepper`, `Fader` | A line of text, a number, a slider (`centred` for a pan, `tint` for a track's hue). |
 | `Chip` | A mark that is on or off, or one of a few words to pick. |
 | `TextButton` | A button with words: `kind: "main"` once per dialog or pane, `"danger"` for what takes something away. |
 | `Sheet`, `AppDialog` | What floats over the score for the caret; a dialog that asks or tells. |
 | `AppMenuBar`, `AppMenu`, `AppMenuItem`, `AppMenuSeparator` | Menus. `keys: KeyNames.native("Ctrl+S")` writes the keys the platform's way; `chosen` marks the current choice or a switch that is on. |
 | `Readout` | A reading on the command bar. |
-| Tiles of `EffectsPalette` (`IconTile`, `LabelTile`, `SymbolTile`) | A sign the caret's note or beat can take: drawn as the score draws it, lit while the caret has it, with its key in the corner when it has one. |
+| Tiles of `EffectsPalette` (`IconTile`, `LabelTile`, `SymbolTile`) | A sign the caret's note or beat can take: drawn as the score draws it, lit while the caret has it, with its key in the corner when the key is a letter (the tooltip names every key). |
 | `Elevation` | The shadow under what floats. |
+| `Scroll` | The scroll bar of a list or a panel that can be cut by its edge: it shows whenever there is more. |
 
 The controls that hold a value are built on Qt Quick's templates
 (`QtQuick.Templates`), not restyled from the Material style: that keeps them
@@ -122,7 +133,9 @@ Rules that keep the parts one family:
 - A tool of the score never takes the keyboard from it (`focusPolicy: Qt.NoFocus`);
   the focus ring shows only for the keyboard.
 - A state under the pointer changes at once or within `quick`; nothing moves
-  while the window is at rest, and no animation runs for longer than `calm`.
+  while the window is at rest, and no animation of a control or a panel runs
+  for longer than `calm`. The score's own scrolling, to the caret and after
+  the playback cursor, has its timings in `ScoreView.qml`.
 - A new command goes into a menu first, then, if it is used all the time,
   onto a bar.
 - A field has its name before it, not inside it: a placeholder only shows an

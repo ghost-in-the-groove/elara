@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// A mark that is on or off, or one of a few words to pick: filled with the
+// A mark that is on or off, or one of a few words to pick: washed with the
 // accent while it is on.
 import QtQuick
 import QtQuick.Controls
@@ -27,13 +27,14 @@ AbstractButton {
         font.pixelSize: Theme.fontBody
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
-        color: root.on ? Theme.accentText : Theme.ink
+        color: root.on ? Theme.accentInk : Theme.ink
     }
 
     background: Rectangle {
         radius: Theme.radiusSmall
-        color: root.on ? Theme.accent : root.pressed ? Theme.pressed : root.hovered ? Theme.hover : "transparent"
-        border.color: root.on ? Theme.accent : Theme.line
+        color: root.pressed ? Theme.pressed : root.on ? Theme.accentWash
+                                                      : root.hovered ? Theme.hover : "transparent"
+        border.color: root.on ? Qt.alpha(Theme.accentInk, 0.5) : Theme.line
     }
 
     ToolTip.visible: hovered && tip.length > 0

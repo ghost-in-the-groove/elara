@@ -22,7 +22,7 @@ Rectangle {
     implicitHeight: Theme.control
     radius: Theme.radiusSmall
     color: Theme.hover
-    opacity: enabled ? 1.0 : 0.45
+    opacity: enabled ? 1.0 : 0.38
 
     Rectangle {
         id: highlight
@@ -36,7 +36,8 @@ Rectangle {
         width: target ? target.width : 0
         height: root.height - 4
         radius: Theme.radiusSmall - 2
-        color: Theme.accent
+        color: Theme.accentWash
+        border.color: Qt.alpha(Theme.accentInk, 0.4)
 
         Behavior on x {
             NumberAnimation {
@@ -91,7 +92,7 @@ Rectangle {
                     anchors.centerIn: parent
                     text: choice.modelData
                     font.pixelSize: Theme.fontBody
-                    color: choice.current ? Theme.accentText : Theme.ink
+                    color: choice.current ? Theme.accentInk : Theme.ink
                     opacity: choice.choosable ? 1.0 : 0.38
 
                     Behavior on color {

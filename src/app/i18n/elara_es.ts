@@ -1474,8 +1474,12 @@
         <translation>Afinador</translation>
     </message>
     <message>
-        <source>Close (Esc)</source>
-        <translation>Cerrar (Esc)</translation>
+        <source>Listening</source>
+        <translation>Escuchando</translation>
+    </message>
+    <message>
+        <source>Close (Ctrl+Shift+T)</source>
+        <translation>Cerrar (Ctrl+Mayús+T)</translation>
     </message>
     <message>
         <source>Play a note</source>
@@ -1520,6 +1524,10 @@
     <message>
         <source>Reference pitch of A4</source>
         <translation>Frecuencia de referencia del La4</translation>
+    </message>
+    <message>
+        <source>Input</source>
+        <translation>Entrada</translation>
     </message>
 </context>
 <context>
@@ -1576,8 +1584,8 @@
 <context>
     <name>WelcomePane</name>
     <message>
-        <source>Tablature, score and music studio</source>
-        <translation>Tablaturas, partituras y estudio musical</translation>
+        <source>Tablature and score editor</source>
+        <translation>Editor de tablaturas y partituras</translation>
     </message>
     <message>
         <source>Open a score…</source>
@@ -2083,13 +2091,6 @@
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
     </message>
-    <message numerus="yes">
-        <source>Opened %1. %n thing(s) changed or left out.</source>
-        <translation>
-            <numerusform>Abierto %1. Se cambió o se dejó fuera %n cosa.</numerusform>
-            <numerusform>Abierto %1. Se cambiaron o se dejaron fuera %n cosas.</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Unknown instrument: %1</source>
         <translation>Instrumento desconocido: %1</translation>
@@ -2509,8 +2510,8 @@
 <context>
     <name>main</name>
     <message>
-        <source>Tablature, score and music studio</source>
-        <translation>Tablaturas, partituras y estudio musical</translation>
+        <source>Tablature and score editor</source>
+        <translation>Editor de tablaturas y partituras</translation>
     </message>
     <message>
         <source>A score to open.</source>
