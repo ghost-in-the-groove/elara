@@ -2,8 +2,11 @@
 #include <elara/core/measure.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace elara::core {
 
@@ -38,6 +41,61 @@ Fraction Voice::startOf(std::size_t index) const {
         start += beats[i].duration.length();
     }
     return start;
+}
+
+namespace {
+
+template <class T>
+std::size_t heapBytes(const std::vector<T>& values) noexcept {
+    return values.capacity() * sizeof(T);
+}
+
+// A string short enough to live in the object holds nothing more: an empty
+// string's capacity is that room on every standard library.
+std::size_t heapBytes(const std::string& text) noexcept {
+    return text.capacity() > std::string().capacity() ? text.capacity() + 1 : 0;
+}
+
+// A shared value's object and its control block (two counts and two pointers).
+template <class T>
+std::size_t sharedBytes() noexcept {
+    return sizeof(T) + (2 * sizeof(long)) + (2 * sizeof(void*));
+}
+
+std::size_t heapBytes(const Beat& beat) noexcept {
+    std::size_t bytes = heapBytes(beat.notes) + heapBytes(beat.graces);
+    for (const Grace& grace : beat.graces) {
+        bytes += heapBytes(grace.notes);
+    }
+    if (beat.chord) {
+        bytes += sharedBytes<ChordSymbol>() + heapBytes(beat.chord->name);
+        if (beat.chord->diagram) {
+            bytes += heapBytes(beat.chord->diagram->frets);
+        }
+    }
+    if (beat.text) {
+        bytes += sharedBytes<std::string>() + heapBytes(*beat.text);
+    }
+    if (beat.lyrics) {
+        bytes += sharedBytes<std::vector<Syllable>>() + heapBytes(*beat.lyrics);
+        for (const Syllable& syllable : *beat.lyrics) {
+            bytes += heapBytes(syllable.text);
+        }
+    }
+    return bytes;
+}
+
+} // namespace
+
+std::size_t approximateBytes(const Measure& measure) noexcept {
+    std::size_t bytes = sizeof(Measure);
+    for (const Voice& voice : measure.voices) {
+        bytes += heapBytes(voice.beats);
+        for (const Beat& beat : voice.beats) {
+            bytes += heapBytes(beat);
+        }
+    }
+    return bytes;
 }
 
 bool Measure::isEmpty() const noexcept {

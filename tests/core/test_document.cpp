@@ -153,6 +153,79 @@ TEST_CASE("Undo gives back the very measures a copy of the song shares", "[core]
     CHECK(doc.song() == snapshot);
 }
 
+TEST_CASE("The history lets its oldest steps go once they hold more than its bytes",
+          "[core][document]") {
+    // Each removal of an empty measure keeps the same few bytes.
+    Document probe(smallSong());
+    probe.execute(std::make_unique<InsertMeasures>(0, 30));
+    CHECK(probe.historyBytes() == 0); // an insertion holds no measures
+    probe.execute(std::make_unique<RemoveMeasures>(0, 1));
+    const std::size_t step = probe.historyBytes();
+    REQUIRE(step > 0);
+
+    const std::size_t budget = (2 * step) + (step / 2);
+    Document doc(smallSong(), Document::kDefaultUndoLimit, budget);
+    CHECK(doc.undoBytes() == budget);
+    doc.execute(std::make_unique<InsertMeasures>(0, 30));
+    const Song before = doc.song();
+    for (int i = 0; i < 6; ++i) {
+        doc.execute(std::make_unique<RemoveMeasures>(0, 1));
+    }
+    CHECK(doc.undoCount() == 2); // two steps fit, the third would not
+    CHECK(doc.historyBytes() == 2 * step);
+    doc.undo();
+    doc.undo();
+    CHECK_FALSE(doc.canUndo());
+    CHECK(doc.song().measureCount() == before.measureCount() - 4);
+    CHECK(doc.historyBytes() == 0); // undone removals hold nothing
+}
+
+TEST_CASE("The newest step is kept however much it holds", "[core][document]") {
+    Document doc(smallSong(), Document::kDefaultUndoLimit, 1);
+    const Song before = doc.song();
+    doc.execute(std::make_unique<RemoveTrack>(0));
+    doc.execute(std::make_unique<RemoveMeasures>(0, 1));
+    CHECK(doc.undoCount() == 1);
+    CHECK(doc.historyBytes() > 1);
+    doc.undo();
+    CHECK_FALSE(doc.canUndo());
+    CHECK(doc.song().measureCount() == before.measureCount());
+}
+
+TEST_CASE("Undo and redo carry a step's bytes along, and an edit drops the redo steps' bytes",
+          "[core][document]") {
+    Document doc(smallSong());
+    const std::size_t track = elara::core::approximateBytes(doc.song().track(0));
+    doc.execute(std::make_unique<RemoveTrack>(0)); // holds the track
+    CHECK(doc.historyBytes() == track);
+    doc.undo(); // the song holds it again
+    CHECK(doc.historyBytes() == 0);
+    doc.redo();
+    CHECK(doc.historyBytes() == track);
+
+    doc.execute(std::make_unique<InsertTrack>(0, guitar()));
+    CHECK(doc.historyBytes() == track); // the song holds the new track
+    const std::size_t added = elara::core::approximateBytes(doc.song().track(0));
+    doc.undo(); // the step keeps it to redo
+    CHECK(doc.historyBytes() == track + added);
+    doc.execute(std::make_unique<SetStartTempo>(Tempo(90.0)));
+    CHECK(doc.historyBytes() == track);
+}
+
+TEST_CASE("A measure's approximate bytes grow with what it holds", "[core][document]") {
+    const Song song = smallSong();
+    const Measure empty;
+    const Measure note = wholeNote(song, 0, 5);
+    CHECK(elara::core::approximateBytes(empty) == sizeof(Measure));
+    CHECK(elara::core::approximateBytes(note) > elara::core::approximateBytes(empty));
+    Measure more = note;
+    Beat lyric = more.voices[0].beats[0];
+    more.voices[0].beats.push_back(lyric);
+    CHECK(elara::core::approximateBytes(more) > elara::core::approximateBytes(note));
+    CHECK(elara::core::approximateBytes(song.track(0)) >
+          song.measureCount() * elara::core::approximateBytes(empty));
+}
+
 TEST_CASE("Content, header, info and tempo edits are undoable", "[core][document]") {
     const Song original = smallSong();
     Document doc(original);

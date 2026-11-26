@@ -230,6 +230,36 @@ CommandGroup::CommandGroup(std::string name, std::vector<std::unique_ptr<Command
     }
 }
 
+// ---- What the history holds (ADR-0121) -------------------------------------------
+
+std::size_t RemoveMeasures::heldBytes() const noexcept {
+    std::size_t bytes = headers_.size() * sizeof(MeasureHeader);
+    for (const SharedValue<Measure>& measure : measures_) {
+        bytes += approximateBytes(measure.get());
+    }
+    return bytes;
+}
+
+std::size_t InsertTrack::heldBytes() const noexcept {
+    return track_ ? approximateBytes(*track_) : 0;
+}
+
+std::size_t RemoveTrack::heldBytes() const noexcept {
+    return track_ ? approximateBytes(*track_) : 0;
+}
+
+std::size_t ReplaceMeasure::heldBytes() const noexcept {
+    return approximateBytes(content_.get());
+}
+
+std::size_t CommandGroup::heldBytes() const noexcept {
+    std::size_t bytes = 0;
+    for (const auto& command : commands_) {
+        bytes += command->heldBytes();
+    }
+    return bytes;
+}
+
 Changes CommandGroup::changes() const noexcept {
     Changes changes{.notation = false, .sound = false};
     for (const auto& command : commands_) {
