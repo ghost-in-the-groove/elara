@@ -51,6 +51,14 @@ public:
     [[nodiscard]] Measure& measure(std::size_t index);
     [[nodiscard]] const Measure& measure(std::size_t index) const;
 
+    /// The measure as the staff's copies share it (ADR-0051), so that a
+    /// command keeps it or puts it back without copying it. Throws
+    /// std::out_of_range for a missing measure.
+    [[nodiscard]] const SharedValue<Measure>& sharedMeasure(std::size_t index) const;
+    /// Exchanges measure `index` and `other`, each shared as it was: nothing
+    /// is copied. Throws std::out_of_range for a missing measure.
+    void swapMeasure(std::size_t index, SharedValue<Measure>& other);
+
     /// The note played at `fret` on `string` (frets relative to the capo), spelled
     /// with `preference`. Throws std::logic_error on a staff without a tuning and
     /// std::out_of_range for a position off the neck.

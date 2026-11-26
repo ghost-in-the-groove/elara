@@ -34,11 +34,13 @@ void RemoveMeasures::apply(Song& song) {
     for (std::size_t m = at_; m < at_ + count_; ++m) {
         headers_.push_back(std::move(song.measureHeader(m)));
     }
+    // The measures are kept as the song shares them: no copy, even while a
+    // copy of the song holds them too.
     for (std::size_t t = 0; t < song.trackCount(); ++t) {
-        Track& track = song.track(t);
+        const Track& track = std::as_const(song).track(t);
         for (std::size_t s = 0; s < track.staffCount(); ++s) {
             for (std::size_t m = at_; m < at_ + count_; ++m) {
-                measures_.push_back(std::move(track.staff(s).measure(m)));
+                measures_.push_back(track.staff(s).sharedMeasure(m));
             }
         }
     }
@@ -55,7 +57,7 @@ void RemoveMeasures::revert(Song& song) {
         Track& track = song.track(t);
         for (std::size_t s = 0; s < track.staffCount(); ++s) {
             for (std::size_t m = at_; m < at_ + count_; ++m) {
-                track.staff(s).measure(m) = std::move(*next++);
+                track.staff(s).swapMeasure(m, *next++);
             }
         }
     }
@@ -90,32 +92,54 @@ void RemoveTrack::revert(Song& song) {
 
 namespace {
 
-// Whether `a` and `b` play the same: they differ at most in what does not
-// sound, chord symbols, beat texts and lyrics (measure.hpp).
-bool soundTheSame(Measure a, Measure b) {
-    for (Measure* measure : {&a, &b}) {
-        for (Voice& voice : measure->voices) {
-            for (Beat& beat : voice.beats) {
-                beat.chord.reset();
-                beat.text.reset();
-                beat.lyrics.reset();
+// Whether beats `a` and `b` play the same: they differ at most in what does
+// not sound, chord symbols, beat texts and lyrics (measure.hpp).
+bool soundTheSame(const Beat& a, const Beat& b) {
+    if (a == b) {
+        return true;
+    }
+    Beat x = a;
+    Beat y = b;
+    for (Beat* beat : {&x, &y}) {
+        beat->chord.reset();
+        beat->text.reset();
+        beat->lyrics.reset();
+    }
+    return x == y;
+}
+
+// Whether measures `a` and `b` play the same. Only beats that differ are
+// copied, to be compared without what does not sound.
+bool soundTheSame(const Measure& a, const Measure& b) {
+    if (a.clef != b.clef || a.repeat != b.repeat) {
+        return false;
+    }
+    for (std::size_t v = 0; v < Measure::kMaxVoices; ++v) {
+        const std::vector<Beat>& x = a.voices[v].beats;
+        const std::vector<Beat>& y = b.voices[v].beats;
+        if (x.size() != y.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < x.size(); ++i) {
+            if (!soundTheSame(x[i], y[i])) {
+                return false;
             }
         }
     }
-    return a == b;
+    return true;
 }
 
 } // namespace
 
 void ReplaceMeasure::apply(Song& song) {
-    const Measure& target = song.track(track_).staff(staff_).measure(measure_); // throws first
-    changes_ = {.notation = true, .sound = !soundTheSame(target, content_)};
+    const Measure& target =
+        std::as_const(song).track(track_).staff(staff_).measure(measure_); // throws first
+    changes_ = {.notation = true, .sound = !soundTheSame(target, content_.get())};
     swapWith(song);
 }
 
 void ReplaceMeasure::swapWith(Song& song) {
-    Measure& target = song.track(track_).staff(staff_).measure(measure_); // throws first
-    std::swap(target, content_);
+    song.track(track_).staff(staff_).swapMeasure(measure_, content_); // throws first
 }
 
 void SetMeasureHeader::apply(Song& song) {
