@@ -119,7 +119,7 @@ if(TARGET elara)
     Qt6::Concurrent Catch2::Catch2)
   # The document and the transport, compiled again for the tests: their QML
   # types belong to the app's QML module, which a test cannot link. The
-  # transport plays through a device of the tests' own (ADR-0122).
+  # transport plays through a device of the tests' own (ADR-0126).
   target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/audio_controller.cpp")
