@@ -19,9 +19,11 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QImage>
+#include <QList>
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QRectF>
 #include <QSize>
 #include <QStringList>
 #include <QTemporaryDir>
@@ -91,6 +93,11 @@ Startup::Startup(QQuickWindow* window, StartupOptions options, const bool& qmlWa
 }
 
 void Startup::start() {
+    // Resized once it is on its screen: a size given as the window is created
+    // is multiplied when it opens on a screen of another scale.
+    if (options_.size && window_ != nullptr) {
+        window_->resize(*options_.size);
+    }
     score_ = window_ != nullptr ? window_->findChild<ScoreDocument*>() : nullptr;
     if (score_ != nullptr) {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
@@ -1173,7 +1180,13 @@ void Startup::queueSection() {
               "the section is not one undo step");
         return true;
     });
-    steps_.emplace_back([this] {
+    steps_.emplace_back([this, check] {
+        // The song string marks it where it first plays: at the start.
+        const QVariantList marks = score_->sectionMarks();
+        const QVariantMap first = marks.isEmpty() ? QVariantMap{} : marks.front().toMap();
+        check(first.value(QStringLiteral("name")).toString() == score_->sectionAt(0) &&
+                  first.value(QStringLiteral("seconds"), -1.0).toDouble() == 0.0,
+              "the song string does not mark where the section starts");
         score_->undo();
         return true;
     });
@@ -1872,6 +1885,17 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("a click on the cursor moved playback to %1 s, not %2 s")
                        .arg(audio->position())
                        .arg(expected);
+        return;
+    }
+    // The transport reads the measure playing there, from 1, and the song
+    // string carries it.
+    const QString playing = QString::number(score_->measureAt(audio->position()) + 1);
+    const auto* readout = window_->findChild<QQuickItem*>(QStringLiteral("measureReadout"));
+    const auto* string = window_->findChild<QQuickItem*>(QStringLiteral("songString"));
+    if (readout == nullptr || readout->property("value").toString() != playing) {
+        failure_ = QStringLiteral("the transport does not read measure %1").arg(playing);
+    } else if (string == nullptr || string->property("marker").toString() != playing) {
+        failure_ = QStringLiteral("the song string does not carry measure %1").arg(playing);
     }
 }
 
@@ -2322,24 +2346,54 @@ void Startup::queueKeepPosition() {
     });
 }
 
-// The bars that float over the bottom of the score, the transport and the
-// note entry bar shown with the caret, must not cover each other.
+// The groups of the command bar (the menus, the file tools, the transport and
+// the panels) and those of the tool row (the entry tools, the track picker and
+// the view switch) must each lie inside the window, beside the others of their
+// bar, however narrow the window is.
 QString Startup::overlappingBars() const {
-    auto* transport = window_->findChild<QQuickItem*>(QStringLiteral("transport"));
-    auto* entry = window_->findChild<QQuickItem*>(QStringLiteral("entryBar"));
-    if (transport == nullptr || entry == nullptr) {
-        return QStringLiteral("no transport or note entry bar");
-    }
-    if (!transport->isVisible() || !entry->isVisible()) {
+    const auto crowded = [this](const QStringList& names) -> QString {
+        QList<std::pair<QString, QRectF>> shown;
+        for (const QString& name : names) {
+            auto* item = window_->findChild<QQuickItem*>(name);
+            if (item == nullptr) {
+                return QStringLiteral("the window has no %1").arg(name);
+            }
+            // Measured as laid out: a bar that has just changed is arranged
+            // with the next frame.
+            if (QQuickItem* bar = item->parentItem()) {
+                bar->ensurePolished();
+            }
+            if (!item->isVisible() || item->width() <= 0.0) {
+                continue;
+            }
+            const QRectF rect =
+                item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
+            if (rect.left() < -0.5 || rect.right() > window_->width() + 0.5) {
+                return QStringLiteral("%1 leaves the window").arg(name);
+            }
+            for (const auto& [other, otherRect] : shown) {
+                if (rect.intersects(otherRect)) {
+                    return QStringLiteral("%1 (from %2 to %3) overlaps %4 (from %5 to %6)")
+                        .arg(name)
+                        .arg(rect.left())
+                        .arg(rect.right())
+                        .arg(other)
+                        .arg(otherRect.left())
+                        .arg(otherRect.right());
+                }
+            }
+            shown.emplace_back(name, rect);
+        }
         return {};
-    }
-    const auto sceneRect = [](const QQuickItem* item) {
-        return item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
     };
-    if (sceneRect(transport).intersects(sceneRect(entry))) {
-        return QStringLiteral("the note entry bar overlaps the transport");
+    if (const QString problem =
+            crowded({QStringLiteral("menus"), QStringLiteral("fileTools"),
+                     QStringLiteral("transport"), QStringLiteral("panelTools")});
+        !problem.isEmpty()) {
+        return problem;
     }
-    return {};
+    return crowded(
+        {QStringLiteral("entryBar"), QStringLiteral("trackPicker"), QStringLiteral("viewSwitch")});
 }
 
 void Startup::finish(bool ok, const QString& detail) {

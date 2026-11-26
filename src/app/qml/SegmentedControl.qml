@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // A row of mutually exclusive choices with a highlight that slides to the
-// chosen one.
+// chosen one. The labels keep one weight, so that choosing never moves them.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import Elara.App
 
 Rectangle {
@@ -14,12 +13,14 @@ Rectangle {
     /// Which choices can be picked (all when shorter than labels).
     property list<bool> enabledChoices
     property int currentIndex: 0
+    /// Room either side of each label.
+    property real sidePadding: 12
 
     signal activated(int index)
 
-    implicitWidth: row.implicitWidth + 6
-    implicitHeight: 32
-    radius: height / 2
+    implicitWidth: row.implicitWidth + 4
+    implicitHeight: Theme.control
+    radius: Theme.radiusSmall
     color: Theme.hover
     opacity: enabled ? 1.0 : 0.45
 
@@ -31,21 +32,21 @@ Rectangle {
 
         visible: target !== null
         x: row.x + (target ? target.x : 0)
-        y: 3
+        y: 2
         width: target ? target.width : 0
-        height: root.height - 6
-        radius: height / 2
-        color: Material.accent
+        height: root.height - 4
+        radius: Theme.radiusSmall - 2
+        color: Theme.accent
 
         Behavior on x {
             NumberAnimation {
-                duration: 180
+                duration: Theme.calm
                 easing.type: Easing.OutCubic
             }
         }
         Behavior on width {
             NumberAnimation {
-                duration: 180
+                duration: Theme.calm
                 easing.type: Easing.OutCubic
             }
         }
@@ -70,8 +71,19 @@ Rectangle {
                                                   || root.enabledChoices[index]
                 readonly property bool current: index === root.currentIndex
 
-                width: label.implicitWidth + 28
+                width: label.implicitWidth + 2 * root.sidePadding
                 height: root.height
+                Accessible.role: Accessible.RadioButton
+                Accessible.name: modelData
+                Accessible.checked: current
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    radius: Theme.radiusSmall - 2
+                    color: Theme.hover
+                    visible: area.containsMouse && !choice.current && choice.choosable
+                }
 
                 Label {
                     id: label
@@ -79,21 +91,22 @@ Rectangle {
                     anchors.centerIn: parent
                     text: choice.modelData
                     font.pixelSize: Theme.fontBody
-                    font.weight: choice.current ? Font.DemiBold : Font.Normal
-                    color: choice.current ? "white" : Theme.ink
-                    opacity: choice.choosable ? 1.0 : 0.35
+                    color: choice.current ? Theme.accentText : Theme.ink
+                    opacity: choice.choosable ? 1.0 : 0.38
 
                     Behavior on color {
                         ColorAnimation {
-                            duration: 180
+                            duration: Theme.calm
                         }
                     }
                 }
 
                 MouseArea {
+                    id: area
+
                     anchors.fill: parent
                     enabled: choice.choosable && root.enabled
-                    cursorShape: Qt.PointingHandCursor
+                    hoverEnabled: true
                     onClicked: {
                         if (!choice.current)
                             root.activated(choice.index);

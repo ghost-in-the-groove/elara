@@ -165,6 +165,10 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption continuousOption(
         QStringLiteral("continuous"),
         QCoreApplication::translate("main", "Show the score as one continuous scroll."));
+    const QCommandLineOption sizeOption(
+        QStringLiteral("size"),
+        QCoreApplication::translate("main", "Open the window at this size, as WIDTHxHEIGHT."),
+        QStringLiteral("size"));
     const QCommandLineOption languageOption(
         QStringLiteral("language"),
         QCoreApplication::translate("main", "Show the interface in this language (en, es)."),
@@ -199,25 +203,16 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main",
                                     "With --smoke-test, edit a new song and quit as a crash "
                                     "would once its copy is written."));
-    parser.addOptions({trackOption,
-                       viewOption,
-                       seekOption,
-                       smokeTest,
-                       screenshot,
-                       tunerOption,
-                       songPaneOption,
-                       measureOption,
-                       lyricsOption,
-                       effectsOption,
-                       tuningOption,
-                       continuousOption,
-                       languageOption,
-                       soundFontOption,
-                       includedSoundFontOption,
-                       guitarSfzOption,
-                       includedGuitarSfzOption,
-                       bassSfzOption,
-                       recoveryFolderOption,
+    parser.addOptions({trackOption,     viewOption,
+                       seekOption,      smokeTest,
+                       screenshot,      tunerOption,
+                       songPaneOption,  measureOption,
+                       lyricsOption,    effectsOption,
+                       tuningOption,    continuousOption,
+                       sizeOption,      languageOption,
+                       soundFontOption, includedSoundFontOption,
+                       guitarSfzOption, includedGuitarSfzOption,
+                       bassSfzOption,   recoveryFolderOption,
                        crashOption});
     parser.process(app);
 
@@ -290,6 +285,20 @@ int main(int argc, char* argv[]) {
             QDir::current().absoluteFilePath(parser.value(recoveryFolderOption));
     }
     options.crashAfterRecoveryCopy = parser.isSet(crashOption);
+    if (parser.isSet(sizeOption)) {
+        const QStringList parts = parser.value(sizeOption).split(QLatin1Char('x'));
+        bool width = false;
+        bool height = false;
+        QSize size;
+        if (parts.size() == 2) {
+            size = QSize(parts.front().toInt(&width), parts.back().toInt(&height));
+        }
+        if (!width || !height || size.width() <= 0 || size.height() <= 0) {
+            std::fprintf(stderr, "elara: --size takes a width and a height, as 1280x860\n");
+            return EXIT_FAILURE;
+        }
+        options.size = size;
+    }
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
@@ -357,7 +366,8 @@ int main(int argc, char* argv[]) {
         }
         return EXIT_FAILURE;
     }
-    if (checking || options.track || options.view || options.seek || options.continuous) {
+    if (checking || options.track || options.view || options.seek || options.continuous ||
+        options.size) {
         auto* startup = new elara::app::Startup(window, options, qmlWarnings);
         startup->start();
     }

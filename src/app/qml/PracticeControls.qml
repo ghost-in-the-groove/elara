@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Practice controls in the transport: the metronome, a measure of clicks before
-// playing, the A-B loop, and the playback speed as a pill that opens a slider
-// with the usual practice speeds (ADR-0024).
+// Practice controls of the transport, on the command bar: the A-B loop, the
+// metronome, a measure of clicks before playing, and the playback speed as a
+// button that opens a slider with the usual practice speeds (ADR-0024).
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
 import Elara.App
 
@@ -14,26 +13,7 @@ RowLayout {
     required property ScoreDocument document
     required property AudioController playback
 
-    spacing: 4
-
-    IconButton {
-        objectName: "metronomeButton"
-        // A metronome: its body, its base and the pendulum.
-        iconPath: "M8.5 20 L10.8 4 L13.2 4 L15.5 20 Z M6.5 20 L17.5 20 M12 16 L16.5 8"
-        tip: qsTr("Metronome")
-        checked: root.document.metronome
-        onClicked: root.document.metronome = !root.document.metronome
-    }
-
-    IconButton {
-        objectName: "countInButton"
-        // A stopwatch: the clicks before the start.
-        iconPath: "M12 21 A7.5 7.5 0 1 0 12 6 A7.5 7.5 0 1 0 12 21 Z M12 9.5 L12 13.5 L14.5 15 "
-                  + "M9.5 3 L14.5 3 M12 3 L12 6 M18.5 6.5 L19.8 5.2"
-        tip: qsTr("Count-in: a measure of clicks before playing")
-        checked: root.playback.countIn
-        onClicked: root.playback.countIn = !root.playback.countIn
-    }
+    spacing: 2
 
     AbstractButton {
         id: loopButton
@@ -41,8 +21,8 @@ RowLayout {
         objectName: "loopButton"
         readonly property bool on: root.playback.looping || root.playback.loopMarked
 
-        implicitHeight: 32
-        implicitWidth: loopRow.implicitWidth + (on ? 20 : 12)
+        implicitHeight: Theme.tool
+        implicitWidth: on ? loopRow.implicitWidth + 16 : Theme.tool
         focusPolicy: Qt.TabFocus
         hoverEnabled: true
         Accessible.name: root.playback.looping ? qsTr("End the A-B loop")
@@ -55,7 +35,7 @@ RowLayout {
 
         Behavior on implicitWidth {
             NumberAnimation {
-                duration: 140
+                duration: Theme.quick
                 easing.type: Easing.OutCubic
             }
         }
@@ -72,10 +52,8 @@ RowLayout {
 
                 Icon {
                     anchors.verticalCenter: parent.verticalCenter
-                    // Two arrows chasing each other round.
-                    path: "M4.5 12 A5.5 5.5 0 0 1 10 6.5 L17.5 6.5 M15 4 L17.5 6.5 L15 9 "
-                          + "M19.5 12 A5.5 5.5 0 0 1 14 17.5 L6.5 17.5 M9 15 L6.5 17.5 L9 20"
-                    color: loopButton.on ? Theme.accentInk : Theme.ink
+                    path: Icons.loop
+                    color: loopButton.on ? Theme.lilac : Theme.pearl
                 }
                 Label {
                     anchors.verticalCenter: parent.verticalCenter
@@ -83,24 +61,36 @@ RowLayout {
                     text: root.playback.looping ? qsTr("A–B") : qsTr("A")
                     font.pixelSize: Theme.fontBody
                     font.weight: Font.DemiBold
-                    color: Theme.accentInk
+                    color: Theme.lilac
                 }
             }
         }
         background: Rectangle {
-            radius: height / 2
-            color: loopButton.on ? Theme.accentWash
-                                 : loopButton.down ? Theme.pressed
-                                                   : loopButton.hovered ? Theme.hover : "transparent"
+            radius: Theme.radiusSmall
+            color: loopButton.down ? Theme.nightPressed
+                                   : loopButton.on ? Qt.alpha(Theme.lilac, 0.22)
+                                                   : loopButton.hovered ? Theme.nightHover : "transparent"
             border.width: loopButton.visualFocus ? 2 : 0
-            border.color: Theme.accentInk
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 120
-                }
-            }
+            border.color: Theme.lilac
         }
+    }
+
+    IconButton {
+        objectName: "metronomeButton"
+        nightBar: true
+        iconPath: Icons.metronome
+        tip: qsTr("Metronome")
+        checked: root.document.metronome
+        onClicked: root.document.metronome = !root.document.metronome
+    }
+
+    IconButton {
+        objectName: "countInButton"
+        nightBar: true
+        iconPath: Icons.countIn
+        tip: qsTr("Count-in: a measure of clicks before playing")
+        checked: root.playback.countIn
+        onClicked: root.playback.countIn = !root.playback.countIn
     }
 
     AbstractButton {
@@ -109,8 +99,9 @@ RowLayout {
         objectName: "speedButton"
         readonly property bool changed: root.document.speed !== 100
 
-        implicitHeight: 32
-        implicitWidth: speedLabel.implicitWidth + 22
+        Layout.leftMargin: 4
+        implicitHeight: Theme.control - 2
+        implicitWidth: speedMetrics.advanceWidth + 20
         focusPolicy: Qt.TabFocus
         hoverEnabled: true
         Accessible.name: qsTr("Playback speed: %1 %").arg(root.document.speed)
@@ -118,6 +109,14 @@ RowLayout {
         ToolTip.delay: 600
         ToolTip.text: qsTr("Playback speed")
         onClicked: speedPopup.opened ? speedPopup.close() : speedPopup.open()
+
+        // As wide as the widest speed, so that a change moves nothing.
+        TextMetrics {
+            id: speedMetrics
+
+            font: speedLabel.font
+            text: qsTr("%1 %").arg(200)
+        }
 
         contentItem: Label {
             id: speedLabel
@@ -127,35 +126,29 @@ RowLayout {
             font.features: {
                 "tnum": 1
             }
-            color: speedButton.changed ? Theme.accentInk : Theme.ink
+            color: speedButton.changed ? Theme.lilac : Theme.pearl
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
         background: Rectangle {
-            radius: height / 2
-            color: speedButton.changed ? Theme.accentWash
-                                       : speedButton.down ? Theme.pressed
-                                                          : speedButton.hovered ? Theme.hover
+            radius: Theme.radiusSmall
+            color: speedButton.down ? Theme.nightPressed
+                                    : speedButton.changed ? Qt.alpha(Theme.lilac, 0.22)
+                                                          : speedButton.hovered ? Theme.nightHover
                                                                                 : "transparent"
             border.width: speedButton.visualFocus ? 2 : 1
-            border.color: speedButton.visualFocus ? Theme.accentInk : Theme.line
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 120
-                }
-            }
+            border.color: speedButton.visualFocus ? Theme.lilac : Theme.nightLine
         }
 
         Popup {
             id: speedPopup
 
             objectName: "speedPopup"
-            // Above the transport, centred on the pill.
-            x: (speedButton.width - width) / 2
-            y: -height - 14
+            // Under the command bar, its right edge on the button's.
+            x: speedButton.width - width
+            y: speedButton.height + 12
             width: 280
-            padding: 16
+            padding: 14
             topPadding: 12
             focus: true
             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
@@ -165,21 +158,14 @@ RowLayout {
                     property: "opacity"
                     from: 0
                     to: 1
-                    duration: 140
-                }
-                NumberAnimation {
-                    property: "scale"
-                    from: 0.96
-                    to: 1
-                    duration: 140
-                    easing.type: Easing.OutCubic
+                    duration: Theme.quick
                 }
             }
             exit: Transition {
                 NumberAnimation {
                     property: "opacity"
                     to: 0
-                    duration: 100
+                    duration: 80
                 }
             }
 
@@ -204,6 +190,7 @@ RowLayout {
                         text: qsTr("Speed")
                         font.pixelSize: Theme.fontBody
                         font.weight: Font.DemiBold
+                        color: Theme.ink
                     }
                     Label {
                         // Follows the slider while it is dragged.
@@ -212,7 +199,7 @@ RowLayout {
                         font.features: {
                             "tnum": 1
                         }
-                        opacity: 0.8
+                        color: Theme.inkSoft
                     }
                 }
 
@@ -261,8 +248,9 @@ RowLayout {
                             readonly property bool on: root.document.speed === modelData
 
                             Layout.fillWidth: true
-                            implicitHeight: 30
+                            implicitHeight: Theme.control - 2
                             focusPolicy: Qt.TabFocus
+                            hoverEnabled: true
                             text: qsTr("%1 %").arg(modelData)
                             onClicked: root.document.speed = modelData
 
@@ -271,19 +259,16 @@ RowLayout {
                                 font.pixelSize: Theme.fontBody
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                color: preset.on ? "white" : Theme.ink
+                                color: preset.on ? Theme.accentText : Theme.ink
                             }
                             background: Rectangle {
-                                radius: height / 2
-                                color: preset.on ? preset.Material.accent
-                                                 : (preset.hovered ? Theme.hover : "transparent")
-                                border.color: preset.on ? preset.Material.accent : Theme.line
-
-                                Behavior on color {
-                                    ColorAnimation {
-                                        duration: 120
-                                    }
-                                }
+                                radius: Theme.radiusSmall
+                                color: preset.on ? Theme.accent
+                                                 : preset.down ? Theme.pressed
+                                                               : preset.hovered ? Theme.hover : "transparent"
+                                border.width: preset.visualFocus ? 2 : 1
+                                border.color: preset.visualFocus ? Theme.accentInk
+                                                                 : preset.on ? Theme.accent : Theme.line
                             }
                         }
                     }
