@@ -66,9 +66,8 @@ that outlived its song.
 
 - A rule of entry is written once and tested without Qt.
 - `ScoreDocument` gets smaller by what moves, not by what binds: the readers
-  and setters QML calls at the caret, about 1000 lines, stay until the class
-  QML sees is itself divided, which is a change to QML and a decision of its
-  own.
+  and setters QML calls at the caret, about 1000 lines, stayed until the class
+  QML sees was itself divided (ADR-0128).
 - The session and the document it is used with must be told the same things:
   the document tells the session the track shown whenever it changes and
   every change of the song it makes itself, and the session is the only one

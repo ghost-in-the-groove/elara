@@ -23,6 +23,7 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
+#include "score_common.hpp"
 #include "when_done.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
@@ -80,10 +81,6 @@ struct SequenceResult {
 namespace {
 
 constexpr double kStaffSpaceMm = 1.75;
-
-QString qstring(std::string_view text) {
-    return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
-}
 
 const notation::PageLayoutOptions& pageOptions() {
     static const notation::PageLayoutOptions options =
@@ -247,11 +244,6 @@ constexpr char kContext[] = "elara::app::ScoreDocument";
 
 // The names of the instrument presets and of the edits, translated in the
 // context of this class. Unknown ones are shown as the core writes them.
-struct Translation {
-    std::string_view key;
-    const char* text;
-};
-
 constexpr std::array kPresetNames{
     Translation{"electric-guitar",
                 QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Electric guitar")},
@@ -368,56 +360,6 @@ constexpr std::array kTuningNames{
     Translation{"mandolin", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Mandolin")},
     Translation{"banjo", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Banjo")},
 };
-
-// The note effects, in core::NoteEffect order, and their keys (ADR-0038):
-// letters A to G type note names, so the effects take others.
-struct EffectKey {
-    const char* name;
-    char16_t key;
-};
-constexpr std::array<EffectKey, ScoreDocument::kEffectCount> kEffects{{
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tie"), u'T'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Hammer-on or pull-off"), u'H'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Slide"), u'S'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bend"), u'U'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Vibrato"), u'V'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Palm mute"), u'P'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Dead note"), u'X'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Let ring"), u'L'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Natural harmonic"), u'N'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ghost note"), u'O'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Accent"), u'>'},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccato"), u'\''},
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Tenuto"), u'_'},        // ADR-0088
-    {QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Staccatissimo"), u'"'}, // ADR-0094
-}};
-static_assert(std::ranges::none_of(kEffects,
-                                   [](const EffectKey& effect) { return effect.name == nullptr; }),
-              "every core::NoteEffect needs a name and a key here");
-
-// The kit pieces of drum entry, by their names in elara_core.
-constexpr std::array kDrumPieceNames{
-    Translation{"Crash cymbal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Crash cymbal")},
-    Translation{"Closed hi-hat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Closed hi-hat")},
-    Translation{"Open hi-hat", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Open hi-hat")},
-    Translation{"Ride cymbal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ride cymbal")},
-    Translation{"Ride bell", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Ride bell")},
-    Translation{"High tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "High tom")},
-    Translation{"Mid tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Mid tom")},
-    Translation{"Snare", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Snare")},
-    Translation{"Side stick", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Side stick")},
-    Translation{"Floor tom", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Floor tom")},
-    Translation{"Bass drum", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Bass drum")},
-    Translation{"Hi-hat pedal", QT_TRANSLATE_NOOP("elara::app::ScoreDocument", "Hi-hat pedal")},
-};
-
-template <std::size_t N>
-QString translated(const std::array<Translation, N>& table, std::string_view key,
-                   std::string_view fallback) {
-    const auto found = std::ranges::find(table, key, &Translation::key);
-    return found == table.end() ? qstring(fallback)
-                                : QCoreApplication::translate(kContext, found->text);
-}
 
 // The preset menu groups guitars, basses (whose tuning presets start with
 // "bass") and the other instruments.
@@ -1078,10 +1020,10 @@ QVariantList ScoreDocument::tracks() const {
 QVariantList ScoreDocument::instrumentPresets() {
     QVariantList list;
     for (const core::InstrumentPreset& preset : core::instrumentPresets()) {
-        list.append(
-            QVariantMap{{QStringLiteral("id"), qstring(preset.id)},
-                        {QStringLiteral("name"), translated(kPresetNames, preset.id, preset.name)},
-                        {QStringLiteral("group"), presetGroup(preset)}});
+        list.append(QVariantMap{
+            {QStringLiteral("id"), qstring(preset.id)},
+            {QStringLiteral("name"), translated(kContext, kPresetNames, preset.id, preset.name)},
+            {QStringLiteral("group"), presetGroup(preset)}});
     }
     return list;
 }
@@ -1092,7 +1034,7 @@ QVariantList ScoreDocument::tuningPresets() {
         const std::optional<core::Tuning> tuning = core::Tuning::preset(id);
         list.append(QVariantMap{
             {QStringLiteral("id"), qstring(id)},
-            {QStringLiteral("name"), translated(kTuningNames, id, id)},
+            {QStringLiteral("name"), translated(kContext, kTuningNames, id, id)},
             {QStringLiteral("notes"), tuning ? qstring(tuning->toString()) : QString()}});
     }
     return list;
@@ -1120,13 +1062,15 @@ QVariantMap ScoreDocument::trackTuning(int track) const {
 }
 
 QString ScoreDocument::undoName() const {
-    return canUndo() ? translated(kEditNames, document_->undoName(), document_->undoName())
-                     : QString();
+    return canUndo()
+               ? translated(kContext, kEditNames, document_->undoName(), document_->undoName())
+               : QString();
 }
 
 QString ScoreDocument::redoName() const {
-    return canRedo() ? translated(kEditNames, document_->redoName(), document_->redoName())
-                     : QString();
+    return canRedo()
+               ? translated(kContext, kEditNames, document_->redoName(), document_->redoName())
+               : QString();
 }
 
 bool ScoreDocument::savesInPlace() const {
@@ -1142,7 +1086,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     }
     core::Song song;
     core::Track track = core::Track::fromPreset(*preset);
-    track.setName(translated(kPresetNames, preset->id, preset->name).toStdString());
+    track.setName(translated(kContext, kPresetNames, preset->id, preset->name).toStdString());
     song.addTrack(std::move(track));
     song.appendMeasures(8);
     layouts_->drop();   // a file still opening must not replace the new song
@@ -1342,10 +1286,6 @@ void ScoreDocument::setRepeats(int measure, const QVariantMap& repeats) {
     }
 }
 
-namespace {
-int denominatorOf(core::NoteValue value);
-} // namespace
-
 QVariantMap ScoreDocument::tempoAt(int measure) const {
     QVariantMap tempo;
     if (!document_ || measure < 0 ||
@@ -1518,7 +1458,7 @@ void ScoreDocument::addTrack(const QString& presetId) {
         return;
     }
     core::Track track = core::Track::fromPreset(*preset);
-    track.setName(translated(kPresetNames, preset->id, preset->name).toStdString());
+    track.setName(translated(kContext, kPresetNames, preset->id, preset->name).toStdString());
     const std::size_t at = document_->song().trackCount();
     execute(std::make_unique<core::InsertTrack>(at, std::move(track)));
     setTrack(static_cast<int>(at));
@@ -1900,47 +1840,12 @@ void ScoreDocument::updateBusy() {
 
 namespace {
 
-// The note values the input duration takes, longest first.
-constexpr std::array kInputValues{core::NoteValue::Whole,      core::NoteValue::Half,
-                                  core::NoteValue::Quarter,    core::NoteValue::Eighth,
-                                  core::NoteValue::Sixteenth,  core::NoteValue::ThirtySecond,
-                                  core::NoteValue::SixtyFourth};
-
-// The tuplets the input offers (ADR-0050): actual notes in the time of normal
-// ones.
-struct InputTuplet {
-    int actual;
-    int normal;
-};
-constexpr std::array kInputTuplets{InputTuplet{2, 3}, InputTuplet{3, 2}, InputTuplet{4, 3},
-                                   InputTuplet{5, 4}, InputTuplet{6, 4}, InputTuplet{7, 4},
-                                   InputTuplet{9, 8}};
-
-// 1 for a whole note, 2 for a half note... 64.
-int denominatorOf(core::NoteValue value) {
-    const auto steps = static_cast<int>(value) - static_cast<int>(core::NoteValue::Whole);
-    return steps < 0 ? 0 : 1 << steps;
-}
-
 std::optional<std::size_t> inputIndex(core::NoteValue value) {
-    const auto it = std::ranges::find(kInputValues, value);
-    if (it == kInputValues.end()) {
+    const auto it = std::ranges::find(core::EditSession::kInputValues, value);
+    if (it == core::EditSession::kInputValues.end()) {
         return std::nullopt;
     }
-    return static_cast<std::size_t>(it - kInputValues.begin());
-}
-
-// A pitch with music signs and its octave: "C♯4", "B♭3".
-QString pitchName(const core::Pitch& pitch) {
-    constexpr std::string_view kLetters = "CDEFGAB";
-    QString text(QChar::fromLatin1(kLetters[static_cast<std::size_t>(pitch.step())]));
-    for (int i = 0; i < pitch.alter(); ++i) {
-        text += QChar(0x266F);
-    }
-    for (int i = 0; i > pitch.alter(); --i) {
-        text += QChar(0x266D);
-    }
-    return text + QString::number(pitch.octave());
+    return static_cast<std::size_t>(it - core::EditSession::kInputValues.begin());
 }
 
 core::CaretMove coreMove(ScoreDocument::CaretMove move) {
@@ -1963,241 +1868,8 @@ core::CaretMove coreMove(ScoreDocument::CaretMove move) {
 
 } // namespace
 
-QString ScoreDocument::caretStatus() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return {};
-    }
-    const core::Song& song = document_->song();
-    QStringList parts;
-    if (session_.hasSelection()) {
-        const int first = selectionFirst() + 1;
-        const int last = selectionLast() + 1;
-        parts.append(first == last ? tr("Measure %1 selected").arg(first)
-                                   : tr("Measures %1-%2 selected").arg(first).arg(last));
-    }
-    parts.append(tr("Measure %1").arg(session_.caret().measure + 1));
-    if (session_.caret().voice > 0) {
-        parts.append(tr("Voice %1").arg(session_.caret().voice + 1));
-    }
-    parts.append(core::onFreeSlot(song, session_.caret())
-                     ? tr("New beat")
-                     : tr("Beat %1").arg(session_.caret().beat + 1));
-    if (const QString chord = caretChord(); !chord.isEmpty()) {
-        parts.append(tr("Chord %1").arg(chord)); // the beat's, before its notes
-    }
-    if (const QString text = caretText(); !text.isEmpty()) {
-        parts.append(tr("\u201C%1\u201D").arg(text));
-    }
-    if (caretFretted()) {
-        parts.append(tr("String %1").arg(session_.caret().string));
-        if (const auto fret = fretAtCaret()) {
-            parts.append(tr("Fret %1").arg(*fret));
-        }
-    }
-    if (caretOnDrums()) {
-        parts.append(laneName(session_.caret().string));
-    }
-    QStringList names;
-    for (const core::Pitch& pitch : pitchesAtCaret()) {
-        names.append(pitchName(pitch));
-    }
-    if (!names.isEmpty() && caretPitched()) {
-        parts.append(names.join(QLatin1Char(' ')));
-    }
-    const int effects = caretEffects();
-    const core::NoteEffects fx = noteEffectsAtCaret();
-    if (fx.slideIn != core::SlideIn::None) {
-        parts.append(slideInName(static_cast<int>(fx.slideIn)));
-    }
-    for (int effect = 0; effect < kEffectCount; ++effect) {
-        if ((effects & (1 << effect)) == 0) {
-            continue;
-        }
-        // Effects of several kinds say which (ADR-0055, ADR-0058).
-        switch (static_cast<core::NoteEffect>(effect)) {
-        case core::NoteEffect::Bend:
-            parts.append(bendName(caretBendForm(), caretBendCents()));
-            break;
-        case core::NoteEffect::Slide:
-            parts.append(slideOutName(static_cast<int>(fx.slideOut)));
-            break;
-        case core::NoteEffect::Harmonic:
-            parts.append(harmonicName(static_cast<int>(fx.harmonic.kind)));
-            break;
-        case core::NoteEffect::Vibrato:
-            parts.append(fx.vibrato == core::Vibrato::Wide ? tr("Wide vibrato")
-                                                           : effectName(effect));
-            break;
-        case core::NoteEffect::Accent:
-            parts.append(fx.accent == core::Accent::Marcato ? tr("Marcato") : effectName(effect));
-            break;
-        default:
-            parts.append(effectName(effect));
-            break;
-        }
-    }
-    if (fx.trill.isTrill()) {
-        parts.append(tr("Trill"));
-    }
-    switch (fx.ornament) {
-    case core::Ornament::Mordent:
-        parts.append(tr("Mordent"));
-        break;
-    case core::Ornament::UpperMordent:
-        parts.append(tr("Upper mordent"));
-        break;
-    case core::Ornament::Turn:
-        parts.append(tr("Turn"));
-        break;
-    case core::Ornament::InvertedTurn:
-        parts.append(tr("Inverted turn"));
-        break;
-    case core::Ornament::None:
-        break;
-    }
-    const auto latin = [](std::string_view text) {
-        return QLatin1StringView(text.data(), static_cast<qsizetype>(text.size()));
-    };
-    if (fx.fingering != core::Finger::None) {
-        parts.append(tr("Finger %1").arg(latin(core::fingeringText(fx.fingering, caretFretted()))));
-    }
-    if (fx.pluck != core::Finger::None) {
-        parts.append(tr("Plucked with %1").arg(latin(core::pluckText(fx.pluck))));
-    }
-    // Then the beat's own effects.
-    if (const int strum = caretStrum(); strum != 0) {
-        parts.append(strum == 1 ? tr("Strum down") : tr("Strum up"));
-    }
-    if (const int stroke = caretPickStroke(); stroke != 0) {
-        parts.append(stroke == 1 ? tr("Down stroke") : tr("Up stroke"));
-    }
-    if (const int tremolo = caretTremolo(); tremolo != 0) {
-        parts.append(tr("Tremolo picking 1/%1").arg(tremolo));
-    }
-    if (const int whammy = caretWhammyForm(); whammy != 0) {
-        parts.append(whammyName(whammy, caretWhammyCents()));
-    }
-    if (const int technique = caretBassTechnique(); technique != 0) {
-        parts.append(bassTechniqueName(technique));
-    }
-    if (const int hairpin = caretHairpin(); hairpin != 0) {
-        parts.append(hairpin == static_cast<int>(core::Hairpin::Crescendo) ? tr("Crescendo")
-                                                                           : tr("Diminuendo"));
-    }
-    switch (static_cast<core::Fermata>(caretFermata())) {
-    case core::Fermata::Short:
-        parts.append(tr("Short fermata"));
-        break;
-    case core::Fermata::Normal:
-        parts.append(tr("Fermata"));
-        break;
-    case core::Fermata::Long:
-        parts.append(tr("Long fermata"));
-        break;
-    case core::Fermata::None:
-        break;
-    }
-    if (const auto ottava = core::enumFromIndex<core::Ottava>(caretOttava());
-        ottava && *ottava != core::Ottava::None) {
-        parts.append(tr("Octave line %1").arg(latin(core::nameOf(*ottava)))); // "8va"...
-    }
-    if (caretSlur()) {
-        parts.append(tr("Slur"));
-    }
-    if (const int pedal = caretPedal(); pedal != 0) {
-        parts.append(pedal == static_cast<int>(core::Pedal::Change) ? tr("Pedal change")
-                                                                    : tr("Sustain pedal"));
-    }
-    if (const int breath = caretBreath(); breath != 0) {
-        parts.append(breath == static_cast<int>(core::Breath::Caesura) ? tr("Caesura")
-                                                                       : tr("Breath mark"));
-    }
-    if (caretGraceNotes() > 0) {
-        parts.append(tr("Grace notes"));
-    }
-    return parts.join(QStringLiteral(" · "));
-}
-
-bool ScoreDocument::caretFretted() const {
-    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
-        return false;
-    }
-    const core::Track& track = document_->song().track(session_.caret().track);
-    return session_.caret().staff < track.staffCount() &&
-           track.staff(session_.caret().staff).isFretted();
-}
-
 int ScoreDocument::inputValue() const {
     return denominatorOf(session_.input().value());
-}
-
-std::optional<int> ScoreDocument::fretAtCaret() const {
-    if (!document_ || !hasCaret(document_->song()) ||
-        core::onFreeSlot(document_->song(), session_.caret())) {
-        return std::nullopt;
-    }
-    const core::Beat& beat = document_->song()
-                                 .track(session_.caret().track)
-                                 .staff(session_.caret().staff)
-                                 .measure(session_.caret().measure)
-                                 .voices.at(session_.caret().voice)
-                                 .beats.at(session_.caret().beat);
-    for (const core::Note& note : beat.notes) {
-        if (note.position && note.position->string == session_.caret().string) {
-            return note.position->fret;
-        }
-    }
-    return std::nullopt;
-}
-
-std::vector<core::Pitch> ScoreDocument::pitchesAtCaret() const {
-    std::vector<core::Pitch> pitches;
-    if (!document_ || !hasCaret(document_->song()) ||
-        core::onFreeSlot(document_->song(), session_.caret())) {
-        return pitches;
-    }
-    const bool fretted = caretFretted();
-    const core::Beat& beat = document_->song()
-                                 .track(session_.caret().track)
-                                 .staff(session_.caret().staff)
-                                 .measure(session_.caret().measure)
-                                 .voices.at(session_.caret().voice)
-                                 .beats.at(session_.caret().beat);
-    for (const core::Note& note : beat.notes) {
-        if (!fretted || (note.position && note.position->string == session_.caret().string)) {
-            pitches.push_back(note.pitch);
-        }
-    }
-    std::ranges::sort(pitches, {}, &core::Pitch::midiNumber);
-    return pitches;
-}
-
-bool ScoreDocument::caretPitched() const {
-    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
-        return false;
-    }
-    const core::Track& track = document_->song().track(session_.caret().track);
-    return track.instrument().kind != core::InstrumentKind::Percussion &&
-           session_.caret().staff < track.staffCount() &&
-           track.staff(session_.caret().staff).clef() != core::Clef::Percussion;
-}
-
-bool ScoreDocument::caretOnDrums() const {
-    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
-        return false;
-    }
-    const core::Track& track = document_->song().track(session_.caret().track);
-    return session_.caret().staff < track.staffCount() &&
-           track.staff(session_.caret().staff).clef() == core::Clef::Percussion;
-}
-
-QString ScoreDocument::laneName(int lane) {
-    const auto pieces = core::drumPieces();
-    if (lane < 1 || lane > static_cast<int>(pieces.size())) {
-        return {};
-    }
-    const std::string_view name = pieces[static_cast<std::size_t>(lane - 1)].name;
-    return translated(kDrumPieceNames, name, name);
 }
 
 void ScoreDocument::moveCaret(CaretMove move) {
@@ -2240,11 +1912,11 @@ void ScoreDocument::typeDigit(int digit) {
     if (!document_ || !hasCaret(document_->song()) || digit < 0 || digit > 9) {
         return;
     }
-    if (caretOnDrums()) {
+    if (onDrumStaff(document_->song(), session_.caret())) {
         emit editFailed(tr("On drums, Enter adds or removes the lane's hit."));
         return;
     }
-    if (!caretFretted()) {
+    if (!onStrings(document_->song(), session_.caret())) {
         emit editFailed(tr("Frets are typed on a track with strings."));
         return;
     }
@@ -2259,10 +1931,11 @@ void ScoreDocument::typeDigit(int digit) {
 }
 
 void ScoreDocument::setInputValue(int value) {
-    const auto it = std::ranges::find_if(kInputValues, [value](core::NoteValue candidate) {
-        return denominatorOf(candidate) == value;
-    });
-    if (it == kInputValues.end()) {
+    const auto it =
+        std::ranges::find_if(core::EditSession::kInputValues, [value](core::NoteValue candidate) {
+            return denominatorOf(candidate) == value;
+        });
+    if (it == core::EditSession::kInputValues.end()) {
         return;
     }
     giveInput(core::Duration(*it, session_.input().dots(), session_.input().tuplet()));
@@ -2276,8 +1949,9 @@ void ScoreDocument::toggleDot() {
 void ScoreDocument::setInputTuplet(int actual) {
     core::Tuplet tuplet;
     if (actual != 0 && actual != inputTuplet()) {
-        const auto found = std::ranges::find(kInputTuplets, actual, &InputTuplet::actual);
-        if (found == kInputTuplets.end()) {
+        const auto found = std::ranges::find(core::EditSession::kInputTuplets, actual,
+                                             &core::EditSession::InputTuplet::actual);
+        if (found == core::EditSession::kInputTuplets.end()) {
             return;
         }
         tuplet = core::Tuplet(found->actual, found->normal);
@@ -2288,820 +1962,15 @@ void ScoreDocument::setInputTuplet(int actual) {
 void ScoreDocument::longerDuration() {
     const auto index = inputIndex(session_.input().value());
     if (index && *index > 0) {
-        setInputValue(denominatorOf(kInputValues.at(*index - 1)));
+        setInputValue(denominatorOf(core::EditSession::kInputValues.at(*index - 1)));
     }
 }
 
 void ScoreDocument::shorterDuration() {
     const auto index = inputIndex(session_.input().value());
-    if (index && *index + 1 < kInputValues.size()) {
-        setInputValue(denominatorOf(kInputValues.at(*index + 1)));
+    if (index && *index + 1 < core::EditSession::kInputValues.size()) {
+        setInputValue(denominatorOf(core::EditSession::kInputValues.at(*index + 1)));
     }
-}
-
-void ScoreDocument::deleteAtCaret() {
-    runEntry(
-        [this](const core::Song& song) { return core::deleteAtCaret(song, session_.caret()); });
-}
-
-void ScoreDocument::deleteBeat() {
-    runEntry([this](const core::Song& song) { return core::deleteBeat(song, session_.caret()); });
-}
-
-void ScoreDocument::insertRest() {
-    runEntry([this](const core::Song& song) {
-        return core::insertRest(song, session_.caret(), session_.input());
-    });
-}
-
-void ScoreDocument::typeNoteName(int step, bool addToChord) {
-    if (!document_ || !hasCaret(document_->song()) || step < 0 || step > 6) {
-        return;
-    }
-    if (!caretPitched()) {
-        emit editFailed(tr("Drums take no note names."));
-        return;
-    }
-    session_.endTyping();
-    try {
-        enter(core::enterPitch(
-            document_->song(), session_.caret(), static_cast<core::Step>(step), session_.input(),
-            addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
-    } catch (const std::out_of_range&) {
-        emit editFailed(caretFretted() ? tr("No string can play that note.")
-                                       : tr("That note is out of range."));
-    }
-}
-
-void ScoreDocument::shiftPitch(int semitones) {
-    if (!document_ || !hasCaret(document_->song())) {
-        return;
-    }
-    session_.endTyping();
-    try {
-        enter(core::shiftPitch(document_->song(), session_.caret(), semitones));
-    } catch (const std::out_of_range&) {
-        emit editFailed(caretFretted() ? tr("The note would leave the neck.")
-                                       : tr("That note is out of range."));
-    }
-}
-
-void ScoreDocument::toggleDrum() {
-    if (!document_ || !hasCaret(document_->song())) {
-        return;
-    }
-    if (!caretOnDrums()) {
-        emit editFailed(tr("Hits are typed on a drum track."));
-        return;
-    }
-    runEntry([this](const core::Song& song) {
-        return core::toggleDrum(song, session_.caret(), session_.input());
-    });
-}
-
-void ScoreDocument::toggleEffect(int effect) {
-    if (!document_ || !hasCaret(document_->song()) || effect < 0 || effect >= kEffectCount) {
-        return;
-    }
-    session_.endTyping();
-    const auto which = static_cast<core::NoteEffect>(effect);
-    try {
-        core::Entry entry = core::toggleEffect(document_->song(), session_.caret(), which);
-        if (!entry.command) {
-            emit editFailed(tr("Effects go on notes: put the caret on one."));
-            return;
-        }
-        enter(std::move(entry));
-    } catch (const std::out_of_range&) {
-        emit editFailed(tr("That fret has no natural harmonic."));
-    } catch (const std::logic_error&) {
-        emit editFailed(which == core::NoteEffect::Tie
-                            ? tr("There is no note to tie to.")
-                            : tr("%1 needs strings.").arg(effectName(effect)));
-    }
-}
-
-int ScoreDocument::caretEffects() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    int effects = 0;
-    for (int effect = 0; effect < kEffectCount; ++effect) {
-        if (core::hasEffectAtCaret(document_->song(), session_.caret(),
-                                   static_cast<core::NoteEffect>(effect))) {
-            effects |= 1 << effect;
-        }
-    }
-    return effects;
-}
-
-QString ScoreDocument::effectName(int effect) const {
-    if (effect < 0 || effect >= kEffectCount) {
-        return {};
-    }
-    return tr(kEffects.at(static_cast<std::size_t>(effect)).name);
-}
-
-QString ScoreDocument::effectKey(int effect) const {
-    if (effect < 0 || effect >= kEffectCount) {
-        return {};
-    }
-    return QString(QChar(kEffects.at(static_cast<std::size_t>(effect)).key));
-}
-
-bool ScoreDocument::effectNeedsStrings(int effect) const {
-    return effect >= 0 && effect < kEffectCount &&
-           core::needsStrings(static_cast<core::NoteEffect>(effect));
-}
-
-int ScoreDocument::effectForKey(const QString& text) const {
-    if (text.size() != 1) {
-        return -1;
-    }
-    const char16_t key = text.front().toUpper().unicode();
-    const auto found =
-        std::ranges::find_if(kEffects, [key](const EffectKey& entry) { return entry.key == key; });
-    return found == kEffects.end() ? -1 : static_cast<int>(found - kEffects.begin());
-}
-
-void ScoreDocument::setBend(int form, int cents) {
-    if (!document_ || !hasCaret(document_->song()) || form < 0 ||
-        form >= static_cast<int>(core::BendForm::Custom)) {
-        return;
-    }
-    session_.endTyping();
-    core::BendCurve curve;
-    try {
-        curve = core::bendCurve(static_cast<core::BendForm>(form), cents);
-    } catch (const std::invalid_argument&) {
-        return;
-    }
-    core::Entry entry = core::setBend(document_->song(), session_.caret(), curve);
-    if (!entry.command) {
-        // Silent when the notes have that bend already.
-        if (entry.missed) {
-            emit editFailed(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    enter(std::move(entry));
-}
-
-core::BeatEffects ScoreDocument::beatEffectsAtCaret() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return {};
-    }
-    return core::beatEffectsAt(document_->song(), session_.caret());
-}
-
-template <typename Value>
-void ScoreDocument::setBeatEffect(Value core::BeatEffects::* field,
-                                  std::type_identity_t<Value> value) {
-    if (!document_ || !hasCaret(document_->song())) {
-        return;
-    }
-    session_.endTyping();
-    core::Entry entry =
-        core::setBeatEffect(document_->song(), session_.caret(), field, std::move(value));
-    if (!entry.command) {
-        // Silent when the beat has it already.
-        if (entry.missed) {
-            emit editFailed(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    enter(std::move(entry));
-}
-
-void ScoreDocument::setStrum(int direction) {
-    if (const std::optional<core::Strum> strum = core::enumFromIndex<core::Strum>(direction)) {
-        setBeatEffect(&core::BeatEffects::strum, *strum);
-    }
-}
-
-void ScoreDocument::setHairpin(int hairpin) {
-    if (const std::optional<core::Hairpin> wedge = core::enumFromIndex<core::Hairpin>(hairpin)) {
-        setBeatEffect(&core::BeatEffects::hairpin, *wedge);
-    }
-}
-
-void ScoreDocument::setSlur(bool slurred) {
-    setBeatEffect(&core::BeatEffects::slur, slurred);
-}
-
-void ScoreDocument::setFermata(int fermata) {
-    if (const std::optional<core::Fermata> pause = core::enumFromIndex<core::Fermata>(fermata)) {
-        setBeatEffect(&core::BeatEffects::fermata, *pause);
-    }
-}
-
-void ScoreDocument::setOttava(int ottava) {
-    if (const std::optional<core::Ottava> line = core::enumFromIndex<core::Ottava>(ottava)) {
-        setBeatEffect(&core::BeatEffects::ottava, *line);
-    }
-}
-
-void ScoreDocument::setPedal(int pedal) {
-    if (const std::optional<core::Pedal> mark = core::enumFromIndex<core::Pedal>(pedal)) {
-        setBeatEffect(&core::BeatEffects::pedal, *mark);
-    }
-}
-
-void ScoreDocument::setBreath(int breath) {
-    if (const std::optional<core::Breath> mark = core::enumFromIndex<core::Breath>(breath)) {
-        setBeatEffect(&core::BeatEffects::breath, *mark);
-    }
-}
-
-void ScoreDocument::toggleGraceNote() {
-    if (caretGraceNotes() > 0) {
-        runEntry([this](const core::Song& song) {
-            return core::removeGraceNotes(song, session_.caret());
-        });
-        return;
-    }
-    runEntry([this](const core::Song& song) {
-        const core::Duration eighth(core::NoteValue::Eighth);
-        try {
-            return core::addGraceNote(song, session_.caret(), -2, eighth, false);
-        } catch (const std::out_of_range&) {
-            return core::addGraceNote(song, session_.caret(), 2, eighth, false); // from above
-        }
-    });
-}
-
-void ScoreDocument::setChordSymbol(const QString& name) {
-    runEntry([this, text = name.toStdString()](const core::Song& song) {
-        return core::setChordSymbol(song, session_.caret(), text);
-    });
-}
-
-namespace {
-
-constexpr qsizetype kOffered = 12; // words a popup offers
-
-/// The different words `pick` finds on the song's beats (a pointer, null for
-/// none) in the order they first appear, at most kOffered.
-template <typename Pick>
-QStringList wordsOf(const core::Song& song, Pick pick) {
-    QStringList found;
-    for (std::size_t m = 0; m < song.measureCount() && found.size() < kOffered; ++m) {
-        for (std::size_t t = 0; t < song.trackCount(); ++t) {
-            const core::Track& track = song.track(t);
-            for (std::size_t s = 0; s < track.staffCount(); ++s) {
-                for (const core::Voice& voice : track.staff(s).measure(m).voices) {
-                    for (const core::Beat& beat : voice.beats) {
-                        const std::string* words = pick(beat);
-                        if (words == nullptr || words->empty()) {
-                            continue;
-                        }
-                        const QString text = qstring(*words);
-                        if (!found.contains(text) && found.size() < kOffered) {
-                            found.append(text);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return found;
-}
-
-} // namespace
-
-QStringList ScoreDocument::songChords() const {
-    if (!document_) {
-        return {};
-    }
-    return wordsOf(document_->song(), [](const core::Beat& beat) -> const std::string* {
-        return beat.chord ? &beat.chord->name : nullptr;
-    });
-}
-
-void ScoreDocument::setBeatText(const QString& text) {
-    runEntry([this, words = text.toStdString()](const core::Song& song) {
-        return core::setBeatText(song, session_.caret(), words);
-    });
-}
-
-QStringList ScoreDocument::songTexts() const {
-    if (!document_) {
-        return {};
-    }
-    return wordsOf(document_->song(), [](const core::Beat& beat) -> const std::string* {
-        return beat.text ? &*beat.text : nullptr;
-    });
-}
-
-int ScoreDocument::caretVerseCount() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    const core::Song& song = document_->song();
-    const core::Caret caret = core::clampCaret(song, session_.caret());
-    return static_cast<int>(core::verseCount(song.track(caret.track).staff(caret.staff)));
-}
-
-QVariantMap ScoreDocument::caretVerse(int verse) const {
-    core::VerseText typed;
-    if (document_ && hasCaret(document_->song()) && verse >= 0) {
-        typed = core::verseAt(document_->song(), session_.caret(), static_cast<std::size_t>(verse));
-    }
-    return {{QStringLiteral("first"), static_cast<int>(typed.first)},
-            {QStringLiteral("text"), qstring(typed.text)}};
-}
-
-int ScoreDocument::setVerse(int verse, int first, const QString& text) {
-    if (verse < 0 || verse >= maxVerses() || first < 0) {
-        return 0;
-    }
-    std::size_t leftover = 0;
-    runEntry([&](const core::Song& song) {
-        core::VerseEntry typed =
-            core::setVerse(song, session_.caret(), static_cast<std::size_t>(verse),
-                           static_cast<std::size_t>(first), text.toStdString());
-        leftover = typed.leftover;
-        return std::move(typed.entry);
-    });
-    return static_cast<int>(leftover);
-}
-
-void ScoreDocument::setPickStroke(int direction) {
-    if (const std::optional<core::PickStroke> stroke =
-            core::enumFromIndex<core::PickStroke>(direction)) {
-        setBeatEffect(&core::BeatEffects::pickStroke, *stroke);
-    }
-}
-
-void ScoreDocument::setTremolo(int value) {
-    std::optional<core::NoteValue> speed;
-    for (const core::NoteValue candidate :
-         {core::NoteValue::Eighth, core::NoteValue::Sixteenth, core::NoteValue::ThirtySecond}) {
-        if (denominatorOf(candidate) == value) {
-            speed = candidate;
-        }
-    }
-    if (value != 0 && !speed) {
-        return;
-    }
-    setBeatEffect(&core::BeatEffects::tremoloPicking, speed);
-}
-
-void ScoreDocument::setWhammy(int form, int cents) {
-    if (form < 0 || form >= static_cast<int>(core::BendForm::Custom)) {
-        return;
-    }
-    core::BendCurve curve;
-    try {
-        curve = core::whammyCurve(static_cast<core::BendForm>(form), cents);
-    } catch (const std::invalid_argument&) {
-        return;
-    }
-    setBeatEffect(&core::BeatEffects::whammyBar, std::move(curve));
-}
-
-void ScoreDocument::setBassTechnique(int technique) {
-    if (const std::optional<core::BassTechnique> bass =
-            core::enumFromIndex<core::BassTechnique>(technique)) {
-        setBeatEffect(&core::BeatEffects::bassTechnique, *bass);
-    }
-}
-
-QString ScoreDocument::whammyAmount(int cents) const {
-    constexpr int kStep = 200;
-    const int depth = std::abs(cents);
-    const QString steps = depth == kStep ? QStringLiteral("1") : bendAmount(depth);
-    return (cents < 0 ? QStringLiteral("-") : QStringLiteral("+")) + steps;
-}
-
-QString ScoreDocument::whammyName(int form, int cents) const {
-    const QString amount = whammyAmount(cents);
-    const bool dive = cents < 0;
-    switch (static_cast<core::BendForm>(form)) {
-    case core::BendForm::None:
-        return {};
-    case core::BendForm::Bend:
-        return (dive ? tr("Dive %1") : tr("Pull-up %1")).arg(amount);
-    case core::BendForm::BendRelease:
-        return (dive ? tr("Dip %1") : tr("Inverted dip %1")).arg(amount);
-    case core::BendForm::PreBend:
-        return (dive ? tr("Pre-dive %1") : tr("Pre-pull-up %1")).arg(amount);
-    case core::BendForm::PreBendRelease:
-        return (dive ? tr("Pre-dive and return %1") : tr("Pre-pull-up and return %1")).arg(amount);
-    case core::BendForm::Custom:
-        break;
-    }
-    return tr("Whammy bar (custom curve)");
-}
-
-QString ScoreDocument::bassTechniqueName(int technique) const {
-    switch (static_cast<core::BassTechnique>(technique)) {
-    case core::BassTechnique::None:
-        return {};
-    case core::BassTechnique::Tap:
-        return tr("Tapping");
-    case core::BassTechnique::Slap:
-        return tr("Slap");
-    case core::BassTechnique::Pop:
-        return tr("Pop");
-    }
-    return {};
-}
-
-core::NoteEffects ScoreDocument::noteEffectsAtCaret() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return {};
-    }
-    return core::noteEffectsAt(document_->song(), session_.caret());
-}
-
-void ScoreDocument::changeNoteEffects(
-    const std::function<core::Entry(const core::Song&, const core::Caret&)>& make) {
-    if (!document_ || !hasCaret(document_->song())) {
-        return;
-    }
-    session_.endTyping();
-    core::Entry entry = make(document_->song(), session_.caret());
-    if (!entry.command) {
-        // Silent when the notes have it already.
-        if (entry.missed) {
-            emit editFailed(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    enter(std::move(entry));
-}
-
-void ScoreDocument::setSlideIn(int kind) {
-    if (const std::optional<core::SlideIn> in = core::enumFromIndex<core::SlideIn>(kind)) {
-        changeNoteEffects([in = *in](const core::Song& song, const core::Caret& caret) {
-            return core::setSlideIn(song, caret, in);
-        });
-    }
-}
-
-void ScoreDocument::setSlideOut(int kind) {
-    if (const std::optional<core::SlideOut> out = core::enumFromIndex<core::SlideOut>(kind)) {
-        changeNoteEffects([out = *out](const core::Song& song, const core::Caret& caret) {
-            return core::setSlideOut(song, caret, out);
-        });
-    }
-}
-
-void ScoreDocument::setVibrato(int kind) {
-    if (const std::optional<core::Vibrato> vibrato = core::enumFromIndex<core::Vibrato>(kind)) {
-        changeNoteEffects([vibrato = *vibrato](const core::Song& song, const core::Caret& caret) {
-            return core::setVibrato(song, caret, vibrato);
-        });
-    }
-}
-
-void ScoreDocument::setAccent(int kind) {
-    if (const std::optional<core::Accent> accent = core::enumFromIndex<core::Accent>(kind)) {
-        changeNoteEffects([accent = *accent](const core::Song& song, const core::Caret& caret) {
-            return core::setAccent(song, caret, accent);
-        });
-    }
-}
-
-void ScoreDocument::setHarmonic(int kind) {
-    const std::optional<core::HarmonicKind> wanted = core::enumFromIndex<core::HarmonicKind>(kind);
-    if (!wanted) {
-        return;
-    }
-    // What setHarmonic() throws, as it documents it.
-    try {
-        changeNoteEffects([harmonic = *wanted](const core::Song& song, const core::Caret& caret) {
-            return core::setHarmonic(song, caret, harmonic);
-        });
-    } catch (const std::out_of_range&) {
-        emit editFailed(tr("That fret has no natural harmonic."));
-    } catch (const std::logic_error&) {
-        emit editFailed(tr("Harmonics need strings."));
-    }
-}
-
-int ScoreDocument::caretSlideIn() const {
-    return static_cast<int>(noteEffectsAtCaret().slideIn);
-}
-
-int ScoreDocument::caretSlideOut() const {
-    return static_cast<int>(noteEffectsAtCaret().slideOut);
-}
-
-int ScoreDocument::caretVibrato() const {
-    return static_cast<int>(noteEffectsAtCaret().vibrato);
-}
-
-int ScoreDocument::caretAccent() const {
-    return static_cast<int>(noteEffectsAtCaret().accent);
-}
-
-int ScoreDocument::caretTrill() const {
-    return noteEffectsAtCaret().trill.semitones;
-}
-
-int ScoreDocument::caretOrnament() const {
-    return static_cast<int>(noteEffectsAtCaret().ornament);
-}
-
-void ScoreDocument::setOrnament(int kind) {
-    if (const std::optional<core::Ornament> ornament = core::enumFromIndex<core::Ornament>(kind)) {
-        changeNoteEffects([ornament = *ornament](const core::Song& song, const core::Caret& caret) {
-            return core::setOrnament(song, caret, ornament);
-        });
-    }
-}
-
-int ScoreDocument::caretFingering() const {
-    return static_cast<int>(noteEffectsAtCaret().fingering);
-}
-
-int ScoreDocument::caretPluck() const {
-    return static_cast<int>(noteEffectsAtCaret().pluck);
-}
-
-void ScoreDocument::setFingering(int finger) {
-    if (const std::optional<core::Finger> chosen = core::enumFromIndex<core::Finger>(finger)) {
-        changeNoteEffects([chosen = *chosen](const core::Song& song, const core::Caret& caret) {
-            return core::setFingering(song, caret, std::span(&chosen, 1));
-        });
-    }
-}
-
-void ScoreDocument::setPluck(int finger) {
-    const std::optional<core::Finger> chosen = core::enumFromIndex<core::Finger>(finger);
-    if (!chosen || !caretFretted()) { // setPluck() needs strings
-        return;
-    }
-    changeNoteEffects([chosen = *chosen](const core::Song& song, const core::Caret& caret) {
-        return core::setPluck(song, caret, chosen);
-    });
-}
-
-void ScoreDocument::toggleTrill() {
-    const bool on = caretTrill() == 0;
-    changeNoteEffects([on](const core::Song& song, const core::Caret& caret) {
-        return on ? core::setTrillToNextStep(song, caret, core::NoteValue::ThirtySecond)
-                  : core::setTrill(song, caret, core::Trill{});
-    });
-}
-
-int ScoreDocument::caretDynamic() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return static_cast<int>(core::Dynamic::MF);
-    }
-    return static_cast<int>(core::dynamicAt(document_->song(), session_.caret()));
-}
-
-void ScoreDocument::setDynamic(int dynamic) {
-    const std::optional<core::Dynamic> wanted = core::enumFromIndex<core::Dynamic>(dynamic);
-    if (!document_ || !hasCaret(document_->song()) || !wanted) {
-        return;
-    }
-    session_.endTyping();
-    core::Entry entry = core::setDynamic(document_->song(), session_.caret(), *wanted);
-    if (!entry.command) {
-        if (core::dynamicAt(document_->song(), session_.caret()) != *wanted) {
-            emit editFailed(tr("Dynamics go on notes: put the caret on one."));
-        }
-        return;
-    }
-    enter(std::move(entry));
-}
-
-QString ScoreDocument::dynamicName(int dynamic) const {
-    const std::optional<core::Dynamic> value = core::enumFromIndex<core::Dynamic>(dynamic);
-    if (!value) {
-        return {};
-    }
-    const std::string_view name = core::nameOf(*value); // as it is written: "ppp" to "fff"
-    return QString::fromLatin1(name.data(), static_cast<qsizetype>(name.size()));
-}
-
-int ScoreDocument::caretHarmonic() const {
-    return static_cast<int>(noteEffectsAtCaret().harmonic.kind);
-}
-
-QString ScoreDocument::slideInName(int kind) const {
-    switch (static_cast<core::SlideIn>(kind)) {
-    case core::SlideIn::FromBelow:
-        return tr("Slide in from below");
-    case core::SlideIn::FromAbove:
-        return tr("Slide in from above");
-    case core::SlideIn::None:
-        break;
-    }
-    return {};
-}
-
-QString ScoreDocument::slideOutName(int kind) const {
-    switch (static_cast<core::SlideOut>(kind)) {
-    case core::SlideOut::Shift:
-        return tr("Shift slide");
-    case core::SlideOut::Legato:
-        return tr("Legato slide");
-    case core::SlideOut::Downwards:
-        return tr("Slide out downwards");
-    case core::SlideOut::Upwards:
-        return tr("Slide out upwards");
-    case core::SlideOut::None:
-        break;
-    }
-    return {};
-}
-
-QString ScoreDocument::harmonicName(int kind) const {
-    switch (static_cast<core::HarmonicKind>(kind)) {
-    case core::HarmonicKind::Natural:
-        return tr("Natural harmonic");
-    case core::HarmonicKind::Artificial:
-        return tr("Artificial harmonic");
-    case core::HarmonicKind::Pinch:
-        return tr("Pinch harmonic");
-    case core::HarmonicKind::Tapped:
-        return tr("Tapped harmonic");
-    case core::HarmonicKind::Semi:
-        return tr("Semi-harmonic");
-    case core::HarmonicKind::None:
-        break;
-    }
-    return {};
-}
-
-int ScoreDocument::caretStrum() const {
-    return static_cast<int>(beatEffectsAtCaret().strum);
-}
-
-int ScoreDocument::caretHairpin() const {
-    return static_cast<int>(beatEffectsAtCaret().hairpin);
-}
-
-int ScoreDocument::caretFermata() const {
-    return static_cast<int>(beatEffectsAtCaret().fermata);
-}
-
-int ScoreDocument::caretOttava() const {
-    return static_cast<int>(beatEffectsAtCaret().ottava);
-}
-
-int ScoreDocument::caretPedal() const {
-    return static_cast<int>(beatEffectsAtCaret().pedal);
-}
-
-int ScoreDocument::caretBreath() const {
-    return static_cast<int>(beatEffectsAtCaret().breath);
-}
-
-bool ScoreDocument::caretSlur() const {
-    return beatEffectsAtCaret().slur;
-}
-
-namespace {
-
-// The clefs the measure popup offers, in its order (ADR-0087).
-constexpr std::array kOfferedClefs{core::Clef::Treble, core::Clef::Bass, core::Clef::Alto,
-                                   core::Clef::Tenor};
-
-} // namespace
-
-int ScoreDocument::caretClef() const {
-    if (!document_ || !hasCaret(document_->song()) || caretOnDrums()) {
-        return -1;
-    }
-    const core::Caret caret = core::clampCaret(document_->song(), session_.caret());
-    switch (document_->song().track(caret.track).staff(caret.staff).clefAt(caret.measure)) {
-    case core::Clef::Treble:
-    case core::Clef::Treble8vb:
-        return 0;
-    case core::Clef::Bass:
-    case core::Clef::Bass8vb:
-        return 1;
-    case core::Clef::Alto:
-        return 2;
-    case core::Clef::Tenor:
-        return 3;
-    case core::Clef::Percussion:
-        break;
-    }
-    return -1;
-}
-
-void ScoreDocument::setClef(int clef) {
-    if (clef < 0 || std::cmp_greater_equal(clef, kOfferedClefs.size())) {
-        return;
-    }
-    runEntry([this, chosen = kOfferedClefs.at(static_cast<std::size_t>(clef))](
-                 const core::Song& song) { return core::setClef(song, session_.caret(), chosen); });
-}
-
-int ScoreDocument::caretRepeat() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    return static_cast<int>(core::measureRepeatAt(document_->song(), session_.caret()));
-}
-
-void ScoreDocument::setMeasureRepeat(int measures) {
-    if (measures < 0 || measures > 2) {
-        return;
-    }
-    runEntry([this, measures](const core::Song& song) {
-        return core::setMeasureRepeat(song, session_.caret(), static_cast<std::size_t>(measures));
-    });
-}
-
-QString ScoreDocument::caretText() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return {};
-    }
-    return qstring(core::beatTextAt(document_->song(), session_.caret()));
-}
-
-QString ScoreDocument::caretChord() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return {};
-    }
-    return qstring(core::chordNameAt(document_->song(), session_.caret()));
-}
-
-int ScoreDocument::caretGraceNotes() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    return static_cast<int>(core::graceNotesAt(document_->song(), session_.caret()));
-}
-
-int ScoreDocument::caretPickStroke() const {
-    return static_cast<int>(beatEffectsAtCaret().pickStroke);
-}
-
-int ScoreDocument::caretTremolo() const {
-    const auto speed = beatEffectsAtCaret().tremoloPicking;
-    return speed ? denominatorOf(*speed) : 0;
-}
-
-int ScoreDocument::caretWhammyForm() const {
-    return static_cast<int>(core::whammyForm(beatEffectsAtCaret().whammyBar));
-}
-
-int ScoreDocument::caretWhammyCents() const {
-    return core::whammyCents(beatEffectsAtCaret().whammyBar);
-}
-
-int ScoreDocument::caretBassTechnique() const {
-    return static_cast<int>(beatEffectsAtCaret().bassTechnique);
-}
-
-int ScoreDocument::caretBendForm() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    return static_cast<int>(core::bendForm(core::bendAtCaret(document_->song(), session_.caret())));
-}
-
-int ScoreDocument::caretBendCents() const {
-    if (!document_ || !hasCaret(document_->song())) {
-        return 0;
-    }
-    return core::bendAtCaret(document_->song(), session_.caret()).maxCents();
-}
-
-QString ScoreDocument::bendAmount(int cents) const {
-    constexpr int kStep = 200;   // cents in a full step
-    constexpr int kQuarter = 50; // cents in a quarter step
-    if (cents == kStep) {
-        return tr("full");
-    }
-    if (cents <= 0 || cents % kQuarter != 0) {
-        return tr("%1 cents").arg(cents);
-    }
-    static constexpr std::array<const char*, 4> kQuarters{"", "1/4", "1/2", "3/4"};
-    const int steps = cents / kStep;
-    const QString part =
-        QLatin1StringView(kQuarters.at(static_cast<std::size_t>((cents % kStep) / kQuarter)));
-    if (steps == 0) {
-        return part;
-    }
-    return part.isEmpty() ? QString::number(steps) : QStringLiteral("%1 %2").arg(steps).arg(part);
-}
-
-QString ScoreDocument::bendName(int form, int cents) const {
-    switch (static_cast<core::BendForm>(form)) {
-    case core::BendForm::None:
-        return {};
-    case core::BendForm::Bend:
-        return tr("Bend %1").arg(bendAmount(cents));
-    case core::BendForm::BendRelease:
-        return tr("Bend and release %1").arg(bendAmount(cents));
-    case core::BendForm::PreBend:
-        return tr("Pre-bend %1").arg(bendAmount(cents));
-    case core::BendForm::PreBendRelease:
-        return tr("Pre-bend and release %1").arg(bendAmount(cents));
-    case core::BendForm::Custom:
-        break;
-    }
-    return tr("Bend (custom curve)");
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
@@ -3121,18 +1990,6 @@ bool ScoreDocument::showEdit(bool changed) {
     }
     placeCaretBox();
     return false;
-}
-
-void ScoreDocument::runEntry(const std::function<core::Entry(const core::Song&)>& make) {
-    if (!document_ || !hasCaret(document_->song())) {
-        return;
-    }
-    session_.endTyping();
-    try {
-        enter(make(document_->song()));
-    } catch (const std::exception& error) {
-        emit editFailed(qstring(error.what()));
-    }
 }
 
 void ScoreDocument::startSession(std::size_t track) {
@@ -3299,8 +2156,9 @@ void ScoreDocument::transposeSelection(int semitones) {
             edited();
         }
     } catch (const std::exception&) {
-        emit editFailed(caretFretted() ? tr("A note would leave the range or the neck.")
-                                       : tr("A note would leave the range."));
+        emit editFailed(onStrings(document_->song(), session_.caret())
+                            ? tr("A note would leave the range or the neck.")
+                            : tr("A note would leave the range."));
     }
 }
 

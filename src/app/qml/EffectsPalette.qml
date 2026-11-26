@@ -12,6 +12,8 @@ Rectangle {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
 
     /// Whether the palette shows; the window slides it in and out.
     property bool opened: true
@@ -231,14 +233,14 @@ Rectangle {
     component BendForm: IconTile {
         required property int form
 
-        active: root.document.caretBendForm === form
+        active: root.editor.caretBendForm === form
         Accessible.role: Accessible.RadioButton
         onClicked: {
             if (active) {
-                root.document.setBend(0, 0);
+                root.editor.setBend(0, 0);
             } else {
-                const cents = root.document.caretBendCents;
-                root.document.setBend(form, cents > 0 ? cents : root.bendCents);
+                const cents = root.editor.caretBendCents;
+                root.editor.setBend(form, cents > 0 ? cents : root.bendCents);
             }
         }
     }
@@ -248,14 +250,14 @@ Rectangle {
         required property int cents
 
         bold: false
-        label: root.amountText(root.document.bendAmount(cents))
-        tip: root.document.bendAmount(cents)
-        active: root.document.caretBendForm > 0 && root.document.caretBendCents === cents
+        label: root.amountText(root.editor.bendAmount(cents))
+        tip: root.editor.bendAmount(cents)
+        active: root.editor.caretBendForm > 0 && root.editor.caretBendCents === cents
         Accessible.role: Accessible.RadioButton
         onClicked: {
-            const form = root.document.caretBendForm;
+            const form = root.editor.caretBendForm;
             root.bendCents = cents;
-            root.document.setBend(form > 0 && form < 5 ? form : 1, cents);
+            root.editor.setBend(form > 0 && form < 5 ? form : 1, cents);
         }
     }
 
@@ -264,16 +266,16 @@ Rectangle {
     component WhammyForm: IconTile {
         required property int form
 
-        readonly property bool diving: root.document.caretWhammyCents < 0
+        readonly property bool diving: root.editor.caretWhammyCents < 0
 
-        active: diving && root.document.caretWhammyForm === form
-        tip: root.document.whammyName(form, diving ? root.document.caretWhammyCents : root.whammyCents)
+        active: diving && root.editor.caretWhammyForm === form
+        tip: root.editor.whammyName(form, diving ? root.editor.caretWhammyCents : root.whammyCents)
         Accessible.role: Accessible.RadioButton
         onClicked: {
             if (active) {
-                root.document.setWhammy(0, 0);
+                root.editor.setWhammy(0, 0);
             } else {
-                root.document.setWhammy(form, diving ? root.document.caretWhammyCents
+                root.editor.setWhammy(form, diving ? root.editor.caretWhammyCents
                                                      : root.whammyCents);
             }
         }
@@ -283,16 +285,16 @@ Rectangle {
     component WhammyAmount: LabelTile {
         required property int cents
 
-        readonly property int form: root.document.caretWhammyForm
+        readonly property int form: root.editor.caretWhammyForm
 
         bold: false
-        label: root.amountText(root.document.whammyAmount(cents))
-        tip: root.document.whammyAmount(cents)
-        active: form > 0 && form < 5 && root.document.caretWhammyCents === cents
+        label: root.amountText(root.editor.whammyAmount(cents))
+        tip: root.editor.whammyAmount(cents)
+        active: form > 0 && form < 5 && root.editor.caretWhammyCents === cents
         Accessible.role: Accessible.RadioButton
         onClicked: {
             root.whammyCents = cents;
-            root.document.setWhammy(form > 0 && form < 5 ? form : 1, cents);
+            root.editor.setWhammy(form > 0 && form < 5 ? form : 1, cents);
         }
     }
 
@@ -303,10 +305,10 @@ Rectangle {
         required property int dynamic
 
         size: 24
-        active: root.document.caretDynamic === dynamic
-        tip: root.document.dynamicName(dynamic)
+        active: root.editor.caretDynamic === dynamic
+        tip: root.editor.dynamicName(dynamic)
         Accessible.role: Accessible.RadioButton
-        onClicked: root.document.setDynamic(dynamic)
+        onClicked: root.editor.setDynamic(dynamic)
     }
 
     // The groups are made when the palette first shows: a window without a
@@ -342,21 +344,21 @@ Rectangle {
 
                     Tiles {
                         Repeater {
-                            model: root.document.effectCount
+                            model: root.editor.effectCount
 
                             delegate: Tile {
                                 id: keyedTile
 
                                 required property int index
                                 readonly property var drawn: root.keyed[index]
-                                readonly property string key: root.document.effectKey(index)
+                                readonly property string key: root.editor.effectKey(index)
 
                                 // Techniques of strings show only on a fretted staff.
-                                visible: root.document.caretFretted
-                                         || !root.document.effectNeedsStrings(index)
-                                active: (root.document.caretEffects & (1 << index)) !== 0
-                                tip: qsTr("%1 (%2)").arg(root.document.effectName(index)).arg(key)
-                                onClicked: root.document.toggleEffect(index)
+                                visible: root.editor.caretFretted
+                                         || !root.editor.effectNeedsStrings(index)
+                                active: (root.editor.caretEffects & (1 << index)) !== 0
+                                tip: qsTr("%1 (%2)").arg(root.editor.effectName(index)).arg(key)
+                                onClicked: root.editor.toggleEffect(index)
 
                                 contentItem: Item {
                                     Icon {
@@ -401,7 +403,7 @@ Rectangle {
 
                 Group {
                     title: qsTr("Bend")
-                    visible: root.document.caretFretted
+                    visible: root.editor.caretFretted
 
                     // The bend's form, then how far it goes.
                     Tiles {
@@ -441,52 +443,52 @@ Rectangle {
 
                 Group {
                     title: qsTr("Slide")
-                    visible: root.document.caretFretted
+                    visible: root.editor.caretFretted
 
                     // How the caret's notes slide in, then out (ADR-0058).
                     Tiles {
                         IconTile {
-                            tip: root.document.slideInName(1)
+                            tip: root.editor.slideInName(1)
                             path: Icons.slideInBelow
-                            active: root.document.caretSlideIn === 1
-                            onClicked: root.document.setSlideIn(active ? 0 : 1)
+                            active: root.editor.caretSlideIn === 1
+                            onClicked: root.editor.setSlideIn(active ? 0 : 1)
                         }
                         IconTile {
-                            tip: root.document.slideInName(2)
+                            tip: root.editor.slideInName(2)
                             path: Icons.slideInAbove
-                            active: root.document.caretSlideIn === 2
-                            onClicked: root.document.setSlideIn(active ? 0 : 2)
+                            active: root.editor.caretSlideIn === 2
+                            onClicked: root.editor.setSlideIn(active ? 0 : 2)
                         }
                         IconTile {
-                            tip: root.document.slideOutName(1)
+                            tip: root.editor.slideOutName(1)
                             path: Icons.slide
-                            active: root.document.caretSlideOut === 1
-                            onClicked: root.document.setSlideOut(active ? 0 : 1)
+                            active: root.editor.caretSlideOut === 1
+                            onClicked: root.editor.setSlideOut(active ? 0 : 1)
                         }
                         IconTile {
-                            tip: root.document.slideOutName(2)
+                            tip: root.editor.slideOutName(2)
                             path: Icons.slideLegato
-                            active: root.document.caretSlideOut === 2
-                            onClicked: root.document.setSlideOut(active ? 0 : 2)
+                            active: root.editor.caretSlideOut === 2
+                            onClicked: root.editor.setSlideOut(active ? 0 : 2)
                         }
                         IconTile {
-                            tip: root.document.slideOutName(3)
+                            tip: root.editor.slideOutName(3)
                             path: Icons.slideOutDown
-                            active: root.document.caretSlideOut === 3
-                            onClicked: root.document.setSlideOut(active ? 0 : 3)
+                            active: root.editor.caretSlideOut === 3
+                            onClicked: root.editor.setSlideOut(active ? 0 : 3)
                         }
                         IconTile {
-                            tip: root.document.slideOutName(4)
+                            tip: root.editor.slideOutName(4)
                             path: Icons.slideOutUp
-                            active: root.document.caretSlideOut === 4
-                            onClicked: root.document.setSlideOut(active ? 0 : 4)
+                            active: root.editor.caretSlideOut === 4
+                            onClicked: root.editor.setSlideOut(active ? 0 : 4)
                         }
                     }
                 }
 
                 Group {
                     title: qsTr("Harmonic")
-                    visible: root.document.caretFretted
+                    visible: root.editor.caretFretted
 
                     // The harmonic's kind, lettered as the score letters it.
                     Tiles {
@@ -497,10 +499,10 @@ Rectangle {
                                 required property int index
                                 required property string modelData
 
-                                tip: root.document.harmonicName(index + 1)
+                                tip: root.editor.harmonicName(index + 1)
                                 label: modelData
-                                active: root.document.caretHarmonic === index + 1
-                                onClicked: root.document.setHarmonic(active ? 0 : index + 1)
+                                active: root.editor.caretHarmonic === index + 1
+                                onClicked: root.editor.setHarmonic(active ? 0 : index + 1)
                             }
                         }
                     }
@@ -514,52 +516,52 @@ Rectangle {
                         IconTile {
                             tip: qsTr("Slight vibrato")
                             path: Icons.vibrato
-                            active: root.document.caretVibrato === 1
-                            onClicked: root.document.setVibrato(active ? 0 : 1)
+                            active: root.editor.caretVibrato === 1
+                            onClicked: root.editor.setVibrato(active ? 0 : 1)
                         }
                         IconTile {
                             tip: qsTr("Wide vibrato")
                             path: Icons.vibratoWide
-                            active: root.document.caretVibrato === 2
-                            onClicked: root.document.setVibrato(active ? 0 : 2)
+                            active: root.editor.caretVibrato === 2
+                            onClicked: root.editor.setVibrato(active ? 0 : 2)
                         }
                         SymbolTile {
                             tip: qsTr("Accent")
                             symbol: "\uE4A0"
                             size: 36
-                            active: root.document.caretAccent === 1
-                            onClicked: root.document.setAccent(active ? 0 : 1)
+                            active: root.editor.caretAccent === 1
+                            onClicked: root.editor.setAccent(active ? 0 : 1)
                         }
                         SymbolTile {
                             tip: qsTr("Marcato")
                             symbol: "\uE4AC"
                             size: 36
-                            active: root.document.caretAccent === 2
-                            onClicked: root.document.setAccent(active ? 0 : 2)
+                            active: root.editor.caretAccent === 2
+                            onClicked: root.editor.setAccent(active ? 0 : 2)
                         }
                         // The finger that plays the caret's notes, numbered as
                         // core::Finger: each click the next one, then none. On a
                         // fretted staff 1 is the index and T the thumb, which
                         // comes last (ADR-0093).
                         LabelTile {
-                            readonly property bool fretted: root.document.caretFretted
-                            readonly property int finger: root.document.caretFingering
+                            readonly property bool fretted: root.editor.caretFretted
+                            readonly property int finger: root.editor.caretFingering
 
                             tip: qsTr("Fingering: again for the next finger")
                             label: (fretted ? ["1", "T", "1", "2", "3", "4"]
                                             : ["1", "1", "2", "3", "4", "5"])[finger]
                             active: finger !== 0
-                            onClicked: root.document.setFingering(
+                            onClicked: root.editor.setFingering(
                                            fretted ? [2, 0, 3, 4, 5, 1][finger] : (finger + 1) % 6)
                         }
                         // The finger that plucks them on a fretted staff: p, i, m,
                         // a, c, then none.
                         LabelTile {
-                            visible: root.document.caretFretted
+                            visible: root.editor.caretFretted
                             tip: qsTr("Plucking finger: again for the next one")
-                            label: ["p", "p", "i", "m", "a", "c"][root.document.caretPluck]
-                            active: root.document.caretPluck !== 0
-                            onClicked: root.document.setPluck((root.document.caretPluck + 1) % 6)
+                            label: ["p", "p", "i", "m", "a", "c"][root.editor.caretPluck]
+                            active: root.editor.caretPluck !== 0
+                            onClicked: root.editor.setPluck((root.editor.caretPluck + 1) % 6)
                         }
                     }
                     Tiles {
@@ -568,37 +570,37 @@ Rectangle {
                             tip: qsTr("Trill")
                             symbol: "\uE566"
                             size: 28
-                            active: root.document.caretTrill !== 0
-                            onClicked: root.document.toggleTrill()
+                            active: root.editor.caretTrill !== 0
+                            onClicked: root.editor.toggleTrill()
                         }
                         // Mordents and turns, numbered as core::Ornament (ADR-0091).
                         SymbolTile {
                             tip: qsTr("Mordent")
                             symbol: "\uE56D"
                             size: 28
-                            active: root.document.caretOrnament === 1
-                            onClicked: root.document.setOrnament(active ? 0 : 1)
+                            active: root.editor.caretOrnament === 1
+                            onClicked: root.editor.setOrnament(active ? 0 : 1)
                         }
                         SymbolTile {
                             tip: qsTr("Upper mordent")
                             symbol: "\uE56C"
                             size: 28
-                            active: root.document.caretOrnament === 2
-                            onClicked: root.document.setOrnament(active ? 0 : 2)
+                            active: root.editor.caretOrnament === 2
+                            onClicked: root.editor.setOrnament(active ? 0 : 2)
                         }
                         SymbolTile {
                             tip: qsTr("Turn")
                             symbol: "\uE567"
                             size: 28
-                            active: root.document.caretOrnament === 3
-                            onClicked: root.document.setOrnament(active ? 0 : 3)
+                            active: root.editor.caretOrnament === 3
+                            onClicked: root.editor.setOrnament(active ? 0 : 3)
                         }
                         SymbolTile {
                             tip: qsTr("Inverted turn")
                             symbol: "\uE568"
                             size: 28
-                            active: root.document.caretOrnament === 4
-                            onClicked: root.document.setOrnament(active ? 0 : 4)
+                            active: root.editor.caretOrnament === 4
+                            onClicked: root.editor.setOrnament(active ? 0 : 4)
                         }
                     }
                 }
@@ -624,14 +626,14 @@ Rectangle {
                         IconTile {
                             tip: qsTr("Crescendo")
                             path: Icons.crescendo
-                            active: root.document.caretHairpin === 1
-                            onClicked: root.document.setHairpin(active ? 0 : 1)
+                            active: root.editor.caretHairpin === 1
+                            onClicked: root.editor.setHairpin(active ? 0 : 1)
                         }
                         IconTile {
                             tip: qsTr("Diminuendo")
                             path: Icons.diminuendo
-                            active: root.document.caretHairpin === 2
-                            onClicked: root.document.setHairpin(active ? 0 : 2)
+                            active: root.editor.caretHairpin === 2
+                            onClicked: root.editor.setHairpin(active ? 0 : 2)
                         }
                     }
                 }
@@ -644,15 +646,15 @@ Rectangle {
                         IconTile {
                             tip: qsTr("Slur to the next note")
                             path: Icons.slur
-                            active: root.document.caretSlur
-                            onClicked: root.document.setSlur(!active)
+                            active: root.editor.caretSlur
+                            onClicked: root.editor.setSlur(!active)
                         }
                         // A small slashed note leading into the caret's beat (ADR-0079).
                         IconTile {
                             tip: qsTr("Grace note")
                             path: Icons.graceNote
-                            active: root.document.caretGraceNotes > 0
-                            onClicked: root.document.toggleGraceNote()
+                            active: root.editor.caretGraceNotes > 0
+                            onClicked: root.editor.toggleGraceNote()
                         }
                         Gap {}
                         // The caret's beat held under a fermata, numbered as
@@ -661,22 +663,22 @@ Rectangle {
                             tip: qsTr("Short fermata")
                             symbol: "\uE4C4"
                             size: 28
-                            active: root.document.caretFermata === 1
-                            onClicked: root.document.setFermata(active ? 0 : 1)
+                            active: root.editor.caretFermata === 1
+                            onClicked: root.editor.setFermata(active ? 0 : 1)
                         }
                         SymbolTile {
                             tip: qsTr("Fermata")
                             symbol: "\uE4C0"
                             size: 28
-                            active: root.document.caretFermata === 2
-                            onClicked: root.document.setFermata(active ? 0 : 2)
+                            active: root.editor.caretFermata === 2
+                            onClicked: root.editor.setFermata(active ? 0 : 2)
                         }
                         SymbolTile {
                             tip: qsTr("Long fermata")
                             symbol: "\uE4C6"
                             size: 28
-                            active: root.document.caretFermata === 3
-                            onClicked: root.document.setFermata(active ? 0 : 3)
+                            active: root.editor.caretFermata === 3
+                            onClicked: root.editor.setFermata(active ? 0 : 3)
                         }
                     }
                     Tiles {
@@ -687,16 +689,16 @@ Rectangle {
                             tip: qsTr("Octave line up: 8va, again for 15ma")
                             symbol: "\uE511"
                             size: 22
-                            active: root.document.caretOttava === 1 || root.document.caretOttava === 3
-                            onClicked: root.document.setOttava(root.document.caretOttava === 1
+                            active: root.editor.caretOttava === 1 || root.editor.caretOttava === 3
+                            onClicked: root.editor.setOttava(root.editor.caretOttava === 1
                                                                ? 3 : (active ? 0 : 1))
                         }
                         SymbolTile {
                             tip: qsTr("Octave line down: 8vb, again for 15mb")
                             symbol: "\uE51C"
                             size: 22
-                            active: root.document.caretOttava === 2 || root.document.caretOttava === 4
-                            onClicked: root.document.setOttava(root.document.caretOttava === 2
+                            active: root.editor.caretOttava === 2 || root.editor.caretOttava === 4
+                            onClicked: root.editor.setOttava(root.editor.caretOttava === 2
                                                                ? 4 : (active ? 0 : 2))
                         }
                         // The sustain pedal under the caret's beat, numbered as
@@ -706,18 +708,18 @@ Rectangle {
                             tip: qsTr("Sustain pedal: again to change it")
                             symbol: "\uE650"
                             size: 18
-                            active: root.document.caretPedal !== 0
-                            onClicked: root.document.setPedal((root.document.caretPedal + 1) % 3)
+                            active: root.editor.caretPedal !== 0
+                            onClicked: root.editor.setPedal((root.editor.caretPedal + 1) % 3)
                         }
                         // A break after the caret's beat, numbered as core::Breath:
                         // a breath mark, a second click a caesura, a third none
                         // (ADR-0095).
                         SymbolTile {
                             tip: qsTr("Breath mark: again for a caesura")
-                            symbol: root.document.caretBreath === 2 ? "\uE4D1" : "\uE4CE"
-                            size: root.document.caretBreath === 2 ? 24 : 44
-                            active: root.document.caretBreath !== 0
-                            onClicked: root.document.setBreath((root.document.caretBreath + 1) % 3)
+                            symbol: root.editor.caretBreath === 2 ? "\uE4D1" : "\uE4CE"
+                            size: root.editor.caretBreath === 2 ? 24 : 44
+                            active: root.editor.caretBreath !== 0
+                            onClicked: root.editor.setBreath((root.editor.caretBreath + 1) % 3)
                         }
                     }
                 }
@@ -728,54 +730,54 @@ Rectangle {
                     // The beat's strum, pick stroke and tremolo picking.
                     Tiles {
                         IconTile {
-                            tip: root.document.caretFretted ? qsTr("Strum down") : qsTr("Roll upwards")
+                            tip: root.editor.caretFretted ? qsTr("Strum down") : qsTr("Roll upwards")
                             path: Icons.strumDown
-                            active: root.document.caretStrum === 1
-                            onClicked: root.document.setStrum(active ? 0 : 1)
+                            active: root.editor.caretStrum === 1
+                            onClicked: root.editor.setStrum(active ? 0 : 1)
                         }
                         IconTile {
-                            tip: root.document.caretFretted ? qsTr("Strum up") : qsTr("Roll downwards")
+                            tip: root.editor.caretFretted ? qsTr("Strum up") : qsTr("Roll downwards")
                             path: Icons.strumUp
-                            active: root.document.caretStrum === 2
-                            onClicked: root.document.setStrum(active ? 0 : 2)
+                            active: root.editor.caretStrum === 2
+                            onClicked: root.editor.setStrum(active ? 0 : 2)
                         }
                         Gap {}
                         SymbolTile {
                             tip: qsTr("Down stroke")
                             symbol: "\uE610"
                             size: 32
-                            active: root.document.caretPickStroke === 1
-                            onClicked: root.document.setPickStroke(active ? 0 : 1)
+                            active: root.editor.caretPickStroke === 1
+                            onClicked: root.editor.setPickStroke(active ? 0 : 1)
                         }
                         SymbolTile {
                             tip: qsTr("Up stroke")
                             symbol: "\uE612"
                             size: 30
-                            active: root.document.caretPickStroke === 2
-                            onClicked: root.document.setPickStroke(active ? 0 : 2)
+                            active: root.editor.caretPickStroke === 2
+                            onClicked: root.editor.setPickStroke(active ? 0 : 2)
                         }
                     }
                     Tiles {
                         IconTile {
                             tip: qsTr("Tremolo picking in eighths")
                             path: Icons.tremolo8
-                            active: root.document.caretTremolo === 8
-                            onClicked: root.document.setTremolo(active ? 0 : 8)
+                            active: root.editor.caretTremolo === 8
+                            onClicked: root.editor.setTremolo(active ? 0 : 8)
                         }
                         IconTile {
                             tip: qsTr("Tremolo picking in sixteenths")
                             path: Icons.tremolo16
-                            active: root.document.caretTremolo === 16
-                            onClicked: root.document.setTremolo(active ? 0 : 16)
+                            active: root.editor.caretTremolo === 16
+                            onClicked: root.editor.setTremolo(active ? 0 : 16)
                         }
                         IconTile {
                             tip: qsTr("Tremolo picking in thirty-seconds")
                             path: Icons.tremolo32
-                            active: root.document.caretTremolo === 32
-                            onClicked: root.document.setTremolo(active ? 0 : 32)
+                            active: root.editor.caretTremolo === 32
+                            onClicked: root.editor.setTremolo(active ? 0 : 32)
                         }
                         Gap {
-                            visible: root.document.caretFretted
+                            visible: root.editor.caretFretted
                         }
                         // Tapping, slap and pop (ADR-0060), lettered as the
                         // score writes them; techniques of strings.
@@ -786,11 +788,11 @@ Rectangle {
                                 required property int index
                                 required property string modelData
 
-                                tip: root.document.bassTechniqueName(index + 1)
+                                tip: root.editor.bassTechniqueName(index + 1)
                                 label: modelData
-                                visible: root.document.caretFretted
-                                active: root.document.caretBassTechnique === index + 1
-                                onClicked: root.document.setBassTechnique(active ? 0 : index + 1)
+                                visible: root.editor.caretFretted
+                                active: root.editor.caretBassTechnique === index + 1
+                                onClicked: root.editor.setBassTechnique(active ? 0 : index + 1)
                             }
                         }
                     }
@@ -799,7 +801,7 @@ Rectangle {
                 Group {
                     title: qsTr("Whammy bar")
                     // A guitar's, so only on a fretted staff.
-                    visible: root.document.caretFretted
+                    visible: root.editor.caretFretted
 
                     // The whammy bar's form, then how deep it dives.
                     Tiles {

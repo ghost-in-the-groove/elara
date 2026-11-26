@@ -1648,6 +1648,417 @@
     </message>
 </context>
 <context>
+    <name>elara::app::CaretEditor</name>
+    <message>
+        <source>Tie</source>
+        <translation>Ligadura</translation>
+    </message>
+    <message>
+        <source>Hammer-on or pull-off</source>
+        <translation>Hammer-on o pull-off</translation>
+    </message>
+    <message>
+        <source>Slide</source>
+        <translation>Deslizamiento</translation>
+    </message>
+    <message>
+        <source>Bend</source>
+        <translation>Bending</translation>
+    </message>
+    <message>
+        <source>Vibrato</source>
+        <translation>Vibrato</translation>
+    </message>
+    <message>
+        <source>Palm mute</source>
+        <translation>Apagado con la palma</translation>
+    </message>
+    <message>
+        <source>Dead note</source>
+        <translation>Nota muerta</translation>
+    </message>
+    <message>
+        <source>Let ring</source>
+        <translation>Dejar sonar</translation>
+    </message>
+    <message>
+        <source>Natural harmonic</source>
+        <translation>Armónico natural</translation>
+    </message>
+    <message>
+        <source>Ghost note</source>
+        <translation>Nota fantasma</translation>
+    </message>
+    <message>
+        <source>Accent</source>
+        <translation>Acento</translation>
+    </message>
+    <message>
+        <source>Staccato</source>
+        <translation>Staccato</translation>
+    </message>
+    <message>
+        <source>Tenuto</source>
+        <translation>Tenuto</translation>
+    </message>
+    <message>
+        <source>Staccatissimo</source>
+        <translation>Staccatissimo</translation>
+    </message>
+    <message>
+        <source>Crash cymbal</source>
+        <translation>Platillo crash</translation>
+    </message>
+    <message>
+        <source>Closed hi-hat</source>
+        <translation>Charles cerrado</translation>
+    </message>
+    <message>
+        <source>Open hi-hat</source>
+        <translation>Charles abierto</translation>
+    </message>
+    <message>
+        <source>Ride cymbal</source>
+        <translation>Platillo ride</translation>
+    </message>
+    <message>
+        <source>Ride bell</source>
+        <translation>Campana del ride</translation>
+    </message>
+    <message>
+        <source>High tom</source>
+        <translation>Tom agudo</translation>
+    </message>
+    <message>
+        <source>Mid tom</source>
+        <translation>Tom medio</translation>
+    </message>
+    <message>
+        <source>Snare</source>
+        <translation>Caja</translation>
+    </message>
+    <message>
+        <source>Side stick</source>
+        <translation>Golpe de aro</translation>
+    </message>
+    <message>
+        <source>Floor tom</source>
+        <translation>Tom de suelo</translation>
+    </message>
+    <message>
+        <source>Bass drum</source>
+        <translation>Bombo</translation>
+    </message>
+    <message>
+        <source>Hi-hat pedal</source>
+        <translation>Pedal de charles</translation>
+    </message>
+    <message>
+        <source>Measure %1 selected</source>
+        <translation>Compás %1 seleccionado</translation>
+    </message>
+    <message>
+        <source>Measures %1-%2 selected</source>
+        <translation>Compases %1-%2 seleccionados</translation>
+    </message>
+    <message>
+        <source>Measure %1</source>
+        <translation>Compás %1</translation>
+    </message>
+    <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
+        <source>New beat</source>
+        <translation>Tiempo nuevo</translation>
+    </message>
+    <message>
+        <source>Beat %1</source>
+        <translation>Tiempo %1</translation>
+    </message>
+    <message>
+        <source>Chord %1</source>
+        <translation>Acorde %1</translation>
+    </message>
+    <message>
+        <source>“%1”</source>
+        <translation>«%1»</translation>
+    </message>
+    <message>
+        <source>String %1</source>
+        <translation>Cuerda %1</translation>
+    </message>
+    <message>
+        <source>Fret %1</source>
+        <translation>Traste %1</translation>
+    </message>
+    <message>
+        <source>Wide vibrato</source>
+        <translation>Vibrato amplio</translation>
+    </message>
+    <message>
+        <source>Marcato</source>
+        <translation>Marcato</translation>
+    </message>
+    <message>
+        <source>Trill</source>
+        <translation>Trino</translation>
+    </message>
+    <message>
+        <source>Mordent</source>
+        <translation>Mordente</translation>
+    </message>
+    <message>
+        <source>Upper mordent</source>
+        <translation>Mordente superior</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>Grupeto</translation>
+    </message>
+    <message>
+        <source>Inverted turn</source>
+        <translation>Grupeto invertido</translation>
+    </message>
+    <message>
+        <source>Finger %1</source>
+        <translation>Dedo %1</translation>
+    </message>
+    <message>
+        <source>Plucked with %1</source>
+        <translation>Pulsada con %1</translation>
+    </message>
+    <message>
+        <source>Strum down</source>
+        <translation>Rasgueo abajo</translation>
+    </message>
+    <message>
+        <source>Strum up</source>
+        <translation>Rasgueo arriba</translation>
+    </message>
+    <message>
+        <source>Down stroke</source>
+        <translation>Púa abajo</translation>
+    </message>
+    <message>
+        <source>Up stroke</source>
+        <translation>Púa arriba</translation>
+    </message>
+    <message>
+        <source>Tremolo picking 1/%1</source>
+        <translation>Trémolo 1/%1</translation>
+    </message>
+    <message>
+        <source>Crescendo</source>
+        <translation>Crescendo</translation>
+    </message>
+    <message>
+        <source>Diminuendo</source>
+        <translation>Diminuendo</translation>
+    </message>
+    <message>
+        <source>Short fermata</source>
+        <translation>Calderón corto</translation>
+    </message>
+    <message>
+        <source>Fermata</source>
+        <translation>Calderón</translation>
+    </message>
+    <message>
+        <source>Long fermata</source>
+        <translation>Calderón largo</translation>
+    </message>
+    <message>
+        <source>Octave line %1</source>
+        <translation>Línea de octava %1</translation>
+    </message>
+    <message>
+        <source>Slur</source>
+        <translation>Ligadura de expresión</translation>
+    </message>
+    <message>
+        <source>Pedal change</source>
+        <translation>Cambio de pedal</translation>
+    </message>
+    <message>
+        <source>Sustain pedal</source>
+        <translation>Pedal de resonancia</translation>
+    </message>
+    <message>
+        <source>Caesura</source>
+        <translation>Cesura</translation>
+    </message>
+    <message>
+        <source>Breath mark</source>
+        <translation>Respiración</translation>
+    </message>
+    <message>
+        <source>Grace notes</source>
+        <translation>Notas de adorno</translation>
+    </message>
+    <message>
+        <source>Drums take no note names.</source>
+        <translation>La batería no admite nombres de nota.</translation>
+    </message>
+    <message>
+        <source>No string can play that note.</source>
+        <translation>Ninguna cuerda puede tocar esa nota.</translation>
+    </message>
+    <message>
+        <source>That note is out of range.</source>
+        <translation>Esa nota está fuera de rango.</translation>
+    </message>
+    <message>
+        <source>The note would leave the neck.</source>
+        <translation>La nota se saldría del mástil.</translation>
+    </message>
+    <message>
+        <source>Hits are typed on a drum track.</source>
+        <translation>Los golpes se escriben en una pista de batería.</translation>
+    </message>
+    <message>
+        <source>Effects go on notes: put the caret on one.</source>
+        <translation>Los efectos van sobre notas: pon el cursor en una.</translation>
+    </message>
+    <message>
+        <source>That fret has no natural harmonic.</source>
+        <translation>Ese traste no tiene armónico natural.</translation>
+    </message>
+    <message>
+        <source>There is no note to tie to.</source>
+        <translation>No hay ninguna nota a la que ligar.</translation>
+    </message>
+    <message>
+        <source>%1 needs strings.</source>
+        <translation>%1 necesita cuerdas.</translation>
+    </message>
+    <message>
+        <source>Dive %1</source>
+        <translation>Hundimiento %1</translation>
+    </message>
+    <message>
+        <source>Pull-up %1</source>
+        <translation>Subida %1</translation>
+    </message>
+    <message>
+        <source>Dip %1</source>
+        <translation>Caída y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Inverted dip %1</source>
+        <translation>Subida y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-dive %1</source>
+        <translation>Prehundimiento %1</translation>
+    </message>
+    <message>
+        <source>Pre-pull-up %1</source>
+        <translation>Presubida %1</translation>
+    </message>
+    <message>
+        <source>Pre-dive and return %1</source>
+        <translation>Prehundimiento y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-pull-up and return %1</source>
+        <translation>Presubida y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Whammy bar (custom curve)</source>
+        <translation>Palanca de trémolo (curva propia)</translation>
+    </message>
+    <message>
+        <source>Tapping</source>
+        <translation>Tapping</translation>
+    </message>
+    <message>
+        <source>Slap</source>
+        <translation>Slap</translation>
+    </message>
+    <message>
+        <source>Pop</source>
+        <translation>Pop</translation>
+    </message>
+    <message>
+        <source>Harmonics need strings.</source>
+        <translation>Los armónicos necesitan cuerdas.</translation>
+    </message>
+    <message>
+        <source>Dynamics go on notes: put the caret on one.</source>
+        <translation>Las dinámicas van en notas: pon el cursor en una.</translation>
+    </message>
+    <message>
+        <source>Slide in from below</source>
+        <translation>Deslizamiento de entrada desde abajo</translation>
+    </message>
+    <message>
+        <source>Slide in from above</source>
+        <translation>Deslizamiento de entrada desde arriba</translation>
+    </message>
+    <message>
+        <source>Shift slide</source>
+        <translation>Deslizamiento con ataque</translation>
+    </message>
+    <message>
+        <source>Legato slide</source>
+        <translation>Deslizamiento ligado</translation>
+    </message>
+    <message>
+        <source>Slide out downwards</source>
+        <translation>Deslizamiento de salida hacia abajo</translation>
+    </message>
+    <message>
+        <source>Slide out upwards</source>
+        <translation>Deslizamiento de salida hacia arriba</translation>
+    </message>
+    <message>
+        <source>Artificial harmonic</source>
+        <translation>Armónico artificial</translation>
+    </message>
+    <message>
+        <source>Pinch harmonic</source>
+        <translation>Armónico pellizcado</translation>
+    </message>
+    <message>
+        <source>Tapped harmonic</source>
+        <translation>Armónico con tapping</translation>
+    </message>
+    <message>
+        <source>Semi-harmonic</source>
+        <translation>Semiarmónico</translation>
+    </message>
+    <message>
+        <source>full</source>
+        <translation>completo</translation>
+    </message>
+    <message>
+        <source>%1 cents</source>
+        <translation>%1 cents</translation>
+    </message>
+    <message>
+        <source>Bend %1</source>
+        <translation>Bending %1</translation>
+    </message>
+    <message>
+        <source>Bend and release %1</source>
+        <translation>Bending y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Pre-bend %1</source>
+        <translation>Pre-bending %1</translation>
+    </message>
+    <message>
+        <source>Pre-bend and release %1</source>
+        <translation>Pre-bending y vuelta %1</translation>
+    </message>
+    <message>
+        <source>Bend (custom curve)</source>
+        <translation>Bending (curva propia)</translation>
+    </message>
+</context>
+<context>
     <name>elara::app::ScoreDocument</name>
     <message>
         <source>Electric guitar</source>
@@ -1957,110 +2368,6 @@
         <source>Write out measure repeat</source>
         <translation>Escribir la repetición de compás</translation>
     </message>
-    <message>
-        <source>Tie</source>
-        <translation>Ligadura</translation>
-    </message>
-    <message>
-        <source>Hammer-on or pull-off</source>
-        <translation>Hammer-on o pull-off</translation>
-    </message>
-    <message>
-        <source>Slide</source>
-        <translation>Deslizamiento</translation>
-    </message>
-    <message>
-        <source>Bend</source>
-        <translation>Bending</translation>
-    </message>
-    <message>
-        <source>Vibrato</source>
-        <translation>Vibrato</translation>
-    </message>
-    <message>
-        <source>Palm mute</source>
-        <translation>Apagado con la palma</translation>
-    </message>
-    <message>
-        <source>Dead note</source>
-        <translation>Nota muerta</translation>
-    </message>
-    <message>
-        <source>Let ring</source>
-        <translation>Dejar sonar</translation>
-    </message>
-    <message>
-        <source>Natural harmonic</source>
-        <translation>Armónico natural</translation>
-    </message>
-    <message>
-        <source>Ghost note</source>
-        <translation>Nota fantasma</translation>
-    </message>
-    <message>
-        <source>Accent</source>
-        <translation>Acento</translation>
-    </message>
-    <message>
-        <source>Staccato</source>
-        <translation>Staccato</translation>
-    </message>
-    <message>
-        <source>Tenuto</source>
-        <translation>Tenuto</translation>
-    </message>
-    <message>
-        <source>Staccatissimo</source>
-        <translation>Staccatissimo</translation>
-    </message>
-    <message>
-        <source>Crash cymbal</source>
-        <translation>Platillo crash</translation>
-    </message>
-    <message>
-        <source>Closed hi-hat</source>
-        <translation>Charles cerrado</translation>
-    </message>
-    <message>
-        <source>Open hi-hat</source>
-        <translation>Charles abierto</translation>
-    </message>
-    <message>
-        <source>Ride cymbal</source>
-        <translation>Platillo ride</translation>
-    </message>
-    <message>
-        <source>Ride bell</source>
-        <translation>Campana del ride</translation>
-    </message>
-    <message>
-        <source>High tom</source>
-        <translation>Tom agudo</translation>
-    </message>
-    <message>
-        <source>Mid tom</source>
-        <translation>Tom medio</translation>
-    </message>
-    <message>
-        <source>Snare</source>
-        <translation>Caja</translation>
-    </message>
-    <message>
-        <source>Side stick</source>
-        <translation>Golpe de aro</translation>
-    </message>
-    <message>
-        <source>Floor tom</source>
-        <translation>Tom de suelo</translation>
-    </message>
-    <message>
-        <source>Bass drum</source>
-        <translation>Bombo</translation>
-    </message>
-    <message>
-        <source>Hi-hat pedal</source>
-        <translation>Pedal de charles</translation>
-    </message>
     <message numerus="yes">
         <source>%n strings</source>
         <translation>
@@ -2183,150 +2490,6 @@
         <translation>Esa afinación no puede tocar todas las notas de %1.</translation>
     </message>
     <message>
-        <source>Measure %1 selected</source>
-        <translation>Compás %1 seleccionado</translation>
-    </message>
-    <message>
-        <source>Measures %1-%2 selected</source>
-        <translation>Compases %1-%2 seleccionados</translation>
-    </message>
-    <message>
-        <source>Measure %1</source>
-        <translation>Compás %1</translation>
-    </message>
-    <message>
-        <source>Voice %1</source>
-        <translation>Voz %1</translation>
-    </message>
-    <message>
-        <source>New beat</source>
-        <translation>Tiempo nuevo</translation>
-    </message>
-    <message>
-        <source>Beat %1</source>
-        <translation>Tiempo %1</translation>
-    </message>
-    <message>
-        <source>“%1”</source>
-        <translation>«%1»</translation>
-    </message>
-    <message>
-        <source>String %1</source>
-        <translation>Cuerda %1</translation>
-    </message>
-    <message>
-        <source>Fret %1</source>
-        <translation>Traste %1</translation>
-    </message>
-    <message>
-        <source>Wide vibrato</source>
-        <translation>Vibrato amplio</translation>
-    </message>
-    <message>
-        <source>Marcato</source>
-        <translation>Marcato</translation>
-    </message>
-    <message>
-        <source>Trill</source>
-        <translation>Trino</translation>
-    </message>
-    <message>
-        <source>Mordent</source>
-        <translation>Mordente</translation>
-    </message>
-    <message>
-        <source>Upper mordent</source>
-        <translation>Mordente superior</translation>
-    </message>
-    <message>
-        <source>Turn</source>
-        <translation>Grupeto</translation>
-    </message>
-    <message>
-        <source>Inverted turn</source>
-        <translation>Grupeto invertido</translation>
-    </message>
-    <message>
-        <source>Finger %1</source>
-        <translation>Dedo %1</translation>
-    </message>
-    <message>
-        <source>Plucked with %1</source>
-        <translation>Pulsada con %1</translation>
-    </message>
-    <message>
-        <source>Strum down</source>
-        <translation>Rasgueo abajo</translation>
-    </message>
-    <message>
-        <source>Strum up</source>
-        <translation>Rasgueo arriba</translation>
-    </message>
-    <message>
-        <source>Down stroke</source>
-        <translation>Púa abajo</translation>
-    </message>
-    <message>
-        <source>Up stroke</source>
-        <translation>Púa arriba</translation>
-    </message>
-    <message>
-        <source>Tremolo picking 1/%1</source>
-        <translation>Trémolo 1/%1</translation>
-    </message>
-    <message>
-        <source>Crescendo</source>
-        <translation>Crescendo</translation>
-    </message>
-    <message>
-        <source>Diminuendo</source>
-        <translation>Diminuendo</translation>
-    </message>
-    <message>
-        <source>Short fermata</source>
-        <translation>Calderón corto</translation>
-    </message>
-    <message>
-        <source>Fermata</source>
-        <translation>Calderón</translation>
-    </message>
-    <message>
-        <source>Long fermata</source>
-        <translation>Calderón largo</translation>
-    </message>
-    <message>
-        <source>Octave line %1</source>
-        <translation>Línea de octava %1</translation>
-    </message>
-    <message>
-        <source>Slur</source>
-        <translation>Ligadura de expresión</translation>
-    </message>
-    <message>
-        <source>Pedal change</source>
-        <translation>Cambio de pedal</translation>
-    </message>
-    <message>
-        <source>Sustain pedal</source>
-        <translation>Pedal de resonancia</translation>
-    </message>
-    <message>
-        <source>Caesura</source>
-        <translation>Cesura</translation>
-    </message>
-    <message>
-        <source>Breath mark</source>
-        <translation>Respiración</translation>
-    </message>
-    <message>
-        <source>Grace notes</source>
-        <translation>Notas de adorno</translation>
-    </message>
-    <message>
-        <source>Chord %1</source>
-        <translation>Acorde %1</translation>
-    </message>
-    <message>
         <source>On drums, Enter adds or removes the lane&apos;s hit.</source>
         <translation>En la batería, Intro añade o quita el golpe del carril.</translation>
     </message>
@@ -2335,168 +2498,8 @@
         <translation>Los trastes se escriben en una pista con cuerdas.</translation>
     </message>
     <message>
-        <source>Drums take no note names.</source>
-        <translation>La batería no admite nombres de nota.</translation>
-    </message>
-    <message>
-        <source>No string can play that note.</source>
-        <translation>Ninguna cuerda puede tocar esa nota.</translation>
-    </message>
-    <message>
-        <source>That note is out of range.</source>
-        <translation>Esa nota está fuera de rango.</translation>
-    </message>
-    <message>
-        <source>The note would leave the neck.</source>
-        <translation>La nota se saldría del mástil.</translation>
-    </message>
-    <message>
-        <source>Hits are typed on a drum track.</source>
-        <translation>Los golpes se escriben en una pista de batería.</translation>
-    </message>
-    <message>
-        <source>Effects go on notes: put the caret on one.</source>
-        <translation>Los efectos van sobre notas: pon el cursor en una.</translation>
-    </message>
-    <message>
-        <source>That fret has no natural harmonic.</source>
-        <translation>Ese traste no tiene armónico natural.</translation>
-    </message>
-    <message>
-        <source>There is no note to tie to.</source>
-        <translation>No hay ninguna nota a la que ligar.</translation>
-    </message>
-    <message>
-        <source>%1 needs strings.</source>
-        <translation>%1 necesita cuerdas.</translation>
-    </message>
-    <message>
-        <source>Harmonics need strings.</source>
-        <translation>Los armónicos necesitan cuerdas.</translation>
-    </message>
-    <message>
-        <source>Dive %1</source>
-        <translation>Hundimiento %1</translation>
-    </message>
-    <message>
         <source>MIDI (*.mid *.midi *.smf *.kar)</source>
         <translation>MIDI (*.mid *.midi *.smf *.kar)</translation>
-    </message>
-    <message>
-        <source>Pull-up %1</source>
-        <translation>Subida %1</translation>
-    </message>
-    <message>
-        <source>Dip %1</source>
-        <translation>Caída y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Inverted dip %1</source>
-        <translation>Subida y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Pre-dive %1</source>
-        <translation>Prehundimiento %1</translation>
-    </message>
-    <message>
-        <source>Pre-pull-up %1</source>
-        <translation>Presubida %1</translation>
-    </message>
-    <message>
-        <source>Pre-dive and return %1</source>
-        <translation>Prehundimiento y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Pre-pull-up and return %1</source>
-        <translation>Presubida y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Whammy bar (custom curve)</source>
-        <translation>Palanca de trémolo (curva propia)</translation>
-    </message>
-    <message>
-        <source>Tapping</source>
-        <translation>Tapping</translation>
-    </message>
-    <message>
-        <source>Slap</source>
-        <translation>Slap</translation>
-    </message>
-    <message>
-        <source>Pop</source>
-        <translation>Pop</translation>
-    </message>
-    <message>
-        <source>Dynamics go on notes: put the caret on one.</source>
-        <translation>Las dinámicas van en notas: pon el cursor en una.</translation>
-    </message>
-    <message>
-        <source>Slide in from below</source>
-        <translation>Deslizamiento de entrada desde abajo</translation>
-    </message>
-    <message>
-        <source>Slide in from above</source>
-        <translation>Deslizamiento de entrada desde arriba</translation>
-    </message>
-    <message>
-        <source>Shift slide</source>
-        <translation>Deslizamiento con ataque</translation>
-    </message>
-    <message>
-        <source>Legato slide</source>
-        <translation>Deslizamiento ligado</translation>
-    </message>
-    <message>
-        <source>Slide out downwards</source>
-        <translation>Deslizamiento de salida hacia abajo</translation>
-    </message>
-    <message>
-        <source>Slide out upwards</source>
-        <translation>Deslizamiento de salida hacia arriba</translation>
-    </message>
-    <message>
-        <source>Artificial harmonic</source>
-        <translation>Armónico artificial</translation>
-    </message>
-    <message>
-        <source>Pinch harmonic</source>
-        <translation>Armónico pellizcado</translation>
-    </message>
-    <message>
-        <source>Tapped harmonic</source>
-        <translation>Armónico con tapping</translation>
-    </message>
-    <message>
-        <source>Semi-harmonic</source>
-        <translation>Semiarmónico</translation>
-    </message>
-    <message>
-        <source>full</source>
-        <translation>completo</translation>
-    </message>
-    <message>
-        <source>%1 cents</source>
-        <translation>%1 cents</translation>
-    </message>
-    <message>
-        <source>Bend %1</source>
-        <translation>Bending %1</translation>
-    </message>
-    <message>
-        <source>Bend and release %1</source>
-        <translation>Bending y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Pre-bend %1</source>
-        <translation>Pre-bending %1</translation>
-    </message>
-    <message>
-        <source>Pre-bend and release %1</source>
-        <translation>Pre-bending y vuelta %1</translation>
-    </message>
-    <message>
-        <source>Bend (custom curve)</source>
-        <translation>Bending (curva propia)</translation>
     </message>
     <message>
         <source>Copied measure %1.</source>

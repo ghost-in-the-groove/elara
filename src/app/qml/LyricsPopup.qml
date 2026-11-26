@@ -11,6 +11,8 @@ Sheet {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
     /// The verse shown, 0 for the first.
     property int verse: 0
     /// The verses the caret's staff sings.
@@ -27,7 +29,7 @@ Sheet {
     /// Shows verse `verse` as the staff sings it: its text and first measure,
     /// the caret's measure for a verse not typed yet.
     function load() {
-        const typed = root.document.caretVerse(root.verse);
+        const typed = root.editor.caretVerse(root.verse);
         root.loaded = typed.text;
         verseField.text = typed.text;
         startField.value = (typed.text.length > 0 ? typed.first : root.document.caretMeasure) + 1;
@@ -36,9 +38,9 @@ Sheet {
     /// Follows the caret's staff when it or its lyrics change while the
     /// popup is open (another track, an undo), unless the field was typed in.
     function refresh() {
-        root.verseCount = root.document.caretVerseCount();
+        root.verseCount = root.editor.caretVerseCount();
         root.verse = Math.max(0, Math.min(root.verse, root.verseCount, root.maxVerses - 1));
-        if (verseField.text === root.loaded && root.document.caretVerse(root.verse).text !== root.loaded)
+        if (verseField.text === root.loaded && root.editor.caretVerse(root.verse).text !== root.loaded)
             load();
     }
     function pickVerse(verse: int) {
@@ -49,8 +51,8 @@ Sheet {
         verseField.forceActiveFocus();
     }
     function apply() {
-        root.leftover = root.document.setVerse(root.verse, startField.value - 1, verseField.text);
-        root.verseCount = root.document.caretVerseCount();
+        root.leftover = root.editor.setVerse(root.verse, startField.value - 1, verseField.text);
+        root.verseCount = root.editor.caretVerseCount();
         if (root.leftover === 0)
             root.close();
     }
@@ -61,7 +63,7 @@ Sheet {
 
     onVerseChanged: load()
     onAboutToShow: {
-        root.verseCount = root.document.caretVerseCount();
+        root.verseCount = root.editor.caretVerseCount();
         root.verse = Math.max(0, Math.min(root.verse, root.verseCount, root.maxVerses - 1));
         load();
     }
@@ -100,8 +102,8 @@ Sheet {
                 iconPath: Icons.trash
                 tip: qsTr("Remove this verse")
                 onClicked: {
-                    root.document.setVerse(root.verse, 0, "");
-                    root.verseCount = root.document.caretVerseCount();
+                    root.editor.setVerse(root.verse, 0, "");
+                    root.verseCount = root.editor.caretVerseCount();
                     root.pickVerse(Math.min(root.verse, root.verseCount));
                 }
             }

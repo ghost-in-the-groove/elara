@@ -8,6 +8,7 @@
 #include <elara/core/measure.hpp>
 #include <elara/core/song.hpp>
 
+#include "caret_editor.hpp"
 #include "score_document.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
@@ -22,6 +23,7 @@
 
 namespace {
 
+using elara::app::CaretEditor;
 using elara::app::ScoreDocument;
 using elara::core::Beat;
 using elara::core::Caret;
@@ -41,10 +43,12 @@ bool settle(Done done) {
 // A new song of eight empty measures on `preset`, the caret on its first beat.
 struct Editing {
     ScoreDocument score;
+    CaretEditor editor; // what is at the caret
     QStringList failures;
     QStringList notices;
 
     explicit Editing(const char* preset = "electric-guitar") {
+        editor.setDocument(&score);
         score.newSong(QString::fromLatin1(preset));
         QObject::connect(&score, &ScoreDocument::editFailed,
                          [this](const QString& message) { failures.append(message); });
@@ -85,7 +89,7 @@ TEST_CASE("editing: a fret typed on the free slot adds a beat of the input durat
     REQUIRE(editing.beats(0).size() == 1);
     CHECK(editing.beats(0)[0].duration.value() == NoteValue::Quarter);
     CHECK(editing.score.caret() == Caret{});
-    CHECK(editing.score.fretAtCaret() == 3);
+    CHECK(editing.editor.fretAtCaret() == 3);
 
     // The free slot after it takes the next one.
     editing.move(Move::NextBeat);
@@ -153,24 +157,24 @@ TEST_CASE("editing: an input duration given on a beat is given to the beat, as o
 TEST_CASE("editing: delete takes the note, then the rest; insert puts a rest before the beat") {
     Editing editing;
     editing.fret(3);
-    editing.score.deleteAtCaret();
+    editing.editor.deleteAtCaret();
     REQUIRE(editing.beats(0).size() == 1);
     CHECK(editing.beats(0)[0].isRest());
-    editing.score.deleteAtCaret();
+    editing.editor.deleteAtCaret();
     CHECK(editing.beats(0).empty());
 
     editing.fret(3);
     editing.score.setInputValue(8);
     CHECK(editing.beats(0)[0].duration.value() == NoteValue::Eighth);
     editing.score.setInputValue(2);
-    editing.score.insertRest();
+    editing.editor.insertRest();
     REQUIRE(editing.beats(0).size() == 2);
     CHECK(editing.beats(0)[0].isRest());
     CHECK(editing.beats(0)[0].duration.value() == NoteValue::Half);
     CHECK(editing.score.caret().beat == 0);
-    editing.score.deleteBeat();
+    editing.editor.deleteBeat();
     REQUIRE(editing.beats(0).size() == 1);
-    CHECK(editing.score.fretAtCaret() == 3);
+    CHECK(editing.editor.fretAtCaret() == 3);
 }
 
 TEST_CASE("editing: the voice typing goes into") {

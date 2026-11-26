@@ -99,6 +99,7 @@ void Startup::start() {
         window_->resize(*options_.size);
     }
     score_ = window_ != nullptr ? window_->findChild<ScoreDocument*>() : nullptr;
+    editor_ = window_ != nullptr ? window_->findChild<CaretEditor*>() : nullptr;
     if (score_ != nullptr) {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
             laidOut_ = true;
@@ -601,7 +602,7 @@ void Startup::queueEntry() {
         }
     };
     steps_.emplace_back([this, check] {
-        entering_ = score_->caretFretted() && score_->caretPage() >= 0;
+        entering_ = editor_->caretFretted() && score_->caretPage() >= 0;
         if (!entering_) {
             return false;
         }
@@ -619,7 +620,7 @@ void Startup::queueEntry() {
         if (!entering_) {
             return false;
         }
-        check(score_->fretAtCaret() == 12, "two digits did not type fret 12");
+        check(editor_->fretAtCaret() == 12, "two digits did not type fret 12");
         check(score_->caretPage() >= 0, "the caret went away after typing");
         score_->undo();
         return true;
@@ -636,25 +637,25 @@ void Startup::queueEntry() {
         if (!entering_) {
             return false;
         }
-        check(score_->fretAtCaret() == 12, "redo did not bring the fret back");
+        check(editor_->fretAtCaret() == 12, "redo did not bring the fret back");
         score_->setInputValue(8);
         check(score_->inputValue() == 8, "the input duration did not change");
-        score_->insertRest();
+        editor_->insertRest();
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!entering_) {
             return false;
         }
-        check(!score_->fretAtCaret().has_value(), "the caret is not on the inserted rest");
-        score_->deleteAtCaret();
+        check(!editor_->fretAtCaret().has_value(), "the caret is not on the inserted rest");
+        editor_->deleteAtCaret();
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!entering_) {
             return false;
         }
-        check(score_->fretAtCaret() == 12, "deleting the rest did not bring the note back");
+        check(editor_->fretAtCaret() == 12, "deleting the rest did not bring the note back");
         for (int i = 0; i < 8 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
@@ -689,7 +690,7 @@ void Startup::queueTuplets() {
                                                : std::nullopt;
     };
     steps_.emplace_back([this, check] {
-        tupleting_ = score_->caretPage() >= 0 && score_->caretFretted();
+        tupleting_ = score_->caretPage() >= 0 && editor_->caretFretted();
         if (!tupleting_) {
             return false;
         }
@@ -799,34 +800,34 @@ void Startup::queuePitches() {
         }
     };
     steps_.emplace_back([this] {
-        pitching_ = score_->caretPage() >= 0 && score_->caretPitched();
+        pitching_ = score_->caretPage() >= 0 && editor_->caretPitched();
         if (!pitching_) {
             return false;
         }
-        score_->typeNoteName(0, false);
+        editor_->typeNoteName(0, false);
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!pitching_) {
             return false;
         }
-        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        const std::vector<core::Pitch> pitches = editor_->pitchesAtCaret();
         check(pitches.size() == 1 && pitches.front().step() == core::Step::C,
               "the note name did not type a C");
         if (pitches.empty()) {
             return false;
         }
-        check(score_->caretStatus().endsWith(QStringLiteral("C%1").arg(pitches.front().octave())),
+        check(editor_->caretStatus().endsWith(QStringLiteral("C%1").arg(pitches.front().octave())),
               "the status does not name the note");
         typedMidi_ = pitches.front().midiNumber();
-        score_->shiftPitch(1);
+        editor_->shiftPitch(1);
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!pitching_) {
             return false;
         }
-        const std::vector<core::Pitch> pitches = score_->pitchesAtCaret();
+        const std::vector<core::Pitch> pitches = editor_->pitchesAtCaret();
         check(pitches.size() == 1 && pitches.front().midiNumber() == typedMidi_ + 1,
               "the note did not move up a semitone");
         for (int i = 0; i < 4 && score_->modified() && score_->canUndo(); ++i) {
@@ -864,39 +865,39 @@ void Startup::queueDrums() {
         if (!drumming_) {
             return false;
         }
-        check(score_->caretOnDrums(), "the caret is not on the drum track");
+        check(editor_->caretOnDrums(), "the caret is not on the drum track");
         const int lanes = static_cast<int>(core::drumPieces().size());
         for (int lane = 1; lane < lanes; ++lane) {
             score_->moveCaret(ScoreDocument::CaretMove::StringUp);
         }
         check(score_->caret().string == 1 &&
-                  score_->caretStatus().endsWith(ScoreDocument::laneName(1)),
+                  editor_->caretStatus().endsWith(CaretEditor::laneName(1)),
               "the status does not name the top lane");
         const double crash = score_->caretRect().top();
         for (int lane = 1; lane < laneOf(kSnareKey); ++lane) {
             score_->moveCaret(ScoreDocument::CaretMove::StringDown);
         }
-        check(score_->caretStatus().endsWith(ScoreDocument::laneName(laneOf(kSnareKey))),
+        check(editor_->caretStatus().endsWith(CaretEditor::laneName(laneOf(kSnareKey))),
               "the status does not name the snare");
         check(score_->caretRect().top() > crash, "the caret did not go down to the snare");
-        score_->toggleDrum();
+        editor_->toggleDrum();
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!drumming_) {
             return false;
         }
-        const std::vector<core::Pitch> hits = score_->pitchesAtCaret();
+        const std::vector<core::Pitch> hits = editor_->pitchesAtCaret();
         check(hits.size() == 1 && hits.front().midiNumber() == kSnareKey,
               "the snare was not added");
-        score_->toggleDrum();
+        editor_->toggleDrum();
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!drumming_) {
             return false;
         }
-        check(score_->pitchesAtCaret().empty(), "the snare was not removed");
+        check(editor_->pitchesAtCaret().empty(), "the snare was not removed");
         for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
@@ -925,18 +926,18 @@ void Startup::queueVoices() {
         }
     };
     steps_.emplace_back([this, check] {
-        voicing_ = score_->caretPage() >= 0 && score_->caretPitched();
+        voicing_ = score_->caretPage() >= 0 && editor_->caretPitched();
         if (!voicing_) {
             return false;
         }
         score_->setCaretVoice(2);
         check(score_->caretVoice() == 2, "the caret did not go to voice 2");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Voice %1").arg(2)),
               "the status does not name voice 2");
-        if (score_->caretFretted()) {
+        if (editor_->caretFretted()) {
             score_->typeDigit(7);
         } else {
-            score_->typeNoteName(2, false);
+            editor_->typeNoteName(2, false);
         }
         return true;
     });
@@ -944,11 +945,11 @@ void Startup::queueVoices() {
         if (!voicing_) {
             return false;
         }
-        check(score_->caretVoice() == 2 && !score_->pitchesAtCaret().empty(),
+        check(score_->caretVoice() == 2 && !editor_->pitchesAtCaret().empty(),
               "the note did not go into voice 2");
         score_->setCaretVoice(1);
         check(score_->caretVoice() == 1 &&
-                  !score_->caretStatus().contains(ScoreDocument::tr("Voice %1").arg(2)),
+                  !editor_->caretStatus().contains(CaretEditor::tr("Voice %1").arg(2)),
               "the caret did not come back to voice 1");
         for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
@@ -986,9 +987,9 @@ void Startup::queueSelection() {
               "Shift+Right did not select two measures");
         check(score_->selectionBoxes(score_->caretPage()).size() == 2,
               "the page does not show the two measures selected");
-        check(score_->caretStatus().startsWith(ScoreDocument::tr("Measures %1-%2 selected")
-                                                   .arg(score_->selectionFirst() + 1)
-                                                   .arg(score_->selectionLast() + 1)),
+        check(editor_->caretStatus().startsWith(CaretEditor::tr("Measures %1-%2 selected")
+                                                    .arg(score_->selectionFirst() + 1)
+                                                    .arg(score_->selectionLast() + 1)),
               "the status does not say what is selected");
         score_->copy();
         check(score_->canPaste(), "nothing was copied");
@@ -1224,12 +1225,12 @@ void Startup::queueMeasureRepeat() {
     };
     steps_.emplace_back([this, check] {
         score_->insertMeasure(true);
-        score_->setMeasureRepeat(1);
-        check(score_->caretRepeat() == 1 &&
+        editor_->setMeasureRepeat(1);
+        check(editor_->caretRepeat() == 1 &&
                   score_->undoName() == ScoreDocument::tr("Repeat measure"),
               "the new measure does not repeat the one before");
-        score_->setMeasureRepeat(0);
-        check(score_->caretRepeat() == 0 &&
+        editor_->setMeasureRepeat(0);
+        check(editor_->caretRepeat() == 0 &&
                   score_->undoName() == ScoreDocument::tr("Write out measure repeat"),
               "taking the sign away did not write out its music");
         return true;
@@ -1425,29 +1426,29 @@ void Startup::queueEffects() {
     constexpr int kAccent = static_cast<int>(core::NoteEffect::Accent);
     constexpr int kStaccato = static_cast<int>(core::NoteEffect::Staccato);
     steps_.emplace_back([this, check] {
-        effecting_ = score_->caretPage() >= 0 && score_->caretPitched();
+        effecting_ = score_->caretPage() >= 0 && editor_->caretPitched();
         if (!effecting_) {
             return false;
         }
-        check(score_->effectForKey(QStringLiteral(">")) == kAccent &&
-                  score_->effectForKey(QStringLiteral("'")) == kStaccato &&
-                  score_->effectForKey(QStringLiteral("_")) ==
+        check(editor_->effectForKey(QStringLiteral(">")) == kAccent &&
+                  editor_->effectForKey(QStringLiteral("'")) == kStaccato &&
+                  editor_->effectForKey(QStringLiteral("_")) ==
                       static_cast<int>(core::NoteEffect::Tenuto) &&
-                  score_->effectForKey(QStringLiteral("\"")) ==
+                  editor_->effectForKey(QStringLiteral("\"")) ==
                       static_cast<int>(core::NoteEffect::Staccatissimo) &&
-                  score_->effectForKey(QStringLiteral("p")) ==
+                  editor_->effectForKey(QStringLiteral("p")) ==
                       static_cast<int>(core::NoteEffect::PalmMute) &&
-                  score_->effectForKey(QStringLiteral("a")) < 0,
+                  editor_->effectForKey(QStringLiteral("a")) < 0,
               "the keys do not map to the effects");
         // The panel shows the techniques of strings on fretted staves only.
-        check(score_->effectNeedsStrings(static_cast<int>(core::NoteEffect::PalmMute)) &&
-                  score_->effectNeedsStrings(static_cast<int>(core::NoteEffect::Harmonic)) &&
-                  !score_->effectNeedsStrings(kAccent) && !score_->effectNeedsStrings(-1),
+        check(editor_->effectNeedsStrings(static_cast<int>(core::NoteEffect::PalmMute)) &&
+                  editor_->effectNeedsStrings(static_cast<int>(core::NoteEffect::Harmonic)) &&
+                  !editor_->effectNeedsStrings(kAccent) && !editor_->effectNeedsStrings(-1),
               "the techniques of strings are not told apart");
-        if (score_->caretFretted()) {
+        if (editor_->caretFretted()) {
             score_->typeDigit(5);
         } else {
-            score_->typeNoteName(0, false);
+            editor_->typeNoteName(0, false);
         }
         return true;
     });
@@ -1455,252 +1456,255 @@ void Startup::queueEffects() {
         if (!effecting_) {
             return false;
         }
-        effectsBefore_ = score_->caretEffects();
-        score_->toggleEffect(kAccent);
-        check((score_->caretEffects() ^ effectsBefore_) == 1 << kAccent,
+        effectsBefore_ = editor_->caretEffects();
+        editor_->toggleEffect(kAccent);
+        check((editor_->caretEffects() ^ effectsBefore_) == 1 << kAccent,
               "the accent did not toggle");
         check(score_->undoName() == ScoreDocument::tr("Change effect"),
               "the effect is not undoable");
-        score_->toggleEffect(kStaccato);
-        check((score_->caretEffects() ^ effectsBefore_) == ((1 << kAccent) | (1 << kStaccato)),
+        editor_->toggleEffect(kStaccato);
+        check((editor_->caretEffects() ^ effectsBefore_) == ((1 << kAccent) | (1 << kStaccato)),
               "staccato did not toggle");
-        const int on = score_->caretEffects();
+        const int on = editor_->caretEffects();
         check(((on & (1 << kStaccato)) != 0) ==
-                  score_->caretStatus().contains(score_->effectName(kStaccato)),
+                  editor_->caretStatus().contains(editor_->effectName(kStaccato)),
               "the status does not name the effects");
-        score_->toggleEffect(kAccent);
+        editor_->toggleEffect(kAccent);
         return true;
     });
     steps_.emplace_back([this, check] {
         if (!effecting_) {
             return false;
         }
-        check((score_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
+        check((editor_->caretEffects() ^ effectsBefore_) == 1 << kStaccato,
               "the accent did not go off again");
         // Bends of any form (ADR-0055).
         constexpr int kRelease = static_cast<int>(core::BendForm::BendRelease);
         constexpr int kPreBend = static_cast<int>(core::BendForm::PreBend);
-        score_->setBend(kRelease, 100);
-        check(score_->caretBendForm() == kRelease && score_->caretBendCents() == 100,
+        editor_->setBend(kRelease, 100);
+        check(editor_->caretBendForm() == kRelease && editor_->caretBendCents() == 100,
               "the bend and release did not go on");
         check(score_->undoName() == ScoreDocument::tr("Change bend"), "the bend is not undoable");
-        check(score_->caretStatus().contains(score_->bendName(kRelease, 100)) &&
-                  score_->bendName(kRelease, 100).endsWith(QStringLiteral("1/2")),
+        check(editor_->caretStatus().contains(editor_->bendName(kRelease, 100)) &&
+                  editor_->bendName(kRelease, 100).endsWith(QStringLiteral("1/2")),
               "the status does not name the bend");
-        score_->setBend(kPreBend, 300);
-        check(score_->caretBendForm() == kPreBend && score_->caretBendCents() == 300 &&
-                  score_->bendAmount(300) == QStringLiteral("1 1/2"),
+        editor_->setBend(kPreBend, 300);
+        check(editor_->caretBendForm() == kPreBend && editor_->caretBendCents() == 300 &&
+                  editor_->bendAmount(300) == QStringLiteral("1 1/2"),
               "the pre-bend did not replace it");
-        score_->setBend(0, 0);
-        check(score_->caretBendForm() == 0 && score_->caretBendCents() == 0, "the bend did not go");
+        editor_->setBend(0, 0);
+        check(editor_->caretBendForm() == 0 && editor_->caretBendCents() == 0,
+              "the bend did not go");
         // The beat's own effects (ADR-0056).
-        score_->setStrum(1);
-        check(score_->caretStrum() == 1, "the strum did not go on");
+        editor_->setStrum(1);
+        check(editor_->caretStrum() == 1, "the strum did not go on");
         check(score_->undoName() == ScoreDocument::tr("Change beat effects"),
               "the beat effects are not undoable");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Strum down")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Strum down")),
               "the status does not name the strum");
-        score_->setTremolo(16);
-        score_->setPickStroke(2);
-        check(score_->caretTremolo() == 16 && score_->caretPickStroke() == 2 &&
-                  score_->caretStrum() == 1,
+        editor_->setTremolo(16);
+        editor_->setPickStroke(2);
+        check(editor_->caretTremolo() == 16 && editor_->caretPickStroke() == 2 &&
+                  editor_->caretStrum() == 1,
               "tremolo picking and the pick stroke did not join the strum");
-        score_->setStrum(0);
-        check(score_->caretStrum() == 0 && score_->caretTremolo() == 16,
+        editor_->setStrum(0);
+        check(editor_->caretStrum() == 0 && editor_->caretTremolo() == 16,
               "the strum did not go on its own");
         // Kinds of note effects (ADR-0058).
-        score_->setVibrato(static_cast<int>(core::Vibrato::Wide));
-        score_->setAccent(static_cast<int>(core::Accent::Marcato));
+        editor_->setVibrato(static_cast<int>(core::Vibrato::Wide));
+        editor_->setAccent(static_cast<int>(core::Accent::Marcato));
         check(score_->undoName() == ScoreDocument::tr("Change accent"),
               "the accent's kind is not undoable");
-        score_->setSlideIn(static_cast<int>(core::SlideIn::FromBelow));
-        score_->setSlideOut(static_cast<int>(core::SlideOut::Downwards));
-        check(score_->caretVibrato() == static_cast<int>(core::Vibrato::Wide) &&
-                  score_->caretAccent() == static_cast<int>(core::Accent::Marcato) &&
-                  score_->caretSlideIn() == static_cast<int>(core::SlideIn::FromBelow) &&
-                  score_->caretSlideOut() == static_cast<int>(core::SlideOut::Downwards),
+        editor_->setSlideIn(static_cast<int>(core::SlideIn::FromBelow));
+        editor_->setSlideOut(static_cast<int>(core::SlideOut::Downwards));
+        check(editor_->caretVibrato() == static_cast<int>(core::Vibrato::Wide) &&
+                  editor_->caretAccent() == static_cast<int>(core::Accent::Marcato) &&
+                  editor_->caretSlideIn() == static_cast<int>(core::SlideIn::FromBelow) &&
+                  editor_->caretSlideOut() == static_cast<int>(core::SlideOut::Downwards),
               "the kinds of effects did not go on");
         check(score_->undoName() == ScoreDocument::tr("Change slide"),
               "the slides are not undoable");
         // A trill to the next step of the key, then off again (ADR-0090).
-        score_->toggleTrill();
-        check(score_->caretTrill() > 0 && score_->undoName() == ScoreDocument::tr("Change trill") &&
-                  score_->caretStatus().contains(ScoreDocument::tr("Trill")),
+        editor_->toggleTrill();
+        check(editor_->caretTrill() > 0 &&
+                  score_->undoName() == ScoreDocument::tr("Change trill") &&
+                  editor_->caretStatus().contains(CaretEditor::tr("Trill")),
               "the trill did not go on");
-        score_->toggleTrill();
-        check(score_->caretTrill() == 0, "the trill did not come off");
+        editor_->toggleTrill();
+        check(editor_->caretTrill() == 0, "the trill did not come off");
         // A turn, then none (ADR-0091).
-        score_->setOrnament(static_cast<int>(core::Ornament::Turn));
-        check(score_->caretOrnament() == static_cast<int>(core::Ornament::Turn) &&
+        editor_->setOrnament(static_cast<int>(core::Ornament::Turn));
+        check(editor_->caretOrnament() == static_cast<int>(core::Ornament::Turn) &&
                   score_->undoName() == ScoreDocument::tr("Change ornament") &&
-                  score_->caretStatus().contains(ScoreDocument::tr("Turn")),
+                  editor_->caretStatus().contains(CaretEditor::tr("Turn")),
               "the turn did not go on");
-        score_->setOrnament(0);
-        check(score_->caretOrnament() == 0, "the turn did not come off");
+        editor_->setOrnament(0);
+        check(editor_->caretOrnament() == 0, "the turn did not come off");
         // A finger and a plucking finger, then none (ADR-0093).
-        score_->setFingering(static_cast<int>(core::Finger::Ring));
-        check(score_->caretFingering() == static_cast<int>(core::Finger::Ring) &&
-                  score_->undoName() == ScoreDocument::tr("Change fingering") &&
-                  score_->caretStatus().contains(
-                      ScoreDocument::tr("Finger %1")
-                          .arg(score_->caretFretted() ? QStringLiteral("3") : QStringLiteral("4"))),
-              "the fingering did not go on");
-        score_->setFingering(0);
-        check(score_->caretFingering() == 0, "the fingering did not come off");
-        if (score_->caretFretted()) {
-            score_->setPluck(static_cast<int>(core::Finger::Index));
-            check(score_->caretPluck() == static_cast<int>(core::Finger::Index) &&
+        editor_->setFingering(static_cast<int>(core::Finger::Ring));
+        check(
+            editor_->caretFingering() == static_cast<int>(core::Finger::Ring) &&
+                score_->undoName() == ScoreDocument::tr("Change fingering") &&
+                editor_->caretStatus().contains(
+                    CaretEditor::tr("Finger %1")
+                        .arg(editor_->caretFretted() ? QStringLiteral("3") : QStringLiteral("4"))),
+            "the fingering did not go on");
+        editor_->setFingering(0);
+        check(editor_->caretFingering() == 0, "the fingering did not come off");
+        if (editor_->caretFretted()) {
+            editor_->setPluck(static_cast<int>(core::Finger::Index));
+            check(editor_->caretPluck() == static_cast<int>(core::Finger::Index) &&
                       score_->undoName() == ScoreDocument::tr("Change plucking finger") &&
-                      score_->caretStatus().contains(
-                          ScoreDocument::tr("Plucked with %1").arg(QStringLiteral("i"))),
+                      editor_->caretStatus().contains(
+                          CaretEditor::tr("Plucked with %1").arg(QStringLiteral("i"))),
                   "the plucking finger did not go on");
-            score_->setPluck(0);
-            check(score_->caretPluck() == 0, "the plucking finger did not come off");
+            editor_->setPluck(0);
+            check(editor_->caretPluck() == 0, "the plucking finger did not come off");
         }
-        const QString status = score_->caretStatus();
-        check(status.contains(ScoreDocument::tr("Wide vibrato")) &&
-                  status.contains(ScoreDocument::tr("Marcato")) &&
-                  status.contains(score_->slideInName(1)) &&
-                  status.contains(score_->slideOutName(3)),
+        const QString status = editor_->caretStatus();
+        check(status.contains(CaretEditor::tr("Wide vibrato")) &&
+                  status.contains(CaretEditor::tr("Marcato")) &&
+                  status.contains(editor_->slideInName(1)) &&
+                  status.contains(editor_->slideOutName(3)),
               "the status does not name the kinds of effects");
         // The whammy bar and the bass techniques (ADR-0060).
         constexpr int kDip = static_cast<int>(core::BendForm::BendRelease);
-        score_->setWhammy(kDip, -300);
-        score_->setBassTechnique(static_cast<int>(core::BassTechnique::Slap));
-        check(score_->caretWhammyForm() == kDip && score_->caretWhammyCents() == -300 &&
-                  score_->whammyAmount(-300) == QStringLiteral("-1 1/2") &&
-                  score_->caretBassTechnique() == static_cast<int>(core::BassTechnique::Slap) &&
-                  score_->caretTremolo() == 16,
+        editor_->setWhammy(kDip, -300);
+        editor_->setBassTechnique(static_cast<int>(core::BassTechnique::Slap));
+        check(editor_->caretWhammyForm() == kDip && editor_->caretWhammyCents() == -300 &&
+                  editor_->whammyAmount(-300) == QStringLiteral("-1 1/2") &&
+                  editor_->caretBassTechnique() == static_cast<int>(core::BassTechnique::Slap) &&
+                  editor_->caretTremolo() == 16,
               "the whammy bar and the slap did not join the beat's effects");
-        check(score_->caretStatus().contains(score_->whammyName(kDip, -300)) &&
-                  score_->caretStatus().contains(ScoreDocument::tr("Slap")),
+        check(editor_->caretStatus().contains(editor_->whammyName(kDip, -300)) &&
+                  editor_->caretStatus().contains(CaretEditor::tr("Slap")),
               "the status does not name the whammy bar and the slap");
-        score_->setWhammy(0, 0);
-        check(score_->caretWhammyForm() == 0 && score_->caretBassTechnique() != 0,
+        editor_->setWhammy(0, 0);
+        check(editor_->caretWhammyForm() == 0 && editor_->caretBassTechnique() != 0,
               "the whammy bar did not go on its own");
         // Hairpins (ADR-0078).
-        score_->setHairpin(static_cast<int>(core::Hairpin::Diminuendo));
-        check(score_->caretHairpin() == static_cast<int>(core::Hairpin::Diminuendo) &&
-                  score_->caretBassTechnique() != 0,
+        editor_->setHairpin(static_cast<int>(core::Hairpin::Diminuendo));
+        check(editor_->caretHairpin() == static_cast<int>(core::Hairpin::Diminuendo) &&
+                  editor_->caretBassTechnique() != 0,
               "the diminuendo did not join the beat's effects");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Diminuendo")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Diminuendo")),
               "the status does not name the diminuendo");
-        score_->setHairpin(0);
-        check(score_->caretHairpin() == 0, "the diminuendo did not go");
+        editor_->setHairpin(0);
+        check(editor_->caretHairpin() == 0, "the diminuendo did not go");
         // Fermatas (ADR-0085).
-        score_->setFermata(static_cast<int>(core::Fermata::Long));
-        check(score_->caretFermata() == static_cast<int>(core::Fermata::Long) &&
-                  score_->caretBassTechnique() != 0,
+        editor_->setFermata(static_cast<int>(core::Fermata::Long));
+        check(editor_->caretFermata() == static_cast<int>(core::Fermata::Long) &&
+                  editor_->caretBassTechnique() != 0,
               "the long fermata did not join the beat's effects");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Long fermata")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Long fermata")),
               "the status does not name the long fermata");
-        score_->setFermata(0);
-        check(score_->caretFermata() == 0, "the fermata did not go");
+        editor_->setFermata(0);
+        check(editor_->caretFermata() == 0, "the fermata did not go");
         // Octave lines (ADR-0089).
-        score_->setOttava(static_cast<int>(core::Ottava::QuindicesimaAlta));
-        check(score_->caretOttava() == static_cast<int>(core::Ottava::QuindicesimaAlta) &&
-                  score_->caretBassTechnique() != 0,
+        editor_->setOttava(static_cast<int>(core::Ottava::QuindicesimaAlta));
+        check(editor_->caretOttava() == static_cast<int>(core::Ottava::QuindicesimaAlta) &&
+                  editor_->caretBassTechnique() != 0,
               "the octave line did not join the beat's effects");
-        check(score_->caretStatus().contains(
-                  ScoreDocument::tr("Octave line %1").arg(QStringLiteral("15ma"))),
+        check(editor_->caretStatus().contains(
+                  CaretEditor::tr("Octave line %1").arg(QStringLiteral("15ma"))),
               "the status does not name the octave line");
-        score_->setOttava(0);
-        check(score_->caretOttava() == 0, "the octave line did not go");
+        editor_->setOttava(0);
+        check(editor_->caretOttava() == 0, "the octave line did not go");
         // The sustain pedal (ADR-0092).
-        score_->setPedal(static_cast<int>(core::Pedal::Change));
-        check(score_->caretPedal() == static_cast<int>(core::Pedal::Change) &&
-                  score_->caretBassTechnique() != 0,
+        editor_->setPedal(static_cast<int>(core::Pedal::Change));
+        check(editor_->caretPedal() == static_cast<int>(core::Pedal::Change) &&
+                  editor_->caretBassTechnique() != 0,
               "the pedal did not join the beat's effects");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Pedal change")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Pedal change")),
               "the status does not name the pedal change");
-        score_->setPedal(0);
-        check(score_->caretPedal() == 0, "the pedal did not come up");
+        editor_->setPedal(0);
+        check(editor_->caretPedal() == 0, "the pedal did not come up");
         // A caesura after the beat, then none (ADR-0095).
-        score_->setBreath(static_cast<int>(core::Breath::Caesura));
-        check(score_->caretBreath() == static_cast<int>(core::Breath::Caesura) &&
-                  score_->caretBassTechnique() != 0 &&
-                  score_->caretStatus().contains(ScoreDocument::tr("Caesura")),
+        editor_->setBreath(static_cast<int>(core::Breath::Caesura));
+        check(editor_->caretBreath() == static_cast<int>(core::Breath::Caesura) &&
+                  editor_->caretBassTechnique() != 0 &&
+                  editor_->caretStatus().contains(CaretEditor::tr("Caesura")),
               "the caesura did not join the beat's effects");
-        score_->setBreath(0);
-        check(score_->caretBreath() == 0, "the caesura did not go");
+        editor_->setBreath(0);
+        check(editor_->caretBreath() == 0, "the caesura did not go");
         // Slurs (ADR-0086).
-        score_->setSlur(true);
-        check(score_->caretSlur() && score_->caretBassTechnique() != 0,
+        editor_->setSlur(true);
+        check(editor_->caretSlur() && editor_->caretBassTechnique() != 0,
               "the slur did not join the beat's effects");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Slur")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Slur")),
               "the status does not name the slur");
-        score_->setSlur(false);
-        check(!score_->caretSlur(), "the slur did not go");
+        editor_->setSlur(false);
+        check(!editor_->caretSlur(), "the slur did not go");
         // Grace notes (ADR-0079): the beat may already lead in with some,
         // which the toggle takes away first.
-        if (score_->caretGraceNotes() > 0) {
-            score_->toggleGraceNote();
-            check(score_->caretGraceNotes() == 0 &&
+        if (editor_->caretGraceNotes() > 0) {
+            editor_->toggleGraceNote();
+            check(editor_->caretGraceNotes() == 0 &&
                       score_->undoName() == ScoreDocument::tr("Remove grace notes"),
                   "the beat's grace notes did not go");
         }
-        score_->toggleGraceNote();
-        check(score_->caretGraceNotes() == 1 &&
+        editor_->toggleGraceNote();
+        check(editor_->caretGraceNotes() == 1 &&
                   score_->undoName() == ScoreDocument::tr("Add grace note") &&
-                  score_->caretStatus().contains(ScoreDocument::tr("Grace notes")),
+                  editor_->caretStatus().contains(CaretEditor::tr("Grace notes")),
               "no grace note joined the caret's beat");
-        score_->toggleGraceNote();
-        check(score_->caretGraceNotes() == 0, "the grace note did not go");
+        editor_->toggleGraceNote();
+        check(editor_->caretGraceNotes() == 0, "the grace note did not go");
         // Chord symbols (ADR-0080): named, offered again, taken away.
-        const QString chordBefore = score_->caretChord();
-        score_->setChordSymbol(QStringLiteral("Am7"));
-        check(score_->caretChord() == QStringLiteral("Am7"), "the caret's beat was not named Am7");
+        const QString chordBefore = editor_->caretChord();
+        editor_->setChordSymbol(QStringLiteral("Am7"));
+        check(editor_->caretChord() == QStringLiteral("Am7"), "the caret's beat was not named Am7");
         check(score_->undoName() == ScoreDocument::tr("Set chord symbol"),
               "naming a chord was not one undo step");
-        check(score_->caretStatus().contains(ScoreDocument::tr("Chord %1").arg("Am7")),
+        check(editor_->caretStatus().contains(CaretEditor::tr("Chord %1").arg("Am7")),
               "the status does not name the chord");
-        check(score_->songChords().contains(QStringLiteral("Am7")),
+        check(editor_->songChords().contains(QStringLiteral("Am7")),
               "the popup does not offer the chord");
-        score_->setChordSymbol(QString());
-        check(score_->caretChord().isEmpty() &&
+        editor_->setChordSymbol(QString());
+        check(editor_->caretChord().isEmpty() &&
                   score_->undoName() == ScoreDocument::tr("Remove chord symbol"),
               "the chord symbol did not go");
         if (!chordBefore.isEmpty()) {
-            score_->setChordSymbol(chordBefore);
+            editor_->setChordSymbol(chordBefore);
         }
         // Beat text (ADR-0081): written, offered again, taken away.
-        const QString textBefore = score_->caretText();
-        score_->setBeatText(QStringLiteral("let ring"));
-        check(score_->caretText() == QStringLiteral("let ring"),
+        const QString textBefore = editor_->caretText();
+        editor_->setBeatText(QStringLiteral("let ring"));
+        check(editor_->caretText() == QStringLiteral("let ring"),
               "the caret's beat did not get its text");
         check(score_->undoName() == ScoreDocument::tr("Set beat text"),
               "writing a text was not one undo step");
-        check(score_->caretStatus().contains(QStringLiteral("let ring")),
+        check(editor_->caretStatus().contains(QStringLiteral("let ring")),
               "the status does not show the text");
-        check(score_->songTexts().contains(QStringLiteral("let ring")),
+        check(editor_->songTexts().contains(QStringLiteral("let ring")),
               "the popup does not offer the text");
-        score_->setBeatText(QString());
-        check(score_->caretText().isEmpty() &&
+        editor_->setBeatText(QString());
+        check(editor_->caretText().isEmpty() &&
                   score_->undoName() == ScoreDocument::tr("Remove beat text"),
               "the text did not go");
         if (!textBefore.isEmpty()) {
-            score_->setBeatText(textBefore);
+            editor_->setBeatText(textBefore);
         }
         // Clef changes (ADR-0087): from the caret's measure on, then back.
-        if (const int clefBefore = score_->caretClef(); clefBefore >= 0) {
+        if (const int clefBefore = editor_->caretClef(); clefBefore >= 0) {
             const int other = clefBefore == 1 ? 0 : 1;
-            score_->setClef(other);
-            check(score_->caretClef() == other &&
+            editor_->setClef(other);
+            check(editor_->caretClef() == other &&
                       score_->undoName() == ScoreDocument::tr("Change clef"),
                   "the clef did not change from the caret's measure");
-            score_->setClef(clefBefore);
-            check(score_->caretClef() == clefBefore, "the clef did not change back");
+            editor_->setClef(clefBefore);
+            check(editor_->caretClef() == clefBefore, "the clef did not change back");
         }
         // Lyrics (ADR-0084): a new verse typed from the caret's measure, shown
         // by the lyrics popup as typed, then taken away.
-        if (const int verse = score_->caretVerseCount(); verse < ScoreDocument::maxVerses()) {
+        if (const int verse = editor_->caretVerseCount(); verse < ScoreDocument::maxVerses()) {
             const int leftover =
-                score_->setVerse(verse, score_->caretMeasure(), QStringLiteral("la_"));
-            const QVariantMap typed = score_->caretVerse(verse);
+                editor_->setVerse(verse, score_->caretMeasure(), QStringLiteral("la_"));
+            const QVariantMap typed = editor_->caretVerse(verse);
             check(leftover == 0 &&
                       typed.value(QStringLiteral("text")).toString() == QStringLiteral("la_") &&
                       typed.value(QStringLiteral("first")).toInt() >= score_->caretMeasure() &&
-                      score_->caretVerseCount() == verse + 1 &&
+                      editor_->caretVerseCount() == verse + 1 &&
                       score_->undoName() == ScoreDocument::tr("Set lyrics"),
                   "the verse did not go on as typed");
             auto* popup = window_->findChild<QObject*>(QStringLiteral("lyricsPopup"));
@@ -1712,23 +1716,23 @@ void Startup::queueEffects() {
                       "the lyrics popup does not show the verse");
                 QMetaObject::invokeMethod(popup, "close");
             }
-            score_->setVerse(verse, 0, QString());
-            check(score_->caretVerseCount() == verse &&
+            editor_->setVerse(verse, 0, QString());
+            check(editor_->caretVerseCount() == verse &&
                       score_->undoName() == ScoreDocument::tr("Remove lyrics"),
                   "the verse did not go");
         }
         // A dynamic from the caret's notes on (ADR-0047).
         constexpr int kLoud = static_cast<int>(core::Dynamic::FF);
-        const int dynamic = score_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
-        score_->setDynamic(dynamic);
-        check(score_->caretDynamic() == dynamic &&
+        const int dynamic = editor_->caretDynamic() == kLoud ? kLoud - 1 : kLoud;
+        editor_->setDynamic(dynamic);
+        check(editor_->caretDynamic() == dynamic &&
                   score_->undoName() == ScoreDocument::tr("Change dynamic"),
               "the dynamic did not go on as one undo step");
-        if (score_->caretFretted()) {
+        if (editor_->caretFretted()) {
             constexpr int kArtificial = static_cast<int>(core::HarmonicKind::Artificial);
-            score_->setHarmonic(kArtificial);
-            check(score_->caretHarmonic() == kArtificial &&
-                      score_->caretStatus().contains(score_->harmonicName(kArtificial)),
+            editor_->setHarmonic(kArtificial);
+            check(editor_->caretHarmonic() == kArtificial &&
+                      editor_->caretStatus().contains(editor_->harmonicName(kArtificial)),
                   "the artificial harmonic did not go on");
         }
         for (int i = 0; i < 64 && score_->modified() && score_->canUndo(); ++i) {

@@ -10,6 +10,8 @@ Rectangle {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
     /// The view of the score: its page and its zoom.
     required property ScoreView view
 
@@ -75,7 +77,7 @@ Rectangle {
         Label {
             objectName: "caretStatus"
             visible: text.length > 0
-            text: root.document.caretPage >= 0 ? root.document.caretStatus : ""
+            text: root.document.caretPage >= 0 ? root.editor.caretStatus : ""
             font.pixelSize: Theme.fontSmall
             font.features: {
                 "tnum": 1
