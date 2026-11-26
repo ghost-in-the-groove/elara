@@ -570,6 +570,34 @@ QVariantMap ScoreDocument::cursorAt(double seconds) const {
             {QStringLiteral("height"), cursor->height}};
 }
 
+int ScoreDocument::measureAt(double seconds) const {
+    if (!sequence_) {
+        return -1;
+    }
+    const std::size_t played = sequence_->playedMeasureAt(seconds);
+    return played < sequence_->measures().size()
+               ? static_cast<int>(sequence_->measures()[played].measure)
+               : -1;
+}
+
+QVariantList ScoreDocument::sectionMarks() const {
+    QVariantList marks;
+    if (!sequence_ || !sequenceSong_) {
+        return marks;
+    }
+    for (std::size_t measure = 0; measure < sequenceSong_->measureCount(); ++measure) {
+        const std::string& name = sequenceSong_->measureHeader(measure).section;
+        if (name.empty()) {
+            continue;
+        }
+        if (const auto seconds = sequence_->secondsAt(measure, 0.0)) {
+            marks.append(QVariantMap{{QStringLiteral("name"), QString::fromStdString(name)},
+                                     {QStringLiteral("seconds"), *seconds}});
+        }
+    }
+    return marks;
+}
+
 double ScoreDocument::secondsAt(int page, double x, double y) const {
     if (!sequence_ || !pages_ || page < 0 || static_cast<std::size_t>(page) >= pages_->size()) {
         return -1.0;

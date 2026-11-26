@@ -24,6 +24,73 @@
     </message>
 </context>
 <context>
+    <name>CommandBar</name>
+    <message>
+        <source>Open a score (Ctrl+O)</source>
+        <translation>Abrir una partitura (Ctrl+O)</translation>
+    </message>
+    <message>
+        <source>Save (Ctrl+S)</source>
+        <translation>Guardar (Ctrl+S)</translation>
+    </message>
+    <message>
+        <source>Undo %1 (Ctrl+Z)</source>
+        <translation>Deshacer: %1 (Ctrl+Z)</translation>
+    </message>
+    <message>
+        <source>Undo (Ctrl+Z)</source>
+        <translation>Deshacer (Ctrl+Z)</translation>
+    </message>
+    <message>
+        <source>Redo %1 (Ctrl+Y)</source>
+        <translation>Rehacer: %1 (Ctrl+Y)</translation>
+    </message>
+    <message>
+        <source>Redo (Ctrl+Y)</source>
+        <translation>Rehacer (Ctrl+Y)</translation>
+    </message>
+    <message>
+        <source>Back to the start (Home)</source>
+        <translation>Volver al principio (Inicio)</translation>
+    </message>
+    <message>
+        <source>Pause</source>
+        <translation>Pausa</translation>
+    </message>
+    <message>
+        <source>Play</source>
+        <translation>Reproducir</translation>
+    </message>
+    <message>
+        <source> (Space)</source>
+        <translation> (Espacio)</translation>
+    </message>
+    <message>
+        <source>Measure</source>
+        <translation>Compás</translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation>Tiempo transcurrido</translation>
+    </message>
+    <message>
+        <source>Tempo</source>
+        <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>Tempo at %1 % of the speed written</source>
+        <translation>Tempo al %1 % de la velocidad escrita</translation>
+    </message>
+    <message>
+        <source>Song and tracks (Ctrl+I)</source>
+        <translation>Canción y pistas (Ctrl+I)</translation>
+    </message>
+    <message>
+        <source>Tuner (Ctrl+Shift+T)</source>
+        <translation>Afinador (Ctrl+Mayús+T)</translation>
+    </message>
+</context>
+<context>
     <name>EntryBar</name>
     <message>
         <source>Whole note</source>
@@ -452,34 +519,6 @@
         <translation>Fuente musical: Bravura (SIL OFL). Fuente de texto: Arimo (SIL OFL).</translation>
     </message>
     <message>
-        <source>New song (Ctrl+N)</source>
-        <translation>Nueva canción (Ctrl+N)</translation>
-    </message>
-    <message>
-        <source>Open a score (Ctrl+O)</source>
-        <translation>Abrir una partitura (Ctrl+O)</translation>
-    </message>
-    <message>
-        <source>Save (Ctrl+S)</source>
-        <translation>Guardar (Ctrl+S)</translation>
-    </message>
-    <message>
-        <source>Undo %1 (Ctrl+Z)</source>
-        <translation>Deshacer: %1 (Ctrl+Z)</translation>
-    </message>
-    <message>
-        <source>Undo (Ctrl+Z)</source>
-        <translation>Deshacer (Ctrl+Z)</translation>
-    </message>
-    <message>
-        <source>Redo %1 (Ctrl+Y)</source>
-        <translation>Rehacer: %1 (Ctrl+Y)</translation>
-    </message>
-    <message>
-        <source>Redo (Ctrl+Y)</source>
-        <translation>Rehacer (Ctrl+Y)</translation>
-    </message>
-    <message>
         <source>Notation</source>
         <translation>Notación</translation>
     </message>
@@ -504,8 +543,28 @@
         <translation>Abrir reciente</translation>
     </message>
     <message>
+        <source>&amp;File</source>
+        <translation>&amp;Archivo</translation>
+    </message>
+    <message>
+        <source>New song</source>
+        <translation>Nueva canción</translation>
+    </message>
+    <message>
+        <source>Open…</source>
+        <translation>Abrir…</translation>
+    </message>
+    <message>
         <source>Clear the list</source>
         <translation>Vaciar la lista</translation>
+    </message>
+    <message>
+        <source>Save</source>
+        <translation>Guardar</translation>
+    </message>
+    <message>
+        <source>Save as…</source>
+        <translation>Guardar como…</translation>
     </message>
     <message>
         <source>Export as PDF…</source>
@@ -518,6 +577,122 @@
     <message>
         <source>Export as MIDI…</source>
         <translation>Exportar como MIDI…</translation>
+    </message>
+    <message>
+        <source>Quit</source>
+        <translation>Salir</translation>
+    </message>
+    <message>
+        <source>&amp;Edit</source>
+        <translation>&amp;Edición</translation>
+    </message>
+    <message>
+        <source>Undo %1</source>
+        <translation>Deshacer %1</translation>
+    </message>
+    <message>
+        <source>Undo</source>
+        <translation>Deshacer</translation>
+    </message>
+    <message>
+        <source>Redo %1</source>
+        <translation>Rehacer %1</translation>
+    </message>
+    <message>
+        <source>Redo</source>
+        <translation>Rehacer</translation>
+    </message>
+    <message>
+        <source>Copy the measures</source>
+        <translation>Copiar los compases</translation>
+    </message>
+    <message>
+        <source>Paste over</source>
+        <translation>Pegar encima</translation>
+    </message>
+    <message>
+        <source>Paste as new measures</source>
+        <translation>Pegar como compases nuevos</translation>
+    </message>
+    <message>
+        <source>Select every measure</source>
+        <translation>Seleccionar todos los compases</translation>
+    </message>
+    <message>
+        <source>Insert a measure</source>
+        <translation>Insertar un compás</translation>
+    </message>
+    <message>
+        <source>Delete the measure</source>
+        <translation>Borrar el compás</translation>
+    </message>
+    <message>
+        <source>Measure…</source>
+        <translation>Compás…</translation>
+    </message>
+    <message>
+        <source>Chord symbol…</source>
+        <translation>Acorde…</translation>
+    </message>
+    <message>
+        <source>Text…</source>
+        <translation>Texto…</translation>
+    </message>
+    <message>
+        <source>Lyrics…</source>
+        <translation>Letra…</translation>
+    </message>
+    <message>
+        <source>&amp;View</source>
+        <translation>&amp;Ver</translation>
+    </message>
+    <message>
+        <source>Zoom in</source>
+        <translation>Acercar</translation>
+    </message>
+    <message>
+        <source>Zoom out</source>
+        <translation>Alejar</translation>
+    </message>
+    <message>
+        <source>Fit the page width</source>
+        <translation>Ajustar al ancho de la página</translation>
+    </message>
+    <message>
+        <source>Song and tracks</source>
+        <translation>Canción y pistas</translation>
+    </message>
+    <message>
+        <source>Tuner</source>
+        <translation>Afinador</translation>
+    </message>
+    <message>
+        <source>&amp;Sound</source>
+        <translation>&amp;Sonido</translation>
+    </message>
+    <message>
+        <source>Back to the start</source>
+        <translation>Volver al principio</translation>
+    </message>
+    <message>
+        <source>End the A-B loop</source>
+        <translation>Terminar el bucle A-B</translation>
+    </message>
+    <message>
+        <source>Mark B of the loop</source>
+        <translation>Marcar el punto B del bucle</translation>
+    </message>
+    <message>
+        <source>Mark A of the loop</source>
+        <translation>Marcar el punto A del bucle</translation>
+    </message>
+    <message>
+        <source>Metronome</source>
+        <translation>Metrónomo</translation>
+    </message>
+    <message>
+        <source>Count-in</source>
+        <translation>Cuenta de entrada</translation>
     </message>
     <message>
         <source>Opening the SoundFont…</source>
@@ -560,15 +735,12 @@
         <translation>Usar el sintetizador integrado</translation>
     </message>
     <message>
+        <source>&amp;Help</source>
+        <translation>A&amp;yuda</translation>
+    </message>
+    <message>
         <source>Details</source>
         <translation>Detalles</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n change(s) on import</source>
-        <translation>
-            <numerusform>%n cambio al importar</numerusform>
-            <numerusform>%n cambios al importar</numerusform>
-        </translation>
     </message>
     <message>
         <source>What opening the file changed or left out</source>
@@ -583,30 +755,6 @@
         <translation>Vista continua</translation>
     </message>
     <message>
-        <source>Zoom out (Ctrl+-)</source>
-        <translation>Alejar (Ctrl+-)</translation>
-    </message>
-    <message>
-        <source>Fit the page width (Ctrl+0)</source>
-        <translation>Ajustar al ancho de página (Ctrl+0)</translation>
-    </message>
-    <message>
-        <source>Zoom in (Ctrl++)</source>
-        <translation>Acercar (Ctrl++)</translation>
-    </message>
-    <message>
-        <source>Song and tracks (Ctrl+I)</source>
-        <translation>Canción y pistas (Ctrl+I)</translation>
-    </message>
-    <message>
-        <source>Tuner (Ctrl+Shift+T)</source>
-        <translation>Afinador (Ctrl+Mayús+T)</translation>
-    </message>
-    <message>
-        <source>More</source>
-        <translation>Más</translation>
-    </message>
-    <message>
         <source>Playing…</source>
         <translation>Reproduciendo…</translation>
     </message>
@@ -619,31 +767,12 @@
         <translation>Suelta para abrir</translation>
     </message>
     <message>
-        <source>Back to the start (Home)</source>
-        <translation>Volver al principio (Inicio)</translation>
-    </message>
-    <message>
         <source>Pause</source>
         <translation>Pausa</translation>
     </message>
     <message>
         <source>Play</source>
         <translation>Reproducir</translation>
-    </message>
-    <message>
-        <source> (Space)</source>
-        <translation> (Espacio)</translation>
-    </message>
-    <message>
-        <source>Page %1 of %2</source>
-        <translation>Página %1 de %2</translation>
-    </message>
-    <message numerus="yes">
-        <source>%n measure(s)</source>
-        <translation>
-            <numerusform>%n compás</numerusform>
-            <numerusform>%n compases</numerusform>
-        </translation>
     </message>
 </context>
 <context>
@@ -1178,6 +1307,58 @@
     <message>
         <source>Basses</source>
         <translation>Bajos</translation>
+    </message>
+</context>
+<context>
+    <name>SongString</name>
+    <message>
+        <source>Position in the song</source>
+        <translation>Posición en la canción</translation>
+    </message>
+</context>
+<context>
+    <name>StatusBar</name>
+    <message>
+        <source>Page %1 of %2</source>
+        <translation>Página %1 de %2</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n measure(s)</source>
+        <translation>
+            <numerusform>%n compás</numerusform>
+            <numerusform>%n compases</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n change(s) on import</source>
+        <translation>
+            <numerusform>%n cambio al importar</numerusform>
+            <numerusform>%n cambios al importar</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Page view</source>
+        <translation>Vista de página</translation>
+    </message>
+    <message>
+        <source>Continuous view</source>
+        <translation>Vista continua</translation>
+    </message>
+    <message>
+        <source>Zoom out (Ctrl+-)</source>
+        <translation>Alejar (Ctrl+-)</translation>
+    </message>
+    <message>
+        <source>Zoom: %1</source>
+        <translation>Zoom: %1</translation>
+    </message>
+    <message>
+        <source>Fit the page width (Ctrl+0)</source>
+        <translation>Ajustar al ancho de página (Ctrl+0)</translation>
+    </message>
+    <message>
+        <source>Zoom in (Ctrl++)</source>
+        <translation>Acercar (Ctrl++)</translation>
     </message>
 </context>
 <context>
@@ -2335,6 +2516,10 @@
     <message>
         <source>Show the score as one continuous scroll.</source>
         <translation>Mostrar la partitura como un desplazamiento continuo.</translation>
+    </message>
+    <message>
+        <source>Open the window at this size, as WIDTHxHEIGHT.</source>
+        <translation>Abre la ventana con este tamaño, como ANCHOxALTO.</translation>
     </message>
     <message>
         <source>Show the interface in this language (en, es).</source>

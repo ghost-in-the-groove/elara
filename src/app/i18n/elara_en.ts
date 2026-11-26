@@ -12,7 +12,17 @@
     </message>
 </context>
 <context>
-    <name>Main</name>
+    <name>SongPane</name>
+    <message numerus="yes">
+        <source>%n measure(s)</source>
+        <translation>
+            <numerusform>%n measure</numerusform>
+            <numerusform>%n measures</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>StatusBar</name>
     <message numerus="yes">
         <source>%n measure(s)</source>
         <translation>
@@ -25,16 +35,6 @@
         <translation>
             <numerusform>%n change on import</numerusform>
             <numerusform>%n changes on import</numerusform>
-        </translation>
-    </message>
-</context>
-<context>
-    <name>SongPane</name>
-    <message numerus="yes">
-        <source>%n measure(s)</source>
-        <translation>
-            <numerusform>%n measure</numerusform>
-            <numerusform>%n measures</numerusform>
         </translation>
     </message>
 </context>
