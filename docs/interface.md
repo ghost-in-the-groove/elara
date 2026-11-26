@@ -62,6 +62,7 @@ All in `Theme.qml`; a QML file never writes a colour of its own.
 |---|---|
 | `night`, `pearl`, `pearlSoft`, `lilac` | The command bar, in both themes: its ground, what is written on it, what is quieter on it, and the string and what is lit on it. `nightHover`, `nightPressed`, `nightLine` and `nightWell` are its states, hairlines and the readings' well. |
 | `desk` | What the pages lie on. |
+| `nightPage`, `nightInk` | The page of the score in the dark theme and the ink on it (ADR-0114). In the light theme, and whenever the score leaves the program, it is black on white. |
 | `bar` | The tool row, the panels and the status bar. |
 | `surface` | Fields, cards and what floats. |
 | `line` | Hairlines between and around surfaces. |

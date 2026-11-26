@@ -15,6 +15,10 @@ Item {
     property real zoom: 1.0
     readonly property real minZoom: 0.25
     readonly property real maxZoom: 4.0
+    /// The page turned dark, its ink light (ADR-0114): for the dark theme.
+    property bool darkPage: false
+    readonly property color paper: darkPage ? Theme.nightPage : "white"
+    readonly property color ink: darkPage ? Theme.nightInk : "black"
     /// Seconds into the song where the playback cursor stands; negative hides it.
     property real cursorSeconds: -1
     /// Scroll so that the cursor stays in view as it moves.
@@ -507,7 +511,10 @@ Item {
             width: root.pageWidth
             height: list.contentHeight
             radius: 2
-            color: Theme.dark ? Qt.rgba(0.851, 0.85, 0.845, 1) : "white"
+            color: root.darkPage ? root.paper
+                                 : Theme.dark ? Qt.rgba(0.851, 0.85, 0.845, 1) : "white"
+            border.width: root.darkPage ? 1 : 0
+            border.color: Theme.line
         }
 
         Repeater {
@@ -551,12 +558,17 @@ Item {
                             height: sheet.height
                             anchors.horizontalCenter: parent.horizontalCenter
                             radius: root.document.showsStrips ? 0 : 2
-                            color: "white"
+                            color: root.paper
+                            // A dark page has no shadow to stand out by: a hairline.
+                            border.width: root.darkPage && !root.document.showsStrips ? 1 : 0
+                            border.color: Theme.line
 
                             ScorePage {
                                 anchors.fill: parent
                                 document: root.document
                                 index: sheet.index
+                                paper: root.paper
+                                ink: root.ink
                                 opacity: painted ? 1.0 : 0.0
 
                                 Behavior on opacity {
@@ -566,12 +578,12 @@ Item {
                                 }
                             }
 
-                            // In the dark theme the paper is dimmed, so that it does not
-                            // glare on the dark desk; the ink stays black.
+                            // In the dark theme a white page is dimmed, so that it does
+                            // not glare on the dark desk; the ink stays black.
                             Rectangle {
                                 anchors.fill: parent
                                 radius: parent.radius
-                                visible: Theme.dark
+                                visible: Theme.dark && !root.darkPage
                                 color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
                             }
 

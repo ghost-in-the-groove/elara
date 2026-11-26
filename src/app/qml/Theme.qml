@@ -27,6 +27,9 @@ QtObject {
     readonly property color bar: dark ? "#1b1a20" : "#f5f3ef"
     /// Fields, cards and whatever floats over the score.
     readonly property color surface: dark ? "#25242b" : "#ffffff"
+    /// The page of the score in the dark theme, and the ink on it (ADR-0114).
+    readonly property color nightPage: "#1c1b21"
+    readonly property color nightInk: "#e7e5ec"
     /// Hairlines between and around surfaces.
     readonly property color line: dark ? "#35333d" : "#d8d4cc"
 
