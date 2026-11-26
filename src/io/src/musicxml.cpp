@@ -23,6 +23,7 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -3139,10 +3140,55 @@ std::expected<std::string, FormatError> mxlScore(std::span<const std::uint8_t> b
 
 } // namespace
 
+namespace {
+
+// The score in `document`, as parsed from `bytes` bytes of XML.
+std::expected<ImportResult, FormatError> importDocument(const pugi::xml_document& document,
+                                                        const pugi::xml_parse_result& parsed,
+                                                        std::size_t bytes,
+                                                        const MusicXmlOptions& options);
+
+// The score in `xml`, a buffer the caller owns: it is parsed in place, so
+// the document holds no copy of the text (H13 of the study). The buffer
+// changes and must outlive the import.
+std::expected<ImportResult, FormatError> importInPlace(std::span<char> xml,
+                                                       const MusicXmlOptions& options) {
+    pugi::xml_document document;
+    const pugi::xml_parse_result parsed = document.load_buffer_inplace(xml.data(), xml.size());
+    return importDocument(document, parsed, xml.size(), options);
+}
+
+// A plain MusicXML file or an .mxl archive, from bytes the caller owns.
+std::expected<ImportResult, FormatError> importOwnedBytes(std::vector<std::uint8_t>& bytes,
+                                                          const MusicXmlOptions& options) {
+    if (!detail::looksLikeZip(bytes)) {
+        return importInPlace(std::span(reinterpret_cast<char*>(bytes.data()), bytes.size()),
+                             options);
+    }
+    try {
+        return mxlScore(bytes).and_then([&options](std::string xml) {
+            return importInPlace(std::span(xml.data(), xml.size()), options);
+        });
+    } catch (const FormatError& error) {
+        return std::unexpected(error);
+    }
+}
+
+} // namespace
+
 std::expected<ImportResult, FormatError> importMusicXml(std::string_view xml,
                                                         const MusicXmlOptions& options) {
     pugi::xml_document document;
     const pugi::xml_parse_result parsed = document.load_buffer(xml.data(), xml.size());
+    return importDocument(document, parsed, xml.size(), options);
+}
+
+namespace {
+
+std::expected<ImportResult, FormatError> importDocument(const pugi::xml_document& document,
+                                                        const pugi::xml_parse_result& parsed,
+                                                        std::size_t bytes,
+                                                        const MusicXmlOptions& options) {
     if (!parsed) {
         return std::unexpected(FormatError{
             std::format("invalid XML at byte {}: {}", parsed.offset, parsed.description())});
@@ -3158,13 +3204,15 @@ std::expected<ImportResult, FormatError> importMusicXml(std::string_view xml,
             std::format("not a MusicXML score (root element <{}>)", name.empty() ? "none" : name)});
     }
     try {
-        return importScore(root, xml.size(), options);
+        return importScore(root, bytes, options);
     } catch (const FormatError& error) {
         return std::unexpected(error);
     } catch (const std::exception& error) {
         return std::unexpected(FormatError{std::format("unsupported content: {}", error.what())});
     }
 }
+
+} // namespace
 
 std::expected<ImportResult, FormatError> importMusicXmlBytes(std::span<const std::uint8_t> bytes,
                                                              const MusicXmlOptions& options) {
@@ -3173,8 +3221,10 @@ std::expected<ImportResult, FormatError> importMusicXmlBytes(std::span<const std
             std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()), options);
     }
     try {
-        return mxlScore(bytes).and_then(
-            [&options](const std::string& xml) { return importMusicXml(xml, options); });
+        // The score unpacked from the archive is this import's own.
+        return mxlScore(bytes).and_then([&options](std::string xml) {
+            return importInPlace(std::span(xml.data(), xml.size()), options);
+        });
     } catch (const FormatError& error) {
         return std::unexpected(error);
     }
@@ -3182,9 +3232,8 @@ std::expected<ImportResult, FormatError> importMusicXmlBytes(std::span<const std
 
 std::expected<ImportResult, FormatError> importMusicXmlFile(const std::filesystem::path& path,
                                                             const MusicXmlOptions& options) {
-    return detail::readFile(path).and_then([&options](const std::vector<std::uint8_t>& bytes) {
-        return importMusicXmlBytes(bytes, options);
-    });
+    return detail::readFile(path).and_then(
+        [&options](std::vector<std::uint8_t> bytes) { return importOwnedBytes(bytes, options); });
 }
 
 } // namespace elara::io
