@@ -1751,6 +1751,31 @@ void Startup::tick() {
     if (effectsPanel_ != nullptr && effectsPanel_->property("opened").toBool()) {
         effectsOpened_ = true;
     }
+    if (!options_.menu.isEmpty() && !menuOpened_ && window_ != nullptr) {
+        const auto* menu = window_->findChild<QObject*>(options_.menu + QStringLiteral("Menu"));
+        menuOpened_ = menu != nullptr && menu->property("visible").toBool();
+    }
+    // A popup the caret opened lies inside the view it belongs to, however
+    // short the window is: the measure popup scrolls rather than leave it.
+    if (window_ != nullptr && popupProblem_.isEmpty()) {
+        for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"),
+                                    QStringLiteral("textPopup"), QStringLiteral("lyricsPopup")}) {
+            const auto* popup = window_->findChild<QObject*>(name);
+            if (popup == nullptr || !popup->property("opened").toBool()) {
+                continue;
+            }
+            const auto* view = popup->property("parent").value<QQuickItem*>();
+            const double top = popup->property("y").toDouble();
+            const double bottom = top + popup->property("height").toDouble();
+            if (view != nullptr && (top < 0.0 || bottom > view->height() + 0.5)) {
+                popupProblem_ = QStringLiteral("%1 (from %2 to %3) leaves its view, %4 high")
+                                    .arg(name)
+                                    .arg(top)
+                                    .arg(bottom)
+                                    .arg(view->height());
+            }
+        }
+    }
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
         finish(false, score_->errorMessage());
@@ -1820,9 +1845,10 @@ void Startup::tick() {
         return;
     }
     if (!options_.screenshot.isEmpty()) {
-        // Let animations settle first, the note effects panel's too once
-        // `--effects` opened it.
-        if (effectsPanel_ != nullptr && !effectsOpened_ &&
+        // Let animations settle first, the note effects palette's too once
+        // `--effects` opened it, and the menu `--menu` names.
+        if (((effectsPanel_ != nullptr && !effectsOpened_) ||
+             (!options_.menu.isEmpty() && !menuOpened_)) &&
             clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
             return;
         }
@@ -1876,12 +1902,12 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
-    // Nothing may cover the cursor, as the measure popup or the note effects
-    // panel open at the caret can: they close first, and the click waits until
-    // they are gone.
-    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel"),
-                                QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
-                                QStringLiteral("lyricsPopup")}) {
+    // Nothing may cover the cursor, as a popup open at the caret or a menu
+    // can: they close first, and the click waits until they are gone.
+    for (const QString& name :
+         {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
+          QStringLiteral("lyricsPopup"), QStringLiteral("fileMenu"), QStringLiteral("editMenu"),
+          QStringLiteral("viewMenu"), QStringLiteral("soundMenu"), QStringLiteral("helpMenu")}) {
         if (auto* popup = window_->findChild<QObject*>(name);
             popup != nullptr && popup->property("visible").toBool()) {
             QMetaObject::invokeMethod(popup, "close");
@@ -1889,12 +1915,29 @@ void Startup::clickCursor() {
             return;
         }
     }
+    // Nor may a notice: in a short window it lies over the foot of the score.
+    if (auto* toast = window_->findChild<QQuickItem*>(QStringLiteral("toast"));
+        toast != nullptr && toast->isVisible()) {
+        toast->setProperty("shown", false);
+        again_ = true;
+        return;
+    }
     const QVariantMap cursor = score_->cursorAt(audio->position());
     const double expected = score_->secondsAt(
         cursor.value(QStringLiteral("page")).toInt(), cursor.value(QStringLiteral("x")).toDouble(),
         cursor.value(QStringLiteral("y")).toDouble() +
             cursor.value(QStringLiteral("height")).toDouble() / 2.0);
     const QPointF at = playhead->mapToScene(QPointF(playhead->width() / 2, playhead->height() / 2));
+    // The view scrolls after the cursor when it stands out of sight, as in a
+    // short window: the click waits until the view has stopped moving and the
+    // cursor has stood in one place for two ticks.
+    const auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    if (view == nullptr || view->property("settling").toBool() || !cursorRest_ ||
+        *cursorRest_ != at) {
+        cursorRest_ = at;
+        again_ = true;
+        return;
+    }
     for (const QEvent::Type type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
         QMouseEvent event(type, at, at, window_->mapToGlobal(at), Qt::LeftButton,
                           type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
@@ -1902,9 +1945,27 @@ void Startup::clickCursor() {
         QCoreApplication::sendEvent(window_, &event);
     }
     if (expected < 0.0 || std::abs(audio->position() - expected) > 1e-6) {
-        failure_ = QStringLiteral("a click on the cursor moved playback to %1 s, not %2 s")
+        // What lay under the click, to tell a covered cursor from a misplaced one.
+        QStringList under;
+        QPointF point = at;
+        for (QQuickItem* item = window_->contentItem(); item != nullptr;) {
+            QQuickItem* child = item->childAt(point.x(), point.y());
+            if (child == nullptr) {
+                break;
+            }
+            point = item->mapToItem(child, point);
+            under.append(child->objectName().isEmpty()
+                             ? QString::fromLatin1(child->metaObject()->className())
+                             : child->objectName());
+            item = child;
+        }
+        failure_ = QStringLiteral("a click on the cursor at %1, %2 moved playback to %3 s, not "
+                                  "%4 s; under it: %5")
+                       .arg(at.x())
+                       .arg(at.y())
                        .arg(audio->position())
-                       .arg(expected);
+                       .arg(expected)
+                       .arg(under.join(QStringLiteral(" > ")));
         return;
     }
     // The transport reads the measure playing there, from 1, and the song
@@ -1916,6 +1977,20 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("the transport does not read measure %1").arg(playing);
     } else if (string == nullptr || string->property("marker").toString() != playing) {
         failure_ = QStringLiteral("the song string does not carry measure %1").arg(playing);
+    } else {
+        // It has a tick where the measures start, every one or one in so
+        // many, and a taller one where the caret's measure does.
+        const int starts = static_cast<int>(score_->measureStarts().size());
+        const int step = string->property("tickStep").toInt();
+        const double caret = score_->measureStart(score_->caretMeasure());
+        if (starts == 0 || step < 1 ||
+            string->property("tickCount").toInt() != (starts - 1) / step) {
+            failure_ = QStringLiteral("the song string has %1 ticks for %2 measures played")
+                           .arg(string->property("tickCount").toInt())
+                           .arg(starts);
+        } else if (std::abs(string->property("caretSeconds").toDouble() - caret) > 1e-9) {
+            failure_ = QStringLiteral("the song string does not mark the caret's measure");
+        }
     }
 }
 
@@ -2412,6 +2487,13 @@ QString Startup::overlappingBars() const {
         !problem.isEmpty()) {
         return problem;
     }
+    // The bar gives up the metronome before the measure it reads.
+    const auto* measure = window_->findChild<QQuickItem*>(QStringLiteral("measureReadout"));
+    const auto* metronome = window_->findChild<QQuickItem*>(QStringLiteral("metronomeButton"));
+    if (measure != nullptr && metronome != nullptr && metronome->isVisible() &&
+        !measure->isVisible()) {
+        return QStringLiteral("the command bar shows the metronome and not the measure");
+    }
     return crowded(
         {QStringLiteral("entryBar"), QStringLiteral("trackPicker"), QStringLiteral("viewSwitch")});
 }
@@ -2423,10 +2505,19 @@ void Startup::finish(bool ok, const QString& detail) {
         ok = false;
         outcome = QStringLiteral("QML warnings");
     }
-    // `--effects` opened the note effects panel at the caret.
+    // `--effects` opened the note effects palette at the caret, and `--menu`
+    // its menu.
     if (ok && options_.smokeTest && options_.effects && !effectsOpened_) {
         ok = false;
-        outcome = QStringLiteral("the note effects panel did not open");
+        outcome = QStringLiteral("the note effects palette did not open");
+    }
+    if (ok && options_.smokeTest && !options_.menu.isEmpty() && !menuOpened_) {
+        ok = false;
+        outcome = QStringLiteral("the %1 menu did not open").arg(options_.menu);
+    }
+    if (ok && !popupProblem_.isEmpty()) {
+        ok = false;
+        outcome = popupProblem_;
     }
     // The window carries the app icon up to the largest size a taskbar asks
     // for (ADR-0064).

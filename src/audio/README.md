@@ -42,7 +42,10 @@ Three targets with different rules:
 - SFZ instruments (ADR-0066): `parseSfz()`/`readSfz()` read the text format
   into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
   and `SfzBank` plays them through a sampler of Elara's own: WAV and FLAC
-  samples read into memory on every core, regions picked by key, velocity,
+  samples read into memory on every core, each averaged to one channel in
+  place by the task that read it (`WavAudio::intoMono()`), so that loading
+  holds the final samples and only the files in flight, regions picked by
+  key, velocity,
   controllers, keyswitch and round robin (in turn, or at random with
   `lorand`/`hirand` from a generator of each sound's own, the same sequence
   every time), the amplitude envelope, loops,
@@ -57,7 +60,9 @@ Three targets with different rules:
   glide when the library has neither (ADR-0070); a fretted track's picked
   notes are never legato;
 - `Player`, the same in real time: songs are handed to the audio thread through
-  atomic pointers and the transport is a set of atomics (ADR-0019), and
+  atomic pointers and the transport is a set of atomics (ADR-0019); a song can
+  be prepared on another thread (`preparer()`, `PreparedSong`) and published
+  on the control thread (`publish()`, ADR-0112); and
   `updateMix()` changes the track levels while it plays, from a song or from
   the tracks' mixes alone (a moving fader, ADR-0039). For practice it counts
   in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and

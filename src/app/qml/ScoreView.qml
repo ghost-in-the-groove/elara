@@ -15,6 +15,10 @@ Item {
     property real zoom: 1.0
     readonly property real minZoom: 0.25
     readonly property real maxZoom: 4.0
+    /// The page turned dark, its ink light (ADR-0114): for the dark theme.
+    property bool darkPage: false
+    readonly property color paper: darkPage ? Theme.nightPage : "white"
+    readonly property color ink: darkPage ? Theme.nightInk : "black"
     /// Seconds into the song where the playback cursor stands; negative hides it.
     property real cursorSeconds: -1
     /// Scroll so that the cursor stays in view as it moves.
@@ -84,13 +88,27 @@ Item {
         return pageY(page) + (pages - page) * (pageExtent(page) + gap);
     }
 
+    /// Whether the view is still moving by itself: scrolling after the caret
+    /// or the playback cursor, or zooming to fit.
+    readonly property bool settling: scrollY.running || scrollX.running || followY.running
+    /// Whether one of the sheets at the caret is open.
+    readonly property bool sheetOpen: measurePopup.visible || chordPopup.visible || textPopup.visible
+                                      || lyricsPopup.visible
+                                     || followX.running || refit.running || shownZoom !== zoom
+    /// What the zoom follows as the room for the pages changes: the paper's
+    /// size ("paper", as a song opens), the page's width ("width"), or nothing
+    /// once it was chosen by hand ("").
+    property string fit: "paper"
+
     function setZoom(value: real) {
         zoom = Math.max(minZoom, Math.min(maxZoom, value));
     }
     function zoomIn() {
+        fit = "";
         setZoom(zoom * 1.25);
     }
     function zoomOut() {
+        fit = "";
         setZoom(zoom / 1.25);
     }
     /// The zoom at which a page fills the width of the view.
@@ -98,11 +116,31 @@ Item {
         return (list.width - 2 * sideMargin) / (document.pageSize.width * unit);
     }
     function fitWidth() {
+        fit = "width";
         setZoom(widthZoom());
     }
     /// Paper size, or smaller when the view is narrower.
     function fitPaper() {
+        fit = "paper";
         setZoom(Math.min(1.0, widthZoom()));
+    }
+    /// Fits again once the view has its new width: a panel that slides in or
+    /// out changes it on every frame, and each zoom paints the pages again.
+    onWidthChanged: {
+        if (fit.length > 0 && document.pageCount > 0)
+            refit.restart();
+    }
+
+    Timer {
+        id: refit
+
+        interval: 90
+        onTriggered: {
+            if (root.fit === "width")
+                root.setZoom(root.widthZoom());
+            else if (root.fit === "paper")
+                root.setZoom(Math.min(1.0, root.widthZoom()));
+        }
     }
     function toTop() {
         list.contentY = list.originY - list.topMargin;
@@ -155,6 +193,12 @@ Item {
         measurePopup.y = Math.max(8, Math.min(height - measurePopup.implicitHeight - 8, y));
         measurePopup.open();
     }
+    /// Moves `popup` up or left until all of it is inside the view.
+    function keepInside(popup) {
+        popup.x = Math.max(8, Math.min(width - popup.width - 8, popup.x));
+        popup.y = Math.max(8, Math.min(height - popup.height - 8, popup.y));
+    }
+
     function openMeasurePopupAtCaret() {
         if (document.caretPage < 0)
             return;
@@ -470,7 +514,10 @@ Item {
             width: root.pageWidth
             height: list.contentHeight
             radius: 2
-            color: Theme.dark ? Qt.rgba(0.851, 0.85, 0.845, 1) : "white"
+            color: root.darkPage ? root.paper
+                                 : Theme.dark ? Qt.rgba(0.851, 0.85, 0.845, 1) : "white"
+            border.width: root.darkPage ? 1 : 0
+            border.color: Theme.line
         }
 
         Repeater {
@@ -514,12 +561,17 @@ Item {
                             height: sheet.height
                             anchors.horizontalCenter: parent.horizontalCenter
                             radius: root.document.showsStrips ? 0 : 2
-                            color: "white"
+                            color: root.paper
+                            // A dark page has no shadow to stand out by: a hairline.
+                            border.width: root.darkPage && !root.document.showsStrips ? 1 : 0
+                            border.color: Theme.line
 
                             ScorePage {
                                 anchors.fill: parent
                                 document: root.document
                                 index: sheet.index
+                                paper: root.paper
+                                ink: root.ink
                                 opacity: painted ? 1.0 : 0.0
 
                                 Behavior on opacity {
@@ -529,12 +581,12 @@ Item {
                                 }
                             }
 
-                            // In the dark theme the paper is dimmed, so that it does not
-                            // glare on the dark desk; the ink stays black.
+                            // In the dark theme a white page is dimmed, so that it does
+                            // not glare on the dark desk; the ink stays black.
                             Rectangle {
                                 anchors.fill: parent
                                 radius: parent.radius
-                                visible: Theme.dark
+                                visible: Theme.dark && !root.darkPage
                                 color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
                             }
 
@@ -641,6 +693,12 @@ Item {
 
         document: root.document
         onClosed: root.forceActiveFocus()
+        // It knows its height once it shows: kept inside the view then.
+        onOpened: root.keepInside(measurePopup)
+        onHeightChanged: {
+            if (visible)
+                root.keepInside(measurePopup);
+        }
     }
 
     WordsPopup {
@@ -714,7 +772,10 @@ Item {
     WheelHandler {
         target: null
         acceptedModifiers: Qt.ControlModifier
-        onWheel: event => root.setZoom(root.zoom * Math.pow(1.0015, event.angleDelta.y))
+        onWheel: event => {
+            root.fit = "";
+            root.setZoom(root.zoom * Math.pow(1.0015, event.angleDelta.y));
+        }
     }
     PinchHandler {
         target: null
@@ -723,6 +784,9 @@ Item {
             if (active)
                 startZoom = root.zoom;
         }
-        onActiveScaleChanged: root.setZoom(startZoom * activeScale)
+        onActiveScaleChanged: {
+            root.fit = "";
+            root.setZoom(startZoom * activeScale);
+        }
     }
 }

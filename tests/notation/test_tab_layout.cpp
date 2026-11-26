@@ -36,6 +36,7 @@ using elara::core::SlideIn;
 using elara::core::SlideOut;
 using elara::core::Song;
 using elara::core::Staff;
+using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::Tuning;
 using elara::notation::capHeight;
@@ -56,6 +57,7 @@ namespace {
 
 constexpr double kEpsilon = 1e-9;
 constexpr double kLineSpace = 1.5;
+constexpr double kFretSize = 1.6; // font size of fret numbers (ADR-0113)
 
 const EngravingFont& bravura() {
     static const EngravingFont font = [] {
@@ -138,7 +140,7 @@ std::vector<std::string> contents(const std::vector<TextItem>& items) {
 
 // The baseline that centres a fret number on the line of `string`.
 double fretBaseline(int string, double staffY = 0.0) {
-    return staffY + kLineSpace * (string - 1) + capHeight(1.3) / 2;
+    return staffY + kLineSpace * (string - 1) + capHeight(kFretSize) / 2;
 }
 
 double noteheadCentre(const GlyphItem& head) {
@@ -251,6 +253,25 @@ TEST_CASE("Tablature layout: notation and tablature line up", "[notation][tab]")
     CHECK(byRole(tab(song).glyphs, Role::Rest).size() == 1);
 }
 
+TEST_CASE("Tablature layout: the time signature shows alone, not under a staff",
+          "[notation][tab]") {
+    Song song = guitar(
+        {{play(1, 0), play(1, 0), play(1, 0), play(1, 0)}, {play(1, 0), play(1, 0), play(1, 0)}});
+    song.measureHeader(1).timeSignature = TimeSignature(3, 4);
+    // Alone, the tablature carries the signature and its change: two digits each.
+    CHECK(byRole(tab(song).glyphs, Role::TimeSignature).size() == 4);
+    // Under a standard staff the signature is that staff's alone (ADR-0113).
+    const DisplayList both = notationAndTab(song);
+    REQUIRE(both.staves.size() == 2);
+    const auto signs = byRole(both.glyphs, Role::TimeSignature);
+    CHECK(signs.size() == 4);
+    for (const GlyphItem& sign : signs) {
+        CHECK(sign.origin.y < both.staves[1].y);
+    }
+    // The measures of both staves still start together after the change.
+    REQUIRE(both.measures.size() == 2);
+}
+
 TEST_CASE("Tablature layout: dead, ghost, tied and harmonic notes", "[notation][tab]") {
     Note dead = fretted(5, 0);
     dead.effects.deadNote = true;
@@ -285,7 +306,7 @@ TEST_CASE("Tablature layout: hammer-ons and pull-offs", "[notation][tab]") {
         CHECK(arc.from.x >= frets[i].origin.x);
         CHECK(arc.to.x <= frets[i + 1].origin.x);
         CHECK(arc.control1.y < arc.from.y);
-        CHECK(arc.from.y < kLineSpace - capHeight(1.3) / 2);
+        CHECK(arc.from.y < kLineSpace - capHeight(kFretSize) / 2);
         CHECK(arc.thickness > arc.endThickness);
     }
     CHECK(contents(texts(list, Role::Technique)) == std::vector<std::string>{"H", "P"});
@@ -301,9 +322,9 @@ TEST_CASE("Tablature layout: grace notes are small fret numbers before their not
     const DisplayList list = tab(guitar({{play(1, 0), graced}}));
     const auto frets = texts(list, Role::FretNumber);
     REQUIRE(contents(frets) == std::vector<std::string>{"0", "5", "7"});
-    const double small = 1.3 * 0.65;
+    const double small = kFretSize * 0.65;
     CHECK_THAT(frets[1].size, WithinAbs(small, kEpsilon));
-    CHECK_THAT(frets[2].size, WithinAbs(1.3, kEpsilon));
+    CHECK_THAT(frets[2].size, WithinAbs(kFretSize, kEpsilon));
     CHECK_THAT(frets[1].origin.y, WithinAbs(kLineSpace * 2 + capHeight(small) / 2, kEpsilon));
     CHECK(frets[1].knockout);
     // The hammer-on arc and its "H" join the grace note to its note.

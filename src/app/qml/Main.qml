@@ -13,15 +13,19 @@ ApplicationWindow {
     property url initialFile
     /// Open the tuner at start (from the command line).
     property bool showTuner: false
-    /// The song panel at the right of the score.
+    /// The song panel at the right of the score, where the tuner also docks:
+    /// one of the two at a time.
     property bool showSongPane: false
     /// Open the caret's measure once the score is laid out (from the command line).
     property bool showMeasure: false
     /// Open the lyrics of the caret's staff once the score is laid out (from
     /// the command line).
     property bool showLyrics: false
-    // Open the note effects panel once there is a caret (`--effects`).
+    // Open the note effects palette once there is a caret (`--effects`).
     property bool showEffects: false
+    /// Open this menu once the window shows (`--menu`): file, edit, view,
+    /// sound or help.
+    property string showMenu
     /// Open the first track's tuning in the song panel once there is a score
     /// (from the command line).
     property bool showTuning: false
@@ -37,6 +41,9 @@ ApplicationWindow {
     property string recoveryFolder
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
+    /// In the dark theme the page is dark too, its ink light (ADR-0114); off,
+    /// it stays a dimmed white page.
+    property bool darkPage: true
 
     onHasScoreChanged: {
         if (hasScore && showTuning) {
@@ -44,6 +51,7 @@ ApplicationWindow {
             showSongPane = true;
             songPane.openTuning(0);
         }
+        keepOneSide(true);
     }
     /// What to do once unsaved changes are saved or discarded.
     property var pendingAction: null
@@ -71,8 +79,8 @@ ApplicationWindow {
         recent.remember = rememberSettings;
         if (initialFile.toString().length > 0)
             score.open(initialFile);
-        if (showTuner)
-            tunerPane.open();
+        if (showMenu.length > 0)
+            Qt.callLater(commandBar.openMenu, showMenu);
         audio.rememberSound = rememberSettings;
         if (initialSoundFont.length > 0 || initialGuitarSfz.length > 0
                 || initialBassSfz.length > 0) {
@@ -99,11 +107,40 @@ ApplicationWindow {
     }
 
     function toggleTuner() {
-        if (tunerPane.visible)
-            tunerPane.close();
-        else
-            tunerPane.open();
+        showTuner = !showTuner;
     }
+
+    /// Wide enough for a panel at each side of the score. Narrower, opening
+    /// one closes the one at the other side.
+    readonly property bool roomy: width >= 1040
+
+    /// In a window without room for both sides, closes the palette when
+    /// `right` is the side to keep, and the right panel otherwise.
+    function keepOneSide(right: bool) {
+        if (roomy || !hasScore || !palette.opened || !(showTuner || showSongPane))
+            return;
+        if (right) {
+            palette.opened = false;
+        } else {
+            showSongPane = false;
+            showTuner = false;
+        }
+    }
+
+    // The song panel and the tuner share the right of the score.
+    onShowSongPaneChanged: {
+        if (!showSongPane)
+            return;
+        showTuner = false;
+        keepOneSide(true);
+    }
+    onShowTunerChanged: {
+        if (!showTuner)
+            return;
+        showSongPane = false;
+        keepOneSide(true);
+    }
+    onRoomyChanged: keepOneSide(true)
 
     /// Runs `action` at once, or after asking whether to save the changes.
     /// While a save is written, decides once it is on the disk.
@@ -250,7 +287,7 @@ ApplicationWindow {
             }
             if (window.showEffects) {
                 window.showEffects = false;
-                entryBar.openEffects();
+                palette.open();
             }
         }
     }
@@ -325,7 +362,7 @@ ApplicationWindow {
     }
 
     // What an export left out, one line each.
-    Dialog {
+    AppDialog {
         id: detailsDialog
 
         property var lines: []
@@ -349,12 +386,12 @@ ApplicationWindow {
                 width: ListView.view.width
                 text: "• " + modelData
                 wrapMode: Text.Wrap
-                opacity: 0.85
+                color: Theme.ink
             }
         }
     }
 
-    Dialog {
+    AppDialog {
         id: unsavedDialog
 
         objectName: "unsavedDialog"
@@ -379,6 +416,7 @@ ApplicationWindow {
             width: unsavedDialog.availableWidth
             text: qsTr("“%1” has changes that are not saved.").arg(score.title)
             wrapMode: Text.Wrap
+            color: Theme.ink
         }
     }
 
@@ -390,7 +428,7 @@ ApplicationWindow {
         onDiscardRequested: file => score.discardRecovery(file)
     }
 
-    Dialog {
+    AppDialog {
         id: about
 
         anchors.centerIn: parent
@@ -401,16 +439,26 @@ ApplicationWindow {
         ColumnLayout {
             spacing: 8
 
+            Logo {
+                Layout.preferredHeight: 56
+                Layout.preferredWidth: 56 * aspect
+                Layout.bottomMargin: 6
+                detailed: false
+                color: Theme.ink
+                stringColor: Theme.accentInk
+                ground: Theme.surface
+            }
             Label {
                 text: qsTr("Version %1 (alpha)").arg(Qt.application.version)
+                color: Theme.ink
             }
             Label {
                 text: qsTr("Free software under the GNU AGPL 3.0 or later.")
-                opacity: 0.7
+                color: Theme.inkSoft
             }
             Label {
                 text: qsTr("Music font: Bravura (SIL OFL). Text font: Arimo (SIL OFL).")
-                opacity: 0.7
+                color: Theme.inkSoft
             }
         }
     }
@@ -427,13 +475,26 @@ ApplicationWindow {
             playback: audio
             hasScore: window.hasScore
             songPaneShown: window.showSongPane
+            tunerShown: window.showTuner
+            paletteShown: palette.opened
+            onPaletteToggled: palette.opened = !palette.opened
             onOpenRequested: window.openScore()
             onSaveRequested: window.save()
             onSongPaneToggled: window.showSongPane = !window.showSongPane
             onTunerRequested: window.toggleTuner()
 
+            /// Opens the menu named `name` (file, edit, view, sound, help).
+            function openMenu(name: string) {
+                const at = ["file", "edit", "view", "sound", "help"].indexOf(name);
+                if (at >= 0)
+                    menuBar.itemAt(at).triggered();
+            }
+
             menus: AppMenuBar {
+                id: menuBar
+
                 AppMenu {
+                    objectName: "fileMenu"
                     title: qsTr("&File")
 
                     AppMenuItem {
@@ -510,6 +571,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "editMenu"
                     title: qsTr("&Edit")
 
                     AppMenuItem {
@@ -590,6 +652,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "viewMenu"
                     title: qsTr("&View")
 
                     AppMenuItem {
@@ -626,6 +689,12 @@ ApplicationWindow {
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
+                        text: qsTr("Dark page in the dark theme")
+                        chosen: window.darkPage
+                        onTriggered: window.darkPage = !window.darkPage
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
                         text: qsTr("Zoom in")
                         keys: KeyNames.native("Ctrl++")
                         enabled: window.hasScore && scoreView.zoom < scoreView.maxZoom
@@ -645,6 +714,13 @@ ApplicationWindow {
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
+                        text: qsTr("Note effects")
+                        keys: KeyNames.native("F2")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && palette.opened
+                        onTriggered: palette.opened = !palette.opened
+                    }
+                    AppMenuItem {
                         text: qsTr("Song and tracks")
                         keys: KeyNames.native("Ctrl+I")
                         enabled: window.hasScore
@@ -654,12 +730,13 @@ ApplicationWindow {
                     AppMenuItem {
                         text: qsTr("Tuner")
                         keys: KeyNames.native("Ctrl+Shift+T")
-                        chosen: tunerPane.visible
+                        chosen: window.showTuner
                         onTriggered: window.toggleTuner()
                     }
                 }
 
                 AppMenu {
+                    objectName: "soundMenu"
                     title: qsTr("&Sound")
 
                     AppMenuItem {
@@ -754,6 +831,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "helpMenu"
                     title: qsTr("&Help")
 
                     AppMenuItem {
@@ -790,7 +868,7 @@ ApplicationWindow {
                 document: score
                 // Tools for the caret: there is none before a staff is shown.
                 enabled: score.caretPage >= 0
-                opacity: enabled ? 1.0 : 0.4
+                opacity: enabled ? 1.0 : 0.38
                 onMeasureRequested: scoreView.openMeasurePopupAtCaret()
                 onChordRequested: scoreView.openChordPopupAtCaret()
                 onTextRequested: scoreView.openTextPopupAtCaret()
@@ -812,6 +890,8 @@ ApplicationWindow {
                     visible: score.trackNames.length > 1
                     takesFocus: false
                     model: [qsTr("All tracks")].concat(score.trackNames)
+                    // Each track in its hue, as in the song panel.
+                    swatches: ["transparent"].concat(score.trackNames.map((name, index) => Theme.trackHue(index)))
                     onActivated: index => score.track = index - 1
                     // Set after the model has been replaced: a new model resets
                     // the index, which would undo a binding.
@@ -874,6 +954,9 @@ ApplicationWindow {
             loopFrom: audio.loopFrom
             loopTo: audio.loopTo
             sections: score.sectionMarks
+            measureStarts: score.measureStarts
+            caretSeconds: window.hasScore && score.measureStarts.length > 0
+                          ? score.measureStart(score.caretMeasure) : -1
             marker: window.hasScore ? commandBar.playingMeasure : ""
             onSeekRequested: seconds => audio.seek(seconds)
         }
@@ -886,6 +969,7 @@ ApplicationWindow {
 
         WelcomePane {
             anchors.fill: parent
+            anchors.rightMargin: rightDock.width
             opacity: window.hasScore ? 0.0 : 1.0
             visible: opacity > 0
             recentScores: recent.scores
@@ -905,10 +989,12 @@ ApplicationWindow {
         ScoreView {
             id: scoreView
 
+            objectName: "scoreView"
+            darkPage: window.dark && window.darkPage
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: songPane.left
+            anchors.left: palette.right
+            anchors.right: rightDock.left
             document: score
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
@@ -924,26 +1010,88 @@ ApplicationWindow {
             }
         }
 
-        // Slides in from the right; the score makes room for it.
-        SongPane {
-            id: songPane
+        // The note effects (ADR-0109): slides in from the left; the score
+        // makes room for it.
+        EffectsPalette {
+            id: palette
 
-            readonly property bool shown: window.showSongPane && window.hasScore
+            objectName: "effectsPanel"
+
+            readonly property bool shown: opened && window.hasScore
 
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.right: parent.right
-            width: shown ? 340 : 0
+            anchors.left: parent.left
+            width: shown ? fullWidth : 0
             visible: width > 0
-            clip: true
             document: score
-            onCloseRequested: window.showSongPane = false
+            onOpenedChanged: {
+                if (opened)
+                    window.keepOneSide(false);
+            }
 
             Behavior on width {
                 NumberAnimation {
                     duration: Theme.calm
                     easing.type: Easing.OutCubic
                 }
+            }
+        }
+
+        // The right of the score: the song panel or the tuner, one at a
+        // time. It slides in and the score makes room for it.
+        Item {
+            id: rightDock
+
+            /// The panel it shows: "song", "tuner" or none.
+            readonly property string panel: window.showTuner ? "tuner"
+                                            : window.showSongPane && window.hasScore ? "song" : ""
+            /// The one it showed last, which stays in it while it closes.
+            property string held
+
+            onPanelChanged: {
+                if (panel.length > 0)
+                    held = panel;
+            }
+            Component.onCompleted: held = panel
+
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            width: panel.length > 0 ? songPane.fullWidth : 0
+            visible: width > 0
+            clip: true
+
+            Behavior on width {
+                NumberAnimation {
+                    duration: Theme.calm
+                    easing.type: Easing.OutCubic
+                }
+            }
+
+            SongPane {
+                id: songPane
+
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                width: fullWidth
+                visible: rightDock.held === "song"
+                document: score
+                onCloseRequested: window.showSongPane = false
+            }
+
+            TunerPane {
+                id: tunerPane
+
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                width: fullWidth
+                visible: rightDock.held === "tuner"
+                opened: window.showTuner
+                document: score
+                onCloseRequested: window.showTuner = false
             }
         }
 
@@ -994,19 +1142,12 @@ ApplicationWindow {
             }
         }
 
-        TunerPane {
-            id: tunerPane
-
-            document: score
-            x: parent.width - width - 16
-            y: 12
-        }
-
         // Errors and notices slide up from the bottom and go away by
         // themselves; a notice with details offers them.
         Rectangle {
             id: toast
 
+            objectName: "toast"
             property string message
             property bool error: true
             property var details: []
@@ -1031,9 +1172,10 @@ ApplicationWindow {
 
             property bool shown: false
 
-            anchors.horizontalCenter: parent.horizontalCenter
+            // Over the score, between the panels.
+            x: Math.round(scoreView.x + (scoreView.width - width) / 2)
             y: shown ? parent.height - height - 20 : parent.height + 8
-            width: Math.min(parent.width - 48, toastRow.implicitWidth + 36)
+            width: Math.min(Math.max(240, scoreView.width - 32), toastRow.implicitWidth + 36)
             height: toastRow.implicitHeight + 20
             radius: Theme.radiusCard
             color: error ? Theme.dangerSurface : Theme.surface
@@ -1058,6 +1200,16 @@ ApplicationWindow {
                 onTriggered: toast.shown = false
             }
 
+            // A sheet at the caret would cover a notice: it goes. An error stays.
+            Connections {
+                target: scoreView
+
+                function onSheetOpenChanged() {
+                    if (scoreView.sheetOpen && !toast.error)
+                        toast.shown = false;
+                }
+            }
+
             MouseArea {
                 anchors.fill: parent
                 onClicked: toast.shown = false
@@ -1072,19 +1224,17 @@ ApplicationWindow {
                 Label {
                     id: toastText
 
-                    Layout.maximumWidth: toast.parent.width - 88 - (detailsButton.visible
-                                                                    ? detailsButton.implicitWidth + 12 : 0)
+                    Layout.maximumWidth: Math.max(140, scoreView.width - 104)
+                                         - (detailsButton.visible ? detailsButton.implicitWidth + 12 : 0)
                     text: toast.message
                     wrapMode: Text.Wrap
                     color: toast.error ? Theme.dangerInk : Theme.ink
                 }
-                Button {
+                TextButton {
                     id: detailsButton
 
                     visible: toast.details.length > 0
-                    flat: true
                     text: qsTr("Details")
-                    Material.foreground: Theme.accentInk
                     onClicked: {
                         detailsDialog.title = toast.message;
                         detailsDialog.lines = toast.details;
@@ -1143,6 +1293,11 @@ ApplicationWindow {
         sequences: [StandardKey.Redo, "Ctrl+Y"]
         enabled: score.canRedo
         onActivated: score.redo()
+    }
+    Shortcut {
+        sequence: "F2"
+        enabled: window.hasScore
+        onActivated: palette.opened = !palette.opened
     }
     Shortcut {
         sequence: "Ctrl+I"

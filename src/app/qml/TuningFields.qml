@@ -3,7 +3,6 @@
 // lowest, the capo's fret, and whether a change keeps the sound or the frets.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
 import Elara.App
 
@@ -26,16 +25,16 @@ ColumnLayout {
         root.document.setTrackTuning(root.track, tuning, capo, root.keepFrets);
     }
 
-    spacing: 8
+    spacing: 6
 
     component FieldLabel: Label {
-        Layout.preferredWidth: 76
-        font.pixelSize: 13
-        opacity: 0.75
+        Layout.preferredWidth: 70
+        font.pixelSize: Theme.fontSmall
+        color: Theme.inkSoft
         elide: Text.ElideRight
     }
 
-    ComboBox {
+    Picker {
         id: presetField
 
         // A tuning no preset has comes first, as the notes it plays.
@@ -46,7 +45,7 @@ ColumnLayout {
                                                                }] : []).concat(root.presets)
 
         Layout.fillWidth: true
-        focusPolicy: Qt.NoFocus
+        takesFocus: false
         model: choices
         textRole: "name"
         currentIndex: choices.findIndex(choice => choice.id === root.preset)
@@ -57,29 +56,56 @@ ColumnLayout {
             }
             currentIndex = Qt.binding(() => choices.findIndex(choice => choice.id === root.preset));
         }
+        Accessible.name: qsTr("Tuning")
 
+        // Each tuning with the notes of its strings under its name.
         delegate: ItemDelegate {
             id: choice
 
             required property var modelData
             required property int index
 
-            width: ListView.view.width
+            width: ListView.view ? ListView.view.width : implicitWidth
+            implicitHeight: 42
+            leftPadding: 30
+            rightPadding: 12
+            topPadding: 0
+            bottomPadding: 0
             highlighted: presetField.highlightedIndex === index
-            contentItem: ColumnLayout {
+
+            contentItem: Column {
+                topPadding: 5
                 spacing: 0
 
                 Label {
-                    Layout.fillWidth: true
+                    width: parent.width
                     text: choice.modelData.name
+                    font.pixelSize: Theme.fontBody
+                    color: Theme.ink
                     elide: Text.ElideRight
                 }
                 Label {
-                    Layout.fillWidth: true
+                    width: parent.width
                     text: choice.modelData.notes
-                    font.pixelSize: 11
-                    opacity: 0.55
+                    font.pixelSize: Theme.fontCaption
+                    color: Theme.inkSoft
                     elide: Text.ElideRight
+                }
+            }
+
+            background: Rectangle {
+                radius: Theme.radiusSmall - 1
+                color: choice.highlighted ? Theme.hover : "transparent"
+
+                Icon {
+                    x: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 16
+                    height: 16
+                    visible: choice.index === presetField.currentIndex
+                    path: Icons.check
+                    lineWidth: 2.2
+                    color: Theme.accentInk
                 }
             }
         }
@@ -87,17 +113,16 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
+        spacing: 6
 
         FieldLabel {
             text: qsTr("Strings")
         }
-        TextField {
+        Field {
             id: notesField
 
             Layout.fillWidth: true
             text: root.notes
-            selectByMouse: true
-            font.pixelSize: 13
             ToolTip.visible: hovered
             ToolTip.delay: 600
             ToolTip.text: qsTr("Open strings from the lowest; Enter applies them")
@@ -112,17 +137,17 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
+        spacing: 6
 
         FieldLabel {
             text: qsTr("Capo")
         }
-        SpinBox {
+        Stepper {
             id: capoField
 
             Layout.fillWidth: true
             from: 0
             to: 24
-            editable: true
             value: root.capo
             textFromValue: (value, locale) => value === 0 ? qsTr("None") : qsTr("Fret %1").arg(value)
             valueFromText: (text, locale) => {
@@ -139,6 +164,7 @@ ColumnLayout {
     // What a change keeps: the sound or the frets.
     RowLayout {
         Layout.fillWidth: true
+        spacing: 6
 
         FieldLabel {
             text: qsTr("Keep")
@@ -157,8 +183,8 @@ ColumnLayout {
         Layout.fillWidth: true
         text: root.keepFrets ? qsTr("The tablature stays; each note sounds what its fret plays now.")
                              : qsTr("The music sounds the same; its notes move to other frets.")
-        font.pixelSize: 12
-        opacity: 0.5
+        font.pixelSize: Theme.fontCaption
+        color: Theme.inkSoft
         wrapMode: Text.Wrap
     }
 }

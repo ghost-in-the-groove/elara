@@ -67,39 +67,37 @@
 <text class="repeat" x="88.53" y="24.414" stroke="none">&#xE501;</text>
 <text class="notehead" x="102.071" y="27.356" stroke="none">&#xE0A2;</text>
 <text class="clef" x="9.183" y="34.138" stroke="none">&#xE06D;</text>
-<text class="timeSignature" x="11.715" y="33.106" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="11.715" y="35.106" stroke="none">&#xE084;</text>
 <text class="repeat" x="37.175" y="34.164" stroke="none">&#xE500;</text>
 <text class="repeat" x="88.53" y="34.164" stroke="none">&#xE501;</text>
 <text class="tempo" x="16.235" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Simile</text>
 <text class="t credit" x="60" y="14.511" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
-<rect class="knockout" x="16.36" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="16.825" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="20.509" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="20.974" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="24.657" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="25.123" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="28.806" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="29.271" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="44.972" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="45.437" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">7</text>
-<rect class="knockout" x="49.121" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="49.586" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="53.269" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="53.735" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="57.418" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="57.883" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="62.927" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="63.392" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="67.075" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="67.541" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="71.224" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="71.689" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="75.373" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="75.838" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">7</text>
-<rect class="knockout" x="102.45" y="35.784" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="102.915" y="36.824" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="16.253" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="16.825" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="20.401" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="20.974" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="24.55" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="25.123" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="28.699" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="29.271" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="44.865" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="45.437" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">7</text>
+<rect class="knockout" x="49.013" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="49.586" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="53.162" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="53.735" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="57.311" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="57.883" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="62.819" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="63.392" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="66.968" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="67.541" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="71.117" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="71.689" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="75.265" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="75.838" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">7</text>
+<rect class="knockout" x="102.342" y="35.652" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="102.915" y="36.932" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
 <text class="t tempo" x="17.399" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 120</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>

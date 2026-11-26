@@ -2,7 +2,8 @@
 // The command bar across the top of the window, dark in both themes: the mark
 // and the menus, the file tools, the transport with its readings and the
 // practice controls, and the panels. Its lower edge is the song string. In a
-// narrow window the file tools go first, then the readings one by one.
+// narrow window the file tools go first, then the tempo and the time, then
+// the metronome and the count-in, and the measure last.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -17,15 +18,20 @@ Rectangle {
     property bool hasScore: false
     /// The menus: an AppMenuBar, placed beside the mark.
     property alias menus: menuSlot.data
-    /// Whether the song and tracks panel shows.
+    /// Whether the song and tracks panel shows, the note effects palette and
+    /// the tuner.
     property bool songPaneShown: false
+    property bool paletteShown: false
+    property bool tunerShown: false
 
     signal openRequested
     signal saveRequested
     signal songPaneToggled
+    signal paletteToggled
     signal tunerRequested
 
-    /// The measure playing, from 1, or the caret's while nothing plays.
+    /// The measure playback stands in, from 1; the caret's before the song
+    /// has a sequence to play.
     readonly property int playingMeasure: {
         const played = hasScore ? document.measureAt(playback.position) : -1;
         return played >= 0 ? played + 1 : Math.max(1, document.caretMeasure + 1);
@@ -45,21 +51,24 @@ Rectangle {
         return Math.floor(whole / 60) + ":" + (rest < 10 ? "0" : "") + rest;
     }
 
-    // What always shows, and what goes when the window is too narrow for it.
-    readonly property real needed: 10 + mark.width + 8 + menuSlot.implicitWidth + 24
-                                   + (hasScore ? transportCore.implicitWidth + 12 + practice.implicitWidth
-                                                 + 24 : 0)
+    // What always shows, and what comes back as the window has room for it:
+    // the measure, the metronome and the count-in, the time, the tempo, the
+    // file tools.
+    readonly property real needed: 10 + mark.width + 8 + menuSlot.implicitWidth + 16
+                                   + (hasScore ? transportCore.implicitWidth + 12 + practice.coreWidth + 16
+                                               : 0)
                                    + panels.implicitWidth + 8
     readonly property real spare: width - needed
     readonly property real wellEdge: 2
-    readonly property bool showMeasure: spare >= measureCell.implicitWidth + wellEdge + 10
-    readonly property bool showTime: spare >= measureCell.implicitWidth + timeCell.implicitWidth
-                                              + wellEdge + 11
-    readonly property bool showTempo: spare >= measureCell.implicitWidth + timeCell.implicitWidth
-                                               + tempoCell.implicitWidth + wellEdge + 12
-    readonly property bool showFiles: spare >= measureCell.implicitWidth + timeCell.implicitWidth
-                                               + tempoCell.implicitWidth + wellEdge + 12
-                                               + files.implicitWidth + 12
+    readonly property real withMeasure: measureCell.implicitWidth + wellEdge + 12
+    readonly property real withToggles: withMeasure + practice.toggles
+    readonly property bool showMeasure: spare >= withMeasure
+    readonly property bool showToggles: spare >= withToggles
+    readonly property bool showTime: spare >= withToggles + timeCell.implicitWidth + 1
+    readonly property bool showTempo: spare >= withToggles + timeCell.implicitWidth
+                                               + tempoCell.implicitWidth + 2
+    readonly property bool showFiles: spare >= withToggles + timeCell.implicitWidth
+                                               + tempoCell.implicitWidth + 2 + files.implicitWidth + 12
 
     implicitHeight: 48
     color: Theme.night
@@ -273,6 +282,7 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 document: root.document
                 playback: root.playback
+                compact: !root.showToggles
             }
         }
 
@@ -290,6 +300,14 @@ Rectangle {
             IconButton {
                 nightBar: true
                 visible: root.hasScore
+                iconPath: Icons.panelLeft
+                tip: qsTr("Note effects (F2)")
+                checked: root.paletteShown
+                onClicked: root.paletteToggled()
+            }
+            IconButton {
+                nightBar: true
+                visible: root.hasScore
                 iconPath: Icons.panelRight
                 tip: qsTr("Song and tracks (Ctrl+I)")
                 // Bound, not checkable: the panel also closes by itself.
@@ -300,6 +318,7 @@ Rectangle {
                 nightBar: true
                 iconPath: Icons.tuner
                 tip: qsTr("Tuner (Ctrl+Shift+T)")
+                checked: root.tunerShown
                 onClicked: root.tunerRequested()
             }
         }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The keyboard entry tools, at the left of the tool row: the note value typing
-// uses, the dot, the tuplet, the voice, a rest, delete, the note effects, the
-// chord symbol, the text, the lyrics and the measure.
+// uses, the dot, the tuplet, the voice, a rest, delete, the chord symbol, the
+// text, the lyrics and the measure. The note effects have a palette of their
+// own (EffectsPalette).
 import QtQuick
 import QtQuick.Controls
 import Elara.App
 
-Rectangle {
+Item {
     id: root
 
     required property ScoreDocument document
@@ -20,46 +21,29 @@ Rectangle {
     /// The lyrics button: the verses of the caret's staff (ADR-0084).
     signal lyricsRequested
 
-    /// Opens the note effects panel.
-    function openEffects() {
-        effects.open();
-    }
-
-    // A bend or dive amount as printed: quarter steps as fraction characters,
-    // drawn at the size of the digits beside them ("1 1/2" becomes a 1 and a
-    // half sign, which the font's fraction feature would shrink along with
-    // them), and a minus sign for a dive.
-    function amountText(text) {
-        return text.replace(/ ?1\/4/g, "\u00BC").replace(/ ?1\/2/g, "\u00BD")
-                   .replace(/ ?3\/4/g, "\u00BE").replace(/^-/, "\u2212");
-    }
-
     // Note values from the music font's metronome marks, longest first.
     readonly property var values: [
-        { value: 1, symbol: "\uECA2", tip: qsTr("Whole note") },
-        { value: 2, symbol: "\uECA3", tip: qsTr("Half note") },
-        { value: 4, symbol: "\uECA5", tip: qsTr("Quarter note") },
-        { value: 8, symbol: "\uECA7", tip: qsTr("Eighth note") },
-        { value: 16, symbol: "\uECA9", tip: qsTr("16th note") },
-        { value: 32, symbol: "\uECAB", tip: qsTr("32nd note") },
-        { value: 64, symbol: "\uECAD", tip: qsTr("64th note") }
+        { value: 1, symbol: "", tip: qsTr("Whole note") },
+        { value: 2, symbol: "", tip: qsTr("Half note") },
+        { value: 4, symbol: "", tip: qsTr("Quarter note") },
+        { value: 8, symbol: "", tip: qsTr("Eighth note") },
+        { value: 16, symbol: "", tip: qsTr("16th note") },
+        { value: 32, symbol: "", tip: qsTr("32nd note") },
+        { value: 64, symbol: "", tip: qsTr("64th note") }
     ]
     readonly property int currentIndex: values.findIndex(entry => entry.value === document.inputValue)
     readonly property color ink: Theme.ink
-    /// How far the next bend goes when the caret's note has none, in cents.
-    property int bendCents: 200
-    /// How far the next dive goes when the caret's beat has none (ADR-0060).
-    property int whammyCents: -200
 
     implicitWidth: row.implicitWidth
     implicitHeight: Theme.tool
-    color: "transparent"
 
-    // A tool of the bar: never takes the keyboard from the score.
+    // A tool of the row: never takes the keyboard from the score.
     component Tool: AbstractButton {
         id: tool
 
         property string tip
+        /// Lit in the accent: what typing uses now.
+        property bool lit: false
 
         implicitWidth: Theme.tool
         implicitHeight: Theme.tool
@@ -68,7 +52,10 @@ Rectangle {
 
         background: Rectangle {
             radius: Theme.radiusSmall
-            color: tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
+            color: tool.pressed ? Theme.pressed : tool.lit ? Theme.accentWash
+                                                           : tool.hovered ? Theme.hover : "transparent"
+            border.width: tool.lit ? 1 : 0
+            border.color: Qt.alpha(Theme.accentInk, 0.4)
         }
 
         ToolTip.visible: hovered && tip.length > 0
@@ -77,251 +64,60 @@ Rectangle {
         Accessible.name: tip
     }
 
+    // A tool drawn as a line icon, with a dot while the caret's beat has what
+    // it sets.
+    component IconTool: Tool {
+        id: iconTool
+
+        property string path
+        property bool marked: false
+
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                path: iconTool.path
+                color: root.ink
+            }
+            Rectangle {
+                width: 6
+                height: 6
+                radius: 3
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 4
+                color: Theme.accent
+                visible: iconTool.marked
+            }
+        }
+    }
+
     // A tuplet in the tuplet menu, checked when the input has it.
-    component TupletItem: MenuItem {
+    component TupletItem: AppMenuItem {
         required property int actual
 
-        checkable: true
-        checked: root.document.inputTuplet === actual
+        chosen: root.document.inputTuplet === actual
         onTriggered: root.document.setInputTuplet(actual)
     }
 
-    // A pill of the effects panel: accent-filled while it is on.
-    component Pill: AbstractButton {
-        id: pill
-
-        property bool active
-
-        implicitHeight: 30
-        focusPolicy: Qt.NoFocus
-        hoverEnabled: true
-        Accessible.checked: active
-
-        background: Rectangle {
-            radius: Theme.radiusSmall
-            color: pill.active ? Theme.accent
-                               : pill.pressed ? Theme.pressed : pill.hovered ? Theme.hover : "transparent"
-        }
-
-        ToolTip.visible: hovered && Accessible.name.length > 0
-        ToolTip.delay: 500
-        ToolTip.text: Accessible.name
-    }
-
-    // A bend form (ADR-0055), numbered as core::BendForm: on the caret's notes
-    // at the bend's amount, or off again when they have it.
-    component BendForm: Pill {
-        id: bendForm
-
-        required property int form
-        required property string tip
-        required property string path
-
-        implicitWidth: 34
-        active: root.document.caretBendForm === form
-        Accessible.role: Accessible.RadioButton
-        Accessible.name: tip
-        onClicked: {
-            if (active) {
-                root.document.setBend(0, 0)
-            } else {
-                const cents = root.document.caretBendCents
-                root.document.setBend(form, cents > 0 ? cents : root.bendCents)
-            }
-        }
-
-        contentItem: Item {
-            Icon {
-                anchors.centerIn: parent
-                path: bendForm.path
-                color: bendForm.active ? Theme.accentText : root.ink
-            }
-        }
-    }
-
-    // A beat effect drawn as an icon (ADR-0056): lit while the caret's beat
-    // has it; a click on a lit one takes it off.
-    component BeatEffect: Pill {
-        id: beatEffect
-
-        required property string tip
-        required property string path
-
-        implicitWidth: 34
-        Accessible.role: Accessible.CheckBox
-        Accessible.name: tip
-
-        contentItem: Item {
-            Icon {
-                anchors.centerIn: parent
-                path: beatEffect.path
-                color: beatEffect.active ? Theme.accentText : root.ink
-            }
-        }
-    }
-
-    // A kind of note effect (ADR-0058), drawn as an icon or a short label:
-    // lit while the caret's notes have it; a click on a lit one takes it off.
-    component EffectKind: Pill {
-        id: effectKind
-
-        required property string tip
-        property string path
-        property string label
-
-        implicitWidth: label.length > 0 ? Math.max(34, kindLabel.implicitWidth + 14) : 34
-        opacity: enabled ? 1.0 : 0.35
-        Accessible.role: Accessible.CheckBox
-        Accessible.name: tip
-
-        contentItem: Item {
-            Icon {
-                anchors.centerIn: parent
-                visible: effectKind.label.length === 0
-                path: effectKind.path
-                color: effectKind.active ? Theme.accentText : root.ink
-            }
-            Label {
-                id: kindLabel
-
-                anchors.centerIn: parent
-                visible: effectKind.label.length > 0
-                text: effectKind.label
-                font.pixelSize: 11
-                font.bold: true
-                color: effectKind.active ? Theme.accentText : root.ink
-            }
-        }
-    }
-
-    // A dynamic (ADR-0047), numbered as core::Dynamic and written as the score
-    // writes it: lit while it is the caret's; a click sets it from the caret's
-    // notes to the next change.
-    component DynamicKind: Pill {
-        id: dynamicKind
-
-        required property int dynamic
-        required property string symbol
-
-        implicitWidth: 40
-        active: root.document.caretDynamic === dynamic
-        Accessible.role: Accessible.RadioButton
-        Accessible.name: root.document.dynamicName(dynamic)
-        onClicked: root.document.setDynamic(dynamic)
-
-        contentItem: Item {
-            MusicSymbol {
-                anchors.centerIn: parent
-                symbol: dynamicKind.symbol
-                size: 26
-                color: dynamicKind.active ? Theme.accentText : root.ink
-            }
-        }
-    }
-
-    // A whammy-bar form (ADR-0060), numbered as core::BendForm and drawn going
-    // down: on the caret's beat at the dive's depth, or off when it has it.
-    component WhammyForm: Pill {
-        id: whammyForm
-
-        required property int form
-        required property string path
-
-        readonly property bool diving: root.document.caretWhammyCents < 0
-
-        implicitWidth: 34
-        active: diving && root.document.caretWhammyForm === form
-        Accessible.role: Accessible.RadioButton
-        Accessible.name: root.document.whammyName(form, diving ? root.document.caretWhammyCents
-                                                                : root.whammyCents)
-        onClicked: {
-            if (active) {
-                root.document.setWhammy(0, 0)
-            } else {
-                root.document.setWhammy(form, diving ? root.document.caretWhammyCents
-                                                     : root.whammyCents)
-            }
-        }
-
-        contentItem: Item {
-            Icon {
-                anchors.centerIn: parent
-                path: whammyForm.path
-                color: whammyForm.active ? Theme.accentText : root.ink
-            }
-        }
-    }
-
-    // How deep a dive goes: the caret's whammy bar, or a dive if it has none.
-    component WhammyAmount: Pill {
-        id: whammyAmount
-
-        required property int cents
-
-        readonly property int form: root.document.caretWhammyForm
-
-        implicitWidth: Math.max(34, whammyLabel.implicitWidth + 16)
-        active: form > 0 && form < 5 && root.document.caretWhammyCents === cents
-        Accessible.role: Accessible.RadioButton
-        Accessible.name: root.document.whammyAmount(cents)
-        onClicked: {
-            root.whammyCents = cents
-            root.document.setWhammy(form > 0 && form < 5 ? form : 1, cents)
-        }
-
-        contentItem: Label {
-            id: whammyLabel
-
-            text: root.amountText(root.document.whammyAmount(whammyAmount.cents))
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            font.pixelSize: 12
-            color: whammyAmount.active ? Theme.accentText : root.ink
-        }
-    }
-
-    // How far a bend goes: the caret's bend, or a bend up if it has none.
-    component BendAmount: Pill {
-        id: bendAmount
-
-        required property int cents
-
-        implicitWidth: Math.max(34, amountLabel.implicitWidth + 16)
-        active: root.document.caretBendForm > 0 && root.document.caretBendCents === cents
-        Accessible.role: Accessible.RadioButton
-        Accessible.name: root.document.bendAmount(cents)
-        onClicked: {
-            const form = root.document.caretBendForm
-            root.bendCents = cents
-            root.document.setBend(form > 0 && form < 5 ? form : 1, cents)
-        }
-
-        contentItem: Label {
-            id: amountLabel
-
-            text: root.amountText(root.document.bendAmount(bendAmount.cents))
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            font.pixelSize: 12
-            color: bendAmount.active ? Theme.accentText : root.ink
-        }
-    }
-
     // A voice in the voice menu, checked when the caret is in it.
-    component VoiceItem: MenuItem {
+    component VoiceItem: AppMenuItem {
         required property int voice
 
         text: qsTr("Voice %1").arg(voice)
-        checkable: true
-        checked: root.document.caretVoice === voice
+        chosen: root.document.caretVoice === voice
         onTriggered: root.document.setCaretVoice(voice)
     }
 
-    component Separator: Rectangle {
-        width: 1
-        height: 22
-        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
-        color: Theme.line
+    component Separator: Item {
+        width: 9
+        height: Theme.tool
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 1
+            height: 20
+            color: Theme.line
+        }
     }
 
     Row {
@@ -345,11 +141,12 @@ Rectangle {
                 width: Theme.tool
                 height: Theme.tool
                 radius: Theme.radiusSmall
-                color: Theme.accent
+                color: Theme.accentWash
+                border.color: Qt.alpha(Theme.accentInk, 0.4)
 
                 Behavior on x {
                     NumberAnimation {
-                        duration: 160
+                        duration: Theme.quick
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -375,7 +172,7 @@ Rectangle {
                         contentItem: MusicSymbol {
                             symbol: valueTool.modelData.symbol
                             size: 22
-                            color: valueTool.index === root.currentIndex ? Theme.accentText : root.ink
+                            color: valueTool.index === root.currentIndex ? Theme.accentInk : root.ink
                         }
                     }
                 }
@@ -383,20 +180,14 @@ Rectangle {
         }
 
         Tool {
-            id: dot
-
             tip: qsTr("Dotted (.)")
+            lit: root.document.inputDotted
             onClicked: root.document.toggleDot()
 
-            background: Rectangle {
-                radius: Theme.radiusSmall
-                color: root.document.inputDotted ? Theme.accent
-                                                 : dot.hovered ? Theme.hover : "transparent"
-            }
             contentItem: MusicSymbol {
-                symbol: "\uECB7"
+                symbol: ""
                 size: 30
-                color: root.document.inputDotted ? Theme.accentText : root.ink
+                color: root.document.inputDotted ? Theme.accentInk : root.ink
             }
         }
 
@@ -408,19 +199,15 @@ Rectangle {
             readonly property bool on: root.document.inputTuplet > 0
 
             tip: qsTr("Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)")
+            lit: on
             onClicked: root.document.setInputTuplet(on ? 0 : 3)
             onPressAndHold: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
 
-            background: Rectangle {
-                radius: Theme.radiusSmall
-                color: tuplet.on ? Theme.accent
-                                 : tuplet.hovered ? Theme.hover : "transparent"
-            }
             contentItem: MusicSymbol {
                 // The tuplet's number in the music font's tuplet digits.
                 symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
                 size: 30
-                color: tuplet.on ? Theme.accentText : root.ink
+                color: tuplet.on ? Theme.accentInk : root.ink
             }
 
             TapHandler {
@@ -428,7 +215,7 @@ Rectangle {
                 onTapped: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
             }
 
-            Menu {
+            AppMenu {
                 id: tupletMenu
 
                 TupletItem {
@@ -459,8 +246,8 @@ Rectangle {
                     actual: 9
                     text: qsTr("Nonuplet (9 in the time of 8)")
                 }
-                MenuSeparator {}
-                MenuItem {
+                AppMenuSeparator {}
+                AppMenuItem {
                     text: qsTr("No tuplet")
                     enabled: tuplet.on
                     onTriggered: root.document.setInputTuplet(0)
@@ -476,21 +263,17 @@ Rectangle {
             readonly property int voice: root.document.caretVoice
 
             tip: qsTr("Voice %1 (Alt+1 to Alt+4); a right click picks one").arg(voice)
+            lit: voice > 1
             onClicked: root.document.setCaretVoice(voice % 4 + 1)
             onPressAndHold: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
 
-            background: Rectangle {
-                radius: Theme.radiusSmall
-                color: voiceTool.voice > 1 ? Theme.accent
-                                           : voiceTool.hovered ? Theme.hover : "transparent"
-            }
             contentItem: Label {
                 text: qsTr("V%1").arg(voiceTool.voice)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: Theme.fontSmall
                 font.weight: Font.DemiBold
-                color: voiceTool.voice > 1 ? Theme.accentText : root.ink
+                color: voiceTool.voice > 1 ? Theme.accentInk : root.ink
             }
 
             TapHandler {
@@ -498,7 +281,7 @@ Rectangle {
                 onTapped: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
             }
 
-            Menu {
+            AppMenu {
                 id: voiceMenu
 
                 VoiceItem {
@@ -516,876 +299,47 @@ Rectangle {
             }
         }
 
-        Item {
-            width: 9
-            height: Theme.tool
-
-            Separator {
-                anchors.centerIn: parent
-            }
-        }
+        Separator {}
 
         Tool {
             tip: qsTr("Insert a rest (Insert)")
             onClicked: root.document.insertRest()
 
             contentItem: MusicSymbol {
-                symbol: "\uE4E5"
+                symbol: ""
                 size: 20
                 color: root.ink
             }
         }
-        Tool {
+        IconTool {
             tip: qsTr("Delete the note (Delete); the beat with Ctrl+Delete")
+            path: Icons.trash
             onClicked: root.document.deleteAtCaret()
-
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.trash
-                    color: root.ink
-                }
-            }
         }
 
-        Tool {
-            id: effectsTool
+        Separator {}
 
-            tip: qsTr("Note effects")
-            onClicked: effects.opened ? effects.close() : effects.open()
-
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.effects
-                    color: root.ink
-                }
-                // A dot while the caret's note has an effect.
-                Rectangle {
-                    width: 6
-                    height: 6
-                    radius: 3
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 5
-                    color: Theme.accent
-                    scale: root.document.caretEffects !== 0 ? 1 : 0
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 140
-                            easing.type: Easing.OutBack
-                        }
-                    }
-                }
-            }
-
-            // The effects of the caret's note, toggled by a click or their key;
-            // it stays open so that several can be set, and never takes the
-            // keyboard from the score.
-            Popup {
-                id: effects
-
-                objectName: "effectsPanel"
-                x: (effectsTool.width - width) / 2
-                y: effectsTool.height + 12
-                padding: 10
-                closePolicy: Popup.CloseOnPressOutsideParent
-
-                enter: Transition {
-                    NumberAnimation {
-                        property: "opacity"
-                        from: 0
-                        to: 1
-                        duration: 140
-                    }
-                    NumberAnimation {
-                        property: "scale"
-                        from: 0.94
-                        to: 1
-                        duration: 160
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                exit: Transition {
-                    NumberAnimation {
-                        property: "opacity"
-                        to: 0
-                        duration: 100
-                    }
-                }
-
-                // The surface and shadow of what floats over the score, as
-                // the measure popup has: the bar itself is transparent.
-                background: Rectangle {
-                    radius: Theme.radiusSheet
-                    color: Theme.surface
-                    border.color: Theme.line
-
-                    Elevation {
-                        radius: parent.radius
-                    }
-                }
-
-                contentItem: Column {
-                    spacing: 6
-
-                    Label {
-                        leftPadding: 4
-                        text: qsTr("Note effects")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    Grid {
-                        columns: 3
-                        spacing: 4
-
-                        Repeater {
-                            model: root.document.effectCount
-
-                            delegate: AbstractButton {
-                                id: chip
-
-                                required property int index
-                                readonly property bool active: (root.document.caretEffects & (1 << index)) !== 0
-
-                                // Techniques of strings show only on a fretted staff.
-                                visible: root.document.caretFretted || !root.document.effectNeedsStrings(index)
-                                implicitWidth: chipRow.implicitWidth + 16
-                                implicitHeight: 30
-                                focusPolicy: Qt.NoFocus
-                                hoverEnabled: true
-                                onClicked: root.document.toggleEffect(index)
-                                Accessible.role: Accessible.CheckBox
-                                Accessible.name: root.document.effectName(index)
-                                Accessible.checked: active
-
-                                background: Rectangle {
-                                    radius: Theme.radiusSmall
-                                    color: chip.active ? Theme.accent
-                                                   : chip.pressed ? Qt.alpha(root.ink, 0.16)
-                                                                  : chip.hovered ? Qt.alpha(root.ink, 0.08)
-                                                                                 : "transparent"
-
-                                    Behavior on color {
-                                        ColorAnimation {
-                                            duration: 120
-                                        }
-                                    }
-                                }
-
-                                contentItem: Item {
-                                    Row {
-                                        id: chipRow
-
-                                        x: 8
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 8
-
-                                        // The key, as on a keycap.
-                                        Rectangle {
-                                            width: 20
-                                            height: 20
-                                            radius: 5
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            color: chip.active ? Qt.alpha(Theme.accentText, 0.24) : Qt.alpha(root.ink, 0.08)
-
-                                            Label {
-                                                anchors.centerIn: parent
-                                                text: root.document.effectKey(chip.index)
-                                                font.pixelSize: 11
-                                                font.bold: true
-                                                color: chip.active ? Theme.accentText : root.ink
-                                            }
-                                        }
-                                        Label {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            text: root.document.effectName(chip.index)
-                                            font.pixelSize: 12
-                                            color: chip.active ? Theme.accentText : root.ink
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Bend")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // The bend's form, then how far it goes.
-                    Row {
-                        spacing: 4
-
-                        BendForm {
-                            form: 1
-                            tip: qsTr("Bend")
-                            path: "M3 19 L7 19 C11 19 12 15 12 6 M9 9 L12 6 L15 9"
-                        }
-                        BendForm {
-                            form: 2
-                            tip: qsTr("Bend and release")
-                            path: "M2 19 L4 19 C7 19 8 14 8 6 M5.5 8.5 L8 6 L10.5 8.5 M8 6 L12 6 C15 6 16 12 16 19 M13.5 16.5 L16 19 L18.5 16.5"
-                        }
-                        BendForm {
-                            form: 3
-                            tip: qsTr("Pre-bend")
-                            path: "M12 20 L12 5 M8.5 8.5 L12 5 L15.5 8.5"
-                        }
-                        BendForm {
-                            form: 4
-                            tip: qsTr("Pre-bend and release")
-                            path: "M7 20 L7 5 M4 8 L7 5 L10 8 M7 5 L10 5 C13 5 15 11 15 19 M12.5 16.5 L15 19 L17.5 16.5"
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        Repeater {
-                            model: [50, 100, 200, 300, 400]
-
-                            delegate: BendAmount {
-                                required property int modelData
-
-                                cents: modelData
-                            }
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Slide")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // How the caret's notes slide in, then out (ADR-0058).
-                    Row {
-                        spacing: 4
-
-                        EffectKind {
-                            tip: root.document.slideInName(1)
-                            path: "M3 19 L11 12 M13 12 A2.5 2.5 0 1 0 18 12 A2.5 2.5 0 1 0 13 12"
-                            active: root.document.caretSlideIn === 1
-                            onClicked: root.document.setSlideIn(active ? 0 : 1)
-                        }
-                        EffectKind {
-                            tip: root.document.slideInName(2)
-                            path: "M3 5 L11 12 M13 12 A2.5 2.5 0 1 0 18 12 A2.5 2.5 0 1 0 13 12"
-                            active: root.document.caretSlideIn === 2
-                            onClicked: root.document.setSlideIn(active ? 0 : 2)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        EffectKind {
-                            tip: root.document.slideOutName(1)
-                            path: "M2 16 A2.5 2.5 0 1 0 7 16 A2.5 2.5 0 1 0 2 16 M8.5 14.5 L15.5 9.5 M17 8 A2.5 2.5 0 1 0 22 8 A2.5 2.5 0 1 0 17 8"
-                            active: root.document.caretSlideOut === 1
-                            onClicked: root.document.setSlideOut(active ? 0 : 1)
-                        }
-                        EffectKind {
-                            tip: root.document.slideOutName(2)
-                            path: "M2 18 A2.5 2.5 0 1 0 7 18 A2.5 2.5 0 1 0 2 18 M8.5 16.5 L15.5 11.5 M17 10 A2.5 2.5 0 1 0 22 10 A2.5 2.5 0 1 0 17 10 M4.5 13 Q11 3 19.5 5.5"
-                            active: root.document.caretSlideOut === 2
-                            onClicked: root.document.setSlideOut(active ? 0 : 2)
-                        }
-                        EffectKind {
-                            tip: root.document.slideOutName(3)
-                            path: "M6 12 A2.5 2.5 0 1 0 11 12 A2.5 2.5 0 1 0 6 12 M13 12 L21 19"
-                            active: root.document.caretSlideOut === 3
-                            onClicked: root.document.setSlideOut(active ? 0 : 3)
-                        }
-                        EffectKind {
-                            tip: root.document.slideOutName(4)
-                            path: "M6 12 A2.5 2.5 0 1 0 11 12 A2.5 2.5 0 1 0 6 12 M13 12 L21 5"
-                            active: root.document.caretSlideOut === 4
-                            onClicked: root.document.setSlideOut(active ? 0 : 4)
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: root.document.caretFretted
-                              ? qsTr("Harmonic, vibrato, accent and ornaments")
-                              : qsTr("Vibrato, accent and ornaments")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // The harmonic's kind (only with strings), the vibrato's
-                    // width and the accent's strength.
-                    Row {
-                        spacing: 4
-
-                        Repeater {
-                            model: ["N.H.", "A.H.", "P.H.", "T.H.", "S.H."]
-
-                            delegate: EffectKind {
-                                required property int index
-                                required property string modelData
-
-                                tip: root.document.harmonicName(index + 1)
-                                label: modelData
-                                visible: root.document.caretFretted
-                                active: root.document.caretHarmonic === index + 1
-                                onClicked: root.document.setHarmonic(active ? 0 : index + 1)
-                            }
-                        }
-
-                        Item {
-                            visible: root.document.caretFretted
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        EffectKind {
-                            tip: qsTr("Slight vibrato")
-                            path: "M3 12 C5 9 7 9 9 12 C11 15 13 15 15 12 C17 9 19 9 21 12"
-                            active: root.document.caretVibrato === 1
-                            onClicked: root.document.setVibrato(active ? 0 : 1)
-                        }
-                        EffectKind {
-                            tip: qsTr("Wide vibrato")
-                            path: "M3 12 C5 5 7 5 9 12 C11 19 13 19 15 12 C17 5 19 5 21 12"
-                            active: root.document.caretVibrato === 2
-                            onClicked: root.document.setVibrato(active ? 0 : 2)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        EffectKind {
-                            tip: qsTr("Accent")
-                            path: "M7 7 L17 12 L7 17"
-                            active: root.document.caretAccent === 1
-                            onClicked: root.document.setAccent(active ? 0 : 1)
-                        }
-                        EffectKind {
-                            tip: qsTr("Marcato")
-                            path: "M7 17 L12 7 L17 17"
-                            active: root.document.caretAccent === 2
-                            onClicked: root.document.setAccent(active ? 0 : 2)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        // To the next step of the key (ADR-0090).
-                        EffectKind {
-                            tip: qsTr("Trill")
-                            label: "tr"
-                            active: root.document.caretTrill !== 0
-                            onClicked: root.document.toggleTrill()
-                        }
-
-                        // Mordents and turns, numbered as core::Ornament (ADR-0091).
-                        EffectKind {
-                            tip: qsTr("Mordent")
-                            path: "M3 14 L7 10 L10 14 L14 10 L17 14 L21 10 M12 6 L12 18"
-                            active: root.document.caretOrnament === 1
-                            onClicked: root.document.setOrnament(active ? 0 : 1)
-                        }
-                        EffectKind {
-                            tip: qsTr("Upper mordent")
-                            path: "M3 14 L7 10 L10 14 L14 10 L17 14 L21 10"
-                            active: root.document.caretOrnament === 2
-                            onClicked: root.document.setOrnament(active ? 0 : 2)
-                        }
-                        EffectKind {
-                            tip: qsTr("Turn")
-                            path: "M4 13 C4 8 10 8 12 12 C14 16 20 16 20 11"
-                            active: root.document.caretOrnament === 3
-                            onClicked: root.document.setOrnament(active ? 0 : 3)
-                        }
-                        EffectKind {
-                            tip: qsTr("Inverted turn")
-                            path: "M4 11 C4 16 10 16 12 12 C14 8 20 8 20 13"
-                            active: root.document.caretOrnament === 4
-                            onClicked: root.document.setOrnament(active ? 0 : 4)
-                        }
-
-                        // The finger that plays the caret's notes, numbered as
-                        // core::Finger: each click the next one, then none. On a
-                        // fretted staff 1 is the index and T the thumb, which
-                        // comes last (ADR-0093).
-                        EffectKind {
-                            readonly property bool fretted: root.document.caretFretted
-                            readonly property int finger: root.document.caretFingering
-                            tip: qsTr("Fingering: again for the next finger")
-                            label: (fretted ? ["1", "T", "1", "2", "3", "4"]
-                                            : ["1", "1", "2", "3", "4", "5"])[finger]
-                            active: finger !== 0
-                            onClicked: root.document.setFingering(
-                                fretted ? [2, 0, 3, 4, 5, 1][finger] : (finger + 1) % 6)
-                        }
-                        // The finger that plucks them on a fretted staff: p, i, m,
-                        // a, c, then none.
-                        EffectKind {
-                            visible: root.document.caretFretted
-                            tip: qsTr("Plucking finger: again for the next one")
-                            label: ["p", "p", "i", "m", "a", "c"][root.document.caretPluck]
-                            active: root.document.caretPluck !== 0
-                            onClicked: root.document.setPluck((root.document.caretPluck + 1) % 6)
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Dynamics")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // From the caret's notes to the next change (ADR-0047).
-                    Row {
-                        spacing: 2
-
-                        Repeater {
-                            model: ["\uE52A", "\uE52B", "\uE520", "\uE52C", "\uE52D",
-                                "\uE522", "\uE52F", "\uE530"]
-
-                            DynamicKind {
-                                required property int index
-                                required property string modelData
-
-                                dynamic: index
-                                symbol: modelData
-                            }
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        // The caret's beat under a hairpin (ADR-0078).
-                        BeatEffect {
-                            tip: qsTr("Crescendo")
-                            path: "M19 7 L5 12 L19 17"
-                            active: root.document.caretHairpin === 1
-                            onClicked: root.document.setHairpin(active ? 0 : 1)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Diminuendo")
-                            path: "M5 7 L19 12 L5 17"
-                            active: root.document.caretHairpin === 2
-                            onClicked: root.document.setHairpin(active ? 0 : 2)
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Phrasing and lines")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // Slurs, grace notes, fermatas, octave lines, the pedal and breaths.
-                    Row {
-                        spacing: 2
-
-                        // The caret's beat slurred to the next (ADR-0086).
-                        BeatEffect {
-                            tip: qsTr("Slur to the next note")
-                            path: "M4 13 Q12 4 20 13 M5 18 A1.6 1.2 0 1 0 8.2 18 A1.6 1.2 0 1 0 5 18 M15.8 18 A1.6 1.2 0 1 0 19 18 A1.6 1.2 0 1 0 15.8 18"
-                            active: root.document.caretSlur
-                            onClicked: root.document.setSlur(!active)
-                        }
-                        // A small slashed note leading into the caret's beat (ADR-0079).
-                        BeatEffect {
-                            tip: qsTr("Grace note")
-                            path: "M8 18 A2.5 2 0 1 0 13 18 A2.5 2 0 1 0 8 18 M13 18 L13 5 Q16 7 17 10 M9 12 L17 7"
-                            active: root.document.caretGraceNotes > 0
-                            onClicked: root.document.toggleGraceNote()
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        // The caret's beat held under a fermata, numbered as
-                        // core::Fermata: short, normal and long (ADR-0085).
-                        BeatEffect {
-                            tip: qsTr("Short fermata")
-                            path: "M5 16 L12 8 L19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
-                            active: root.document.caretFermata === 1
-                            onClicked: root.document.setFermata(active ? 0 : 1)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Fermata")
-                            path: "M5 16 A7 7 0 0 1 19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
-                            active: root.document.caretFermata === 2
-                            onClicked: root.document.setFermata(active ? 0 : 2)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Long fermata")
-                            path: "M5 16 L5 9 L19 9 L19 16 M11 15 A1 1 0 1 0 13 15 A1 1 0 1 0 11 15"
-                            active: root.document.caretFermata === 3
-                            onClicked: root.document.setFermata(active ? 0 : 3)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        // The caret's beat under an octave line, numbered as
-                        // core::Ottava: a second click makes 8va 15ma and 8vb
-                        // 15mb, a third takes the line off (ADR-0089).
-                        BeatEffect {
-                            tip: qsTr("Octave line up: 8va, again for 15ma")
-                            path: "M4.3 5.5 A1.7 1.7 0 1 0 7.7 5.5 A1.7 1.7 0 1 0 4.3 5.5 M3.9 9.4 A2.1 2.1 0 1 0 8.1 9.4 A2.1 2.1 0 1 0 3.9 9.4 M10.5 7.5 L12.5 7.5 M14.5 7.5 L16.5 7.5 M18.5 7.5 L20 7.5 L20 11.5"
-                            active: root.document.caretOttava === 1 || root.document.caretOttava === 3
-                            onClicked: root.document.setOttava(root.document.caretOttava === 1 ? 3 : (active ? 0 : 1))
-                        }
-                        BeatEffect {
-                            tip: qsTr("Octave line down: 8vb, again for 15mb")
-                            path: "M4.3 14.6 A1.7 1.7 0 1 0 7.7 14.6 A1.7 1.7 0 1 0 4.3 14.6 M3.9 18.5 A2.1 2.1 0 1 0 8.1 18.5 A2.1 2.1 0 1 0 3.9 18.5 M10.5 16.5 L12.5 16.5 M14.5 16.5 L16.5 16.5 M18.5 16.5 L20 16.5 L20 12.5"
-                            active: root.document.caretOttava === 2 || root.document.caretOttava === 4
-                            onClicked: root.document.setOttava(root.document.caretOttava === 2 ? 4 : (active ? 0 : 2))
-                        }
-
-                        // The sustain pedal under the caret's beat, numbered as
-                        // core::Pedal: down, a second click changes it there, a
-                        // third lifts it (ADR-0092).
-                        BeatEffect {
-                            tip: qsTr("Sustain pedal: again to change it")
-                            path: "M3 9 L3 16 L9.5 16 L12 11.5 L14.5 16 L21 16 L21 10"
-                            active: root.document.caretPedal !== 0
-                            onClicked: root.document.setPedal((root.document.caretPedal + 1) % 3)
-                        }
-
-                        // A break after the caret's beat, numbered as core::Breath:
-                        // a breath mark, a second click a caesura, a third none
-                        // (ADR-0095).
-                        BeatEffect {
-                            tip: qsTr("Breath mark: again for a caesura")
-                            path: root.document.caretBreath === 2
-                                  ? "M7 19 L12 5 M12 19 L17 5"
-                                  : "M11 8 A1 1 0 1 1 13 8 A1 1 0 1 1 11 8 M13 8 C13 11.5 12 14 9.5 16"
-                            active: root.document.caretBreath !== 0
-                            onClicked: root.document.setBreath((root.document.caretBreath + 1) % 3)
-                        }
-                    }
-
-                    Label {
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Beat")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // The beat's strum, pick stroke and tremolo picking.
-                    Row {
-                        spacing: 4
-
-                        BeatEffect {
-                            tip: root.document.caretFretted ? qsTr("Strum down") : qsTr("Roll upwards")
-                            path: "M12 4 L12 20 M7 15 L12 20 L17 15"
-                            active: root.document.caretStrum === 1
-                            onClicked: root.document.setStrum(active ? 0 : 1)
-                        }
-                        BeatEffect {
-                            tip: root.document.caretFretted ? qsTr("Strum up") : qsTr("Roll downwards")
-                            path: "M12 20 L12 4 M7 9 L12 4 L17 9"
-                            active: root.document.caretStrum === 2
-                            onClicked: root.document.setStrum(active ? 0 : 2)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        BeatEffect {
-                            tip: qsTr("Down stroke")
-                            path: "M6 18 L6 7 L18 7 L18 18"
-                            active: root.document.caretPickStroke === 1
-                            onClicked: root.document.setPickStroke(active ? 0 : 1)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Up stroke")
-                            path: "M7 6 L12 18 L17 6"
-                            active: root.document.caretPickStroke === 2
-                            onClicked: root.document.setPickStroke(active ? 0 : 2)
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        BeatEffect {
-                            tip: qsTr("Tremolo picking in eighths")
-                            path: "M7 14 L17 10"
-                            active: root.document.caretTremolo === 8
-                            onClicked: root.document.setTremolo(active ? 0 : 8)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Tremolo picking in sixteenths")
-                            path: "M7 11 L17 7 M7 17 L17 13"
-                            active: root.document.caretTremolo === 16
-                            onClicked: root.document.setTremolo(active ? 0 : 16)
-                        }
-                        BeatEffect {
-                            tip: qsTr("Tremolo picking in thirty-seconds")
-                            path: "M7 8 L17 4 M7 13 L17 9 M7 18 L17 14"
-                            active: root.document.caretTremolo === 32
-                            onClicked: root.document.setTremolo(active ? 0 : 32)
-                        }
-
-                        Item {
-                            visible: root.document.caretFretted
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        // Tapping, slap and pop (ADR-0060), lettered as the
-                        // score writes them; techniques of strings.
-                        Repeater {
-                            model: ["T", "S", "P"]
-
-                            delegate: EffectKind {
-                                required property int index
-                                required property string modelData
-
-                                tip: root.document.bassTechniqueName(index + 1)
-                                label: modelData
-                                visible: root.document.caretFretted
-                                active: root.document.caretBassTechnique === index + 1
-                                onClicked: root.document.setBassTechnique(active ? 0 : index + 1)
-                            }
-                        }
-                    }
-
-                    Label {
-                        visible: root.document.caretFretted
-                        leftPadding: 4
-                        topPadding: 4
-                        text: qsTr("Whammy bar")
-                        font.pixelSize: 11
-                        color: root.ink
-                        opacity: 0.6
-                    }
-
-                    // The whammy bar's form, then how deep it dives: a
-                    // guitar's, so only on a fretted staff.
-                    Row {
-                        visible: root.document.caretFretted
-                        spacing: 4
-
-                        WhammyForm {
-                            form: 1
-                            path: "M3 7 L8 7 L13 17 L21 17"
-                        }
-                        WhammyForm {
-                            form: 2
-                            path: "M3 7 L8 7 L12 17 L16 7 L21 7"
-                        }
-                        WhammyForm {
-                            form: 3
-                            path: "M5 5 L5 17 L21 17"
-                        }
-                        WhammyForm {
-                            form: 4
-                            path: "M5 5 L5 17 L10 17 L16 7 L21 7"
-                        }
-
-                        Item {
-                            width: 9
-                            height: 30
-
-                            Separator {
-                                anchors.centerIn: parent
-                                height: 18
-                            }
-                        }
-
-                        Repeater {
-                            model: [-100, -200, -300, -400, -600]
-
-                            delegate: WhammyAmount {
-                                required property int modelData
-
-                                cents: modelData
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Tool {
+        IconTool {
             tip: qsTr("Chord symbol (Ctrl+K)")
+            path: Icons.chord
+            marked: root.document.caretChord.length > 0
             onClicked: root.chordRequested()
-
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.chord
-                    color: root.ink
-                }
-                // A dot while the caret's beat names a chord.
-                Rectangle {
-                    width: 6
-                    height: 6
-                    radius: 3
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 5
-                    color: Theme.accent
-                    scale: root.document.caretChord.length > 0 ? 1 : 0
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 140
-                            easing.type: Easing.OutBack
-                        }
-                    }
-                }
-            }
         }
-
-        Tool {
+        IconTool {
             tip: qsTr("Text (Ctrl+T)")
+            path: Icons.text
+            marked: root.document.caretText.length > 0
             onClicked: root.textRequested()
-
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.text
-                    color: root.ink
-                }
-                // A dot while the caret's beat has a text.
-                Rectangle {
-                    width: 6
-                    height: 6
-                    radius: 3
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: 5
-                    color: Theme.accent
-                    scale: root.document.caretText.length > 0 ? 1 : 0
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 140
-                            easing.type: Easing.OutBack
-                        }
-                    }
-                }
-            }
         }
-
-        Tool {
+        IconTool {
             tip: qsTr("Lyrics (Ctrl+Shift+L)")
+            path: Icons.lyrics
             onClicked: root.lyricsRequested()
-
-            // A microphone.
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.lyrics
-                    color: root.ink
-                }
-            }
         }
-
-        Tool {
+        IconTool {
             tip: qsTr("Measure: signatures, insert, delete (Ctrl+M)")
+            path: Icons.measure
             onClicked: root.measureRequested()
-
-            contentItem: Item {
-                Icon {
-                    anchors.centerIn: parent
-                    path: Icons.measure
-                    color: root.ink
-                }
-            }
         }
     }
 }

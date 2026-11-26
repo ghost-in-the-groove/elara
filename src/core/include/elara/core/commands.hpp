@@ -4,6 +4,7 @@
 #pragma once
 
 #include <elara/core/document.hpp>
+#include <elara/core/shared_value.hpp>
 #include <elara/core/tuning.hpp>
 
 #include <cstddef>
@@ -41,7 +42,8 @@ private:
     std::size_t at_;
     std::size_t count_;
     std::vector<MeasureHeader> headers_;
-    std::vector<Measure> measures_; // track by track, staff by staff
+    // Track by track, staff by staff, shared as the song held them (ADR-0051).
+    std::vector<SharedValue<Measure>> measures_;
 };
 
 /// Inserts a track before track `at` (see Song::insertTrack).
@@ -91,7 +93,9 @@ private:
     std::size_t track_;
     std::size_t staff_;
     std::size_t measure_;
-    Measure content_; // the new content before apply(), the old one after
+    // The new content before apply(), the old one after, shared as the song
+    // held it (ADR-0051): the swap copies neither.
+    SharedValue<Measure> content_;
     std::string name_;
     Changes changes_;
 };

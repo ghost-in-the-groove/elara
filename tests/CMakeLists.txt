@@ -154,17 +154,22 @@ if(TARGET elara)
   # The song panel open, with the first track's tuning, while the song is edited.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
-  # The measure popup open at the caret while the measures are edited.
+  # The measure popup open at the caret while the measures are edited; it
+  # must stay inside the view, scrolling when it is taller than it.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   # The lyrics popup open over a staff that sings while a verse is typed.
   add_test(NAME app.smoke_lyrics
     COMMAND elara --smoke-test --lyrics "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
-  # The note effects panel open at the caret while effects are set.
+  # A menu open as the window shows: its items load without warnings, and it
+  # closes for the click on the playback cursor.
+  add_test(NAME app.smoke_menu
+    COMMAND elara --smoke-test --menu view "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
+  # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
-  set_tests_properties(app.smoke app.smoke_narrow app.smoke_open_tracks app.smoke_open_views
-    app.smoke_open_missing
+  set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
+    app.smoke_open_views app.smoke_open_missing
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
     app.smoke_effects
     PROPERTIES
@@ -183,7 +188,8 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 61 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 57 layouts\\)")
-  set_tests_properties(app.smoke_narrow PROPERTIES PASS_REGULAR_EXPRESSION "smoke-test: ok")
+  set_tests_properties(app.smoke_narrow app.smoke_menu PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
