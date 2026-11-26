@@ -126,6 +126,10 @@ Rules that keep the parts one family:
   onto a bar.
 - A field has its name before it, not inside it: a placeholder only shows an
   example of what to type.
+- An empty list says what it is for, in a sentence: the recent scores before
+  any was opened.
+- Nothing plays an entrance: the window opens into its task. The home shows at
+  once, and a panel slides only when someone opens it.
 - What the caret opens stays inside the view: a popup taller than the window
   scrolls (the smoke test checks that it does not leave it).
 - An icon is a shape, and a shape costs about a millisecond to make. What

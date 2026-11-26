@@ -1588,8 +1588,16 @@
         <translation>o suelta un archivo en cualquier parte de esta ventana</translation>
     </message>
     <message>
+        <source>Guitar Pro 3 to 8 · MusicXML · MIDI · Elara</source>
+        <translation>Guitar Pro 3 a 8 · MusicXML · MIDI · Elara</translation>
+    </message>
+    <message>
         <source>Recent</source>
         <translation>Recientes</translation>
+    </message>
+    <message>
+        <source>The scores you open show here, the latest first, to pick up where you left them.</source>
+        <translation>Las partituras que abras aparecen aquí, la última primero, para retomarlas donde las dejaste.</translation>
     </message>
     <message>
         <source>Open %1</source>

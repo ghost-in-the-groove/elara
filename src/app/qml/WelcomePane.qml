@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// What the window shows before a score is open.
+// What the window shows before a score is open: what to do at the left (open
+// a score, start a song), the scores opened last beside it. In a narrow window
+// the two stand one over the other.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -16,156 +18,134 @@ Item {
     signal recentRequested(url file)
     signal forgetRequested(url file)
 
+    /// Side by side when there is room for both columns.
+    readonly property bool wide: width >= 760
+    readonly property real startWidth: 300
+    readonly property real recentWidth: Math.max(280, Math.min(440, width - startWidth - 150))
+
     // Centred when it fits; a short window scrolls it instead of cutting it.
     Flickable {
         id: flick
 
         anchors.fill: parent
         contentWidth: width
-        contentHeight: Math.max(height, column.implicitHeight + 48)
+        contentHeight: Math.max(height, home.implicitHeight + 64)
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
-        ScrollBar.vertical: ScrollBar {
-            policy: flick.contentHeight > flick.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-        }
+        ScrollIndicator.vertical: ScrollIndicator {}
 
-        ColumnLayout {
-            id: column
+        GridLayout {
+            id: home
 
-            x: (flick.width - width) / 2
-            y: Math.max(24, (flick.height - implicitHeight) / 2)
-            spacing: 10
-            opacity: 0
-            transform: Translate {
-                id: rise
+            x: Math.round((flick.width - width) / 2)
+            y: Math.round(Math.max(32, (flick.height - implicitHeight) / 2))
+            width: root.wide ? root.startWidth + 57 + root.recentWidth : Math.min(420, flick.width - 48)
+            columns: root.wide ? 3 : 1
+            columnSpacing: 28
+            rowSpacing: 28
 
-                y: 16
-            }
+            // What to do.
+            ColumnLayout {
+                Layout.preferredWidth: root.wide ? root.startWidth : -1
+                Layout.fillWidth: !root.wide
+                Layout.alignment: Qt.AlignTop
+                spacing: 8
 
-            // One entrance animation, then the pane is static (nothing keeps
-            // repainting while it is shown).
-            Component.onCompleted: entrance.start()
-
-            ParallelAnimation {
-                id: entrance
-
-                NumberAnimation {
-                    target: column
-                    property: "opacity"
-                    to: 1
-                    duration: 420
-                    easing.type: Easing.OutCubic
+                // The logo, with the frets on its strings.
+                Logo {
+                    Layout.preferredHeight: 92
+                    Layout.preferredWidth: 92 * aspect
+                    Layout.leftMargin: -4
+                    color: Theme.ink
+                    stringColor: Theme.accentInk
+                    ground: Theme.desk
                 }
-                NumberAnimation {
-                    target: rise
-                    property: "y"
-                    to: 0
-                    duration: 420
-                    easing.type: Easing.OutCubic
+
+                Label {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 14
+                    text: qsTr("Tablature, score and music studio")
+                    font.pixelSize: Theme.fontTitle
+                    color: Theme.inkSoft
+                    wrapMode: Text.Wrap
                 }
-            }
 
-            // The logo, with the frets on its strings.
-            Logo {
-                Layout.alignment: Qt.AlignHCenter
-                // Smaller in a short window, to leave room for the recent scores.
-                Layout.preferredHeight: root.height < 720 ? 120 : 170
-                Layout.preferredWidth: Layout.preferredHeight * aspect
-                Layout.bottomMargin: 6
-                color: Theme.ink
-                stringColor: Theme.accentInk
-                ground: Theme.desk
-            }
-
-            Label {
-                Layout.alignment: Qt.AlignHCenter
-                text: qsTr("Tablature, score and music studio")
-                font.pixelSize: 16
-                opacity: 0.7
-            }
-
-            RowLayout {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 24
-                spacing: 12
-
-                Button {
+                TextButton {
+                    Layout.fillWidth: true
+                    implicitHeight: 36
+                    kind: "main"
+                    iconPath: Icons.open
                     text: qsTr("Open a score…")
-                    highlighted: true
-                    font.pixelSize: 15
                     onClicked: root.openRequested()
                 }
 
-                Button {
+                TextButton {
+                    Layout.fillWidth: true
+                    implicitHeight: 36
+                    iconPath: Icons.newSong
                     text: qsTr("New song")
-                    flat: true
-                    font.pixelSize: 15
                     onClicked: root.newRequested()
                 }
-            }
 
-            Label {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 4
-                text: qsTr("or drop a file anywhere in this window")
-                font.pixelSize: 13
-                opacity: 0.55
-            }
-
-            Flow {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 18
-                Layout.preferredWidth: 420
-                spacing: 8
-
-                Repeater {
-                    model: ["Guitar Pro 3–7", "MusicXML", "MIDI", "Elara"]
-
-                    delegate: Rectangle {
-                        required property string modelData
-
-                        width: chip.implicitWidth + 24
-                        height: 26
-                        radius: 13
-                        color: Theme.hover
-
-                        Label {
-                            id: chip
-
-                            anchors.centerIn: parent
-                            text: parent.modelData
-                            font.pixelSize: 12
-                            opacity: 0.75
-                        }
-                    }
+                Label {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 10
+                    text: qsTr("or drop a file anywhere in this window")
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.inkSoft
+                    wrapMode: Text.Wrap
                 }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("Guitar Pro 3 to 8 · MusicXML · MIDI · Elara")
+                    font.pixelSize: Theme.fontSmall
+                    color: Theme.inkSoft
+                    wrapMode: Text.Wrap
+                }
+            }
+
+            Rectangle {
+                visible: root.wide
+                Layout.fillHeight: true
+                Layout.preferredWidth: 1
+                color: Theme.line
             }
 
             // The scores opened last, to pick up where the work was left.
-            Label {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.topMargin: 30
-                Layout.preferredWidth: 440
-                visible: recentList.count > 0
-                leftPadding: 10
-                text: qsTr("Recent")
-                font.pixelSize: Theme.fontSmall
-                font.weight: Font.DemiBold
-                font.capitalization: Font.AllUppercase
-                font.letterSpacing: 0.8
-                opacity: 0.55
-            }
-
-            Column {
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: 440
+            ColumnLayout {
+                Layout.preferredWidth: root.wide ? root.recentWidth : -1
+                Layout.fillWidth: !root.wide
+                Layout.alignment: Qt.AlignTop
                 spacing: 2
+
+                Label {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 6
+                    leftPadding: 8
+                    text: qsTr("Recent")
+                    font.pixelSize: Theme.fontSmall
+                    font.weight: Font.DemiBold
+                    color: Theme.inkSoft
+                }
+
+                // Before any score was opened: what the list is for.
+                Label {
+                    Layout.fillWidth: true
+                    visible: recentList.count === 0
+                    leftPadding: 8
+                    rightPadding: 8
+                    text: qsTr("The scores you open show here, the latest first, to pick up where you left them.")
+                    font.pixelSize: Theme.fontBody
+                    color: Theme.inkSoft
+                    wrapMode: Text.Wrap
+                }
 
                 Repeater {
                     id: recentList
 
-                    model: root.recentScores.slice(0, 6)
+                    model: root.recentScores.slice(0, 8)
 
                     delegate: Item {
                         id: row
@@ -173,27 +153,10 @@ Item {
                         required property var modelData
                         required property int index
 
-                        width: parent.width
-                        height: 50
-                        opacity: 0
+                        Layout.fillWidth: true
+                        implicitHeight: 46
                         Accessible.role: Accessible.Button
                         Accessible.name: qsTr("Open %1").arg(modelData.name)
-
-                        // Each row arrives a moment after the one above, once.
-                        SequentialAnimation {
-                            running: true
-
-                            PauseAnimation {
-                                duration: 180 + 45 * row.index
-                            }
-                            NumberAnimation {
-                                target: row
-                                property: "opacity"
-                                to: 1
-                                duration: 260
-                                easing.type: Easing.OutCubic
-                            }
-                        }
 
                         HoverHandler {
                             id: hover
@@ -209,25 +172,19 @@ Item {
                             anchors.fill: parent
                             radius: Theme.radiusSmall
                             color: hover.hovered ? Theme.hover : "transparent"
-
-                            Behavior on color {
-                                ColorAnimation {
-                                    duration: 120
-                                }
-                            }
                         }
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 6
-                            spacing: 12
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 4
+                            spacing: 11
 
                             // The file's format, as a badge.
                             Rectangle {
-                                Layout.preferredWidth: 50
-                                Layout.preferredHeight: 30
-                                radius: 7
+                                Layout.preferredWidth: 46
+                                Layout.preferredHeight: 26
+                                radius: Theme.radiusSmall
                                 color: Theme.accentWash
 
                                 Label {
@@ -244,38 +201,32 @@ Item {
 
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 1
+                                spacing: 0
 
                                 Label {
                                     Layout.fillWidth: true
                                     text: row.modelData.name
                                     elide: Text.ElideRight
-                                    font.pixelSize: Theme.fontBody + 1
+                                    font.pixelSize: Theme.fontBody
+                                    color: Theme.ink
                                 }
                                 Label {
                                     Layout.fillWidth: true
                                     text: row.modelData.folder
                                     elide: Text.ElideMiddle
                                     font.pixelSize: Theme.fontCaption
-                                    opacity: 0.55
+                                    color: Theme.inkSoft
                                 }
                             }
 
                             IconButton {
-                                implicitWidth: 30
-                                implicitHeight: 30
-                                padding: 7
-                                // A cross.
-                                iconPath: "M7 7 L17 17 M17 7 L7 17"
+                                implicitWidth: 28
+                                implicitHeight: 28
+                                padding: 6
+                                iconPath: Icons.close
                                 tip: qsTr("Remove from the list")
                                 opacity: hover.hovered || hovered || visualFocus ? 1.0 : 0.0
                                 onClicked: root.forgetRequested(row.modelData.url)
-
-                                Behavior on opacity {
-                                    NumberAnimation {
-                                        duration: 120
-                                    }
-                                }
                             }
                         }
                     }
