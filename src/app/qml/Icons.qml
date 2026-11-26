@@ -20,6 +20,7 @@ QtObject {
     readonly property string loop: "M4.5 12 A5.5 5.5 0 0 1 10 6.5 L17.5 6.5 M15 4 L17.5 6.5 L15 9 M19.5 12 A5.5 5.5 0 0 1 14 17.5 L6.5 17.5 M9 15 L6.5 17.5 L9 20"
     readonly property string metronome: "M8.5 20 L10.8 4 L13.2 4 L15.5 20 Z M6.5 20 L17.5 20 M12 16 L16.5 8"
     readonly property string countIn: "M12 21 A7.5 7.5 0 1 0 12 6 A7.5 7.5 0 1 0 12 21 Z M12 9.5 L12 13.5 L14.5 15 M9.5 3 L14.5 3 M12 3 L12 6 M18.5 6.5 L19.8 5.2"
+    readonly property string tuning: "M7 4 L7 20 M12 4 L12 20 M17 4 L17 20 M4.5 9 L19.5 9"
     readonly property string tuner: "M9 3 L9 10 Q9 14 12 14 Q15 14 15 10 L15 3 M12 14 L12 21"
 
     // Panels and views.

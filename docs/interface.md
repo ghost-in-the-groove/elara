@@ -99,10 +99,20 @@ change never moves what is beside them.
 | `IconButton` | A tool with an icon and a tooltip. `nightBar` on the command bar; `takesFocus: false` for tools of the score. |
 | `SegmentedControl` | A few choices of which one is always chosen. |
 | `Picker` | One choice from a list. |
+| `Field`, `Stepper`, `Fader` | A line of text, a number, a slider (`centred` for a pan, `tint` for a track's hue). |
+| `Chip` | A mark that is on or off, or one of a few words to pick. |
+| `TextButton` | A button with words: `kind: "main"` once per dialog or pane, `"danger"` for what takes something away. |
+| `Sheet`, `AppDialog` | What floats over the score for the caret; a dialog that asks or tells. |
 | `AppMenuBar`, `AppMenu`, `AppMenuItem`, `AppMenuSeparator` | Menus. `keys: KeyNames.native("Ctrl+S")` writes the keys the platform's way; `chosen` marks the current choice or a switch that is on. |
 | `Readout` | A reading on the command bar. |
 | Tiles of `EffectsPalette` (`IconTile`, `LabelTile`, `SymbolTile`) | A sign the caret's note or beat can take: drawn as the score draws it, lit while the caret has it, with its key in the corner when it has one. |
 | `Elevation` | The shadow under what floats. |
+
+The controls that hold a value are built on Qt Quick's templates
+(`QtQuick.Templates`), not restyled from the Material style: that keeps them
+30 px high and lets the theme colour every part of them. Use these parts in
+new panels; a stock `TextField`, `SpinBox`, `ComboBox`, `Slider`, `Button` or
+`Dialog` in a new file is a mistake.
 
 Rules that keep the parts one family:
 
@@ -114,6 +124,10 @@ Rules that keep the parts one family:
   while the window is at rest, and no animation runs for longer than `calm`.
 - A new command goes into a menu first, then, if it is used all the time,
   onto a bar.
+- A field has its name before it, not inside it: a placeholder only shows an
+  example of what to type.
+- What the caret opens stays inside the view: a popup taller than the window
+  scrolls (the smoke test checks that it does not leave it).
 - An icon is a shape, and a shape costs about a millisecond to make. What
   shows many of them only now and then makes them when it shows: the check
   marks and arrows of the menus, the tiles of the palette. Measure the start

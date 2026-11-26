@@ -330,7 +330,7 @@ ApplicationWindow {
     }
 
     // What an export left out, one line each.
-    Dialog {
+    AppDialog {
         id: detailsDialog
 
         property var lines: []
@@ -354,12 +354,12 @@ ApplicationWindow {
                 width: ListView.view.width
                 text: "• " + modelData
                 wrapMode: Text.Wrap
-                opacity: 0.85
+                color: Theme.ink
             }
         }
     }
 
-    Dialog {
+    AppDialog {
         id: unsavedDialog
 
         objectName: "unsavedDialog"
@@ -384,6 +384,7 @@ ApplicationWindow {
             width: unsavedDialog.availableWidth
             text: qsTr("“%1” has changes that are not saved.").arg(score.title)
             wrapMode: Text.Wrap
+            color: Theme.ink
         }
     }
 
@@ -395,7 +396,7 @@ ApplicationWindow {
         onDiscardRequested: file => score.discardRecovery(file)
     }
 
-    Dialog {
+    AppDialog {
         id: about
 
         anchors.centerIn: parent
@@ -406,16 +407,26 @@ ApplicationWindow {
         ColumnLayout {
             spacing: 8
 
+            Logo {
+                Layout.preferredHeight: 56
+                Layout.preferredWidth: 56 * aspect
+                Layout.bottomMargin: 6
+                detailed: false
+                color: Theme.ink
+                stringColor: Theme.accentInk
+                ground: Theme.surface
+            }
             Label {
                 text: qsTr("Version %1 (alpha)").arg(Qt.application.version)
+                color: Theme.ink
             }
             Label {
                 text: qsTr("Free software under the GNU AGPL 3.0 or later.")
-                opacity: 0.7
+                color: Theme.inkSoft
             }
             Label {
                 text: qsTr("Music font: Bravura (SIL OFL). Text font: Arimo (SIL OFL).")
-                opacity: 0.7
+                color: Theme.inkSoft
             }
         }
     }
@@ -933,6 +944,7 @@ ApplicationWindow {
         ScoreView {
             id: scoreView
 
+            objectName: "scoreView"
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: palette.right
@@ -985,7 +997,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.right: parent.right
-            width: shown ? 340 : 0
+            width: shown ? fullWidth : 0
             visible: width > 0
             clip: true
             document: score
@@ -1059,6 +1071,7 @@ ApplicationWindow {
         Rectangle {
             id: toast
 
+            objectName: "toast"
             property string message
             property bool error: true
             property var details: []
@@ -1130,13 +1143,11 @@ ApplicationWindow {
                     wrapMode: Text.Wrap
                     color: toast.error ? Theme.dangerInk : Theme.ink
                 }
-                Button {
+                TextButton {
                     id: detailsButton
 
                     visible: toast.details.length > 0
-                    flat: true
                     text: qsTr("Details")
-                    Material.foreground: Theme.accentInk
                     onClicked: {
                         detailsDialog.title = toast.message;
                         detailsDialog.lines = toast.details;

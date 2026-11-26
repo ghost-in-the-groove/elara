@@ -154,7 +154,8 @@ if(TARGET elara)
   # The song panel open, with the first track's tuning, while the song is edited.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
-  # The measure popup open at the caret while the measures are edited.
+  # The measure popup open at the caret while the measures are edited; it
+  # must stay inside the view, scrolling when it is taller than it.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   # The lyrics popup open over a staff that sings while a verse is typed.
