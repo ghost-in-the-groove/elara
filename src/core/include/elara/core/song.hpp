@@ -97,6 +97,12 @@ struct TrackMix {
     friend bool operator==(const TrackMix&, const TrackMix&) = default;
 };
 
+class Track;
+
+/// Roughly how many bytes `track` holds: its staves' measures
+/// (approximateBytes(const Measure&)) and its own objects (ADR-0121).
+[[nodiscard]] std::size_t approximateBytes(const Track& track) noexcept;
+
 class Track {
 public:
     /// Throws std::invalid_argument when `staves` is empty.

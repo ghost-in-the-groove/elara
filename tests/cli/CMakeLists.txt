@@ -175,7 +175,17 @@ set_tests_properties(cli.rests_rejects_bad_duration PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.edit_undo_and_redo_history
   COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "time 2 6/8" undo)
 set_tests_properties(cli.edit_undo_and_redo_history PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"modified\":true")
+  PASS_REGULAR_EXPRESSION "\"measureCount\":4,.*\"undo\":{\"count\":2,\"next\":\"Insert measures\"},\"redo\":{\"count\":1,\"next\":\"Change time signature\"},\"historyBytes\":[0-9]+,\"modified\":true")
+
+# The history says how much it holds: a removed track is kept to undo (ADR-0121).
+add_test(NAME cli.edit_history_bytes
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "remove-track 0")
+set_tests_properties(cli.edit_history_bytes PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"historyBytes\":[1-9][0-9]+,")
+add_test(NAME cli.edit_history_bytes_none
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4")
+set_tests_properties(cli.edit_history_bytes_none PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"historyBytes\":0,")
 
 # A signature change runs until the next change, as in the app.
 add_test(NAME cli.edit_signature_runs_to_next_change
@@ -1051,7 +1061,7 @@ add_test(NAME cli.edit_file_and_save
 set_tests_properties(cli.edit_file_and_save PROPERTIES
   FIXTURES_REQUIRED cli_song
   FIXTURES_SETUP cli_edited
-  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Edit measure\"},\"redo\":{\"count\":0,\"next\":null},\"modified\":false}")
+  PASS_REGULAR_EXPRESSION "\"undo\":{\"count\":2,\"next\":\"Edit measure\"},\"redo\":{\"count\":0,\"next\":null},\"historyBytes\":[0-9]+,\"modified\":false}")
 
 add_test(NAME cli.dump_reads_edited_song COMMAND elara-cli --json dump "${ELARA_CLI_EDITED}")
 set_tests_properties(cli.dump_reads_edited_song PROPERTIES

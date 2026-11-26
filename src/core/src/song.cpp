@@ -135,6 +135,23 @@ Note Staff::frettedNote(int string, int fret, SpellingPreference preference) con
 
 // ---- Track ----------------------------------------------------------------
 
+std::size_t approximateBytes(const Track& track) noexcept {
+    const auto text = [](const std::string& value) {
+        return value.capacity() > std::string().capacity() ? value.capacity() + 1 : 0;
+    };
+    // Each measure is held through a shared value: its control block too.
+    constexpr std::size_t kShared = (2 * sizeof(long)) + (2 * sizeof(void*));
+    std::size_t bytes = sizeof(Track) + text(track.name()) + text(track.instrument().name);
+    for (std::size_t s = 0; s < track.staffCount(); ++s) {
+        const Staff& staff = track.staff(s);
+        bytes += sizeof(Staff);
+        for (std::size_t m = 0; m < staff.measureCount(); ++m) {
+            bytes += sizeof(SharedValue<Measure>) + kShared + approximateBytes(staff.measure(m));
+        }
+    }
+    return bytes;
+}
+
 Track::Track(std::string name, Instrument instrument, std::vector<Staff> staves)
     : name_(std::move(name)), instrument_(std::move(instrument)), staves_(std::move(staves)) {
     if (staves_.empty()) {

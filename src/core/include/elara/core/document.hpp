@@ -51,6 +51,11 @@ public:
     /// What apply() and revert() change, valid once apply() ran: everything
     /// unless the command knows better.
     [[nodiscard]] virtual Changes changes() const noexcept { return {}; }
+
+    /// Roughly how many bytes of song data the command holds now, which the
+    /// song does not: what keeping it in the history costs (ADR-0121). 0 for
+    /// a command that holds no measures or tracks.
+    [[nodiscard]] virtual std::size_t heldBytes() const noexcept { return 0; }
 };
 
 /// A song being edited: the song, its undo and redo history and its save point.
@@ -58,15 +63,20 @@ public:
 class Document {
 public:
     static constexpr std::size_t kDefaultUndoLimit = 1000;
+    /// The bytes the undo and redo steps may hold before the oldest go
+    /// (ADR-0121).
+    static constexpr std::size_t kDefaultUndoBytes = std::size_t{256} << 20U;
 
     Document() = default;
-    explicit Document(Song song, std::size_t undoLimit = kDefaultUndoLimit);
+    explicit Document(Song song, std::size_t undoLimit = kDefaultUndoLimit,
+                      std::size_t undoBytes = kDefaultUndoBytes);
 
     [[nodiscard]] const Song& song() const noexcept { return song_; }
 
     /// Applies `command` and records it as the newest undo step, discarding what
-    /// could be redone. Beyond the undo limit the oldest step is dropped. If
-    /// apply() throws, the exception propagates and nothing changes.
+    /// could be redone. Beyond the undo limit, or while the steps hold more
+    /// than the undo bytes, the oldest steps are dropped; the newest is always
+    /// kept. If apply() throws, the exception propagates and nothing changes.
     void execute(std::unique_ptr<Command> command);
 
     [[nodiscard]] bool canUndo() const noexcept { return !done_.empty(); }
@@ -74,6 +84,10 @@ public:
     [[nodiscard]] std::size_t undoCount() const noexcept { return done_.size(); }
     [[nodiscard]] std::size_t redoCount() const noexcept { return undone_.size(); }
     [[nodiscard]] std::size_t undoLimit() const noexcept { return undoLimit_; }
+    [[nodiscard]] std::size_t undoBytes() const noexcept { return undoBytes_; }
+    /// What the undo and redo steps hold, as Command::heldBytes() measured it
+    /// when each was done or undone.
+    [[nodiscard]] std::size_t historyBytes() const noexcept { return historyBytes_; }
 
     /// Name of the step undo() or redo() would apply; empty when there is none.
     [[nodiscard]] std::string_view undoName() const noexcept;
@@ -110,12 +124,18 @@ private:
     struct Step {
         std::unique_ptr<Command> command;
         std::uint64_t revision = 0;
+        std::size_t bytes = 0; ///< command->heldBytes() as last measured
     };
+
+    /// Measures again what `step` holds, now that it was done or undone.
+    void remeasure(Step& step) noexcept;
 
     Song song_;
     std::deque<Step> done_;    // oldest first
     std::vector<Step> undone_; // next to redo last
     std::size_t undoLimit_ = kDefaultUndoLimit;
+    std::size_t undoBytes_ = kDefaultUndoBytes;
+    std::size_t historyBytes_ = 0;
     std::uint64_t base_ = 0;                 ///< the state before the oldest step kept
     std::uint64_t next_ = 1;                 ///< the revision of the next command executed
     std::optional<std::uint64_t> saved_ = 0; ///< the state saved; none when no state is
