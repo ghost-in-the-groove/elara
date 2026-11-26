@@ -38,7 +38,8 @@ Three targets with different rules:
   real-time-safe interface the renderer and the player strike notes on.
   `builtinBank()` wraps the built-in `Synth`; `RenderOptions::bank` and
   `Player::setSoundBank()` choose another, such as a SoundFont. The player
-  keeps a track's sound across loads while its instrument stays the same;
+  keeps a track's sound across loads while its instrument stays the same,
+  and across banks that make it the same (`SoundBank::source()`, ADR-0120);
 - SFZ instruments (ADR-0066): `parseSfz()`/`readSfz()` read the text format
   into regions (`SfzProgram`, `SfzRegion`), listing the opcodes not played,
   and `SfzBank` plays them through a sampler of Elara's own: WAV and FLAC

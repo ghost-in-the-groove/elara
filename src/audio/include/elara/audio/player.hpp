@@ -83,8 +83,10 @@ public:
     bool publish(PreparedSong song);
 
     /// Where the tracks of the next load() get their sound; the built-in
-    /// synthesizer when null, as at first. The metronome and the count-in
-    /// always click on the built-in drums.
+    /// synthesizer when null, as at first. A track keeps the sound it has
+    /// when the new bank makes it the same (SoundBank::source()), so that a
+    /// bank changed for the guitars makes no other track's sound again. The
+    /// metronome and the count-in always click on the built-in drums.
     void setSoundBank(std::shared_ptr<const SoundBank> bank);
 
     /// Starts or resumes playback; from the start when it stopped at the end.

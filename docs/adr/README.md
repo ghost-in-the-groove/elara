@@ -119,6 +119,7 @@ one that replaces them.
 | [0111](0111-change-kinds.md) | Edits say what they change | Accepted |
 | [0112](0112-preparing-the-player.md) | Preparing the player on a worker | Accepted |
 | [0113](0113-tablature-for-reading.md) | Tablature for reading: larger numbers, and the time signature only when it stands alone | Accepted |
+| [0120](0120-sounds-kept-by-source.md) | Sounds kept by their source when the bank changes | Accepted |
 
 ## Template
 

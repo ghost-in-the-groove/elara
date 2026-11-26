@@ -117,6 +117,10 @@ public:
     /// The instrument's name, or the other bank's for the tracks it leaves.
     [[nodiscard]] std::string soundName(const core::Instrument& instrument) const override;
 
+    /// The instrument's samples, shared by every bank with() makes of it, or
+    /// the other bank's source for the tracks it leaves.
+    [[nodiscard]] const void* source(const core::Instrument& instrument) const noexcept override;
+
     SfzBank(std::shared_ptr<const SfzData> data, std::shared_ptr<const SoundBank> others,
             SfzTracks tracks);
 

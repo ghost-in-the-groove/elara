@@ -84,6 +84,13 @@ public:
     /// the timbre's name for the built-in synthesizer ("guitar"), the
     /// preset's for a SoundFont.
     [[nodiscard]] virtual std::string soundName(const core::Instrument& instrument) const = 0;
+
+    /// What makes the sound for `instrument`: two banks that give the same
+    /// source for an instrument make the same sound for it, so that a player
+    /// keeps a track's sound when its bank changes only for other tracks. The
+    /// bank itself, unless it hands the instrument to another bank. Compared
+    /// only while the bank that gave it is alive.
+    [[nodiscard]] virtual const void* source(const core::Instrument& instrument) const noexcept;
 };
 
 /// The built-in synthesizer as a sound bank: a Synth in the instrument's
