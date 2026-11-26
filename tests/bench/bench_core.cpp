@@ -7,6 +7,7 @@
 #include <elara/core/fraction.hpp>
 #include <elara/core/parallel.hpp>
 #include <elara/core/song.hpp>
+#include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
 
 #include "bench_songs.hpp"
@@ -148,6 +149,36 @@ TEST_CASE("edit benchmarks", "[benchmark][core][document]") {
         doc.execute(std::make_unique<RemoveTrack>(0));
         doc.undo();
         return doc.song().trackCount();
+    };
+}
+
+// The same edits while a copy of the song shares its measures, as the app's
+// snapshot for the layout and the sequence does (ADR-0051). Each run takes a
+// new copy first: "copy the large song (snapshot)" is what that costs.
+TEST_CASE("edit benchmarks with a snapshot alive", "[benchmark][core][document]") {
+    using namespace elara::core;
+    Document doc(elara::bench::largeSong());
+    const Measure edited = doc.song().track(7).staff(0).measure(250);
+
+    BENCHMARK("edit one measure and undo, a snapshot alive") {
+        const Song snapshot = doc.song();
+        doc.execute(std::make_unique<ReplaceMeasure>(7, 0, 250, edited));
+        doc.undo();
+        return snapshot.measureCount();
+    };
+
+    BENCHMARK("remove 100 measures from every track and undo, a snapshot alive") {
+        const Song snapshot = doc.song();
+        doc.execute(std::make_unique<RemoveMeasures>(200, 100));
+        doc.undo();
+        return snapshot.measureCount();
+    };
+
+    BENCHMARK("transpose every track a semitone and undo, a snapshot alive") {
+        const Song snapshot = doc.song();
+        doc.execute(makeTranspose(doc.song(), {.semitones = 1}));
+        doc.undo();
+        return snapshot.measureCount();
     };
 }
 
