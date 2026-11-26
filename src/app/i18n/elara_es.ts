@@ -1168,6 +1168,14 @@
         <translation>Compás</translation>
     </message>
     <message>
+        <source>Beats in a measure</source>
+        <translation>Tiempos por compás</translation>
+    </message>
+    <message>
+        <source>Beat unit</source>
+        <translation>Figura del tiempo</translation>
+    </message>
+    <message>
         <source>Key signature</source>
         <translation>Armadura</translation>
     </message>
@@ -1515,6 +1523,10 @@
     <message>
         <source>Custom</source>
         <translation>Personalizada</translation>
+    </message>
+    <message>
+        <source>Tuning</source>
+        <translation>Afinación</translation>
     </message>
     <message>
         <source>Strings</source>

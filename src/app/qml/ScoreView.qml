@@ -84,6 +84,10 @@ Item {
         return pageY(page) + (pages - page) * (pageExtent(page) + gap);
     }
 
+    /// Whether the view is still moving by itself: scrolling after the caret
+    /// or the playback cursor, or zooming to fit.
+    readonly property bool settling: scrollY.running || scrollX.running || followY.running
+                                     || followX.running || refit.running || shownZoom !== zoom
     /// What the zoom follows as the room for the pages changes: the paper's
     /// size ("paper", as a song opens), the page's width ("width"), or nothing
     /// once it was chosen by hand ("").
@@ -182,6 +186,12 @@ Item {
         measurePopup.y = Math.max(8, Math.min(height - measurePopup.implicitHeight - 8, y));
         measurePopup.open();
     }
+    /// Moves `popup` up or left until all of it is inside the view.
+    function keepInside(popup) {
+        popup.x = Math.max(8, Math.min(width - popup.width - 8, popup.x));
+        popup.y = Math.max(8, Math.min(height - popup.height - 8, popup.y));
+    }
+
     function openMeasurePopupAtCaret() {
         if (document.caretPage < 0)
             return;
@@ -668,6 +678,12 @@ Item {
 
         document: root.document
         onClosed: root.forceActiveFocus()
+        // It knows its height once it shows: kept inside the view then.
+        onOpened: root.keepInside(measurePopup)
+        onHeightChanged: {
+            if (visible)
+                root.keepInside(measurePopup);
+        }
     }
 
     WordsPopup {

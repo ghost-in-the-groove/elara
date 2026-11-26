@@ -76,6 +76,13 @@ qt_add_qml_module(elara
     qml/AppMenuItem.qml
     qml/AppMenuSeparator.qml
     qml/Picker.qml
+    qml/Field.qml
+    qml/Stepper.qml
+    qml/Fader.qml
+    qml/Chip.qml
+    qml/TextButton.qml
+    qml/Sheet.qml
+    qml/AppDialog.qml
     qml/Elevation.qml
     qml/ScoreView.qml
     qml/EntryBar.qml

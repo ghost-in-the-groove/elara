@@ -304,8 +304,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The note effects as a palette docked at the left of the score, lit with
       the caret's note, each key in the corner of its tile; the zoom keeps
       fitting when a panel opens (ADR-0109)
-- [ ] The song panel, the popups and the tuner in the interface's own controls;
-      the measure popup fits a short window
+- [x] The song panel, the popups, the tuner and the dialogs in the interface's
+      own controls, each track in its own hue; the measure popup fits a short
+      window
 - [ ] The welcome pane as a home: what to do at the left, the recent scores
       beside it
 - [ ] The page in the dark theme, and the score's own signs: the tablature clef,

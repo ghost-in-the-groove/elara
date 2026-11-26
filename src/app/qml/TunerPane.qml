@@ -3,12 +3,11 @@
 // tune and the strings of the instrument. It listens only while it is open.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Shapes
 import Elara.App
 
-Popup {
+Sheet {
     id: root
 
     // With a tuning, the nearest string and how far it is from its pitch;
@@ -53,49 +52,12 @@ Popup {
         return (rounded > 0 ? "+" : rounded < 0 ? "−" : "±") + Math.abs(rounded).toFixed(1);
     }
 
-    width: 360
-    padding: 20
-    topPadding: 14
+    width: 340
+    padding: 16
+    topPadding: 10
     focus: true
     closePolicy: Popup.CloseOnEscape
     transformOrigin: Popup.TopRight
-
-    enter: Transition {
-        ParallelAnimation {
-            NumberAnimation {
-                property: "opacity"
-                from: 0
-                to: 1
-                duration: 160
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                property: "scale"
-                from: 0.94
-                to: 1
-                duration: 220
-                easing.type: Easing.OutBack
-            }
-        }
-    }
-    exit: Transition {
-        NumberAnimation {
-            property: "opacity"
-            to: 0
-            duration: 120
-            easing.type: Easing.InCubic
-        }
-    }
-
-    background: Rectangle {
-        radius: Theme.radiusSheet
-        color: Theme.surface
-        border.color: Theme.line
-
-        Elevation {
-            radius: parent.radius
-        }
-    }
 
     TunerController {
         id: tuner
@@ -126,8 +88,9 @@ Popup {
 
             Label {
                 text: qsTr("Tuner")
-                font.pixelSize: Theme.fontTitle
+                font.pixelSize: Theme.fontBody
                 font.weight: Font.DemiBold
+                color: Theme.ink
             }
 
             // Pulses while the input is heard.
@@ -170,7 +133,10 @@ Popup {
             }
 
             IconButton {
-                iconPath: "M7 7 L17 17 M17 7 L7 17"
+                implicitWidth: 28
+                implicitHeight: 28
+                padding: 6
+                iconPath: Icons.close
                 tip: qsTr("Close (Esc)")
                 onClicked: root.close()
             }
@@ -247,15 +213,15 @@ Popup {
                 x: gauge.width / 2 - gauge.radius * 0.87 - width / 2
                 y: gauge.centerY - gauge.radius * 0.5 + 6
                 text: "−50"
-                font.pixelSize: 11
-                opacity: 0.5
+                font.pixelSize: Theme.fontCaption
+                color: Theme.inkSoft
             }
             Label {
                 x: gauge.width / 2 + gauge.radius * 0.87 - width / 2
                 y: gauge.centerY - gauge.radius * 0.5 + 6
                 text: "+50"
-                font.pixelSize: 11
-                opacity: 0.5
+                font.pixelSize: Theme.fontCaption
+                color: Theme.inkSoft
             }
 
             // The note, inside the arc.
@@ -318,7 +284,7 @@ Popup {
                     height: 22
                     radius: 11
                     color: marker.tint
-                    border.color: root.background.color
+                    border.color: Theme.surface
                     border.width: 4
                     scale: root.inTune ? 1.15 : 1.0
 
@@ -372,8 +338,8 @@ Popup {
                         .arg(tuner.frequency.toFixed(1))
                       : qsTr("%1 cents · %2 Hz").arg(root.signedCents(tuner.cents))
                         .arg(tuner.frequency.toFixed(1))
-                font.pixelSize: 12
-                opacity: 0.6
+                font.pixelSize: Theme.fontSmall
+                color: Theme.inkSoft
             }
         }
 
@@ -394,10 +360,10 @@ Popup {
                     required property string modelData
                     readonly property bool current: root.byString && index === tuner.stringIndex
 
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: !current ? "transparent" : root.inTune ? root.tuneColor : Material.accent
+                    width: 34
+                    height: 34
+                    radius: 17
+                    color: !current ? "transparent" : root.inTune ? root.tuneColor : Theme.accent
                     border.color: current ? color : root.faintColor
                     border.width: 1.5
 
@@ -412,7 +378,7 @@ Popup {
                         text: chip.modelData.replace(/-?[0-9]+$/, "")
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
-                        color: chip.current ? "white" : root.textColor
+                        color: chip.current ? Theme.accentText : root.textColor
                     }
 
                     ToolTip.visible: chipArea.containsMouse
@@ -433,13 +399,13 @@ Popup {
 
         // The whole width, so that long names ("Guitarra, un semitono abajo")
         // are not cut.
-        ComboBox {
+        Picker {
             Layout.fillWidth: true
             Layout.topMargin: 6
             model: tuner.tuningLabels
             currentIndex: tuner.tuning
             onActivated: index => tuner.tuning = index
-            ToolTip.visible: hovered
+            ToolTip.visible: hovered && !popup.visible
             ToolTip.delay: 600
             ToolTip.text: qsTr("Instrument and tuning")
         }
@@ -451,16 +417,16 @@ Popup {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Reference A4")
-                opacity: 0.7
+                font.pixelSize: Theme.fontSmall
+                color: Theme.inkSoft
                 elide: Text.ElideRight
             }
 
-            SpinBox {
+            Stepper {
                 Layout.preferredWidth: 140
                 from: 400
                 to: 480
                 value: tuner.a4
-                editable: true
                 textFromValue: (value, locale) => qsTr("%1 Hz").arg(value)
                 valueFromText: (text, locale) => parseInt(text.replace(/[^0-9]/g, ""))
                 onValueModified: tuner.a4 = value
@@ -481,7 +447,7 @@ Popup {
                 width: parent.width * tuner.level
                 height: parent.height
                 radius: 2
-                color: tuner.level > 0.97 ? Theme.danger : Material.accent
+                color: tuner.level > 0.97 ? Theme.danger : Theme.accent
 
                 Behavior on width {
                     NumberAnimation {

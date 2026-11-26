@@ -3,11 +3,11 @@
 // syllable for each note of its first voice, from a measure on.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Templates as T
 import Elara.App
 
-Popup {
+Sheet {
     id: root
 
     required property ScoreDocument document
@@ -23,7 +23,6 @@ Popup {
     property string loaded
 
     readonly property int maxVerses: document.maxVerses
-    readonly property color ink: Theme.ink
 
     /// Shows verse `verse` as the staff sings it: its text and first measure,
     /// the caret's measure for a verse not typed yet.
@@ -57,8 +56,6 @@ Popup {
     }
 
     width: 420
-    padding: 16
-    topPadding: 10
     focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
 
@@ -82,41 +79,8 @@ Popup {
         }
     }
 
-    enter: Transition {
-        NumberAnimation {
-            property: "opacity"
-            from: 0
-            to: 1
-            duration: 140
-        }
-        NumberAnimation {
-            property: "scale"
-            from: 0.96
-            to: 1
-            duration: 140
-            easing.type: Easing.OutCubic
-        }
-    }
-    exit: Transition {
-        NumberAnimation {
-            property: "opacity"
-            to: 0
-            duration: 100
-        }
-    }
-
-    background: Rectangle {
-        radius: Theme.radiusSheet
-        color: Theme.surface
-        border.color: Theme.line
-
-        Elevation {
-            radius: parent.radius
-        }
-    }
-
     contentItem: ColumnLayout {
-        spacing: 10
+        spacing: 8
 
         RowLayout {
             Layout.fillWidth: true
@@ -124,13 +88,16 @@ Popup {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Lyrics")
-                font.pixelSize: Theme.fontTitle
+                font.pixelSize: Theme.fontBody
                 font.weight: Font.DemiBold
-                color: root.ink
+                color: Theme.ink
             }
             IconButton {
+                implicitWidth: 28
+                implicitHeight: 28
+                padding: 6
                 visible: root.verse < root.verseCount
-                iconPath: "M6 7 L18 7 M9 7 L9 19 L15 19 L15 7 M10 4 L14 4"
+                iconPath: Icons.trash
                 tip: qsTr("Remove this verse")
                 onClicked: {
                     root.document.setVerse(root.verse, 0, "");
@@ -139,7 +106,10 @@ Popup {
                 }
             }
             IconButton {
-                iconPath: "M7 7 L17 17 M17 7 L7 17"
+                implicitWidth: 28
+                implicitHeight: 28
+                padding: 6
+                iconPath: Icons.close
                 tip: qsTr("Close")
                 onClicked: root.close()
             }
@@ -148,57 +118,27 @@ Popup {
         // The verses the staff sings, then one more to start a new verse.
         RowLayout {
             Layout.fillWidth: true
-            spacing: 6
+            spacing: 5
 
             Label {
+                rightPadding: 3
                 text: qsTr("Verse")
-                font.pixelSize: Theme.fontBody
-                color: root.ink
-                opacity: 0.7
+                font.pixelSize: Theme.fontSmall
+                color: Theme.inkSoft
             }
             Repeater {
                 model: Math.min(root.verseCount + 1, root.maxVerses)
 
-                delegate: AbstractButton {
-                    id: chip
-
+                delegate: Chip {
                     required property int index
-                    readonly property bool current: index === root.verse
                     readonly property bool added: index === root.verseCount
 
+                    implicitWidth: Math.max(28, implicitContentWidth + 18)
                     text: added ? "+" : String(index + 1)
-                    focusPolicy: Qt.NoFocus
-                    hoverEnabled: true
-                    implicitHeight: 30
-                    implicitWidth: Math.max(30, chipLabel.implicitWidth + 18)
+                    on: index === root.verse
+                    tip: added ? qsTr("New verse") : ""
                     onClicked: root.pickVerse(index)
                     Accessible.name: added ? qsTr("New verse") : qsTr("Verse %1").arg(index + 1)
-                    ToolTip.visible: added && hovered
-                    ToolTip.delay: 600
-                    ToolTip.text: qsTr("New verse")
-
-                    contentItem: Label {
-                        id: chipLabel
-
-                        text: chip.text
-                        font.pixelSize: Theme.fontBody
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                        color: chip.current ? "white" : root.ink
-                    }
-                    background: Rectangle {
-                        radius: height / 2
-                        color: chip.current ? chip.Material.accent
-                                            : chip.pressed ? Theme.pressed
-                                                           : chip.hovered ? Theme.hover : "transparent"
-                        border.color: chip.current ? chip.Material.accent : Theme.line
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 120
-                            }
-                        }
-                    }
                 }
             }
             Item {
@@ -206,19 +146,54 @@ Popup {
             }
         }
 
-        ScrollView {
+        // The verse, several lines of it.
+        Flickable {
+            id: verseBox
+
             Layout.fillWidth: true
             Layout.preferredHeight: 116
+            contentWidth: width
+            contentHeight: verseField.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            clip: true
 
-            TextArea {
+            ScrollIndicator.vertical: ScrollIndicator {}
+
+            // Keeps the line being typed in sight.
+            function follow(caret: rect) {
+                if (caret.y < contentY)
+                    contentY = caret.y;
+                else if (caret.y + caret.height > contentY + height)
+                    contentY = caret.y + caret.height - height;
+            }
+
+            Rectangle {
+                parent: verseBox
+                anchors.fill: parent
+                z: -1
+                radius: Theme.radiusSmall
+                color: Theme.surface
+                border.width: verseField.activeFocus ? 2 : 1
+                border.color: verseField.activeFocus ? Theme.accentInk : Theme.line
+            }
+
+            T.TextArea {
                 id: verseField
 
+                width: verseBox.width
+                implicitHeight: Math.max(verseBox.height, contentHeight + topPadding + bottomPadding)
+                padding: 9
                 placeholderText: qsTr("Verse text")
                 wrapMode: TextEdit.Wrap
                 selectByMouse: true
                 font.pixelSize: Theme.fontTitle
+                color: Theme.ink
+                selectionColor: Qt.alpha(Theme.accent, 0.4)
+                selectedTextColor: Theme.ink
+                placeholderTextColor: Theme.inkSoft
                 Accessible.name: qsTr("Verse text")
                 onTextChanged: root.leftover = 0
+                onCursorRectangleChanged: verseBox.follow(cursorRectangle)
                 Keys.onReturnPressed: event => {
                     if (event.modifiers & Qt.ControlModifier)
                         root.apply();
@@ -231,16 +206,24 @@ Popup {
                     else
                         event.accepted = false;
                 }
+
+                Text {
+                    x: verseField.leftPadding
+                    y: verseField.topPadding
+                    visible: verseField.length === 0 && verseField.preeditText.length === 0
+                    text: verseField.placeholderText
+                    font: verseField.font
+                    color: verseField.placeholderTextColor
+                }
             }
         }
 
         Label {
             Layout.fillWidth: true
             text: qsTr("A syllable for each note. Spaces and hyphens part syllables, one more space skips a note, _ holds a syllable and + joins two words.")
-            font.pixelSize: Theme.fontSmall
-            opacity: 0.5
+            font.pixelSize: Theme.fontCaption
+            color: Theme.inkSoft
             wrapMode: Text.Wrap
-            color: root.ink
         }
 
         Label {
@@ -258,25 +241,23 @@ Popup {
 
             Label {
                 text: qsTr("From measure")
-                font.pixelSize: Theme.fontBody
-                color: root.ink
-                opacity: 0.7
+                font.pixelSize: Theme.fontSmall
+                color: Theme.inkSoft
             }
-            SpinBox {
+            Stepper {
                 id: startField
 
-                Layout.preferredWidth: 130
+                Layout.preferredWidth: 120
                 from: 1
                 to: Math.max(1, root.document.measureCount)
-                editable: true
                 Accessible.name: qsTr("First measure of the verse")
             }
             Item {
                 Layout.fillWidth: true
             }
-            Button {
+            TextButton {
+                kind: "main"
                 text: qsTr("Apply")
-                highlighted: true
                 onClicked: root.apply()
                 ToolTip.visible: hovered
                 ToolTip.delay: 600
