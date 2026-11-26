@@ -3,7 +3,6 @@
 // continuous view), scrolled vertically and zoomed smoothly.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Effects
 import Elara.App
 
@@ -20,7 +19,7 @@ Item {
     property real cursorSeconds: -1
     /// Scroll so that the cursor stays in view as it moves.
     property bool followCursor: false
-    property color cursorColor: "#3f6ad8"
+    property color cursorColor: Theme.accent
     /// A click on the score asks to move playback there.
     signal seekRequested(real seconds)
     /// Where the cursor stands (ScoreDocument.cursorAt), empty when hidden.
@@ -156,10 +155,6 @@ Item {
         measurePopup.y = Math.max(8, Math.min(height - measurePopup.implicitHeight - 8, y));
         measurePopup.open();
     }
-    function openEffects() {
-        entryBar.openEffects();
-    }
-
     function openMeasurePopupAtCaret() {
         if (document.caretPage < 0)
             return;
@@ -177,9 +172,8 @@ Item {
         openWordsPopupAtCaret(textPopup);
     }
     /// Opens the lyrics popup away from the caret's staff, so that the
-    /// lyrics under it show as they change: at the bottom of the view, over
-    /// the transport, under a staff in its upper half and under the entry bar
-    /// otherwise (ADR-0084).
+    /// lyrics under it show as they change: at the bottom of the view under a
+    /// staff in its upper half, and at the top otherwise (ADR-0084).
     function openLyricsPopupAtCaret() {
         if (document.caretPage < 0)
             return;
@@ -187,8 +181,8 @@ Item {
         lyricsPopup.x = Math.max(8, Math.min(width - lyricsPopup.width - 8,
                                              at.x - lyricsPopup.width / 2));
         lyricsPopup.y = at.y < height / 2
-                ? Math.max(8, height - lyricsPopup.implicitHeight - 96)
-                : entryStrip.height + 8;
+                ? Math.max(8, height - lyricsPopup.implicitHeight - 16)
+                : 8;
         lyricsPopup.open();
     }
     function openWordsPopupAtCaret(popup) {
@@ -434,10 +428,7 @@ Item {
         // How far above and below the view pages stay loaded.
         readonly property real buffer: Math.max(0, root.pageHeight)
 
-        anchors.top: entryStrip.bottom
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.fill: parent
         topMargin: 24
         bottomMargin: 24
         clip: true
@@ -561,8 +552,8 @@ Item {
                                     width: modelData.width * scale
                                     height: modelData.height * scale
                                     radius: 3
-                                    color: Qt.alpha(Material.accent, 0.1)
-                                    border.color: Qt.alpha(Material.accent, 0.35)
+                                    color: Qt.alpha(Theme.accent, 0.1)
+                                    border.color: Qt.alpha(Theme.accent, 0.35)
                                     border.width: 1
 
                                     NumberAnimation on opacity {
@@ -585,8 +576,8 @@ Item {
                                 width: box.width * scale
                                 height: box.height * scale
                                 radius: Math.min(width, height) * 0.22
-                                color: Qt.alpha(Material.accent, root.activeFocus ? 0.22 : 0.1)
-                                border.color: Qt.alpha(Material.accent, root.activeFocus ? 0.9 : 0.4)
+                                color: Qt.alpha(Theme.accent, root.activeFocus ? 0.22 : 0.1)
+                                border.color: Qt.alpha(Theme.accent, root.activeFocus ? 0.9 : 0.4)
                                 border.width: 1.5
 
                                 Behavior on x {
@@ -687,49 +678,6 @@ Item {
 
         document: root.document
         onClosed: root.forceActiveFocus()
-    }
-
-    // The note entry bar: a strip over the top of the pages while there is a
-    // caret, so that only the transport covers the score.
-    Rectangle {
-        id: entryStrip
-
-        readonly property bool shown: root.document.caretPage >= 0
-
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: shown ? 46 : 0
-        visible: height > 0
-        clip: true
-        color: Theme.bar
-
-        Behavior on height {
-            NumberAnimation {
-                duration: 180
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        EntryBar {
-            id: entryBar
-
-            objectName: "entryBar"
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 1
-            document: root.document
-            onMeasureRequested: root.openMeasurePopupAtCaret()
-            onChordRequested: root.openChordPopupAtCaret()
-            onTextRequested: root.openTextPopupAtCaret()
-            onLyricsRequested: root.openLyricsPopupAtCaret()
-        }
-
-        Rectangle {
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: 1
-            color: Theme.line
-        }
     }
 
     // The playback cursor: a line across the system, over the pages.

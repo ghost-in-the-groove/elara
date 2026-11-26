@@ -67,6 +67,9 @@ class ScoreDocument : public QObject {
     /// The verses a staff sings at most (ADR-0084).
     Q_PROPERTY(int maxVerses READ maxVerses CONSTANT)
     Q_PROPERTY(double duration READ duration NOTIFY sequenceChanged)
+    /// Where each named section first plays (ADR-0062), in song order: maps
+    /// with "name" and "seconds". A section that never plays is left out.
+    Q_PROPERTY(QVariantList sectionMarks READ sectionMarks NOTIFY sequenceChanged)
     Q_PROPERTY(int track READ track WRITE setTrack NOTIFY trackChanged)
     Q_PROPERTY(View view READ view WRITE setView NOTIFY viewChanged)
     Q_PROPERTY(bool hasTablature READ hasTablature NOTIFY layoutChanged)
@@ -281,6 +284,10 @@ public:
     /// page `page`: on the column of notes there, the first time its measure
     /// plays; negative away from every measure.
     Q_INVOKABLE double secondsAt(int page, double x, double y) const;
+    /// The measure playing `seconds` into the song, from 0; negative before a
+    /// song is sequenced and past its end.
+    Q_INVOKABLE int measureAt(double seconds) const;
+    [[nodiscard]] QVariantList sectionMarks() const;
 
     /// The song and the sequence it plays as; null before a song is open.
     /// After an edit the sequence follows when the edit's layout is done: it

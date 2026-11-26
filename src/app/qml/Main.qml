@@ -138,6 +138,13 @@ ApplicationWindow {
         });
     }
 
+    /// Runs an edit asked for from a menu and brings the caret into view, as
+    /// the keys do.
+    function edit(action) {
+        action();
+        scoreView.reveal();
+    }
+
     /// Saves, then runs `action` once the song is on the disk.
     function saveThen(action) {
         savedAction = action;
@@ -243,7 +250,7 @@ ApplicationWindow {
             }
             if (window.showEffects) {
                 window.showEffects = false;
-                scoreView.openEffects();
+                entryBar.openEffects();
             }
         }
     }
@@ -407,180 +414,39 @@ ApplicationWindow {
             }
         }
     }
+    // The command bar with the menus and the transport, the song string along
+    // its lower edge, and the tool row under it while a score is open.
+    header: Item {
+        implicitHeight: commandBar.height + (window.hasScore ? toolRow.height : 0)
 
-    // Flat, with a hairline under it: the score is what has depth.
-    header: ToolBar {
-        Material.background: Theme.bar
-        Material.foreground: Theme.ink
-        Material.elevation: 0
-        height: 56
+        CommandBar {
+            id: commandBar
 
-        Rectangle {
-            anchors.bottom: parent.bottom
             width: parent.width
-            height: 1
-            color: Theme.line
-        }
+            document: score
+            playback: audio
+            hasScore: window.hasScore
+            songPaneShown: window.showSongPane
+            onOpenRequested: window.openScore()
+            onSaveRequested: window.save()
+            onSongPaneToggled: window.showSongPane = !window.showSongPane
+            onTunerRequested: window.toggleTuner()
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 10
-            spacing: 4
+            menus: AppMenuBar {
+                AppMenu {
+                    title: qsTr("&File")
 
-            Logo {
-                Layout.preferredHeight: 32
-                Layout.preferredWidth: 32 * aspect
-                Layout.alignment: Qt.AlignVCenter
-                Layout.rightMargin: 10
-                detailed: false
-                // Only the e in a narrow window: the song's title needs the room.
-                named: window.width >= 1000
-                color: Theme.ink
-                stringColor: Theme.accentInk
-                ground: Theme.bar
-            }
-
-            IconButton {
-                // A sheet with a plus.
-                iconPath: "M6 3 L14 3 L19 8 L19 21 L6 21 Z M14 3 L14 8 L19 8 M12.5 11 L12.5 17 M9.5 14 L15.5 14"
-                tip: qsTr("New song (Ctrl+N)")
-                onClicked: window.newSong()
-            }
-
-            IconButton {
-                iconPath: "M3 7 L3 18 Q3 19 4 19 L20 19 Q21 19 21 18 L21 9 Q21 8 20 8 L11.5 8 L9.5 6 L4 6 Q3 6 3 7 Z"
-                tip: qsTr("Open a score (Ctrl+O)")
-                onClicked: window.openScore()
-            }
-
-            IconButton {
-                visible: window.hasScore
-                enabled: score.modified || !score.savesInPlace
-                // A floppy disk.
-                iconPath: "M5 4 L16 4 L20 8 L20 20 L4 20 L4 5 Q4 4 5 4 Z M8 4 L8 9 L15 9 L15 4 M8 20 L8 14 L16 14 L16 20"
-                tip: qsTr("Save (Ctrl+S)")
-                onClicked: window.save()
-            }
-
-            IconButton {
-                visible: window.hasScore
-                enabled: score.canUndo
-                iconPath: "M9 14 L4 9 L9 4 M4 9 L14 9 Q20 9 20 15 Q20 20 14 20 L10 20"
-                tip: score.canUndo ? qsTr("Undo %1 (Ctrl+Z)").arg(score.undoName) : qsTr("Undo (Ctrl+Z)")
-                onClicked: score.undo()
-            }
-
-            IconButton {
-                visible: window.hasScore
-                enabled: score.canRedo
-                iconPath: "M15 14 L20 9 L15 4 M20 9 L10 9 Q4 9 4 15 Q4 20 10 20 L14 20"
-                tip: score.canRedo ? qsTr("Redo %1 (Ctrl+Y)").arg(score.redoName) : qsTr("Redo (Ctrl+Y)")
-                onClicked: score.redo()
-            }
-
-            ToolSeparator {
-                visible: window.hasScore
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 4
-                spacing: 0
-                opacity: window.hasScore ? 1.0 : 0.0
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 200
+                    AppMenuItem {
+                        text: qsTr("New song")
+                        keys: KeyNames.native("Ctrl+N")
+                        onTriggered: window.newSong()
                     }
-                }
-
-                Label {
-                    Layout.fillWidth: true
-                    text: score.title + (score.modified ? "  •" : "")
-                    font.pixelSize: 15
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-                Label {
-                    Layout.fillWidth: true
-                    visible: text.length > 0
-                    text: score.artist
-                    font.pixelSize: Theme.fontSmall
-                    opacity: 0.65
-                    elide: Text.ElideRight
-                }
-            }
-
-            SegmentedControl {
-                visible: window.hasScore
-                labels: [qsTr("Notation"), qsTr("Tablature"), qsTr("Both")]
-                enabledChoices: [true, score.hasTablature, score.hasTablature]
-                currentIndex: !score.hasTablature ? 0 : score.view === ScoreDocument.Standard ? 0
-                              : score.view === ScoreDocument.Tablature ? 1 : 2
-                onActivated: index => score.view = [ScoreDocument.Standard,
-                                                    ScoreDocument.Tablature,
-                                                    ScoreDocument.Both][index]
-            }
-
-            ComboBox {
-                id: trackPicker
-
-                Layout.preferredWidth: 200
-                Layout.leftMargin: 6
-                visible: score.trackNames.length > 1
-                model: [qsTr("All tracks")].concat(score.trackNames)
-                onActivated: index => score.track = index - 1
-                // Set after the model has been replaced: a new model resets
-                // the index, which would undo a binding.
-                onModelChanged: Qt.callLater(showTrack)
-
-                function showTrack() {
-                    currentIndex = score.track + 1;
-                }
-
-                Connections {
-                    target: score
-
-                    function onTrackChanged() {
-                        trackPicker.showTrack();
+                    AppMenuItem {
+                        text: qsTr("Open…")
+                        keys: KeyNames.native("Ctrl+O")
+                        onTriggered: window.openScore()
                     }
-                }
-                ToolTip.visible: hovered
-                ToolTip.delay: 600
-                ToolTip.text: qsTr("Track")
-            }
-
-            IconButton {
-                visible: window.hasScore
-                // Three sliders.
-                iconPath: "M4 7 L20 7 M4 12 L20 12 M4 17 L20 17 M9 5 L9 9 M15 10 L15 14 M7 15 L7 19"
-                tip: qsTr("Song and tracks (Ctrl+I)")
-                // Bound, not checkable: the panel also closes by itself.
-                checked: window.showSongPane
-                onClicked: window.showSongPane = !window.showSongPane
-            }
-
-            IconButton {
-                // A tuning fork.
-                iconPath: "M9 3 L9 10 Q9 14 12 14 Q15 14 15 10 L15 3 M12 14 L12 21"
-                tip: qsTr("Tuner (Ctrl+Shift+T)")
-                onClicked: window.toggleTuner()
-            }
-
-            IconButton {
-                id: moreButton
-
-                iconPath: "M12 5.5 L12 5.6 M12 12 L12 12.1 M12 18.5 L12 18.6"
-                tip: qsTr("More")
-                onClicked: moreMenu.open()
-
-                Menu {
-                    id: moreMenu
-
-                    y: moreButton.height
-
-                    Menu {
+                    AppMenu {
                         id: recentMenu
 
                         title: qsTr("Open recent")
@@ -589,7 +455,7 @@ ApplicationWindow {
                         Instantiator {
                             model: recent.scores
 
-                            delegate: MenuItem {
+                            delegate: AppMenuItem {
                                 required property var modelData
 
                                 text: modelData.name
@@ -598,31 +464,236 @@ ApplicationWindow {
                             onObjectAdded: (index, object) => recentMenu.insertItem(index, object)
                             onObjectRemoved: (index, object) => recentMenu.removeItem(object)
                         }
-                        MenuSeparator {}
-                        MenuItem {
+                        AppMenuSeparator {}
+                        AppMenuItem {
                             text: qsTr("Clear the list")
                             onTriggered: recent.clear()
                         }
                     }
-                    MenuItem {
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Save")
+                        keys: KeyNames.native("Ctrl+S")
+                        enabled: window.hasScore && (score.modified || !score.savesInPlace)
+                        onTriggered: window.save()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Save as…")
+                        keys: KeyNames.native("Ctrl+Shift+S")
+                        enabled: window.hasScore
+                        onTriggered: saveDialog.open()
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
                         // The score as shown, on A4 pages (ADR-0074).
                         text: qsTr("Export as PDF…")
+                        keys: KeyNames.native("Ctrl+P")
                         enabled: window.hasScore
                         onTriggered: window.exportPdf()
                     }
-                    MenuItem {
+                    AppMenuItem {
                         text: qsTr("Export as MusicXML…")
                         enabled: window.hasScore
                         onTriggered: window.exportMusicXml()
                     }
-                    MenuItem {
+                    AppMenuItem {
                         text: qsTr("Export as MIDI…")
                         enabled: window.hasScore
                         onTriggered: window.exportMidi()
                     }
-                    MenuSeparator {}
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Quit")
+                        keys: KeyNames.native("Ctrl+Q")
+                        onTriggered: window.close()
+                    }
+                }
 
-                    MenuItem {
+                AppMenu {
+                    title: qsTr("&Edit")
+
+                    AppMenuItem {
+                        text: score.canUndo ? qsTr("Undo %1").arg(score.undoName) : qsTr("Undo")
+                        keys: KeyNames.native("Ctrl+Z")
+                        enabled: score.canUndo
+                        onTriggered: score.undo()
+                    }
+                    AppMenuItem {
+                        text: score.canRedo ? qsTr("Redo %1").arg(score.redoName) : qsTr("Redo")
+                        keys: KeyNames.native("Ctrl+Y")
+                        enabled: score.canRedo
+                        onTriggered: score.redo()
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Copy the measures")
+                        keys: KeyNames.native("Ctrl+C")
+                        enabled: window.hasScore
+                        onTriggered: score.copy()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Paste over")
+                        keys: KeyNames.native("Ctrl+V")
+                        enabled: window.hasScore && score.canPaste
+                        onTriggered: window.edit(() => score.paste(false))
+                    }
+                    AppMenuItem {
+                        text: qsTr("Paste as new measures")
+                        keys: KeyNames.native("Ctrl+Shift+V")
+                        enabled: window.hasScore && score.canPaste
+                        onTriggered: window.edit(() => score.paste(true))
+                    }
+                    AppMenuItem {
+                        text: qsTr("Select every measure")
+                        keys: KeyNames.native("Ctrl+A")
+                        enabled: window.hasScore
+                        onTriggered: score.selectAll()
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Insert a measure")
+                        keys: KeyNames.native("Ctrl+Ins")
+                        enabled: score.caretPage >= 0
+                        onTriggered: window.edit(() => score.insertMeasure(false))
+                    }
+                    AppMenuItem {
+                        text: qsTr("Delete the measure")
+                        keys: KeyNames.native("Ctrl+Shift+Del")
+                        enabled: score.caretPage >= 0
+                        onTriggered: window.edit(() => score.removeMeasure())
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Measure…")
+                        keys: KeyNames.native("Ctrl+M")
+                        enabled: score.caretPage >= 0
+                        onTriggered: scoreView.openMeasurePopupAtCaret()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Chord symbol…")
+                        keys: KeyNames.native("Ctrl+K")
+                        enabled: score.caretPage >= 0
+                        onTriggered: scoreView.openChordPopupAtCaret()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Text…")
+                        keys: KeyNames.native("Ctrl+T")
+                        enabled: score.caretPage >= 0
+                        onTriggered: scoreView.openTextPopupAtCaret()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Lyrics…")
+                        keys: KeyNames.native("Ctrl+Shift+L")
+                        enabled: score.caretPage >= 0
+                        onTriggered: scoreView.openLyricsPopupAtCaret()
+                    }
+                }
+
+                AppMenu {
+                    title: qsTr("&View")
+
+                    AppMenuItem {
+                        text: qsTr("Notation")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && (score.view === ScoreDocument.Standard
+                                                    || !score.hasTablature)
+                        onTriggered: score.view = ScoreDocument.Standard
+                    }
+                    AppMenuItem {
+                        text: qsTr("Tablature")
+                        enabled: window.hasScore && score.hasTablature
+                        chosen: enabled && score.view === ScoreDocument.Tablature
+                        onTriggered: score.view = ScoreDocument.Tablature
+                    }
+                    AppMenuItem {
+                        text: qsTr("Both")
+                        enabled: window.hasScore && score.hasTablature
+                        chosen: enabled && score.view === ScoreDocument.Both
+                        onTriggered: score.view = ScoreDocument.Both
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Page view")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && !score.continuous
+                        onTriggered: score.continuous = false
+                    }
+                    AppMenuItem {
+                        text: qsTr("Continuous view")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && score.continuous
+                        onTriggered: score.continuous = true
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Zoom in")
+                        keys: KeyNames.native("Ctrl++")
+                        enabled: window.hasScore && scoreView.zoom < scoreView.maxZoom
+                        onTriggered: scoreView.zoomIn()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Zoom out")
+                        keys: KeyNames.native("Ctrl+-")
+                        enabled: window.hasScore && scoreView.zoom > scoreView.minZoom
+                        onTriggered: scoreView.zoomOut()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Fit the page width")
+                        keys: KeyNames.native("Ctrl+0")
+                        enabled: window.hasScore
+                        onTriggered: scoreView.fitWidth()
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        text: qsTr("Song and tracks")
+                        keys: KeyNames.native("Ctrl+I")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && window.showSongPane
+                        onTriggered: window.showSongPane = !window.showSongPane
+                    }
+                    AppMenuItem {
+                        text: qsTr("Tuner")
+                        keys: KeyNames.native("Ctrl+Shift+T")
+                        chosen: tunerPane.visible
+                        onTriggered: window.toggleTuner()
+                    }
+                }
+
+                AppMenu {
+                    title: qsTr("&Sound")
+
+                    AppMenuItem {
+                        text: audio.playingSong ? qsTr("Pause") : qsTr("Play")
+                        keys: KeyNames.native("Space")
+                        enabled: window.hasScore
+                        onTriggered: audio.togglePlayback()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Back to the start")
+                        keys: KeyNames.native("Home")
+                        enabled: window.hasScore && (audio.playingSong || audio.position > 0)
+                        onTriggered: audio.stopPlayback()
+                    }
+                    AppMenuItem {
+                        text: audio.looping ? qsTr("End the A-B loop")
+                                            : audio.loopMarked ? qsTr("Mark B of the loop")
+                                                               : qsTr("Mark A of the loop")
+                        keys: KeyNames.native("Ctrl+L")
+                        enabled: window.hasScore
+                        onTriggered: audio.markLoop()
+                    }
+                    AppMenuItem {
+                        text: qsTr("Metronome")
+                        chosen: score.metronome
+                        onTriggered: score.metronome = !score.metronome
+                    }
+                    AppMenuItem {
+                        text: qsTr("Count-in")
+                        chosen: audio.countIn
+                        onTriggered: audio.countIn = !audio.countIn
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
                         text: audio.loadingSoundFont ? qsTr("Opening the SoundFont…")
                                                      : audio.soundFontName.length > 0
                                                        ? qsTr("SoundFont: %1").arg(audio.soundFontName)
@@ -630,17 +701,16 @@ ApplicationWindow {
                         enabled: !audio.loadingSoundFont
                         onTriggered: soundFontDialog.open()
                     }
-                    MenuItem {
+                    AppMenuItem {
                         // The SoundFont that comes with Elara (ADR-0069), back
                         // after another sound was chosen.
                         visible: audio.includedSoundFont.length > 0
-                        height: visible ? implicitHeight : 0
                         text: qsTr("Use the included SoundFont")
                         enabled: audio.soundFont !== audio.includedSoundFont
                                  && !audio.loadingSoundFont
                         onTriggered: audio.setSoundFont(audio.includedSoundFont)
                     }
-                    MenuItem {
+                    AppMenuItem {
                         text: audio.guitarSfzName.length > 0
                               ? qsTr("Guitars: %1").arg(audio.guitarSfzName)
                               : qsTr("Choose an SFZ instrument for the guitars…")
@@ -650,17 +720,16 @@ ApplicationWindow {
                             sfzDialog.open();
                         }
                     }
-                    MenuItem {
+                    AppMenuItem {
                         // The guitar SFZ instrument that comes with Elara
                         // (ADR-0072).
                         visible: audio.includedGuitarSfz.length > 0
-                        height: visible ? implicitHeight : 0
                         text: qsTr("Use the included guitar")
                         enabled: audio.guitarSfz !== audio.includedGuitarSfz
                                  && !audio.loadingSoundFont
                         onTriggered: audio.setSfz("guitars", audio.includedGuitarSfz)
                     }
-                    MenuItem {
+                    AppMenuItem {
                         text: audio.bassSfzName.length > 0
                               ? qsTr("Basses: %1").arg(audio.bassSfzName)
                               : qsTr("Choose an SFZ instrument for the basses…")
@@ -670,24 +739,143 @@ ApplicationWindow {
                             sfzDialog.open();
                         }
                     }
-                    MenuItem {
+                    AppMenuItem {
                         text: qsTr("Use the built-in synthesizer")
                         enabled: (audio.soundFont.length > 0 || audio.guitarSfz.length > 0
                                   || audio.bassSfz.length > 0) && !audio.loadingSoundFont
                         onTriggered: audio.useBuiltinSound()
                     }
-                    MenuSeparator {}
-                    MenuItem {
+                    AppMenuSeparator {}
+                    AppMenuItem {
                         text: audio.playing ? qsTr("Playing…") : qsTr("Play a test tone")
                         enabled: !audio.playing
                         onTriggered: audio.playTestTone(440, 1.5)
                     }
-                    MenuItem {
+                }
+
+                AppMenu {
+                    title: qsTr("&Help")
+
+                    AppMenuItem {
                         text: qsTr("About Elara")
                         onTriggered: about.open()
                     }
                 }
             }
+        }
+
+        // The tool row: what typing uses at the left, what the score shows at
+        // the right.
+        Rectangle {
+            id: toolRow
+
+            /// What is left for the track picker once the tools and the view
+            /// switch have their room.
+            readonly property real spare: width - entryBar.implicitWidth - 44
+                                          - (viewSwitch.visible ? viewSwitch.implicitWidth + 8 : 0)
+
+            y: commandBar.height
+            width: parent.width
+            height: 46
+            visible: window.hasScore
+            color: Theme.bar
+
+            EntryBar {
+                id: entryBar
+
+                objectName: "entryBar"
+                x: 10
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 1
+                document: score
+                // Tools for the caret: there is none before a staff is shown.
+                enabled: score.caretPage >= 0
+                opacity: enabled ? 1.0 : 0.4
+                onMeasureRequested: scoreView.openMeasurePopupAtCaret()
+                onChordRequested: scoreView.openChordPopupAtCaret()
+                onTextRequested: scoreView.openTextPopupAtCaret()
+                onLyricsRequested: scoreView.openLyricsPopupAtCaret()
+            }
+
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.verticalCenterOffset: 1
+                spacing: 8
+
+                Picker {
+                    id: trackPicker
+
+                    objectName: "trackPicker"
+                    width: Math.max(112, Math.min(200, toolRow.spare))
+                    visible: score.trackNames.length > 1
+                    takesFocus: false
+                    model: [qsTr("All tracks")].concat(score.trackNames)
+                    onActivated: index => score.track = index - 1
+                    // Set after the model has been replaced: a new model resets
+                    // the index, which would undo a binding.
+                    onModelChanged: Qt.callLater(showTrack)
+                    Accessible.name: qsTr("Track")
+
+                    function showTrack() {
+                        currentIndex = score.track + 1;
+                    }
+
+                    Connections {
+                        target: score
+
+                        function onTrackChanged() {
+                            trackPicker.showTrack();
+                        }
+                    }
+                    ToolTip.visible: hovered && !popup.visible
+                    ToolTip.delay: 600
+                    ToolTip.text: qsTr("Track")
+                }
+
+                SegmentedControl {
+                    id: viewSwitch
+
+                    objectName: "viewSwitch"
+                    // In a narrow window the View menu has the same choices.
+                    visible: toolRow.width >= entryBar.implicitWidth + implicitWidth + 44
+                                              + (trackPicker.visible ? 120 : 0)
+                    labels: [qsTr("Notation"), qsTr("Tablature"), qsTr("Both")]
+                    enabledChoices: [true, score.hasTablature, score.hasTablature]
+                    currentIndex: !score.hasTablature ? 0 : score.view === ScoreDocument.Standard ? 0
+                                  : score.view === ScoreDocument.Tablature ? 1 : 2
+                    onActivated: index => score.view = [ScoreDocument.Standard,
+                                                        ScoreDocument.Tablature,
+                                                        ScoreDocument.Both][index]
+                }
+            }
+
+            Rectangle {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                height: 1
+                color: Theme.line
+            }
+        }
+
+        SongString {
+            id: songString
+
+            objectName: "songString"
+            width: parent.width
+            // Its line is the last two pixels of the command bar.
+            y: commandBar.height - height / 2 - 1
+            enabled: window.hasScore
+            position: audio.position
+            duration: score.duration
+            loopMarked: audio.loopMarked
+            looping: audio.looping
+            loopFrom: audio.loopFrom
+            loopTo: audio.loopTo
+            sections: score.sectionMarks
+            marker: window.hasScore ? commandBar.playingMeasure : ""
+            onSeekRequested: seconds => audio.seek(seconds)
         }
     }
 
@@ -708,7 +896,7 @@ ApplicationWindow {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 220
+                    duration: Theme.calm
                     easing.type: Easing.OutCubic
                 }
             }
@@ -725,13 +913,12 @@ ApplicationWindow {
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
             onSeekRequested: seconds => audio.seek(seconds)
-            cursorColor: Material.accent
             opacity: window.hasScore ? 1.0 : 0.0
             visible: opacity > 0
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 260
+                    duration: Theme.calm
                     easing.type: Easing.OutCubic
                 }
             }
@@ -754,7 +941,7 @@ ApplicationWindow {
 
             Behavior on width {
                 NumberAnimation {
-                    duration: 220
+                    duration: Theme.calm
                     easing.type: Easing.OutCubic
                 }
             }
@@ -794,171 +981,16 @@ ApplicationWindow {
 
             Behavior on opacity {
                 NumberAnimation {
-                    duration: 140
+                    duration: Theme.quick
                 }
             }
 
             Label {
                 anchors.centerIn: parent
                 text: qsTr("Drop to open")
-                font.pixelSize: 22
+                font.pixelSize: 20
                 font.weight: Font.DemiBold
                 color: Theme.accentInk
-            }
-        }
-
-        // The transport: floats over the bottom of the score, and slides in
-        // once there is one.
-        Rectangle {
-            id: transport
-
-            objectName: "transport"
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: window.hasScore ? parent.height - height - 20 : parent.height + 12
-            width: transportRow.implicitWidth + 28
-            height: 56
-            radius: 28
-            color: Theme.surface
-            border.color: Theme.line
-            opacity: window.hasScore ? 1.0 : 0.0
-            visible: opacity > 0
-
-            Elevation {
-                radius: parent.radius
-            }
-
-            Behavior on y {
-                NumberAnimation {
-                    duration: 300
-                    easing.type: Easing.OutCubic
-                }
-            }
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 220
-                }
-            }
-
-            RowLayout {
-                id: transportRow
-
-                anchors.centerIn: parent
-                spacing: 10
-
-                IconButton {
-                    iconPath: "M6.5 6 L6.5 18 M18 6.5 L9.5 12 L18 17.5 Z"
-                    tip: qsTr("Back to the start (Home)")
-                    enabled: audio.playingSong || audio.position > 0
-                    onClicked: audio.stopPlayback()
-                }
-
-                RoundButton {
-                    id: playButton
-
-                    implicitWidth: 44
-                    implicitHeight: 44
-                    topInset: 0
-                    bottomInset: 0
-                    leftInset: 0
-                    rightInset: 0
-                    padding: 0
-                    focusPolicy: Qt.TabFocus
-                    Accessible.name: audio.playingSong ? qsTr("Pause") : qsTr("Play")
-                    ToolTip.visible: hovered
-                    ToolTip.delay: 600
-                    ToolTip.text: (audio.playingSong ? qsTr("Pause") : qsTr("Play"))
-                                  + qsTr(" (Space)")
-                    onClicked: audio.togglePlayback()
-
-                    background: Rectangle {
-                        radius: width / 2
-                        color: playButton.down ? Qt.darker(window.Material.accent, 1.15)
-                                               : playButton.hovered ? Qt.lighter(window.Material.accent, 1.12)
-                                                                    : window.Material.accent
-
-                        Behavior on color {
-                            ColorAnimation {
-                                duration: 120
-                            }
-                        }
-                    }
-
-                    contentItem: Item {
-                        Icon {
-                            anchors.centerIn: parent
-                            width: 22
-                            height: 22
-                            color: "white"
-                            filled: true
-                            lineWidth: 1.5
-                            path: audio.playingSong ? "M7 5 L10 5 L10 19 L7 19 Z M14 5 L17 5 L17 19 L14 19 Z"
-                                                    : "M8 5 L19 12 L8 19 Z"
-                        }
-                    }
-
-                    // Gives a little under the pointer.
-                    scale: pressed ? 0.94 : 1.0
-
-                    Behavior on scale {
-                        NumberAnimation {
-                            duration: 120
-                        }
-                    }
-                }
-
-                Label {
-                    text: window.clock(audio.position) + " / " + window.clock(score.duration)
-                    font.pixelSize: Theme.fontBody
-                    font.features: {
-                        "tnum": 1
-                    }
-                    opacity: 0.8
-                    Layout.preferredWidth: 86
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Slider {
-                    id: seekBar
-
-                    Layout.preferredWidth: 240
-                    from: 0
-                    to: Math.max(0.001, score.duration)
-                    focusPolicy: Qt.NoFocus
-                    onMoved: audio.seek(value)
-
-                    Binding {
-                        target: seekBar
-                        property: "value"
-                        value: audio.position
-                        when: !seekBar.pressed
-                        restoreMode: Binding.RestoreNone
-                    }
-
-                    // The A-B loop under the bar: A to B, or a mark at A while
-                    // B is still to come.
-                    Rectangle {
-                        objectName: "loopBand"
-
-                        readonly property real track: seekBar.availableWidth - seekBar.handle.width
-                        readonly property real start: seekBar.leftPadding + seekBar.handle.width / 2
-                                                      + track * Math.min(1, audio.loopFrom / seekBar.to)
-
-                        visible: audio.looping || audio.loopMarked
-                        x: audio.looping ? start : start - 1
-                        width: audio.looping ? Math.max(2, track * Math.min(1, (audio.loopTo - audio.loopFrom) / seekBar.to))
-                                             : 2
-                        y: seekBar.topPadding + seekBar.availableHeight / 2 + 6
-                        height: 3
-                        radius: 1.5
-                        color: window.Material.accent
-                        opacity: audio.looping ? 0.9 : 0.6
-                    }
-                }
-
-                PracticeControls {
-                    document: score
-                    playback: audio
-                }
             }
         }
 
@@ -1000,10 +1032,9 @@ ApplicationWindow {
             property bool shown: false
 
             anchors.horizontalCenter: parent.horizontalCenter
-            y: shown ? parent.height - height - (window.hasScore ? transport.height + 36 : 24)
-                     : parent.height + 8
-            width: Math.min(parent.width - 48, toastRow.implicitWidth + 40)
-            height: toastRow.implicitHeight + 24
+            y: shown ? parent.height - height - 20 : parent.height + 8
+            width: Math.min(parent.width - 48, toastRow.implicitWidth + 36)
+            height: toastRow.implicitHeight + 20
             radius: Theme.radiusCard
             color: error ? Theme.dangerSurface : Theme.surface
             border.color: error ? Theme.danger : Theme.line
@@ -1015,7 +1046,7 @@ ApplicationWindow {
 
             Behavior on y {
                 NumberAnimation {
-                    duration: 220
+                    duration: Theme.calm
                     easing.type: Easing.OutCubic
                 }
             }
@@ -1065,187 +1096,14 @@ ApplicationWindow {
         }
     }
 
-    footer: ToolBar {
-        Material.background: Theme.bar
-        Material.foreground: Theme.ink
-        Material.elevation: 0
-        height: 32
+    footer: StatusBar {
         visible: window.hasScore
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Theme.line
-        }
-
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: 16
-            anchors.rightMargin: 10
-            spacing: 10
-
-            // Strips have no page numbers.
-            Label {
-                visible: !score.showsStrips
-                text: qsTr("Page %1 of %2").arg(scoreView.currentPage).arg(score.pageCount)
-                font.pixelSize: Theme.fontSmall
-                font.features: {
-                    "tnum": 1
-                }
-                opacity: 0.75
-            }
-            Rectangle {
-                visible: !score.showsStrips
-                implicitWidth: 3
-                implicitHeight: 3
-                radius: 1.5
-                color: Theme.ink
-                opacity: 0.35
-            }
-            Label {
-                text: qsTr("%n measure(s)", "", score.measureCount)
-                font.pixelSize: Theme.fontSmall
-                font.features: {
-                    "tnum": 1
-                }
-                opacity: 0.75
-            }
-            // What opening the file changed or left out, to read again.
-            Rectangle {
-                visible: score.importWarnings.length > 0
-                implicitWidth: 3
-                implicitHeight: 3
-                radius: 1.5
-                color: Theme.ink
-                opacity: 0.35
-            }
-            Label {
-                objectName: "importWarningsLabel"
-                visible: score.importWarnings.length > 0
-                text: qsTr("%n change(s) on import", "", score.importWarnings.length)
-                font.pixelSize: Theme.fontSmall
-                font.underline: importWarningsArea.containsMouse
-                color: Theme.warning
-
-                MouseArea {
-                    id: importWarningsArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        detailsDialog.title = qsTr("What opening the file changed or left out");
-                        detailsDialog.lines = score.importWarnings;
-                        detailsDialog.open();
-                    }
-                }
-            }
-            Item {
-                Layout.fillWidth: true
-            }
-
-            // Pages or one continuous scroll (ADR-0057), as one group.
-            Rectangle {
-                implicitWidth: layoutRow.implicitWidth
-                implicitHeight: 24
-                radius: height / 2
-                color: Theme.hover
-
-                Row {
-                    id: layoutRow
-
-                    anchors.centerIn: parent
-
-                    IconButton {
-                        objectName: "pageViewButton"
-                        implicitWidth: 24
-                        implicitHeight: 24
-                        padding: 4
-                        // Two pages, one under the other.
-                        iconPath: "M7 3 L17 3 L17 10.5 L7 10.5 Z M7 13.5 L17 13.5 L17 21 L7 21 Z"
-                        tip: qsTr("Page view")
-                        checked: !score.continuous
-                        onClicked: score.continuous = false
-                    }
-                    IconButton {
-                        objectName: "continuousViewButton"
-                        implicitWidth: 24
-                        implicitHeight: 24
-                        padding: 4
-                        // One long sheet with systems on it.
-                        iconPath: "M7 3 L17 3 L17 21 L7 21 Z M10 7.5 L14 7.5 M10 12 L14 12 M10 16.5 L14 16.5"
-                        tip: qsTr("Continuous view")
-                        checked: score.continuous
-                        onClicked: score.continuous = true
-                    }
-                }
-            }
-
-            // Zoom, as one group: out, the level (a click fits the width), in.
-            Rectangle {
-                implicitWidth: zoomRow.implicitWidth
-                implicitHeight: 24
-                radius: height / 2
-                color: Theme.hover
-
-                Row {
-                    id: zoomRow
-
-                    anchors.centerIn: parent
-
-                    IconButton {
-                        implicitWidth: 24
-                        implicitHeight: 24
-                        padding: 4
-                        enabled: scoreView.zoom > scoreView.minZoom
-                        iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10"
-                        tip: qsTr("Zoom out (Ctrl+-)")
-                        onClicked: scoreView.zoomOut()
-                    }
-
-                    AbstractButton {
-                        id: zoomLevel
-
-                        implicitWidth: 48
-                        implicitHeight: 24
-                        hoverEnabled: true
-                        focusPolicy: Qt.TabFocus
-                        text: Math.round(scoreView.zoom * 100) + "%"
-                        ToolTip.visible: hovered
-                        ToolTip.delay: 600
-                        ToolTip.text: qsTr("Fit the page width (Ctrl+0)")
-                        onClicked: scoreView.fitWidth()
-
-                        background: Rectangle {
-                            radius: height / 2
-                            color: zoomLevel.down ? Theme.pressed
-                                                  : zoomLevel.hovered ? Theme.hover : "transparent"
-                            border.width: zoomLevel.visualFocus ? 2 : 0
-                            border.color: Theme.accentInk
-                        }
-
-                        contentItem: Label {
-                            text: zoomLevel.text
-                            font.pixelSize: Theme.fontSmall
-                            font.features: {
-                                "tnum": 1
-                            }
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                    }
-
-                    IconButton {
-                        implicitWidth: 24
-                        implicitHeight: 24
-                        padding: 4
-                        enabled: scoreView.zoom < scoreView.maxZoom
-                        iconPath: "M15.5 10 A5.5 5.5 0 1 1 4.5 10 A5.5 5.5 0 1 1 15.5 10 M14 14 L20 20 M7.5 10 L12.5 10 M10 7.5 L10 12.5"
-                        tip: qsTr("Zoom in (Ctrl++)")
-                        onClicked: scoreView.zoomIn()
-                    }
-                }
-            }
+        document: score
+        view: scoreView
+        onImportWarningsRequested: {
+            detailsDialog.title = qsTr("What opening the file changed or left out");
+            detailsDialog.lines = score.importWarnings;
+            detailsDialog.open();
         }
     }
 
@@ -1266,6 +1124,10 @@ ApplicationWindow {
         sequences: [StandardKey.SaveAs]
         enabled: window.hasScore
         onActivated: saveDialog.open()
+    }
+    Shortcut {
+        sequence: "Ctrl+Q"
+        onActivated: window.close()
     }
     Shortcut {
         sequences: [StandardKey.Print]

@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QQuickWindow>
+#include <QSize>
 #include <QString>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -29,6 +30,7 @@ struct StartupOptions {
     std::optional<ScoreDocument::View> view;
     std::optional<double> seek; ///< seconds to move the transport to, paused
     bool continuous = false;    ///< show the continuous view (ADR-0057)
+    std::optional<QSize> size;  ///< the window's size, in place of its own
     bool smokeTest = false;     ///< check the window (and the file), then quit
     bool effects = false;       ///< the note effects panel opens at the caret
     bool tuner = false;         ///< the tuner opens at start
