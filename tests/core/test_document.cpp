@@ -129,6 +129,30 @@ TEST_CASE("Undo restores removed content exactly", "[core][document]") {
     CHECK(doc.song().track(0).staff(0).measure(1) == original.track(1).staff(0).measure(3));
 }
 
+TEST_CASE("Undo gives back the very measures a copy of the song shares", "[core][document]") {
+    Document doc(smallSong());
+    const Song snapshot = doc.song(); // shares every measure, as the app's copy does
+    const auto shared = [&doc, &snapshot](std::size_t t, std::size_t m) {
+        return doc.song().track(t).staff(0).sharedMeasure(m).shares(
+            snapshot.track(t).staff(0).sharedMeasure(m));
+    };
+
+    doc.execute(std::make_unique<ReplaceMeasure>(0, 0, 1, wholeNote(snapshot, 0, 9)));
+    CHECK_FALSE(shared(0, 1));
+    CHECK(shared(0, 0));
+    doc.undo();
+    CHECK(shared(0, 1));
+
+    doc.execute(std::make_unique<RemoveMeasures>(1, 2));
+    doc.undo();
+    for (std::size_t t = 0; t < snapshot.trackCount(); ++t) {
+        for (std::size_t m = 0; m < snapshot.measureCount(); ++m) {
+            CHECK(shared(t, m));
+        }
+    }
+    CHECK(doc.song() == snapshot);
+}
+
 TEST_CASE("Content, header, info and tempo edits are undoable", "[core][document]") {
     const Song original = smallSong();
     Document doc(original);
