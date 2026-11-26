@@ -311,8 +311,10 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       window
 - [x] The welcome pane as a home: what to do at the left, the recent scores
       beside it
-- [ ] The page in the dark theme, and the score's own signs: the tablature clef,
-      the fret numbers and the texts of the techniques
+- [x] The page in the dark theme: dark paper and light ink, black on white
+      when it leaves the program (ADR-0114)
+- [ ] The window remembers its size, its panels, its zoom and the dark page
+      from one run to the next
 - [ ] A command palette: every command by name, with its keys
 
 ## Milestone 6 - Practice tools

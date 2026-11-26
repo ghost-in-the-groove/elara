@@ -23,6 +23,14 @@ struct ScoreFonts {
     [[nodiscard]] static ScoreFonts fromDirectory(const QString& directory);
 };
 
+/// What a score is painted in: its ink on its paper. Black on white for print
+/// and by default; the window's dark theme can turn them round (ADR-0114).
+struct ScoreColours {
+    QColor paper{Qt::white};
+    QColor ink{Qt::black};
+    friend bool operator==(const ScoreColours&, const ScoreColours&) = default;
+};
+
 /// Paints display lists: glyphs of the music font and text as outlines, lines,
 /// beams, curves and polygons as shapes, in the order the SVG writer uses.
 /// Painting works the same on every platform, without a screen and on any
@@ -36,17 +44,20 @@ public:
     [[nodiscard]] bool isValid() const;
 
     /// Paints `list` with one staff space `scale` pixels long, its (0, 0) at
-    /// the painter's origin.
-    void paint(QPainter& painter, const notation::DisplayList& list, double scale) const;
+    /// the painter's origin, in the ink of `colours`; what clears the lines
+    /// behind a text takes their paper.
+    void paint(QPainter& painter, const notation::DisplayList& list, double scale,
+               const ScoreColours& colours = {}) const;
 
-    /// `list` on white, from its top (0 for a page) to its bottom, at `scale`
-    /// pixels per staff space and `devicePixelRatio` device pixels per pixel.
+    /// `list` on the paper of `colours`, from its top (0 for a page) to its
+    /// bottom, at `scale` pixels per staff space and `devicePixelRatio` device
+    /// pixels per pixel.
     [[nodiscard]] QImage render(const notation::DisplayList& list, double scale,
-                                double devicePixelRatio = 1.0) const;
+                                double devicePixelRatio = 1.0,
+                                const ScoreColours& colours = {}) const;
 
 private:
     ScoreFonts fonts_;
-    QColor ink_{Qt::black};
 };
 
 } // namespace elara::app

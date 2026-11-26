@@ -658,6 +658,10 @@
         <translation>&amp;Ver</translation>
     </message>
     <message>
+        <source>Dark page in the dark theme</source>
+        <translation>Página oscura en el tema oscuro</translation>
+    </message>
+    <message>
         <source>Zoom in</source>
         <translation>Acercar</translation>
     </message>

@@ -40,6 +40,9 @@ ApplicationWindow {
     property string recoveryFolder
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
+    /// In the dark theme the page is dark too, its ink light (ADR-0114); off,
+    /// it stays a dimmed white page.
+    property bool darkPage: true
 
     onHasScoreChanged: {
         if (hasScore && showTuning) {
@@ -656,6 +659,12 @@ ApplicationWindow {
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
+                        text: qsTr("Dark page in the dark theme")
+                        chosen: window.darkPage
+                        onTriggered: window.darkPage = !window.darkPage
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
                         text: qsTr("Zoom in")
                         keys: KeyNames.native("Ctrl++")
                         enabled: window.hasScore && scoreView.zoom < scoreView.maxZoom
@@ -945,6 +954,7 @@ ApplicationWindow {
             id: scoreView
 
             objectName: "scoreView"
+            darkPage: window.dark && window.darkPage
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: palette.right
