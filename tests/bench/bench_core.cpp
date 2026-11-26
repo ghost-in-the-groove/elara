@@ -124,6 +124,22 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
     BENCHMARK("validate the large song (fills, frets, ties)") {
         return elara::core::validate(song).size();
     };
+
+    // Song::tempoAt() walks the headers from the start (C03 in the optimization
+    // study): asking it at every measure of a song with a change in each is the
+    // worst case.
+    elara::core::Song changing = song;
+    for (std::size_t m = 0; m < changing.measureCount(); ++m) {
+        changing.measureHeader(m).tempoChanges.push_back(
+            {.tempo = elara::core::Tempo(100.0 + static_cast<double>(m % 40))});
+    }
+    BENCHMARK("the tempo at each of 500 measures, a change in every one") {
+        double sum = 0.0;
+        for (std::size_t m = 0; m < changing.measureCount(); ++m) {
+            sum += changing.tempoAt(m).bpm();
+        }
+        return sum;
+    };
 }
 
 TEST_CASE("edit benchmarks", "[benchmark][core][document]") {

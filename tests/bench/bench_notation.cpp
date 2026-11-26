@@ -110,6 +110,20 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         return layoutPages(song, both, font, pages);
     };
 
+    // Tempo context (C03 in the optimization study): a tempo change at the start
+    // of every measure, every other one gradual, is the worst case for looking up
+    // the tempo in force before a system and the end of each ramp.
+    elara::core::Song changing = song;
+    for (std::size_t m = 0; m < changing.measureCount(); ++m) {
+        changing.measureHeader(m).tempoChanges.push_back(
+            {.tempo = elara::core::Tempo(100.0 + static_cast<double>(m % 40)),
+             .gradual = m % 2 == 0});
+    }
+    pages.threads = 0;
+    BENCHMARK("the same, a tempo change in every measure") {
+        return layoutPages(changing, both, font, pages);
+    };
+
     // Keyboard entry (ADR-0032): the app looks for the caret on every page
     // after each move; the last measure is the worst case. Then a click.
     const elara::core::Caret last{.measure = song.measureCount() - 1, .string = 3};
