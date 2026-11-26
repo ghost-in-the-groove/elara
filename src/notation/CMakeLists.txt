@@ -16,6 +16,7 @@ add_library(elara_notation STATIC
   src/smufl.cpp
   src/standard_staff.cpp
   src/svg.cpp
+  src/symbol.cpp
   src/system_layout.cpp
   src/tab_staff.cpp)
 add_library(elara::notation ALIAS elara_notation)
