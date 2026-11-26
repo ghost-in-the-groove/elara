@@ -35,7 +35,8 @@ their cap height (0.72 em).
 TAB clef (six-string glyph from five strings up, four-string below) and time
 signatures, no key signature. A fret number is centred on its string line and
 under the centre of the notehead standard notation draws for the same note, at
-1.3 staff spaces, and clears the line behind it. A note without a fret position
+1.3 staff spaces (1.6 since ADR-0113, which also leaves the time signature to
+the standard staff when there is one), and clears the line behind it. A note without a fret position
 takes the lowest fret that sounds it. Dead notes are `X`, ghost and tied notes
 are in parentheses, natural harmonics in angle brackets (`<12>`, `<3.2>`).
 Rests show only when the system has no standard notation of the staff; so does

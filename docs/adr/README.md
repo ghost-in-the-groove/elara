@@ -117,6 +117,7 @@ one that replaces them.
 | [0109](0109-note-effects-palette.md) | The note effects palette | Accepted |
 | [0110](0110-job-lanes.md) | One running job and the newest request per flow | Accepted |
 | [0111](0111-change-kinds.md) | Edits say what they change | Accepted |
+| [0113](0113-tablature-for-reading.md) | Tablature for reading: larger numbers, and the time signature only when it stands alone | Accepted |
 
 ## Template
 

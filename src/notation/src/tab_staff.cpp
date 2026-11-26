@@ -28,12 +28,12 @@ namespace {
 using core::Fraction;
 
 constexpr double kLineSpace = 1.5;      // between string lines
-constexpr double kFretSize = 1.3;       // font size of fret numbers
+constexpr double kFretSize = 1.6;       // font size of fret numbers
 constexpr double kFretPadding = 0.12;   // around a fret number, in its column's ink
 constexpr double kArcGap = 0.15;        // between a fret number and a hammer-on arc
 constexpr double kArcHeight = 0.45;     // of hammer-on and pull-off arcs
 constexpr double kArcInset = 0.25;      // arcs start this share of a number's width in
-constexpr double kArcLabelSize = 0.85;  // "H" and "P"
+constexpr double kArcLabelSize = 1.05;  // "H" and "P"
 constexpr double kArcLabelGap = 0.12;   // between an arc and its label
 constexpr double kSlideGap = 0.15;      // between a slide line and its fret numbers
 constexpr double kSlideRise = 0.3;      // half the height a slide line climbs
@@ -43,7 +43,7 @@ constexpr double kBendGap = 0.1;        // between a fret number and its bend
 constexpr double kBendWidth = 0.9;      // horizontal run of a bend or release arrow
 constexpr double kArrowLength = 0.5;
 constexpr double kArrowWidth = 0.45;
-constexpr double kBendLabelSize = 0.95;
+constexpr double kBendLabelSize = 1.2;
 constexpr double kBendLabelGap = 0.2;  // between an arrowhead and its label
 constexpr double kReleaseDrop = 0.6;   // a release ends this far above its string
 constexpr double kRunEndGap = 0.3;     // a technique run ends before the next column
@@ -129,8 +129,10 @@ public:
         const BoundingBox& box = metrics(clef).box;
         double x = glyphFrom(clef, kClefX, height() / 2 + (box.southWest.y + box.northEast.y) / 2,
                              Role::Clef);
-        if (first == 0 || song_.measureHeader(first - 1).timeSignature !=
-                              song_.measureHeader(first).timeSignature) {
+        // Under a standard staff the time signature is that staff's: the
+        // tablature shows it only when it stands alone (ADR-0113).
+        if (alone_ && (first == 0 || song_.measureHeader(first - 1).timeSignature !=
+                                         song_.measureHeader(first).timeSignature)) {
             x = timeSignature(song_.measureHeader(first).timeSignature, x + kHeaderGap,
                               height() / 2);
         }
@@ -139,7 +141,8 @@ public:
 
     double changes(std::size_t m, double x) override {
         measure_ = m;
-        if (song_.measureHeader(m).timeSignature != song_.measureHeader(m - 1).timeSignature) {
+        if (alone_ &&
+            song_.measureHeader(m).timeSignature != song_.measureHeader(m - 1).timeSignature) {
             x = timeSignature(song_.measureHeader(m).timeSignature, x + kHeaderGap, height() / 2);
         }
         return x;

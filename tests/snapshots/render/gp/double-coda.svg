@@ -54,8 +54,6 @@
 <text class="notehead" x="98.679" y="31.396" stroke="none">&#xE0A2;</text>
 <text class="accidental" x="97.483" y="31.396" stroke="none">&#xE262;</text>
 <text class="clef" x="9.183" y="40.678" stroke="none">&#xE06D;</text>
-<text class="timeSignature" x="11.715" y="39.646" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="11.715" y="41.646" stroke="none">&#xE084;</text>
 <text class="navigation" x="28.474" y="26.54" style="font-size:2.6px" stroke="none">&#xE047;</text>
 <text class="navigation" x="41.524" y="26.54" style="font-size:2.6px" stroke="none">&#xE047;</text>
 <text class="navigation" x="43.193" y="26.54" style="font-size:2.6px" stroke="none">&#xE047;</text>
@@ -65,20 +63,20 @@
 <text class="tempo" x="16.235" y="22.62" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Navigation</text>
 <text class="t credit" x="60" y="14.511" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
-<rect class="knockout" x="16.614" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="17.079" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">0</text>
-<rect class="knockout" x="29.663" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="30.129" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">1</text>
-<rect class="knockout" x="43.909" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="44.374" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="56.958" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="57.423" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="71.203" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="71.669" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">4</text>
-<rect class="knockout" x="84.813" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="85.278" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">5</text>
-<rect class="knockout" x="99.058" y="36.324" width="0.931" height="1.144" fill="white" stroke="none"/>
-<text class="t fretNumber" x="99.523" y="37.364" style="font-size:1.3px" text-anchor="middle" stroke="none">6</text>
+<rect class="knockout" x="16.507" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="17.079" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="29.556" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="30.129" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">1</text>
+<rect class="knockout" x="43.801" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="44.374" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="56.851" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="57.423" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">3</text>
+<rect class="knockout" x="71.096" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="71.669" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">4</text>
+<rect class="knockout" x="84.705" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="85.278" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">5</text>
+<rect class="knockout" x="98.95" y="36.192" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="99.523" y="37.472" style="font-size:1.6px" text-anchor="middle" stroke="none">6</text>
 <text class="t navigation" x="57.232" y="26.61" style="font-size:1.4px;font-style:italic" text-anchor="end" stroke="none">To Coda</text>
 <text class="t navigation" x="68.429" y="26.61" style="font-size:1.4px;font-style:italic" text-anchor="end" stroke="none">To Double Coda</text>
 <text class="t navigation" x="83.234" y="26.61" style="font-size:1.4px;font-style:italic" text-anchor="end" stroke="none">D.S.S. al Double Coda</text>
