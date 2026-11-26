@@ -74,16 +74,7 @@ float sampleAt(std::span<const std::byte> bytes, std::size_t at, std::uint16_t e
 } // namespace
 
 std::vector<float> WavAudio::mono() const {
-    const std::size_t channels = format.channels;
-    std::vector<float> out(frames());
-    for (std::size_t f = 0; f < out.size(); ++f) {
-        float sum = 0.0f;
-        for (std::size_t c = 0; c < channels; ++c) {
-            sum += samples[(f * channels) + c];
-        }
-        out[f] = sum / static_cast<float>(channels);
-    }
-    return out;
+    return WavAudio(*this).intoMono();
 }
 
 std::vector<float> WavAudio::intoMono() && {

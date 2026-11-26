@@ -29,8 +29,8 @@ make a state nobody would see.
   Results between the first and the last of a burst are not shown, as before.
   Showing them would show pages of a song that is no longer the one edited.
 - Each lane counts requests, jobs run, requests skipped and results that came
-  too late. The smoke test prints the counts, as the study of the
-  optimizations left asks (`docs/optimization-study.md`, H02).
+  too late. The smoke test prints the counts, so a change that makes the app
+  run needless jobs shows up in its output.
 
 ## Consequences
 

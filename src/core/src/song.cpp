@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/song.hpp>
 
+#include "held_bytes.hpp"
+
 #include <algorithm>
 #include <bit>
 #include <cstddef>
@@ -136,17 +138,15 @@ Note Staff::frettedNote(int string, int fret, SpellingPreference preference) con
 // ---- Track ----------------------------------------------------------------
 
 std::size_t approximateBytes(const Track& track) noexcept {
-    const auto text = [](const std::string& value) {
-        return value.capacity() > std::string().capacity() ? value.capacity() + 1 : 0;
-    };
-    // Each measure is held through a shared value: its control block too.
-    constexpr std::size_t kShared = (2 * sizeof(long)) + (2 * sizeof(void*));
-    std::size_t bytes = sizeof(Track) + text(track.name()) + text(track.instrument().name);
+    std::size_t bytes = sizeof(Track) + detail::heapBytes(track.name()) +
+                        detail::heapBytes(track.instrument().name);
     for (std::size_t s = 0; s < track.staffCount(); ++s) {
         const Staff& staff = track.staff(s);
         bytes += sizeof(Staff);
+        // Each measure is held through a shared value: its control block too.
         for (std::size_t m = 0; m < staff.measureCount(); ++m) {
-            bytes += sizeof(SharedValue<Measure>) + kShared + approximateBytes(staff.measure(m));
+            bytes += sizeof(SharedValue<Measure>) + detail::kControlBlockBytes +
+                     approximateBytes(staff.measure(m));
         }
     }
     return bytes;

@@ -125,9 +125,8 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
         return elara::core::validate(song).size();
     };
 
-    // Song::tempoAt() walks the headers from the start (C03 in the optimization
-    // study): asking it at every measure of a song with a change in each is the
-    // worst case.
+    // Song::tempoAt() walks the headers from the start: asking it at every
+    // measure of a song with a change in each is the worst case.
     elara::core::Song changing = song;
     for (std::size_t m = 0; m < changing.measureCount(); ++m) {
         changing.measureHeader(m).tempoChanges.push_back(

@@ -1578,8 +1578,8 @@ std::vector<std::uint8_t> fullScoreParts(std::string_view bytes) {
 
 // Reads the GPIF document `xml` with the PartConfiguration bytes beside it
 // (empty when there are none). `xml` is a buffer the caller owns: it is
-// parsed in place, so the document holds no copy of the text (H13 of the
-// study). The buffer changes and must outlive the import.
+// parsed in place, so the document holds no copy of the text. The buffer
+// changes and must outlive the import.
 std::expected<ImportResult, FormatError> importScore(std::span<char> xml, std::string_view parts,
                                                      const GuitarProOptions& options);
 
