@@ -60,7 +60,9 @@ Three targets with different rules:
   glide when the library has neither (ADR-0070); a fretted track's picked
   notes are never legato;
 - `Player`, the same in real time: songs are handed to the audio thread through
-  atomic pointers and the transport is a set of atomics (ADR-0019), and
+  atomic pointers and the transport is a set of atomics (ADR-0019); a song can
+  be prepared on another thread (`preparer()`, `PreparedSong`) and published
+  on the control thread (`publish()`, ADR-0112); and
   `updateMix()` changes the track levels while it plays, from a song or from
   the tracks' mixes alone (a moving fader, ADR-0039). For practice it counts
   in before it starts (`play(CountIn)`, from `Sequence::countInAt()`) and
