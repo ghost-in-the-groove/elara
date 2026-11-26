@@ -368,7 +368,9 @@ def cmd_test(args: argparse.Namespace) -> int:
     # Build first so a test run never exercises stale binaries.
     if not getattr(args, "no_build", False) and (code := cmd_build(args)) != 0:
         return code
-    cmd = ["ctest", "--preset", args.preset]
+    # Every test is a process of its own and writes only its own files, so
+    # they run side by side, one per core (CONTRIBUTING.md).
+    cmd = ["ctest", "--preset", args.preset, "--parallel", str(os.cpu_count() or 1)]
     if getattr(args, "regex", None):
         cmd += ["-R", args.regex]
     return run(cmd)
