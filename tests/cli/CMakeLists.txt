@@ -296,6 +296,13 @@ add_test(NAME cli.dump_voice_two COMMAND elara-cli --json dump "${ELARA_CLI_VOIC
 set_tests_properties(cli.dump_voice_two PROPERTIES
   FIXTURES_REQUIRED cli_voices
   PASS_REGULAR_EXPRESSION "\"measures\":\\[\\[\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"C5\"}\\]}\\],\\[{\"duration\":\"4\",\"notes\":\\[{\"pitch\":\"E5\"}\\]}\\]\\]\\]")
+# The input duration follows the beat the caret moves to, as the app's keys
+# have it (ADR-0127): back on the eighth, typing uses eighths again.
+add_test(NAME cli.edit_input_follows_the_caret
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "duration 8" "fret 3"
+    right "duration 2" "fret 5" left)
+set_tests_properties(cli.edit_input_follows_the_caret PROPERTIES
+  PASS_REGULAR_EXPRESSION "beat 0, string 1; input 8")
 add_test(NAME cli.edit_rejects_voice_five
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "voice 5")
 set_tests_properties(cli.edit_rejects_voice_five PROPERTIES

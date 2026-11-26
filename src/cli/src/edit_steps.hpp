@@ -6,9 +6,7 @@
 
 #include <elara/core/clipboard.hpp>
 #include <elara/core/document.hpp>
-#include <elara/core/duration.hpp>
-#include <elara/core/entry.hpp>
-#include <elara/core/song.hpp>
+#include <elara/core/edit_session.hpp>
 
 #include <stdexcept>
 #include <string_view>
@@ -22,16 +20,14 @@ public:
     using std::invalid_argument::invalid_argument;
 };
 
-/// Keyboard entry across steps (ADR-0021): the caret and the input duration.
-struct EntryState {
-    core::Caret caret{};
-    core::Duration input{core::NoteValue::Quarter};
-};
-
 /// What a run of steps carries from one step to the next.
 struct StepState {
-    EntryState entry;
-    core::MeasureClip clipboard; ///< what the last copy step copied
+    /// Keyboard entry across steps (ADR-0021): the caret and the input
+    /// duration, in the session the app's keys use too (ADR-0127).
+    core::EditSession session;
+    /// What the last copy step copied. The copy and paste steps name their
+    /// measures and tracks, so they do not use the session's selection.
+    core::MeasureClip clipboard;
 };
 
 /// Runs one step, its words separated by spaces ("repeat 1 end 3"), on `doc`,

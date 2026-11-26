@@ -132,3 +132,54 @@ TEST_CASE("Edit steps: malformed steps and steps the song rejects fail apart", "
     CHECK(failureOf(empty, "undo") == Failure::Rejected);
     CHECK(failureOf(empty, "fret 3") == Failure::Rejected);
 }
+
+// ---- The session the steps share with the app (ADR-0127) -----------------------
+
+TEST_CASE("Edit steps: the input duration follows the beat the caret moves to", "[cli][edit]") {
+    using elara::core::Duration;
+    using elara::core::NoteValue;
+    Run run = runSteps({"add-track electric-guitar", "append-measures 2", "duration 8", "fret 3",
+                        "right", "duration 2", "fret 5"});
+    CHECK(run.state.session.input() == Duration(NoteValue::Half));
+    // Back on the eighth, typing uses eighths again, as the app's keys do.
+    runStep(run.doc, "left", run.state);
+    CHECK(run.state.session.input() == Duration(NoteValue::Eighth));
+    runStep(run.doc, "insert-rest", run.state);
+    const auto& beats = run.doc.song().track(0).staff(0).measure(0).voices[0].beats;
+    REQUIRE(beats.size() == 3);
+    CHECK(beats[0].isRest());
+    CHECK(beats[0].duration == Duration(NoteValue::Eighth));
+
+    // A caret step follows the beat it names too, and the free slot leaves
+    // the input as it was.
+    runStep(run.doc, "caret 0 0 2", run.state);
+    CHECK(run.state.session.input() == Duration(NoteValue::Half));
+    runStep(run.doc, "next-measure", run.state);
+    CHECK(run.state.session.input() == Duration(NoteValue::Half));
+    runStep(run.doc, "fret 7", run.state);
+    CHECK(run.doc.song().track(0).staff(0).measure(1).voices[0].beats.at(0).duration ==
+          Duration(NoteValue::Half));
+}
+
+TEST_CASE("Edit steps: the caret is inside the song after every step", "[cli][edit]") {
+    using elara::core::Caret;
+    Run run = runSteps({"add-track electric-guitar", "append-measures 3", "caret 0 2 0", "fret 3",
+                        "remove-measures 1 2"});
+    CHECK(run.state.session.caret() == Caret{});
+    runStep(run.doc, "undo", run.state);
+    runStep(run.doc, "caret 0 2 0", run.state);
+    CHECK(run.state.session.caret() == Caret{.measure = 2});
+    // A caret the song does not have is refused, and the caret stays.
+    CHECK(failureOf(run, "caret 0 9 0") == Failure::Rejected);
+    CHECK(failureOf(run, "caret 0 2 5") == Failure::Rejected);
+    CHECK(run.state.session.caret() == Caret{.measure = 2});
+}
+
+TEST_CASE("Edit steps: a song with no place for a caret refuses the entry steps", "[cli][edit]") {
+    Run run = runSteps({});
+    for (const std::string_view step : {"right", "voice 2", "duration 8", "fret 3", "delete"}) {
+        INFO(step);
+        CHECK(failureOf(run, step) == Failure::Rejected);
+    }
+    CHECK_FALSE(run.doc.canUndo());
+}

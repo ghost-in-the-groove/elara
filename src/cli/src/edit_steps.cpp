@@ -6,6 +6,7 @@
 #include <elara/core/clipboard.hpp>
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
+#include <elara/core/edit_session.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/lyrics.hpp>
@@ -243,11 +244,16 @@ std::string choiceOf() {
     return all;
 }
 
-/// Runs a keyboard entry step; false when `step` is not one.
-bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
+/// Runs a keyboard entry step through the session; false when `step` is not
+/// one.
+bool runEntryStep(Document& doc, const Step& step, core::EditSession& session) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
+    // A song without tracks or measures has no caret, and core says so.
+    const auto requireCaret = [&song, &session] {
+        (void)clampCaret(song, session.caret());
+    };
     static constexpr std::array<std::pair<std::string_view, CaretMove>, 6> kMoves{{
         {"right", CaretMove::NextBeat},
         {"left", CaretMove::PreviousBeat},
@@ -258,7 +264,8 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     }};
     for (const auto& [name, move] : kMoves) {
         if (verb == name) {
-            entry.caret = moveCaret(song, entry.caret, move);
+            requireCaret();
+            session.move(song, move);
             return true;
         }
     }
@@ -271,7 +278,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         if (clampCaret(song, wanted) != wanted) {
             throw std::out_of_range("the song has no such caret position");
         }
-        entry.caret = wanted;
+        session.place(song, wanted);
         return true;
     } else if (verb == "voice") { // voice <1..4>: where typing goes from now on
         const int voice = step.number<int>(1);
@@ -279,28 +286,30 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             throw StepSyntaxError(
                 std::format("voice: 1 to {}, not {}", core::Measure::kMaxVoices, voice));
         }
-        entry.caret.voice = static_cast<std::size_t>(voice - 1);
-        entry.caret = clampCaret(song, entry.caret);
+        requireCaret();
+        session.setVoice(song, static_cast<std::size_t>(voice - 1));
         return true;
     } else if (verb == "fret") {
-        edit = enterFret(song, entry.caret, step.number<int>(1), entry.input);
+        edit = enterFret(song, session.caret(), step.number<int>(1), session.input());
     } else if (verb == "pitch") { // pitch <C..B> [add]
         if (step.has(2) && step.word(2) != "add") {
             throw StepSyntaxError(std::format("pitch: expected add, got {}", step.word(2)));
         }
-        edit = enterPitch(song, entry.caret, step.noteName(1), entry.input,
+        edit = enterPitch(song, session.caret(), step.noteName(1), session.input(),
                           step.has(2) ? PitchMode::AddToChord : PitchMode::Replace);
     } else if (verb == "shift") { // shift <semitones>
-        edit = shiftPitch(song, entry.caret, step.number<int>(1));
+        edit = shiftPitch(song, session.caret(), step.number<int>(1));
     } else if (verb == "duration") {
-        entry.input = step.duration(1);
-        edit = setBeatDuration(song, entry.caret, entry.input);
+        const Duration duration = step.duration(1);
+        requireCaret();
+        session.setInput(doc, duration);
+        return true;
     } else if (verb == "delete") {
-        edit = deleteAtCaret(song, entry.caret);
+        edit = deleteAtCaret(song, session.caret());
     } else if (verb == "delete-beat") {
-        edit = deleteBeat(song, entry.caret);
+        edit = deleteBeat(song, session.caret());
     } else if (verb == "insert-rest") {
-        edit = insertRest(song, entry.caret, entry.input);
+        edit = insertRest(song, session.caret(), session.input());
     } else if (verb == "drum") { // drum [key]: the caret's lane, or that piece's
         if (step.has(1)) {
             const int key = step.number<int>(1);
@@ -309,16 +318,18 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             if (found == pieces.end()) {
                 throw std::out_of_range(std::format("drum: no lane for key {}", key));
             }
-            entry.caret.string = static_cast<int>(found - pieces.begin()) + 1;
+            Caret lane = session.caret();
+            lane.string = static_cast<int>(found - pieces.begin()) + 1;
+            session.enter(doc, Entry{.command = nullptr, .caret = lane});
         }
-        edit = toggleDrum(song, entry.caret, entry.input);
+        edit = toggleDrum(song, session.caret(), session.input());
     } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
         const std::string_view name = step.word(1);
         const std::optional<NoteEffect> effect = parseName<NoteEffect>(name);
         if (!effect) {
             throw StepSyntaxError(std::format("not an effect: {}", name));
         }
-        edit = toggleEffect(song, entry.caret, *effect);
+        edit = toggleEffect(song, session.caret(), *effect);
     } else if (verb == "bend") { // bend <form> [cents]: on the caret's notes, a step by default
         constexpr int kFullStep = 200;
         const std::string_view name = step.word(1);
@@ -328,7 +339,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             throw StepSyntaxError(std::format("not a bend form: {}", name));
         }
         const int cents = step.has(2) ? step.number<int>(2) : kFullStep;
-        edit = setBend(song, entry.caret, bendCurve(found->second, cents));
+        edit = setBend(song, session.caret(), bendCurve(found->second, cents));
     } else if (verb == "strum" || verb == "pick" || verb == "tremolo" || verb == "whammy" ||
                verb == "bass" || verb == "hairpin" || verb == "fermata" || verb == "slur" ||
                verb == "ottava" || verb == "pedal" || verb == "breath") {
@@ -339,7 +350,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         // ottava <8va|8vb|15ma|15mb|none> (ADR-0089), pedal <down|change|none>
         // (ADR-0092), breath <comma|caesura|none> (after it, ADR-0095): that
         // effect of the caret's beat, its others kept
-        const Caret& at = entry.caret;
+        const Caret& at = session.caret();
         if (verb == "strum") {
             edit = setBeatEffect(song, at, &BeatEffects::strum,
                                  strokeDirection<Strum>(verb, step.word(1)));
@@ -385,20 +396,20 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             edit = setBeatEffect(song, at, &BeatEffects::slur, word == "on");
         }
     } else if (verb == "slide-in") { // slide-in <from-below|from-above|none>: the caret's notes
-        edit = setSlideIn(song, entry.caret, kindOf<SlideIn>(verb, step.word(1)));
+        edit = setSlideIn(song, session.caret(), kindOf<SlideIn>(verb, step.word(1)));
     } else if (verb == "slide-out") { // slide-out <shift|legato|downwards|upwards|none>
-        edit = setSlideOut(song, entry.caret, kindOf<SlideOut>(verb, step.word(1)));
+        edit = setSlideOut(song, session.caret(), kindOf<SlideOut>(verb, step.word(1)));
     } else if (verb == "vibrato") { // vibrato <slight|wide|none>
-        edit = setVibrato(song, entry.caret, kindOf<Vibrato>(verb, step.word(1)));
+        edit = setVibrato(song, session.caret(), kindOf<Vibrato>(verb, step.word(1)));
     } else if (verb == "accent") { // accent <accent|marcato|none>
-        edit = setAccent(song, entry.caret, kindOf<Accent>(verb, step.word(1)));
+        edit = setAccent(song, session.caret(), kindOf<Accent>(verb, step.word(1)));
     } else if (verb == "ornament") { // ornament <mordent|upper-mordent|turn|inverted-turn|none>
-        edit = setOrnament(song, entry.caret, kindOf<Ornament>(verb, step.word(1)));
+        edit = setOrnament(song, session.caret(), kindOf<Ornament>(verb, step.word(1)));
     } else if (verb == "fingering") {
         // fingering <finger...> (ADR-0093): one per note from the lowest up, or
         // one for all; 1-5 from the thumb, or t and 1-4 on a fretted instrument.
         const bool fretted =
-            song.track(entry.caret.track).instrument().kind == InstrumentKind::Fretted;
+            song.track(session.caret().track).instrument().kind == InstrumentKind::Fretted;
         std::vector<Finger> fingers;
         for (std::size_t i = 1; i == 1 || step.has(i); ++i) {
             const std::string_view word = step.word(i);
@@ -409,7 +420,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             }
             fingers.push_back(*finger);
         }
-        edit = setFingering(song, entry.caret, fingers);
+        edit = setFingering(song, session.caret(), fingers);
     } else if (verb == "pluck") { // pluck <p|i|m|a|c|none> (ADR-0093)
         const std::string_view word = step.word(1);
         const std::optional<Finger> finger =
@@ -417,14 +428,14 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         if (!finger) {
             throw StepSyntaxError(std::format("not a plucking finger: {}", word));
         }
-        edit = setPluck(song, entry.caret, *finger);
+        edit = setPluck(song, session.caret(), *finger);
     } else if (verb == "trill") { // trill <on|semitones|none> [16|32|64] (ADR-0090)
         const std::string_view what = step.word(1);
         const NoteValue speed = step.has(2) ? trillSpeed(step.word(2)) : NoteValue::ThirtySecond;
         if (what == "none") {
-            edit = setTrill(song, entry.caret, Trill{});
+            edit = setTrill(song, session.caret(), Trill{});
         } else if (what == "on") { // to the next step of the key
-            edit = setTrillToNextStep(song, entry.caret, speed);
+            edit = setTrillToNextStep(song, session.caret(), speed);
         } else {
             const int semitones = step.number<int>(1);
             if (semitones == 0 || std::abs(semitones) > Trill::kMaxSemitones) {
@@ -433,29 +444,29 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
                                 Trill::kMaxSemitones, what));
             }
             edit =
-                setTrill(song, entry.caret,
+                setTrill(song, session.caret(),
                          Trill{.semitones = static_cast<std::int8_t>(semitones), .speed = speed});
         }
     } else if (verb == "harmonic") { // harmonic <natural|artificial|pinch|tapped|semi|none>
-        edit = setHarmonic(song, entry.caret, kindOf<HarmonicKind>(verb, step.word(1)));
+        edit = setHarmonic(song, session.caret(), kindOf<HarmonicKind>(verb, step.word(1)));
     } else if (verb == "chord") { // chord <name> | chord none: the caret's beat (ADR-0080)
         const std::string name = step.rest(1);
-        edit = setChordSymbol(song, entry.caret, name == "none" ? std::string() : name);
+        edit = setChordSymbol(song, session.caret(), name == "none" ? std::string() : name);
     } else if (verb == "clef") { // clef <name>: from the caret's measure on (ADR-0087)
         // Drums keep their clef.
-        edit = setClef(song, entry.caret, kindOf<Clef>(verb, step.word(1), Clef::Percussion));
+        edit = setClef(song, session.caret(), kindOf<Clef>(verb, step.word(1), Clef::Percussion));
     } else if (verb == "simile") { // simile 1 | simile 2 | simile none: measure repeat (ADR-0102)
-        edit = setMeasureRepeat(song, entry.caret, step.word(1) == "none" ? 0 : step.index(1));
+        edit = setMeasureRepeat(song, session.caret(), step.word(1) == "none" ? 0 : step.index(1));
     } else if (verb == "text") { // text <words> | text none: above the caret's beat (ADR-0081)
         const std::string text = step.rest(1);
-        edit = setBeatText(song, entry.caret, text == "none" ? std::string() : text);
+        edit = setBeatText(song, session.caret(), text == "none" ? std::string() : text);
     } else if (verb == "lyrics") { // lyrics <verse> <measure> <text> | lyrics <verse> none
         const std::size_t verse = step.index(1);
         if (verse >= kMaxVerses) {
             throw StepSyntaxError(std::format("lyrics: verse {} past the {}th", verse, kMaxVerses));
         }
         const bool none = step.word(2) == "none" && !step.has(3);
-        VerseEntry typed = setVerse(song, entry.caret, verse, none ? 0 : step.index(2),
+        VerseEntry typed = setVerse(song, session.caret(), verse, none ? 0 : step.index(2),
                                     none ? std::string() : step.rawRest(3));
         if (typed.leftover > 0) {
             std::cerr << std::format(
@@ -464,7 +475,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         edit = std::move(typed.entry);
     } else if (verb == "grace") { // grace <semitones> [duration] [on] | grace none
         if (step.word(1) == "none") {
-            edit = removeGraceNotes(song, entry.caret);
+            edit = removeGraceNotes(song, session.caret());
         } else {
             Duration duration(NoteValue::Eighth);
             bool onBeat = false;
@@ -475,7 +486,7 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
                     duration = step.duration(i);
                 }
             }
-            edit = addGraceNote(song, entry.caret, step.number<int>(1), duration, onBeat);
+            edit = addGraceNote(song, session.caret(), step.number<int>(1), duration, onBeat);
         }
     } else if (verb == "dynamic") { // dynamic <ppp..fff>: from the caret to the next change
         const std::string_view name = step.word(1);
@@ -483,14 +494,11 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         if (!dynamic) {
             throw StepSyntaxError(std::format("not a dynamic: {}", name));
         }
-        edit = setDynamic(song, entry.caret, *dynamic);
+        edit = setDynamic(song, session.caret(), *dynamic);
     } else {
         return false;
     }
-    if (edit.command) {
-        doc.execute(std::move(edit.command));
-    }
-    entry.caret = edit.caret;
+    session.enter(doc, std::move(edit));
     return true;
 }
 
@@ -602,12 +610,12 @@ std::unique_ptr<core::Command> markStep(const Song& song, const Step& step) {
 
 // `clipboard` holds what the last copy step copied.
 void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard,
-                   EntryState& entry) {
+                   core::EditSession& session) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
 
-    if (runEntryStep(doc, step, entry)) {
+    if (runEntryStep(doc, step, session)) {
         return;
     }
     if (verb == "undo") {
@@ -845,11 +853,9 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
 } // namespace
 
 void runStep(core::Document& doc, std::string_view text, StepState& state) {
-    runParsedStep(doc, Step(text), state.clipboard, state.entry);
+    runParsedStep(doc, Step(text), state.clipboard, state.session);
     // Undo, removals and other edits can take the caret's beat away.
-    if (hasCaret(doc.song())) {
-        state.entry.caret = core::clampCaret(doc.song(), state.entry.caret);
-    }
+    state.session.songChanged(doc.song());
 }
 
 } // namespace elara::cli
