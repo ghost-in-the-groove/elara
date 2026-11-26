@@ -753,14 +753,27 @@ private:
     std::uint64_t random_ = 0x9E3779B97F4A7C15ULL;
 };
 
+// A sample file as a bank keeps it: its channels averaged. No frames for a
+// file that could not be read or holds none.
+struct ReadSample {
+    std::vector<float> frames;
+    double rate = 0.0;
+};
+
 // The samples a program names, read on every core (the program's worker
-// pool). The result holds them in the order of `paths`.
-std::vector<std::expected<WavAudio, std::string>>
-readSamples(const std::vector<std::filesystem::path>& paths) {
-    std::vector<std::expected<WavAudio, std::string>> results(
-        paths.size(), std::unexpected(std::string("not read")));
+// pool). Each task averages its file's channels as soon as it is decoded,
+// so the decoded channels of a file are let go before the task reads
+// another: loading holds the final samples and only the files in flight.
+// The result holds them in the order of `paths`.
+std::vector<ReadSample> readSamples(const std::vector<std::filesystem::path>& paths) {
+    std::vector<ReadSample> results(paths.size());
     core::forEachIndex(0, paths.size(), core::threadsFor(0, paths.size(), 2, paths.size()),
-                       [&](std::size_t i) { results[i] = readAudioFile(paths[i]); });
+                       [&](std::size_t i) {
+                           if (auto wav = readAudioFile(paths[i]); wav && wav->frames() > 0) {
+                               results[i].rate = wav->format.sampleRate;
+                               results[i].frames = std::move(*wav).intoMono();
+                           }
+                       });
     return results;
 }
 
@@ -872,7 +885,7 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
             files.push_back(folder / std::filesystem::path(names[i]));
         }
     }
-    auto decoded = readSamples(files);
+    auto read = readSamples(files);
     data->samples.resize(names.size());
     std::set<std::string> missing;
     std::vector<bool> usable(names.size(), true);
@@ -881,9 +894,9 @@ SfzBank::load(SfzProgram program, const std::filesystem::path& folder, std::stri
         if (names[i].starts_with('*')) {
             sample.frames = generator(names[i]);
             sample.generator = true;
-        } else if (auto& wav = decoded[fileOf[i]]; wav && wav->frames() > 0) {
-            sample.frames = wav->format.channels == 1 ? std::move(wav->samples) : wav->mono();
-            sample.rate = wav->format.sampleRate;
+        } else if (ReadSample& file = read[fileOf[i]]; !file.frames.empty()) {
+            sample.frames = std::move(file.frames);
+            sample.rate = file.rate;
             data->bytes += sample.frames.size() * sizeof(float);
         }
         if (sample.frames.empty()) {

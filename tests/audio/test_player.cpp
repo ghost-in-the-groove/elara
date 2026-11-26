@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <thread>
 #include <utility>
@@ -571,4 +572,33 @@ TEST_CASE("Player: without a song there is nothing to count in to", "[audio][pla
     player.play({.clicks = 4, .interval = 0.25});
     CHECK(peakLevel(play(player, 0.1)) == 0.0f);
     CHECK_FALSE(player.isCountingIn());
+}
+
+TEST_CASE("Player: a song prepared on another thread plays as one loaded", "[audio][player]") {
+    const Song played = song(2, 60);
+    const Sequence sequence(played);
+    Player loaded(kRate);
+    loaded.load(played, sequence);
+    Player published(kRate);
+    // What preparing needs is taken on the control thread; the work runs on
+    // another one, as the app's worker does (ADR-0112).
+    const auto prepare = published.preparer();
+    std::optional<elara::audio::PreparedSong> prepared;
+    std::thread worker([&] { prepared.emplace(prepare(played, sequence)); });
+    worker.join();
+    REQUIRE(prepared.has_value());
+    CHECK(published.publish(std::move(*prepared)));
+    CHECK(published.duration() == loaded.duration());
+    loaded.play();
+    published.play();
+    CHECK(play(published, 1.0) == play(loaded, 1.0));
+}
+
+TEST_CASE("Player: a song prepared for another sample rate is not published", "[audio][player]") {
+    const Song played = song(1, 60);
+    const Sequence sequence(played);
+    Player other(kRate * 2);
+    Player player(kRate);
+    CHECK_FALSE(player.publish(other.preparer()(played, sequence)));
+    CHECK(player.duration() == 0.0);
 }

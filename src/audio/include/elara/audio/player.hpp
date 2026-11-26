@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <vector>
@@ -18,9 +19,30 @@ struct TrackMix;
 
 namespace elara::audio {
 
+class Player;
 class Sequence;
 class SoundBank;
 struct CountIn;
+
+/// A song made ready for one player on any thread (Player::preparer(),
+/// ADR-0112): its events in frames and the sounds of its tracks. Player::publish()
+/// hands it to the audio thread.
+class PreparedSong {
+public:
+    PreparedSong(PreparedSong&&) noexcept;
+    PreparedSong& operator=(PreparedSong&&) noexcept;
+    PreparedSong(const PreparedSong&) = delete;
+    PreparedSong& operator=(const PreparedSong&) = delete;
+    ~PreparedSong();
+
+    struct Parts;
+
+private:
+    friend class Player;
+    explicit PreparedSong(std::unique_ptr<Parts> parts);
+
+    std::unique_ptr<Parts> parts_;
+};
 
 /// Plays a sequence in real time through one sound per track, from the
 /// built-in synthesizer or another sound bank (setSoundBank()).
@@ -49,6 +71,16 @@ public:
     /// whose instrument (kind and program) has not changed since the last
     /// load keeps its sound, so reloading after an edit reads no samples.
     void load(const core::Song& song, const Sequence& sequence);
+
+    /// load() in two halves, so that the slow one runs off the control thread
+    /// (ADR-0112). preparer(), on the control thread, takes the sounds the
+    /// player keeps and its bank as they are; the function it returns prepares
+    /// a song on any thread, as load() would, reading no more of the player.
+    /// publish(), on the control thread, hands the result to the audio thread
+    /// as load() does. A song prepared for a player at another sample rate is
+    /// not published: publish() returns false.
+    [[nodiscard]] std::function<PreparedSong(const core::Song&, const Sequence&)> preparer() const;
+    bool publish(PreparedSong song);
 
     /// Where the tracks of the next load() get their sound; the built-in
     /// synthesizer when null, as at first. The metronome and the count-in
