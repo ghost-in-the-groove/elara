@@ -489,6 +489,24 @@ ScoreDocument::ScoreDocument(QObject* parent)
       sequences_(std::make_unique<JobLane<SequenceResult>>(this, [this] { updateBusy(); })) {
     // Connected first, so that the list is up to date for whoever else hears it.
     connect(this, &ScoreDocument::songChanged, this, [this] { trackList_.setTracks(tracks()); });
+    // The measures played and their times change far less often than the
+    // notes do: whoever draws them hears of it only then.
+    connect(this, &ScoreDocument::sequenceChanged, this, [this] {
+        std::vector<audio::PlayedMeasure> played;
+        if (sequence_) {
+            played = sequence_->measures();
+        }
+        if (played == played_) {
+            return;
+        }
+        played_ = std::move(played);
+        measureStarts_.clear();
+        measureStarts_.reserve(static_cast<qsizetype>(played_.size()));
+        for (const audio::PlayedMeasure& measure : played_) {
+            measureStarts_.append(measure.start);
+        }
+        emit measureStartsChanged();
+    });
     recoveryTimer_.setSingleShot(true);
     recoveryTimer_.setInterval(kRecoveryMilliseconds);
     connect(&recoveryTimer_, &QTimer::timeout, this, &ScoreDocument::writeRecovery);
@@ -581,6 +599,13 @@ int ScoreDocument::measureAt(double seconds) const {
     return played < sequence_->measures().size()
                ? static_cast<int>(sequence_->measures()[played].measure)
                : -1;
+}
+
+double ScoreDocument::measureStart(int measure) const {
+    if (!sequence_ || measure < 0) {
+        return -1.0;
+    }
+    return sequence_->secondsAt(static_cast<std::size_t>(measure), 0.0).value_or(-1.0);
 }
 
 QVariantList ScoreDocument::sectionMarks() const {
@@ -954,15 +979,10 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
     if (practiceMoved && sequencing_ != song_) {
         resequence();
     }
-    // What the file opened lost goes with it, and is told once.
+    // What the file opened lost goes with it: the status bar tells it for as
+    // long as the song is open.
     if (layout.opened) {
         setImportWarnings(layout.warnings);
-        if (!layout.warnings.isEmpty()) {
-            emit report(tr("Opened %1. %n thing(s) changed or left out.", "",
-                           static_cast<int>(layout.warnings.size()))
-                            .arg(QFileInfo(layout.source.toLocalFile()).fileName()),
-                        layout.warnings);
-        }
     }
 }
 

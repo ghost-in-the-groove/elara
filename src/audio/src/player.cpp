@@ -97,49 +97,97 @@ Player::~Player() {
     delete retired_.load();
 }
 
-void Player::load(const core::Song& song, const Sequence& sequence) {
+struct PreparedSong::Parts {
+    std::unique_ptr<Player::Loaded> loaded;
+    std::vector<Player::KeptSound> kept;
+    double duration = 0.0;
+    double sampleRate = 0.0;
+};
+
+PreparedSong::PreparedSong(std::unique_ptr<Parts> parts) : parts_(std::move(parts)) {}
+PreparedSong::PreparedSong(PreparedSong&&) noexcept = default;
+PreparedSong& PreparedSong::operator=(PreparedSong&&) noexcept = default;
+PreparedSong::~PreparedSong() = default;
+
+namespace {
+
+// Prepares `song` as load() does for a player at `sampleRate` that keeps the
+// sounds `keptBefore`, getting new ones from `bank`. Runs on any thread.
+PreparedSong::Parts prepareSong(const std::vector<Player::KeptSound>& keptBefore,
+                                const std::shared_ptr<const SoundBank>& bank, double sampleRate,
+                                std::size_t maxBlockFrames, const core::Song& song,
+                                const Sequence& sequence) {
     const std::size_t tracks = song.trackCount();
-    auto events = detail::eventsByTrack(sequence, tracks + 1, sampleRate_); // the metronome's last
+    auto events = detail::eventsByTrack(sequence, tracks + 1, sampleRate); // the metronome's last
     const bool clicks = !events[tracks].empty();
-    auto loaded = std::make_unique<Loaded>(tracks, clicks ? tracks + 1 : tracks, sampleRate_,
-                                           maxBlockFrames_);
+    auto loaded = std::make_unique<Player::Loaded>(tracks, clicks ? tracks + 1 : tracks, sampleRate,
+                                                   maxBlockFrames);
     loaded->headroom = detail::headroom(std::span(events).first(tracks));
-    loaded->endFrame = std::llround(sequence.duration() * sampleRate_);
-    loaded->left.assign(maxBlockFrames_, 0.0f);
-    loaded->right.assign(maxBlockFrames_, 0.0f);
+    loaded->endFrame = std::llround(sequence.duration() * sampleRate);
+    loaded->left.assign(maxBlockFrames, 0.0f);
+    loaded->right.assign(maxBlockFrames, 0.0f);
     loaded->tracks.reserve(tracks);
-    std::vector<KeptSound> kept;
+    std::vector<Player::KeptSound> kept;
     kept.reserve(tracks);
     for (std::size_t t = 0; t < tracks; ++t) {
         const core::Instrument& instrument = song.track(t).instrument();
-        if (t < kept_.size() && kept_[t].fits(instrument)) {
-            kept.push_back(std::move(kept_[t]));
+        if (t < keptBefore.size() && keptBefore[t].fits(instrument)) {
+            kept.push_back(keptBefore[t]);
         } else {
             kept.push_back(
-                {.instrument = instrument, .sound = bank_->sound(instrument, sampleRate_)});
+                {.instrument = instrument, .sound = bank->sound(instrument, sampleRate)});
         }
         const detail::TrackLevel level = detail::levelOf(song, t, loaded->headroom);
         loaded->setLevel(t, level);
         loaded->tracks.push_back({.sound = kept.back().sound,
                                   .events = std::move(events[t]),
-                                  .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+                                  .buffer = std::vector<float>(maxBlockFrames, 0.0f),
                                   .applied = level});
     }
     if (clicks) {
         loaded->setLevel(tracks, detail::kMetronomeLevel);
         loaded->tracks.push_back(
-            {.sound = builtinBank()->sound({.kind = core::InstrumentKind::Percussion}, sampleRate_),
+            {.sound = builtinBank()->sound({.kind = core::InstrumentKind::Percussion}, sampleRate),
              .events = std::move(events[tracks]),
-             .buffer = std::vector<float>(maxBlockFrames_, 0.0f),
+             .buffer = std::vector<float>(maxBlockFrames, 0.0f),
              .applied = detail::kMetronomeLevel});
     }
-    kept_ = std::move(kept);
-    duration_ = sequence.duration();
+    return {.loaded = std::move(loaded),
+            .kept = std::move(kept),
+            .duration = sequence.duration(),
+            .sampleRate = sampleRate};
+}
+
+} // namespace
+
+void Player::load(const core::Song& song, const Sequence& sequence) {
+    publish(PreparedSong(std::make_unique<PreparedSong::Parts>(
+        prepareSong(kept_, bank_, sampleRate_, maxBlockFrames_, song, sequence))));
+}
+
+std::function<PreparedSong(const core::Song&, const Sequence&)> Player::preparer() const {
+    // Copies of what the player holds now: the sounds are shared, never
+    // changed by the worker.
+    return [kept = kept_, bank = bank_, sampleRate = sampleRate_,
+            maxBlockFrames = maxBlockFrames_](const core::Song& song, const Sequence& sequence) {
+        return PreparedSong(std::make_unique<PreparedSong::Parts>(
+            prepareSong(kept, bank, sampleRate, maxBlockFrames, song, sequence)));
+    };
+}
+
+bool Player::publish(PreparedSong song) {
+    if (!song.parts_ || song.parts_->sampleRate != sampleRate_) {
+        return false;
+    }
+    PreparedSong::Parts& parts = *song.parts_;
+    kept_ = std::move(parts.kept);
+    duration_ = parts.duration;
     tidy();
-    latest_ = loaded.get();
+    latest_ = parts.loaded.get();
     // A song the audio thread has not taken yet is replaced. The release
-    // publishes the levels stored above with the song.
-    delete pending_.exchange(loaded.release(), std::memory_order_acq_rel);
+    // publishes the levels stored in the song with it.
+    delete pending_.exchange(parts.loaded.release(), std::memory_order_acq_rel);
+    return true;
 }
 
 void Player::updateMix(const core::Song& song) noexcept {
@@ -316,7 +364,16 @@ void renderClicks(Synth& synth, std::int64_t from, std::span<float> out, std::in
 } // namespace
 
 void Player::renderBlock(std::span<float> left, std::span<float> right) noexcept {
-    if (current_ == nullptr) {
+    // Paused with nothing ringing, the block is silent and no sound needs to
+    // run for it: an idle player costs next to nothing. The sounds' own
+    // clocks stand still meanwhile; no voice of theirs is there to follow them.
+    const auto ringing = [this] {
+        return current_->countIn.activeVoices() > 0 ||
+               std::ranges::any_of(current_->tracks, [](const Loaded::Track& track) {
+                   return track.sound->activeVoices() > 0;
+               });
+    };
+    if (current_ == nullptr || (!wasPlaying_ && !ringing())) {
         std::ranges::fill(left, 0.0f);
         std::ranges::fill(right, 0.0f);
         return;

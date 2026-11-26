@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The song as one string along the lower edge of the command bar: what has
 // played is lit, the measure playing rides it as a fret number rides a string
-// of tablature, the sections are inlays and the A-B loop a band. A click or a
-// drag moves playback there.
+// of tablature, the measures are ticks, the sections inlays and the A-B loop
+// a band; a taller tick stands at the caret's measure. A click or a drag
+// moves playback there.
 import QtQuick
 import QtQuick.Controls
 import Elara.App
@@ -22,6 +23,24 @@ Item {
     property var sections: []
     /// What rides the string at the position: the number of the measure there.
     property string marker
+    /// Where the caret's measure starts, in seconds: a taller tick; negative
+    /// for none.
+    property real caretSeconds: -1
+    /// Where the measures played start, in seconds.
+    property var measureStarts: []
+    /// A tick every so many measures, so that they stand apart.
+    readonly property int tickStep: {
+        const room = Math.max(1, Math.floor(width / 12));
+        let step = 1;
+        while (measureStarts.length / step > room)
+            step *= 2;
+        return step;
+    }
+    readonly property var ticks: measureStarts.filter((start, index) => index > 0
+                                                                        && index % tickStep === 0)
+    readonly property int tickCount: ticks.length
+    /// Whether playback has left the start: the string is lit up to it then.
+    readonly property bool moved: position > 0
 
     signal seekRequested(real seconds)
 
@@ -67,7 +86,7 @@ Item {
         width: parent.width
         y: root.lineY - height / 2
         height: thickness
-        color: Qt.alpha(Theme.lilac, 0.3)
+        color: Qt.alpha(Theme.lilac, 0.5)
 
         Behavior on thickness {
             NumberAnimation {
@@ -77,9 +96,37 @@ Item {
         }
     }
 
+    // A tick where each measure starts.
+    Repeater {
+        model: root.enabled ? root.ticks : []
+
+        delegate: Rectangle {
+            required property real modelData
+
+            x: Math.round(root.xAt(modelData))
+            y: root.lineY - 5
+            width: 1
+            height: 4
+            color: Qt.alpha(Theme.lilac, 0.55)
+        }
+    }
+
+    // Where the caret's measure starts.
+    Rectangle {
+        objectName: "caretTick"
+
+        visible: root.enabled && root.caretSeconds >= 0
+        x: Math.round(root.xAt(root.caretSeconds)) - 1
+        y: root.lineY - 8
+        width: 2
+        height: 7
+        radius: 1
+        color: Theme.pearl
+    }
+
     // What has played.
     Rectangle {
-        visible: root.enabled
+        visible: root.enabled && root.moved
         width: root.xAt(root.position)
         y: string.y
         height: string.height
@@ -117,16 +164,20 @@ Item {
         }
     }
 
-    // The measure playing, on the string; nothing rides it at the start of
-    // a song that has not played yet.
+    // The measure at the position, on the string: outlined while the song
+    // stands at its start, filled once playback has moved.
     Rectangle {
-        visible: root.enabled && root.marker.length > 0 && (root.position > 0 || area.pressed)
+        readonly property bool lit: root.moved || area.pressed
+
+        visible: root.enabled && root.marker.length > 0
         x: Math.round(root.xAt(root.position) - width / 2)
         y: Math.round(root.lineY - height / 2)
         width: Math.max(22, markerLabel.implicitWidth + 10)
         height: 14
         radius: 4
-        color: Theme.accent
+        color: lit ? Theme.accent : Theme.night
+        border.width: lit ? 0 : 1
+        border.color: Theme.lilac
 
         Label {
             id: markerLabel
@@ -138,7 +189,7 @@ Item {
             font.features: {
                 "tnum": 1
             }
-            color: Theme.accentText
+            color: parent.lit ? Theme.accentText : Theme.lilac
         }
     }
 

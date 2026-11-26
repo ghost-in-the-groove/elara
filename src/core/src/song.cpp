@@ -105,6 +105,14 @@ const Measure& Staff::measure(std::size_t index) const {
     return checkedAt(measures_, index, "Staff: no such measure").get();
 }
 
+const SharedValue<Measure>& Staff::sharedMeasure(std::size_t index) const {
+    return checkedAt(measures_, index, "Staff: no such measure");
+}
+
+void Staff::swapMeasure(std::size_t index, SharedValue<Measure>& other) {
+    std::swap(checkedAt(measures_, index, "Staff: no such measure"), other);
+}
+
 Clef Staff::clefAt(std::size_t m) const {
     checkedAt(measures_, m, "Staff: no such measure");
     for (std::size_t at = m + 1; at-- > 0;) {

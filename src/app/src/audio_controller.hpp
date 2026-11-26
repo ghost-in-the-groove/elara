@@ -13,6 +13,7 @@
 
 namespace elara::audio {
 class Player;
+class PreparedSong;
 class SoundBank;
 class Sequence;
 class SystemAudio;
@@ -163,6 +164,9 @@ private:
     bool openDevice();
     void loadSong();
     void loadSequence();
+    void loadSequenceNow();
+    void publishSequence(const std::shared_ptr<const elara::audio::Sequence>& sequence,
+                         elara::audio::PreparedSong prepared);
     void songEdited();
     void previewMix();
     void setPlaying(bool playing);
@@ -191,6 +195,9 @@ private:
     QPointer<elara::app::ScoreDocument> document_;
     std::unique_ptr<elara::audio::SystemAudio> audio_;
     std::unique_ptr<elara::audio::Player> player_;
+    /// Songs prepared for player_ on a worker: only the newest is published
+    /// (ADR-0112).
+    elara::app::JobLane<std::shared_ptr<elara::audio::PreparedSong>> preparing_{this};
     std::shared_ptr<const elara::audio::Sequence> loaded_; // what player_ plays
     std::shared_ptr<const elara::audio::Sequence> placed_; // what position_ counts in
     QTimer pollTimer_;

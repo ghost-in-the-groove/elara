@@ -3,6 +3,8 @@
 #pragma once
 
 #include "score_document.hpp"
+#include "score_painter.hpp"
+#include <QColor>
 #include <QImage>
 #include <QPointer>
 #include <QQuickItem>
@@ -27,6 +29,9 @@ class ScorePage : public QQuickItem {
         elara::app::ScoreDocument* document READ document WRITE setDocument NOTIFY documentChanged)
     Q_PROPERTY(int index READ index WRITE setIndex NOTIFY indexChanged)
     Q_PROPERTY(bool painted READ painted NOTIFY paintedChanged)
+    /// What the page is painted in (ADR-0114): black on white unless set.
+    Q_PROPERTY(QColor paper READ paper WRITE setPaper NOTIFY coloursChanged)
+    Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY coloursChanged)
 
 public:
     explicit ScorePage(QQuickItem* parent = nullptr);
@@ -37,6 +42,10 @@ public:
     void setIndex(int index);
     /// Whether the page has been painted at least once.
     [[nodiscard]] bool painted() const { return painted_; }
+    [[nodiscard]] QColor paper() const { return colours_.paper; }
+    void setPaper(const QColor& paper);
+    [[nodiscard]] QColor ink() const { return colours_.ink; }
+    void setInk(const QColor& ink);
 
     /// Pages painted since the program started (for `elara --smoke-test`).
     [[nodiscard]] static int paintCount();
@@ -48,6 +57,7 @@ signals:
     void documentChanged();
     void indexChanged();
     void paintedChanged();
+    void coloursChanged();
 
 protected:
     QSGNode* updatePaintNode(QSGNode* old, UpdatePaintNodeData* data) override;
@@ -67,7 +77,9 @@ private:
     std::shared_ptr<const notation::DisplayList> shown_;
     double shownScale_ = 0.0;
     double shownRatio_ = 0.0;
-    QImage image_; ///< painted, waiting to become a texture
+    ScoreColours shownColours_;
+    ScoreColours colours_; ///< what the next paint uses
+    QImage image_;         ///< painted, waiting to become a texture
     bool painted_ = false;
 };
 

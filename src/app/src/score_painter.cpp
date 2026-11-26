@@ -151,7 +151,7 @@ void paintGlyphs(QPainter& painter, const DisplayList& list, double scale,
 // neighbouring text. Fonts are made once per size and outlines once per glyph
 // and size.
 void paintTexts(QPainter& painter, const DisplayList& list, double scale, const ScoreFonts& fonts,
-                const QColor& ink) {
+                const ScoreColours& colours) {
     if (list.texts.empty()) {
         return;
     }
@@ -200,7 +200,7 @@ void paintTexts(QPainter& painter, const DisplayList& list, double scale, const 
             const double cap = notation::capHeight(item.size) * scale;
             painter.fillRect(
                 QRectF(left - pad, origin.y() - cap - pad, width + 2 * pad, cap + 2 * pad),
-                Qt::white);
+                colours.paper);
         }
         double x = left;
         for (qsizetype i = 0; i < indexes.size() && i < advances.size(); ++i) {
@@ -209,7 +209,7 @@ void paintTexts(QPainter& painter, const DisplayList& list, double scale, const 
         }
     }
     for (const Letter& letter : letters) {
-        letter.outlines->fill(painter, letter.index, letter.origin, ink);
+        letter.outlines->fill(painter, letter.index, letter.origin, colours.ink);
     }
 }
 
@@ -267,34 +267,36 @@ bool ScorePainter::isValid() const {
     return QRawFont(fonts_.music, kStaffSpacesPerEm).isValid();
 }
 
-void ScorePainter::paint(QPainter& painter, const DisplayList& list, double scale) const {
+void ScorePainter::paint(QPainter& painter, const DisplayList& list, double scale,
+                         const ScoreColours& colours) const {
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(ink_);
+    painter.setBrush(colours.ink);
     // The order of the SVG writer: knockouts clear lines and glyphs, curves
     // and polygons go on top.
-    paintLines(painter, list, scale, ink_);
+    paintLines(painter, list, scale, colours.ink);
     paintBeams(painter, list, scale);
-    paintGlyphs(painter, list, scale, fonts_.music, ink_);
-    paintTexts(painter, list, scale, fonts_, ink_);
-    paintCurves(painter, list, scale, ink_);
+    paintGlyphs(painter, list, scale, fonts_.music, colours.ink);
+    paintTexts(painter, list, scale, fonts_, colours);
+    paintCurves(painter, list, scale, colours.ink);
     paintPolygons(painter, list, scale);
     painter.restore();
 }
 
-QImage ScorePainter::render(const DisplayList& list, double scale, double devicePixelRatio) const {
+QImage ScorePainter::render(const DisplayList& list, double scale, double devicePixelRatio,
+                            const ScoreColours& colours) const {
     // Painted in device pixels so that glyphs get their real size, not a
     // scaled-up small one.
     const double pixels = scale * devicePixelRatio;
     const int width = std::max(1, static_cast<int>(std::ceil(list.width * pixels)));
     const int height = std::max(1, static_cast<int>(std::ceil((list.bottom - list.top) * pixels)));
     QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
-    image.fill(Qt::white);
+    image.fill(colours.paper);
     {
         QPainter painter(&image);
         painter.translate(0.0, -list.top * pixels);
-        paint(painter, list, pixels);
+        paint(painter, list, pixels, colours);
     }
     image.setDevicePixelRatio(devicePixelRatio);
     return image;
