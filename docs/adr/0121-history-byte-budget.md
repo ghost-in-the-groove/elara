@@ -22,8 +22,9 @@ large step.
   `ReplaceMeasure`, `InsertTrack` (after an undo), `RemoveTrack` and
   `CommandGroup` (what its commands hold). `core::approximateBytes()` measures a
   measure or a track: the objects and what their vectors, strings and shared
-  values hold, by capacity. A measure a copy of the song still shares is
-  counted whole: it is the history's alone once the copy is gone.
+  values hold, by capacity, the points of bend and whammy curves among them
+  (ADR-0129). A measure a copy of the song still shares is counted whole: it
+  is the history's alone once the copy is gone.
 - `Document` keeps each step's bytes, measured when the step is done or undone,
   and their total, `historyBytes()`. After `execute()` it drops the oldest
   steps while there are more than the undo limit or while the steps hold more
