@@ -21,7 +21,10 @@
 #include <optional>
 
 AudioController::AudioController(QObject* parent)
-    : QObject(parent),
+    : AudioController([] { return std::make_unique<elara::audio::SystemAudio>(); }, parent) {}
+
+AudioController::AudioController(DeviceFactory makeDevice, QObject* parent)
+    : QObject(parent), makeDevice_(std::move(makeDevice)),
       includedSoundFont_(elara::app::includedSoundFont(QCoreApplication::applicationDirPath())),
       includedGuitarSfz_(elara::app::includedGuitarSfz(QCoreApplication::applicationDirPath())) {
     using namespace std::chrono_literals;
@@ -94,9 +97,9 @@ void AudioController::nextDeviceJob() {
     }
     if (!audio_) {
         // Made on this thread, which the audio runtime then belongs to.
-        audio_ = std::make_unique<elara::audio::SystemAudio>();
+        audio_ = makeDevice_();
     }
-    elara::audio::SystemAudio* audio = audio_.get(); // outlives the job: see the destructor
+    elara::audio::OutputDevice* audio = audio_.get(); // outlives the job: see the destructor
     if (openWanted_) {
         openWanted_ = false;
         opening_ = true;

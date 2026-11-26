@@ -72,6 +72,11 @@ Three targets with different rules:
   playing or paused). Paused with no voice sounding, it fills its blocks
   with silence without running any track's sound. It is an `AudioSource`,
   the interface a device plays;
+- `OutputDevice`, the interface of the device the transport plays through
+  (open a device by `OutputDeviceChoice`, list the outputs, its sample rate,
+  the source it plays, the test tone) and the threads it may be used from
+  (ADR-0122, ADR-0126). `SystemAudio` is the one that plays through the sound
+  card; the app tests play through one of their own;
 - the tone generator, fade envelope and the WAV writers (whole buffers, or
   block by block with `WavFileWriter`), `readWav()`/`decodeWav()` for
   PCM and float WAV files, `readFlac()`/`decodeFlac()` for FLAC files, decoded
@@ -83,11 +88,11 @@ Three targets with different rules:
 
 `elara_audio_juce` opens the
 system audio device through JUCE (ADR-0002) and exposes a plain C++ API
-(`elara::audio::SystemAudio`, `listOutputDevices()`); `SystemAudio::setSource()`
-plays an `AudioSource` such as a `Player`. `open()` takes an
-`OutputDeviceChoice`, a driver type and a device name or the system's
-default, and with `outputDevices()` may run on a worker while the main thread
-leaves the object alone (ADR-0122). `MicrophoneInput` (and
+(`elara::audio::SystemAudio`, an `OutputDevice`, and `listOutputDevices()`);
+`SystemAudio::setSource()` plays an `AudioSource` such as a `Player`. `open()`
+takes an `OutputDeviceChoice`, a driver type and a device name or the
+system's default, and with `outputDevices()` may run on a worker while the
+main thread leaves the object alone (ADR-0122). `MicrophoneInput` (and
 `listInputDevices()`) listens to the default input on a device of its own and
 queues the loudest channel's samples in a `SampleRing` (ADR-0029).
 
