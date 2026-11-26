@@ -477,9 +477,14 @@ void Startup::queueSave() {
     steps_.emplace_back([this, check] {
         check(score_->songTitle() == QStringLiteral("Saved") && !score_->modified(),
               "undoing the edit made while saving did not return to the state saved");
+        score_->setSongTitle(QStringLiteral("Waiting"));
+        return true;
+    });
+    steps_.emplace_back([this] {
         // A new song asked for while a save is written waits for it, and is
         // made without asking once the save holds every change (ADR-0107).
-        score_->setSongTitle(QStringLiteral("Waiting"));
+        // The edit before was laid out first, so that the new song's layout
+        // never takes the place of the edit's, whenever the save ends.
         saved_.reset();
         score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("waiting"))));
         QMetaObject::invokeMethod(window_, "newSong");
@@ -487,7 +492,9 @@ void Startup::queueSave() {
         return true;
     });
     steps_.emplace_back([this, check] {
-        if (!saved_) {
+        // The save has ended and the new song made then is laid out, so that
+        // the next edit does not take the place of its layout.
+        if (!saved_ || score_->busy()) {
             again_ = true;
             return false;
         }
