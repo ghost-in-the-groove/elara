@@ -99,6 +99,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Rhythm under tablature shown without standard notation (ADR-0041)
 - [x] Tablature read from arm's length: larger fret numbers and technique
       texts; the time signature only on a tablature that stands alone (ADR-0113)
+- [x] Chord diagrams large enough to read at 100 %: wider strings and frets,
+      larger dots and marks (ADR-0113)
 - [x] Tempo marks at the start and at every tempo change (ADR-0042)
 - [x] Dynamics marks under the staff where the loudness changes (ADR-0044)
 - [x] Hairpins (crescendo, diminuendo; ADR-0078)

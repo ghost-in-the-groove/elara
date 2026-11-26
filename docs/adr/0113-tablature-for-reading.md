@@ -32,9 +32,13 @@ ADR-0013 drew the time signature on every tablature staff.
   1.15 staff spaces high between lines 1.5 apart, so a number still clears the
   lines above and below it. Grace numbers stay at 0.65 of that.
 - **Technique texts at 1.25** (6.2 pt), the letters over an arc at 1.05, the
-  amount over a bend at 1.2, the whammy bar's label at 1.1 and the first fret
-  of a chord diagram at 1.0. The lanes that hold them grow by what the text
-  grew, so nothing touches the lane above.
+  amount over a bend at 1.2 and the whammy bar's label at 1.1. The lanes that
+  hold them grow by what the text grew, so nothing touches the lane above.
+- **Chord diagrams four tenths larger**: strings 0.85 staff spaces apart and
+  frets 1.0 (they were 0.6 and 0.7), the dots and the open and muted marks at
+  0.95 of the font's size, the first fret's number at 1.2. A dot now fills
+  most of the room between two strings, so the string it is on, and an open
+  string from a muted one, can be told at 100 %.
 - **The time signature is the standard staff's.** A tablature staff under the
   standard staff of the same instrument leaves it out, at the start and at
   every change; the measures of both staves still start together, the
@@ -43,6 +47,8 @@ ADR-0013 drew the time signature on every tablature staff.
 
 ## Consequences
 
+- A line with chord diagrams is 1.3 staff spaces higher, and two diagrams
+  over close beats push those beats a little further apart.
 - A system with many fretted notes is a little wider: two-digit frets take
   more room, and a long song may break its lines elsewhere.
 - Notation and tablature together are a little higher where techniques are

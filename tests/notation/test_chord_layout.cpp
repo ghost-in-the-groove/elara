@@ -330,6 +330,33 @@ TEST_CASE("Chord symbols: a diagram under the name on fretted staves",
     }
 }
 
+TEST_CASE("Chord symbols: a diagram is large enough to read beside the tablature (ADR-0113)",
+          "[notation][layout][chords]") {
+    const DisplayList list = layout(guitar(
+        {{named(play(5, 0), chord("Am", ChordDiagram{.firstFret = 1, .frets = {0, 1, 2, 2, 0, x}})),
+          play(3, 2, NoteValue::Half), play(2, 1)}}));
+    const Grid lines = grid(list);
+    REQUIRE(lines.strings.size() == 6);
+    REQUIRE(lines.frets.size() == 5);
+    // Strings and frets far enough apart to tell which string a dot is on:
+    // the grid of six strings is wider than the staff is high.
+    const double space = lines.strings[1].from.x - lines.strings[0].from.x;
+    const double fret = lines.frets[1].from.y - lines.frets[0].from.y;
+    CHECK(space >= 0.8);
+    CHECK(fret >= 0.95);
+    CHECK(lines.strings.back().from.x - lines.strings.front().from.x > 4.0);
+    // A dot fills most of the room between two strings and never touches
+    // the next one; the open and muted marks are as large.
+    const auto dots = glyphs(list, Role::Chord, Glyph::FretboardFilledCircle);
+    REQUIRE(!dots.empty());
+    const double dot = glyphBottom(dots[0]) - glyphTop(dots[0]);
+    CHECK(dot > 0.6 * space);
+    CHECK(dot < space);
+    const auto open = glyphs(list, Role::Chord, Glyph::FretboardO);
+    REQUIRE(!open.empty());
+    CHECK_THAT(open[0].scale, WithinAbs(dots[0].scale, kEpsilon));
+}
+
 TEST_CASE("Chord symbols: a diagram up the neck shows its first fret, a long one more frets",
           "[notation][layout][chords]") {
     const DisplayList high = layout(guitar(
