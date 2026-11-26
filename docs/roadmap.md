@@ -309,7 +309,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The song panel, the popups, the tuner and the dialogs in the interface's
       own controls, each track in its own hue; the measure popup fits a short
       window
-- [ ] The welcome pane as a home: what to do at the left, the recent scores
+- [x] The welcome pane as a home: what to do at the left, the recent scores
       beside it
 - [ ] The page in the dark theme, and the score's own signs: the tablature clef,
       the fret numbers and the texts of the techniques
