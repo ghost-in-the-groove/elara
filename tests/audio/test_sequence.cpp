@@ -410,11 +410,10 @@ TEST_CASE("Sequence: note events for a synthesizer", "[audio][sequence]") {
     CHECK(is(events[5], 2.0, EventKind::NoteOff, 60)); // the whole note ends
     CHECK(events[0].velocity == sequence.notes()[0].velocity);
 
-    // Seeking: the first event at or after a time.
-    CHECK(sequence.eventAt(0.0) == 0);
-    CHECK(sequence.eventAt(0.5) == 1);
-    CHECK(sequence.eventAt(0.75) == 3);
-    CHECK(sequence.eventAt(10.0) == events.size());
+    // One track: its own events are the same, in the same order.
+    CHECK(sequence.eventCount() == events.size());
+    CHECK(std::ranges::equal(sequence.trackEvents(0), events));
+    CHECK(sequence.trackEvents(1).empty());
 }
 
 TEST_CASE("Sequence: an empty song plays nothing", "[audio][sequence]") {
@@ -972,8 +971,9 @@ TEST_CASE("Sequence: a slower or faster speed scales every tempo", "[audio][sequ
         shaking.effects.vibrato = Vibrato::Wide;
         voice(guitar, 0) = {beat(NoteValue::Whole, {shaking})};
         const Sequence slow(guitar, {.speed = 0.5});
-        const auto first = std::ranges::find(slow.events(), EventKind::Pitch, &NoteEvent::kind);
-        REQUIRE(first != slow.events().end());
+        const std::vector<NoteEvent> events = slow.events();
+        const auto first = std::ranges::find(events, EventKind::Pitch, &NoteEvent::kind);
+        REQUIRE(first != events.end());
         CHECK_THAT(first->glide, WithinAbs(1.0 / 22.0, 1e-6));
         CHECK(first->cents == 50);
     }

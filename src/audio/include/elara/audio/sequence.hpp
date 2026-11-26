@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <vector>
 
 namespace elara::core {
@@ -118,15 +119,18 @@ public:
     [[nodiscard]] const std::vector<PlayedMeasure>& measures() const noexcept { return measures_; }
     /// Ordered by start, then track, staff, voice and key.
     [[nodiscard]] const std::vector<PlayedNote>& notes() const noexcept { return notes_; }
-    /// Ordered by time, releases before attacks before pitch changes, then by
-    /// track and key.
-    [[nodiscard]] const std::vector<NoteEvent>& events() const noexcept { return events_; }
+    /// The events of `track` (the metronome's on metronomeTrack()), ordered by
+    /// time, releases before attacks before pitch changes, then by key; none
+    /// for a track with none. What playback reads.
+    [[nodiscard]] std::span<const NoteEvent> trackEvents(std::size_t track) const noexcept;
+    /// How many events there are on every track.
+    [[nodiscard]] std::size_t eventCount() const noexcept { return eventCount_; }
+    /// Every track's events in one list, ordered by time, releases before
+    /// attacks before pitch changes, then by track and key: merged on each
+    /// call, for what needs a single list.
+    [[nodiscard]] std::vector<NoteEvent> events() const;
     /// Seconds from the start to the end of the last played measure.
     [[nodiscard]] double duration() const noexcept { return duration_; }
-
-    /// The index of the first event at or after `seconds` (events().size()
-    /// when there is none): where playback starting there begins.
-    [[nodiscard]] std::size_t eventAt(double seconds) const noexcept;
 
     /// A count-in for playback from `seconds`: the beats of one measure of the
     /// measure played there (its time signature's pulse), at the tempo there.
@@ -165,7 +169,8 @@ private:
 
     std::vector<PlayedMeasure> measures_;
     std::vector<PlayedNote> notes_;
-    std::vector<NoteEvent> events_;
+    std::vector<std::vector<NoteEvent>> trackEvents_; // by track, the metronome's last
+    std::size_t eventCount_ = 0;
     double duration_ = 0.0;
     double speed_ = 1.0;
     bool metronome_ = false;
