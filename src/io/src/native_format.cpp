@@ -18,6 +18,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -88,6 +89,23 @@ std::optional<Enum> enumFrom(const std::array<std::string_view, N>& names, std::
 // Writing
 // ============================================================================
 
+// song.json as yyjson writes it, in yyjson's own buffer: handed on as it is,
+// with no copy of the text.
+class JsonText {
+public:
+    JsonText(char* text, std::size_t size) : text_(text), size_(size) {}
+    [[nodiscard]] std::string_view view() const { return {text_.get(), size_}; }
+
+private:
+    struct Free {
+        void operator()(char* text) const {
+            std::free(text); // NOLINT(cppcoreguidelines-no-malloc): allocated by yyjson
+        }
+    };
+    std::unique_ptr<char, Free> text_;
+    std::size_t size_ = 0;
+};
+
 class Writer {
 public:
     Writer() : doc_(yyjson_mut_doc_new(nullptr)) {
@@ -101,7 +119,7 @@ public:
     Writer& operator=(Writer&&) = delete;
     ~Writer() { yyjson_mut_doc_free(doc_); }
 
-    std::string write(const Song& song) {
+    JsonText write(const Song& song) {
         yyjson_mut_val* root = yyjson_mut_obj(doc_);
         yyjson_mut_doc_set_root(doc_, root);
         yyjson_mut_obj_add_str(doc_, root, "format", kFormatName.data());
@@ -127,9 +145,7 @@ public:
         if (text == nullptr) {
             throw std::runtime_error("cannot write song.json");
         }
-        std::string json(text, length);
-        std::free(text); // NOLINT(cppcoreguidelines-no-malloc): allocated by yyjson
-        return json;
+        return {text, length};
     }
 
 private:
@@ -1241,7 +1257,7 @@ private:
 
 std::string songToJson(const Song& song) {
     Writer writer;
-    return writer.write(song);
+    return std::string(writer.write(song).view());
 }
 
 std::expected<Song, FormatError> songFromJson(std::string_view json) {
@@ -1263,10 +1279,10 @@ std::expected<Song, FormatError> songFromJson(std::string_view json) {
 }
 
 std::vector<std::uint8_t> encodeNative(const Song& song) {
-    const std::string json = songToJson(song);
+    const JsonText json = Writer().write(song);
     const std::array entries{
         detail::ZipEntry{.name = "mimetype", .content = kNativeMimeType, .level = 0},
-        detail::ZipEntry{.name = "song.json", .content = json}};
+        detail::ZipEntry{.name = "song.json", .content = json.view()}};
     return detail::writeZip(entries);
 }
 
