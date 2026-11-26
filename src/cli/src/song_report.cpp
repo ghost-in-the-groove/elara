@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "song_report.hpp"
 
+#include <elara/core/names.hpp>
+
 #include "common.hpp"
 
+#include <cstddef>
 #include <format>
 #include <iostream>
+#include <optional>
+#include <string>
 
 namespace elara::cli {
 
@@ -69,24 +74,21 @@ std::string measuresJson(const core::Song& song) {
             out += R"(,"doubleBar":true)";
         }
         if (header.tripletFeel != core::TripletFeel::None) {
-            out += std::format(R"(,"tripletFeel":"{}")",
-                               kTripletFeelNames.at(static_cast<std::size_t>(header.tripletFeel)));
+            out += std::format(R"(,"tripletFeel":"{}")", core::nameOf(header.tripletFeel));
         }
         std::string signs;
-        for (const SignName& sign : kSignNames) {
-            if (header.*sign.flag) {
-                signs += std::format(R"({}"{}")", signs.empty() ? "" : ",", sign.name);
+        for (const core::NavigationSign sign : core::enumValues<core::NavigationSign>()) {
+            if (header.*core::signFlag(sign)) {
+                signs += std::format(R"({}"{}")", signs.empty() ? "" : ",", core::nameOf(sign));
             }
         }
         if (!signs.empty()) {
             out += std::format(R"(,"signs":[{}])", signs);
         }
         if (header.jump != core::JumpTo::None) {
-            out += std::format(R"(,"jump":"{}")",
-                               kJumpToNames.at(static_cast<std::size_t>(header.jump)));
+            out += std::format(R"(,"jump":"{}")", core::nameOf(header.jump));
             if (header.jumpThen != core::JumpThen::End) {
-                out += std::format(R"(,"jumpThen":"{}")",
-                                   kJumpThenNames.at(static_cast<std::size_t>(header.jumpThen)));
+                out += std::format(R"(,"jumpThen":"{}")", core::nameOf(header.jumpThen));
             }
         }
         // A tempo that starts the measure (ADR-0042); changes inside it are

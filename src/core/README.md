@@ -66,6 +66,7 @@ sixth string of a guitar sounds F#2.
 
 | Header | What it gives you |
 |---|---|
+| `names.hpp` | The text names of the model's enumerations (`EnumNames<Enum>`, specialised right after each enumeration with a compile-time check that it names every value once): `nameOf()` ("from-below", "8va", "dal-segno"), `parseName<Enum>()` back (nullopt for any other text), `enumFromIndex<Enum>()` for a number from a control (nullopt past the last value), `enumValues<Enum>()` and `kEnumCount<Enum>` to go through them. The native file format, `elara-cli`'s steps and its JSON reports all write and read these, so a name changed here changes the format (`tests/core/test_names.cpp` pins them). `NavigationSign` and `signFlag()` name the navigation flags of a `MeasureHeader` the same way. |
 | `shared_value.hpp` | `SharedValue<T>`: a value its copies share until one of them changes it (`edit()` copies it first when shared), safe to copy and read on other threads (ADR-0051); `SharedOptional<T>`: an optional value its copies share and nobody changes, compared by value, so a beat without one costs a null pointer (ADR-0080) |
 | `parallel.hpp` | `forEachIndex()`: independent jobs on the calling thread and the threads of `WorkerPool::shared()`, kept waiting so a parallel call starts no threads (ADR-0053); the first exception is rethrown and nested calls are allowed. `threadsFor()`: how many threads a job count and amount of work deserve. Used by import, export, sequencing and notation layout. |
 

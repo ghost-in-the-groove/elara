@@ -15,7 +15,8 @@ and the `elara_core` model; nothing is stored in this module.
 
 The `.elara` file is a zip archive with a `mimetype` entry and a `song.json`
 that uses the model's names and text forms (`"8."`, `"F#3"`, `"6/8"`) and omits
-defaults. Unzip a song to read or diff it. Any model change needs a matching
+defaults; enumerations are written by their names in `elara_core`
+(`core::nameOf()`, `names.hpp`), so renaming one there changes the format. Unzip a song to read or diff it. Any model change needs a matching
 change here and in the round-trip test (`tests/io/test_native_format.cpp`).
 
 Every importer reads each track's starting volume, pan and, where the format

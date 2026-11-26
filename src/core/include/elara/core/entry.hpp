@@ -5,9 +5,11 @@
 #include <elara/core/duration.hpp>
 #include <elara/core/effects.hpp>
 #include <elara/core/lyrics.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/song.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -146,6 +148,13 @@ enum class NoteEffect : std::uint8_t {
     Tenuto,        ///< tenuto; with staccato, portato (ADR-0088)
     Staccatissimo, ///< staccatissimo, which takes the place of a staccato (ADR-0094)
 };
+template <>
+struct EnumNames<NoteEffect> {
+    static constexpr auto kNames = std::to_array<std::string_view>(
+        {"tie", "legato", "slide", "bend", "vibrato", "palm-mute", "dead-note", "let-ring",
+         "harmonic", "ghost", "accent", "staccato", "tenuto", "staccatissimo"});
+};
+static_assert(namesEnd(NoteEffect::Staccatissimo));
 
 /// Whether `effect` is a technique of strings (hammer-on or pull-off, palm
 /// mute, dead note, natural harmonic), which toggleEffect() puts only on a

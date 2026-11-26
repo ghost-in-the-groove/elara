@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/names.hpp>
 #include <elara/core/version.hpp>
 #include <elara/io/native_format.hpp>
 
@@ -30,60 +31,8 @@ using namespace core;
 
 constexpr std::string_view kFormatName = "elara";
 
-// ---- Names of enumerations (kebab-case, index = enum value) -------------------
-
-constexpr std::array kClefNames = std::to_array<std::string_view>(
-    {"treble", "treble-8vb", "bass", "bass-8vb", "alto", "tenor", "percussion"});
-constexpr std::array kRepeatNames =
-    std::to_array<std::string_view>({"none", "one", "two-first", "two-second"});
-constexpr std::array kKindNames =
-    std::to_array<std::string_view>({"fretted", "percussion", "keyboard", "pitched"});
-constexpr std::array kSlideInNames =
-    std::to_array<std::string_view>({"none", "from-below", "from-above"});
-constexpr std::array kSlideOutNames =
-    std::to_array<std::string_view>({"none", "shift", "legato", "downwards", "upwards"});
-constexpr std::array kHarmonicNames =
-    std::to_array<std::string_view>({"none", "natural", "artificial", "pinch", "tapped", "semi"});
-constexpr std::array kVibratoNames = std::to_array<std::string_view>({"none", "slight", "wide"});
-constexpr std::array kOrnamentNames = std::to_array<std::string_view>(
-    {"none", "mordent", "upper-mordent", "turn", "inverted-turn"}); // ADR-0091
-constexpr std::array kFingerNames = std::to_array<std::string_view>(
-    {"none", "thumb", "index", "middle", "ring", "little"}); // ADR-0093
-constexpr std::array kAccentNames = std::to_array<std::string_view>({"none", "accent", "marcato"});
-constexpr std::array kDynamicNames =
-    std::to_array<std::string_view>({"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"});
-constexpr std::array kStrokeNames = std::to_array<std::string_view>({"none", "down", "up"});
-constexpr std::array kHairpinNames =
-    std::to_array<std::string_view>({"none", "crescendo", "diminuendo"});
-constexpr std::array kFermataNames =
-    std::to_array<std::string_view>({"none", "short", "normal", "long"});
-constexpr std::array kOttavaNames =
-    std::to_array<std::string_view>({"none", "8va", "8vb", "15ma", "15mb"});
-constexpr std::array kPedalNames = std::to_array<std::string_view>({"none", "down", "change"});
-constexpr std::array kBreathNames =
-    std::to_array<std::string_view>({"none", "comma", "caesura"}); // ADR-0095
-constexpr std::array kBassNames = std::to_array<std::string_view>({"none", "tap", "slap", "pop"});
-constexpr std::array kJumpToNames =
-    std::to_array<std::string_view>({"none", "da-capo", "dal-segno", "dal-segno-segno"});
-constexpr std::array kJumpThenNames =
-    std::to_array<std::string_view>({"end", "al-fine", "al-coda", "al-double-coda"});
-constexpr std::array kTripletFeelNames = std::to_array<std::string_view>( // ADR-0104
-    {"none", "eighth", "sixteenth", "dotted-eighth", "dotted-sixteenth", "scottish-eighth",
-     "scottish-sixteenth"});
-
-template <typename Enum, std::size_t N>
-std::string_view nameOf(const std::array<std::string_view, N>& names, Enum value) {
-    return names.at(static_cast<std::size_t>(value));
-}
-
-template <typename Enum, std::size_t N>
-std::optional<Enum> enumFrom(const std::array<std::string_view, N>& names, std::string_view text) {
-    const auto found = std::ranges::find(names, text);
-    if (found == names.end()) {
-        return std::nullopt;
-    }
-    return static_cast<Enum>(found - names.begin());
-}
+// Enumerations are written by their names in the model (core::EnumNames), so
+// renaming one there changes the format.
 
 // ============================================================================
 // Writing
@@ -177,11 +126,10 @@ private:
             yyjson_mut_obj_add_real(doc_, object, key, value);
         }
     }
-    template <typename Enum, std::size_t N>
-    void addEnumIfNot(yyjson_mut_val* object, const char* key,
-                      const std::array<std::string_view, N>& names, Enum value, Enum skip) {
+    template <NamedEnum Enum>
+    void addEnumIfNot(yyjson_mut_val* object, const char* key, Enum value, Enum skip) {
         if (value != skip) {
-            addText(object, key, nameOf(names, value));
+            addText(object, key, nameOf(value));
         }
     }
 
@@ -242,8 +190,7 @@ private:
             add(object, "alternateEndings", endings);
         }
         addFlag(object, "doubleBar", value.doubleBar);
-        addEnumIfNot(object, "tripletFeel", kTripletFeelNames, value.tripletFeel,
-                     TripletFeel::None);
+        addEnumIfNot(object, "tripletFeel", value.tripletFeel, TripletFeel::None);
         addFlag(object, "segno", value.segno);
         addFlag(object, "segnoSegno", value.segnoSegno);
         addFlag(object, "coda", value.coda);
@@ -251,9 +198,9 @@ private:
         addFlag(object, "fine", value.fine);
         addFlag(object, "toCoda", value.toCoda);
         addFlag(object, "toDoubleCoda", value.toDoubleCoda);
-        addEnumIfNot(object, "jump", kJumpToNames, value.jump, JumpTo::None);
+        addEnumIfNot(object, "jump", value.jump, JumpTo::None);
         if (value.jump != JumpTo::None) {
-            addEnumIfNot(object, "jumpThen", kJumpThenNames, value.jumpThen, JumpThen::End);
+            addEnumIfNot(object, "jumpThen", value.jumpThen, JumpThen::End);
         }
         addTextIfAny(object, "section", value.section);
         return object;
@@ -265,7 +212,7 @@ private:
         const Instrument& instrument = value.instrument();
         yyjson_mut_val* inst = yyjson_mut_obj(doc_);
         addTextIfAny(inst, "name", instrument.name);
-        addText(inst, "kind", nameOf(kKindNames, instrument.kind));
+        addText(inst, "kind", nameOf(instrument.kind));
         if (instrument.midiProgram != 0) {
             addInt(inst, "midiProgram", instrument.midiProgram);
         }
@@ -297,7 +244,7 @@ private:
 
     yyjson_mut_val* staff(const Staff& value) {
         yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "clef", nameOf(kClefNames, value.clef()));
+        addText(object, "clef", nameOf(value.clef()));
         if (value.tuning()) {
             addText(object, "tuning", value.tuning()->toString());
         }
@@ -314,7 +261,7 @@ private:
                 }
                 yyjson_mut_val* change = yyjson_mut_obj(doc_);
                 addInt(change, "measure", static_cast<std::int64_t>(m));
-                addText(change, "clef", nameOf(kClefNames, *clef));
+                addText(change, "clef", nameOf(*clef));
                 yyjson_mut_arr_append(clefs, change);
             }
         }
@@ -331,7 +278,7 @@ private:
                 }
                 yyjson_mut_val* sign = yyjson_mut_obj(doc_);
                 addInt(sign, "measure", static_cast<std::int64_t>(m));
-                addText(sign, "repeat", nameOf(kRepeatNames, repeat));
+                addText(sign, "repeat", nameOf(repeat));
                 yyjson_mut_arr_append(repeats, sign);
             }
         }
@@ -470,7 +417,7 @@ private:
         }
         if (fx.harmonic != Harmonic{}) {
             yyjson_mut_val* harmonic = yyjson_mut_obj(doc_);
-            addText(harmonic, "kind", nameOf(kHarmonicNames, fx.harmonic.kind));
+            addText(harmonic, "kind", nameOf(fx.harmonic.kind));
             if (fx.harmonic.fretTenths != 0) {
                 addNumber(harmonic, "fret", fx.harmonic.fretTenths / 10.0);
             }
@@ -484,9 +431,9 @@ private:
         }
         addFlag(object, "tiedFromPrevious", fx.tiedFromPrevious);
         addFlag(object, "legatoFromPrevious", fx.legatoFromPrevious);
-        addEnumIfNot(object, "slideIn", kSlideInNames, fx.slideIn, SlideIn::None);
-        addEnumIfNot(object, "slideOut", kSlideOutNames, fx.slideOut, SlideOut::None);
-        addEnumIfNot(object, "vibrato", kVibratoNames, fx.vibrato, Vibrato::None);
+        addEnumIfNot(object, "slideIn", fx.slideIn, SlideIn::None);
+        addEnumIfNot(object, "slideOut", fx.slideOut, SlideOut::None);
+        addEnumIfNot(object, "vibrato", fx.vibrato, Vibrato::None);
         addFlag(object, "palmMute", fx.palmMute);
         addFlag(object, "deadNote", fx.deadNote);
         addFlag(object, "ghost", fx.ghost);
@@ -494,11 +441,11 @@ private:
         addFlag(object, "staccato", fx.staccato);
         addFlag(object, "staccatissimo", fx.staccatissimo);
         addFlag(object, "tenuto", fx.tenuto);
-        addEnumIfNot(object, "accent", kAccentNames, fx.accent, Accent::None);
-        addEnumIfNot(object, "ornament", kOrnamentNames, fx.ornament, Ornament::None);
-        addEnumIfNot(object, "fingering", kFingerNames, fx.fingering, Finger::None);
-        addEnumIfNot(object, "pluck", kFingerNames, fx.pluck, Finger::None);
-        addEnumIfNot(object, "dynamic", kDynamicNames, fx.dynamic, Dynamic::MF);
+        addEnumIfNot(object, "accent", fx.accent, Accent::None);
+        addEnumIfNot(object, "ornament", fx.ornament, Ornament::None);
+        addEnumIfNot(object, "fingering", fx.fingering, Finger::None);
+        addEnumIfNot(object, "pluck", fx.pluck, Finger::None);
+        addEnumIfNot(object, "dynamic", fx.dynamic, Dynamic::MF);
         return object;
     }
 
@@ -507,18 +454,18 @@ private:
         if (!fx.whammyBar.isEmpty()) {
             add(object, "whammyBar", curve(fx.whammyBar));
         }
-        addEnumIfNot(object, "pickStroke", kStrokeNames, fx.pickStroke, PickStroke::None);
-        addEnumIfNot(object, "strum", kStrokeNames, fx.strum, Strum::None);
+        addEnumIfNot(object, "pickStroke", fx.pickStroke, PickStroke::None);
+        addEnumIfNot(object, "strum", fx.strum, Strum::None);
         if (fx.tremoloPicking) {
             addText(object, "tremoloPicking", Duration(*fx.tremoloPicking).toString());
         }
-        addEnumIfNot(object, "bassTechnique", kBassNames, fx.bassTechnique, BassTechnique::None);
-        addEnumIfNot(object, "hairpin", kHairpinNames, fx.hairpin, Hairpin::None);
-        addEnumIfNot(object, "fermata", kFermataNames, fx.fermata, Fermata::None);
+        addEnumIfNot(object, "bassTechnique", fx.bassTechnique, BassTechnique::None);
+        addEnumIfNot(object, "hairpin", fx.hairpin, Hairpin::None);
+        addEnumIfNot(object, "fermata", fx.fermata, Fermata::None);
         addFlag(object, "slur", fx.slur);
-        addEnumIfNot(object, "ottava", kOttavaNames, fx.ottava, Ottava::None);
-        addEnumIfNot(object, "pedal", kPedalNames, fx.pedal, Pedal::None);
-        addEnumIfNot(object, "breath", kBreathNames, fx.breath, Breath::None);
+        addEnumIfNot(object, "ottava", fx.ottava, Ottava::None);
+        addEnumIfNot(object, "pedal", fx.pedal, Pedal::None);
+        addEnumIfNot(object, "breath", fx.breath, Breath::None);
         return object;
     }
 
@@ -747,14 +694,13 @@ private:
         return value != nullptr && yyjson_get_bool(value);
     }
 
-    template <typename Enum, std::size_t N>
-    Enum enumValue(yyjson_val* object, const char* key,
-                   const std::array<std::string_view, N>& names, Enum fallback) {
+    template <NamedEnum Enum>
+    Enum enumValue(yyjson_val* object, const char* key, Enum fallback) {
         const auto text = optionalText(object, key);
         if (!text) {
             return fallback;
         }
-        const auto value = enumFrom<Enum>(names, *text);
+        const auto value = parseName<Enum>(*text);
         if (!value) {
             Scope scope(*this, key);
             fail(std::format("unknown value: {}", *text));
@@ -880,7 +826,7 @@ private:
             });
         }
         header.doubleBar = flag(object, "doubleBar");
-        header.tripletFeel = enumValue(object, "tripletFeel", kTripletFeelNames, TripletFeel::None);
+        header.tripletFeel = enumValue(object, "tripletFeel", TripletFeel::None);
         header.segno = flag(object, "segno");
         header.segnoSegno = flag(object, "segnoSegno");
         header.coda = flag(object, "coda");
@@ -888,9 +834,9 @@ private:
         header.fine = flag(object, "fine");
         header.toCoda = flag(object, "toCoda");
         header.toDoubleCoda = flag(object, "toDoubleCoda");
-        header.jump = enumValue(object, "jump", kJumpToNames, JumpTo::None);
+        header.jump = enumValue(object, "jump", JumpTo::None);
         if (header.jump != JumpTo::None) {
-            header.jumpThen = enumValue(object, "jumpThen", kJumpThenNames, JumpThen::End);
+            header.jumpThen = enumValue(object, "jumpThen", JumpThen::End);
         }
         if (const auto section = optionalText(object, "section")) {
             header.section = std::string(*section);
@@ -906,7 +852,7 @@ private:
         if (yyjson_val* inst = optionalObject(object, "instrument")) {
             Scope scope(*this, "instrument");
             instrument.name = std::string(optionalText(inst, "name").value_or(""));
-            instrument.kind = enumValue(inst, "kind", kKindNames, InstrumentKind::Pitched);
+            instrument.kind = enumValue(inst, "kind", InstrumentKind::Pitched);
             instrument.midiProgram =
                 static_cast<int>(optionalInteger(inst, "midiProgram", 0, 127).value_or(0));
             instrument.writtenOffset =
@@ -929,7 +875,7 @@ private:
                 if (!yyjson_is_obj(staff)) {
                     fail("expected an object");
                 }
-                const Clef clef = enumValue(staff, "clef", kClefNames, Clef::Treble);
+                const Clef clef = enumValue(staff, "clef", Clef::Treble);
                 std::optional<Tuning> tuning;
                 if (yyjson_obj_get(staff, "tuning") != nullptr) {
                     tuning = parsed<Tuning>(staff, "tuning", Tuning::parse, "a tuning");
@@ -967,7 +913,7 @@ private:
             const auto m = static_cast<std::size_t>(
                 integer(change, "measure", 0, static_cast<std::int64_t>(measureCount) - 1));
             const std::string_view name = requiredText(change, "clef");
-            const auto clef = enumFrom<Clef>(kClefNames, name);
+            const auto clef = parseName<Clef>(name);
             if (!clef) {
                 Scope inner(*this, "clef");
                 fail(std::format("unknown value: {}", name));
@@ -990,7 +936,7 @@ private:
             const auto m = static_cast<std::size_t>(
                 integer(sign, "measure", 0, static_cast<std::int64_t>(measureCount) - 1));
             const std::string_view name = requiredText(sign, "repeat");
-            const auto repeat = enumFrom<MeasureRepeat>(kRepeatNames, name);
+            const auto repeat = parseName<MeasureRepeat>(name);
             if (!repeat) {
                 Scope inner(*this, "repeat");
                 fail(std::format("unknown value: {}", name));
@@ -1180,7 +1126,7 @@ private:
         fx.bend = readCurve(object, "bend");
         if (yyjson_val* harmonic = optionalObject(object, "harmonic")) {
             Scope scope(*this, "harmonic");
-            fx.harmonic.kind = enumValue(harmonic, "kind", kHarmonicNames, HarmonicKind::None);
+            fx.harmonic.kind = enumValue(harmonic, "kind", HarmonicKind::None);
             if (const auto fret = optionalNumber(harmonic, "fret")) {
                 const double tenths = std::round(*fret * 10.0);
                 if (!(tenths >= 0.0 && tenths <= Tuning::kMaxFret * 10.0)) {
@@ -1208,9 +1154,9 @@ private:
         }
         fx.tiedFromPrevious = flag(object, "tiedFromPrevious");
         fx.legatoFromPrevious = flag(object, "legatoFromPrevious");
-        fx.slideIn = enumValue(object, "slideIn", kSlideInNames, SlideIn::None);
-        fx.slideOut = enumValue(object, "slideOut", kSlideOutNames, SlideOut::None);
-        fx.vibrato = enumValue(object, "vibrato", kVibratoNames, Vibrato::None);
+        fx.slideIn = enumValue(object, "slideIn", SlideIn::None);
+        fx.slideOut = enumValue(object, "slideOut", SlideOut::None);
+        fx.vibrato = enumValue(object, "vibrato", Vibrato::None);
         fx.palmMute = flag(object, "palmMute");
         fx.deadNote = flag(object, "deadNote");
         fx.ghost = flag(object, "ghost");
@@ -1218,19 +1164,19 @@ private:
         fx.staccato = flag(object, "staccato");
         fx.staccatissimo = flag(object, "staccatissimo");
         fx.tenuto = flag(object, "tenuto");
-        fx.accent = enumValue(object, "accent", kAccentNames, Accent::None);
-        fx.ornament = enumValue(object, "ornament", kOrnamentNames, Ornament::None);
-        fx.fingering = enumValue(object, "fingering", kFingerNames, Finger::None);
-        fx.pluck = enumValue(object, "pluck", kFingerNames, Finger::None);
-        fx.dynamic = enumValue(object, "dynamic", kDynamicNames, Dynamic::MF);
+        fx.accent = enumValue(object, "accent", Accent::None);
+        fx.ornament = enumValue(object, "ornament", Ornament::None);
+        fx.fingering = enumValue(object, "fingering", Finger::None);
+        fx.pluck = enumValue(object, "pluck", Finger::None);
+        fx.dynamic = enumValue(object, "dynamic", Dynamic::MF);
         return fx;
     }
 
     BeatEffects readBeatEffects(yyjson_val* object) {
         BeatEffects fx;
         fx.whammyBar = readCurve(object, "whammyBar");
-        fx.pickStroke = enumValue(object, "pickStroke", kStrokeNames, PickStroke::None);
-        fx.strum = enumValue(object, "strum", kStrokeNames, Strum::None);
+        fx.pickStroke = enumValue(object, "pickStroke", PickStroke::None);
+        fx.strum = enumValue(object, "strum", Strum::None);
         if (yyjson_obj_get(object, "tremoloPicking") != nullptr) {
             const Duration speed = duration(object, "tremoloPicking");
             if (speed.dots() != 0 || !speed.tuplet().isNone()) {
@@ -1239,13 +1185,13 @@ private:
             }
             fx.tremoloPicking = speed.value();
         }
-        fx.bassTechnique = enumValue(object, "bassTechnique", kBassNames, BassTechnique::None);
-        fx.hairpin = enumValue(object, "hairpin", kHairpinNames, Hairpin::None);
-        fx.fermata = enumValue(object, "fermata", kFermataNames, Fermata::None);
+        fx.bassTechnique = enumValue(object, "bassTechnique", BassTechnique::None);
+        fx.hairpin = enumValue(object, "hairpin", Hairpin::None);
+        fx.fermata = enumValue(object, "fermata", Fermata::None);
         fx.slur = flag(object, "slur");
-        fx.ottava = enumValue(object, "ottava", kOttavaNames, Ottava::None);
-        fx.pedal = enumValue(object, "pedal", kPedalNames, Pedal::None);
-        fx.breath = enumValue(object, "breath", kBreathNames, Breath::None);
+        fx.ottava = enumValue(object, "ottava", Ottava::None);
+        fx.pedal = enumValue(object, "pedal", Pedal::None);
+        fx.breath = enumValue(object, "breath", Breath::None);
         return fx;
     }
 

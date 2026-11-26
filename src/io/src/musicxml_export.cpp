@@ -3,6 +3,7 @@
 // the reverse of the import mapping: what MusicXML can hold imports back
 // unchanged, the rest is listed in the warnings.
 #include <elara/core/chord_name.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/version.hpp>
 #include <elara/io/musicxml.hpp>
 
@@ -219,8 +220,6 @@ double fourDecimals(double value) {
 // ---- Vocabulary -----------------------------------------------------------------
 
 constexpr std::array<std::string_view, 7> kStepNames{"C", "D", "E", "F", "G", "A", "B"};
-constexpr std::array<std::string_view, 4> kKindNames{"fretted", "percussion", "keyboard",
-                                                     "pitched"};
 
 /// Where a drum is drawn on a five-line staff (docs/instruments.md, treble-clef
 /// positions) and its notehead.
@@ -517,12 +516,10 @@ public:
         }
         const InstrumentKind readBack = kindReadBack();
         if (readBack != track_.instrument().kind && song_.measureCount() > 0) {
-            warnings_.add(
-                track_.name(),
-                std::format("{} instrument read back as {}",
-                            kKindNames[static_cast<std::size_t>(track_.instrument().kind)],
-                            kKindNames[static_cast<std::size_t>(readBack)]),
-                0);
+            warnings_.add(track_.name(),
+                          std::format("{} instrument read back as {}",
+                                      nameOf(track_.instrument().kind), nameOf(readBack)),
+                          0);
         }
     }
 

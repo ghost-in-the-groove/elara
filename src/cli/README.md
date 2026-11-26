@@ -147,7 +147,9 @@ or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
 `save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
-changes nothing adds no undo step.
+changes nothing adds no undo step. Steps and reports name the model's
+enumerations (signs, jumps, triplet feels, credits, effects and their kinds)
+as `elara_core` does (`core::nameOf()`, `names.hpp`), as the native file does.
 
 `feel` changes the triplet feel from measure `m` until the next change of it,
 one undo step, "Change triplet feel" (ADR-0104); the measures list it as

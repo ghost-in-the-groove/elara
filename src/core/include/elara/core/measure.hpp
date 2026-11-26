@@ -5,6 +5,7 @@
 #include <elara/core/effects.hpp>
 #include <elara/core/fraction.hpp>
 #include <elara/core/instrument.hpp>
+#include <elara/core/names.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/shared_value.hpp>
 #include <elara/core/tuning.hpp>
@@ -14,6 +15,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace elara::core {
@@ -123,6 +125,12 @@ enum class MeasureRepeat : std::uint8_t {
     TwoFirst,  ///< with the next measure, repeats the two measures before
     TwoSecond, ///< the second measure of a two-measure repeat
 };
+template <>
+struct EnumNames<MeasureRepeat> {
+    static constexpr auto kNames =
+        std::to_array<std::string_view>({"none", "one", "two-first", "two-second"});
+};
+static_assert(namesEnd(MeasureRepeat::TwoSecond));
 
 /// The content of one staff in one measure: up to four independent voices.
 struct Measure {
