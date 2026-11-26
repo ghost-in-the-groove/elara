@@ -113,6 +113,7 @@ one that replaces them.
 | [0105](0105-sanitizers.md) | Sanitizers | Accepted |
 | [0106](0106-recovery-copies.md) | Recovery copies | Accepted |
 | [0107](0107-saving-on-workers.md) | Saving and PDF export on workers | Accepted |
+| [0110](0110-job-lanes.md) | One running job and the newest request per flow | Accepted |
 
 ## Template
 
