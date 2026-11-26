@@ -117,6 +117,24 @@ if(TARGET elara)
     app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
     Qt6::Concurrent Catch2::Catch2)
+  # The document and the transport, compiled again for the tests: their QML
+  # types belong to the app's QML module, which a test cannot link. The
+  # transport plays through a device of the tests' own (ADR-0126).
+  target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp
+    "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/src/audio_controller.cpp")
+  set_target_properties(elara_app_tests PROPERTIES AUTOMOC ON)
+  target_link_libraries(elara_app_tests PRIVATE Qt6::Qml elara::notation elara::core
+    elara::audio_juce elara::audio_fluid)
+  # The fonts the document lays scores out with, where the app has them.
+  qt_add_resources(elara_app_tests "test_fonts"
+    PREFIX "/fonts"
+    BASE "${ELARA_FONT_DIR}"
+    FILES
+      "${ELARA_FONT_DIR}/Bravura.otf"
+      "${ELARA_FONT_DIR}/Bravura.json"
+      "${ELARA_FONT_DIR}/Arimo.ttf"
+      "${ELARA_FONT_DIR}/Arimo-Italic.ttf")
   target_compile_definitions(elara_app_tests PRIVATE
     ELARA_APP_ICON_SVG="${PROJECT_SOURCE_DIR}/src/app/icons/elara.svg"
     ELARA_FONT_DIR="${ELARA_FONT_DIR}"

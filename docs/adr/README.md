@@ -123,6 +123,7 @@ one that replaces them.
 | [0120](0120-sounds-kept-by-source.md) | Sounds kept by their source when the bank changes | Accepted |
 | [0121](0121-history-byte-budget.md) | The undo history is bounded by its size too | Accepted |
 | [0122](0122-choosing-and-opening-the-output-device.md) | Choosing the output device and opening it on a worker | Accepted |
+| [0126](0126-the-transport-plays-through-an-output-device.md) | The transport plays through an output device it is given | Accepted |
 
 ## Template
 

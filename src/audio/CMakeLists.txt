@@ -2,6 +2,7 @@
 # real-time-safe DSP and audio file helpers. Pure C++23.
 add_library(elara_audio STATIC
   src/offline_renderer.cpp
+  src/output_device.cpp
   src/pitch_detector.cpp
   src/player.cpp
   src/sample_ring.cpp

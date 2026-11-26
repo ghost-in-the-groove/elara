@@ -196,15 +196,6 @@ findOutput(const juce::OwnedArray<juce::AudioIODeviceType>& types,
 
 } // namespace
 
-OutputDeviceChoice parseOutputDeviceChoice(std::string_view text) {
-    constexpr std::string_view kSeparator = " / ";
-    if (const auto at = text.find(kSeparator); at != std::string_view::npos) {
-        return {.type = std::string(text.substr(0, at)),
-                .name = std::string(text.substr(at + kSeparator.size()))};
-    }
-    return {.type = {}, .name = std::string(text)};
-}
-
 std::vector<OutputDeviceInfo> listOutputDevices() {
     const juce::ScopedJuceInitialiser_GUI juceInit;
     juce::AudioDeviceManager manager;

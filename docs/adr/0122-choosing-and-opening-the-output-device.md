@@ -67,4 +67,5 @@ is made). JUCE's device manager is not safe to use from two threads at once.
 - CI has no audio device, so the tests check that a device that is not there
   fails with its name (`cli.play_rejects_unknown_device`,
   `cli.tone_rejects_unknown_device`). Opening on a worker, choosing a device and
-  changing it while playing were checked by hand on Windows.
+  changing it while playing were checked by hand on Windows; ADR-0126 tests
+  them through a device of the tests' own.

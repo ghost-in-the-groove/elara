@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
-#include <elara/audio/system_audio.hpp>
+#include <elara/audio/output_device.hpp>
 
 #include "score_document.hpp"
 #include <QFuture>
@@ -13,6 +13,7 @@
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -69,7 +70,14 @@ class AudioController : public QObject {
     Q_PROPERTY(QString includedGuitarSfz READ includedGuitarSfz CONSTANT)
 
 public:
+    /// Makes the output device, on the thread the controller lives on, when
+    /// playback or the test tone first needs one (ADR-0122).
+    using DeviceFactory = std::function<std::unique_ptr<elara::audio::OutputDevice>()>;
+
+    /// Plays through the system's sound card (elara::audio::SystemAudio).
     explicit AudioController(QObject* parent = nullptr);
+    /// Plays through the devices `makeDevice` makes.
+    explicit AudioController(DeviceFactory makeDevice, QObject* parent = nullptr);
     ~AudioController() override;
     AudioController(const AudioController&) = delete;
     AudioController& operator=(const AudioController&) = delete;
@@ -239,7 +247,8 @@ private:
     QPointer<elara::app::ScoreDocument> document_;
     /// Made here, opened and listed on a worker (ADR-0122). While a device job
     /// runs, only the worker uses it.
-    std::unique_ptr<elara::audio::SystemAudio> audio_;
+    DeviceFactory makeDevice_;
+    std::unique_ptr<elara::audio::OutputDevice> audio_;
     // What a device job finds: an error or the device opened, or the outputs.
     struct DeviceJobResult {
         QString error;
