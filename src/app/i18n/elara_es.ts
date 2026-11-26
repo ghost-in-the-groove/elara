@@ -82,6 +82,10 @@
         <translation>Tempo al %1 % de la velocidad escrita</translation>
     </message>
     <message>
+        <source>Note effects (F2)</source>
+        <translation>Efectos de nota (F2)</translation>
+    </message>
+    <message>
         <source>Song and tracks (Ctrl+I)</source>
         <translation>Canción y pistas (Ctrl+I)</translation>
     </message>
@@ -91,102 +95,14 @@
     </message>
 </context>
 <context>
-    <name>EntryBar</name>
-    <message>
-        <source>Whole note</source>
-        <translation>Redonda</translation>
-    </message>
-    <message>
-        <source>Half note</source>
-        <translation>Blanca</translation>
-    </message>
-    <message>
-        <source>Quarter note</source>
-        <translation>Negra</translation>
-    </message>
-    <message>
-        <source>Eighth note</source>
-        <translation>Corchea</translation>
-    </message>
-    <message>
-        <source>16th note</source>
-        <translation>Semicorchea</translation>
-    </message>
-    <message>
-        <source>32nd note</source>
-        <translation>Fusa</translation>
-    </message>
-    <message>
-        <source>64th note</source>
-        <translation>Semifusa</translation>
-    </message>
-    <message>
-        <source>Voice %1</source>
-        <translation>Voz %1</translation>
-    </message>
-    <message>
-        <source>%1 (+ longer, - shorter)</source>
-        <translation>%1 (+ más larga, - más corta)</translation>
-    </message>
-    <message>
-        <source>Dotted (.)</source>
-        <translation>Con puntillo (.)</translation>
-    </message>
-    <message>
-        <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
-        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
-    </message>
-    <message>
-        <source>Duplet (2 in the time of 3)</source>
-        <translation>Dosillo (2 en el tiempo de 3)</translation>
-    </message>
-    <message>
-        <source>Triplet (3 in the time of 2)</source>
-        <translation>Tresillo (3 en el tiempo de 2)</translation>
-    </message>
-    <message>
-        <source>Quadruplet (4 in the time of 3)</source>
-        <translation>Cuatrillo (4 en el tiempo de 3)</translation>
-    </message>
-    <message>
-        <source>Quintuplet (5 in the time of 4)</source>
-        <translation>Quintillo (5 en el tiempo de 4)</translation>
-    </message>
-    <message>
-        <source>Sextuplet (6 in the time of 4)</source>
-        <translation>Seisillo (6 en el tiempo de 4)</translation>
-    </message>
-    <message>
-        <source>Septuplet (7 in the time of 4)</source>
-        <translation>Septillo (7 en el tiempo de 4)</translation>
-    </message>
-    <message>
-        <source>Nonuplet (9 in the time of 8)</source>
-        <translation>Nonillo (9 en el tiempo de 8)</translation>
-    </message>
-    <message>
-        <source>No tuplet</source>
-        <translation>Sin grupo irregular</translation>
-    </message>
-    <message>
-        <source>Voice %1 (Alt+1 to Alt+4); a right click picks one</source>
-        <translation>Voz %1 (Alt+1 a Alt+4); clic derecho para elegir otra</translation>
-    </message>
-    <message>
-        <source>V%1</source>
-        <translation>V%1</translation>
-    </message>
-    <message>
-        <source>Insert a rest (Insert)</source>
-        <translation>Insertar un silencio (Insert)</translation>
-    </message>
-    <message>
-        <source>Delete the note (Delete); the beat with Ctrl+Delete</source>
-        <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
-    </message>
+    <name>EffectsPalette</name>
     <message>
         <source>Note effects</source>
         <translation>Efectos de nota</translation>
+    </message>
+    <message>
+        <source>%1 (%2)</source>
+        <translation>%1 (%2)</translation>
     </message>
     <message>
         <source>Bend</source>
@@ -209,8 +125,8 @@
         <translation>Deslizamiento</translation>
     </message>
     <message>
-        <source>Harmonic, vibrato, accent and ornaments</source>
-        <translation>Armónico, vibrato, acento y adornos</translation>
+        <source>Harmonic</source>
+        <translation>Armónico</translation>
     </message>
     <message>
         <source>Vibrato, accent and ornaments</source>
@@ -355,6 +271,101 @@
     <message>
         <source>Whammy bar</source>
         <translation>Palanca de trémolo</translation>
+    </message>
+</context>
+<context>
+    <name>EntryBar</name>
+    <message>
+        <source>Whole note</source>
+        <translation>Redonda</translation>
+    </message>
+    <message>
+        <source>Half note</source>
+        <translation>Blanca</translation>
+    </message>
+    <message>
+        <source>Quarter note</source>
+        <translation>Negra</translation>
+    </message>
+    <message>
+        <source>Eighth note</source>
+        <translation>Corchea</translation>
+    </message>
+    <message>
+        <source>16th note</source>
+        <translation>Semicorchea</translation>
+    </message>
+    <message>
+        <source>32nd note</source>
+        <translation>Fusa</translation>
+    </message>
+    <message>
+        <source>64th note</source>
+        <translation>Semifusa</translation>
+    </message>
+    <message>
+        <source>Voice %1</source>
+        <translation>Voz %1</translation>
+    </message>
+    <message>
+        <source>%1 (+ longer, - shorter)</source>
+        <translation>%1 (+ más larga, - más corta)</translation>
+    </message>
+    <message>
+        <source>Dotted (.)</source>
+        <translation>Con puntillo (.)</translation>
+    </message>
+    <message>
+        <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
+        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
+    </message>
+    <message>
+        <source>Duplet (2 in the time of 3)</source>
+        <translation>Dosillo (2 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Triplet (3 in the time of 2)</source>
+        <translation>Tresillo (3 en el tiempo de 2)</translation>
+    </message>
+    <message>
+        <source>Quadruplet (4 in the time of 3)</source>
+        <translation>Cuatrillo (4 en el tiempo de 3)</translation>
+    </message>
+    <message>
+        <source>Quintuplet (5 in the time of 4)</source>
+        <translation>Quintillo (5 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Sextuplet (6 in the time of 4)</source>
+        <translation>Seisillo (6 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Septuplet (7 in the time of 4)</source>
+        <translation>Septillo (7 en el tiempo de 4)</translation>
+    </message>
+    <message>
+        <source>Nonuplet (9 in the time of 8)</source>
+        <translation>Nonillo (9 en el tiempo de 8)</translation>
+    </message>
+    <message>
+        <source>No tuplet</source>
+        <translation>Sin grupo irregular</translation>
+    </message>
+    <message>
+        <source>Voice %1 (Alt+1 to Alt+4); a right click picks one</source>
+        <translation>Voz %1 (Alt+1 a Alt+4); clic derecho para elegir otra</translation>
+    </message>
+    <message>
+        <source>V%1</source>
+        <translation>V%1</translation>
+    </message>
+    <message>
+        <source>Insert a rest (Insert)</source>
+        <translation>Insertar un silencio (Insert)</translation>
+    </message>
+    <message>
+        <source>Delete the note (Delete); the beat with Ctrl+Delete</source>
+        <translation>Borrar la nota (Supr); el tiempo con Ctrl+Supr</translation>
     </message>
     <message>
         <source>Chord symbol (Ctrl+K)</source>
@@ -657,6 +668,10 @@
     <message>
         <source>Fit the page width</source>
         <translation>Ajustar al ancho de la página</translation>
+    </message>
+    <message>
+        <source>Note effects</source>
+        <translation>Efectos de nota</translation>
     </message>
     <message>
         <source>Song and tracks</source>
@@ -2524,6 +2539,10 @@
     <message>
         <source>Show the score as one continuous scroll.</source>
         <translation>Mostrar la partitura como un desplazamiento continuo.</translation>
+    </message>
+    <message>
+        <source>Open a menu at start: file, edit, view, sound or help.</source>
+        <translation>Abre un menú al arrancar: file, edit, view, sound o help.</translation>
     </message>
     <message>
         <source>Open the window at this size, as WIDTHxHEIGHT.</source>

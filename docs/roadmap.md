@@ -303,8 +303,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The window's bands: the command bar with the menus and the transport, the
       song string, the tool row and the status bar; one set of colours, sizes
       and icons (ADR-0108)
-- [ ] The note effects as a palette docked at the left of the score, lit with
-      the caret's note
+- [x] The note effects as a palette docked at the left of the score, lit with
+      the caret's note, each key in the corner of its tile; the zoom keeps
+      fitting when a panel opens (ADR-0109)
 - [ ] The song panel, the popups and the tuner in the interface's own controls;
       the measure popup fits a short window
 - [ ] The welcome pane as a home: what to do at the left, the recent scores

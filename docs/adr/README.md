@@ -114,6 +114,7 @@ one that replaces them.
 | [0106](0106-recovery-copies.md) | Recovery copies | Accepted |
 | [0107](0107-saving-on-workers.md) | Saving and PDF export on workers | Accepted |
 | [0108](0108-window-layout.md) | The window: command bar, song string, tool row and status bar | Accepted |
+| [0109](0109-note-effects-palette.md) | The note effects palette | Accepted |
 | [0110](0110-job-lanes.md) | One running job and the newest request per flow | Accepted |
 | [0111](0111-change-kinds.md) | Edits say what they change | Accepted |
 | [0112](0112-preparing-the-player.md) | Preparing the player on a worker | Accepted |
