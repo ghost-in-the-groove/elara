@@ -6,6 +6,7 @@
 #include <elara/audio/flac_reader.hpp>
 #include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/pitch_detector.hpp>
+#include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
 #include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/sound_bank.hpp>
@@ -98,6 +99,30 @@ TEST_CASE("offline rendering benchmarks", "[benchmark][audio]") {
     };
     BENCHMARK("render 10 s of the large song on one thread") {
         return tenSeconds(1);
+    };
+}
+
+TEST_CASE("player benchmarks", "[benchmark][audio][player]") {
+    const elara::core::Song song = elara::bench::largeSong();
+    elara::audio::Player player(48000.0);
+    player.load(song, elara::audio::Sequence(song));
+    std::vector<float> left(512);
+    std::vector<float> right(512);
+    // Played for a second, then paused for ten: the notes ring out first.
+    player.play();
+    for (int b = 0; b < 94; ++b) {
+        player.render(left, right);
+    }
+    player.pause();
+    for (int b = 0; b < 940; ++b) {
+        player.render(left, right);
+    }
+    // What the audio device asks of a paused player once nothing rings.
+    BENCHMARK("1 s of a paused player of the large song, nothing ringing (512-frame blocks)") {
+        for (int b = 0; b < 94; ++b) {
+            player.render(left, right);
+        }
+        return left[0];
     };
 }
 

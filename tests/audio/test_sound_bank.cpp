@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -48,14 +49,17 @@ constexpr double kRate = 48000.0;
 constexpr float kSteadyLevel = 0.25f;
 
 // A test sound: a constant level for every key held, nothing once released.
+// Counts the frames it renders in `rendered`.
 class SteadySound final : public TrackSound {
 public:
+    explicit SteadySound(std::atomic<std::int64_t>& rendered) : rendered_(rendered) {}
     void noteOn(int /*key*/, int /*velocity*/, Touch /*touch*/) noexcept override { ++held_; }
     void noteOff(int /*key*/) noexcept override { held_ = std::max(held_ - 1, 0); }
     void glide(int /*key*/, double /*cents*/, double /*seconds*/) noexcept override {}
     void releaseAll() noexcept override { held_ = 0; }
     void reset() noexcept override { held_ = 0; }
     void render(std::span<float> out) noexcept override {
+        rendered_ += static_cast<std::int64_t>(out.size());
         for (float& sample : out) {
             sample += kSteadyLevel * static_cast<float>(held_);
         }
@@ -65,6 +69,7 @@ public:
     }
 
 private:
+    std::atomic<std::int64_t>& rendered_;
     int held_ = 0;
 };
 
@@ -75,13 +80,14 @@ public:
                                                     double /*sampleRate*/) const override {
         ++made;
         programs.push_back(instrument.midiProgram);
-        return std::make_unique<SteadySound>();
+        return std::make_unique<SteadySound>(rendered);
     }
     [[nodiscard]] std::string soundName(const Instrument& instrument) const override {
         return "steady " + std::to_string(instrument.midiProgram);
     }
 
     mutable std::atomic<int> made{0};
+    mutable std::atomic<std::int64_t> rendered{0}; ///< frames its sounds rendered
     mutable std::vector<int> programs;
 };
 
@@ -206,6 +212,20 @@ TEST_CASE("Playback: tracks play through the player's sound bank", "[audio][soun
         std::vector<float> right2(64);
         player.render(left2, right2);
         CHECK(std::ranges::all_of(left2, [](float sample) { return sample == 0.0f; }));
+    }
+    SECTION("paused with nothing ringing, the sounds do not run") {
+        player.pause();
+        std::vector<float> left2(256, 1.0f);
+        std::vector<float> right2(256, 1.0f);
+        player.render(left2, right2); // the pause releases the note
+        const std::int64_t rendered = bank->rendered;
+        player.render(left2, right2);
+        CHECK(bank->rendered == rendered);
+        CHECK(std::ranges::all_of(left2, [](float sample) { return sample == 0.0f; }));
+        CHECK(std::ranges::all_of(right2, [](float sample) { return sample == 0.0f; }));
+        player.play();
+        player.render(left2, right2);
+        CHECK(bank->rendered > rendered);
     }
     SECTION("another bank makes new sounds") {
         player.setSoundBank(builtinBank());
