@@ -114,9 +114,18 @@ int runDevices(bool json) {
     return kExitOk;
 }
 
-int runTone(bool json, const ToneOptions& tone) {
+constexpr const char* kDeviceHelp =
+    "Output device, as `devices` lists it: \"TYPE / NAME\" or NAME (default: the system's)";
+
+struct DeviceToneOptions {
+    ToneOptions tone;
+    std::string device;
+};
+
+int runTone(bool json, const DeviceToneOptions& options) {
+    const auto& tone = options.tone;
     audio::SystemAudio system;
-    if (auto opened = system.open(); !opened) {
+    if (auto opened = system.open(audio::parseOutputDeviceChoice(options.device)); !opened) {
         return fail(opened.error());
     }
     system.playTone(tone.frequencyHz, tone.seconds);
@@ -525,6 +534,7 @@ struct PlayOptions {
     std::vector<double> loop; // from, to
     std::string soundFont;
     std::vector<std::string> sfz;
+    std::string device;
 };
 
 int runPlay(bool json, const PlayOptions& options) {
@@ -546,7 +556,7 @@ int runPlay(bool json, const PlayOptions& options) {
     }
     const audio::Sequence sequence(*song, options.practice.sequence());
     audio::SystemAudio system;
-    if (auto opened = system.open(); !opened) {
+    if (auto opened = system.open(audio::parseOutputDeviceChoice(options.device)); !opened) {
         return fail(opened.error());
     }
     audio::Player player(system.sampleRate());
@@ -951,8 +961,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
 
     auto playing = std::make_shared<PlayOptions>();
     auto* playCommand = app.add_subcommand(
-        "play", "Play a song through the built-in synthesizer or a SoundFont on the default "
-                "output device");
+        "play", "Play a song through the built-in synthesizer or a SoundFont on an output device");
     playCommand->add_option("file", playing->file, "A .elara file or any file import reads")
         ->required();
     playCommand->add_option("--from", playing->from, "Start this many seconds into the song")
@@ -969,6 +978,7 @@ void addAudioCommands(CLI::App& app, Context& context) {
     playCommand->add_option("--loop", playing->loop, "Loop from FROM to TO seconds")
         ->expected(2)
         ->type_name("FROM TO");
+    playCommand->add_option("--device", playing->device, kDeviceHelp);
     playCommand->callback(
         [&context, playing] { context.exitCode = runPlay(context.json, *playing); });
 
@@ -999,9 +1009,10 @@ void addAudioCommands(CLI::App& app, Context& context) {
         context.exitCode = runDevices(context.json);
     });
 
-    auto play = std::make_shared<ToneOptions>();
-    auto* tone = app.add_subcommand("tone", "Play a sine test tone on the default output device");
-    addToneOptions(*tone, *play);
+    auto play = std::make_shared<DeviceToneOptions>();
+    auto* tone = app.add_subcommand("tone", "Play a sine test tone on an output device");
+    addToneOptions(*tone, play->tone);
+    tone->add_option("--device", play->device, kDeviceHelp);
     tone->callback([&context, play] { context.exitCode = runTone(context.json, *play); });
 
     auto tuned = std::make_shared<TuneOptions>();

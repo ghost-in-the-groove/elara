@@ -7,7 +7,7 @@ look at a score, so every capability must be observable from here:
 elara-cli [--json] version
 elara-cli [--json] render-tone --out tone.wav [--frequency 440] [--seconds 1] [--sample-rate 48000]
 elara-cli [--json] devices                         # outputs and inputs
-elara-cli [--json] tone [--frequency 440] [--seconds 1]
+elara-cli [--json] tone [--frequency 440] [--seconds 1] [--device "TYPE / NAME"]
 elara-cli [--json] tune <FILE.wav/.flac> [--a4 440] [--tuning guitar]   # the tuner's reading of a recording
 elara-cli [--json] listen [--seconds 5] [--a4 440] [--tuning guitar] # tune from the default input
 elara-cli [--json] pitch <PITCH|MIDI> [--flats] [--a4 440]
@@ -32,6 +32,7 @@ elara-cli [--json] render-audio <FILE> [--out FILE.wav] [--sample-rate 48000] [-
                                  [--sfz [TRACKS=]FILE.sfz]...
 elara-cli [--json] play <FILE> [--from 0] [--seconds S] [--speed 100] [--metronome]
                          [--count-in] [--loop FROM TO] [--soundfont FILE.sf2] [--sfz [TRACKS=]FILE.sfz]...
+                         [--device "TYPE / NAME"]   # as devices lists it; NAME alone for any type
 elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's presets
 elara-cli [--json] sfz <FILE.sfz>                             # what Elara plays of an SFZ
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]

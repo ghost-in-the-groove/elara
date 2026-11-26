@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QSettings>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtConcurrent/QtConcurrentRun>
 
 #include <algorithm>
@@ -33,6 +34,7 @@ AudioController::AudioController(QObject* parent)
 }
 
 AudioController::~AudioController() {
+    deviceJob_.waitForFinished(); // a device job uses audio_ until it ends
     if (audio_) {
         audio_->setSource(nullptr); // the audio thread lets go of the player first
     }
@@ -60,20 +62,137 @@ void AudioController::setDocument(elara::app::ScoreDocument* document) {
     emit documentChanged();
 }
 
-bool AudioController::openDevice() {
-    if (audio_) {
-        return true;
+// The device is open and no device job holds audio_: this thread may use it.
+bool AudioController::deviceReady() const {
+    return audio_ && deviceOpen_ && !deviceBusy_;
+}
+
+// Opening a device can take a moment, or seconds when it wakes up, so it
+// happens on a worker; what waits for it starts once it has (ADR-0122).
+void AudioController::openDevice() {
+    if (opening_ && openingDevice_ == outputDevice_) {
+        return; // already on its way
     }
-    auto audio = std::make_unique<elara::audio::SystemAudio>();
-    if (auto opened = audio->open(); !opened) {
-        setErrorMessage(
-            tr("Audio device unavailable: %1").arg(QString::fromStdString(opened.error())));
-        return false;
+    openWanted_ = true;
+    nextDeviceJob();
+}
+
+void AudioController::listOutputDevices() {
+    if (listWanted_ || listing_) {
+        return;
     }
-    audio_ = std::move(audio);
-    deviceDescription_ = QString::fromStdString(audio_->deviceDescription());
-    emit deviceDescriptionChanged();
-    return true;
+    listWanted_ = true;
+    emit outputDevicesChanged();
+    nextDeviceJob();
+}
+
+// One device job at a time, opening before listing. While one runs, only the
+// worker uses audio_.
+void AudioController::nextDeviceJob() {
+    if (deviceBusy_ || (!openWanted_ && !listWanted_)) {
+        return;
+    }
+    if (!audio_) {
+        // Made on this thread, which the audio runtime then belongs to.
+        audio_ = std::make_unique<elara::audio::SystemAudio>();
+    }
+    elara::audio::SystemAudio* audio = audio_.get(); // outlives the job: see the destructor
+    if (openWanted_) {
+        openWanted_ = false;
+        opening_ = true;
+        openingDevice_ = outputDevice_;
+        deviceOpen_ = false;
+        emit openingDeviceChanged();
+        deviceJob_ = QtConcurrent::run([audio, device = openingDevice_] {
+            DeviceJobResult result;
+            if (auto opened = audio->open(device); !opened) {
+                result.error = QString::fromStdString(opened.error());
+            } else {
+                result.description = QString::fromStdString(audio->deviceDescription());
+            }
+            return result;
+        });
+    } else {
+        listWanted_ = false;
+        listing_ = true;
+        deviceJob_ = QtConcurrent::run([audio] {
+            DeviceJobResult result;
+            for (const auto& device : audio->outputDevices()) {
+                result.outputs.append(
+                    QVariantMap{{QStringLiteral("type"), QString::fromStdString(device.type)},
+                                {QStringLiteral("name"), QString::fromStdString(device.name)},
+                                {QStringLiteral("isDefault"), device.isDefault}});
+            }
+            return result;
+        });
+    }
+    deviceBusy_ = true;
+    elara::app::whenDone(deviceJob_, this, [this](const DeviceJobResult& result) {
+        deviceBusy_ = false;
+        if (opening_) {
+            opening_ = false;
+            if (deviceDescription_ != result.description) {
+                deviceDescription_ = result.description;
+                emit deviceDescriptionChanged();
+            }
+            deviceOpened(result.error);
+            emit openingDeviceChanged();
+        } else {
+            listing_ = false;
+            outputDevices_ = result.outputs;
+            emit outputDevicesChanged();
+        }
+        nextDeviceJob();
+    });
+}
+
+// The device opened, or did not and `error` says why: playback and the test
+// tone asked for meanwhile start, unless another device was chosen since.
+void AudioController::deviceOpened(const QString& error) {
+    deviceOpen_ = error.isEmpty();
+    if (openWanted_) {
+        return; // what waits for a device waits for that one
+    }
+    if (!deviceOpen_) {
+        setErrorMessage(tr("Audio device unavailable: %1").arg(error));
+        playWhenOpen_ = false;
+        toneWhenOpen_.reset();
+        if (player_) {
+            player_->pause();
+            pollTransport();
+        }
+        return;
+    }
+    if (player_) {
+        followDeviceRate(); // the new device may run at another rate
+    }
+    if (playWhenOpen_) {
+        playWhenOpen_ = false;
+        togglePlayback();
+    }
+    if (toneWhenOpen_) {
+        const auto [frequencyHz, seconds] = *toneWhenOpen_;
+        toneWhenOpen_.reset();
+        playTestTone(frequencyHz, seconds);
+    }
+}
+
+QString AudioController::outputDeviceType() const {
+    return QString::fromStdString(outputDevice_.type);
+}
+
+QString AudioController::outputDeviceName() const {
+    return QString::fromStdString(outputDevice_.name);
+}
+
+// The player renders at the device's rate and plays the document's song.
+void AudioController::makePlayer() {
+    player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
+    player_->setSoundBank(bank_);
+    preparing_.drop();
+    loadSequenceNow();
+    player_->seek(position_);
+    audio_->setSource(player_.get());
 }
 
 // The song was edited. When it plays as before (the document kept its
@@ -185,16 +304,18 @@ void AudioController::togglePlayback() {
     if (!document_ || !document_->song() || !document_->sequence()) {
         return;
     }
-    if (!player_) {
-        if (!openDevice()) {
-            return;
+    // A player whose device is changing plays or pauses at once; without a
+    // device ready, playback starts once it is, and a second press while it
+    // opens takes that back.
+    if (!deviceReady() && !(player_ && deviceBusy_)) {
+        playWhenOpen_ = !playWhenOpen_;
+        if (playWhenOpen_) {
+            openDevice();
         }
-        player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
-        player_->setSoundBank(bank_);
-        preparing_.drop();
-        loadSequenceNow();
-        player_->seek(position_);
-        audio_->setSource(player_.get());
+        return;
+    }
+    if (!player_) {
+        makePlayer();
     } else {
         followDeviceRate(); // the device may have restarted while paused
     }
@@ -211,6 +332,7 @@ void AudioController::togglePlayback() {
 }
 
 void AudioController::stopPlayback() {
+    playWhenOpen_ = false;
     if (player_) {
         player_->pause();
         player_->seek(0.0);
@@ -268,7 +390,7 @@ void AudioController::pollTransport() {
 // pitch and speed: a player made at the new rate takes over, from the same
 // place in the music.
 void AudioController::followDeviceRate() {
-    const double rate = audio_ ? audio_->sampleRate() : 0.0;
+    const double rate = deviceReady() ? audio_->sampleRate() : 0.0;
     if (rate <= 0.0 || rate == player_->sampleRate() || !document_ || !loaded_ ||
         loaded_ != document_->sequence() || !document_->sequenceSong()) {
         return;
@@ -356,6 +478,8 @@ namespace {
 const QString kSoundFontKey = QStringLiteral("audio/soundFont");
 const QString kGuitarSfzKey = QStringLiteral("audio/guitarSfz");
 const QString kBassSfzKey = QStringLiteral("audio/bassSfz");
+const QString kOutputTypeKey = QStringLiteral("audio/outputDeviceType");
+const QString kOutputNameKey = QStringLiteral("audio/outputDeviceName");
 
 // A local path from a path or a file URL, as file dialogs give them.
 QString localPath(const QString& file) {
@@ -492,6 +616,27 @@ void AudioController::restoreSound() {
     if (const QString file = saved(kBassSfzKey); !file.isEmpty()) {
         setSfz(QStringLiteral("basses"), file);
     }
+    // Not looked for now: a device that is gone says so on the first play.
+    setOutputDevice(settings.value(kOutputTypeKey).toString(),
+                    settings.value(kOutputNameKey).toString());
+}
+
+void AudioController::setOutputDevice(const QString& type, const QString& name) {
+    elara::audio::OutputDeviceChoice device{
+        .type = name.isEmpty() ? std::string() : type.toStdString(), .name = name.toStdString()};
+    if (device == outputDevice_) {
+        return;
+    }
+    outputDevice_ = std::move(device);
+    emit outputDeviceChanged();
+    if (rememberSound_) {
+        QSettings settings;
+        settings.setValue(kOutputTypeKey, outputDeviceType());
+        settings.setValue(kOutputNameKey, outputDeviceName());
+    }
+    if (deviceOpen_ || opening_) {
+        openDevice(); // what plays moves to it
+    }
 }
 
 QString AudioController::trackSound(int track) const {
@@ -560,7 +705,9 @@ void AudioController::useSoundBank() {
 }
 
 void AudioController::playTestTone(double frequencyHz, double seconds) {
-    if (!openDevice()) {
+    if (!deviceReady()) {
+        toneWhenOpen_ = {frequencyHz, seconds}; // once the device opens
+        openDevice();
         return;
     }
     setErrorMessage({});

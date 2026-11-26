@@ -84,7 +84,10 @@ Three targets with different rules:
 `elara_audio_juce` opens the
 system audio device through JUCE (ADR-0002) and exposes a plain C++ API
 (`elara::audio::SystemAudio`, `listOutputDevices()`); `SystemAudio::setSource()`
-plays an `AudioSource` such as a `Player`. `MicrophoneInput` (and
+plays an `AudioSource` such as a `Player`. `open()` takes an
+`OutputDeviceChoice`, a driver type and a device name or the system's
+default, and with `outputDevices()` may run on a worker while the main thread
+leaves the object alone (ADR-0122). `MicrophoneInput` (and
 `listInputDevices()`) listens to the default input on a device of its own and
 queues the loudest channel's samples in a `SampleRing` (ADR-0029).
 

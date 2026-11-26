@@ -823,6 +823,54 @@ ApplicationWindow {
                         onTriggered: audio.useBuiltinSound()
                     }
                     AppMenuSeparator {}
+                    AppMenu {
+                        // The output device (ADR-0122), looked for each time
+                        // the menu opens: one may have been plugged in.
+                        id: outputMenu
+
+                        objectName: "outputMenu"
+                        title: audio.outputDeviceName.length > 0
+                               ? qsTr("Output: %1").arg(audio.outputDeviceName)
+                               : qsTr("Output: system default")
+
+                        Connections {
+                            target: outputMenu
+
+                            function onAboutToShow() {
+                                audio.listOutputDevices();
+                            }
+                        }
+                        AppMenuItem {
+                            text: qsTr("System default")
+                            chosen: audio.outputDeviceName.length === 0
+                            onTriggered: audio.setOutputDevice("", "")
+                        }
+                        AppMenuSeparator {}
+                        AppMenuItem {
+                            visible: audio.outputDevices.length === 0
+                            enabled: false
+                            text: audio.listingOutputDevices ? qsTr("Looking for devices…")
+                                                             : qsTr("No output device found")
+                        }
+                        Instantiator {
+                            model: audio.outputDevices
+
+                            delegate: AppMenuItem {
+                                required property var modelData
+
+                                text: modelData.type + " / " + modelData.name
+                                chosen: audio.outputDeviceType === modelData.type
+                                        && audio.outputDeviceName === modelData.name
+                                onTriggered: audio.setOutputDevice(modelData.type, modelData.name)
+                            }
+                            // After the default, the separator and the note.
+                            onObjectAdded: (index, object) => {
+                                outputMenu.insertItem(index + 3, object);
+                                outputMenu.fitWidth();
+                            }
+                            onObjectRemoved: (index, object) => outputMenu.removeItem(object)
+                        }
+                    }
                     AppMenuItem {
                         text: audio.playing ? qsTr("Playing…") : qsTr("Play a test tone")
                         enabled: !audio.playing

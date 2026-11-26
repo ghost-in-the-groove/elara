@@ -754,6 +754,26 @@
         <translation>Usar el sintetizador integrado</translation>
     </message>
     <message>
+        <source>Output: %1</source>
+        <translation>Salida: %1</translation>
+    </message>
+    <message>
+        <source>Output: system default</source>
+        <translation>Salida: la predeterminada del sistema</translation>
+    </message>
+    <message>
+        <source>System default</source>
+        <translation>Predeterminada del sistema</translation>
+    </message>
+    <message>
+        <source>Looking for devices…</source>
+        <translation>Buscando dispositivos…</translation>
+    </message>
+    <message>
+        <source>No output device found</source>
+        <translation>No se ha encontrado ninguna salida</translation>
+    </message>
+    <message>
         <source>&amp;Help</source>
         <translation>A&amp;yuda</translation>
     </message>

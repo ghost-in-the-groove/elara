@@ -1,22 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
+#include <elara/audio/system_audio.hpp>
+
 #include "score_document.hpp"
+#include <QFuture>
 #include <QObject>
 #include <QPointer>
 #include <QString>
 #include <QTimer>
+#include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <utility>
 
 namespace elara::audio {
 class Player;
 class PreparedSong;
 class SoundBank;
 class Sequence;
-class SystemAudio;
 } // namespace elara::audio
 
 /// QML bridge to the system audio device: the transport that plays the open
@@ -32,6 +37,13 @@ class AudioController : public QObject {
     Q_PROPERTY(double position READ position NOTIFY positionChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY playingChanged)
     Q_PROPERTY(QString deviceDescription READ deviceDescription NOTIFY deviceDescriptionChanged)
+    // The output device (ADR-0122): chosen among outputDevices, empty for the
+    // system's default; it opens on a worker.
+    Q_PROPERTY(QString outputDeviceType READ outputDeviceType NOTIFY outputDeviceChanged)
+    Q_PROPERTY(QString outputDeviceName READ outputDeviceName NOTIFY outputDeviceChanged)
+    Q_PROPERTY(QVariantList outputDevices READ outputDevices NOTIFY outputDevicesChanged)
+    Q_PROPERTY(bool listingOutputDevices READ listingOutputDevices NOTIFY outputDevicesChanged)
+    Q_PROPERTY(bool openingDevice READ openingDevice NOTIFY openingDeviceChanged)
     Q_PROPERTY(QString errorMessage READ errorMessage NOTIFY errorMessageChanged)
     // Practice (ADR-0024): a measure of clicks before playing, and the A-B loop.
     Q_PROPERTY(bool countIn READ countIn WRITE setCountIn NOTIFY countInChanged)
@@ -78,7 +90,29 @@ public:
     [[nodiscard]] QString deviceDescription() const { return deviceDescription_; }
     [[nodiscard]] QString errorMessage() const { return errorMessage_; }
 
-    /// Plays the score, or pauses it.
+    /// The output device chosen: its driver type and name, empty for the
+    /// system's default.
+    [[nodiscard]] QString outputDeviceType() const;
+    [[nodiscard]] QString outputDeviceName() const;
+    /// The output devices found by the last listOutputDevices(), each a map of
+    /// "type", "name" and "isDefault" (the system's default of its type).
+    [[nodiscard]] QVariantList outputDevices() const { return outputDevices_; }
+    /// True while they are being looked for.
+    [[nodiscard]] bool listingOutputDevices() const { return listWanted_ || listing_; }
+    /// True while the device opens, which happens on a worker: playback and the
+    /// test tone asked for meanwhile start once it has.
+    [[nodiscard]] bool openingDevice() const { return opening_; }
+    /// Looks for the output devices on a worker; outputDevices changes once
+    /// they are found.
+    Q_INVOKABLE void listOutputDevices();
+    /// Plays through the output device `name` of the driver type `type`, or
+    /// through the system's default when `name` is empty, from now on: at once
+    /// when the device is already open, playing or paused as before. Kept for
+    /// the next start when rememberSound is on.
+    Q_INVOKABLE void setOutputDevice(const QString& type, const QString& name);
+
+    /// Plays the score, or pauses it. The first time, the device opens first,
+    /// on a worker, and playback starts once it has.
     Q_INVOKABLE void togglePlayback();
     /// Stops and goes back to the start.
     Q_INVOKABLE void stopPlayback();
@@ -137,7 +171,8 @@ public:
     Q_INVOKABLE void useBuiltinSound();
     /// Opens the SoundFont and the SFZ instruments chosen last time, when
     /// rememberSound is on: the included SoundFont when no sound was ever
-    /// chosen or the file chosen is gone.
+    /// chosen or the file chosen is gone. The output device chosen last time
+    /// is chosen again; it opens on the first play.
     Q_INVOKABLE void restoreSound();
     /// The sound track `track` of the open song plays with: the timbre's
     /// name, the SoundFont preset's or the SFZ instrument's.
@@ -151,6 +186,9 @@ signals:
     void positionChanged();
     void playingChanged();
     void deviceDescriptionChanged();
+    void outputDeviceChanged();
+    void outputDevicesChanged();
+    void openingDeviceChanged();
     void errorMessageChanged();
     void countInChanged();
     void countingInChanged();
@@ -161,7 +199,11 @@ signals:
     void rememberSoundChanged();
 
 private:
-    bool openDevice();
+    [[nodiscard]] bool deviceReady() const;
+    void openDevice();
+    void nextDeviceJob();
+    void deviceOpened(const QString& error);
+    void makePlayer();
     void loadSong();
     void loadSequence();
     void loadSequenceNow();
@@ -195,7 +237,27 @@ private:
     void useSoundBank();
 
     QPointer<elara::app::ScoreDocument> document_;
+    /// Made here, opened and listed on a worker (ADR-0122). While a device job
+    /// runs, only the worker uses it.
     std::unique_ptr<elara::audio::SystemAudio> audio_;
+    // What a device job finds: an error or the device opened, or the outputs.
+    struct DeviceJobResult {
+        QString error;
+        QString description;
+        QVariantList outputs;
+    };
+    QFuture<DeviceJobResult> deviceJob_; // the job running, waited for on destruction
+    bool deviceBusy_ = false;            // a device job runs
+    bool deviceOpen_ = false;            // audio_ has a device open
+    bool opening_ = false;               // the job running opens a device
+    bool listing_ = false;               // the job running lists the outputs
+    bool openWanted_ = false;            // open outputDevice_ once the job running ends
+    bool listWanted_ = false;            // list the outputs once the job running ends
+    bool playWhenOpen_ = false;          // start playback once the device opens
+    std::optional<std::pair<double, double>> toneWhenOpen_; // Hz, seconds
+    elara::audio::OutputDeviceChoice outputDevice_;         // empty: the default
+    elara::audio::OutputDeviceChoice openingDevice_;        // what the job opens
+    QVariantList outputDevices_;
     std::unique_ptr<elara::audio::Player> player_;
     /// Songs prepared for player_ on a worker: only the newest is published
     /// (ADR-0112).

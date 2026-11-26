@@ -1728,6 +1728,16 @@ set_tests_properties(cli.render_audio_rejects_missing_sfz PROPERTIES WILL_FAIL T
 add_test(NAME cli.play_rejects_missing_file
   COMMAND elara-cli play "${ELARA_CORPUS}/missing.gp")
 set_tests_properties(cli.play_rejects_missing_file PROPERTIES WILL_FAIL TRUE)
+# An output device chosen by type and name, or by name alone (ADR-0122), must
+# be there: a device no system has fails, naming it, before anything plays.
+add_test(NAME cli.play_rejects_unknown_device
+  COMMAND elara-cli play "${ELARA_CORPUS}/gp/band.gp" --device "Nowhere / No such device")
+set_tests_properties(cli.play_rejects_unknown_device PROPERTIES
+  PASS_REGULAR_EXPRESSION "error: no output device \"Nowhere / No such device\"")
+add_test(NAME cli.tone_rejects_unknown_device
+  COMMAND elara-cli tone --seconds 0.1 --device "No such device")
+set_tests_properties(cli.tone_rejects_unknown_device PROPERTIES
+  PASS_REGULAR_EXPRESSION "error: no output device \"No such device\"")
 # Count-in and loop (ADR-0024): the count-in is a measure of beats where
 # playback starts (melody.musicxml ends in 3/4 at quarter = 100; band.gp is
 # 4/4 at quarter = 90, here at half speed). A loop must start before it ends,

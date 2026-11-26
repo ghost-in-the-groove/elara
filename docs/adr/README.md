@@ -122,6 +122,7 @@ one that replaces them.
 | [0114](0114-dark-page.md) | The page in the dark theme | Accepted |
 | [0120](0120-sounds-kept-by-source.md) | Sounds kept by their source when the bank changes | Accepted |
 | [0121](0121-history-byte-budget.md) | The undo history is bounded by its size too | Accepted |
+| [0122](0122-choosing-and-opening-the-output-device.md) | Choosing the output device and opening it on a worker | Accepted |
 
 ## Template
 
