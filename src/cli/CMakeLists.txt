@@ -1,5 +1,13 @@
 # elara-cli: headless entry point for tests, scripts and power users (ADR-0003).
 # Every user-visible capability should be reachable from here with --json output.
+
+# The steps of `elara-cli edit`, parsed and run against a document, in a library
+# of their own so that tests run them without the executable.
+add_library(elara_cli_steps STATIC src/edit_steps.cpp)
+target_include_directories(elara_cli_steps PUBLIC src)
+target_link_libraries(elara_cli_steps PUBLIC elara::core)
+elara_target_warnings(elara_cli_steps)
+
 add_executable(elara-cli
   src/main.cpp
   src/common.cpp
@@ -12,6 +20,7 @@ add_executable(elara-cli
   src/theory_commands.cpp)
 
 target_link_libraries(elara-cli PRIVATE
+  elara_cli_steps
   elara::core
   elara::io
   elara::notation
