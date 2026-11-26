@@ -124,9 +124,10 @@ struct Rig {
     std::unique_ptr<FakeDevice> made = std::make_unique<FakeDevice>();
     FakeDevice& device = *made;
     elara::app::ScoreDocument score;
-    AudioController audio{[this] { return std::move(made); }};
+    AudioController audio;
 
-    Rig() {
+    // The transport makes its device once, the first time it needs one.
+    Rig() : audio([this] { return std::move(made); }) {
         score.newSong(QStringLiteral("electric-guitar"));
         audio.setDocument(&score);
     }
