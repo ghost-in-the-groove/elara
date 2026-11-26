@@ -239,7 +239,12 @@ if(TARGET elara)
     FIXTURES_REQUIRED recovery_clean
     FIXTURES_SETUP recovery_left
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(left a recovery copy\\)")
+  # Alone: it tells the copy a crash left by taking the lock that run held
+  # (ADR-0106), and among the parallel tests that lock was once found still
+  # taken (most likely the crashed run's process id given to another elara,
+  # or its lock file held open by another process).
   set_tests_properties(app.smoke_recovery PROPERTIES
+    RUN_SERIAL TRUE
     FIXTURES_REQUIRED recovery_left
     PASS_REGULAR_EXPRESSION "recovery: Left by a crash[\r\n]+.*smoke-test: ok")
 

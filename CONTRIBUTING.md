@@ -57,6 +57,9 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
    `app.smoke` passing (QML loads with zero warnings).
 5. **Tests first for behaviour.** Add or extend a test that fails, then make it pass.
    Test names are prefixed by module (`core.`, `io.`, `audio.`, `cli.`, `app.`).
+   Tests run in parallel, one per core: a test writes only files of its own
+   (a name no other test uses, or a `FIXTURES_SETUP` the tests that read it
+   require).
 6. **Licences.** Never copy code or assets from Guitar Pro, MuseScore or other
    projects unless the licence is compatible *and* recorded in
    `THIRD_PARTY_NOTICES.md`. File formats are implemented from public documentation.
