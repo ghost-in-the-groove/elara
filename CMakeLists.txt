@@ -36,6 +36,22 @@ include(GNUInstallDirs)
 include(ElaraWarnings)
 include(ElaraDependencies)
 
+# Optimisation across translation units at link time, for optimised builds
+# only. Off: with MSVC it made the binaries a quarter smaller but no faster,
+# and imports and PDF writing slower (docs/performance.md). On for measuring
+# other toolchains: cmake --preset release -DELARA_IPO=ON.
+option(ELARA_IPO "Optimise across translation units at link time in optimised builds" OFF)
+if(ELARA_IPO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT elara_ipo_supported OUTPUT elara_ipo_output LANGUAGES CXX)
+  if(elara_ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  else()
+    message(WARNING "ELARA_IPO is on, but this toolchain cannot do it: ${elara_ipo_output}")
+  endif()
+endif()
+
 # Where elara-cli and its fonts install (ADR-0048): inside the app bundle on
 # macOS, so the disk image holds one thing to drag; next to the app elsewhere.
 if(APPLE AND ELARA_BUILD_APP)
