@@ -47,6 +47,13 @@ reads and writes Standard MIDI File chunks and events, and `src/midi_shared.hpp`
 holds what the MIDI reader and writer agree on. Every exporter is tested by
 importing its output back (`tests/io/test_musicxml_export.cpp`, `tests/io/test_midi.cpp`).
 
+MusicXML marks (articulations, ornaments, pick strokes, tremolo strokes and
+dynamics) are one table per kind in `src/musicxml_shared.hpp`, from element
+name to model value: the writer writes from it and the reader reads with it.
+What only the reader accepts sits beside the tables (`<spiccato/>` and
+`<detached-legato/>` as aliases, `<pppp/>` as ppp). A new mark goes in its
+table, and `tests/io/test_musicxml_marks.cpp` checks that every mark comes back.
+
 - **May depend on:** `elara_core`, the standard library, yyjson, miniz and
   pugixml (private: they never appear in public headers).
 - **Must not include:** Qt, JUCE.

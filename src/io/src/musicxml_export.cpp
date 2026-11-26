@@ -219,8 +219,6 @@ double fourDecimals(double value) {
 // ---- Vocabulary -----------------------------------------------------------------
 
 constexpr std::array<std::string_view, 7> kStepNames{"C", "D", "E", "F", "G", "A", "B"};
-constexpr std::array<std::string_view, 8> kDynamicNames{"ppp", "pp", "p",  "mp",
-                                                        "mf",  "f",  "ff", "fff"};
 constexpr std::array<std::string_view, 4> kKindNames{"fretted", "percussion", "keyboard",
                                                      "pitched"};
 
@@ -1309,7 +1307,7 @@ private:
             xml.endOpen();
             xml.open("direction-type");
             xml.open("dynamics");
-            xml.empty(kDynamicNames[static_cast<std::size_t>(mark.dynamic)]);
+            xml.empty(detail::nameOf(detail::kDynamics, mark.dynamic));
             xml.close("dynamics");
             xml.close("direction-type");
             if (xmlStaves_ > 1) {
@@ -1818,11 +1816,12 @@ private:
                                (note.position && !percussion_) || !fx.bend.isEmpty() ||
                                fx.harmonic.kind != HarmonicKind::None ||
                                fx.fingering != Finger::None || fx.pluck != Finger::None;
-        const bool breath = firstNote && beatFx.breath != Breath::None; // ADR-0095
-        const bool articulations = fx.staccato || fx.staccatissimo || fx.tenuto ||
-                                   fx.accent != Accent::None || fx.slideIn != SlideIn::None ||
-                                   fx.slideOut == SlideOut::Downwards ||
-                                   fx.slideOut == SlideOut::Upwards || breath;
+        // A breath mark or a caesura goes on the first note (ADR-0095).
+        const Breath breath = firstNote ? beatFx.breath : Breath::None;
+        const auto marked = [&fx, breath](const detail::ArticulationMark& mark) {
+            return detail::hasMark(mark, fx, breath);
+        };
+        const bool articulations = std::ranges::any_of(detail::kArticulations, marked);
         const bool arpeggiate = beatFx.strum != Strum::None;
         const bool fermata = firstNote && beatFx.fermata != Fermata::None;
         const bool slurs = firstNote && (place.slurStart != 0 || place.slurStop != 0);
@@ -1866,7 +1865,7 @@ private:
             if (technical) {
                 xml.open("technical");
                 if (firstNote && beatFx.pickStroke != PickStroke::None) {
-                    xml.empty(beatFx.pickStroke == PickStroke::Up ? "up-bow" : "down-bow");
+                    xml.empty(detail::nameOf(detail::kPickStrokes, beatFx.pickStroke));
                 }
                 if (tapped) {
                     xml.text("tap", "T");
@@ -1905,28 +1904,10 @@ private:
             }
             if (articulations) {
                 xml.open("articulations");
-                if (fx.accent != Accent::None) {
-                    xml.empty(fx.accent == Accent::Marcato ? "strong-accent" : "accent");
-                }
-                if (fx.staccato) {
-                    xml.empty("staccato");
-                }
-                if (fx.staccatissimo) { // ADR-0094
-                    xml.empty("staccatissimo");
-                }
-                if (fx.tenuto) {
-                    xml.empty("tenuto");
-                }
-                if (fx.slideIn != SlideIn::None) {
-                    xml.empty(fx.slideIn == SlideIn::FromBelow ? "scoop" : "plop");
-                }
-                if (fx.slideOut == SlideOut::Upwards) {
-                    xml.empty("doit");
-                } else if (fx.slideOut == SlideOut::Downwards) {
-                    xml.empty("falloff");
-                }
-                if (breath) {
-                    xml.empty(beatFx.breath == Breath::Caesura ? "caesura" : "breath-mark");
+                for (const detail::ArticulationMark& mark : detail::kArticulations) {
+                    if (marked(mark)) {
+                        xml.empty(mark.name);
+                    }
                 }
                 xml.close("articulations");
             }
@@ -2011,12 +1992,8 @@ private:
         if (fx.trill.isTrill()) {
             writeTrill(xml, note, m);
         }
-        // Mordents and turns (ADR-0091), MusicXML's upper mordent being the
-        // inverted one.
-        static constexpr std::array<std::string_view, 5> kOrnaments{
-            "", "mordent", "inverted-mordent", "turn", "inverted-turn"};
-        if (fx.ornament != Ornament::None) {
-            xml.empty(kOrnaments[static_cast<std::size_t>(fx.ornament) % kOrnaments.size()]);
+        if (fx.ornament != Ornament::None) { // ADR-0091
+            xml.empty(detail::nameOf(detail::kOrnaments, fx.ornament));
         }
         if (fx.vibrato != Vibrato::None) {
             xml.start("wavy-line");
@@ -2029,17 +2006,15 @@ private:
             xml.endEmpty();
         }
         if (tremolo) {
-            // Strokes through the stem: 1 eighths, 2 sixteenths, 3 thirty-seconds.
-            int marks = static_cast<int>(*tremolo) - static_cast<int>(NoteValue::Quarter);
-            if (marks < 1 || marks > 3) {
+            const int strokes = detail::tremoloStrokes(*tremolo);
+            if (detail::tremoloSpeed(strokes) != *tremolo) {
                 warn("tremolo picking written at the nearest speed (eighths, sixteenths or "
                      "thirty-seconds)",
                      m);
-                marks = std::clamp(marks, 1, 3);
             }
             xml.start("tremolo");
             xml.attribute("type", "single");
-            xml.endNumber("tremolo", marks);
+            xml.endNumber("tremolo", strokes);
         }
         xml.close("ornaments");
     }
