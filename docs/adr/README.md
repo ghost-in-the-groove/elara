@@ -127,6 +127,7 @@ one that replaces them.
 | [0126](0126-the-transport-plays-through-an-output-device.md) | The transport plays through an output device it is given | Accepted |
 | [0127](0127-the-editing-session.md) | The editing session lives in core | Accepted |
 | [0128](0128-the-caret-editor.md) | What is at the caret has a class of its own | Accepted |
+| [0129](0129-the-model-keeps-its-value-types.md) | The model keeps its value types | Accepted |
 
 ## Template
 

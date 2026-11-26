@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/commands.hpp>
 #include <elara/core/document.hpp>
+#include <elara/core/effects.hpp>
+#include <elara/core/measure.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <random>
@@ -12,11 +15,14 @@
 #include <vector>
 
 using elara::core::Beat;
+using elara::core::BendCurve;
+using elara::core::BendPoint;
 using elara::core::CommandGroup;
 using elara::core::Document;
 using elara::core::Duration;
 using elara::core::findInstrumentPreset;
 using elara::core::Fraction;
+using elara::core::Grace;
 using elara::core::InsertMeasures;
 using elara::core::InsertTrack;
 using elara::core::KeyMode;
@@ -224,6 +230,64 @@ TEST_CASE("A measure's approximate bytes grow with what it holds", "[core][docum
     CHECK(elara::core::approximateBytes(more) > elara::core::approximateBytes(note));
     CHECK(elara::core::approximateBytes(song.track(0)) >
           song.measureCount() * elara::core::approximateBytes(empty));
+}
+
+TEST_CASE("A measure's approximate bytes count the points of its bend and whammy curves",
+          "[core][document]") {
+    using elara::core::approximateBytes;
+    const Song song = smallSong();
+    const Measure plain = wholeNote(song, 0, 5);
+    const BendCurve curve = BendCurve::bendRelease(200);
+    REQUIRE(curve.points().size() > 1);
+    const std::size_t points = curve.points().capacity() * sizeof(BendPoint);
+
+    // A curve without points holds nothing beyond the note or beat it is in.
+    Measure none = plain;
+    none.voices[0].beats[0].notes[0].effects.bend = BendCurve{};
+    none.voices[0].beats[0].effects.whammyBar = BendCurve{};
+    CHECK(approximateBytes(none) == approximateBytes(plain));
+
+    Measure bent = plain;
+    bent.voices[0].beats[0].notes[0].effects.bend = curve;
+    CHECK(approximateBytes(bent) == approximateBytes(plain) + points);
+
+    Measure dived = plain;
+    dived.voices[0].beats[0].effects.whammyBar = curve;
+    CHECK(approximateBytes(dived) == approximateBytes(plain) + points);
+
+    // The bend of a grace note counts as the bend of any other.
+    Measure graced = plain;
+    graced.voices[0].beats[0].graces.push_back(
+        Grace{.duration = Duration(NoteValue::Eighth),
+              .notes = {song.track(0).staff(0).frettedNote(6, 3)}});
+    Measure gracedBent = graced;
+    gracedBent.voices[0].beats[0].graces[0].notes[0].effects.bend = curve;
+    CHECK(approximateBytes(gracedBent) == approximateBytes(graced) + points);
+
+    // Each curve counts: two bent notes and a dive hold three.
+    Measure all = bent;
+    Beat& beat = all.voices[0].beats[0];
+    beat.notes.push_back(beat.notes[0]);
+    beat.effects.whammyBar = curve;
+    Measure allPlain = all;
+    Beat& plainBeat = allPlain.voices[0].beats[0];
+    plainBeat.notes[0].effects.bend = BendCurve{};
+    plainBeat.notes[1].effects.bend = BendCurve{};
+    plainBeat.effects.whammyBar = BendCurve{};
+    CHECK(approximateBytes(all) == approximateBytes(allPlain) + (3 * points));
+}
+
+TEST_CASE("The history counts the curves of the measures a step holds", "[core][document]") {
+    Song song = smallSong();
+    const std::size_t plain = elara::core::approximateBytes(song.track(0).staff(0).measure(1));
+    const BendCurve curve = BendCurve::bendRelease(200);
+    song.track(0).staff(0).measure(1).voices[0].beats[0].notes[0].effects.bend = curve;
+    const std::size_t bent = elara::core::approximateBytes(song.track(0).staff(0).measure(1));
+    REQUIRE(bent == plain + (curve.points().capacity() * sizeof(BendPoint)));
+
+    Document doc(song);
+    doc.execute(std::make_unique<ReplaceMeasure>(0, 0, 1, Measure{})); // holds the bent measure
+    CHECK(doc.historyBytes() == bent);
 }
 
 TEST_CASE("Content, header, info and tempo edits are undoable", "[core][document]") {

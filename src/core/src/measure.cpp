@@ -50,10 +50,25 @@ namespace {
 using detail::heapBytes;
 using detail::sharedBytes;
 
+// The points of a bend or whammy curve: the curve itself is in its note or beat.
+std::size_t heapBytes(const BendCurve& curve) noexcept {
+    return heapBytes(curve.points());
+}
+
+// The points of the bends of `notes`.
+std::size_t bendBytes(const std::vector<Note>& notes) noexcept {
+    std::size_t bytes = 0;
+    for (const Note& note : notes) {
+        bytes += heapBytes(note.effects.bend);
+    }
+    return bytes;
+}
+
 std::size_t heapBytes(const Beat& beat) noexcept {
-    std::size_t bytes = heapBytes(beat.notes) + heapBytes(beat.graces);
+    std::size_t bytes = heapBytes(beat.notes) + bendBytes(beat.notes) +
+                        heapBytes(beat.effects.whammyBar) + heapBytes(beat.graces);
     for (const Grace& grace : beat.graces) {
-        bytes += heapBytes(grace.notes);
+        bytes += heapBytes(grace.notes) + bendBytes(grace.notes);
     }
     if (beat.chord) {
         bytes += sharedBytes<ChordSymbol>() + heapBytes(beat.chord->name);
