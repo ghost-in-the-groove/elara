@@ -464,8 +464,9 @@ void AudioController::clearSfz(const QString& tracks) {
 void AudioController::useBuiltinSound() {
     for (SoundPart* part : {&soundFont_, &guitars_, &basses_}) {
         ++part->request; // a sound still opening is no longer wanted
-        useSoundPart(*part, nullptr, {});
+        setSoundPart(*part, nullptr, {});
     }
+    useSoundBank(); // once, for the three parts
 }
 
 void AudioController::restoreSound() {
@@ -503,9 +504,17 @@ QString AudioController::trackSound(int track) const {
         bank->soundName(song->track(static_cast<std::size_t>(track)).instrument()));
 }
 
-// `part` plays through `bank`, from `file`, which is remembered when
-// rememberSound is on.
+// `part` plays through `bank`, from `file`, from now on.
 void AudioController::useSoundPart(SoundPart& part,
+                                   std::shared_ptr<const elara::audio::SoundBank> bank,
+                                   const QString& file) {
+    setSoundPart(part, std::move(bank), file);
+    useSoundBank();
+}
+
+// `part` is `bank`, from `file`, which is remembered when rememberSound is
+// on; useSoundBank() makes the tracks play through it.
+void AudioController::setSoundPart(SoundPart& part,
                                    std::shared_ptr<const elara::audio::SoundBank> bank,
                                    const QString& file) {
     const bool font = &part == &soundFont_;
@@ -524,13 +533,13 @@ void AudioController::useSoundPart(SoundPart& part,
                                                   : kBassSfzKey,
                              file);
     }
-    useSoundBank();
 }
 
 // The tracks play through the SoundFont, or the built-in synthesizer, and
 // the guitars and basses through their SFZ instruments, from now on, playing
-// or not, at the same place: the player makes their sounds again as it loads
-// the sequence. The instruments share their samples with the banks they had.
+// or not, at the same place: the player makes again, as it loads the
+// sequence, the sounds of the tracks whose part changed. The instruments
+// share their samples with the banks they had.
 void AudioController::useSoundBank() {
     using elara::audio::SfzTracks;
     std::shared_ptr<const elara::audio::SoundBank> bank = soundFont_.bank;

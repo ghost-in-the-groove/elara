@@ -1040,4 +1040,11 @@ std::string SfzBank::soundName(const core::Instrument& instrument) const {
     return data_->name;
 }
 
+const void* SfzBank::source(const core::Instrument& instrument) const noexcept {
+    if (!plays(instrument)) {
+        return others_->source(instrument);
+    }
+    return data_.get();
+}
+
 } // namespace elara::audio

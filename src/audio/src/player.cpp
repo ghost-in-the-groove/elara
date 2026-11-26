@@ -19,20 +19,27 @@
 
 namespace elara::audio {
 
-/// A song ready for the audio thread: everything render() needs, allocated on
-/// the control thread.
-/// A track's sound and the instrument it was made for, kept across loads.
+/// A track's sound, the instrument it was made for and where it came from,
+/// kept across loads and across banks that make it the same.
 struct Player::KeptSound {
     core::Instrument instrument;
     std::shared_ptr<TrackSound> sound;
+    /// The bank last asked for this track's sound. Holding it keeps `source`
+    /// alive, so that no other bank's source can take its address.
+    std::shared_ptr<const SoundBank> bank;
+    const void* source = nullptr; ///< bank->source(instrument)
 
-    /// Whether a track of `other` sounds as this one: the same kind and
-    /// program, whatever its name.
-    [[nodiscard]] bool fits(const core::Instrument& other) const noexcept {
-        return other.kind == instrument.kind && other.midiProgram == instrument.midiProgram;
+    /// Whether a track of `other`, whose sound comes from `from`, sounds as
+    /// this one: the same kind and program, whatever its name, from the same
+    /// source.
+    [[nodiscard]] bool fits(const core::Instrument& other, const void* from) const noexcept {
+        return other.kind == instrument.kind && other.midiProgram == instrument.midiProgram &&
+               from == source;
     }
 };
 
+/// A song ready for the audio thread: everything render() needs, allocated on
+/// the control thread.
 struct Player::Loaded {
     struct Track {
         std::shared_ptr<TrackSound> sound; // shared with the next load when kept
@@ -82,13 +89,9 @@ Player::Player(double sampleRate, std::size_t maxBlockFrames)
       bank_(builtinBank()) {}
 
 void Player::setSoundBank(std::shared_ptr<const SoundBank> bank) {
-    if (!bank) {
-        bank = builtinBank();
-    }
-    if (bank != bank_) {
-        bank_ = std::move(bank);
-        kept_.clear();
-    }
+    // The sounds kept stay: the next load keeps those the new bank makes
+    // the same (SoundBank::source()).
+    bank_ = bank ? std::move(bank) : builtinBank();
 }
 
 Player::~Player() {
@@ -131,11 +134,15 @@ PreparedSong::Parts prepareSong(const std::vector<Player::KeptSound>& keptBefore
     kept.reserve(tracks);
     for (std::size_t t = 0; t < tracks; ++t) {
         const core::Instrument& instrument = song.track(t).instrument();
-        if (t < keptBefore.size() && keptBefore[t].fits(instrument)) {
+        const void* source = bank->source(instrument);
+        if (t < keptBefore.size() && keptBefore[t].fits(instrument, source)) {
             kept.push_back(keptBefore[t]);
+            kept.back().bank = bank; // lets the bank before go
         } else {
-            kept.push_back(
-                {.instrument = instrument, .sound = bank->sound(instrument, sampleRate)});
+            kept.push_back({.instrument = instrument,
+                            .sound = bank->sound(instrument, sampleRate),
+                            .bank = bank,
+                            .source = source});
         }
         const detail::TrackLevel level = detail::levelOf(song, t, loaded->headroom);
         loaded->setLevel(t, level);

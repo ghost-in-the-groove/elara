@@ -3,6 +3,8 @@
 #include <elara/audio/offline_renderer.hpp>
 #include <elara/audio/player.hpp>
 #include <elara/audio/sequence.hpp>
+#include <elara/audio/sfz.hpp>
+#include <elara/audio/sfz_bank.hpp>
 #include <elara/audio/sound_bank.hpp>
 #include <elara/audio/synth.hpp>
 #include <elara/core/song.hpp>
@@ -15,9 +17,11 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -27,6 +31,8 @@ using elara::audio::OfflineRenderer;
 using elara::audio::Player;
 using elara::audio::Sequence;
 using elara::audio::SequenceOptions;
+using elara::audio::SfzBank;
+using elara::audio::SfzTracks;
 using elara::audio::SoundBank;
 using elara::audio::Synth;
 using elara::audio::Timbre;
@@ -90,6 +96,18 @@ public:
     mutable std::atomic<std::int64_t> rendered{0}; ///< frames its sounds rendered
     mutable std::vector<int> programs;
 };
+
+// An SFZ instrument of one generated sample, read from `text`.
+std::shared_ptr<const SfzBank> sfzOf(std::string_view text) {
+    auto program = elara::audio::parseSfz(
+        text, [](std::string_view) -> std::expected<std::string, std::string> {
+            return std::unexpected(std::string("no includes here"));
+        });
+    REQUIRE(program.has_value());
+    auto bank = SfzBank::load(*std::move(program), {}, "test");
+    REQUIRE(bank.has_value());
+    return *std::move(bank);
+}
 
 // One measure of 4/4 at quarter = 120 (two seconds) with a quarter note C4 on
 // beat 1 of each track, one track for each General MIDI program.
@@ -212,6 +230,18 @@ TEST_CASE("Playback: tracks play through the player's sound bank", "[audio][soun
         std::vector<float> right2(64);
         player.render(left2, right2);
         CHECK(std::ranges::all_of(left2, [](float sample) { return sample == 0.0f; }));
+    }
+    SECTION("a bank that changes the guitars' instrument keeps the other tracks' sounds") {
+        player.setSoundBank(sfzOf("<region> sample=*sine\n")->with(bank, SfzTracks::Guitars));
+        player.load(two, Sequence(two));
+        CHECK(bank->made == 2); // the bass still plays the sound it had
+        player.setSoundBank(sfzOf("<region> sample=*silence\n")->with(bank, SfzTracks::Guitars));
+        player.load(two, Sequence(two));
+        CHECK(bank->made == 2);
+        player.setSoundBank(bank);
+        player.load(two, Sequence(two));
+        CHECK(bank->made == 3);
+        CHECK(bank->programs.back() == 25); // the guitar's sound, made again
     }
     SECTION("paused with nothing ringing, the sounds do not run") {
         player.pause();

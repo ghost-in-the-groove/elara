@@ -190,6 +190,8 @@ private:
     void setLoading(int change);
     void useSoundPart(SoundPart& part, std::shared_ptr<const elara::audio::SoundBank> bank,
                       const QString& file);
+    void setSoundPart(SoundPart& part, std::shared_ptr<const elara::audio::SoundBank> bank,
+                      const QString& file);
     void useSoundBank();
 
     QPointer<elara::app::ScoreDocument> document_;

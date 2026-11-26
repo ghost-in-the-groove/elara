@@ -45,6 +45,10 @@ public:
 
 } // namespace
 
+const void* SoundBank::source(const core::Instrument& /*instrument*/) const noexcept {
+    return this;
+}
+
 std::shared_ptr<const SoundBank> builtinBank() {
     static const std::shared_ptr<const SoundBank> bank = std::make_shared<BuiltinBank>();
     return bank;
