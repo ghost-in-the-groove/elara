@@ -85,11 +85,6 @@ QString qstring(std::string_view text) {
     return QString::fromUtf8(text.data(), static_cast<qsizetype>(text.size()));
 }
 
-// Whether a song has somewhere to put the caret.
-bool hasCaret(const core::Song& song) {
-    return song.trackCount() > 0 && song.measureCount() > 0;
-}
-
 const notation::PageLayoutOptions& pageOptions() {
     static const notation::PageLayoutOptions options =
         notation::pageOptions(notation::kA4, kStaffSpaceMm);
@@ -918,10 +913,7 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         sequencing_.reset();
         document_.emplace(*layout.song);
         ++documentsMade_;
-        caret_ = core::Caret{.track = static_cast<std::size_t>(std::max(0, layout.track))};
-        anchor_.reset(); // a selection is of the song it was made in
-        pendingDigit_ = -1;
-        setInput(core::Duration{});
+        startSession(static_cast<std::size_t>(std::max(0, layout.track)));
         emit historyChanged();
     }
     // The song and its sequence change together, so whoever hears songChanged
@@ -1164,10 +1156,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     source_.clear();
     setImportWarnings({});
     track_ = 0;
-    caret_ = core::Caret{};
-    anchor_.reset(); // a selection is of the song it was made in
-    pendingDigit_ = -1;
-    setInput(core::Duration{});
+    startSession(0);
     const std::array<std::size_t, 1> first{0};
     view_ = notation::hasTablature(*song_, first) ? View::Both : View::Standard;
     emit songReplaced();
@@ -1464,26 +1453,28 @@ void ScoreDocument::setSection(int measure, const QString& name) {
 }
 
 int ScoreDocument::caretTimeNumerator() const {
-    return document_ && caret_.measure < document_->song().measureCount()
-               ? document_->song().measureHeader(caret_.measure).timeSignature.numerator()
+    return document_ && session_.caret().measure < document_->song().measureCount()
+               ? document_->song().measureHeader(session_.caret().measure).timeSignature.numerator()
                : 4;
 }
 
 int ScoreDocument::caretTimeDenominator() const {
-    return document_ && caret_.measure < document_->song().measureCount()
-               ? document_->song().measureHeader(caret_.measure).timeSignature.denominator()
+    return document_ && session_.caret().measure < document_->song().measureCount()
+               ? document_->song()
+                     .measureHeader(session_.caret().measure)
+                     .timeSignature.denominator()
                : 4;
 }
 
 int ScoreDocument::caretKeyFifths() const {
-    return document_ && caret_.measure < document_->song().measureCount()
-               ? document_->song().measureHeader(caret_.measure).keySignature.fifths()
+    return document_ && session_.caret().measure < document_->song().measureCount()
+               ? document_->song().measureHeader(session_.caret().measure).keySignature.fifths()
                : 0;
 }
 
 bool ScoreDocument::caretKeyMinor() const {
-    return document_ && caret_.measure < document_->song().measureCount() &&
-           document_->song().measureHeader(caret_.measure).keySignature.mode() ==
+    return document_ && session_.caret().measure < document_->song().measureCount() &&
+           document_->song().measureHeader(session_.caret().measure).keySignature.mode() ==
                core::KeyMode::Minor;
 }
 
@@ -1491,11 +1482,12 @@ void ScoreDocument::insertMeasure(bool after) {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    const std::size_t at = caret_.measure + (after ? 1 : 0);
-    caret_.measure = at;
-    caret_.beat = 0;
+    core::Caret caret = session_.caret();
+    caret.measure += after ? 1 : 0;
+    caret.beat = 0;
     pendingDigit_ = -1;
-    execute(std::make_unique<core::InsertMeasures>(at, 1));
+    enter(core::Entry{.command = std::make_unique<core::InsertMeasures>(caret.measure, 1),
+                      .caret = caret});
 }
 
 void ScoreDocument::removeMeasure() {
@@ -1503,7 +1495,7 @@ void ScoreDocument::removeMeasure() {
         return;
     }
     pendingDigit_ = -1;
-    execute(std::make_unique<core::RemoveMeasures>(caret_.measure, 1));
+    execute(std::make_unique<core::RemoveMeasures>(session_.caret().measure, 1));
 }
 
 void ScoreDocument::setMeasureCount(int count) {
@@ -1984,12 +1976,13 @@ QString ScoreDocument::caretStatus() const {
         parts.append(first == last ? tr("Measure %1 selected").arg(first)
                                    : tr("Measures %1-%2 selected").arg(first).arg(last));
     }
-    parts.append(tr("Measure %1").arg(caret_.measure + 1));
-    if (caret_.voice > 0) {
-        parts.append(tr("Voice %1").arg(caret_.voice + 1));
+    parts.append(tr("Measure %1").arg(session_.caret().measure + 1));
+    if (session_.caret().voice > 0) {
+        parts.append(tr("Voice %1").arg(session_.caret().voice + 1));
     }
-    parts.append(core::onFreeSlot(song, caret_) ? tr("New beat")
-                                                : tr("Beat %1").arg(caret_.beat + 1));
+    parts.append(core::onFreeSlot(song, session_.caret())
+                     ? tr("New beat")
+                     : tr("Beat %1").arg(session_.caret().beat + 1));
     if (const QString chord = caretChord(); !chord.isEmpty()) {
         parts.append(tr("Chord %1").arg(chord)); // the beat's, before its notes
     }
@@ -1997,13 +1990,13 @@ QString ScoreDocument::caretStatus() const {
         parts.append(tr("\u201C%1\u201D").arg(text));
     }
     if (caretFretted()) {
-        parts.append(tr("String %1").arg(caret_.string));
+        parts.append(tr("String %1").arg(session_.caret().string));
         if (const auto fret = fretAtCaret()) {
             parts.append(tr("Fret %1").arg(*fret));
         }
     }
     if (caretOnDrums()) {
-        parts.append(laneName(caret_.string));
+        parts.append(laneName(session_.caret().string));
     }
     QStringList names;
     for (const core::Pitch& pitch : pitchesAtCaret()) {
@@ -2127,29 +2120,31 @@ QString ScoreDocument::caretStatus() const {
 }
 
 bool ScoreDocument::caretFretted() const {
-    if (!document_ || caret_.track >= document_->song().trackCount()) {
+    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
         return false;
     }
-    const core::Track& track = document_->song().track(caret_.track);
-    return caret_.staff < track.staffCount() && track.staff(caret_.staff).isFretted();
+    const core::Track& track = document_->song().track(session_.caret().track);
+    return session_.caret().staff < track.staffCount() &&
+           track.staff(session_.caret().staff).isFretted();
 }
 
 int ScoreDocument::inputValue() const {
-    return denominatorOf(input_.value());
+    return denominatorOf(session_.input().value());
 }
 
 std::optional<int> ScoreDocument::fretAtCaret() const {
-    if (!document_ || !hasCaret(document_->song()) || core::onFreeSlot(document_->song(), caret_)) {
+    if (!document_ || !hasCaret(document_->song()) ||
+        core::onFreeSlot(document_->song(), session_.caret())) {
         return std::nullopt;
     }
     const core::Beat& beat = document_->song()
-                                 .track(caret_.track)
-                                 .staff(caret_.staff)
-                                 .measure(caret_.measure)
-                                 .voices.at(caret_.voice)
-                                 .beats.at(caret_.beat);
+                                 .track(session_.caret().track)
+                                 .staff(session_.caret().staff)
+                                 .measure(session_.caret().measure)
+                                 .voices.at(session_.caret().voice)
+                                 .beats.at(session_.caret().beat);
     for (const core::Note& note : beat.notes) {
-        if (note.position && note.position->string == caret_.string) {
+        if (note.position && note.position->string == session_.caret().string) {
             return note.position->fret;
         }
     }
@@ -2158,18 +2153,19 @@ std::optional<int> ScoreDocument::fretAtCaret() const {
 
 std::vector<core::Pitch> ScoreDocument::pitchesAtCaret() const {
     std::vector<core::Pitch> pitches;
-    if (!document_ || !hasCaret(document_->song()) || core::onFreeSlot(document_->song(), caret_)) {
+    if (!document_ || !hasCaret(document_->song()) ||
+        core::onFreeSlot(document_->song(), session_.caret())) {
         return pitches;
     }
     const bool fretted = caretFretted();
     const core::Beat& beat = document_->song()
-                                 .track(caret_.track)
-                                 .staff(caret_.staff)
-                                 .measure(caret_.measure)
-                                 .voices.at(caret_.voice)
-                                 .beats.at(caret_.beat);
+                                 .track(session_.caret().track)
+                                 .staff(session_.caret().staff)
+                                 .measure(session_.caret().measure)
+                                 .voices.at(session_.caret().voice)
+                                 .beats.at(session_.caret().beat);
     for (const core::Note& note : beat.notes) {
-        if (!fretted || (note.position && note.position->string == caret_.string)) {
+        if (!fretted || (note.position && note.position->string == session_.caret().string)) {
             pitches.push_back(note.pitch);
         }
     }
@@ -2178,22 +2174,22 @@ std::vector<core::Pitch> ScoreDocument::pitchesAtCaret() const {
 }
 
 bool ScoreDocument::caretPitched() const {
-    if (!document_ || caret_.track >= document_->song().trackCount()) {
+    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
         return false;
     }
-    const core::Track& track = document_->song().track(caret_.track);
+    const core::Track& track = document_->song().track(session_.caret().track);
     return track.instrument().kind != core::InstrumentKind::Percussion &&
-           caret_.staff < track.staffCount() &&
-           track.staff(caret_.staff).clef() != core::Clef::Percussion;
+           session_.caret().staff < track.staffCount() &&
+           track.staff(session_.caret().staff).clef() != core::Clef::Percussion;
 }
 
 bool ScoreDocument::caretOnDrums() const {
-    if (!document_ || caret_.track >= document_->song().trackCount()) {
+    if (!document_ || session_.caret().track >= document_->song().trackCount()) {
         return false;
     }
-    const core::Track& track = document_->song().track(caret_.track);
-    return caret_.staff < track.staffCount() &&
-           track.staff(caret_.staff).clef() == core::Clef::Percussion;
+    const core::Track& track = document_->song().track(session_.caret().track);
+    return session_.caret().staff < track.staffCount() &&
+           track.staff(session_.caret().staff).clef() == core::Clef::Percussion;
 }
 
 QString ScoreDocument::laneName(int lane) {
@@ -2211,8 +2207,9 @@ void ScoreDocument::moveCaret(CaretMove move) {
     }
     clearSelection();
     pendingDigit_ = -1;
-    caret_ = core::moveCaret(document_->song(), caret_, coreMove(move));
-    followBeat();
+    const core::Duration input = session_.input();
+    session_.move(document_->song(), coreMove(move));
+    inputMaybeChanged(input);
     placeCaretBox();
 }
 
@@ -2222,9 +2219,9 @@ void ScoreDocument::setCaretVoice(int voice) {
         return;
     }
     pendingDigit_ = -1;
-    caret_.voice = static_cast<std::size_t>(voice - 1);
-    caret_ = core::clampCaret(document_->song(), caret_);
-    followBeat();
+    const core::Duration input = session_.input();
+    session_.setVoice(document_->song(), static_cast<std::size_t>(voice - 1));
+    inputMaybeChanged(input);
     placeCaretBox();
 }
 
@@ -2235,15 +2232,13 @@ bool ScoreDocument::placeCaret(int index, double x, double y) {
         return false;
     }
     const auto picked = notation::caretAt((*pages_)[static_cast<std::size_t>(index)], *pagesSong_,
-                                          {x, y}, caret_, *font);
+                                          {x, y}, session_.caret(), *font);
     if (!picked) {
         return false;
     }
     clearSelection();
     pendingDigit_ = -1;
-    caret_ = core::clampCaret(document_->song(), *picked);
-    followBeat();
-    placeCaretBox();
+    placeCaretAt(*picked);
     return true;
 }
 
@@ -2259,8 +2254,9 @@ void ScoreDocument::typeDigit(int digit) {
         emit editFailed(tr("Frets are typed on a track with strings."));
         return;
     }
-    const bool second = pendingDigit_ > 0 && digitCaret_ == caret_ && digitEdit_ == edits_ &&
-                        digitClock_.isValid() && digitClock_.elapsed() <= kTwoDigitMilliseconds;
+    const bool second = pendingDigit_ > 0 && digitCaret_ == session_.caret() &&
+                        digitEdit_ == edits_ && digitClock_.isValid() &&
+                        digitClock_.elapsed() <= kTwoDigitMilliseconds;
     if (second) {
         const int fret = pendingDigit_ * 10 + digit;
         pendingDigit_ = -1;
@@ -2268,7 +2264,8 @@ void ScoreDocument::typeDigit(int digit) {
             document_->undo(); // the first digit's note, so both are one undo step
         }
         try {
-            core::Entry entry = core::enterFret(document_->song(), caret_, fret, input_);
+            core::Entry entry =
+                core::enterFret(document_->song(), session_.caret(), fret, session_.input());
             if (!enter(std::move(entry)) && digitChanged_) {
                 edited(); // nothing to change: the song is back as before the first digit
             }
@@ -2281,14 +2278,15 @@ void ScoreDocument::typeDigit(int digit) {
         }
     }
     try {
-        core::Entry entry = core::enterFret(document_->song(), caret_, digit, input_);
+        core::Entry entry =
+            core::enterFret(document_->song(), session_.caret(), digit, session_.input());
         digitChanged_ = enter(std::move(entry));
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
         return;
     }
     pendingDigit_ = digit;
-    digitCaret_ = caret_;
+    digitCaret_ = session_.caret();
     digitEdit_ = edits_;
     digitClock_.restart();
 }
@@ -2300,15 +2298,12 @@ void ScoreDocument::setInputValue(int value) {
     if (it == kInputValues.end()) {
         return;
     }
-    setInput(core::Duration(*it, input_.dots(), input_.tuplet()));
-    runEntry(
-        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+    giveInput(core::Duration(*it, session_.input().dots(), session_.input().tuplet()));
 }
 
 void ScoreDocument::toggleDot() {
-    setInput(core::Duration(input_.value(), input_.dots() > 0 ? 0 : 1, input_.tuplet()));
-    runEntry(
-        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+    const core::Duration input = session_.input();
+    giveInput(core::Duration(input.value(), input.dots() > 0 ? 0 : 1, input.tuplet()));
 }
 
 void ScoreDocument::setInputTuplet(int actual) {
@@ -2320,35 +2315,36 @@ void ScoreDocument::setInputTuplet(int actual) {
         }
         tuplet = core::Tuplet(found->actual, found->normal);
     }
-    setInput(core::Duration(input_.value(), input_.dots(), tuplet));
-    runEntry(
-        [this](const core::Song& song) { return core::setBeatDuration(song, caret_, input_); });
+    giveInput(core::Duration(session_.input().value(), session_.input().dots(), tuplet));
 }
 
 void ScoreDocument::longerDuration() {
-    const auto index = inputIndex(input_.value());
+    const auto index = inputIndex(session_.input().value());
     if (index && *index > 0) {
         setInputValue(denominatorOf(kInputValues.at(*index - 1)));
     }
 }
 
 void ScoreDocument::shorterDuration() {
-    const auto index = inputIndex(input_.value());
+    const auto index = inputIndex(session_.input().value());
     if (index && *index + 1 < kInputValues.size()) {
         setInputValue(denominatorOf(kInputValues.at(*index + 1)));
     }
 }
 
 void ScoreDocument::deleteAtCaret() {
-    runEntry([this](const core::Song& song) { return core::deleteAtCaret(song, caret_); });
+    runEntry(
+        [this](const core::Song& song) { return core::deleteAtCaret(song, session_.caret()); });
 }
 
 void ScoreDocument::deleteBeat() {
-    runEntry([this](const core::Song& song) { return core::deleteBeat(song, caret_); });
+    runEntry([this](const core::Song& song) { return core::deleteBeat(song, session_.caret()); });
 }
 
 void ScoreDocument::insertRest() {
-    runEntry([this](const core::Song& song) { return core::insertRest(song, caret_, input_); });
+    runEntry([this](const core::Song& song) {
+        return core::insertRest(song, session_.caret(), session_.input());
+    });
 }
 
 void ScoreDocument::typeNoteName(int step, bool addToChord) {
@@ -2361,9 +2357,9 @@ void ScoreDocument::typeNoteName(int step, bool addToChord) {
     }
     pendingDigit_ = -1;
     try {
-        enter(
-            core::enterPitch(document_->song(), caret_, static_cast<core::Step>(step), input_,
-                             addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
+        enter(core::enterPitch(
+            document_->song(), session_.caret(), static_cast<core::Step>(step), session_.input(),
+            addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
     } catch (const std::out_of_range&) {
         emit editFailed(caretFretted() ? tr("No string can play that note.")
                                        : tr("That note is out of range."));
@@ -2376,7 +2372,7 @@ void ScoreDocument::shiftPitch(int semitones) {
     }
     pendingDigit_ = -1;
     try {
-        enter(core::shiftPitch(document_->song(), caret_, semitones));
+        enter(core::shiftPitch(document_->song(), session_.caret(), semitones));
     } catch (const std::out_of_range&) {
         emit editFailed(caretFretted() ? tr("The note would leave the neck.")
                                        : tr("That note is out of range."));
@@ -2391,7 +2387,9 @@ void ScoreDocument::toggleDrum() {
         emit editFailed(tr("Hits are typed on a drum track."));
         return;
     }
-    runEntry([this](const core::Song& song) { return core::toggleDrum(song, caret_, input_); });
+    runEntry([this](const core::Song& song) {
+        return core::toggleDrum(song, session_.caret(), session_.input());
+    });
 }
 
 void ScoreDocument::toggleEffect(int effect) {
@@ -2401,7 +2399,7 @@ void ScoreDocument::toggleEffect(int effect) {
     pendingDigit_ = -1;
     const auto which = static_cast<core::NoteEffect>(effect);
     try {
-        core::Entry entry = core::toggleEffect(document_->song(), caret_, which);
+        core::Entry entry = core::toggleEffect(document_->song(), session_.caret(), which);
         if (!entry.command) {
             emit editFailed(tr("Effects go on notes: put the caret on one."));
             return;
@@ -2422,7 +2420,7 @@ int ScoreDocument::caretEffects() const {
     }
     int effects = 0;
     for (int effect = 0; effect < kEffectCount; ++effect) {
-        if (core::hasEffectAtCaret(document_->song(), caret_,
+        if (core::hasEffectAtCaret(document_->song(), session_.caret(),
                                    static_cast<core::NoteEffect>(effect))) {
             effects |= 1 << effect;
         }
@@ -2471,7 +2469,7 @@ void ScoreDocument::setBend(int form, int cents) {
     } catch (const std::invalid_argument&) {
         return;
     }
-    core::Entry entry = core::setBend(document_->song(), caret_, curve);
+    core::Entry entry = core::setBend(document_->song(), session_.caret(), curve);
     if (!entry.command) {
         // Silent when the notes have that bend already.
         if (entry.missed) {
@@ -2486,7 +2484,7 @@ core::BeatEffects ScoreDocument::beatEffectsAtCaret() const {
     if (!document_ || !hasCaret(document_->song())) {
         return {};
     }
-    return core::beatEffectsAt(document_->song(), caret_);
+    return core::beatEffectsAt(document_->song(), session_.caret());
 }
 
 template <typename Value>
@@ -2496,7 +2494,8 @@ void ScoreDocument::setBeatEffect(Value core::BeatEffects::* field,
         return;
     }
     pendingDigit_ = -1;
-    core::Entry entry = core::setBeatEffect(document_->song(), caret_, field, std::move(value));
+    core::Entry entry =
+        core::setBeatEffect(document_->song(), session_.caret(), field, std::move(value));
     if (!entry.command) {
         // Silent when the beat has it already.
         if (entry.missed) {
@@ -2549,22 +2548,24 @@ void ScoreDocument::setBreath(int breath) {
 
 void ScoreDocument::toggleGraceNote() {
     if (caretGraceNotes() > 0) {
-        runEntry([this](const core::Song& song) { return core::removeGraceNotes(song, caret_); });
+        runEntry([this](const core::Song& song) {
+            return core::removeGraceNotes(song, session_.caret());
+        });
         return;
     }
     runEntry([this](const core::Song& song) {
         const core::Duration eighth(core::NoteValue::Eighth);
         try {
-            return core::addGraceNote(song, caret_, -2, eighth, false);
+            return core::addGraceNote(song, session_.caret(), -2, eighth, false);
         } catch (const std::out_of_range&) {
-            return core::addGraceNote(song, caret_, 2, eighth, false); // from above
+            return core::addGraceNote(song, session_.caret(), 2, eighth, false); // from above
         }
     });
 }
 
 void ScoreDocument::setChordSymbol(const QString& name) {
     runEntry([this, text = name.toStdString()](const core::Song& song) {
-        return core::setChordSymbol(song, caret_, text);
+        return core::setChordSymbol(song, session_.caret(), text);
     });
 }
 
@@ -2612,7 +2613,7 @@ QStringList ScoreDocument::songChords() const {
 
 void ScoreDocument::setBeatText(const QString& text) {
     runEntry([this, words = text.toStdString()](const core::Song& song) {
-        return core::setBeatText(song, caret_, words);
+        return core::setBeatText(song, session_.caret(), words);
     });
 }
 
@@ -2630,14 +2631,14 @@ int ScoreDocument::caretVerseCount() const {
         return 0;
     }
     const core::Song& song = document_->song();
-    const core::Caret caret = core::clampCaret(song, caret_);
+    const core::Caret caret = core::clampCaret(song, session_.caret());
     return static_cast<int>(core::verseCount(song.track(caret.track).staff(caret.staff)));
 }
 
 QVariantMap ScoreDocument::caretVerse(int verse) const {
     core::VerseText typed;
     if (document_ && hasCaret(document_->song()) && verse >= 0) {
-        typed = core::verseAt(document_->song(), caret_, static_cast<std::size_t>(verse));
+        typed = core::verseAt(document_->song(), session_.caret(), static_cast<std::size_t>(verse));
     }
     return {{QStringLiteral("first"), static_cast<int>(typed.first)},
             {QStringLiteral("text"), qstring(typed.text)}};
@@ -2650,7 +2651,7 @@ int ScoreDocument::setVerse(int verse, int first, const QString& text) {
     std::size_t leftover = 0;
     runEntry([&](const core::Song& song) {
         core::VerseEntry typed =
-            core::setVerse(song, caret_, static_cast<std::size_t>(verse),
+            core::setVerse(song, session_.caret(), static_cast<std::size_t>(verse),
                            static_cast<std::size_t>(first), text.toStdString());
         leftover = typed.leftover;
         return std::move(typed.entry);
@@ -2744,7 +2745,7 @@ core::NoteEffects ScoreDocument::noteEffectsAtCaret() const {
     if (!document_ || !hasCaret(document_->song())) {
         return {};
     }
-    return core::noteEffectsAt(document_->song(), caret_);
+    return core::noteEffectsAt(document_->song(), session_.caret());
 }
 
 void ScoreDocument::changeNoteEffects(
@@ -2753,7 +2754,7 @@ void ScoreDocument::changeNoteEffects(
         return;
     }
     pendingDigit_ = -1;
-    core::Entry entry = make(document_->song(), caret_);
+    core::Entry entry = make(document_->song(), session_.caret());
     if (!entry.command) {
         // Silent when the notes have it already.
         if (entry.missed) {
@@ -2883,7 +2884,7 @@ int ScoreDocument::caretDynamic() const {
     if (!document_ || !hasCaret(document_->song())) {
         return static_cast<int>(core::Dynamic::MF);
     }
-    return static_cast<int>(core::dynamicAt(document_->song(), caret_));
+    return static_cast<int>(core::dynamicAt(document_->song(), session_.caret()));
 }
 
 void ScoreDocument::setDynamic(int dynamic) {
@@ -2892,9 +2893,9 @@ void ScoreDocument::setDynamic(int dynamic) {
         return;
     }
     pendingDigit_ = -1;
-    core::Entry entry = core::setDynamic(document_->song(), caret_, *wanted);
+    core::Entry entry = core::setDynamic(document_->song(), session_.caret(), *wanted);
     if (!entry.command) {
-        if (core::dynamicAt(document_->song(), caret_) != *wanted) {
+        if (core::dynamicAt(document_->song(), session_.caret()) != *wanted) {
             emit editFailed(tr("Dynamics go on notes: put the caret on one."));
         }
         return;
@@ -3001,7 +3002,7 @@ int ScoreDocument::caretClef() const {
     if (!document_ || !hasCaret(document_->song()) || caretOnDrums()) {
         return -1;
     }
-    const core::Caret caret = core::clampCaret(document_->song(), caret_);
+    const core::Caret caret = core::clampCaret(document_->song(), session_.caret());
     switch (document_->song().track(caret.track).staff(caret.staff).clefAt(caret.measure)) {
     case core::Clef::Treble:
     case core::Clef::Treble8vb:
@@ -3024,14 +3025,14 @@ void ScoreDocument::setClef(int clef) {
         return;
     }
     runEntry([this, chosen = kOfferedClefs.at(static_cast<std::size_t>(clef))](
-                 const core::Song& song) { return core::setClef(song, caret_, chosen); });
+                 const core::Song& song) { return core::setClef(song, session_.caret(), chosen); });
 }
 
 int ScoreDocument::caretRepeat() const {
     if (!document_ || !hasCaret(document_->song())) {
         return 0;
     }
-    return static_cast<int>(core::measureRepeatAt(document_->song(), caret_));
+    return static_cast<int>(core::measureRepeatAt(document_->song(), session_.caret()));
 }
 
 void ScoreDocument::setMeasureRepeat(int measures) {
@@ -3039,7 +3040,7 @@ void ScoreDocument::setMeasureRepeat(int measures) {
         return;
     }
     runEntry([this, measures](const core::Song& song) {
-        return core::setMeasureRepeat(song, caret_, static_cast<std::size_t>(measures));
+        return core::setMeasureRepeat(song, session_.caret(), static_cast<std::size_t>(measures));
     });
 }
 
@@ -3047,21 +3048,21 @@ QString ScoreDocument::caretText() const {
     if (!document_ || !hasCaret(document_->song())) {
         return {};
     }
-    return qstring(core::beatTextAt(document_->song(), caret_));
+    return qstring(core::beatTextAt(document_->song(), session_.caret()));
 }
 
 QString ScoreDocument::caretChord() const {
     if (!document_ || !hasCaret(document_->song())) {
         return {};
     }
-    return qstring(core::chordNameAt(document_->song(), caret_));
+    return qstring(core::chordNameAt(document_->song(), session_.caret()));
 }
 
 int ScoreDocument::caretGraceNotes() const {
     if (!document_ || !hasCaret(document_->song())) {
         return 0;
     }
-    return static_cast<int>(core::graceNotesAt(document_->song(), caret_));
+    return static_cast<int>(core::graceNotesAt(document_->song(), session_.caret()));
 }
 
 int ScoreDocument::caretPickStroke() const {
@@ -3089,14 +3090,14 @@ int ScoreDocument::caretBendForm() const {
     if (!document_ || !hasCaret(document_->song())) {
         return 0;
     }
-    return static_cast<int>(core::bendForm(core::bendAtCaret(document_->song(), caret_)));
+    return static_cast<int>(core::bendForm(core::bendAtCaret(document_->song(), session_.caret())));
 }
 
 int ScoreDocument::caretBendCents() const {
     if (!document_ || !hasCaret(document_->song())) {
         return 0;
     }
-    return core::bendAtCaret(document_->song(), caret_).maxCents();
+    return core::bendAtCaret(document_->song(), session_.caret()).maxCents();
 }
 
 QString ScoreDocument::bendAmount(int cents) const {
@@ -3137,13 +3138,20 @@ QString ScoreDocument::bendName(int form, int cents) const {
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
-    caret_ = entry.caret;
-    if (entry.command) {
-        if (execute(std::move(entry.command))) {
-            return true; // the new layout places the caret
-        }
+    bool changed = false;
+    try {
+        changed = session_.enter(*document_, std::move(entry));
+    } catch (const std::exception& error) {
+        emit editFailed(qstring(error.what()));
     }
-    clampCaret();
+    return showEdit(changed);
+}
+
+bool ScoreDocument::showEdit(bool changed) {
+    if (changed) {
+        edited();
+        return true; // the new layout places the caret
+    }
     placeCaretBox();
     return false;
 }
@@ -3160,42 +3168,51 @@ void ScoreDocument::runEntry(const std::function<core::Entry(const core::Song&)>
     }
 }
 
-void ScoreDocument::followBeat() {
-    if (!document_ || core::onFreeSlot(document_->song(), caret_)) {
-        return;
-    }
-    const core::Duration duration = document_->song()
-                                        .track(caret_.track)
-                                        .staff(caret_.staff)
-                                        .measure(caret_.measure)
-                                        .voices.at(caret_.voice)
-                                        .beats.at(caret_.beat)
-                                        .duration;
-    const core::Tuplet tuplet = duration.tuplet();
-    const bool offered =
-        tuplet.isNone() || std::ranges::any_of(kInputTuplets, [&tuplet](const InputTuplet& item) {
-            return item.actual == tuplet.actual() && item.normal == tuplet.normal();
-        });
-    if (offered && duration.dots() <= 1 && inputIndex(duration.value())) {
-        setInput(duration);
+void ScoreDocument::startSession(std::size_t track) {
+    const core::Duration input = session_.input();
+    session_.start(track);
+    inputMaybeChanged(input);
+    anchor_.reset(); // a selection is of the song it was made in
+    pendingDigit_ = -1;
+}
+
+void ScoreDocument::inputMaybeChanged(core::Duration before) {
+    if (session_.input() != before) {
+        emit inputChanged();
     }
 }
 
-void ScoreDocument::setInput(core::Duration duration) {
-    if (duration != input_) {
-        input_ = duration;
-        emit inputChanged();
+void ScoreDocument::giveInput(core::Duration duration) {
+    if (!document_ || !hasCaret(document_->song())) {
+        return;
     }
+    pendingDigit_ = -1;
+    const core::Duration before = session_.input();
+    bool changed = false;
+    try {
+        changed = session_.setInput(*document_, duration);
+    } catch (const std::exception& error) {
+        emit editFailed(qstring(error.what()));
+    }
+    inputMaybeChanged(before);
+    showEdit(changed);
+}
+
+void ScoreDocument::placeCaretAt(const core::Caret& caret) {
+    const core::Duration input = session_.input();
+    session_.place(document_->song(), caret);
+    inputMaybeChanged(input);
+    placeCaretBox();
 }
 
 void ScoreDocument::clampCaret() {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    if (track_ != kAllTracks) {
-        caret_.track = static_cast<std::size_t>(track_);
-    }
-    caret_ = core::clampCaret(document_->song(), caret_);
+    session_.showTrack(document_->song(),
+                       track_ == kAllTracks
+                           ? std::nullopt
+                           : std::optional<std::size_t>(static_cast<std::size_t>(track_)));
 }
 
 void ScoreDocument::placeCaretBox() {
@@ -3204,7 +3221,8 @@ void ScoreDocument::placeCaretBox() {
     const notation::EngravingFont* font = musicMetrics();
     if (pages_ && pagesSong_ && font != nullptr) {
         for (std::size_t i = 0; i < pages_->size(); ++i) {
-            if (const auto box = notation::caretBox((*pages_)[i], *pagesSong_, caret_, *font)) {
+            if (const auto box =
+                    notation::caretBox((*pages_)[i], *pagesSong_, session_.caret(), *font)) {
                 page = static_cast<int>(i);
                 rect = QRectF(box->x, box->y, box->width, box->height);
                 break;
@@ -3218,11 +3236,11 @@ void ScoreDocument::placeCaretBox() {
 }
 
 int ScoreDocument::selectionFirst() const {
-    return anchor_ ? static_cast<int>(std::min(*anchor_, caret_.measure)) : -1;
+    return anchor_ ? static_cast<int>(std::min(*anchor_, session_.caret().measure)) : -1;
 }
 
 int ScoreDocument::selectionLast() const {
-    return anchor_ ? static_cast<int>(std::max(*anchor_, caret_.measure)) : -1;
+    return anchor_ ? static_cast<int>(std::max(*anchor_, session_.caret().measure)) : -1;
 }
 
 QVariantList ScoreDocument::selectionBoxes(int index) const {
@@ -3247,7 +3265,7 @@ void ScoreDocument::selectionMoved() {
 
 std::pair<std::size_t, std::size_t> ScoreDocument::selectedRange() const {
     if (!anchor_) {
-        return {caret_.measure, 1};
+        return {session_.caret().measure, 1};
     }
     const auto first = static_cast<std::size_t>(selectionFirst());
     return {first, static_cast<std::size_t>(selectionLast()) - first + 1};
@@ -3259,16 +3277,16 @@ void ScoreDocument::extendSelection(int measures) {
     }
     const core::Song& song = document_->song();
     if (!anchor_) {
-        anchor_ = caret_.measure;
+        anchor_ = session_.caret().measure;
     }
     const auto last = static_cast<long long>(song.measureCount()) - 1;
-    const auto target = std::clamp(static_cast<long long>(caret_.measure) + measures, 0LL, last);
+    const auto target =
+        std::clamp(static_cast<long long>(session_.caret().measure) + measures, 0LL, last);
     pendingDigit_ = -1;
-    caret_.measure = static_cast<std::size_t>(target);
-    caret_.beat = 0;
-    caret_ = core::clampCaret(song, caret_);
-    followBeat();
-    placeCaretBox();
+    core::Caret caret = session_.caret();
+    caret.measure = static_cast<std::size_t>(target);
+    caret.beat = 0;
+    placeCaretAt(caret);
 }
 
 void ScoreDocument::selectAll() {
@@ -3278,11 +3296,10 @@ void ScoreDocument::selectAll() {
     const core::Song& song = document_->song();
     pendingDigit_ = -1;
     anchor_ = song.measureCount() - 1;
-    caret_.measure = 0;
-    caret_.beat = 0;
-    caret_ = core::clampCaret(song, caret_);
-    followBeat();
-    placeCaretBox();
+    core::Caret caret = session_.caret();
+    caret.measure = 0;
+    caret.beat = 0;
+    placeCaretAt(caret);
 }
 
 void ScoreDocument::clearSelection() {
@@ -3300,7 +3317,7 @@ void ScoreDocument::copy() {
     }
     const auto [first, count] = selectedRange();
     const bool every = track_ == kAllTracks;
-    clip_ = core::copyMeasures(document_->song(), first, count, every ? 0 : caret_.track,
+    clip_ = core::copyMeasures(document_->song(), first, count, every ? 0 : session_.caret().track,
                                every ? 0 : 1);
     emit clipboardChanged();
     emit notice(count == 1 ? tr("Copied measure %1.").arg(first + 1)
@@ -3317,7 +3334,7 @@ void ScoreDocument::paste(bool insert) {
     }
     const std::size_t at = selectedRange().first;
     // One copied track goes to the caret's; several to the tracks they came from.
-    const std::size_t track = clip_->tracks.size() == 1 ? caret_.track : 0;
+    const std::size_t track = clip_->tracks.size() == 1 ? session_.caret().track : 0;
     std::unique_ptr<core::Command> command;
     try {
         command = core::makePaste(document_->song(), *clip_, at, track,
@@ -3331,12 +3348,11 @@ void ScoreDocument::paste(bool insert) {
     }
     pendingDigit_ = -1;
     anchor_ = at;
-    caret_.measure = at + clip_->measureCount() - 1;
-    caret_.beat = 0;
-    if (!execute(std::move(command))) {
-        anchor_.reset();
-        clampCaret();
-        placeCaretBox();
+    core::Caret caret = session_.caret();
+    caret.measure = at + clip_->measureCount() - 1;
+    caret.beat = 0;
+    if (!enter(core::Entry{.command = std::move(command), .caret = caret})) {
+        clearSelection();
     }
 }
 
@@ -3347,7 +3363,7 @@ void ScoreDocument::transposeSelection(int semitones) {
     const auto [first, count] = selectedRange();
     core::Transposition what{.semitones = semitones, .first = first, .count = count};
     if (track_ != kAllTracks) {
-        what.tracks.push_back(caret_.track);
+        what.tracks.push_back(session_.caret().track);
     }
     std::unique_ptr<core::Command> command;
     try {

@@ -314,8 +314,12 @@ bool isEffectTarget(const Note& note, const Staff& staff, int string) {
 
 } // namespace
 
+bool hasCaret(const Song& song) noexcept {
+    return song.trackCount() > 0 && song.measureCount() > 0;
+}
+
 Caret clampCaret(const Song& song, Caret caret) {
-    if (song.trackCount() == 0 || song.measureCount() == 0) {
+    if (!hasCaret(song)) {
         throw std::invalid_argument("clampCaret: a song without tracks or measures has no caret");
     }
     caret.track = std::min(caret.track, song.trackCount() - 1);

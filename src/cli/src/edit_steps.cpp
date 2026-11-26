@@ -844,10 +844,6 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
 
 } // namespace
 
-bool hasCaret(const core::Song& song) {
-    return song.trackCount() > 0 && song.measureCount() > 0;
-}
-
 void runStep(core::Document& doc, std::string_view text, StepState& state) {
     runParsedStep(doc, Step(text), state.clipboard, state.entry);
     // Undo, removals and other edits can take the caret's beat away.

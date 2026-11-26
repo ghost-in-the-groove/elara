@@ -40,6 +40,9 @@ struct Caret {
     friend bool operator==(const Caret&, const Caret&) = default;
 };
 
+/// Whether the song has a place for a caret: a track and a measure.
+[[nodiscard]] bool hasCaret(const Song& song) noexcept;
+
 /// The nearest caret the song has: every index clamped (so a caret whose beat
 /// or measure went away moves back), the beat to the free slot or else the last
 /// beat, the string to the staff's strings or drum lanes (1 on any other staff).

@@ -34,9 +34,6 @@ struct StepState {
     core::MeasureClip clipboard; ///< what the last copy step copied
 };
 
-/// True when the song has a place for the caret: a track and a measure.
-[[nodiscard]] bool hasCaret(const core::Song& song);
-
 /// Runs one step, its words separated by spaces ("repeat 1 end 3"), on `doc`,
 /// then brings the caret back into the song. Throws StepSyntaxError for a
 /// malformed step, and what the song's edits throw for one it rejects.

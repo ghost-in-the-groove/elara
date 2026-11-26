@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// The editing session (ADR-0127): the caret and the input duration from one
+// action to the next.
+#include <elara/core/commands.hpp>
+#include <elara/core/document.hpp>
+#include <elara/core/edit_session.hpp>
+#include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
+#include <elara/core/song.hpp>
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cstddef>
+#include <memory>
+#include <stdexcept>
+#include <string_view>
+
+using namespace elara::core;
+
+namespace {
+
+const Duration kQuarter(NoteValue::Quarter);
+const Duration kEighth(NoteValue::Eighth);
+const Duration kHalf(NoteValue::Half);
+
+/// A guitar and a bass in 4/4 over three measures. The guitar plays an eighth
+/// and a dotted half in the first measure, a quintuplet eighth in the second
+/// and nothing in the third; the bass plays nothing.
+Song bandSong() {
+    Song song;
+    song.appendMeasures(3);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-bass")));
+    Staff& staff = song.track(0).staff(0);
+    staff.measure(0).voices[0].beats = {
+        Beat{.duration = kEighth, .notes = {staff.frettedNote(6, 3)}},
+        Beat{.duration = Duration(NoteValue::Half, 1), .notes = {staff.frettedNote(5, 2)}}};
+    staff.measure(1).voices[0].beats = {
+        Beat{.duration = Duration(NoteValue::Eighth, 0, Tuplet(5, 4)),
+             .notes = {staff.frettedNote(1, 0)}}};
+    return song;
+}
+
+const Voice& voice(const Song& song, std::size_t measure, std::size_t index = 0,
+                   std::size_t track = 0) {
+    return song.track(track).staff(0).measure(measure).voices.at(index);
+}
+
+/// A command that the song refuses as it is executed.
+class Refused final : public Command {
+public:
+    [[nodiscard]] std::string_view name() const noexcept override { return "Refused"; }
+    void apply(Song& /*song*/) override { throw std::logic_error("refused"); }
+    void revert(Song& /*song*/) override {}
+};
+
+} // namespace
+
+TEST_CASE("Session: it starts on the first beat of a track, a quarter note to type",
+          "[core][session]") {
+    EditSession session;
+    CHECK(session.caret() == Caret{});
+    CHECK(session.input() == kQuarter);
+
+    Document doc(bandSong());
+    session.move(doc.song(), CaretMove::NextMeasure);
+    session.setInput(doc, kHalf);
+    session.start(1);
+    CHECK(session.caret() == Caret{.track = 1});
+    CHECK(session.input() == kQuarter);
+}
+
+TEST_CASE("Session: the input duration follows the beat the caret moves to", "[core][session]") {
+    const Song song = bandSong();
+    EditSession session;
+    // Where it starts it has followed nothing yet.
+    CHECK(session.input() == kQuarter);
+    session.move(song, CaretMove::NextBeat);
+    CHECK(session.caret().beat == 1);
+    CHECK(session.input() == Duration(NoteValue::Half, 1));
+    session.move(song, CaretMove::PreviousBeat);
+    CHECK(session.input() == kEighth);
+
+    // The free slot has no duration: the input stays.
+    session.move(song, CaretMove::NextBeat);
+    session.move(song, CaretMove::NextBeat);
+    REQUIRE(onFreeSlot(song, session.caret()));
+    CHECK(session.input() == Duration(NoteValue::Half, 1));
+
+    // A tuplet typing offers is followed too.
+    session.move(song, CaretMove::NextMeasure);
+    CHECK(session.input() == Duration(NoteValue::Eighth, 0, Tuplet(5, 4)));
+}
+
+TEST_CASE("Session: a duration typing does not offer is not followed", "[core][session]") {
+    Song song = bandSong();
+    Staff& staff = song.track(0).staff(0);
+    staff.measure(2).voices[0].beats = {
+        Beat{.duration = Duration(NoteValue::Quarter, 2), .notes = {staff.frettedNote(1, 0)}},
+        Beat{.duration = Duration(NoteValue::Eighth, 0, Tuplet(11, 8)),
+             .notes = {staff.frettedNote(1, 0)}}};
+    EditSession session;
+    session.place(song, Caret{.measure = 2});
+    CHECK(session.input() == kQuarter); // two dots
+    session.move(song, CaretMove::NextBeat);
+    CHECK(session.input() == kQuarter); // eleven in the time of eight
+}
+
+TEST_CASE("Session: a click puts the caret on the nearest place the song has", "[core][session]") {
+    const Song song = bandSong();
+    EditSession session;
+    session.place(song, Caret{.measure = 0, .beat = 1, .string = 4});
+    CHECK(session.caret() == Caret{.measure = 0, .beat = 1, .string = 4});
+    CHECK(session.input() == Duration(NoteValue::Half, 1));
+
+    session.place(song, Caret{.track = 7, .measure = 9, .beat = 9, .string = 12});
+    CHECK(session.caret() == Caret{.track = 1, .measure = 2, .beat = 0, .string = 4});
+}
+
+TEST_CASE("Session: typing goes into another voice from its nearest beat", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    session.move(doc.song(), CaretMove::NextBeat);
+    CHECK(session.setVoice(doc.song(), 1));
+    // The second voice is empty: its free slot.
+    CHECK(session.caret() == Caret{.voice = 1, .beat = 0});
+    CHECK_FALSE(session.setVoice(doc.song(), 1)); // there already
+    CHECK_FALSE(session.setVoice(doc.song(), 4)); // a measure has four
+    CHECK(session.caret().voice == 1);
+
+    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 7, session.input())));
+    CHECK(voice(doc.song(), 0, 1).beats.size() == 1);
+    CHECK(voice(doc.song(), 0, 0).beats.size() == 2);
+}
+
+TEST_CASE("Session: entering an edit moves the caret and executes its command", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    session.place(doc.song(), Caret{.measure = 2});
+
+    // A fret on the free slot: a beat of the input duration, the caret on it.
+    CHECK(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())));
+    REQUIRE(voice(doc.song(), 2).beats.size() == 1);
+    CHECK(voice(doc.song(), 2).beats[0].duration == kQuarter);
+    CHECK(session.caret() == Caret{.measure = 2});
+    CHECK(doc.undoName() == "Enter note");
+
+    // An entry without a command only moves the caret.
+    CHECK_FALSE(session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 1}}));
+    CHECK(session.caret() == Caret{.measure = 1});
+    CHECK(doc.undoCount() == 1);
+
+    // The caret an entry names may be of the song after it: a measure added
+    // at the end takes the caret.
+    CHECK(session.enter(doc, Entry{.command = std::make_unique<InsertMeasures>(3, 1),
+                                   .caret = Caret{.measure = 3}}));
+    CHECK(doc.song().measureCount() == 4);
+    CHECK(session.caret() == Caret{.measure = 3});
+}
+
+TEST_CASE("Session: an edit the song refuses leaves the caret inside the song", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    CHECK_THROWS_AS(session.enter(doc, Entry{.command = std::make_unique<Refused>(),
+                                             .caret = Caret{.measure = 8, .beat = 3}}),
+                    std::logic_error);
+    CHECK(session.caret() == Caret{.measure = 2});
+    CHECK_FALSE(doc.canUndo());
+}
+
+TEST_CASE("Session: the input duration is given to the caret's beat", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    CHECK(session.setInput(doc, kHalf));
+    CHECK(session.input() == kHalf);
+    CHECK(voice(doc.song(), 0).beats[0].duration == kHalf);
+    CHECK(doc.undoName() == "Change duration");
+    CHECK_FALSE(session.setInput(doc, kHalf)); // it has it
+
+    // The free slot has no beat to give it to; typing uses it from now on.
+    session.place(doc.song(), Caret{.measure = 2});
+    CHECK_FALSE(session.setInput(doc, kEighth));
+    CHECK(session.input() == kEighth);
+    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())));
+    CHECK(voice(doc.song(), 2).beats[0].duration == kEighth);
+}
+
+TEST_CASE("Session: the caret stays on the track shown alone", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    session.place(doc.song(), Caret{.measure = 1, .string = 6});
+    session.showTrack(doc.song(), 1);
+    // The bass has four strings and nothing in that measure.
+    CHECK(session.caret() == Caret{.track = 1, .measure = 1, .beat = 0, .string = 4});
+
+    // An edit whose caret is on another track comes back to the one shown.
+    session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
+    CHECK(session.caret().track == 1);
+
+    // With every track shown the caret stays on the one it was on.
+    session.showTrack(doc.song(), std::nullopt);
+    CHECK(session.caret().track == 1);
+    session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
+    CHECK(session.caret().track == 0);
+
+    // The track shown goes: the caret is on the last the song has.
+    session.showTrack(doc.song(), 1);
+    doc.execute(std::make_unique<RemoveTrack>(1));
+    session.showTrack(doc.song(), 0);
+    CHECK(session.caret().track == 0);
+}
+
+TEST_CASE("Session: a song without tracks or measures has no caret to move", "[core][session]") {
+    Song empty;
+    EditSession session;
+    session.move(empty, CaretMove::NextBeat);
+    session.place(empty, Caret{.measure = 3});
+    session.showTrack(empty, 2);
+    CHECK_FALSE(session.setVoice(empty, 1));
+    CHECK(session.caret() == Caret{});
+
+    Document doc(empty);
+    CHECK_FALSE(session.setInput(doc, kHalf));
+    CHECK(session.input() == kHalf);
+    CHECK_FALSE(session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 3}}));
+}
