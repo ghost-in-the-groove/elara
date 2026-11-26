@@ -252,6 +252,12 @@ ApplicationWindow {
         id: recent
     }
 
+    CaretEditor {
+        id: caretEditor
+
+        document: score
+    }
+
     AudioController {
         id: audio
 
@@ -914,6 +920,7 @@ ApplicationWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.verticalCenterOffset: 1
                 document: score
+                editor: caretEditor
                 // Tools for the caret: there is none before a staff is shown.
                 enabled: score.caretPage >= 0
                 opacity: enabled ? 1.0 : 0.38
@@ -1044,6 +1051,7 @@ ApplicationWindow {
             anchors.left: palette.right
             anchors.right: rightDock.left
             document: score
+            editor: caretEditor
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             followCursor: true
             onSeekRequested: seconds => audio.seek(seconds)
@@ -1073,6 +1081,7 @@ ApplicationWindow {
             width: shown ? fullWidth : 0
             visible: width > 0
             document: score
+            editor: caretEditor
             onOpenedChanged: {
                 if (opened)
                     window.keepOneSide(false);
@@ -1297,6 +1306,7 @@ ApplicationWindow {
     footer: StatusBar {
         visible: window.hasScore
         document: score
+        editor: caretEditor
         view: scoreView
         onImportWarningsRequested: {
             detailsDialog.title = qsTr("What opening the file changed or left out");

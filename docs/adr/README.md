@@ -126,6 +126,7 @@ one that replaces them.
 | [0123](0123-mark-and-effect-edits-in-core.md) | Measure marks and effects are edited through core | Accepted |
 | [0126](0126-the-transport-plays-through-an-output-device.md) | The transport plays through an output device it is given | Accepted |
 | [0127](0127-the-editing-session.md) | The editing session lives in core | Accepted |
+| [0128](0128-the-caret-editor.md) | What is at the caret has a class of its own | Accepted |
 
 ## Template
 

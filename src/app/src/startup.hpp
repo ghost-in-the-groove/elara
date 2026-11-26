@@ -2,6 +2,7 @@
 // What the app does after its window loads, from the command line.
 #pragma once
 
+#include "caret_editor.hpp"
 #include "score_document.hpp"
 #include <QElapsedTimer>
 #include <QObject>
@@ -106,6 +107,7 @@ private:
     StartupOptions options_;
     const bool& qmlWarnings_;
     QPointer<ScoreDocument> score_;
+    QPointer<CaretEditor> editor_; ///< what is at score_'s caret
     QTimer timer_;
     QElapsedTimer clock_;
     qint64 stepStarted_ = 0;

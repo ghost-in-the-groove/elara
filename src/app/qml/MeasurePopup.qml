@@ -12,6 +12,8 @@ Sheet {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
 
     readonly property var marks: document.caretNavigation
     readonly property var repeats: document.caretRepeats
@@ -119,7 +121,7 @@ Sheet {
             // clefs, drums their own.
             RowLayout {
                 Layout.fillWidth: true
-                visible: root.document.caretClef >= 0
+                visible: root.editor.caretClef >= 0
                 spacing: 6
 
                 FieldLabel {
@@ -129,8 +131,8 @@ Sheet {
                     Layout.fillWidth: true
                     takesFocus: false
                     model: [qsTr("Treble"), qsTr("Bass"), qsTr("Alto"), qsTr("Tenor")]
-                    currentIndex: root.document.caretClef
-                    onActivated: index => root.document.setClef(index)
+                    currentIndex: root.editor.caretClef
+                    onActivated: index => root.editor.setClef(index)
                     ToolTip.visible: hovered && !popup.visible
                     ToolTip.delay: 600
                     ToolTip.text: qsTr("The clef of this staff from this measure on")
@@ -150,8 +152,8 @@ Sheet {
                     Layout.fillWidth: true
                     takesFocus: false
                     model: [qsTr("None"), qsTr("The measure before"), qsTr("The two measures before")]
-                    currentIndex: root.document.caretRepeat
-                    onActivated: index => root.document.setMeasureRepeat(index)
+                    currentIndex: root.editor.caretRepeat
+                    onActivated: index => root.editor.setMeasureRepeat(index)
                     ToolTip.visible: hovered && !popup.visible
                     ToolTip.delay: 600
                     ToolTip.text: qsTr("Play the measure, or the two measures, before this one: the sign takes the place of the music here")

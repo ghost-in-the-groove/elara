@@ -11,6 +11,8 @@ Item {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
 
     /// The measure button: the caret's measure, its signatures and length.
     signal measureRequested
@@ -303,7 +305,7 @@ Item {
 
         Tool {
             tip: qsTr("Insert a rest (Insert)")
-            onClicked: root.document.insertRest()
+            onClicked: root.editor.insertRest()
 
             contentItem: MusicSymbol {
                 symbol: ""
@@ -314,7 +316,7 @@ Item {
         IconTool {
             tip: qsTr("Delete the note (Delete); the beat with Ctrl+Delete")
             path: Icons.trash
-            onClicked: root.document.deleteAtCaret()
+            onClicked: root.editor.deleteAtCaret()
         }
 
         Separator {}
@@ -322,13 +324,13 @@ Item {
         IconTool {
             tip: qsTr("Chord symbol (Ctrl+K)")
             path: Icons.chord
-            marked: root.document.caretChord.length > 0
+            marked: root.editor.caretChord.length > 0
             onClicked: root.chordRequested()
         }
         IconTool {
             tip: qsTr("Text (Ctrl+T)")
             path: Icons.text
-            marked: root.document.caretText.length > 0
+            marked: root.editor.caretText.length > 0
             onClicked: root.textRequested()
         }
         IconTool {

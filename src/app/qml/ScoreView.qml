@@ -10,6 +10,8 @@ Item {
     id: root
 
     required property ScoreDocument document
+    // What is at the document's caret, read and edited.
+    required property CaretEditor editor
 
     /// 1 shows pages at their paper size (96 logical pixels per inch).
     property real zoom: 1.0
@@ -274,7 +276,7 @@ Item {
             if (document.hasSelection)
                 document.transposeSelection(semitones);
             else
-                document.shiftPitch(semitones);
+                editor.shiftPitch(semitones);
             event.accepted = true;
             reveal();
             return;
@@ -304,7 +306,7 @@ Item {
         // A to G type note names; with Shift they join the beat's chord.
         const letter = "CDEFGAB".indexOf(event.text.toUpperCase());
         if (!control && event.text.length === 1 && letter >= 0) {
-            document.typeNoteName(letter, shift);
+            editor.typeNoteName(letter, shift);
             event.accepted = true;
             reveal();
             return;
@@ -312,9 +314,9 @@ Item {
         // Note effects: T tie, H hammer-on or pull-off, S slide, U bend,
         // V vibrato, P palm mute, X dead note, L let ring, N harmonic,
         // O ghost note, > accent, ' staccato, _ tenuto, " staccatissimo.
-        const effect = control ? -1 : document.effectForKey(event.text);
+        const effect = control ? -1 : editor.effectForKey(event.text);
         if (effect >= 0) {
-            document.toggleEffect(effect);
+            editor.toggleEffect(effect);
             event.accepted = true;
             reveal();
             return;
@@ -358,13 +360,13 @@ Item {
             document.moveCaret(ScoreDocument.StringDown);
         } else if (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace) {
             if (control)
-                document.deleteBeat();
+                editor.deleteBeat();
             else
-                document.deleteAtCaret();
+                editor.deleteAtCaret();
         } else if (event.key === Qt.Key_Insert && !control) {
-            document.insertRest();
+            editor.insertRest();
         } else if (!control && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            document.toggleDrum();
+            editor.toggleDrum();
         } else if (!control && event.key === Qt.Key_Plus) {
             document.longerDuration();
         } else if (!control && event.key === Qt.Key_Minus) {
@@ -692,6 +694,7 @@ Item {
         objectName: "measurePopup"
 
         document: root.document
+        editor: root.editor
         onClosed: root.forceActiveFocus()
         // It knows its height once it shows: kept inside the view then.
         onOpened: root.keepInside(measurePopup)
@@ -707,12 +710,12 @@ Item {
 
         title: qsTr("Chord symbol")
         placeholder: qsTr("Am7, C/G, N.C.…")
-        hint: root.document.caretFretted ? qsTr("Enter names it; the beat's frets draw its diagram.")
+        hint: root.editor.caretFretted ? qsTr("Enter names it; the beat's frets draw its diagram.")
                                          : qsTr("Enter names it; an empty name takes it away.")
         removeTip: qsTr("Remove the chord symbol")
-        current: root.document.caretChord
-        onOpening: offered = root.document.songChords()
-        onApplied: words => root.document.setChordSymbol(words)
+        current: root.editor.caretChord
+        onOpening: offered = root.editor.songChords()
+        onApplied: words => root.editor.setChordSymbol(words)
         onClosed: root.forceActiveFocus()
     }
 
@@ -724,9 +727,9 @@ Item {
         placeholder: qsTr("let it ring, ad lib., solo…")
         hint: qsTr("Enter writes it above the beat; an empty text takes it away.")
         removeTip: qsTr("Remove the text")
-        current: root.document.caretText
-        onOpening: offered = root.document.songTexts()
-        onApplied: words => root.document.setBeatText(words)
+        current: root.editor.caretText
+        onOpening: offered = root.editor.songTexts()
+        onApplied: words => root.editor.setBeatText(words)
         onClosed: root.forceActiveFocus()
     }
 
@@ -735,6 +738,7 @@ Item {
         objectName: "lyricsPopup"
 
         document: root.document
+        editor: root.editor
         onClosed: root.forceActiveFocus()
     }
 
