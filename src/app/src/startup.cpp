@@ -109,7 +109,7 @@ void Startup::start() {
         connect(score_, &ScoreDocument::saveFinished, this,
                 [this](const QUrl& /*file*/, bool saved) { saved_ = saved; });
         connect(score_, &ScoreDocument::exportFinished, this,
-                [this](const QString& /*file*/, bool written) { exported_ = written; });
+                [this](const QUrl& /*file*/, bool written) { exported_ = written; });
     }
     if (options_.effects && window_ != nullptr) {
         effectsPanel_ = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
@@ -440,7 +440,10 @@ void Startup::queueRecoveryCopy() {
 
 // Saving on a worker (ADR-0107): the file holds the song as it was when the
 // save started, and an edit made while it is written stays unsaved; undoing
-// that edit returns to the state saved. The song is left there, saved.
+// that edit returns to the state saved. A new song asked for in the window
+// while a save is written waits for it, and a save that ends after another
+// song replaced the one it wrote marks nothing. The steps after these edit a
+// new song.
 void Startup::queueSave() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -478,6 +481,40 @@ void Startup::queueSave() {
     steps_.emplace_back([this, check] {
         check(score_->songTitle() == QStringLiteral("Saved") && !score_->modified(),
               "undoing the edit made while saving did not return to the state saved");
+        // A new song asked for while a save is written waits for it, and is
+        // made without asking once the save holds every change (ADR-0107).
+        score_->setSongTitle(QStringLiteral("Waiting"));
+        saved_.reset();
+        score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("waiting"))));
+        QMetaObject::invokeMethod(window_, "newSong");
+        window_->setProperty("showSongPane", false);
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!saved_) {
+            again_ = true;
+            return false;
+        }
+        const auto* unsaved = window_->findChild<QObject*>(QStringLiteral("unsavedDialog"));
+        check(unsaved != nullptr && !unsaved->property("visible").toBool(),
+              "a song saved while a new one waited was asked to be saved");
+        check(score_->songTitle() != QStringLiteral("Waiting") && score_->source().isEmpty() &&
+                  !score_->modified(),
+              "the new song asked for while saving was not made once the save ended");
+        // A song that replaces the one being saved is not marked saved by it.
+        score_->setSongTitle(QStringLiteral("Replaced"));
+        saved_.reset();
+        score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("replaced"))));
+        score_->newSong(QStringLiteral("electric-guitar"));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!saved_) {
+            again_ = true;
+            return false;
+        }
+        check(*saved_ && score_->source().isEmpty() && !score_->modified(),
+              "a save marked the song that replaced the one it wrote");
         return false;
     });
 }

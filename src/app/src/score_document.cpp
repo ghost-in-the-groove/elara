@@ -769,6 +769,11 @@ void ScoreDocument::writeRecovery() {
                  if (store != recovery_) {
                      return; // written to a folder no longer used
                  }
+                 // A write that failed, not one dropped by a removal, is
+                 // tried again.
+                 if (!written && recoverySong_ == song) {
+                     recoverySong_.reset();
+                 }
                  // Unless the copy was removed since: the song was saved.
                  if (written && recoverySong_ == song) {
                      if (!recoveredFrom_.isEmpty()) {
@@ -902,7 +907,7 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         ++sequenceGeneration_;
         sequencing_.reset();
         document_.emplace(*layout.song);
-        ++documents_;
+        ++documentsMade_;
         caret_ = core::Caret{.track = static_cast<std::size_t>(std::max(0, layout.track))};
         pendingDigit_ = -1;
         setInput(core::Duration{});
@@ -1146,7 +1151,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     ++sequenceGeneration_; // nor an edit's sequence still being built
     sequencing_.reset();
     document_.emplace(std::move(song));
-    ++documents_;
+    ++documentsMade_;
     song_ = std::make_shared<const core::Song>(document_->song());
     sequence_ = std::make_shared<const audio::Sequence>(*song_, practice_);
     sequenceSong_ = song_;
@@ -1558,14 +1563,27 @@ void ScoreDocument::redo() {
     }
 }
 
+void ScoreDocument::failLater(void (ScoreDocument::*finished)(const QUrl&, bool),
+                              const QString& file, const QString& problem) {
+    // After the call that failed returns, as the work's own result comes.
+    QMetaObject::invokeMethod(
+        this,
+        [this, finished, file, problem] {
+            emit editFailed(problem);
+            emit(this->*finished)(QUrl::fromLocalFile(file), false);
+        },
+        Qt::QueuedConnection);
+}
+
 void ScoreDocument::save(const QUrl& file) {
-    if (!document_ || !song_) {
-        emit saveFinished(file, false);
-        return;
-    }
     QString local = file.isLocalFile() ? file.toLocalFile() : file.toString();
     if (!local.endsWith(QStringLiteral(".elara"), Qt::CaseInsensitive)) {
         local += QStringLiteral(".elara");
+    }
+    if (!document_ || !song_) {
+        failLater(&ScoreDocument::saveFinished, local,
+                  tr("Could not save %1: %2").arg(local, tr("There is no song to save.")));
+        return;
     }
     if (saving_++ == 0) {
         emit savingChanged();
@@ -1584,7 +1602,7 @@ void ScoreDocument::save(const QUrl& file) {
                                }),
              this,
              [this, local, revision = document_->revision(),
-              document = documents_](const QString& error) {
+              document = documentsMade_](const QString& error) {
                  if (--saving_ == 0) {
                      emit savingChanged();
                  }
@@ -1595,7 +1613,7 @@ void ScoreDocument::save(const QUrl& file) {
                      return;
                  }
                  // Unless another song replaced the one saved meanwhile.
-                 if (document == documents_) {
+                 if (document == documentsMade_) {
                      document_->markSaved(revision);
                      if (saved != source_) {
                          source_ = saved;
@@ -1704,14 +1722,15 @@ void ScoreDocument::exportPdf(const QUrl& file) {
         local += QStringLiteral(".pdf");
     }
     if (!song_) {
-        emit exportFinished(local, false);
+        failLater(&ScoreDocument::exportFinished, local,
+                  tr("Could not export %1: %2").arg(local, tr("There is no song to export.")));
         return;
     }
     const notation::EngravingFont* font = musicMetrics();
     const notation::FontOutlines* outlines = musicOutlines();
     if (font == nullptr || outlines == nullptr) {
-        emit editFailed(tr("Could not export %1: %2").arg(local, tr("The music font is missing.")));
-        emit exportFinished(local, false);
+        failLater(&ScoreDocument::exportFinished, local,
+                  tr("Could not export %1: %2").arg(local, tr("The music font is missing.")));
         return;
     }
     whenDone(
@@ -1746,7 +1765,7 @@ void ScoreDocument::exportPdf(const QUrl& file) {
             } else {
                 emit editFailed(tr("Could not export %1: %2").arg(local, error));
             }
-            emit exportFinished(local, error.isEmpty());
+            emit exportFinished(QUrl::fromLocalFile(local), error.isEmpty());
         });
 }
 

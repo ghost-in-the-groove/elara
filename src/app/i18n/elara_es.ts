@@ -2064,6 +2064,10 @@
         <translation>No se pudo guardar %1: %2</translation>
     </message>
     <message>
+        <source>There is no song to save.</source>
+        <translation>No hay ninguna canción que guardar.</translation>
+    </message>
+    <message>
         <source>MusicXML</source>
         <translation>MusicXML</translation>
     </message>
@@ -2081,6 +2085,10 @@
             <numerusform>Exportado %1. %2 dejó fuera %n cosa.</numerusform>
             <numerusform>Exportado %1. %2 dejó fuera %n cosas.</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>There is no song to export.</source>
+        <translation>No hay ninguna canción que exportar.</translation>
     </message>
     <message>
         <source>The music font is missing.</source>

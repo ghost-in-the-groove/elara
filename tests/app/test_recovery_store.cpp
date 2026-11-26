@@ -4,6 +4,9 @@
 
 #include <QDateTime>
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QLockFile>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QUrl>
@@ -29,6 +32,25 @@ std::string titleIn(const RecoveryStore::Copy& copy) {
     const auto song = elara::io::loadNative(std::filesystem::path(copy.file.toStdU16String()));
     REQUIRE(song.has_value());
     return song->info().title;
+}
+
+// Leaves `file` as a run that ends without releasing its lock does: naming,
+// as its owner, a process that is gone.
+void leaveStaleLock(const QString& file) {
+    QByteArray contents;
+    {
+        QLockFile lock(file);
+        REQUIRE(lock.tryLock(0));
+        QFile held(file);
+        REQUIRE(held.open(QIODevice::ReadOnly));
+        contents = held.readAll();
+    }
+    const qsizetype pidEnd = contents.indexOf('\n');
+    REQUIRE(pidEnd > 0);
+    contents.replace(0, pidEnd, "999999996"); // no process has this id
+    QFile left(file);
+    REQUIRE(left.open(QIODevice::WriteOnly));
+    REQUIRE(left.write(contents) == contents.size());
 }
 
 } // namespace
@@ -135,4 +157,29 @@ TEST_CASE("Recovery copies: a store in a folder that does not exist yet makes it
     CHECK(store.left().empty());
     CHECK(store.write(songTitled("Deep"), QUrl(), QStringLiteral("Deep"), store.removals()));
     CHECK(QDir(folder).exists());
+}
+
+TEST_CASE("Recovery copies: what a run left besides a copy is cleared away", "[app][recovery]") {
+    const QTemporaryDir dir;
+    const QDir folder(dir.path());
+    // A run that ended while writing its first copy, and one that ended after
+    // its copy was removed but before its lock was.
+    const QString halfWritten = QStringLiteral("0b6e2f4a-3c1d-4e5f-8a9b-0c1d2e3f4a5b");
+    const QString emptied = QStringLiteral("9f8e7d6c-5b4a-4321-8fed-cba987654321");
+    for (const QString& name : {halfWritten + QStringLiteral(".json"),
+                                halfWritten + QStringLiteral(".elara.part.saving")}) {
+        QFile file(folder.filePath(name));
+        REQUIRE(file.open(QIODevice::WriteOnly));
+    }
+    leaveStaleLock(folder.filePath(emptied + QStringLiteral(".lock")));
+    // A run still going on, its copy removed: its lock stays.
+    RecoveryStore running(dir.path());
+    REQUIRE(running.write(songTitled("Running"), QUrl(), QStringLiteral("Running"),
+                          running.removals()));
+    running.remove();
+
+    CHECK(RecoveryStore(dir.path()).left().empty());
+    const QString runningLock =
+        QFileInfo(running.copyFile()).completeBaseName() + QStringLiteral(".lock");
+    CHECK(folder.entryList(QDir::Files) == QStringList{runningLock});
 }
