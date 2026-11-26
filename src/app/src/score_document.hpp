@@ -7,6 +7,7 @@
 #include <elara/core/clipboard.hpp>
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
+#include <elara/core/edit_session.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/song.hpp>
 #include <elara/io/result.hpp>
@@ -489,14 +490,14 @@ public:
     [[nodiscard]] bool caretFretted() const;
     /// The duration typing uses: 1 a whole note, 2 a half note... 64.
     [[nodiscard]] int inputValue() const;
-    [[nodiscard]] bool inputDotted() const { return input_.dots() > 0; }
+    [[nodiscard]] bool inputDotted() const { return session_.input().dots() > 0; }
     /// The actual notes of the input duration's tuplet (3 for a triplet), 0
     /// when it has none.
     [[nodiscard]] int inputTuplet() const {
-        return input_.tuplet().isNone() ? 0 : input_.tuplet().actual();
+        return session_.input().tuplet().isNone() ? 0 : session_.input().tuplet().actual();
     }
     /// The caret in the song being edited.
-    [[nodiscard]] core::Caret caret() const { return caret_; }
+    [[nodiscard]] core::Caret caret() const { return session_.caret(); }
     /// The fret of the note on the caret's string at its beat, if there is one.
     [[nodiscard]] std::optional<int> fretAtCaret() const;
     /// The notes the caret is on, low to high: the one on its string on a
@@ -511,7 +512,7 @@ public:
 
     Q_INVOKABLE void moveCaret(CaretMove move);
     /// The voice typing goes into, 1 to 4 (the core's voice plus one).
-    [[nodiscard]] int caretVoice() const { return static_cast<int>(caret_.voice) + 1; }
+    [[nodiscard]] int caretVoice() const { return static_cast<int>(session_.caret().voice) + 1; }
     /// Moves the caret to voice `voice` (1 to 4) of its measure, at its beat or
     /// the nearest one that voice has; typing then goes there.
     Q_INVOKABLE void setCaretVoice(int voice);
@@ -694,25 +695,25 @@ public:
     Q_INVOKABLE QString harmonicName(int kind) const;
 
     /// The caret's measure, 0-based, and its signatures.
-    [[nodiscard]] int caretMeasure() const { return static_cast<int>(caret_.measure); }
+    [[nodiscard]] int caretMeasure() const { return static_cast<int>(session_.caret().measure); }
     [[nodiscard]] int caretTimeNumerator() const;
     [[nodiscard]] int caretTimeDenominator() const;
     [[nodiscard]] int caretKeyFifths() const;
     [[nodiscard]] bool caretKeyMinor() const;
     [[nodiscard]] QVariantMap caretNavigation() const {
-        return navigationAt(static_cast<int>(caret_.measure));
+        return navigationAt(static_cast<int>(session_.caret().measure));
     }
     [[nodiscard]] QVariantMap caretRepeats() const {
-        return repeatsAt(static_cast<int>(caret_.measure));
+        return repeatsAt(static_cast<int>(session_.caret().measure));
     }
     [[nodiscard]] QVariantMap caretTempo() const {
-        return tempoAt(static_cast<int>(caret_.measure));
+        return tempoAt(static_cast<int>(session_.caret().measure));
     }
     [[nodiscard]] int caretTripletFeel() const {
-        return tripletFeelAt(static_cast<int>(caret_.measure));
+        return tripletFeelAt(static_cast<int>(session_.caret().measure));
     }
     [[nodiscard]] QString caretSection() const {
-        return sectionAt(static_cast<int>(caret_.measure));
+        return sectionAt(static_cast<int>(session_.caret().measure));
     }
     /// The clef in force at the caret (ADR-0087) as the measure popup offers
     /// it: 0 treble, 1 bass, 2 alto, 3 tenor, the octave forms as the plain
@@ -841,10 +842,19 @@ private:
     /// Makes an entry from the song being edited and enters it, reporting
     /// what it throws through editFailed().
     void runEntry(const std::function<core::Entry(const core::Song&)>& make);
-    /// The input duration takes the caret beat's, when it has one typing can use.
-    void followBeat();
-    void setInput(core::Duration duration);
-    /// Clamps the caret to the song being edited.
+    /// Another song: the session starts on its track `track`, nothing selected.
+    void startSession(std::size_t track);
+    /// Tells inputChanged() when the input duration is no longer `before`.
+    void inputMaybeChanged(core::Duration before);
+    /// Shows what an edit of the session did, the edited song or only the
+    /// caret, and returns `changed`.
+    bool showEdit(bool changed);
+    /// The duration typing uses from now on, which the caret's beat takes too;
+    /// reports through editFailed() a beat that cannot take it.
+    void giveInput(core::Duration duration);
+    /// Puts the caret on `caret`, or the nearest place the song has.
+    void placeCaretAt(const core::Caret& caret);
+    /// The caret back on the track shown and inside the song being edited.
     void clampCaret();
     /// Finds the caret on the pages shown.
     void placeCaretBox();
@@ -878,8 +888,7 @@ private:
     /// (ADR-0052); shared with the layouts running on workers.
     std::shared_ptr<notation::PageLayoutCache> layoutCache_ =
         std::make_shared<notation::PageLayoutCache>();
-    core::Caret caret_;
-    core::Duration input_;
+    core::EditSession session_; ///< the caret and the input duration (ADR-0127)
     int caretPage_ = -1;
     QRectF caretRect_;
     std::optional<std::size_t> anchor_; ///< where the selection started

@@ -125,6 +125,7 @@ one that replaces them.
 | [0122](0122-choosing-and-opening-the-output-device.md) | Choosing the output device and opening it on a worker | Accepted |
 | [0123](0123-mark-and-effect-edits-in-core.md) | Measure marks and effects are edited through core | Accepted |
 | [0126](0126-the-transport-plays-through-an-output-device.md) | The transport plays through an output device it is given | Accepted |
+| [0127](0127-the-editing-session.md) | The editing session lives in core | Accepted |
 
 ## Template
 

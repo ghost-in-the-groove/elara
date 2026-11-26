@@ -5,6 +5,7 @@ add_library(elara_core STATIC
   src/commands.cpp
   src/document.cpp
   src/duration.cpp
+  src/edit_session.cpp
   src/effects.cpp
   src/entry.cpp
   src/fraction.cpp
