@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// The keyboard entry bar, in a strip over the top of the pages: the note value
-// typing uses, the dot, the tuplet, a rest, delete, the note effects, and
-// where the caret is.
+// The keyboard entry tools, at the left of the tool row: the note value typing
+// uses, the dot, the tuplet, the voice, a rest, delete, the note effects, the
+// chord symbol, the text, the lyrics and the measure.
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import Elara.App
 
 Rectangle {
@@ -52,8 +51,8 @@ Rectangle {
     /// How far the next dive goes when the caret's beat has none (ADR-0060).
     property int whammyCents: -200
 
-    implicitWidth: row.implicitWidth + 16
-    implicitHeight: 44
+    implicitWidth: row.implicitWidth
+    implicitHeight: Theme.tool
     color: "transparent"
 
     // A tool of the bar: never takes the keyboard from the score.
@@ -62,20 +61,14 @@ Rectangle {
 
         property string tip
 
-        implicitWidth: 34
-        implicitHeight: 34
+        implicitWidth: Theme.tool
+        implicitHeight: Theme.tool
         focusPolicy: Qt.NoFocus
         hoverEnabled: true
 
         background: Rectangle {
-            radius: height / 2
+            radius: Theme.radiusSmall
             color: tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 120
-                }
-            }
         }
 
         ToolTip.visible: hovered && tip.length > 0
@@ -105,16 +98,9 @@ Rectangle {
         Accessible.checked: active
 
         background: Rectangle {
-            radius: height / 2
-            color: pill.active ? Material.accent
-                               : pill.pressed ? Qt.alpha(root.ink, 0.16)
-                                              : pill.hovered ? Qt.alpha(root.ink, 0.08) : "transparent"
-
-            Behavior on color {
-                ColorAnimation {
-                    duration: 120
-                }
-            }
+            radius: Theme.radiusSmall
+            color: pill.active ? Theme.accent
+                               : pill.pressed ? Theme.pressed : pill.hovered ? Theme.hover : "transparent"
         }
 
         ToolTip.visible: hovered && Accessible.name.length > 0
@@ -144,10 +130,12 @@ Rectangle {
             }
         }
 
-        contentItem: Icon {
-            path: bendForm.path
-            lineWidth: 1.8
-            color: bendForm.active ? "white" : root.ink
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                path: bendForm.path
+                color: bendForm.active ? Theme.accentText : root.ink
+            }
         }
     }
 
@@ -163,10 +151,12 @@ Rectangle {
         Accessible.role: Accessible.CheckBox
         Accessible.name: tip
 
-        contentItem: Icon {
-            path: beatEffect.path
-            lineWidth: 1.8
-            color: beatEffect.active ? "white" : root.ink
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                path: beatEffect.path
+                color: beatEffect.active ? Theme.accentText : root.ink
+            }
         }
     }
 
@@ -189,8 +179,7 @@ Rectangle {
                 anchors.centerIn: parent
                 visible: effectKind.label.length === 0
                 path: effectKind.path
-                lineWidth: 1.8
-                color: effectKind.active ? "white" : root.ink
+                color: effectKind.active ? Theme.accentText : root.ink
             }
             Label {
                 id: kindLabel
@@ -200,7 +189,7 @@ Rectangle {
                 text: effectKind.label
                 font.pixelSize: 11
                 font.bold: true
-                color: effectKind.active ? "white" : root.ink
+                color: effectKind.active ? Theme.accentText : root.ink
             }
         }
     }
@@ -225,7 +214,7 @@ Rectangle {
                 anchors.centerIn: parent
                 symbol: dynamicKind.symbol
                 size: 26
-                color: dynamicKind.active ? "white" : root.ink
+                color: dynamicKind.active ? Theme.accentText : root.ink
             }
         }
     }
@@ -254,10 +243,12 @@ Rectangle {
             }
         }
 
-        contentItem: Icon {
-            path: whammyForm.path
-            lineWidth: 1.8
-            color: whammyForm.active ? "white" : root.ink
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                path: whammyForm.path
+                color: whammyForm.active ? Theme.accentText : root.ink
+            }
         }
     }
 
@@ -285,7 +276,7 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 12
-            color: whammyAmount.active ? "white" : root.ink
+            color: whammyAmount.active ? Theme.accentText : root.ink
         }
     }
 
@@ -312,7 +303,7 @@ Rectangle {
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             font.pixelSize: 12
-            color: bendAmount.active ? "white" : root.ink
+            color: bendAmount.active ? Theme.accentText : root.ink
         }
     }
 
@@ -336,12 +327,12 @@ Rectangle {
     Row {
         id: row
 
-        anchors.centerIn: parent
+        anchors.verticalCenter: parent.verticalCenter
         spacing: 2
 
         Item {
             width: valueRow.width
-            height: 34
+            height: Theme.tool
 
             // The chosen value, gliding from one to the next.
             Rectangle {
@@ -351,10 +342,10 @@ Rectangle {
 
                 visible: target !== null
                 x: target ? target.x : 0
-                width: 34
-                height: 34
-                radius: 17
-                color: Material.accent
+                width: Theme.tool
+                height: Theme.tool
+                radius: Theme.radiusSmall
+                color: Theme.accent
 
                 Behavior on x {
                     NumberAnimation {
@@ -384,7 +375,7 @@ Rectangle {
                         contentItem: MusicSymbol {
                             symbol: valueTool.modelData.symbol
                             size: 22
-                            color: valueTool.index === root.currentIndex ? "white" : root.ink
+                            color: valueTool.index === root.currentIndex ? Theme.accentText : root.ink
                         }
                     }
                 }
@@ -398,20 +389,14 @@ Rectangle {
             onClicked: root.document.toggleDot()
 
             background: Rectangle {
-                radius: height / 2
-                color: root.document.inputDotted ? Material.accent
+                radius: Theme.radiusSmall
+                color: root.document.inputDotted ? Theme.accent
                                                  : dot.hovered ? Theme.hover : "transparent"
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 120
-                    }
-                }
             }
             contentItem: MusicSymbol {
                 symbol: "\uECB7"
                 size: 30
-                color: root.document.inputDotted ? "white" : root.ink
+                color: root.document.inputDotted ? Theme.accentText : root.ink
             }
         }
 
@@ -427,21 +412,15 @@ Rectangle {
             onPressAndHold: tupletMenu.popup(tuplet, 0, tuplet.height + 6)
 
             background: Rectangle {
-                radius: height / 2
-                color: tuplet.on ? Material.accent
+                radius: Theme.radiusSmall
+                color: tuplet.on ? Theme.accent
                                  : tuplet.hovered ? Theme.hover : "transparent"
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 120
-                    }
-                }
             }
             contentItem: MusicSymbol {
                 // The tuplet's number in the music font's tuplet digits.
                 symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
                 size: 30
-                color: tuplet.on ? "white" : root.ink
+                color: tuplet.on ? Theme.accentText : root.ink
             }
 
             TapHandler {
@@ -501,15 +480,9 @@ Rectangle {
             onPressAndHold: voiceMenu.popup(voiceTool, 0, voiceTool.height + 6)
 
             background: Rectangle {
-                radius: height / 2
-                color: voiceTool.voice > 1 ? Material.accent
+                radius: Theme.radiusSmall
+                color: voiceTool.voice > 1 ? Theme.accent
                                            : voiceTool.hovered ? Theme.hover : "transparent"
-
-                Behavior on color {
-                    ColorAnimation {
-                        duration: 120
-                    }
-                }
             }
             contentItem: Label {
                 text: qsTr("V%1").arg(voiceTool.voice)
@@ -517,7 +490,7 @@ Rectangle {
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: Theme.fontSmall
                 font.weight: Font.DemiBold
-                color: voiceTool.voice > 1 ? "white" : root.ink
+                color: voiceTool.voice > 1 ? Theme.accentText : root.ink
             }
 
             TapHandler {
@@ -544,8 +517,8 @@ Rectangle {
         }
 
         Item {
-            width: 8
-            height: 34
+            width: 9
+            height: Theme.tool
 
             Separator {
                 anchors.centerIn: parent
@@ -566,9 +539,12 @@ Rectangle {
             tip: qsTr("Delete the note (Delete); the beat with Ctrl+Delete")
             onClicked: root.document.deleteAtCaret()
 
-            contentItem: Icon {
-                path: "M5 7 L19 7 M10 7 L10 4.5 L14 4.5 L14 7 M7 7 L8 20 L16 20 L17 7"
-                color: root.ink
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: Icons.trash
+                    color: root.ink
+                }
             }
         }
 
@@ -581,7 +557,7 @@ Rectangle {
             contentItem: Item {
                 Icon {
                     anchors.centerIn: parent
-                    path: "M3 12 C5 8 7 8 9 12 C11 16 13 16 15 12 C17 8 19 8 21 12"
+                    path: Icons.effects
                     color: root.ink
                 }
                 // A dot while the caret's note has an effect.
@@ -592,7 +568,7 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 5
-                    color: Material.accent
+                    color: Theme.accent
                     scale: root.document.caretEffects !== 0 ? 1 : 0
 
                     Behavior on scale {
@@ -687,8 +663,8 @@ Rectangle {
                                 Accessible.checked: active
 
                                 background: Rectangle {
-                                    radius: height / 2
-                                    color: chip.active ? Material.accent
+                                    radius: Theme.radiusSmall
+                                    color: chip.active ? Theme.accent
                                                    : chip.pressed ? Qt.alpha(root.ink, 0.16)
                                                                   : chip.hovered ? Qt.alpha(root.ink, 0.08)
                                                                                  : "transparent"
@@ -714,21 +690,21 @@ Rectangle {
                                             height: 20
                                             radius: 5
                                             anchors.verticalCenter: parent.verticalCenter
-                                            color: chip.active ? Qt.alpha("white", 0.24) : Qt.alpha(root.ink, 0.08)
+                                            color: chip.active ? Qt.alpha(Theme.accentText, 0.24) : Qt.alpha(root.ink, 0.08)
 
                                             Label {
                                                 anchors.centerIn: parent
                                                 text: root.document.effectKey(chip.index)
                                                 font.pixelSize: 11
                                                 font.bold: true
-                                                color: chip.active ? "white" : root.ink
+                                                color: chip.active ? Theme.accentText : root.ink
                                             }
                                         }
                                         Label {
                                             anchors.verticalCenter: parent.verticalCenter
                                             text: root.document.effectName(chip.index)
                                             font.pixelSize: 12
-                                            color: chip.active ? "white" : root.ink
+                                            color: chip.active ? Theme.accentText : root.ink
                                         }
                                     }
                                 }
@@ -1330,7 +1306,7 @@ Rectangle {
             contentItem: Item {
                 Icon {
                     anchors.centerIn: parent
-                    path: "M7 6 L7 20 M12 6 L12 20 M17 6 L17 20 M5 6 L19 6 M5 11 L19 11 M5 16 L19 16"
+                    path: Icons.chord
                     color: root.ink
                 }
                 // A dot while the caret's beat names a chord.
@@ -1341,7 +1317,7 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 5
-                    color: Material.accent
+                    color: Theme.accent
                     scale: root.document.caretChord.length > 0 ? 1 : 0
 
                     Behavior on scale {
@@ -1361,7 +1337,7 @@ Rectangle {
             contentItem: Item {
                 Icon {
                     anchors.centerIn: parent
-                    path: "M6 6 L18 6 M12 6 L12 19 M9 19 L15 19"
+                    path: Icons.text
                     color: root.ink
                 }
                 // A dot while the caret's beat has a text.
@@ -1372,7 +1348,7 @@ Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 5
-                    color: Material.accent
+                    color: Theme.accent
                     scale: root.document.caretText.length > 0 ? 1 : 0
 
                     Behavior on scale {
@@ -1390,9 +1366,12 @@ Rectangle {
             onClicked: root.lyricsRequested()
 
             // A microphone.
-            contentItem: Icon {
-                path: "M9.5 6.5 A2.5 2.5 0 0 1 14.5 6.5 L14.5 11 A2.5 2.5 0 0 1 9.5 11 Z M6.5 11 A5.5 5.5 0 0 0 17.5 11 M12 16.5 L12 20 M9 20 L15 20"
-                color: root.ink
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: Icons.lyrics
+                    color: root.ink
+                }
             }
         }
 
@@ -1400,30 +1379,13 @@ Rectangle {
             tip: qsTr("Measure: signatures, insert, delete (Ctrl+M)")
             onClicked: root.measureRequested()
 
-            contentItem: Icon {
-                path: "M4 7 L4 17 M20 7 L20 17 M4 9 L20 9 M4 12 L20 12 M4 15 L20 15 M12 7 L12 17"
-                color: root.ink
+            contentItem: Item {
+                Icon {
+                    anchors.centerIn: parent
+                    path: Icons.measure
+                    color: root.ink
+                }
             }
-        }
-
-        Item {
-            width: 8
-            height: 34
-
-            Separator {
-                anchors.centerIn: parent
-            }
-        }
-
-        Label {
-            anchors.verticalCenter: parent.verticalCenter
-            leftPadding: 4
-            rightPadding: 10
-            text: root.document.caretStatus
-            font.pixelSize: Theme.fontSmall
-            font.features: { "tnum": 1 }
-            color: root.ink
-            opacity: 0.8
         }
     }
 }

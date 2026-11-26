@@ -287,6 +287,24 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Saving and PDF export on workers: the window goes on while they are
       written, and edits made meanwhile stay unsaved (ADR-0107)
 
+## The interface
+
+The window redrawn around the score (`docs/interface.md`), after looking at how
+Guitar Pro, MuseScore and Dorico lay out the same job.
+
+- [x] The window's bands: the command bar with the menus and the transport, the
+      song string, the tool row and the status bar; one set of colours, sizes
+      and icons (ADR-0108)
+- [ ] The note effects as a palette docked at the left of the score, lit with
+      the caret's note
+- [ ] The song panel, the popups and the tuner in the interface's own controls;
+      the measure popup fits a short window
+- [ ] The welcome pane as a home: what to do at the left, the recent scores
+      beside it
+- [ ] The page in the dark theme, and the score's own signs: the tablature clef,
+      the fret numbers and the texts of the techniques
+- [ ] A command palette: every command by name, with its keys
+
 ## Milestone 6 - Practice tools
 
 - [x] Metronome with count-in, A-B loop, speed 25-200 %
