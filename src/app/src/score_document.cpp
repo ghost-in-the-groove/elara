@@ -71,6 +71,12 @@ struct ScoreLayout {
     QStringList warnings; ///< what reading `source` approximated or dropped
 };
 
+// An edited song's sequence, or why it could not be built.
+struct SequenceResult {
+    std::shared_ptr<const audio::Sequence> sequence;
+    QString error;
+};
+
 namespace {
 
 constexpr double kStaffSpaceMm = 1.75;
@@ -166,12 +172,6 @@ std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
     }
     return sequence;
 }
-
-// An edited song's sequence, or why it could not be built.
-struct SequenceResult {
-    std::shared_ptr<const audio::Sequence> sequence;
-    QString error;
-};
 
 // Lays out `track` (or every track) of `song` as `view` on A4 pages or, when
 // `continuous`, on one endless page cut into strips as high as A4 pages
@@ -483,7 +483,10 @@ QString trackDetail(const core::Track& track) {
 
 } // namespace
 
-ScoreDocument::ScoreDocument(QObject* parent) : QObject(parent) {
+ScoreDocument::ScoreDocument(QObject* parent)
+    : QObject(parent),
+      layouts_(std::make_unique<JobLane<ScoreLayout>>(this, [this] { updateBusy(); })),
+      sequences_(std::make_unique<JobLane<SequenceResult>>(this, [this] { updateBusy(); })) {
     // Connected first, so that the list is up to date for whoever else hears it.
     connect(this, &ScoreDocument::songChanged, this, [this] { trackList_.setTracks(tracks()); });
     recoveryTimer_.setSingleShot(true);
@@ -641,43 +644,37 @@ void ScoreDocument::open(const QUrl& file) {
 }
 
 void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> recovered) {
-    const std::uint64_t generation = ++generation_;
     status_ = Status::Loading;
     errorMessage_.clear();
     emit statusChanged();
-    setPending(+1);
-    whenDone(QtConcurrent::run(
-                 [file, practice = practice_, continuous = continuous_, cache = layoutCache_] {
-                     return openAndLayOut(file, practice, continuous, *cache);
-                 }),
-             this, [this, generation, recovered = std::move(recovered)](const ScoreLayout& result) {
-                 setPending(-1);
-                 if (generation != generation_) {
-                     return;
-                 }
-                 if (!result.error.isEmpty()) {
-                     fail(result.error);
-                     return;
-                 }
-                 if (!recovered) {
-                     apply(result);
-                     return;
-                 }
-                 // The song the copy holds, with the file it came from and
-                 // changes no file holds.
-                 ScoreLayout layout = result;
-                 layout.source = recovered->source;
-                 apply(layout);
-                 if (source_ != recovered->source) {
-                     source_ = recovered->source;
-                     emit sourceChanged();
-                     emit songChanged();
-                 }
-                 document_->markUnsaved();
-                 recoveredFrom_ = recovered->file;
-                 emit historyChanged();
-                 writeRecovery();
-             });
+    layouts_->request(
+        [file, practice = practice_, continuous = continuous_, cache = layoutCache_] {
+            return openAndLayOut(file, practice, continuous, *cache);
+        },
+        [this, recovered = std::move(recovered)](const ScoreLayout& result) {
+            if (!result.error.isEmpty()) {
+                fail(result.error);
+                return;
+            }
+            if (!recovered) {
+                apply(result);
+                return;
+            }
+            // The song the copy holds, with the file it came from and
+            // changes no file holds.
+            ScoreLayout layout = result;
+            layout.source = recovered->source;
+            apply(layout);
+            if (source_ != recovered->source) {
+                source_ = recovered->source;
+                emit sourceChanged();
+                emit songChanged();
+            }
+            document_->markUnsaved();
+            recoveredFrom_ = recovered->file;
+            emit historyChanged();
+            writeRecovery();
+        });
 }
 
 QString ScoreDocument::recoveryFolder() const {
@@ -801,22 +798,16 @@ void ScoreDocument::relayout() {
     if (!song_) {
         return;
     }
-    const std::uint64_t generation = ++generation_;
-    setPending(+1);
-    whenDone(QtConcurrent::run(
-                 [song = song_, track = track_, view = view_, continuous = continuous_,
-                  cache = layoutCache_] { return layOut(song, track, view, continuous, *cache); }),
-             this, [this, generation](const ScoreLayout& result) {
-                 setPending(-1);
-                 if (generation != generation_) {
-                     return;
-                 }
-                 if (!result.error.isEmpty()) {
-                     fail(result.error);
-                     return;
-                 }
-                 apply(result);
-             });
+    layouts_->request(
+        [song = song_, track = track_, view = view_, continuous = continuous_,
+         cache = layoutCache_] { return layOut(song, track, view, continuous, *cache); },
+        [this](const ScoreLayout& result) {
+            if (!result.error.isEmpty()) {
+                fail(result.error);
+                return;
+            }
+            apply(result);
+        });
     // An edit's sequence is built beside its layout, on another worker: the
     // pages show as soon as they are laid out instead of waiting for it.
     if (sequenceSong_ != song_ && sequencing_ != song_) {
@@ -828,36 +819,31 @@ void ScoreDocument::relayout() {
 // is all an edit costs it. Until it arrives, playback plays the previous one
 // with the new mix (ADR-0031).
 void ScoreDocument::resequence() {
-    const std::uint64_t generation = ++sequenceGeneration_;
     sequencing_ = song_;
-    setPending(+1);
-    whenDone(QtConcurrent::run([song = song_, heard = sequence_, practice = practice_] {
-                 SequenceResult result;
-                 try {
-                     result.sequence = sequenceFor(*song, heard, practice);
-                 } catch (const std::exception& error) {
-                     result.error = qstring(error.what());
-                 }
-                 return result;
-             }),
-             this, [this, generation, song = song_](const SequenceResult& result) {
-                 setPending(-1);
-                 if (generation != sequenceGeneration_) {
-                     return;
-                 }
-                 sequencing_.reset();
-                 if (!result.error.isEmpty()) {
-                     fail(result.error);
-                     return;
-                 }
-                 // The song and its sequence change together, so whoever hears
-                 // sequenceChanged sees them as a pair.
-                 sequenceSong_ = song;
-                 if (result.sequence != sequence_) {
-                     sequence_ = result.sequence;
-                     emit sequenceChanged();
-                 }
-             });
+    sequences_->request(
+        [song = song_, heard = sequence_, practice = practice_] {
+            SequenceResult result;
+            try {
+                result.sequence = sequenceFor(*song, heard, practice);
+            } catch (const std::exception& error) {
+                result.error = qstring(error.what());
+            }
+            return result;
+        },
+        [this, song = song_](const SequenceResult& result) {
+            sequencing_.reset();
+            if (!result.error.isEmpty()) {
+                fail(result.error);
+                return;
+            }
+            // The song and its sequence change together, so whoever hears
+            // sequenceChanged sees them as a pair.
+            sequenceSong_ = song;
+            if (result.sequence != sequence_) {
+                sequence_ = result.sequence;
+                emit sequenceChanged();
+            }
+        });
 }
 
 std::shared_ptr<const notation::DisplayList> ScoreDocument::page(int index) const {
@@ -876,7 +862,7 @@ const ScorePainter& ScoreDocument::painter() {
 void ScoreDocument::apply(const ScoreLayout& layout) {
     if (layout.opened) {
         // An edit's sequence still being built belongs to the song before.
-        ++sequenceGeneration_;
+        sequences_->drop();
         sequencing_.reset();
         document_.emplace(*layout.song);
         ++documentsMade_;
@@ -1119,8 +1105,8 @@ void ScoreDocument::newSong(const QString& presetId) {
     track.setName(translated(kPresetNames, preset->id, preset->name).toStdString());
     song.addTrack(std::move(track));
     song.appendMeasures(8);
-    ++generation_;         // a file still opening must not replace the new song
-    ++sequenceGeneration_; // nor an edit's sequence still being built
+    layouts_->drop();   // a file still opening must not replace the new song
+    sequences_->drop(); // nor an edit's sequence still being built
     sequencing_.reset();
     document_.emplace(std::move(song));
     ++documentsMade_;
@@ -1856,10 +1842,21 @@ void ScoreDocument::fail(const QString& message) {
     emit statusChanged();
 }
 
-void ScoreDocument::setPending(int delta) {
-    const bool wasBusy = busy();
-    pending_ += delta;
-    if (busy() != wasBusy) {
+bool ScoreDocument::busy() const {
+    return layouts_->busy() || sequences_->busy();
+}
+
+LaneWork ScoreDocument::layoutWork() const {
+    return layouts_->work();
+}
+
+LaneWork ScoreDocument::sequenceWork() const {
+    return sequences_->work();
+}
+
+void ScoreDocument::updateBusy() {
+    if (busy() != busy_) {
+        busy_ = busy();
         emit busyChanged();
     }
 }

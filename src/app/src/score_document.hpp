@@ -13,6 +13,7 @@
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/page_layout.hpp>
 
+#include "job_lane.hpp"
 #include "recovery_store.hpp"
 #include "score_painter.hpp"
 #include "track_list.hpp"
@@ -40,6 +41,7 @@
 namespace elara::app {
 
 struct ScoreLayout;
+struct SequenceResult;
 
 /// A song opened from a file, or new, and laid out on A4 pages. Opening and
 /// laying out run on worker threads; the window keeps showing the previous
@@ -200,7 +202,12 @@ public:
     [[nodiscard]] QUrl source() const { return source_; }
     [[nodiscard]] Status status() const { return status_; }
     [[nodiscard]] QString errorMessage() const { return errorMessage_; }
-    [[nodiscard]] bool busy() const { return pending_ > 0; }
+    /// Whether a file is being opened, or the score laid out or sequenced.
+    [[nodiscard]] bool busy() const;
+    /// What laying out and sequencing did so far (ADR-0110): the smoke test
+    /// prints it.
+    [[nodiscard]] LaneWork layoutWork() const;
+    [[nodiscard]] LaneWork sequenceWork() const;
     [[nodiscard]] QString title() const;
     [[nodiscard]] QString artist() const;
     /// The song's credits, one line per elara::core::Credit; empty lines when
@@ -821,7 +828,7 @@ private:
     void edited();
     void apply(const ScoreLayout& layout);
     void fail(const QString& message);
-    void setPending(int delta);
+    void updateBusy();
     void resequence();
     /// The selected measures, or the caret's: first and count.
     [[nodiscard]] std::pair<std::size_t, std::size_t> selectedRange() const;
@@ -866,9 +873,11 @@ private:
     QList<qreal> pageTops_;
     bool hasTablature_ = false;
     int layoutMilliseconds_ = 0;
-    int pending_ = 0;
-    std::uint64_t generation_ = 0;                   ///< of layouts: only the latest is shown
-    std::uint64_t sequenceGeneration_ = 0;           ///< of sequences: only the latest is played
+    bool busy_ = false;
+    /// Opening and laying out: only the newest is shown (ADR-0110).
+    std::unique_ptr<JobLane<ScoreLayout>> layouts_;
+    /// Sequencing: only the newest is played.
+    std::unique_ptr<JobLane<SequenceResult>> sequences_;
     std::shared_ptr<RecoveryStore> recovery_;        ///< shared with the write running
     QTimer recoveryTimer_;                           ///< writes the copy when it fires
     std::shared_ptr<const core::Song> recoverySong_; ///< the song the copy holds or will
