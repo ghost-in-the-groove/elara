@@ -18,7 +18,6 @@
 #include "recovery_store.hpp"
 #include "score_painter.hpp"
 #include "track_list.hpp"
-#include <QElapsedTimer>
 #include <QObject>
 #include <QRectF>
 #include <QSizeF>
@@ -190,7 +189,8 @@ public:
     Q_ENUM(CaretMove)
 
     /// How long after a digit a second one makes a two-digit fret.
-    static constexpr int kTwoDigitMilliseconds = 700;
+    static constexpr int kTwoDigitMilliseconds =
+        static_cast<int>(core::EditSession::kTwoDigitWindow.count());
 
     /// `track` for every track of the song at once.
     static constexpr int kAllTracks = -1;
@@ -888,18 +888,14 @@ private:
     /// (ADR-0052); shared with the layouts running on workers.
     std::shared_ptr<notation::PageLayoutCache> layoutCache_ =
         std::make_shared<notation::PageLayoutCache>();
-    core::EditSession session_; ///< the caret and the input duration (ADR-0127)
+    /// The caret, the input duration and the digit waiting for a second one
+    /// (ADR-0127).
+    core::EditSession session_;
     int caretPage_ = -1;
     QRectF caretRect_;
     std::optional<std::size_t> anchor_; ///< where the selection started
     int selectionRevision_ = 0;
     std::optional<core::MeasureClip> clip_; ///< the measures copied
-    int pendingDigit_ = -1;                 ///< a digit just typed, waiting for a second
-    core::Caret digitCaret_;                ///< where it was typed
-    std::uint64_t digitEdit_ = 0;           ///< edits_ after it
-    bool digitChanged_ = false;             ///< whether it changed the song (and can be undone)
-    QElapsedTimer digitClock_;
-    std::uint64_t edits_ = 0; ///< edits, undos and redos so far
     int track_ = 0;
     View view_ = View::Both;
     bool continuous_ = false;

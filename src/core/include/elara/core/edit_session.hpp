@@ -10,12 +10,15 @@
 #include <elara/core/song.hpp>
 
 #include <array>
+#include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 
 namespace elara::core {
 
-/// The caret and the duration typing uses, kept inside the song they edit.
+/// The caret, the duration typing uses and the digit waiting for a second
+/// one, kept inside the song they edit.
 ///
 /// The session holds no song: each action takes the song, or the document it
 /// edits, and leaves the caret on a place that song has. A song without
@@ -38,6 +41,11 @@ public:
         InputTuplet{2, 3}, InputTuplet{3, 2}, InputTuplet{4, 3}, InputTuplet{5, 4},
         InputTuplet{6, 4}, InputTuplet{7, 4}, InputTuplet{9, 8}};
 
+    /// How long after a digit a second one makes a two-digit fret.
+    static constexpr std::chrono::milliseconds kTwoDigitWindow{700};
+    /// The clock typeDigit() is told the time by.
+    using Clock = std::chrono::steady_clock;
+
     [[nodiscard]] const Caret& caret() const noexcept { return caret_; }
     /// The duration typing gives a new beat.
     [[nodiscard]] Duration input() const noexcept { return input_; }
@@ -51,7 +59,8 @@ public:
     void showTrack(const Song& song, std::optional<std::size_t> track);
 
     /// The song changed otherwise than through the session (another edit, an
-    /// undo, a redo): the caret goes back inside it.
+    /// undo, a redo): the caret goes back inside it, and a digit no longer
+    /// waits for a second one.
     void songChanged(const Song& song);
 
     // ---- The caret ----------------------------------------------------------
@@ -77,6 +86,19 @@ public:
     /// inside the song either way.
     bool enter(Document& document, Entry entry);
 
+    /// Types a digit at `now`: a fret on the caret's string (enterFret()).
+    /// A second digit within kTwoDigitWindow of a first one that was not 0,
+    /// with nothing done in between, makes the two-digit fret instead, as one
+    /// undo step; when that fret is off the neck the first digit stays and
+    /// the second starts a fret of its own. Returns whether the song changed.
+    /// What enterFret() throws for a fret of one digit goes on to the caller.
+    bool typeDigit(Document& document, int digit, Clock::time_point now);
+
+    /// Ends the wait for a second digit, as every action but a digit does:
+    /// for an edit at the caret that may turn out to change nothing and never
+    /// be entered.
+    void endTyping() noexcept { typed_.reset(); }
+
     /// The duration typing uses from now on, which the caret's beat takes too
     /// (setBeatDuration()). Returns whether the song changed. When the beat
     /// cannot take it, what the edit throws goes on to the caller and the
@@ -89,9 +111,19 @@ private:
     /// The input duration takes the caret beat's, when typing offers it.
     void followBeat(const Song& song);
 
+    /// A digit just typed, which a second one may follow.
+    struct Typed {
+        int digit = 0;
+        Caret caret;                ///< where it was typed
+        std::uint64_t revision = 0; ///< the song's state after it
+        bool changed = false;       ///< whether it changed the song, and can be undone
+        Clock::time_point at;
+    };
+
     Caret caret_;
     Duration input_;
     std::optional<std::size_t> shown_; ///< the track shown alone
+    std::optional<Typed> typed_;
 };
 
 } // namespace elara::core
