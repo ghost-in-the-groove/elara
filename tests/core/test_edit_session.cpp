@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <stdexcept>
@@ -223,4 +224,159 @@ TEST_CASE("Session: a song without tracks or measures has no caret to move", "[c
     CHECK_FALSE(session.setInput(doc, kHalf));
     CHECK(session.input() == kHalf);
     CHECK_FALSE(session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 3}}));
+}
+
+// ---- Two digits for one fret --------------------------------------------------
+
+namespace {
+
+using namespace std::chrono_literals;
+
+/// A session on the first beat of the third measure of bandSong(), which is
+/// empty, and the time its digits are typed at.
+struct Typing {
+    Document doc{bandSong()};
+    EditSession session;
+    EditSession::Clock::time_point now{};
+
+    Typing() { session.place(doc.song(), Caret{.measure = 2}); }
+
+    bool type(int digit, std::chrono::milliseconds later = 100ms) {
+        now += later;
+        return session.typeDigit(doc, digit, now);
+    }
+    /// The fret on the first string of the caret's beat; -1 without a note there.
+    [[nodiscard]] int fret() const {
+        const Voice& typed = voice(doc.song(), 2);
+        if (session.caret().beat >= typed.beats.size()) {
+            return -1;
+        }
+        for (const Note& note : typed.beats[session.caret().beat].notes) {
+            if (note.position && note.position->string == session.caret().string) {
+                return note.position->fret;
+            }
+        }
+        return -1;
+    }
+};
+
+} // namespace
+
+TEST_CASE("Session: two digits make one fret, as one undo step", "[core][session]") {
+    Typing typing;
+    CHECK(typing.type(1));
+    CHECK(typing.fret() == 1);
+    CHECK(typing.type(2));
+    CHECK(typing.fret() == 12);
+    CHECK(typing.doc.undoCount() == 1);
+    CHECK_FALSE(typing.doc.canRedo());
+    typing.doc.undo();
+    CHECK(typing.fret() == -1);
+
+    // A third digit starts another fret.
+    typing.doc.redo();
+    typing.session.songChanged(typing.doc.song());
+    CHECK(typing.type(1));
+    CHECK(typing.type(2));
+    CHECK(typing.type(3));
+    CHECK(typing.fret() == 3);
+}
+
+TEST_CASE("Session: the second digit comes within the moment, or starts a fret of its own",
+          "[core][session]") {
+    Typing typing;
+    typing.type(1);
+    typing.type(2, EditSession::kTwoDigitWindow); // just in time
+    CHECK(typing.fret() == 12);
+
+    typing.type(1, 5s);
+    typing.type(2, EditSession::kTwoDigitWindow + 1ms); // just late
+    CHECK(typing.fret() == 2);
+    typing.doc.undo();
+    CHECK(typing.fret() == 1); // the first digit was a step of its own
+}
+
+TEST_CASE("Session: a first digit 0 is fret 0, and a fret off the neck keeps the first digit",
+          "[core][session]") {
+    Typing typing;
+    typing.type(0);
+    typing.type(7);
+    CHECK(typing.fret() == 7);
+    typing.doc.undo();
+    CHECK(typing.fret() == 0);
+    typing.session.songChanged(typing.doc.song());
+
+    typing.type(4, 5s);
+    CHECK(typing.type(5)); // no fret 45
+    CHECK(typing.fret() == 5);
+    typing.doc.undo();
+    CHECK(typing.fret() == 4);
+}
+
+TEST_CASE("Session: two digits that change nothing leave the song as it was", "[core][session]") {
+    Typing typing;
+    typing.type(1);
+    typing.type(2);
+    typing.type(1, 5s); // fret 1 over 12
+    // Fret 12 again: the first digit is undone, and there is nothing to enter.
+    CHECK(typing.type(2));
+    CHECK(typing.fret() == 12);
+    CHECK(typing.doc.undoCount() == 1);
+}
+
+TEST_CASE("Session: any other action ends the wait for a second digit", "[core][session]") {
+    Typing typing;
+    const auto second = [&typing](auto&& between) {
+        typing.type(1, 5s);
+        between(typing.session, typing.doc);
+        typing.type(2);
+        return typing.fret();
+    };
+    CHECK(second([](EditSession&, Document&) {}) == 12);
+
+    // The caret moved away and came back.
+    CHECK(second([](EditSession& session, Document& doc) {
+              session.move(doc.song(), CaretMove::StringDown);
+              session.move(doc.song(), CaretMove::StringUp);
+          }) == 2);
+    CHECK(second([](EditSession& session, Document& doc) {
+              session.place(doc.song(), session.caret());
+          }) == 2);
+    CHECK(second([](EditSession& session, Document& doc) {
+              session.setVoice(doc.song(), 1);
+              session.setVoice(doc.song(), 0);
+          }) == 2);
+    // An edit, though it changed nothing, and one that is never entered.
+    CHECK(second([](EditSession& session, Document& doc) {
+              session.enter(doc, Entry{.command = nullptr, .caret = session.caret()});
+          }) == 2);
+    CHECK(second([](EditSession& session, Document&) { session.endTyping(); }) == 2);
+    CHECK(second([](EditSession& session, Document& doc) {
+              session.setInput(doc, session.input());
+          }) == 2);
+    // The song changed under the session, and came back to the same state.
+    CHECK(second([](EditSession& session, Document& doc) {
+              doc.undo();
+              doc.redo();
+              session.songChanged(doc.song());
+          }) == 2);
+    // The same, though nobody told the session: the song is not as the digit left it.
+    CHECK(second([](EditSession&, Document& doc) { doc.undo(); }) == 2);
+    // Another song.
+    typing.type(1, 5s);
+    typing.session.start(0);
+    typing.session.place(typing.doc.song(), Caret{.measure = 2});
+    typing.type(2);
+    CHECK(typing.fret() == 2);
+}
+
+TEST_CASE("Session: a digit where no fret can be typed says why and waits for nothing",
+          "[core][session]") {
+    Song song;
+    song.appendMeasures(1);
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
+    Document doc(song);
+    EditSession session;
+    CHECK_THROWS_AS(session.typeDigit(doc, 3, {}), std::logic_error);
+    CHECK_FALSE(doc.canUndo());
 }

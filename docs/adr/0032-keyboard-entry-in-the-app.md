@@ -71,7 +71,9 @@ caret does not blink and costs no frames when nothing moves.
   inserted and deleted, then everything undone back to the original song.
   `tests/app/test_fret_entry.cpp` checks the rules for the second digit
   through the document: off the neck, after a 0, after the caret moved or an
-  undo, too late, and on a track without strings.
+  undo, too late, and on a track without strings. The rule itself is
+  `core::EditSession::typeDigit()` (ADR-0127), tested in
+  `tests/core/test_edit_session.cpp` with the time given to it.
   `tests/app/test_score_editing.cpp` checks the rest of what the keys do
   through the document: where the caret goes, what the input duration
   follows, what a selection covers, and what copy, paste, transpose and undo
