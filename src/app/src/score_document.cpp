@@ -919,6 +919,7 @@ void ScoreDocument::apply(const ScoreLayout& layout) {
         document_.emplace(*layout.song);
         ++documentsMade_;
         caret_ = core::Caret{.track = static_cast<std::size_t>(std::max(0, layout.track))};
+        anchor_.reset(); // a selection is of the song it was made in
         pendingDigit_ = -1;
         setInput(core::Duration{});
         emit historyChanged();
@@ -1164,6 +1165,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     setImportWarnings({});
     track_ = 0;
     caret_ = core::Caret{};
+    anchor_.reset(); // a selection is of the song it was made in
     pendingDigit_ = -1;
     setInput(core::Duration{});
     const std::array<std::size_t, 1> first{0};

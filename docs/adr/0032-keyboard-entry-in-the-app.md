@@ -72,3 +72,7 @@ caret does not blink and costs no frames when nothing moves.
   `tests/app/test_fret_entry.cpp` checks the rules for the second digit
   through the document: off the neck, after a 0, after the caret moved or an
   undo, too late, and on a track without strings.
+  `tests/app/test_score_editing.cpp` checks the rest of what the keys do
+  through the document: where the caret goes, what the input duration
+  follows, what a selection covers, and what copy, paste, transpose and undo
+  do to them.
