@@ -15,8 +15,7 @@ the tree made most of them the same as before.
 
 Going back to the built-in sound cleared the three parts one at a time, and
 each applied the bank and asked for the player to be prepared again: up to
-three intermediate states for one request. The study of the optimizations
-left calls both H04.
+three intermediate states for one request.
 
 ## Decision
 

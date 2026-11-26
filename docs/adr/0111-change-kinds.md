@@ -12,9 +12,8 @@ sequence with the one playing and kept the old one when they were equal
 cost a whole sequence, and for a mix change a whole layout too, on edits that
 cannot change either. A track's volume, pan, mute and solo are not drawn, and
 the player applies them itself. Song information, chord symbols, beat texts,
-lyrics and section names are drawn but do not sound (`measure.hpp`). The study
-of the optimizations left calls this H01 and asks that such edits run zero
-sequences.
+lyrics and section names are drawn but do not sound (`measure.hpp`). Such
+edits should run no sequence at all.
 
 ## Decision
 
@@ -46,4 +45,4 @@ sequences.
   sequence. Commands therefore say so only when it is plain from what they
   change, and a new command changes everything until it says otherwise.
 - The descriptor can grow, for example which tracks or measures changed, when
-  layout and sequencing become incremental (H07, H08).
+  layout and sequencing become incremental.

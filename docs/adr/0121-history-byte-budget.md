@@ -10,9 +10,9 @@ the oldest beyond that, whatever each step held. Commands keep what the song no
 longer holds (ADR-0005): a step that transposes every track, pastes over many
 measures or removes them keeps every measure it replaced. On a large song one
 such step holds as much as the song's measures, so a long session of them kept
-many songs' worth of memory in a history nobody would undo that far. The study
-of the optimizations calls this H11 and asks for a memory budget beside the
-number of steps, with a policy for a single very large step.
+many songs' worth of memory in a history nobody would undo that far. It needs
+a memory budget beside the number of steps, with a policy for a single very
+large step.
 
 ## Decision
 

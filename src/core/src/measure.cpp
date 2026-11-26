@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/core/measure.hpp>
 
+#include "held_bytes.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <stdexcept>
@@ -45,22 +47,8 @@ Fraction Voice::startOf(std::size_t index) const {
 
 namespace {
 
-template <class T>
-std::size_t heapBytes(const std::vector<T>& values) noexcept {
-    return values.capacity() * sizeof(T);
-}
-
-// A string short enough to live in the object holds nothing more: an empty
-// string's capacity is that room on every standard library.
-std::size_t heapBytes(const std::string& text) noexcept {
-    return text.capacity() > std::string().capacity() ? text.capacity() + 1 : 0;
-}
-
-// A shared value's object and its control block (two counts and two pointers).
-template <class T>
-std::size_t sharedBytes() noexcept {
-    return sizeof(T) + (2 * sizeof(long)) + (2 * sizeof(void*));
-}
+using detail::heapBytes;
+using detail::sharedBytes;
 
 std::size_t heapBytes(const Beat& beat) noexcept {
     std::size_t bytes = heapBytes(beat.notes) + heapBytes(beat.graces);

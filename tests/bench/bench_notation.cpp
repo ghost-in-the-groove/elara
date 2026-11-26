@@ -144,9 +144,9 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         return layoutPages(song, both, font, pages);
     };
 
-    // Tempo context (C03 in the optimization study): a tempo change at the start
-    // of every measure, every other one gradual, is the worst case for looking up
-    // the tempo in force before a system and the end of each ramp.
+    // Tempo context: a tempo change at the start of every measure, every other
+    // one gradual, is the worst case for looking up the tempo in force before a
+    // system and the end of each ramp.
     elara::core::Song changing = song;
     for (std::size_t m = 0; m < changing.measureCount(); ++m) {
         changing.measureHeader(m).tempoChanges.push_back(

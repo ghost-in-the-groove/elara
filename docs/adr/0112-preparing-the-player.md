@@ -11,8 +11,7 @@ sequence to frames, splits the events by track and makes the mixing buffers.
 For a track whose instrument changed, it also asks the sound bank for a new
 sound: a SoundFont preset selects samples that FluidSynth may load then, and
 an SFZ instrument reads its samples. On a long score, or after changing an
-instrument or a sound bank, the window stopped answering for that time. The
-study of the optimizations left calls this H03.
+instrument or a sound bank, the window stopped answering for that time.
 
 Running `load()` itself on a worker would not do. It updates the sounds the
 player keeps and the song the audio thread will take next, which the

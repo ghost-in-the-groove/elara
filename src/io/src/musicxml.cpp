@@ -3149,8 +3149,8 @@ std::expected<ImportResult, FormatError> importDocument(const pugi::xml_document
                                                         const MusicXmlOptions& options);
 
 // The score in `xml`, a buffer the caller owns: it is parsed in place, so
-// the document holds no copy of the text (H13 of the study). The buffer
-// changes and must outlive the import.
+// the document holds no copy of the text. The buffer changes and must
+// outlive the import.
 std::expected<ImportResult, FormatError> importInPlace(std::span<char> xml,
                                                        const MusicXmlOptions& options) {
     pugi::xml_document document;
