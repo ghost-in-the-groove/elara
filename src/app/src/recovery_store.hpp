@@ -32,7 +32,10 @@ namespace elara::app {
 /// them.
 ///
 /// write() may run on a worker thread while the others run on the interface
-/// thread. Destroying the store releases its locks and keeps the copies.
+/// thread; it prepares the copy beside its place and renames it there, so the
+/// others never wait for the disk. left() also clears away what runs that are
+/// gone left besides a copy. Destroying the store releases its locks and keeps
+/// the copies.
 class RecoveryStore {
 public:
     /// A copy an earlier run left behind.
@@ -77,11 +80,14 @@ public:
 
 private:
     [[nodiscard]] QString pathOf(const QString& id, const char* extension) const;
+    /// Removes the files named after `id`, but for its lock.
+    void removeFilesOf(const QString& id) const;
 
     QString folder_;
-    QString id_; ///< names this run's files
-    mutable std::mutex mutex_;
-    std::unique_ptr<QLockFile> lock_;                     ///< this run's, from its first write
+    QString id_;                      ///< names this run's files
+    mutable std::mutex mutex_;        ///< over the members below and the files' names
+    std::mutex writing_;              ///< one write() at a time
+    std::unique_ptr<QLockFile> lock_; ///< this run's, from its first write
     std::map<QString, std::unique_ptr<QLockFile>> taken_; ///< left copies' locks, by id
     std::uint64_t removals_ = 0;
 };

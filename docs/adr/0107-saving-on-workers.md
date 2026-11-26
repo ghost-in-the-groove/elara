@@ -36,8 +36,12 @@ closing the window or opening another file, must wait for it to end.
   replaced the one saved meanwhile, the save marks nothing.
 - The window runs what waited for a save once `saveFinished` says it is on the
   disk. If the song changed again while it was written, the window asks again
-  whether to save. A failed save drops what waited. Closing the window while a
-  save is written waits for it. When the document goes, its queues finish the
+  whether to save. A failed save drops what waited. Anything that would replace
+  the song, or close the window, while a save is written waits for every save
+  asked to end, and only then asks whether to save, if the song changed
+  meanwhile. Work that cannot start, with no song to save, reports
+  `editFailed()` and its `...Finished` signal after the call returns, as work
+  that ran does. When the document goes, its queues finish the
   jobs left in them first.
 
 ## Consequences

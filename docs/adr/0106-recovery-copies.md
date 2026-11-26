@@ -27,7 +27,10 @@ offer a copy that is no longer needed.
   and again five seconds after the first change since, so that a crash loses at
   most the last few seconds of edits. The song is shared, not copied, with a
   worker that encodes and writes it, so an edit never waits for the disk. One
-  write runs at a time.
+  write runs at a time. It prepares the files beside their places
+  (`<id>.elara.part`, `<id>.json.part`) and renames them there, so removing the
+  copy on the interface thread waits for two renames at most, never for the
+  disk to hold the data. A write that fails is tried again five seconds later.
 - The copy goes as soon as the song has no unsaved changes: it was saved, its
   changes were undone, or another song replaced it. A write that started
   before the removal is dropped: the store counts removals, and a write passes
@@ -35,7 +38,8 @@ offer a copy that is no longer needed.
   discarded, so the copy goes then too.
 - At start the window lists the copies whose lock nobody holds, the newest
   first, and takes their locks, so that two runs started together do not both
-  offer them. For each one it offers Recover or Discard; closing the dialog
+  offer them. What such runs left besides a copy, files half written or a lock
+  held after their copy went, is removed then. For each one it offers Recover or Discard; closing the dialog
   keeps the copies for the next start. A recovered song opens with its title
   and its own file, if it had one, and with unsaved changes
   (`core::Document::markUnsaved()`). Its copy goes once this run's own copy

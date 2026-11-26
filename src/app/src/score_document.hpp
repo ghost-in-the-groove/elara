@@ -779,11 +779,15 @@ signals:
     /// A save() is done: `saved` tells whether `file` holds the song now.
     void saveFinished(const QUrl& file, bool saved);
     /// An export on a worker is done: `written` tells whether `file` was.
-    void exportFinished(const QString& file, bool written);
+    void exportFinished(const QUrl& file, bool written);
 
 private:
     /// Opens `file`, recovered from `recovered` when it is a recovery copy.
     void load(const QUrl& file, std::optional<RecoveryStore::Copy> recovered);
+    /// Reports work on `file` that could not start: editFailed() with
+    /// `problem`, then `finished` saying it failed, once the caller returns.
+    void failLater(void (ScoreDocument::*finished)(const QUrl&, bool), const QString& file,
+                   const QString& problem);
     /// Keeps the recovery copy in step with the history: written a while
     /// after an unsaved change, removed once there are none.
     void keepRecovery();
@@ -869,9 +873,9 @@ private:
     QTimer recoveryTimer_;                           ///< writes the copy when it fires
     std::shared_ptr<const core::Song> recoverySong_; ///< the song the copy holds or will
     bool recoveryWriting_ = false;                   ///< a write is running on a worker
-    QString recoveredFrom_;       ///< a recovered copy, to discard once this run's is written
-    std::uint64_t documents_ = 0; ///< documents opened or made so far: a save knows its own
-    int saving_ = 0;              ///< saves being written
+    QString recoveredFrom_;           ///< a recovered copy, to discard once this run's is written
+    std::uint64_t documentsMade_ = 0; ///< documents opened or made so far: a save knows its own
+    int saving_ = 0;                  ///< saves being written
     /// Saves run here, one at a time and in order; exports, one at a time, in
     /// the other. Destroyed with the document after the jobs left in them.
     QThreadPool saveQueue_;
