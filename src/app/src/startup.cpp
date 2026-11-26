@@ -1751,6 +1751,10 @@ void Startup::tick() {
     if (effectsPanel_ != nullptr && effectsPanel_->property("opened").toBool()) {
         effectsOpened_ = true;
     }
+    if (!options_.menu.isEmpty() && !menuOpened_ && window_ != nullptr) {
+        const auto* menu = window_->findChild<QObject*>(options_.menu + QStringLiteral("Menu"));
+        menuOpened_ = menu != nullptr && menu->property("visible").toBool();
+    }
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
         finish(false, score_->errorMessage());
@@ -1820,9 +1824,10 @@ void Startup::tick() {
         return;
     }
     if (!options_.screenshot.isEmpty()) {
-        // Let animations settle first, the note effects panel's too once
-        // `--effects` opened it.
-        if (effectsPanel_ != nullptr && !effectsOpened_ &&
+        // Let animations settle first, the note effects palette's too once
+        // `--effects` opened it, and the menu `--menu` names.
+        if (((effectsPanel_ != nullptr && !effectsOpened_) ||
+             (!options_.menu.isEmpty() && !menuOpened_)) &&
             clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
             return;
         }
@@ -1876,12 +1881,12 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
-    // Nothing may cover the cursor, as the measure popup or the note effects
-    // panel open at the caret can: they close first, and the click waits until
-    // they are gone.
-    for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("effectsPanel"),
-                                QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
-                                QStringLiteral("lyricsPopup")}) {
+    // Nothing may cover the cursor, as a popup open at the caret or a menu
+    // can: they close first, and the click waits until they are gone.
+    for (const QString& name :
+         {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
+          QStringLiteral("lyricsPopup"), QStringLiteral("fileMenu"), QStringLiteral("editMenu"),
+          QStringLiteral("viewMenu"), QStringLiteral("soundMenu"), QStringLiteral("helpMenu")}) {
         if (auto* popup = window_->findChild<QObject*>(name);
             popup != nullptr && popup->property("visible").toBool()) {
             QMetaObject::invokeMethod(popup, "close");
@@ -2423,10 +2428,15 @@ void Startup::finish(bool ok, const QString& detail) {
         ok = false;
         outcome = QStringLiteral("QML warnings");
     }
-    // `--effects` opened the note effects panel at the caret.
+    // `--effects` opened the note effects palette at the caret, and `--menu`
+    // its menu.
     if (ok && options_.smokeTest && options_.effects && !effectsOpened_) {
         ok = false;
-        outcome = QStringLiteral("the note effects panel did not open");
+        outcome = QStringLiteral("the note effects palette did not open");
+    }
+    if (ok && options_.smokeTest && !options_.menu.isEmpty() && !menuOpened_) {
+        ok = false;
+        outcome = QStringLiteral("the %1 menu did not open").arg(options_.menu);
     }
     // The window carries the app icon up to the largest size a taskbar asks
     // for (ADR-0064).

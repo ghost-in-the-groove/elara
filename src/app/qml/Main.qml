@@ -20,8 +20,11 @@ ApplicationWindow {
     /// Open the lyrics of the caret's staff once the score is laid out (from
     /// the command line).
     property bool showLyrics: false
-    // Open the note effects panel once there is a caret (`--effects`).
+    // Open the note effects palette once there is a caret (`--effects`).
     property bool showEffects: false
+    /// Open this menu once the window shows (`--menu`): file, edit, view,
+    /// sound or help.
+    property string showMenu
     /// Open the first track's tuning in the song panel once there is a score
     /// (from the command line).
     property bool showTuning: false
@@ -73,6 +76,8 @@ ApplicationWindow {
             score.open(initialFile);
         if (showTuner)
             tunerPane.open();
+        if (showMenu.length > 0)
+            Qt.callLater(commandBar.openMenu, showMenu);
         audio.rememberSound = rememberSettings;
         if (initialSoundFont.length > 0 || initialGuitarSfz.length > 0
                 || initialBassSfz.length > 0) {
@@ -250,7 +255,7 @@ ApplicationWindow {
             }
             if (window.showEffects) {
                 window.showEffects = false;
-                entryBar.openEffects();
+                palette.open();
             }
         }
     }
@@ -427,13 +432,25 @@ ApplicationWindow {
             playback: audio
             hasScore: window.hasScore
             songPaneShown: window.showSongPane
+            paletteShown: palette.opened
+            onPaletteToggled: palette.opened = !palette.opened
             onOpenRequested: window.openScore()
             onSaveRequested: window.save()
             onSongPaneToggled: window.showSongPane = !window.showSongPane
             onTunerRequested: window.toggleTuner()
 
+            /// Opens the menu named `name` (file, edit, view, sound, help).
+            function openMenu(name: string) {
+                const at = ["file", "edit", "view", "sound", "help"].indexOf(name);
+                if (at >= 0)
+                    menuBar.itemAt(at).triggered();
+            }
+
             menus: AppMenuBar {
+                id: menuBar
+
                 AppMenu {
+                    objectName: "fileMenu"
                     title: qsTr("&File")
 
                     AppMenuItem {
@@ -510,6 +527,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "editMenu"
                     title: qsTr("&Edit")
 
                     AppMenuItem {
@@ -590,6 +608,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "viewMenu"
                     title: qsTr("&View")
 
                     AppMenuItem {
@@ -645,6 +664,13 @@ ApplicationWindow {
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
+                        text: qsTr("Note effects")
+                        keys: KeyNames.native("F2")
+                        enabled: window.hasScore
+                        chosen: window.hasScore && palette.opened
+                        onTriggered: palette.opened = !palette.opened
+                    }
+                    AppMenuItem {
                         text: qsTr("Song and tracks")
                         keys: KeyNames.native("Ctrl+I")
                         enabled: window.hasScore
@@ -660,6 +686,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "soundMenu"
                     title: qsTr("&Sound")
 
                     AppMenuItem {
@@ -754,6 +781,7 @@ ApplicationWindow {
                 }
 
                 AppMenu {
+                    objectName: "helpMenu"
                     title: qsTr("&Help")
 
                     AppMenuItem {
@@ -907,7 +935,7 @@ ApplicationWindow {
 
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.left: parent.left
+            anchors.left: palette.right
             anchors.right: songPane.left
             document: score
             cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
@@ -917,6 +945,30 @@ ApplicationWindow {
             visible: opacity > 0
 
             Behavior on opacity {
+                NumberAnimation {
+                    duration: Theme.calm
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        // The note effects (ADR-0109): slides in from the left; the score
+        // makes room for it.
+        EffectsPalette {
+            id: palette
+
+            objectName: "effectsPanel"
+
+            readonly property bool shown: opened && window.hasScore
+
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            width: shown ? fullWidth : 0
+            visible: width > 0
+            document: score
+
+            Behavior on width {
                 NumberAnimation {
                     duration: Theme.calm
                     easing.type: Easing.OutCubic
@@ -1143,6 +1195,11 @@ ApplicationWindow {
         sequences: [StandardKey.Redo, "Ctrl+Y"]
         enabled: score.canRedo
         onActivated: score.redo()
+    }
+    Shortcut {
+        sequence: "F2"
+        enabled: window.hasScore
+        onActivated: palette.opened = !palette.opened
     }
     Shortcut {
         sequence: "Ctrl+I"
