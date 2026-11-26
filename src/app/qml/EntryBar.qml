@@ -52,8 +52,10 @@ Item {
 
         background: Rectangle {
             radius: Theme.radiusSmall
-            color: tool.lit ? Theme.accent
-                            : tool.pressed ? Theme.pressed : tool.hovered ? Theme.hover : "transparent"
+            color: tool.pressed ? Theme.pressed : tool.lit ? Theme.accentWash
+                                                           : tool.hovered ? Theme.hover : "transparent"
+            border.width: tool.lit ? 1 : 0
+            border.color: Qt.alpha(Theme.accentInk, 0.4)
         }
 
         ToolTip.visible: hovered && tip.length > 0
@@ -139,7 +141,8 @@ Item {
                 width: Theme.tool
                 height: Theme.tool
                 radius: Theme.radiusSmall
-                color: Theme.accent
+                color: Theme.accentWash
+                border.color: Qt.alpha(Theme.accentInk, 0.4)
 
                 Behavior on x {
                     NumberAnimation {
@@ -169,7 +172,7 @@ Item {
                         contentItem: MusicSymbol {
                             symbol: valueTool.modelData.symbol
                             size: 22
-                            color: valueTool.index === root.currentIndex ? Theme.accentText : root.ink
+                            color: valueTool.index === root.currentIndex ? Theme.accentInk : root.ink
                         }
                     }
                 }
@@ -184,7 +187,7 @@ Item {
             contentItem: MusicSymbol {
                 symbol: ""
                 size: 30
-                color: root.document.inputDotted ? Theme.accentText : root.ink
+                color: root.document.inputDotted ? Theme.accentInk : root.ink
             }
         }
 
@@ -204,7 +207,7 @@ Item {
                 // The tuplet's number in the music font's tuplet digits.
                 symbol: String.fromCharCode(0xE880 + (tuplet.on ? root.document.inputTuplet : 3))
                 size: 30
-                color: tuplet.on ? Theme.accentText : root.ink
+                color: tuplet.on ? Theme.accentInk : root.ink
             }
 
             TapHandler {
@@ -270,7 +273,7 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 font.pixelSize: Theme.fontSmall
                 font.weight: Font.DemiBold
-                color: voiceTool.voice > 1 ? Theme.accentText : root.ink
+                color: voiceTool.voice > 1 ? Theme.accentInk : root.ink
             }
 
             TapHandler {

@@ -117,7 +117,9 @@ one that replaces them.
 | [0109](0109-note-effects-palette.md) | The note effects palette | Accepted |
 | [0110](0110-job-lanes.md) | One running job and the newest request per flow | Accepted |
 | [0111](0111-change-kinds.md) | Edits say what they change | Accepted |
+| [0112](0112-preparing-the-player.md) | Preparing the player on a worker | Accepted |
 | [0113](0113-tablature-for-reading.md) | Tablature for reading: larger numbers, and the time signature only when it stands alone | Accepted |
+| [0114](0114-dark-page.md) | The page in the dark theme | Accepted |
 | [0121](0121-history-byte-budget.md) | The undo history is bounded by its size too | Accepted |
 
 ## Template

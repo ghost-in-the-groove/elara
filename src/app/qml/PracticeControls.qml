@@ -12,6 +12,12 @@ RowLayout {
 
     required property ScoreDocument document
     required property AudioController playback
+    /// Without the metronome and the count-in, which the Sound menu also has.
+    property bool compact: false
+    /// The width those two take, and the width of the rest.
+    readonly property real toggles: 2 * (Theme.tool + spacing)
+    readonly property real coreWidth: loopButton.implicitWidth + spacing + speedButton.Layout.leftMargin
+                                      + speedButton.implicitWidth
 
     spacing: 2
 
@@ -77,6 +83,7 @@ RowLayout {
 
     IconButton {
         objectName: "metronomeButton"
+        visible: !root.compact
         nightBar: true
         iconPath: Icons.metronome
         tip: qsTr("Metronome")
@@ -86,6 +93,7 @@ RowLayout {
 
     IconButton {
         objectName: "countInButton"
+        visible: !root.compact
         nightBar: true
         iconPath: Icons.countIn
         tip: qsTr("Count-in: a measure of clicks before playing")
@@ -259,16 +267,17 @@ RowLayout {
                                 font.pixelSize: Theme.fontBody
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
-                                color: preset.on ? Theme.accentText : Theme.ink
+                                color: preset.on ? Theme.accentInk : Theme.ink
                             }
                             background: Rectangle {
                                 radius: Theme.radiusSmall
-                                color: preset.on ? Theme.accent
-                                                 : preset.down ? Theme.pressed
+                                color: preset.down ? Theme.pressed
+                                                   : preset.on ? Theme.accentWash
                                                                : preset.hovered ? Theme.hover : "transparent"
                                 border.width: preset.visualFocus ? 2 : 1
-                                border.color: preset.visualFocus ? Theme.accentInk
-                                                                 : preset.on ? Theme.accent : Theme.line
+                                border.color: preset.visualFocus || preset.on
+                                              ? Qt.alpha(Theme.accentInk, preset.visualFocus ? 1.0 : 0.5)
+                                              : Theme.line
                             }
                         }
                     }

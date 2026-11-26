@@ -1310,12 +1310,12 @@ set_tests_properties(cli.render_scroll PROPERTIES
 # other two whole; one SVG per strip.
 add_test(NAME cli.render_strips
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 60 --no-credits)
+          --width 40 --strip-height 63 --no-credits)
 set_tests_properties(cli.render_strips PROPERTIES
   PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":1,[^{]*{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
 add_test(NAME cli.render_strips_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 60 --no-credits
+          --width 40 --strip-height 63 --no-credits
           --svg "${CMAKE_CURRENT_BINARY_DIR}/strips.svg")
 set_tests_properties(cli.render_strips_svg PROPERTIES
   PASS_REGULAR_EXPRESSION "measures 0 to 2 of 3: 3 systems on 2 strips.*saved .*strips-1\\.svg.*saved .*strips-2\\.svg")
@@ -1761,9 +1761,9 @@ set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
 # starts playback on the same column the first time through: at 1 s.
 add_test(NAME cli.render_time_at_a_note
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --time-at 0 27.7 38)
+          --layout page --time-at 0 28.5 41.8)
 set_tests_properties(cli.render_time_at_a_note PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":27.7,\"y\":38,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":28.5,\"y\":41.8,\"measure\":0,\"seconds\":1},\"pages\":\\[")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES

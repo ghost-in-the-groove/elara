@@ -28,6 +28,7 @@
 #include <limits>
 #include <optional>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -1576,8 +1577,10 @@ std::vector<std::uint8_t> fullScoreParts(std::string_view bytes) {
 }
 
 // Reads the GPIF document `xml` with the PartConfiguration bytes beside it
-// (empty when there are none).
-std::expected<ImportResult, FormatError> importScore(std::string_view xml, std::string_view parts,
+// (empty when there are none). `xml` is a buffer the caller owns: it is
+// parsed in place, so the document holds no copy of the text (H13 of the
+// study). The buffer changes and must outlive the import.
+std::expected<ImportResult, FormatError> importScore(std::span<char> xml, std::string_view parts,
                                                      const GuitarProOptions& options);
 
 bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, std::size_t at = 0) {
@@ -1592,15 +1595,16 @@ bool startsWith(std::span<const std::uint8_t> bytes, std::string_view prefix, st
 
 std::expected<ImportResult, FormatError> importGpif(std::string_view xml,
                                                     const GuitarProOptions& options) {
-    return importScore(xml, {}, options);
+    std::string text(xml);
+    return importScore(std::span(text.data(), text.size()), {}, options);
 }
 
 namespace {
 
-std::expected<ImportResult, FormatError> importScore(std::string_view xml, std::string_view parts,
+std::expected<ImportResult, FormatError> importScore(std::span<char> xml, std::string_view parts,
                                                      const GuitarProOptions& options) {
     pugi::xml_document document;
-    const pugi::xml_parse_result parsed = document.load_buffer(xml.data(), xml.size());
+    const pugi::xml_parse_result parsed = document.load_buffer_inplace(xml.data(), xml.size());
     if (!parsed) {
         return std::unexpected(FormatError{std::format("Guitar Pro: damaged score: {} at byte {}",
                                                        parsed.description(), parsed.offset)});
@@ -1657,7 +1661,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
         }
         const std::string parts =
             partsOf([&zip] { return zip.entry("Content/PartConfiguration"); });
-        return importScore(*score, parts, options);
+        return importScore(std::span(score->data(), score->size()), parts, options);
     }
     if (startsWith(bytes, "BCFZ") || startsWith(bytes, "BCFS")) {
         // Unpacked once for both files: unpacking is most of what opening a
@@ -1676,7 +1680,7 @@ std::expected<ImportResult, FormatError> importGuitarPro(std::span<const std::ui
         }
         const std::string parts =
             partsOf([&container] { return container->entry("PartConfiguration"); });
-        return importScore(*score, parts, options);
+        return importScore(std::span(score->data(), score->size()), parts, options);
     }
     if (startsWith(bytes, "FICHIER GUITAR PRO", 1) || startsWith(bytes, "FICHIER GUITARE PRO", 1)) {
         try {

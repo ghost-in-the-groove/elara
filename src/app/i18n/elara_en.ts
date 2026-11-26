@@ -55,13 +55,6 @@
         </translation>
     </message>
     <message numerus="yes">
-        <source>Opened %1. %n thing(s) changed or left out.</source>
-        <translation>
-            <numerusform>Opened %1. %n thing changed or left out.</numerusform>
-            <numerusform>Opened %1. %n things changed or left out.</numerusform>
-        </translation>
-    </message>
-    <message numerus="yes">
         <source>Exported %1. %2 left out %n thing(s).</source>
         <translation>
             <numerusform>Exported %1. %2 left out %n thing.</numerusform>

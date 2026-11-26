@@ -658,6 +658,10 @@
         <translation>&amp;Ver</translation>
     </message>
     <message>
+        <source>Dark page in the dark theme</source>
+        <translation>Página oscura en el tema oscuro</translation>
+    </message>
+    <message>
         <source>Zoom in</source>
         <translation>Acercar</translation>
     </message>
@@ -1168,6 +1172,14 @@
         <translation>Compás</translation>
     </message>
     <message>
+        <source>Beats in a measure</source>
+        <translation>Tiempos por compás</translation>
+    </message>
+    <message>
+        <source>Beat unit</source>
+        <translation>Figura del tiempo</translation>
+    </message>
+    <message>
         <source>Key signature</source>
         <translation>Armadura</translation>
     </message>
@@ -1462,8 +1474,12 @@
         <translation>Afinador</translation>
     </message>
     <message>
-        <source>Close (Esc)</source>
-        <translation>Cerrar (Esc)</translation>
+        <source>Listening</source>
+        <translation>Escuchando</translation>
+    </message>
+    <message>
+        <source>Close (Ctrl+Shift+T)</source>
+        <translation>Cerrar (Ctrl+Mayús+T)</translation>
     </message>
     <message>
         <source>Play a note</source>
@@ -1509,12 +1525,20 @@
         <source>Reference pitch of A4</source>
         <translation>Frecuencia de referencia del La4</translation>
     </message>
+    <message>
+        <source>Input</source>
+        <translation>Entrada</translation>
+    </message>
 </context>
 <context>
     <name>TuningFields</name>
     <message>
         <source>Custom</source>
         <translation>Personalizada</translation>
+    </message>
+    <message>
+        <source>Tuning</source>
+        <translation>Afinación</translation>
     </message>
     <message>
         <source>Strings</source>
@@ -1560,8 +1584,8 @@
 <context>
     <name>WelcomePane</name>
     <message>
-        <source>Tablature, score and music studio</source>
-        <translation>Tablaturas, partituras y estudio musical</translation>
+        <source>Tablature and score editor</source>
+        <translation>Editor de tablaturas y partituras</translation>
     </message>
     <message>
         <source>Open a score…</source>
@@ -1576,8 +1600,16 @@
         <translation>o suelta un archivo en cualquier parte de esta ventana</translation>
     </message>
     <message>
+        <source>Guitar Pro 3 to 8 · MusicXML · MIDI · Elara</source>
+        <translation>Guitar Pro 3 a 8 · MusicXML · MIDI · Elara</translation>
+    </message>
+    <message>
         <source>Recent</source>
         <translation>Recientes</translation>
+    </message>
+    <message>
+        <source>The scores you open show here, the latest first, to pick up where you left them.</source>
+        <translation>Las partituras que abras aparecen aquí, la última primero, para retomarlas donde las dejaste.</translation>
     </message>
     <message>
         <source>Open %1</source>
@@ -2059,13 +2091,6 @@
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
     </message>
-    <message numerus="yes">
-        <source>Opened %1. %n thing(s) changed or left out.</source>
-        <translation>
-            <numerusform>Abierto %1. Se cambió o se dejó fuera %n cosa.</numerusform>
-            <numerusform>Abierto %1. Se cambiaron o se dejaron fuera %n cosas.</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Unknown instrument: %1</source>
         <translation>Instrumento desconocido: %1</translation>
@@ -2485,8 +2510,8 @@
 <context>
     <name>main</name>
     <message>
-        <source>Tablature, score and music studio</source>
-        <translation>Tablaturas, partituras y estudio musical</translation>
+        <source>Tablature and score editor</source>
+        <translation>Editor de tablaturas y partituras</translation>
     </message>
     <message>
         <source>A score to open.</source>

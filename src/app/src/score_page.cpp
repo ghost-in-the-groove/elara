@@ -59,6 +59,24 @@ void ScorePage::setDocument(ScoreDocument* document) {
     repaint();
 }
 
+void ScorePage::setPaper(const QColor& paper) {
+    if (paper == colours_.paper) {
+        return;
+    }
+    colours_.paper = paper;
+    emit coloursChanged();
+    repaint();
+}
+
+void ScorePage::setInk(const QColor& ink) {
+    if (ink == colours_.ink) {
+        return;
+    }
+    colours_.ink = ink;
+    emit coloursChanged();
+    repaint();
+}
+
 void ScorePage::setIndex(int index) {
     if (index == index_) {
         return;
@@ -109,7 +127,8 @@ void ScorePage::repaint() {
     scale *= std::min({1.0, kMaxSide / side, std::sqrt(kMaxPixels / pixels)});
     // The texture already shows this page at this size: an edit elsewhere in
     // the song costs a comparison here, not a paint.
-    if (shown_ && scale == shownScale_ && ratio == shownRatio_ && *page == *shown_) {
+    if (shown_ && scale == shownScale_ && ratio == shownRatio_ && colours_ == shownColours_ &&
+        *page == *shown_) {
         shown_ = std::move(page); // lets the previous layout go
         ++kept;
         return;
@@ -117,9 +136,10 @@ void ScorePage::repaint() {
     shown_ = page;
     shownScale_ = scale;
     shownRatio_ = ratio;
+    shownColours_ = colours_;
     const std::uint64_t ticket = ++ticket_;
-    whenDone(QtConcurrent::run([page = std::move(page), scale, ratio] {
-                 return ScoreDocument::painter().render(*page, scale, ratio);
+    whenDone(QtConcurrent::run([page = std::move(page), scale, ratio, colours = colours_] {
+                 return ScoreDocument::painter().render(*page, scale, ratio, colours);
              }),
              this, [this, ticket](const QImage& image) {
                  if (ticket != ticket_) {

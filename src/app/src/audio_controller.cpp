@@ -116,19 +116,43 @@ void AudioController::previewMix() {
     }
 }
 
-// The document's sequence with the song it was built from, which an edit
-// whose sequence is still being built has left behind; then that edit's mix.
+// The document's sequence with the song it was built from, then the edited
+// song's mix. The player is prepared on a worker (ADR-0112): its events and
+// any new sounds, which can mean reading samples. Playback goes on with what
+// it has until the newest prepared song is published.
 void AudioController::loadSequence() {
-    const auto& sequence = document_->sequence();
+    preparing_.request(
+        [prepare = player_->preparer(), song = document_->sequenceSong(),
+         sequence = document_->sequence()] {
+            return std::make_shared<elara::audio::PreparedSong>(prepare(*song, *sequence));
+        },
+        [this, sequence = document_->sequence()](
+            const std::shared_ptr<elara::audio::PreparedSong>& prepared) {
+            if (player_ && document_ && document_->song()) {
+                publishSequence(sequence, std::move(*prepared));
+            }
+        });
+}
+
+// load() at once, for a player that has nothing to play yet.
+void AudioController::loadSequenceNow() {
+    publishSequence(document_->sequence(),
+                    player_->preparer()(*document_->sequenceSong(), *document_->sequence()));
+}
+
+void AudioController::publishSequence(const std::shared_ptr<const elara::audio::Sequence>& sequence,
+                                      elara::audio::PreparedSong prepared) {
     // Another speed or a tempo edit moves the time of every note: playback
     // goes on from the same place in the music.
     const double before = player_->position();
     const double after =
         loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    if (!player_->publish(std::move(prepared))) {
+        return; // prepared for the player before a device rate change
+    }
     if (placed_) {
         carryLoop(*placed_, *sequence); // so does the loop
     }
-    player_->load(*document_->sequenceSong(), *sequence);
     if (after != before) {
         player_->seek(after);
     }
@@ -167,7 +191,8 @@ void AudioController::togglePlayback() {
         }
         player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
         player_->setSoundBank(bank_);
-        loadSequence();
+        preparing_.drop();
+        loadSequenceNow();
         player_->seek(position_);
         audio_->setSource(player_.get());
     } else {
@@ -256,6 +281,7 @@ void AudioController::followDeviceRate() {
     // Once the device plays the new player, the old one is no longer called.
     audio_->setSource(next.get());
     player_ = std::move(next);
+    preparing_.drop();
 }
 
 void AudioController::setCountIn(bool countIn) {

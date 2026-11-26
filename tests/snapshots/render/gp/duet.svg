@@ -2,107 +2,107 @@
 <style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
 <rect x="0" y="0" width="120" height="169.714" fill="white"/>
 <g fill="black" stroke="black">
-<line class="staffLine" x1="19.975" y1="28.069" x2="54.929" y2="28.069" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="29.069" x2="54.929" y2="29.069" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="30.069" x2="54.929" y2="30.069" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="31.069" x2="54.929" y2="31.069" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="32.069" x2="54.929" y2="32.069" stroke-width="0.13"/>
-<line class="ledgerLine" x1="31.624" y1="33.069" x2="33.604" y2="33.069" stroke-width="0.16"/>
-<line class="ledgerLine" x1="31.624" y1="34.069" x2="33.604" y2="34.069" stroke-width="0.16"/>
-<line class="ledgerLine" x1="31.624" y1="35.069" x2="33.604" y2="35.069" stroke-width="0.16"/>
-<line class="stem" x1="33.144" y1="34.901" x2="33.144" y2="28.069" stroke-width="0.12"/>
-<line class="stem" x1="36.144" y1="30.401" x2="36.144" y2="27.069" stroke-width="0.12"/>
-<line class="stem" x1="38.084" y1="29.237" x2="38.084" y2="32.569" stroke-width="0.12"/>
-<line class="barline" x1="44.104" y1="28.069" x2="44.104" y2="32.069" stroke-width="0.16"/>
-<line class="barline" x1="53.949" y1="28.069" x2="53.949" y2="32.069" stroke-width="0.16"/>
-<line class="barline" x1="54.679" y1="28.069" x2="54.679" y2="32.069" stroke-width="0.5"/>
-<line class="chord" x1="34.114" y1="23.277" x2="34.114" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="33.514" y1="23.277" x2="33.514" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="32.914" y1="23.277" x2="32.914" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="32.314" y1="23.277" x2="32.314" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="31.714" y1="23.277" x2="31.714" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="31.114" y1="23.277" x2="31.114" y2="26.077" stroke-width="0.1"/>
-<line class="chord" x1="31.064" y1="23.277" x2="34.164" y2="23.277" stroke-width="0.25"/>
-<line class="chord" x1="31.064" y1="23.977" x2="34.164" y2="23.977" stroke-width="0.1"/>
-<line class="chord" x1="31.064" y1="24.677" x2="34.164" y2="24.677" stroke-width="0.1"/>
-<line class="chord" x1="31.064" y1="25.377" x2="34.164" y2="25.377" stroke-width="0.1"/>
-<line class="chord" x1="31.064" y1="26.077" x2="34.164" y2="26.077" stroke-width="0.1"/>
-<line class="staffLine" x1="19.975" y1="38.931" x2="54.929" y2="38.931" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="40.431" x2="54.929" y2="40.431" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="41.931" x2="54.929" y2="41.931" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="43.431" x2="54.929" y2="43.431" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="44.931" x2="54.929" y2="44.931" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="46.431" x2="54.929" y2="46.431" stroke-width="0.13"/>
-<line class="barline" x1="44.104" y1="38.931" x2="44.104" y2="46.431" stroke-width="0.16"/>
-<line class="barline" x1="53.949" y1="38.931" x2="53.949" y2="46.431" stroke-width="0.16"/>
-<line class="barline" x1="54.679" y1="38.931" x2="54.679" y2="46.431" stroke-width="0.5"/>
-<line class="staffLine" x1="19.975" y1="52.843" x2="54.929" y2="52.843" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="53.843" x2="54.929" y2="53.843" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="54.843" x2="54.929" y2="54.843" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="55.843" x2="54.929" y2="55.843" stroke-width="0.13"/>
-<line class="staffLine" x1="19.975" y1="56.843" x2="54.929" y2="56.843" stroke-width="0.13"/>
-<line class="stem" x1="33.144" y1="56.175" x2="33.144" y2="48.843" stroke-width="0.12"/>
-<line class="stem" x1="36.124" y1="51.899" x2="36.124" y2="48.843" stroke-width="0.12"/>
-<line class="stem" x1="39.144" y1="54.175" x2="39.144" y2="48.843" stroke-width="0.12"/>
-<line class="stem" x1="42.124" y1="51.899" x2="42.124" y2="48.843" stroke-width="0.12"/>
-<line class="barline" x1="44.104" y1="52.843" x2="44.104" y2="56.843" stroke-width="0.16"/>
-<line class="ledgerLine" x1="44.984" y1="51.843" x2="47.12" y2="51.843" stroke-width="0.16"/>
-<line class="stem" x1="46.504" y1="56.175" x2="46.504" y2="48.343" stroke-width="0.12"/>
-<line class="barline" x1="53.949" y1="52.843" x2="53.949" y2="56.843" stroke-width="0.16"/>
-<line class="barline" x1="54.679" y1="52.843" x2="54.679" y2="56.843" stroke-width="0.5"/>
-<line class="barline" x1="20.055" y1="28.069" x2="20.055" y2="56.843" stroke-width="0.16"/>
-<text class="clef" x="20.575" y="31.069" stroke="none">&#xE052;</text>
-<text class="keySignature" x="24.159" y="30.069" stroke="none">&#xE260;</text>
-<text class="keySignature" x="25.183" y="28.569" stroke="none">&#xE260;</text>
-<text class="keySignature" x="26.207" y="30.569" stroke="none">&#xE260;</text>
-<text class="timeSignature" x="28.011" y="29.069" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="28.011" y="31.069" stroke="none">&#xE084;</text>
-<text class="notehead" x="32.024" y="31.569" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="32.024" y="33.069" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="32.024" y="35.069" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="35.024" y="30.569" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="38.024" y="29.069" stroke="none">&#xE0A3;</text>
-<text class="accidental" x="36.92" y="29.069" stroke="none">&#xE260;</text>
-<text class="notehead" x="45.384" y="28.069" stroke="none">&#xE0A2;</text>
-<text class="chord" x="34.113" y="22.914" style="font-size:3px" stroke="none">&#xE85A;</text>
-<text class="chord" x="33.513" y="22.914" style="font-size:3px" stroke="none">&#xE85A;</text>
-<text class="chord" x="32.913" y="23.629" style="font-size:3px" stroke="none">&#xE858;</text>
-<text class="chord" x="32.313" y="24.329" style="font-size:3px" stroke="none">&#xE858;</text>
-<text class="chord" x="31.713" y="24.329" style="font-size:3px" stroke="none">&#xE858;</text>
-<text class="chord" x="31.113" y="22.914" style="font-size:3px" stroke="none">&#xE85A;</text>
-<text class="clef" x="20.587" y="42.713" stroke="none">&#xE06D;</text>
-<text class="clef" x="20.575" y="54.843" stroke="none">&#xE069;</text>
-<text class="timeSignature" x="23.003" y="53.843" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="23.003" y="55.843" stroke="none">&#xE084;</text>
-<text class="notehead" x="32.024" y="52.343" stroke="none">&#xE0A9;</text>
-<text class="notehead" x="32.024" y="56.343" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="35.024" y="52.343" stroke="none">&#xE0A9;</text>
-<text class="notehead" x="38.024" y="52.343" stroke="none">&#xE0A9;</text>
-<text class="notehead" x="38.024" y="54.343" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="41.024" y="52.343" stroke="none">&#xE0A9;</text>
-<text class="notehead" x="45.384" y="51.843" stroke="none">&#xE0A8;</text>
-<text class="notehead" x="45.384" y="56.343" stroke="none">&#xE0A3;</text>
-<text class="rest" x="49.627" y="54.843" stroke="none">&#xE4E4;</text>
-<text class="tempo" x="32.024" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
+<line class="staffLine" x1="19.975" y1="29.432" x2="55.614" y2="29.432" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="30.432" x2="55.614" y2="30.432" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="31.432" x2="55.614" y2="31.432" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="32.432" x2="55.614" y2="32.432" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="33.432" x2="55.614" y2="33.432" stroke-width="0.13"/>
+<line class="ledgerLine" x1="32.309" y1="34.432" x2="34.289" y2="34.432" stroke-width="0.16"/>
+<line class="ledgerLine" x1="32.309" y1="35.432" x2="34.289" y2="35.432" stroke-width="0.16"/>
+<line class="ledgerLine" x1="32.309" y1="36.432" x2="34.289" y2="36.432" stroke-width="0.16"/>
+<line class="stem" x1="33.829" y1="36.264" x2="33.829" y2="29.432" stroke-width="0.12"/>
+<line class="stem" x1="36.829" y1="31.764" x2="36.829" y2="28.432" stroke-width="0.12"/>
+<line class="stem" x1="38.769" y1="30.6" x2="38.769" y2="33.932" stroke-width="0.12"/>
+<line class="barline" x1="44.789" y1="29.432" x2="44.789" y2="33.432" stroke-width="0.16"/>
+<line class="barline" x1="54.634" y1="29.432" x2="54.634" y2="33.432" stroke-width="0.16"/>
+<line class="barline" x1="55.364" y1="29.432" x2="55.364" y2="33.432" stroke-width="0.5"/>
+<line class="chord" x1="35.424" y1="23.44" x2="35.424" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="34.574" y1="23.44" x2="34.574" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="33.724" y1="23.44" x2="33.724" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="32.874" y1="23.44" x2="32.874" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="32.024" y1="23.44" x2="32.024" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="31.174" y1="23.44" x2="31.174" y2="27.44" stroke-width="0.1"/>
+<line class="chord" x1="31.124" y1="23.44" x2="35.474" y2="23.44" stroke-width="0.3"/>
+<line class="chord" x1="31.124" y1="24.44" x2="35.474" y2="24.44" stroke-width="0.1"/>
+<line class="chord" x1="31.124" y1="25.44" x2="35.474" y2="25.44" stroke-width="0.1"/>
+<line class="chord" x1="31.124" y1="26.44" x2="35.474" y2="26.44" stroke-width="0.1"/>
+<line class="chord" x1="31.124" y1="27.44" x2="35.474" y2="27.44" stroke-width="0.1"/>
+<line class="staffLine" x1="19.975" y1="40.294" x2="55.614" y2="40.294" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="41.794" x2="55.614" y2="41.794" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="43.294" x2="55.614" y2="43.294" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="44.794" x2="55.614" y2="44.794" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="46.294" x2="55.614" y2="46.294" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="47.794" x2="55.614" y2="47.794" stroke-width="0.13"/>
+<line class="barline" x1="44.789" y1="40.294" x2="44.789" y2="47.794" stroke-width="0.16"/>
+<line class="barline" x1="54.634" y1="40.294" x2="54.634" y2="47.794" stroke-width="0.16"/>
+<line class="barline" x1="55.364" y1="40.294" x2="55.364" y2="47.794" stroke-width="0.5"/>
+<line class="staffLine" x1="19.975" y1="54.206" x2="55.614" y2="54.206" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="55.206" x2="55.614" y2="55.206" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="56.206" x2="55.614" y2="56.206" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="57.206" x2="55.614" y2="57.206" stroke-width="0.13"/>
+<line class="staffLine" x1="19.975" y1="58.206" x2="55.614" y2="58.206" stroke-width="0.13"/>
+<line class="stem" x1="33.829" y1="57.538" x2="33.829" y2="50.206" stroke-width="0.12"/>
+<line class="stem" x1="36.809" y1="53.262" x2="36.809" y2="50.206" stroke-width="0.12"/>
+<line class="stem" x1="39.829" y1="55.538" x2="39.829" y2="50.206" stroke-width="0.12"/>
+<line class="stem" x1="42.809" y1="53.262" x2="42.809" y2="50.206" stroke-width="0.12"/>
+<line class="barline" x1="44.789" y1="54.206" x2="44.789" y2="58.206" stroke-width="0.16"/>
+<line class="ledgerLine" x1="45.669" y1="53.206" x2="47.805" y2="53.206" stroke-width="0.16"/>
+<line class="stem" x1="47.189" y1="57.538" x2="47.189" y2="49.706" stroke-width="0.12"/>
+<line class="barline" x1="54.634" y1="54.206" x2="54.634" y2="58.206" stroke-width="0.16"/>
+<line class="barline" x1="55.364" y1="54.206" x2="55.364" y2="58.206" stroke-width="0.5"/>
+<line class="barline" x1="20.055" y1="29.432" x2="20.055" y2="58.206" stroke-width="0.16"/>
+<text class="clef" x="20.575" y="32.432" stroke="none">&#xE052;</text>
+<text class="keySignature" x="24.159" y="31.432" stroke="none">&#xE260;</text>
+<text class="keySignature" x="25.183" y="29.932" stroke="none">&#xE260;</text>
+<text class="keySignature" x="26.207" y="31.932" stroke="none">&#xE260;</text>
+<text class="timeSignature" x="28.011" y="30.432" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="28.011" y="32.432" stroke="none">&#xE084;</text>
+<text class="notehead" x="32.709" y="32.932" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="32.709" y="34.432" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="32.709" y="36.432" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="35.709" y="31.932" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="38.709" y="30.432" stroke="none">&#xE0A3;</text>
+<text class="accidental" x="37.605" y="30.432" stroke="none">&#xE260;</text>
+<text class="notehead" x="46.069" y="29.432" stroke="none">&#xE0A2;</text>
+<text class="chord" x="35.422" y="22.97" style="font-size:3.8px" stroke="none">&#xE85A;</text>
+<text class="chord" x="34.572" y="22.97" style="font-size:3.8px" stroke="none">&#xE85A;</text>
+<text class="chord" x="33.722" y="23.942" style="font-size:3.8px" stroke="none">&#xE858;</text>
+<text class="chord" x="32.872" y="24.942" style="font-size:3.8px" stroke="none">&#xE858;</text>
+<text class="chord" x="32.022" y="24.942" style="font-size:3.8px" stroke="none">&#xE858;</text>
+<text class="chord" x="31.172" y="22.97" style="font-size:3.8px" stroke="none">&#xE85A;</text>
+<text class="clef" x="20.587" y="44.076" stroke="none">&#xE06D;</text>
+<text class="clef" x="20.575" y="56.206" stroke="none">&#xE069;</text>
+<text class="timeSignature" x="23.003" y="55.206" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="23.003" y="57.206" stroke="none">&#xE084;</text>
+<text class="notehead" x="32.709" y="53.706" stroke="none">&#xE0A9;</text>
+<text class="notehead" x="32.709" y="57.706" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="35.709" y="53.706" stroke="none">&#xE0A9;</text>
+<text class="notehead" x="38.709" y="53.706" stroke="none">&#xE0A9;</text>
+<text class="notehead" x="38.709" y="55.706" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="41.709" y="53.706" stroke="none">&#xE0A9;</text>
+<text class="notehead" x="46.069" y="53.206" stroke="none">&#xE0A8;</text>
+<text class="notehead" x="46.069" y="57.706" stroke="none">&#xE0A3;</text>
+<text class="rest" x="50.311" y="56.206" stroke="none">&#xE4E4;</text>
+<text class="tempo" x="32.709" y="19.72" style="font-size:2.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Duet</text>
 <text class="t credit" x="60" y="14.511" style="font-size:2px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
-<text class="t chord" x="32.614" y="22.089" style="font-size:1.5px" text-anchor="middle" stroke="none">Eb</text>
-<rect class="knockout" x="32.041" y="45.727" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="32.614" y="47.007" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
-<rect class="knockout" x="32.041" y="44.227" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="32.614" y="45.507" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="32.041" y="42.727" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="32.614" y="44.007" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
-<rect class="knockout" x="35.041" y="41.227" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="35.614" y="42.507" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
-<rect class="knockout" x="38.041" y="39.727" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="38.614" y="41.007" style="font-size:1.6px" text-anchor="middle" stroke="none">1</text>
-<rect class="knockout" x="45.655" y="38.227" width="1.146" height="1.408" fill="white" stroke="none"/>
-<text class="t fretNumber" x="46.228" y="39.507" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
-<text class="t technique" x="38.314" y="37.507" style="font-size:1.25px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
-<text class="t tempo" x="33.187" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 132</text>
-<text class="t trackName" x="18.975" y="37.826" style="font-size:1.6px" text-anchor="end" stroke="none">Rhythm Guitar</text>
-<text class="t trackName" x="18.975" y="55.419" style="font-size:1.6px" text-anchor="end" stroke="none">Drums</text>
+<text class="t chord" x="33.299" y="22.089" style="font-size:1.5px" text-anchor="middle" stroke="none">Eb</text>
+<rect class="knockout" x="32.726" y="47.09" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="33.299" y="48.37" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="32.726" y="45.59" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="33.299" y="46.87" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="32.726" y="44.09" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="33.299" y="45.37" style="font-size:1.6px" text-anchor="middle" stroke="none">2</text>
+<rect class="knockout" x="35.726" y="42.59" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="36.299" y="43.87" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
+<rect class="knockout" x="38.726" y="41.09" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="39.299" y="42.37" style="font-size:1.6px" text-anchor="middle" stroke="none">1</text>
+<rect class="knockout" x="46.34" y="39.59" width="1.146" height="1.408" fill="white" stroke="none"/>
+<text class="t fretNumber" x="46.913" y="40.87" style="font-size:1.6px" text-anchor="middle" stroke="none">0</text>
+<text class="t technique" x="38.999" y="38.87" style="font-size:1.25px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
+<text class="t tempo" x="33.872" y="20.07" style="font-size:1.4px" text-anchor="start" stroke="none">= 132</text>
+<text class="t trackName" x="18.975" y="39.189" style="font-size:1.6px" text-anchor="end" stroke="none">Rhythm Guitar</text>
+<text class="t trackName" x="18.975" y="56.782" style="font-size:1.6px" text-anchor="end" stroke="none">Drums</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

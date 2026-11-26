@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
+#include <ctime>
 #include <format>
 #include <fstream>
 #include <ios>
@@ -151,37 +153,113 @@ std::vector<std::string> ZipReader::names() {
     return result;
 }
 
-std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries) {
+namespace {
+
+// miniz writes the archive through this, at any offset: it goes back to fill
+// in an entry's header once the entry's sizes are known.
+// Nothing is thrown through miniz: a failure to grow writes nothing, and
+// miniz fails the entry.
+template <class Bytes>
+std::size_t writeAt(void* opaque, mz_uint64 offset, const void* data, std::size_t size) noexcept {
+    Bytes& bytes = *static_cast<Bytes*>(opaque);
+    const auto at = static_cast<std::size_t>(offset);
+    try {
+        if (bytes.size() < at + size) {
+            bytes.resize(at + size);
+        }
+    } catch (...) {
+        return 0;
+    }
+    std::memcpy(bytes.data() + at, data, size);
+    return size;
+}
+
+// An entry's pieces read as one text, from any offset (miniz reads them in
+// order, so the piece a read starts in is kept from one read to the next).
+class PieceReader {
+public:
+    explicit PieceReader(std::span<const std::string_view> pieces) : pieces_(pieces) {}
+
+    static std::size_t read(void* opaque, mz_uint64 offset, void* out, std::size_t size) {
+        return static_cast<PieceReader*>(opaque)->readAt(static_cast<std::size_t>(offset),
+                                                         static_cast<char*>(out), size);
+    }
+
+private:
+    std::size_t readAt(std::size_t offset, char* out, std::size_t size) {
+        if (offset < start_) {
+            piece_ = 0;
+            start_ = 0;
+        }
+        std::size_t done = 0;
+        while (done < size && piece_ < pieces_.size()) {
+            const std::string_view piece = pieces_[piece_];
+            const std::size_t at = offset + done - start_;
+            if (at >= piece.size()) {
+                start_ += piece.size();
+                ++piece_;
+                continue;
+            }
+            const std::size_t count = std::min(size - done, piece.size() - at);
+            std::memcpy(out + done, piece.data() + at, count);
+            done += count;
+        }
+        return done;
+    }
+
+    std::span<const std::string_view> pieces_;
+    std::size_t piece_ = 0; // the piece that starts at start_
+    std::size_t start_ = 0;
+};
+
+} // namespace
+
+template <class Bytes>
+Bytes writeZip(std::span<const ZipEntry> entries) {
     std::size_t total = 0;
     for (const ZipEntry& entry : entries) {
         total += entry.content.size();
+        for (const std::string_view piece : entry.pieces) {
+            total += piece.size();
+        }
     }
+    Bytes bytes;
+    bytes.reserve(total / 4 + 4096);
     mz_zip_archive zip{};
-    if (mz_zip_writer_init_heap(&zip, 0, total / 4 + 4096) == 0) {
+    zip.m_pWrite = &writeAt<Bytes>;
+    zip.m_pIO_opaque = &bytes;
+    if (mz_zip_writer_init(&zip, 0) == 0) {
         throw std::runtime_error("cannot create the zip archive");
     }
+    // Every entry is read through the same callback, dated now as
+    // mz_zip_writer_add_mem() dates its entries, with its sizes in its header
+    // (no data descriptor after it).
+    const MZ_TIME_T now = std::time(nullptr);
     bool written = true;
     for (const ZipEntry& entry : entries) {
         const std::string name(entry.name);
-        const auto level = static_cast<mz_uint>(entry.level);
-        written = written && mz_zip_writer_add_mem(&zip, name.c_str(), entry.content.data(),
-                                                   entry.content.size(), level) != 0;
+        const std::span<const std::string_view> pieces =
+            entry.pieces.empty() ? std::span(&entry.content, 1) : entry.pieces;
+        std::size_t size = 0;
+        for (const std::string_view piece : pieces) {
+            size += piece.size();
+        }
+        PieceReader reader(pieces);
+        const auto flags = static_cast<mz_uint>(entry.level) | MZ_ZIP_FLAG_WRITE_HEADER_SET_SIZE;
+        written = written && mz_zip_writer_add_read_buf_callback(
+                                 &zip, name.c_str(), &PieceReader::read, &reader, size, &now,
+                                 nullptr, 0, flags, nullptr, 0, nullptr, 0) != 0;
     }
-    void* buffer = nullptr;
-    std::size_t size = 0;
-    written = written && mz_zip_writer_finalize_heap_archive(&zip, &buffer, &size) != 0;
-    std::vector<std::uint8_t> bytes;
-    if (written) {
-        const auto* begin = static_cast<const std::uint8_t*>(buffer);
-        bytes.assign(begin, begin + size);
-    }
-    mz_free(buffer);
+    written = written && mz_zip_writer_finalize_archive(&zip) != 0;
     mz_zip_writer_end(&zip);
     if (!written) {
         throw std::runtime_error("cannot write the zip archive");
     }
     return bytes;
 }
+
+template std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
+template std::string writeZip(std::span<const ZipEntry> entries);
 
 void writeFileAtomically(const std::filesystem::path& path, std::string_view content) {
     std::filesystem::path temporary = path;
