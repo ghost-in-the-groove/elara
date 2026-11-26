@@ -380,3 +380,198 @@ TEST_CASE("Session: a digit where no fret can be typed says why and waits for no
     CHECK_THROWS_AS(session.typeDigit(doc, 3, {}), std::logic_error);
     CHECK_FALSE(doc.canUndo());
 }
+
+// ---- The selection, the clipboard and transposing ------------------------------
+
+namespace {
+
+using Measures = EditSession::Measures;
+
+/// bandSong() with a note for the bass in the first measure.
+Song bandSongWithBass() {
+    Song song = bandSong();
+    Staff& bass = song.track(1).staff(0);
+    bass.measure(0).voices[0].beats = {Beat{.duration = kHalf, .notes = {bass.frettedNote(4, 3)}}};
+    return song;
+}
+
+int midiOf(const Song& song, std::size_t track, std::size_t measure) {
+    return voice(song, measure, 0, track).beats.at(0).notes.at(0).pitch.midiNumber();
+}
+
+} // namespace
+
+TEST_CASE("Session: a selection runs from where it started to the caret's measure",
+          "[core][session]") {
+    const Song song = bandSong();
+    EditSession session;
+    session.place(song, Caret{.measure = 1});
+    // Without one, an edit of measures takes the caret's.
+    CHECK_FALSE(session.hasSelection());
+    CHECK(session.selection() == Measures{.first = 1, .count = 1});
+
+    session.extendSelection(song, 1);
+    CHECK(session.hasSelection());
+    CHECK(session.selection() == Measures{.first = 1, .count = 2});
+    CHECK(session.caret() == Caret{.measure = 2});
+    // Back past where it started: it turns round, the caret on a first beat.
+    session.extendSelection(song, -2);
+    CHECK(session.selection() == Measures{.first = 0, .count = 2});
+    CHECK(session.selection().last() == 1);
+    CHECK(session.caret() == Caret{.measure = 0});
+    CHECK(session.input() == kEighth); // the beat it landed on
+    // It stops at the ends of the song, and no measures further is no change.
+    session.extendSelection(song, -5);
+    CHECK(session.selection() == Measures{.first = 0, .count = 2});
+    session.extendSelection(song, 50);
+    CHECK(session.selection() == Measures{.first = 1, .count = 2});
+    session.extendSelection(song, 0);
+    CHECK(session.selection() == Measures{.first = 1, .count = 2});
+
+    session.selectAll(song);
+    CHECK(session.selection() == Measures{.first = 0, .count = 3});
+    CHECK(session.caret() == Caret{.measure = 0});
+}
+
+TEST_CASE("Session: an arrow or a click ends the selection, another voice keeps it",
+          "[core][session]") {
+    const Song song = bandSong();
+    EditSession session;
+    session.extendSelection(song, 1);
+    CHECK(session.setVoice(song, 1));
+    CHECK(session.hasSelection());
+    session.move(song, CaretMove::StringDown);
+    CHECK_FALSE(session.hasSelection());
+
+    session.extendSelection(song, 1);
+    session.place(song, session.caret());
+    CHECK_FALSE(session.hasSelection());
+
+    session.extendSelection(song, 1);
+    CHECK(session.clearSelection());
+    CHECK_FALSE(session.clearSelection()); // none to end
+    CHECK_FALSE(session.hasSelection());
+}
+
+TEST_CASE("Session: the selection stays inside the song, and ends with it", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    session.selectAll(doc.song()); // it started at the third measure
+    doc.execute(std::make_unique<RemoveMeasures>(1, 2));
+    session.songChanged(doc.song());
+    CHECK(session.selection() == Measures{.first = 0, .count = 1});
+    CHECK(session.hasSelection());
+
+    session.start(0);
+    CHECK_FALSE(session.hasSelection());
+}
+
+TEST_CASE("Session: copy and paste take the track shown alone, or every track", "[core][session]") {
+    Document doc(bandSongWithBass());
+    EditSession session;
+    CHECK_FALSE(session.canPaste());
+
+    // The guitar alone, its first two measures.
+    session.showTrack(doc.song(), 0);
+    session.extendSelection(doc.song(), 1);
+    CHECK(session.copy(doc.song()) == Measures{.first = 0, .count = 2});
+    CHECK(session.canPaste());
+    CHECK(session.hasSelection()); // copying leaves it
+
+    // Over the third measure on: the song grows by the one that does not fit.
+    session.place(doc.song(), Caret{.measure = 2});
+    CHECK(session.paste(doc, PasteMode::Replace));
+    CHECK(doc.song().measureCount() == 4);
+    CHECK(voice(doc.song(), 2) == voice(doc.song(), 0));
+    CHECK(voice(doc.song(), 3) == voice(doc.song(), 1));
+    CHECK(voice(doc.song(), 2, 0, 1).beats.empty()); // the bass was not copied
+    // What was pasted is selected, the caret on the first beat of its last measure.
+    CHECK(session.selection() == Measures{.first = 2, .count = 2});
+    CHECK(session.caret() == Caret{.measure = 3});
+
+    // Every track, into new measures before the selection's first.
+    doc.undo();
+    session.songChanged(doc.song());
+    session.showTrack(doc.song(), std::nullopt);
+    session.place(doc.song(), Caret{.measure = 0});
+    CHECK(session.copy(doc.song()) == Measures{.first = 0, .count = 1});
+    session.place(doc.song(), Caret{.track = 1, .measure = 1});
+    CHECK(session.paste(doc, PasteMode::Insert));
+    CHECK(doc.song().measureCount() == 4);
+    CHECK(voice(doc.song(), 1, 0, 0) == voice(doc.song(), 0, 0, 0));
+    CHECK(voice(doc.song(), 1, 0, 1) == voice(doc.song(), 0, 0, 1));
+    CHECK(session.selection() == Measures{.first = 1, .count = 1});
+    CHECK(session.caret().track == 1);
+    CHECK(session.caret().measure == 1);
+}
+
+TEST_CASE("Session: what was copied can be pasted into another song", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    session.showTrack(doc.song(), 0);
+    session.copy(doc.song());
+
+    Document other(bandSong());
+    session.start(0);
+    session.showTrack(other.song(), 0);
+    session.place(other.song(), Caret{.measure = 2});
+    CHECK(session.paste(other, PasteMode::Replace));
+    CHECK(voice(other.song(), 2) == voice(doc.song(), 0));
+}
+
+TEST_CASE("Session: a paste that cannot be changes nothing", "[core][session]") {
+    Song song = bandSong();
+    song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
+    Document doc(song);
+    EditSession session;
+    session.showTrack(doc.song(), 0);
+    CHECK_THROWS_AS(session.paste(doc, PasteMode::Replace), std::logic_error);
+
+    // A guitar's measure does not go to the drums.
+    session.copy(doc.song());
+    session.showTrack(doc.song(), 2);
+    session.place(doc.song(), Caret{.track = 2, .measure = 1});
+    const Caret before = session.caret();
+    CHECK_THROWS_AS(session.paste(doc, PasteMode::Replace), std::invalid_argument);
+    CHECK(session.caret() == before);
+    CHECK_FALSE(session.hasSelection());
+    CHECK_FALSE(doc.canUndo());
+
+    // Copied from every track, it needs as many tracks from the first.
+    Document small(bandSong());
+    session.showTrack(doc.song(), std::nullopt);
+    session.copy(doc.song());
+    CHECK_THROWS_AS(session.paste(small, PasteMode::Replace), std::out_of_range);
+    CHECK_FALSE(small.canUndo());
+}
+
+TEST_CASE("Session: transposing moves the selection on the track shown, or on every track",
+          "[core][session]") {
+    Document doc(bandSongWithBass());
+    EditSession session;
+    const int guitar = midiOf(doc.song(), 0, 0);
+    const int second = midiOf(doc.song(), 0, 1);
+    const int bass = midiOf(doc.song(), 1, 0);
+
+    // The caret's measure of the guitar.
+    session.showTrack(doc.song(), 0);
+    CHECK(session.transpose(doc, 2));
+    CHECK(midiOf(doc.song(), 0, 0) == guitar + 2);
+    CHECK(midiOf(doc.song(), 0, 1) == second);
+    CHECK(midiOf(doc.song(), 1, 0) == bass);
+
+    // Every measure of every track; the selection stays.
+    session.showTrack(doc.song(), std::nullopt);
+    session.selectAll(doc.song());
+    CHECK(session.transpose(doc, -1));
+    CHECK(midiOf(doc.song(), 0, 0) == guitar + 1);
+    CHECK(midiOf(doc.song(), 0, 1) == second - 1);
+    CHECK(midiOf(doc.song(), 1, 0) == bass - 1);
+    CHECK(session.selection() == Measures{.first = 0, .count = 3});
+
+    CHECK_FALSE(session.transpose(doc, 0));
+    const std::size_t steps = doc.undoCount();
+    CHECK_THROWS(session.transpose(doc, -60)); // below the lowest string
+    CHECK(doc.undoCount() == steps);
+    CHECK(midiOf(doc.song(), 1, 0) == bass - 1);
+}

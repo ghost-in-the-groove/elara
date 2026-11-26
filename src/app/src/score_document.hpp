@@ -737,7 +737,7 @@ public:
 
     /// Selected measures (ADR-0036): from an anchor, where the selection
     /// started, to the caret's measure. 0-based; -1 without a selection.
-    [[nodiscard]] bool hasSelection() const { return anchor_.has_value(); }
+    [[nodiscard]] bool hasSelection() const { return session_.hasSelection(); }
     [[nodiscard]] int selectionFirst() const;
     [[nodiscard]] int selectionLast() const;
     /// Changes whenever the selection or its place on the pages does.
@@ -754,7 +754,7 @@ public:
     /// Copies the selected measures, or the caret's, of the shown track (of
     /// every track when all are shown).
     Q_INVOKABLE void copy();
-    [[nodiscard]] bool canPaste() const { return clip_.has_value(); }
+    [[nodiscard]] bool canPaste() const { return session_.canPaste(); }
     /// Pastes the copied measures at the first selected measure, or the
     /// caret's, over the measures there or into new ones before it; the pasted
     /// measures are selected.
@@ -842,7 +842,7 @@ private:
     /// Makes an entry from the song being edited and enters it, reporting
     /// what it throws through editFailed().
     void runEntry(const std::function<core::Entry(const core::Song&)>& make);
-    /// Another song: the session starts on its track `track`, nothing selected.
+    /// Another song: the session starts on its track `track`.
     void startSession(std::size_t track);
     /// Tells inputChanged() when the input duration is no longer `before`.
     void inputMaybeChanged(core::Duration before);
@@ -863,8 +863,6 @@ private:
     void fail(const QString& message);
     void updateBusy();
     void resequence();
-    /// The selected measures, or the caret's: first and count.
-    [[nodiscard]] std::pair<std::size_t, std::size_t> selectedRange() const;
     /// The selection changed, or its place on the pages.
     void selectionMoved();
 
@@ -888,14 +886,12 @@ private:
     /// (ADR-0052); shared with the layouts running on workers.
     std::shared_ptr<notation::PageLayoutCache> layoutCache_ =
         std::make_shared<notation::PageLayoutCache>();
-    /// The caret, the input duration and the digit waiting for a second one
-    /// (ADR-0127).
+    /// The caret, the input duration, the digit waiting for a second one, the
+    /// selection and the measures copied (ADR-0127).
     core::EditSession session_;
     int caretPage_ = -1;
     QRectF caretRect_;
-    std::optional<std::size_t> anchor_; ///< where the selection started
     int selectionRevision_ = 0;
-    std::optional<core::MeasureClip> clip_; ///< the measures copied
     int track_ = 0;
     View view_ = View::Both;
     bool continuous_ = false;

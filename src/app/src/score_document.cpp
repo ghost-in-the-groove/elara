@@ -1157,6 +1157,7 @@ void ScoreDocument::newSong(const QString& presetId) {
     setImportWarnings({});
     track_ = 0;
     startSession(0);
+    clampCaret(); // the session hears which track is shown
     const std::array<std::size_t, 1> first{0};
     view_ = notation::hasTablature(*song_, first) ? View::Both : View::Standard;
     emit songReplaced();
@@ -1781,9 +1782,6 @@ void ScoreDocument::edited() {
         emit trackChanged();
     }
     clampCaret();
-    if (anchor_ && *anchor_ >= song_->measureCount()) {
-        anchor_ = song_->measureCount() - 1;
-    }
     emit caretChanged();
     emit songChanged();
     emit historyChanged();
@@ -1971,7 +1969,7 @@ QString ScoreDocument::caretStatus() const {
     }
     const core::Song& song = document_->song();
     QStringList parts;
-    if (anchor_) {
+    if (session_.hasSelection()) {
         const int first = selectionFirst() + 1;
         const int last = selectionLast() + 1;
         parts.append(first == last ? tr("Measure %1 selected").arg(first)
@@ -2206,7 +2204,6 @@ void ScoreDocument::moveCaret(CaretMove move) {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    clearSelection();
     const core::Duration input = session_.input();
     session_.move(document_->song(), coreMove(move));
     inputMaybeChanged(input);
@@ -2235,7 +2232,6 @@ bool ScoreDocument::placeCaret(int index, double x, double y) {
     if (!picked) {
         return false;
     }
-    clearSelection();
     placeCaretAt(*picked);
     return true;
 }
@@ -3143,7 +3139,6 @@ void ScoreDocument::startSession(std::size_t track) {
     const core::Duration input = session_.input();
     session_.start(track);
     inputMaybeChanged(input);
-    anchor_.reset(); // a selection is of the song it was made in
 }
 
 void ScoreDocument::inputMaybeChanged(core::Duration before) {
@@ -3205,22 +3200,22 @@ void ScoreDocument::placeCaretBox() {
 }
 
 int ScoreDocument::selectionFirst() const {
-    return anchor_ ? static_cast<int>(std::min(*anchor_, session_.caret().measure)) : -1;
+    return session_.hasSelection() ? static_cast<int>(session_.selection().first) : -1;
 }
 
 int ScoreDocument::selectionLast() const {
-    return anchor_ ? static_cast<int>(std::max(*anchor_, session_.caret().measure)) : -1;
+    return session_.hasSelection() ? static_cast<int>(session_.selection().last()) : -1;
 }
 
 QVariantList ScoreDocument::selectionBoxes(int index) const {
     QVariantList boxes;
-    if (!anchor_ || !pages_ || index < 0 || index >= static_cast<int>(pages_->size())) {
+    if (!session_.hasSelection() || !pages_ || index < 0 ||
+        index >= static_cast<int>(pages_->size())) {
         return boxes;
     }
-    const auto first = static_cast<std::size_t>(selectionFirst());
-    const auto last = static_cast<std::size_t>(selectionLast());
+    const core::EditSession::Measures selected = session_.selection();
     for (const notation::MeasureBox& box : (*pages_)[static_cast<std::size_t>(index)].measures) {
-        if (box.index >= first && box.index <= last) {
+        if (box.index >= selected.first && box.index <= selected.last()) {
             boxes.append(QRectF(box.x, box.y, box.width, box.height));
         }
     }
@@ -3232,48 +3227,30 @@ void ScoreDocument::selectionMoved() {
     emit selectionChanged();
 }
 
-std::pair<std::size_t, std::size_t> ScoreDocument::selectedRange() const {
-    if (!anchor_) {
-        return {session_.caret().measure, 1};
-    }
-    const auto first = static_cast<std::size_t>(selectionFirst());
-    return {first, static_cast<std::size_t>(selectionLast()) - first + 1};
-}
-
 void ScoreDocument::extendSelection(int measures) {
     if (!document_ || !hasCaret(document_->song()) || measures == 0) {
         return;
     }
-    const core::Song& song = document_->song();
-    if (!anchor_) {
-        anchor_ = session_.caret().measure;
-    }
-    const auto last = static_cast<long long>(song.measureCount()) - 1;
-    const auto target =
-        std::clamp(static_cast<long long>(session_.caret().measure) + measures, 0LL, last);
-    core::Caret caret = session_.caret();
-    caret.measure = static_cast<std::size_t>(target);
-    caret.beat = 0;
-    placeCaretAt(caret);
+    const core::Duration input = session_.input();
+    session_.extendSelection(document_->song(), measures);
+    inputMaybeChanged(input);
+    placeCaretBox();
 }
 
 void ScoreDocument::selectAll() {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    const core::Song& song = document_->song();
-    anchor_ = song.measureCount() - 1;
-    core::Caret caret = session_.caret();
-    caret.measure = 0;
-    caret.beat = 0;
-    placeCaretAt(caret);
+    const core::Duration input = session_.input();
+    session_.selectAll(document_->song());
+    inputMaybeChanged(input);
+    placeCaretBox();
 }
 
 void ScoreDocument::clearSelection() {
-    if (!anchor_) {
+    if (!session_.clearSelection()) {
         return;
     }
-    anchor_.reset();
     emit caretChanged(); // the status line
     selectionMoved();
 }
@@ -3282,65 +3259,49 @@ void ScoreDocument::copy() {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    const auto [first, count] = selectedRange();
-    const bool every = track_ == kAllTracks;
-    clip_ = core::copyMeasures(document_->song(), first, count, every ? 0 : session_.caret().track,
-                               every ? 0 : 1);
+    const core::EditSession::Measures copied = session_.copy(document_->song());
     emit clipboardChanged();
-    emit notice(count == 1 ? tr("Copied measure %1.").arg(first + 1)
-                           : tr("Copied measures %1-%2.").arg(first + 1).arg(first + count));
+    emit notice(copied.count == 1
+                    ? tr("Copied measure %1.").arg(copied.first + 1)
+                    : tr("Copied measures %1-%2.").arg(copied.first + 1).arg(copied.last() + 1));
 }
 
 void ScoreDocument::paste(bool insert) {
     if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    if (!clip_) {
+    if (!session_.canPaste()) {
         emit editFailed(tr("Copy some measures first."));
         return;
     }
-    const std::size_t at = selectedRange().first;
-    // One copied track goes to the caret's; several to the tracks they came from.
-    const std::size_t track = clip_->tracks.size() == 1 ? session_.caret().track : 0;
-    std::unique_ptr<core::Command> command;
+    bool changed = false;
     try {
-        command = core::makePaste(document_->song(), *clip_, at, track,
-                                  insert ? core::PasteMode::Insert : core::PasteMode::Replace);
+        changed =
+            session_.paste(*document_, insert ? core::PasteMode::Insert : core::PasteMode::Replace);
     } catch (const std::out_of_range&) {
         emit editFailed(tr("The song has fewer tracks than were copied."));
         return;
     } catch (const std::invalid_argument&) {
         emit editFailed(tr("Those measures do not fit this track."));
         return;
+    } catch (const std::exception& error) {
+        emit editFailed(qstring(error.what()));
     }
-    anchor_ = at;
-    core::Caret caret = session_.caret();
-    caret.measure = at + clip_->measureCount() - 1;
-    caret.beat = 0;
-    if (!enter(core::Entry{.command = std::move(command), .caret = caret})) {
-        clearSelection();
-    }
+    showEdit(changed);
 }
 
 void ScoreDocument::transposeSelection(int semitones) {
-    if (!document_ || !hasCaret(document_->song()) || semitones == 0) {
+    if (!document_ || !hasCaret(document_->song())) {
         return;
     }
-    const auto [first, count] = selectedRange();
-    core::Transposition what{.semitones = semitones, .first = first, .count = count};
-    if (track_ != kAllTracks) {
-        what.tracks.push_back(session_.caret().track);
-    }
-    std::unique_ptr<core::Command> command;
     try {
-        command = core::makeTranspose(document_->song(), what);
+        if (session_.transpose(*document_, semitones)) {
+            edited();
+        }
     } catch (const std::exception&) {
         emit editFailed(caretFretted() ? tr("A note would leave the range or the neck.")
                                        : tr("A note would leave the range."));
-        return;
     }
-    session_.endTyping();
-    execute(std::move(command));
 }
 
 } // namespace elara::app
