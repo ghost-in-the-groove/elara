@@ -64,7 +64,9 @@ beat, for example): it is how callers keep the caret valid after every edit.
 steps: `caret <track> <measure> <beat> [string]`, `right`, `left`, `up`,
 `down`, `next-measure`, `previous-measure`, `fret <n>`, `duration <d>` (the
 input duration, and the caret beat's), `delete`, `delete-beat`,
-`insert-rest`. Its output includes the caret and the input duration.
+`insert-rest`. Its output includes the caret and the input duration. They
+are kept in a `core::EditSession`, as the app keeps them (ADR-0127), so the
+input duration follows the beat the caret moves to.
 
 ## Consequences
 

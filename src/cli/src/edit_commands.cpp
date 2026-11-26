@@ -42,27 +42,27 @@ std::string caretJson(const Song& song, const core::Caret& caret) {
         core::onFreeSlot(song, caret));
 }
 
-void printJson(const Document& doc, const EntryState& entry) {
+void printJson(const Document& doc, const core::EditSession& session) {
     const Song& song = doc.song();
     std::cout
         << std::format(
                R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"caret":{},"input":"{}","undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"historyBytes":{},"modified":{}}})",
                jsonEscape(song.info().title), song.startTempo().bpm(), tracksJson(song),
                song.measureCount(), measuresJson(song), issuesJson(core::validate(song)),
-               caretJson(song, entry.caret), entry.input.toString(), doc.undoCount(),
+               caretJson(song, session.caret()), session.input().toString(), doc.undoCount(),
                jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
                doc.historyBytes(), doc.isModified())
         << '\n';
 }
 
-void printText(const Document& doc, const EntryState& entry) {
+void printText(const Document& doc, const core::EditSession& session) {
     printSongText(doc.song());
-    if (const core::Caret& caret = entry.caret; hasCaret(doc.song())) {
+    if (const core::Caret& caret = session.caret(); hasCaret(doc.song())) {
         std::cout << std::format(
             "caret: track {}, staff {}, measure {}, voice {}, beat {}{}, string {}; input {}\n",
             caret.track, caret.staff, caret.measure, caret.voice, caret.beat,
             core::onFreeSlot(doc.song(), caret) ? " (free slot)" : "", caret.string,
-            entry.input.toString());
+            session.input().toString());
     }
     std::cout << std::format("undo: {} ({} step(s)), redo: {} ({} step(s)){}\n",
                              doc.canUndo() ? doc.undoName() : "-", doc.undoCount(),
@@ -105,9 +105,9 @@ int runEdit(bool json, const EditOptions& options) {
         doc.markSaved();
     }
     if (json) {
-        printJson(doc, state.entry);
+        printJson(doc, state.session);
     } else {
-        printText(doc, state.entry);
+        printText(doc, state.session);
     }
     return kExitOk;
 }

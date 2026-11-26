@@ -54,9 +54,13 @@ that outlived its song.
 - `ScoreDocument` has a session and delegates to it. It keeps what is Qt's:
   the properties and invokables QML binds to, the signals, the caret's box on
   the pages, the translated messages. QML does not change.
-- The CLI's steps keep a caret, a duration and a clipboard of their own for
-  now. They can use the session instead: the one difference to settle is that
-  the app's input duration follows the caret and a step's does not.
+- The steps of `elara-cli edit` keep their caret and input duration in a
+  session too, so a run of steps does what the same keys do in the app. One
+  thing changed for it: a step's input duration used to stay as the last
+  `duration` step left it, and now follows the beat the caret moves to, as the
+  app's always did. No test of the CLI depended on the difference. The `copy`,
+  `paste` and `transpose` steps name their measures and tracks, so they keep a
+  clipboard of their own and do not use the session's selection.
 
 ## Consequences
 
@@ -73,3 +77,8 @@ that outlived its song.
   did: the edits at the caret that are made before they are entered. The
   rest are the session's own actions.
 - `hasCaret()` is core's, where the app and the CLI each had a copy.
+- A script of steps that moves the caret onto a beat of another duration and
+  then types on a free slot, or inserts a rest, without a `duration` step in
+  between now gets that beat's duration.
+- Steps that use the selection (select, then copy or paste what is selected)
+  can be added on the session without new rules.

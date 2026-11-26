@@ -207,7 +207,8 @@ beat of a short measure), `pitch <C..B> [add]` types a note name in the
 octave nearest the previous note (with `add`, above the beat's highest note;
 on tablature on the nearest string that reaches it, ADR-0034), `shift
 <semitones>` moves the caret's note, `duration <d>` sets the input duration and
-the caret beat's, `delete` removes the note on the caret's string (on a staff
+the caret beat's (moving the caret to a beat gives the input duration that
+beat's, as in the app; the free slot leaves it as it was, ADR-0127), `delete` removes the note on the caret's string (on a staff
 without strings, the beat's notes; on a rest, the rest), `delete-beat` the
 whole beat, and `insert-rest` adds a rest before it. On a percussion staff the
 caret's string is a drum lane, from the crash at the top to the hi-hat pedal
@@ -330,6 +331,8 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
 - The steps of `edit` are parsed and run in `src/edit_steps.cpp`, the
   `elara_cli_steps` library: `runStep()` throws `StepSyntaxError` for a step that
   is not well formed (exit 2) and lets what the song refuses through (exit 1).
+  The caret and the input duration of a run of steps are a `core::EditSession`,
+  the one the app's keys use (ADR-0127).
   `tests/cli/test_edit_steps.cpp` runs steps against a song with Catch2; the
   `cli.edit_rejects_*` CTests check the message each step fails with.
 
