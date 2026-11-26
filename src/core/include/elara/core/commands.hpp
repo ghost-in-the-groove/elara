@@ -254,4 +254,29 @@ private:
 [[nodiscard]] std::unique_ptr<Command> changeSection(const Song& song, std::size_t measure,
                                                      std::string name);
 
+// The marks of a measure header, a group at a time (ADR-0123): each takes the
+// whole group, checks it and is one undo step named as SetMeasureHeader names
+// a change of that group alone. Each is null when the measure has those marks
+// already, and throws std::out_of_range ("Song: no such measure") when the song
+// has no measure `measure`.
+
+/// Gives measure `measure` exactly the signs and the jump of `marks`
+/// (ADR-0049), "Change navigation marks". Without a jump nothing ends the
+/// music early: `jumpThen` is taken as JumpThen::End. Throws
+/// std::invalid_argument for a jump or a jumpThen that is no enumerator.
+[[nodiscard]] std::unique_ptr<Command> changeNavigation(const Song& song, std::size_t measure,
+                                                        const NavigationMarks& marks);
+
+/// Gives measure `measure` exactly the repeat barlines and alternate endings
+/// of `marks` (ADR-0016), "Change repeats". Throws std::invalid_argument, as
+/// checkRepeatTimes() does, for a number of times other than 0 (no end
+/// repeat) or 2 to 255.
+[[nodiscard]] std::unique_ptr<Command> changeRepeats(const Song& song, std::size_t measure,
+                                                     const RepeatMarks& marks);
+
+/// Closes measure `measure` with a double barline or a single one (ADR-0103),
+/// "Change barline"; it does not change the sound.
+[[nodiscard]] std::unique_ptr<Command> changeBarline(const Song& song, std::size_t measure,
+                                                     bool doubleBar);
+
 } // namespace elara::core

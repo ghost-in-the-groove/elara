@@ -2120,6 +2120,14 @@
         <translation>%1/%2 no es un compás válido.</translation>
     </message>
     <message>
+        <source>Endings are the times through a repeat, 1 to %1.</source>
+        <translation>Los finales son las veces que se pasa por una repetición, de 1 a %1.</translation>
+    </message>
+    <message>
+        <source>A repeated section plays 2 to 255 times, not %1.</source>
+        <translation>Una sección repetida se toca de 2 a 255 veces, no %1.</translation>
+    </message>
+    <message>
         <source>Could not save %1: %2</source>
         <translation>No se pudo guardar %1: %2</translation>
     </message>

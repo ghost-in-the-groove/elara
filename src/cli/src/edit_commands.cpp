@@ -353,15 +353,18 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
         // hairpin <crescendo|diminuendo|none>, fermata <short|normal|long|none>,
         // slur <on|none> (to the next beat of its voice),
         // ottava <8va|8vb|15ma|15mb|none> (ADR-0089), pedal <down|change|none>
-        // (ADR-0092), breath <comma|caesura|none> (after it, ADR-0095): the
-        // caret's beat
-        BeatEffects effects = beatEffectsAt(song, entry.caret);
+        // (ADR-0092), breath <comma|caesura|none> (after it, ADR-0095): that
+        // effect of the caret's beat, its others kept
+        const Caret& at = entry.caret;
         if (verb == "strum") {
-            effects.strum = strokeDirection<Strum>(verb, step.word(1));
+            edit = setBeatEffect(song, at, &BeatEffects::strum,
+                                 strokeDirection<Strum>(verb, step.word(1)));
         } else if (verb == "pick") {
-            effects.pickStroke = strokeDirection<PickStroke>(verb, step.word(1));
+            edit = setBeatEffect(song, at, &BeatEffects::pickStroke,
+                                 strokeDirection<PickStroke>(verb, step.word(1)));
         } else if (verb == "tremolo") {
-            effects.tremoloPicking = tremoloSpeed(step.word(1));
+            edit =
+                setBeatEffect(song, at, &BeatEffects::tremoloPicking, tremoloSpeed(step.word(1)));
         } else if (verb == "whammy") {
             constexpr int kStepDown = -200;
             const std::string_view name = step.word(1);
@@ -370,40 +373,37 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
             if (found == kWhammyForms.end()) {
                 throw StepSyntaxError(std::format("not a whammy-bar form: {}", name));
             }
-            effects.whammyBar =
-                whammyCurve(found->second, step.has(2) ? step.number<int>(2) : kStepDown);
+            edit = setBeatEffect(
+                song, at, &BeatEffects::whammyBar,
+                whammyCurve(found->second, step.has(2) ? step.number<int>(2) : kStepDown));
         } else if (verb == "bass") {
-            effects.bassTechnique = kindOf<BassTechnique>(verb, step.word(1));
+            edit = setBeatEffect(song, at, &BeatEffects::bassTechnique,
+                                 kindOf<BassTechnique>(verb, step.word(1)));
         } else if (verb == "hairpin") {
-            effects.hairpin = kindOf<Hairpin>(verb, step.word(1));
+            edit =
+                setBeatEffect(song, at, &BeatEffects::hairpin, kindOf<Hairpin>(verb, step.word(1)));
         } else if (verb == "fermata") {
-            effects.fermata = kindOf<Fermata>(verb, step.word(1));
+            edit =
+                setBeatEffect(song, at, &BeatEffects::fermata, kindOf<Fermata>(verb, step.word(1)));
         } else if (verb == "ottava") {
-            effects.ottava = kindOf<Ottava>(verb, step.word(1));
+            edit =
+                setBeatEffect(song, at, &BeatEffects::ottava, kindOf<Ottava>(verb, step.word(1)));
         } else if (verb == "pedal") {
-            effects.pedal = kindOf<Pedal>(verb, step.word(1));
+            edit = setBeatEffect(song, at, &BeatEffects::pedal, kindOf<Pedal>(verb, step.word(1)));
         } else if (verb == "breath") {
-            effects.breath = kindOf<Breath>(verb, step.word(1));
+            edit =
+                setBeatEffect(song, at, &BeatEffects::breath, kindOf<Breath>(verb, step.word(1)));
         } else {
             const std::string_view word = step.word(1);
             if (word != "none" && word != "on") {
                 throw StepSyntaxError(std::format("{}: none, on, not {}", verb, word));
             }
-            effects.slur = word == "on";
+            edit = setBeatEffect(song, at, &BeatEffects::slur, word == "on");
         }
-        edit = setBeatEffects(song, entry.caret, effects);
-    } else if (verb == "slide-in" || verb == "slide-out") {
-        // slide-in <from-below|from-above|none>,
-        // slide-out <shift|legato|downwards|upwards|none>: the caret's notes
-        const NoteEffects now = noteEffectsAt(song, entry.caret);
-        SlideIn in = now.slideIn;
-        SlideOut out = now.slideOut;
-        if (verb == "slide-in") {
-            in = kindOf<SlideIn>(verb, step.word(1));
-        } else {
-            out = kindOf<SlideOut>(verb, step.word(1));
-        }
-        edit = setSlides(song, entry.caret, in, out);
+    } else if (verb == "slide-in") { // slide-in <from-below|from-above|none>: the caret's notes
+        edit = setSlideIn(song, entry.caret, kindOf<SlideIn>(verb, step.word(1)));
+    } else if (verb == "slide-out") { // slide-out <shift|legato|downwards|upwards|none>
+        edit = setSlideOut(song, entry.caret, kindOf<SlideOut>(verb, step.word(1)));
     } else if (verb == "vibrato") { // vibrato <slight|wide|none>
         edit = setVibrato(song, entry.caret, kindOf<Vibrato>(verb, step.word(1)));
     } else if (verb == "accent") { // accent <accent|marcato|none>
@@ -508,6 +508,112 @@ bool runEntryStep(Document& doc, const Step& step, EntryState& entry) {
     }
     entry.caret = edit.caret;
     return true;
+}
+
+// A step's number as an int, the largest int for any larger one, which core
+// then rejects as out of range.
+int countOf(std::size_t number) {
+    return static_cast<int>(std::min<std::size_t>(number, std::numeric_limits<int>::max()));
+}
+
+// Runs `check`, a check core makes of what a step names: what it rejects makes
+// the step malformed, core's message following the step's verb.
+template <typename Check>
+auto checked(std::string_view verb, Check check) {
+    try {
+        return check();
+    } catch (const std::invalid_argument& error) {
+        throw StepSyntaxError(std::format("{}: {}", verb, error.what()));
+    }
+}
+
+// The marks of a measure header (ADR-0123): sign <m> <segno|coda|fine|to-coda|
+// ...>... | none, jump <m> <da-capo|dal-segno|dal-segno-segno|none> [al-...],
+// repeat <m> [start] [end <times>] | none, ending <m> <time>... | none and
+// barline <m> double|single. Each gives the measure exactly what it names of
+// its group of marks, keeping the rest of the group; core checks the group and
+// names the change. Null when the measure has those marks already.
+std::unique_ptr<core::Command> markStep(const Song& song, const Step& step) {
+    using namespace core;
+    const std::string_view verb = step.verb();
+    const std::size_t measure = step.index(1);
+    const MeasureHeader& header = song.measureHeader(measure); // a missing measure first
+    if (verb == "sign") {
+        NavigationMarks marks = navigationOf(header);
+        marks.signs = {};
+        if (!step.has(2)) {
+            throw StepSyntaxError("sign: expected signs or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const std::optional<NavigationSign> sign = parseName<NavigationSign>(step.word(i));
+                if (!sign) {
+                    throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
+                }
+                marks.set(*sign, true);
+            }
+        }
+        return changeNavigation(song, measure, marks);
+    }
+    if (verb == "jump") {
+        NavigationMarks marks = navigationOf(header);
+        const std::optional<JumpTo> to = parseName<JumpTo>(step.word(2));
+        if (!to) {
+            throw StepSyntaxError(std::format("not a jump: {}", step.word(2)));
+        }
+        // The step names the whole jump: without al-... it plays to the end.
+        marks.jump = *to;
+        marks.jumpThen = JumpThen::End;
+        if (step.has(3)) {
+            const std::optional<JumpThen> then = parseName<JumpThen>(step.word(3));
+            if (!then || marks.jump == JumpTo::None || step.has(4)) {
+                throw StepSyntaxError(std::format("jump: not al-fine, al-coda or "
+                                                  "al-double-coda: {}",
+                                                  step.word(3)));
+            }
+            marks.jumpThen = *then;
+        }
+        return changeNavigation(song, measure, marks);
+    }
+    if (verb == "repeat") {
+        RepeatMarks marks = repeatsOf(header);
+        marks.start = false;
+        marks.times = 0;
+        if (!step.has(2)) {
+            throw StepSyntaxError("repeat: expected start, end <times> or none");
+        }
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                if (step.word(i) == "start") {
+                    marks.start = true;
+                } else if (step.word(i) == "end") {
+                    const int times = countOf(step.index(++i));
+                    checked(verb, [times] { checkRepeatTimes(times); });
+                    marks.times = times;
+                } else {
+                    throw StepSyntaxError(std::format("not a repeat: {}", step.word(i)));
+                }
+            }
+        }
+        return changeRepeats(song, measure, marks);
+    }
+    if (verb == "ending") {
+        RepeatMarks marks = repeatsOf(header);
+        marks.endings = 0;
+        if (step.word(2) != "none" || step.has(3)) {
+            for (std::size_t i = 2; step.has(i); ++i) {
+                const int time = countOf(step.index(i));
+                const std::uint8_t bit = checked(verb, [time] { return endingBit(time); });
+                marks.endings = static_cast<std::uint8_t>(marks.endings | bit);
+            }
+        }
+        return changeRepeats(song, measure, marks);
+    }
+    const std::string_view kind = step.word(2);
+    if ((kind != "double" && kind != "single") || step.has(3)) {
+        throw StepSyntaxError(std::format("barline: expected double or single, not {}", kind));
+    }
+    return changeBarline(song, measure, kind == "double");
 }
 
 // `clipboard` holds what the last copy step copied.
@@ -741,103 +847,10 @@ void runStep(Document& doc, const Step& step, core::MeasureClip& clipboard, Entr
         if (auto change = makeRetune(song, what)) {
             doc.execute(std::move(change));
         }
-    } else if (verb == "sign") { // sign <m> <segno|coda|fine|to-coda|...>... | none
-        const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
-        for (const NavigationSign sign : enumValues<NavigationSign>()) {
-            header.*signFlag(sign) = false;
-        }
-        if (!step.has(2)) {
-            throw StepSyntaxError("sign: expected signs or none");
-        }
-        if (step.word(2) != "none" || step.has(3)) {
-            for (std::size_t i = 2; step.has(i); ++i) {
-                const std::optional<NavigationSign> sign = parseName<NavigationSign>(step.word(i));
-                if (!sign) {
-                    throw StepSyntaxError(std::format("not a sign: {}", step.word(i)));
-                }
-                header.*signFlag(*sign) = true;
-            }
-        }
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
-        }
-    } else if (verb == "repeat") { // repeat <m> [start] [end <times>] | none
-        const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
-        header.repeatStart = false;
-        header.repeatTimes = 0;
-        if (!step.has(2)) {
-            throw StepSyntaxError("repeat: expected start, end <times> or none");
-        }
-        if (step.word(2) != "none" || step.has(3)) {
-            for (std::size_t i = 2; step.has(i); ++i) {
-                if (step.word(i) == "start") {
-                    header.repeatStart = true;
-                } else if (step.word(i) == "end") {
-                    const std::size_t times = step.index(++i);
-                    if (times < 2 || times > std::numeric_limits<std::uint8_t>::max()) {
-                        throw StepSyntaxError(
-                            std::format("repeat: a section plays 2 to 255 times, not {}", times));
-                    }
-                    header.repeatTimes = static_cast<std::uint8_t>(times);
-                } else {
-                    throw StepSyntaxError(std::format("not a repeat: {}", step.word(i)));
-                }
-            }
-        }
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
-        }
-    } else if (verb == "barline") { // barline <m> double|single
-        const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
-        const std::string_view kind = step.word(2);
-        if ((kind != "double" && kind != "single") || step.has(3)) {
-            throw StepSyntaxError(std::format("barline: expected double or single, not {}", kind));
-        }
-        header.doubleBar = kind == "double";
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
-        }
-    } else if (verb == "ending") { // ending <m> <time>... | none
-        const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
-        header.alternateEndings = 0;
-        if (step.word(2) != "none" || step.has(3)) {
-            for (std::size_t i = 2; step.has(i); ++i) {
-                const std::size_t time = step.index(i);
-                if (time < 1 || time > MeasureHeader::kMaxEnding) {
-                    throw StepSyntaxError(std::format("ending: times through are 1 to {}, not {}",
-                                                      MeasureHeader::kMaxEnding, time));
-                }
-                header.alternateEndings =
-                    static_cast<std::uint8_t>(header.alternateEndings | (1U << (time - 1)));
-            }
-        }
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
-        }
-    } else if (verb == "jump") { // jump <m> <da-capo|dal-segno|dal-segno-segno|none> [al-...]
-        const std::size_t measure = step.index(1);
-        MeasureHeader header = song.measureHeader(measure);
-        const std::optional<JumpTo> to = parseName<JumpTo>(step.word(2));
-        if (!to) {
-            throw StepSyntaxError(std::format("not a jump: {}", step.word(2)));
-        }
-        header.jump = *to;
-        header.jumpThen = JumpThen::End;
-        if (step.has(3)) {
-            const std::optional<JumpThen> then = parseName<JumpThen>(step.word(3));
-            if (!then || header.jump == JumpTo::None || step.has(4)) {
-                throw StepSyntaxError(std::format("jump: not al-fine, al-coda or "
-                                                  "al-double-coda: {}",
-                                                  step.word(3)));
-            }
-            header.jumpThen = *then;
-        }
-        if (header != song.measureHeader(measure)) {
-            doc.execute(std::make_unique<SetMeasureHeader>(measure, std::move(header)));
+    } else if (verb == "sign" || verb == "jump" || verb == "repeat" || verb == "ending" ||
+               verb == "barline") {
+        if (auto change = markStep(song, step)) {
+            doc.execute(std::move(change));
         }
     } else {
         throw StepSyntaxError(std::format("unknown step: {}", verb));

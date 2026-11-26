@@ -248,26 +248,92 @@ struct MeasureHeader {
     friend bool operator==(const MeasureHeader&, const MeasureHeader&) = default;
 };
 
+/// The flag of MeasureHeader that holds a navigation sign, and its name there.
+struct SignFlag {
+    bool MeasureHeader::* flag;
+    std::string_view field; ///< as MeasureHeader spells it: "segnoSegno"
+};
+
+/// The flags of the navigation signs, in the order of NavigationSign: the one
+/// list of them that everything reading or writing the signs goes through.
+inline constexpr std::array<SignFlag, kEnumCount<NavigationSign>> kSignFlags{{
+    {.flag = &MeasureHeader::segno, .field = "segno"},
+    {.flag = &MeasureHeader::segnoSegno, .field = "segnoSegno"},
+    {.flag = &MeasureHeader::coda, .field = "coda"},
+    {.flag = &MeasureHeader::doubleCoda, .field = "doubleCoda"},
+    {.flag = &MeasureHeader::fine, .field = "fine"},
+    {.flag = &MeasureHeader::toCoda, .field = "toCoda"},
+    {.flag = &MeasureHeader::toDoubleCoda, .field = "toDoubleCoda"},
+}};
+
 /// The flag of MeasureHeader that holds `sign`: `header.*signFlag(sign)`.
 [[nodiscard]] constexpr bool MeasureHeader::* signFlag(NavigationSign sign) noexcept {
-    switch (sign) {
-    case NavigationSign::Segno:
-        return &MeasureHeader::segno;
-    case NavigationSign::SegnoSegno:
-        return &MeasureHeader::segnoSegno;
-    case NavigationSign::Coda:
-        return &MeasureHeader::coda;
-    case NavigationSign::DoubleCoda:
-        return &MeasureHeader::doubleCoda;
-    case NavigationSign::Fine:
-        return &MeasureHeader::fine;
-    case NavigationSign::ToCoda:
-        return &MeasureHeader::toCoda;
-    case NavigationSign::ToDoubleCoda:
-        break;
-    }
-    return &MeasureHeader::toDoubleCoda;
+    return kSignFlags.at(std::to_underlying(sign)).flag;
 }
+
+/// The name of that flag ("segnoSegno"), the key the native format and the
+/// app's measure popup give the sign.
+[[nodiscard]] constexpr std::string_view signField(NavigationSign sign) noexcept {
+    return kSignFlags.at(std::to_underlying(sign)).field;
+}
+
+/// The navigation marks of a measure (ADR-0049) as one edit changes them
+/// (changeNavigation()): its signs and its jump.
+struct NavigationMarks {
+    std::array<bool, kEnumCount<NavigationSign>> signs{}; ///< by NavigationSign
+    JumpTo jump = JumpTo::None;
+    JumpThen jumpThen = JumpThen::End; ///< what ends the music once the jump was taken
+
+    [[nodiscard]] constexpr bool has(NavigationSign sign) const noexcept {
+        return signs.at(std::to_underlying(sign));
+    }
+    constexpr void set(NavigationSign sign, bool on) noexcept {
+        signs.at(std::to_underlying(sign)) = on;
+    }
+
+    friend constexpr bool operator==(const NavigationMarks&, const NavigationMarks&) = default;
+};
+
+/// The navigation marks `header` holds.
+[[nodiscard]] inline NavigationMarks navigationOf(const MeasureHeader& header) noexcept {
+    NavigationMarks marks{.jump = header.jump, .jumpThen = header.jumpThen};
+    for (const NavigationSign sign : enumValues<NavigationSign>()) {
+        marks.set(sign, header.*signFlag(sign));
+    }
+    return marks;
+}
+
+/// The repeat marks of a measure (ADR-0016) as one edit changes them
+/// (changeRepeats()).
+struct RepeatMarks {
+    bool start = false; ///< a start repeat barline opens the measure
+    /// How many times the section an end repeat barline closing the measure
+    /// plays, 2 to 255 (checkRepeatTimes()), or 0 for none.
+    int times = 0;
+    /// The times through the repeat that play the measure, as
+    /// MeasureHeader::alternateEndings holds them (endingBit()); 0 for every time.
+    std::uint8_t endings = 0;
+
+    friend constexpr bool operator==(const RepeatMarks&, const RepeatMarks&) = default;
+};
+
+/// The repeat marks `header` holds.
+[[nodiscard]] inline RepeatMarks repeatsOf(const MeasureHeader& header) noexcept {
+    return RepeatMarks{.start = header.repeatStart,
+                       .times = header.repeatEnd() ? header.repeatTimes : 0,
+                       .endings = header.alternateEndings};
+}
+
+/// Throws std::invalid_argument unless a repeated section can play `times`
+/// times, 2 to 255. The message says so ("a section plays 2 to 255 times, not
+/// 1") without naming the edit, for the caller to put its own name before it.
+void checkRepeatTimes(int times);
+
+/// The bit of MeasureHeader::alternateEndings for the `time`-th time through a
+/// repeat. Throws std::invalid_argument for a time outside 1 to
+/// MeasureHeader::kMaxEnding ("times through are 1 to 8, not 9", without
+/// naming the edit).
+[[nodiscard]] std::uint8_t endingBit(int time);
 
 struct SongInfo {
     std::string title{};

@@ -84,6 +84,11 @@ Entry unchanged(const Caret& caret) {
     return Entry{.command = nullptr, .caret = caret};
 }
 
+/// Nothing changed because nothing at the caret takes the edit (ADR-0123).
+Entry missed(const Caret& caret) {
+    return Entry{.command = nullptr, .caret = caret, .missed = true};
+}
+
 /// Where the caret's beat (or the free slot) starts in its measure.
 Fraction caretStart(const Song& song, const Caret& caret) {
     const std::vector<Beat>& beats = voiceAt(song, caret).beats;
@@ -707,27 +712,41 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
 namespace {
 
 // Changes the effects of the notes the caret is on (as for toggleEffect) with
-// `change`, as one undo step named `name`; unchanged when no note changes.
+// `change`, as one undo step named `name`; unchanged when no note changes,
+// missed when there is none.
 template <typename Change>
 Entry changeEffects(const Song& song, const Caret& at, std::string name, Change change) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
-        return unchanged(caret);
+        return missed(caret);
     }
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     Measure content = measureAt(song, caret);
+    bool found = false;
     bool changed = false;
     for (Note& note : content.voices.at(caret.voice).beats[caret.beat].notes) {
         if (isEffectTarget(note, staff, caret.string)) {
             const NoteEffects before = note.effects;
             change(note);
+            found = true;
             changed = changed || note.effects != before;
         }
     }
     if (!changed) {
-        return unchanged(caret);
+        return found ? unchanged(caret) : missed(caret);
     }
     return replace(caret, std::move(content), std::move(name));
+}
+
+// What a rest keeps of `effects`: a hairpin, a fermata, a slur, an octave line
+// and the pedal going on over it (ADR-0078, ADR-0085, ADR-0086, ADR-0089,
+// ADR-0092).
+BeatEffects restEffects(const BeatEffects& effects) {
+    return BeatEffects{.hairpin = effects.hairpin,
+                       .fermata = effects.fermata,
+                       .slur = effects.slur,
+                       .ottava = effects.ottava,
+                       .pedal = effects.pedal};
 }
 
 } // namespace
@@ -760,6 +779,15 @@ Entry setSlides(const Song& song, const Caret& at, SlideIn in, SlideOut out) {
         note.effects.slideIn = in;
         note.effects.slideOut = out;
     });
+}
+
+Entry setSlideIn(const Song& song, const Caret& at, SlideIn in) {
+    return changeEffects(song, at, "Change slide", [in](Note& note) { note.effects.slideIn = in; });
+}
+
+Entry setSlideOut(const Song& song, const Caret& at, SlideOut out) {
+    return changeEffects(song, at, "Change slide",
+                         [out](Note& note) { note.effects.slideOut = out; });
 }
 
 Entry setVibrato(const Song& song, const Caret& at, Vibrato vibrato) {
@@ -798,7 +826,7 @@ Entry setOrnament(const Song& song, const Caret& at, Ornament ornament) {
 Entry setFingering(const Song& song, const Caret& at, std::span<const Finger> fingers) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
-        return unchanged(caret);
+        return missed(caret);
     }
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     Measure content = measureAt(song, caret);
@@ -820,7 +848,7 @@ Entry setFingering(const Song& song, const Caret& at, std::span<const Finger> fi
         targets[i]->effects.fingering = finger;
     }
     if (!changed) {
-        return unchanged(caret);
+        return targets.empty() ? missed(caret) : unchanged(caret);
     }
     return replace(caret, std::move(content), "Change fingering");
 }
@@ -859,24 +887,25 @@ Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
 Entry setBeatEffects(const Song& song, const Caret& at, const BeatEffects& effects) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
-        return unchanged(caret);
+        return missed(caret);
     }
     Measure content = measureAt(song, caret);
     Beat& beat = content.voices.at(caret.voice).beats[caret.beat];
+    const bool rest = beat.notes.empty();
     BeatEffects changed = effects;
-    if (beat.notes.empty()) {
-        // A rest holds only a hairpin, a fermata, a slur, an octave line and
-        // the pedal going on over it (ADR-0078, ADR-0085, ADR-0086, ADR-0089,
-        // ADR-0092).
+    if (rest) {
+        // A rest keeps only what restEffects() does, its other effects as they
+        // were.
+        const BeatEffects kept = restEffects(effects);
         changed = beat.effects;
-        changed.hairpin = effects.hairpin;
-        changed.fermata = effects.fermata;
-        changed.slur = effects.slur;
-        changed.ottava = effects.ottava;
-        changed.pedal = effects.pedal;
+        changed.hairpin = kept.hairpin;
+        changed.fermata = kept.fermata;
+        changed.slur = kept.slur;
+        changed.ottava = kept.ottava;
+        changed.pedal = kept.pedal;
     }
     if (beat.effects == changed) {
-        return unchanged(caret);
+        return rest && restEffects(effects) != effects ? missed(caret) : unchanged(caret);
     }
     beat.effects = changed;
     return replace(caret, std::move(content), "Change beat effects");
@@ -888,14 +917,7 @@ BeatEffects beatEffectsAt(const Song& song, const Caret& at) {
         return {};
     }
     const Beat& beat = voiceAt(song, caret).beats[caret.beat];
-    if (beat.notes.empty()) {
-        return BeatEffects{.hairpin = beat.effects.hairpin,
-                           .fermata = beat.effects.fermata,
-                           .slur = beat.effects.slur,
-                           .ottava = beat.effects.ottava,
-                           .pedal = beat.effects.pedal};
-    }
-    return beat.effects;
+    return beat.notes.empty() ? restEffects(beat.effects) : beat.effects;
 }
 
 Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration duration,

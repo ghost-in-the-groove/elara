@@ -6,8 +6,11 @@
 #include <algorithm>
 #include <bit>
 #include <cstddef>
+#include <cstdint>
+#include <format>
 #include <functional>
 #include <iterator>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -264,6 +267,22 @@ void Song::removeMeasures(std::size_t at, std::size_t count) {
             staff.measures_.erase(staff.measures_.begin() + first, staff.measures_.begin() + last);
         }
     }
+}
+
+void checkRepeatTimes(int times) {
+    constexpr int kMaxTimes = std::numeric_limits<decltype(MeasureHeader::repeatTimes)>::max();
+    if (times < 2 || times > kMaxTimes) {
+        throw std::invalid_argument(
+            std::format("a section plays 2 to {} times, not {}", kMaxTimes, times));
+    }
+}
+
+std::uint8_t endingBit(int time) {
+    if (time < 1 || time > MeasureHeader::kMaxEnding) {
+        throw std::invalid_argument(
+            std::format("times through are 1 to {}, not {}", MeasureHeader::kMaxEnding, time));
+    }
+    return static_cast<std::uint8_t>(1U << static_cast<unsigned>(time - 1));
 }
 
 MeasureHeader& Song::measureHeader(std::size_t index) {

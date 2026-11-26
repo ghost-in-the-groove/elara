@@ -537,3 +537,85 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     }
     CHECK_THROWS_AS(setHarmonic(piano.song(), at(0, 0), HarmonicKind::Natural), std::logic_error);
 }
+
+TEST_CASE("Effects: a slide in or out changes only that slide of each note",
+          "[core][entry][effects]") {
+    // The notes of a chord keep their other effects, which may differ
+    // (ADR-0058, ADR-0123): the high note's slide out is not copied onto the
+    // low one.
+    Note low{.pitch = Pitch::fromMidi(60)};
+    Note high{.pitch = Pitch::fromMidi(64)};
+    high.effects.slideOut = SlideOut::Shift;
+    const Song before = oneBeat("piano", {low, high});
+    Document doc(before);
+    Song expected = before;
+    std::vector<Note>& notes = expected.track(0).staff(0).measure(0).voices[0].beats[0].notes;
+
+    run(doc, setSlideIn(doc.song(), at(0, 0), SlideIn::FromBelow));
+    CHECK(doc.undoName() == "Change slide");
+    notes[0].effects.slideIn = SlideIn::FromBelow;
+    notes[1].effects.slideIn = SlideIn::FromBelow;
+    CHECK(doc.song() == expected);
+
+    run(doc, setSlideOut(doc.song(), at(0, 0), SlideOut::Legato));
+    CHECK(doc.undoName() == "Change slide");
+    notes[0].effects.slideOut = SlideOut::Legato;
+    notes[1].effects.slideOut = SlideOut::Legato;
+    CHECK(doc.song() == expected);
+
+    const Entry same = setSlideIn(doc.song(), at(0, 0), SlideIn::FromBelow);
+    CHECK(same.command == nullptr);
+    CHECK_FALSE(same.missed);
+    doc.undo();
+    doc.undo();
+    CHECK(doc.song() == before);
+}
+
+TEST_CASE("Effects: a beat's effects one at a time, the others kept", "[core][entry][effects]") {
+    const Song before = guitarSong();
+    Document doc(before);
+    const Caret chord = at(0, 0, 2);
+    run(doc, setBeatEffect(doc.song(), chord, &BeatEffects::strum, Strum::Down));
+    run(doc, setBeatEffect(doc.song(), chord, &BeatEffects::hairpin, Hairpin::Crescendo));
+    CHECK(doc.undoName() == "Change beat effects");
+    Song expected = before;
+    BeatEffects& effects = expected.track(0).staff(0).measure(0).voices[0].beats[0].effects;
+    effects.strum = Strum::Down;
+    effects.hairpin = Hairpin::Crescendo;
+    CHECK(doc.song() == expected);
+    CHECK(setBeatEffect(doc.song(), chord, &BeatEffects::strum, Strum::Down).command == nullptr);
+
+    // A rest takes a hairpin but no strum.
+    run(doc, setBeatEffect(doc.song(), at(0, 2), &BeatEffects::hairpin, Hairpin::Diminuendo));
+    expected.track(0).staff(0).measure(0).voices[0].beats[2].effects.hairpin = Hairpin::Diminuendo;
+    CHECK(doc.song() == expected);
+}
+
+TEST_CASE("Effects: an edit that changes nothing says whether anything there takes it",
+          "[core][entry][effects]") {
+    Document doc(guitarSong());
+    // Already so: the note is there.
+    const Entry same = setVibrato(doc.song(), at(0, 1, 1), Vibrato::None);
+    CHECK(same.command == nullptr);
+    CHECK_FALSE(same.missed);
+
+    // A rest, a string without a note and the free slot: nothing takes it.
+    const std::array index{Finger::Index};
+    for (const Caret& nothing : {at(0, 2, 1), at(0, 1, 3), at(1, 1, 1)}) {
+        CHECK(setVibrato(doc.song(), nothing, Vibrato::None).missed);
+        CHECK(setSlideIn(doc.song(), nothing, SlideIn::FromBelow).missed);
+        CHECK(setSlideOut(doc.song(), nothing, SlideOut::None).missed);
+        CHECK(setBend(doc.song(), nothing, BendCurve{}).missed);
+        CHECK(setFingering(doc.song(), nothing, index).missed);
+    }
+
+    // A rest takes a hairpin, not a strum; the free slot takes nothing.
+    const Caret rest = at(0, 2);
+    CHECK(setBeatEffect(doc.song(), rest, &BeatEffects::strum, Strum::Down).missed);
+    const Entry none = setBeatEffect(doc.song(), rest, &BeatEffects::strum, Strum::None);
+    CHECK(none.command == nullptr);
+    CHECK_FALSE(none.missed);
+    CHECK(setBeatEffect(doc.song(), at(1, 1), &BeatEffects::hairpin, Hairpin::None).missed);
+    CHECK(setBeatEffect(doc.song(), rest, &BeatEffects::hairpin, Hairpin::Crescendo).command !=
+          nullptr);
+}
