@@ -2027,8 +2027,9 @@ void Startup::typeText(const QString& text) {
 // it, a few letters find a note effect, Enter puts it on the caret's note and
 // closes; Ctrl+E and Enter run the command used last again. A number goes to
 // its measure, with playback; "tempo 90" sets the tempo there, and the space
-// typed into it plays nothing; Escape closes it with nothing done. Undone, the
-// song must end as it started.
+// typed into it plays nothing; Escape closes it with nothing done, and Ctrl+E
+// opens it again as it fades and closes it. Undone, the song must end as it
+// started.
 void Startup::queueCommands() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -2037,7 +2038,9 @@ void Startup::queueCommands() {
         }
     };
     constexpr int kPalmMute = static_cast<int>(core::NoteEffect::PalmMute);
-    const auto palmMuted = [this] { return (editor_->caretEffects() & (1 << kPalmMute)) != 0; };
+    const auto palmMuted = [this] {
+        return (editor_->caretEffects() & (1 << kPalmMute)) != 0;
+    };
     const auto chosen = [this] {
         return commandPalette_ != nullptr ? commandPalette_->property("chosenId").toString()
                                           : QString();
@@ -2072,7 +2075,8 @@ void Startup::queueCommands() {
         check(commandPalette_->property("commandCount").toInt() > 150,
               "it offers fewer commands than the window has");
         typeText(QStringLiteral("palm"));
-        check(chosen() == QStringLiteral("effect.%1").arg(kPalmMute), "palm did not find palm mute");
+        check(chosen() == QStringLiteral("effect.%1").arg(kPalmMute),
+              "palm did not find palm mute");
         pressKey(Qt::Key_Return);
         return true;
     });
@@ -2119,7 +2123,7 @@ void Startup::queueCommands() {
         pressKey(Qt::Key_Return);
         return true;
     });
-    steps_.emplace_back([this, check] {
+    steps_.emplace_back([this, check, shows] {
         if (!commanding_) {
             return false;
         }
@@ -2132,6 +2136,13 @@ void Startup::queueCommands() {
         pressKey(Qt::Key_Escape);
         check(!commandPalette_->property("opened").toBool() && score_->undoName() == undo,
               "Escape did not close it with nothing done");
+        // Its keys open it again as it fades, and close it.
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(shows() && !commandPalette_->property("leaving").toBool() &&
+                  commandPalette_->property("rowCount").toInt() > 0,
+              "Ctrl+E did not open it again as it closed");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(commandPalette_->property("leaving").toBool(), "Ctrl+E did not close it");
         for (int i = 0; i < 6 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }

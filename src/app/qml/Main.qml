@@ -1388,9 +1388,10 @@ ApplicationWindow {
         enabled: score.canRedo
         onActivated: score.redo()
     }
+    // While the palette shows, its own shortcut closes it.
     Shortcut {
         sequences: ["Ctrl+E", "Ctrl+Shift+P"]
-        onActivated: commandPalette.opened ? commandPalette.close() : commandPalette.show("")
+        onActivated: commandPalette.show("")
     }
     Shortcut {
         sequence: "F2"

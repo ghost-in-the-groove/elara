@@ -25,7 +25,11 @@ std::vector<PaletteCommand> commands() {
         {.id = "file.open", .name = "Open…", .group = "File", .words = {}, .enabled = true},
         {.id = "file.save", .name = "Save", .group = "File", .words = {}, .enabled = true},
         {.id = "edit.paste", .name = "Paste over", .group = "Edit", .words = {}, .enabled = true},
-        {.id = "fx.palm", .name = "Palm mute", .group = "Note effects", .words = "P.M.", .enabled = true},
+        {.id = "fx.palm",
+         .name = "Palm mute",
+         .group = "Note effects",
+         .words = "P.M.",
+         .enabled = true},
         {.id = "fx.harmonic",
          .name = "Natural harmonic",
          .group = "Note effects",
@@ -42,7 +46,11 @@ std::vector<PaletteCommand> commands() {
          .group = "Beat",
          .words = {},
          .enabled = true},
-        {.id = "ornament.trill", .name = "Trill", .group = "Vibrato, accent and ornaments", .words = "tr", .enabled = true},
+        {.id = "ornament.trill",
+         .name = "Trill",
+         .group = "Vibrato, accent and ornaments",
+         .words = "tr",
+         .enabled = true},
         {.id = "edit.measure",
          .name = "Insert a measure",
          .group = "Edit",
@@ -53,7 +61,11 @@ std::vector<PaletteCommand> commands() {
          .group = "Armónico",
          .words = "A.H.",
          .enabled = true},
-        {.id = "ottava.up", .name = "Octave line up", .group = "Phrasing and lines", .words = "8va 15ma", .enabled = true},
+        {.id = "ottava.up",
+         .name = "Octave line up",
+         .group = "Phrasing and lines",
+         .words = "8va 15ma",
+         .enabled = true},
     };
 }
 
@@ -115,8 +127,7 @@ TEST_CASE("Command search: accents and capitals do not matter", "[app][palette]"
     CHECK(lit("armonico") == "Armónico");
 }
 
-TEST_CASE("Command search: letters in order find a name, after closer matches",
-          "[app][palette]") {
+TEST_CASE("Command search: letters in order find a name, after closer matches", "[app][palette]") {
     // t-r-m in "Tremolo": no word starts with "trm".
     CHECK(found("trm").front() == "beat.tremolo");
     CHECK(lit("trm") == "Trm");
@@ -160,8 +171,11 @@ TEST_CASE("Command search: the palette's object lists, marks and remembers", "[a
     CommandSearch search;
     search.setCommands(QVariantList{
         QVariantMap{{"id", "file.save"}, {"name", "Save <now>"}, {"group", "File"}},
-        QVariantMap{{"id", "fx.palm"}, {"name", "Palm mute"}, {"group", "Note effects"},
-                    {"words", "P.M."}, {"enabled", false}},
+        QVariantMap{{"id", "fx.palm"},
+                    {"name", "Palm mute"},
+                    {"group", "Note effects"},
+                    {"words", "P.M."},
+                    {"enabled", false}},
     });
     const QVariantList results = search.search("sav");
     REQUIRE(results.size() == 1);
@@ -181,8 +195,7 @@ TEST_CASE("Command search: the palette's object lists, marks and remembers", "[a
     CHECK(search.recent().front() == "other.19");
 }
 
-TEST_CASE("Command search: the recent commands are kept only while remembering",
-          "[app][palette]") {
+TEST_CASE("Command search: the recent commands are kept only while remembering", "[app][palette]") {
     const QTemporaryDir dir;
     REQUIRE(dir.isValid());
     const QString file = dir.filePath("settings.ini");

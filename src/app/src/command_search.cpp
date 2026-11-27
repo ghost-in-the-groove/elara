@@ -127,7 +127,8 @@ std::optional<Hit> lettersInOrder(QStringView token, const Field& field) {
         if (hit.marks.isEmpty()) {
             continue;
         }
-        const auto spread = static_cast<int>(hit.marks.back() - hit.marks.front() + 1 - token.size());
+        const auto spread =
+            static_cast<int>(hit.marks.back() - hit.marks.front() + 1 - token.size());
         hit.score = std::max(1, kLettersInOrder + 3 * atWordStart - 2 * gaps - spread / 4);
         if (!best || hit.score > best->score) {
             best = std::move(hit);
@@ -235,8 +236,8 @@ QList<PaletteMatch> searchCommands(const QString& text, std::span<const PaletteC
         const Field name(command.name);
         const Field words(command.words);
         const Field group(command.group);
-        PaletteMatch match{.command = static_cast<qsizetype>(i), .score = 0, .marks = {},
-                           .recent = false};
+        PaletteMatch match{
+            .command = static_cast<qsizetype>(i), .score = 0, .marks = {}, .recent = false};
         bool all = true;
         for (const QStringView token : tokens) {
             int best = 0;
@@ -289,8 +290,7 @@ QString markedName(const QString& name, const QList<qsizetype>& marks) {
     while (at < name.size()) {
         const bool bold = mark < marks.size() && marks[mark] == at;
         qsizetype end = at;
-        while (end < name.size() &&
-               (mark < marks.size() && marks[mark] == end) == bold) {
+        while (end < name.size() && (mark < marks.size() && marks[mark] == end) == bold) {
             mark += bold ? 1 : 0;
             ++end;
         }

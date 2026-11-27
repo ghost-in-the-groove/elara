@@ -213,7 +213,13 @@ Popup {
             seen.add(key);
             return true;
         });
-        search.setCommands(commands);
+        search.setCommands(commands.map(command => ({
+                                            id: command.id,
+                                            name: command.name,
+                                            group: command.group,
+                                            words: command.words,
+                                            enabled: command.enabled
+                                        })));
     }
 
     /// The entry tools: the note values, the dot, the tuplets, the voices,
@@ -630,8 +636,22 @@ Popup {
         }
     }
 
+    /// Whether it is fading out, closed but still shown.
+    property bool leaving: false
+
+    onAboutToShow: leaving = false
+    onAboutToHide: leaving = true
+
     CommandSearch {
         id: search
+    }
+
+    // While it shows, the window's shortcuts are held (it closes on Escape),
+    // so its own keys are here: they close it, or open it again as it fades.
+    Shortcut {
+        sequences: ["Ctrl+E", "Ctrl+Shift+P"]
+        enabled: root.visible
+        onActivated: root.leaving ? root.show("") : root.close()
     }
 
     // A change at the caret while it shows (Shift+Enter keeps it open) is
