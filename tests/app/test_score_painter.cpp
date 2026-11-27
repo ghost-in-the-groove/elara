@@ -256,6 +256,35 @@ TEST_CASE("Score painter: a dark page has its paper, its ink and knockouts of it
     CHECK(inkAt(day, list, kScale, 3.0, 2.0));
 }
 
+TEST_CASE("Score painter: a page on opaque paper is opaque everywhere", "[app]") {
+    // What lets ScorePage hand the page to the scene graph as an opaque
+    // texture, drawn without blending: nothing painted leaves a hole, not
+    // the knockouts behind fret numbers, glyphs, curves or polygons.
+    const auto opened = elara::io::openFile(kCorpus / "gp/guitar-techniques.gp");
+    REQUIRE(opened.has_value());
+    const std::array<std::size_t, 1> tracks{0};
+    const auto staves =
+        elara::notation::selectTracks(opened->song, tracks, elara::notation::TrackView::Both);
+    const auto pages = elara::notation::layoutPages(
+        opened->song, staves, metrics(), elara::notation::pageOptions(elara::notation::kA4));
+    REQUIRE_FALSE(pages.empty());
+    constexpr double kScale = 8.0;
+    const ScoreColours night{.paper = QColor(0x27, 0x26, 0x2e), .ink = QColor(0xe7, 0xe5, 0xec)};
+    for (const ScoreColours& colours : std::array{ScoreColours{}, night}) {
+        const QImage image = painter().render(pages.front(), kScale, 1.0, colours);
+        REQUIRE_FALSE(image.isNull());
+        std::size_t holes = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                if (qAlpha(image.pixel(x, y)) != 255) {
+                    ++holes;
+                }
+            }
+        }
+        CHECK(holes == 0);
+    }
+}
+
 TEST_CASE("Score painter: ties are lenses, thick in the middle", "[app]") {
     DisplayList list = blank();
     list.curves.push_back(CurveItem{.from = {2.0, 2.0},

@@ -141,11 +141,12 @@ void ScorePage::repaint() {
     whenDone(QtConcurrent::run([page = std::move(page), scale, ratio, colours = colours_] {
                  return ScoreDocument::painter().render(*page, scale, ratio, colours);
              }),
-             this, [this, ticket](const QImage& image) {
+             this, [this, ticket, opaque = colours_.paper.alpha() == 255](const QImage& image) {
                  if (ticket != ticket_) {
                      return;
                  }
                  image_ = image;
+                 imageOpaque_ = opaque;
                  ++paints;
                  update();
                  if (!painted_) {
@@ -163,8 +164,15 @@ QSGNode* ScorePage::updatePaintNode(QSGNode* old, UpdatePaintNodeData* /*data*/)
             node->setOwnsTexture(true);
             node->setFiltering(QSGTexture::Linear);
         }
+        // A page painted on opaque paper is opaque everywhere: its texture
+        // goes into the scene graph's opaque pass, drawn without blending and
+        // hiding the paper under it instead of being blended over it.
+        QQuickWindow::CreateTextureOptions options;
+        if (imageOpaque_) {
+            options |= QQuickWindow::TextureIsOpaque;
+        }
         // The node deletes the texture it replaces.
-        node->setTexture(window()->createTextureFromImage(image_));
+        node->setTexture(window()->createTextureFromImage(image_, options));
         image_ = QImage();
     }
     if (node != nullptr) {
