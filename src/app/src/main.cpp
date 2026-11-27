@@ -175,6 +175,9 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption effectsOption(
         QStringLiteral("effects"),
         QCoreApplication::translate("main", "Open the note effects panel at the caret at start."));
+    const QCommandLineOption commandsOption(
+        QStringLiteral("commands"),
+        QCoreApplication::translate("main", "Open the command palette at start."));
     const QCommandLineOption continuousOption(
         QStringLiteral("continuous"),
         QCoreApplication::translate("main", "Show the score as one continuous scroll."));
@@ -228,31 +231,19 @@ int main(int argc, char* argv[]) {
                                     "in this file instead of the settings, also with "
                                     "--smoke-test."),
         QStringLiteral("file"));
-    parser.addOptions({trackOption,
-                       viewOption,
-                       seekOption,
-                       playOption,
-                       holdOption,
-                       smokeTest,
-                       screenshot,
-                       tunerOption,
-                       songPaneOption,
-                       measureOption,
-                       lyricsOption,
-                       effectsOption,
-                       tuningOption,
-                       continuousOption,
-                       menuOption,
-                       sizeOption,
-                       languageOption,
-                       soundFontOption,
-                       includedSoundFontOption,
-                       guitarSfzOption,
-                       includedGuitarSfzOption,
-                       bassSfzOption,
-                       recoveryFolderOption,
-                       crashOption,
-                       windowStateOption});
+    parser.addOptions({trackOption,      viewOption,
+                       seekOption,       playOption,
+                       holdOption,       smokeTest,
+                       screenshot,       tunerOption,
+                       songPaneOption,   measureOption,
+                       lyricsOption,     effectsOption,
+                       commandsOption,   tuningOption,
+                       continuousOption, menuOption,
+                       sizeOption,       languageOption,
+                       soundFontOption,  includedSoundFontOption,
+                       guitarSfzOption,  includedGuitarSfzOption,
+                       bassSfzOption,    recoveryFolderOption,
+                       crashOption,      windowStateOption});
     parser.addOption(holdStillOption);
     parser.process(app);
 
@@ -355,6 +346,7 @@ int main(int argc, char* argv[]) {
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
+    options.commands = parser.isSet(commandsOption);
     options.holdStill = parser.isSet(holdStillOption);
     options.menu = parser.value(menuOption);
     if (!options.menu.isEmpty() &&
@@ -410,6 +402,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
                                  {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
                                  {QStringLiteral("showEffects"), options.effects},
+                                 {QStringLiteral("showCommands"), options.commands},
                                  {QStringLiteral("showMenu"), options.menu},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},

@@ -33,6 +33,7 @@
 #include <QTemporaryDir>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QWindow>
 
 #include <algorithm>
 #include <array>
@@ -42,6 +43,12 @@
 #include <filesystem>
 #include <optional>
 #include <utility>
+
+// Types a key into a window as the system does, shortcuts included: what Qt's
+// own tests type with (QTest::keyClick), exported by Qt GUI.
+Q_GUI_EXPORT void qt_handleKeyEvent(QWindow* window, QEvent::Type type, int key,
+                                    Qt::KeyboardModifiers modifiers, const QString& text,
+                                    bool autorepeat, ushort count);
 
 namespace elara::app {
 
@@ -202,6 +209,7 @@ void Startup::queueSteps() {
             queueSymbols();
             queueMeasureRepeat();
             queueEffects();
+            queueCommands();
             queueContinuous();
         }
         return;
@@ -2065,11 +2073,202 @@ void Startup::queueEffects() {
     });
 }
 
+void Startup::pressKey(int key, Qt::KeyboardModifiers modifiers, const QString& text) {
+    for (const QEvent::Type type : {QEvent::KeyPress, QEvent::KeyRelease}) {
+        qt_handleKeyEvent(window_, type, key, modifiers, text, false, 1);
+    }
+}
+
+void Startup::typeText(const QString& text) {
+    for (const QChar c : text) {
+        // A printable key's code is its character, in capitals.
+        pressKey(static_cast<int>(c.toUpper().unicode()), Qt::NoModifier, QString(c));
+    }
+}
+
+// The command palette (ADR-0135), typed into as a person would: Ctrl+E opens
+// it, a few letters find a note effect, Enter puts it on the caret's note and
+// closes; Ctrl+E and Enter run the command used last again. A number goes to
+// its measure, with playback; "tempo 90" sets the tempo there, and the space
+// typed into it plays nothing; Escape closes it with nothing done, and Ctrl+E
+// opens it again as it fades and closes it. Undone, the song must end as it
+// started.
+void Startup::queueCommands() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("command palette check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    constexpr int kPalmMute = static_cast<int>(core::NoteEffect::PalmMute);
+    const auto palmMuted = [this] {
+        return (editor_->caretEffects() & (1 << kPalmMute)) != 0;
+    };
+    const auto chosen = [this] {
+        return commandPalette_ != nullptr ? commandPalette_->property("chosenId").toString()
+                                          : QString();
+    };
+    const auto shows = [this] {
+        return commandPalette_ != nullptr && commandPalette_->property("visible").toBool();
+    };
+    // Another popup holds the window's shortcuts while it shows, fading out
+    // included (the lyrics popup the effects opened and closed): Ctrl+E waits
+    // for it to go, as a person sees it go. Tooltips hold nothing.
+    const auto anotherPopupShows = [this] {
+        const auto objects = window_->findChildren<QObject*>();
+        return std::ranges::any_of(objects, [this](const QObject* object) {
+            return object != commandPalette_ && object->inherits("QQuickPopup") &&
+                   !object->inherits("QQuickToolTip") && object->property("visible").toBool();
+        });
+    };
+    // Where the keys went, for a failure: the window with the keyboard, the
+    // item with the focus and the popups that show.
+    const auto keyboard = [this] {
+        const QWindow* focused = QGuiApplication::focusWindow();
+        const QQuickItem* item = window_->activeFocusItem();
+        QStringList popups;
+        for (const QObject* object : window_->findChildren<QObject*>()) {
+            if (object->inherits("QQuickPopup") && object->property("visible").toBool()) {
+                popups << QStringLiteral("%1 %2").arg(
+                    QLatin1StringView(object->metaObject()->className()), object->objectName());
+            }
+        }
+        return QStringLiteral("keys to %1, focus on %2 %3, popups: %4")
+            .arg(focused == window_   ? QStringLiteral("the window")
+                 : focused == nullptr ? QStringLiteral("no window")
+                                      : QLatin1StringView(focused->metaObject()->className()),
+                 item != nullptr ? QLatin1StringView(item->metaObject()->className())
+                                 : QLatin1StringView("nothing"),
+                 item != nullptr ? item->objectName() : QString(),
+                 popups.isEmpty() ? QStringLiteral("none") : popups.join(QStringLiteral(", ")));
+    };
+    // A note of its own, typed once the wait for a second digit has ended.
+    steps_.emplace_back([this, check] {
+        commandPalette_ = window_->findChild<QObject*>(QStringLiteral("commandPalette"));
+        check(commandPalette_ != nullptr, "the window has none");
+        commanding_ =
+            commandPalette_ != nullptr && score_->caretPage() >= 0 && editor_->caretFretted();
+        if (!commanding_) {
+            return false;
+        }
+        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        score_->typeDigit(7);
+        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        return true;
+    });
+    // Its command runs once it has closed: the step waits for the edit.
+    steps_.emplace_back([this, check, palmMuted, chosen, shows, anotherPopupShows, keyboard] {
+        if (!commanding_) {
+            return false;
+        }
+        if (anotherPopupShows()) {
+            again_ = true;
+            return false;
+        }
+        check(!palmMuted(), "the note typed is already palm muted");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        if (!shows()) {
+            // What would be typed into it must not go into the score.
+            check(false, qPrintable(QStringLiteral("Ctrl+E did not open it (%1)").arg(keyboard())));
+            commanding_ = false;
+            return false;
+        }
+        check(commandPalette_->property("commandCount").toInt() > 150,
+              "it offers fewer commands than the window has");
+        typeText(QStringLiteral("palm"));
+        check(chosen() == QStringLiteral("effect.%1").arg(kPalmMute),
+              "palm did not find palm mute");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, palmMuted, chosen, shows] {
+        if (!commanding_) {
+            return false;
+        }
+        check(palmMuted() && score_->undoName() == ScoreDocument::tr("Change effect"),
+              "Enter did not palm mute the caret's note");
+        check(!commandPalette_->property("opened").toBool(), "Enter did not close it");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(shows() && chosen() == QStringLiteral("effect.%1").arg(kPalmMute),
+              "it did not open on the command used last");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, palmMuted, chosen] {
+        if (!commanding_) {
+            return false;
+        }
+        check(!palmMuted(), "Ctrl+E and Enter did not run the command used last again");
+        commandMeasure_ = std::min(3, score_->measureCount());
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QString::number(commandMeasure_));
+        check(chosen() == QStringLiteral("typed.measure"), "a number did not offer its measure");
+        pressKey(Qt::Key_Return);
+        // The caret moves without a layout: this waits a tick for the command.
+        return true;
+    });
+    steps_.emplace_back([this, check, chosen] {
+        if (!commanding_) {
+            return false;
+        }
+        const auto* audio = window_->findChild<AudioController*>();
+        check(score_->caretMeasure() == commandMeasure_ - 1,
+              "the number did not take the caret to its measure");
+        check(audio != nullptr &&
+                  std::abs(audio->position() - score_->measureStart(commandMeasure_ - 1)) < 1e-6,
+              "the number did not take playback to its measure");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QStringLiteral("tempo 90"));
+        check(audio != nullptr && !audio->playingSong(), "a space typed into it started playback");
+        check(chosen() == QStringLiteral("typed.tempo"), "tempo 90 was not offered");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, shows] {
+        if (!commanding_) {
+            return false;
+        }
+        check(score_->caretTempo().value(QStringLiteral("bpm")).toInt() == 90,
+              "tempo 90 did not set the tempo at the caret's measure");
+        const QString undo = score_->undoName();
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QStringLiteral("zqzqzq"));
+        check(commandPalette_->property("rowCount").toInt() == 0, "nonsense found commands");
+        pressKey(Qt::Key_Escape);
+        check(!commandPalette_->property("opened").toBool() && score_->undoName() == undo,
+              "Escape did not close it with nothing done");
+        // Its keys open it again as it fades, and close it.
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(shows() && !commandPalette_->property("leaving").toBool() &&
+                  commandPalette_->property("rowCount").toInt() > 0,
+              "Ctrl+E did not open it again as it closed");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(commandPalette_->property("leaving").toBool(), "Ctrl+E did not close it");
+        for (int i = 0; i < 6 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!commanding_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing what it did did not restore the song");
+        return false;
+    });
+}
+
 void Startup::tick() {
     // The panel closes again once the smoke test clicks the score; it must
     // have opened at some point.
     if (effectsPanel_ != nullptr && effectsPanel_->property("opened").toBool()) {
         effectsOpened_ = true;
+    }
+    if (options_.commands && !commandsOpened_ && window_ != nullptr) {
+        const auto* palette = window_->findChild<QObject*>(QStringLiteral("commandPalette"));
+        commandsOpened_ = palette != nullptr && palette->property("opened").toBool();
     }
     if (!options_.menu.isEmpty() && !menuOpened_ && window_ != nullptr) {
         const auto* menu = window_->findChild<QObject*>(options_.menu + QStringLiteral("Menu"));
@@ -2176,7 +2375,8 @@ void Startup::tick() {
         // Let animations settle first, the note effects palette's too once
         // `--effects` opened it, and the menu `--menu` names.
         if (((effectsPanel_ != nullptr && !effectsOpened_) ||
-             (!options_.menu.isEmpty() && !menuOpened_)) &&
+             (!options_.menu.isEmpty() && !menuOpened_) ||
+             (options_.commands && !commandsOpened_)) &&
             clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
             return;
         }
@@ -3046,6 +3246,10 @@ void Startup::finish(bool ok, const QString& detail) {
     if (ok && options_.smokeTest && options_.effects && !effectsOpened_) {
         ok = false;
         outcome = QStringLiteral("the note effects palette did not open");
+    }
+    if (ok && options_.smokeTest && options_.commands && !commandsOpened_) {
+        ok = false;
+        outcome = QStringLiteral("the command palette did not open");
     }
     if (ok && options_.smokeTest && !options_.menu.isEmpty() && !menuOpened_) {
         ok = false;

@@ -85,6 +85,7 @@ QtObject {
     readonly property string plus: "M12 6 L12 18 M6 12 L18 12"
     readonly property string minus: "M6 12 L18 12"
     readonly property string check: "M5.5 12.5 L10 17 L18.5 7.5"
+    readonly property string search: "M10.5 4 A6.5 6.5 0 1 0 10.5 17 A6.5 6.5 0 1 0 10.5 4 Z M15.25 15.25 L20 20"
     readonly property string chevronDown: "M7 10 L12 15 L17 10"
     readonly property string chevronRight: "M10 7 L15 12 L10 17"
 }
