@@ -15,6 +15,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | página | page | `layoutPages()`, `PageLayoutOptions` | Systems stacked between margins, with the title on the first (ADR-0014) |
 | salto de línea | line break | `LineBreaker` | Where one system ends and the next starts, chosen to space the systems evenly (ADR-0014) |
 | justificar | justify | stretch | Stretch or tighten a system's spacing so that it fills the width (ADR-0014) |
+| incidencia de maquetación | layout issue | `LayoutIssue`, `layoutIssues()` | What a laid-out page could not keep: ink that must never touch overlapping (noteheads, fret numbers, syllables...), or a measure wider than the page (ADR-0150). Not an `Issue` of `validate()`, which is about the song |
 | muelle | spring | `Spring` | The space after a column of notes: an ideal length and the least its ink needs (ADR-0014) |
 | créditos | credits | `Role::Credit` | Title, subtitle, artist, words and music by, copyright and page numbers |
 | lista de visualización | display list | `DisplayList` | What layout produces: glyphs, lines, beams, text and curves in staff spaces (ADR-0012) |

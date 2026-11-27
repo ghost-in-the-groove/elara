@@ -7,6 +7,7 @@
 #include <elara/notation/cursor.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/font_outlines.hpp>
+#include <elara/notation/layout_issues.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
@@ -58,6 +59,7 @@ struct RenderOptions {
     double stripHeight = 0.0; // staff spaces, for the strips layout; 0: the paper's height
     std::size_t measuresPerSystem = 0;
     bool noCredits = false;
+    bool issues = false; // report what the layout could not keep (ADR-0150)
     std::string svg;
     std::string pdf;
     std::string metadata;
@@ -126,6 +128,40 @@ CursorReport timeReport(const core::Song& song, std::span<const notation::Displa
             .text = std::format("time at page {}, x {}, y {}: measure {}, {} s\n",
                                 jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
                                 position->measure + 1, jsonNumber(*seconds))};
+}
+
+/// What the layout of `pages` could not keep (ADR-0150): overlaps, and on pages
+/// laid out with `page` the measures wider than the page, as a JSON array and
+/// a line each.
+CursorReport issuesReport(std::span<const notation::DisplayList> pages,
+                          const notation::EngravingFont& font,
+                          const std::optional<notation::PageLayoutOptions>& page) {
+    const std::vector<notation::LayoutIssue> issues =
+        page ? notation::layoutIssues(pages, font, *page) : notation::overlaps(pages, font);
+    CursorReport report{.json = "[", .text = {}};
+    for (std::size_t i = 0; i < issues.size(); ++i) {
+        const notation::LayoutIssue& issue = issues[i];
+        const bool overlap = issue.kind == notation::LayoutIssueKind::Overlap;
+        const std::string roles =
+            overlap ? std::format(R"(["{}","{}"])", roleName(issue.first), roleName(issue.second))
+                    : std::string("[]");
+        report.json += std::format(
+            R"({}{{"kind":"{}","page":{},"measure":{},"roles":{},"box":[{},{},{},{}]}})",
+            i == 0 ? "" : ",", notation::issueKindName(issue.kind), issue.page, issue.measure,
+            roles, jsonNumber(issue.box.x), jsonNumber(issue.box.y), jsonNumber(issue.box.width),
+            jsonNumber(issue.box.height));
+        report.text +=
+            overlap ? std::format("issue: {} overlaps {} in measure {} on page {} at x {}, y {}\n",
+                                  roleName(issue.first), roleName(issue.second), issue.measure + 1,
+                                  issue.page + 1, jsonNumber(issue.box.x), jsonNumber(issue.box.y))
+                    : std::format("issue: measure {} on page {} is {} staff spaces too wide\n",
+                                  issue.measure + 1, issue.page + 1, jsonNumber(issue.box.width));
+    }
+    report.json += ']';
+    if (issues.empty()) {
+        report.text = "issues: none\n";
+    }
+    return report;
 }
 
 /// The symbol that is edited where it is drawn (ADR-0130) at `at` (page, x,
@@ -419,8 +455,10 @@ int runRender(bool json, const RenderOptions& options) {
     }
     const bool paged = options.layout != "line";
     std::vector<notation::DisplayList> pages;
+    std::optional<notation::PageLayoutOptions> laidOut;
     if (paged) {
         const notation::PageLayoutOptions page = pageLayoutOptions(options);
+        laidOut = page;
         if (page.width <= 2 * page.margin) {
             return usageError("the margins leave no room on the page");
         }
@@ -538,6 +576,9 @@ int runRender(bool json, const RenderOptions& options) {
             body +=
                 std::format(R"("symbolAt":{},)", symbolReport(pages, *font, options.symbolAt).json);
         }
+        if (options.issues) {
+            body += std::format(R"("issues":{},)", issuesReport(pages, *font, laidOut).json);
+        }
         if (paged) {
             body += R"("pages":[)";
             for (std::size_t p = 0; p < pages.size(); ++p) {
@@ -599,6 +640,9 @@ int runRender(bool json, const RenderOptions& options) {
     }
     if (!options.symbolAt.empty()) {
         std::cout << symbolReport(pages, *font, options.symbolAt).text;
+    }
+    if (options.issues) {
+        std::cout << issuesReport(pages, *font, laidOut).text;
     }
     return kExitOk;
 }
@@ -672,6 +716,10 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->expected(3);
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");
+    render->add_flag("--issues", options->issues,
+                     "Report what the layout could not keep: noteheads, accidentals, fret "
+                     "numbers, syllables or chord names whose ink overlaps, and measures wider "
+                     "than the page");
     render->add_option("--svg", options->svg,
                        "Also write SVG; with --layout page or strips and several pages or "
                        "strips, one file each (name-1.svg, ...)");
