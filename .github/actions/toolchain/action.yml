@@ -88,8 +88,10 @@ runs:
           macOS)   triplet=x64-osx ;;
           Linux)   triplet=x64-linux ;;
         esac
+        # x64-osx is one of vcpkg's community triplets.
+        source=$(ls "$root/triplets/$triplet.cmake" "$root/triplets/community/$triplet.cmake" 2>/dev/null | head -n 1)
         mkdir -p "$RUNNER_TEMP/vcpkg-triplets" "$RUNNER_TEMP/vcpkg-binary" "$RUNNER_TEMP/vcpkg-downloads"
-        { cat "$root/triplets/$triplet.cmake"; echo "set(VCPKG_DISABLE_COMPILER_TRACKING ON)"; } \
+        { cat "$source"; echo "set(VCPKG_DISABLE_COMPILER_TRACKING ON)"; } \
           > "$RUNNER_TEMP/vcpkg-triplets/$triplet.cmake"
         {
           echo "VCPKG_ROOT=$root"

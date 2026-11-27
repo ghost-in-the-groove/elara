@@ -53,10 +53,11 @@ jobs:
         run: ccache --zero-stats
 
       - name: Check, build and test
+        id: ci
         run: python scripts/elara.py ci --preset ${{ matrix.preset }}
 
       - name: ccache statistics
-        if: always()
+        if: always() && steps.ci.outcome != 'skipped'
         run: ccache --show-stats
 
       # Only main saves a cache, which pull requests restore: caches saved by a
