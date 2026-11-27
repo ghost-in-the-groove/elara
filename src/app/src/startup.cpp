@@ -2107,6 +2107,37 @@ void Startup::queueCommands() {
     const auto shows = [this] {
         return commandPalette_ != nullptr && commandPalette_->property("visible").toBool();
     };
+    // Another popup holds the window's shortcuts while it shows, fading out
+    // included (the lyrics popup the effects opened and closed): Ctrl+E waits
+    // for it to go, as a person sees it go. Tooltips hold nothing.
+    const auto anotherPopupShows = [this] {
+        const auto objects = window_->findChildren<QObject*>();
+        return std::ranges::any_of(objects, [this](const QObject* object) {
+            return object != commandPalette_ && object->inherits("QQuickPopup") &&
+                   !object->inherits("QQuickToolTip") && object->property("visible").toBool();
+        });
+    };
+    // Where the keys went, for a failure: the window with the keyboard, the
+    // item with the focus and the popups that show.
+    const auto keyboard = [this] {
+        const QWindow* focused = QGuiApplication::focusWindow();
+        const QQuickItem* item = window_->activeFocusItem();
+        QStringList popups;
+        for (const QObject* object : window_->findChildren<QObject*>()) {
+            if (object->inherits("QQuickPopup") && object->property("visible").toBool()) {
+                popups << QStringLiteral("%1 %2").arg(QLatin1StringView(object->metaObject()->className()),
+                                                      object->objectName());
+            }
+        }
+        return QStringLiteral("keys to %1, focus on %2 %3, popups: %4")
+            .arg(focused == window_    ? QStringLiteral("the window")
+                 : focused == nullptr ? QStringLiteral("no window")
+                                       : QLatin1StringView(focused->metaObject()->className()),
+                 item != nullptr ? QLatin1StringView(item->metaObject()->className())
+                                 : QLatin1StringView("nothing"),
+                 item != nullptr ? item->objectName() : QString(),
+                 popups.isEmpty() ? QStringLiteral("none") : popups.join(QStringLiteral(", ")));
+    };
     // A note of its own, typed once the wait for a second digit has ended.
     steps_.emplace_back([this, check] {
         commandPalette_ = window_->findChild<QObject*>(QStringLiteral("commandPalette"));
@@ -2124,13 +2155,22 @@ void Startup::queueCommands() {
         return true;
     });
     // Its command runs once it has closed: the step waits for the edit.
-    steps_.emplace_back([this, check, palmMuted, chosen, shows] {
+    steps_.emplace_back([this, check, palmMuted, chosen, shows, anotherPopupShows, keyboard] {
         if (!commanding_) {
+            return false;
+        }
+        if (anotherPopupShows()) {
+            again_ = true;
             return false;
         }
         check(!palmMuted(), "the note typed is already palm muted");
         pressKey(Qt::Key_E, Qt::ControlModifier);
-        check(shows(), "Ctrl+E did not open it");
+        if (!shows()) {
+            // What would be typed into it must not go into the score.
+            check(false, qPrintable(QStringLiteral("Ctrl+E did not open it (%1)").arg(keyboard())));
+            commanding_ = false;
+            return false;
+        }
         check(commandPalette_->property("commandCount").toInt() > 150,
               "it offers fewer commands than the window has");
         typeText(QStringLiteral("palm"));
