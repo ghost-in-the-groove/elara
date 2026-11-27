@@ -152,7 +152,7 @@ void Startup::start() {
 }
 
 bool Startup::checking() const {
-    return options_.smokeTest || !options_.screenshot.isEmpty();
+    return options_.smokeTest || !options_.screenshot.isEmpty() || options_.hold.has_value();
 }
 
 void Startup::queueSteps() {
@@ -2161,6 +2161,13 @@ void Startup::tick() {
             return;
         }
     }
+    if (options_.play && !played_) {
+        played_ = true;
+        auto* audio = window_ != nullptr ? window_->findChild<AudioController*>() : nullptr;
+        if (audio != nullptr && !audio->playing()) {
+            audio->togglePlayback();
+        }
+    }
     if (!checking()) {
         timer_.stop();
         return;
@@ -2194,6 +2201,17 @@ void Startup::tick() {
     }
     if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
         finish(false, overlap);
+        return;
+    }
+    // `--hold`: the window stays open with the check's timer stopped, so
+    // that only the app's own work runs, then the check ends as usual.
+    if (options_.hold && !held_) {
+        held_ = true;
+        timer_.stop();
+        std::printf("hold: %g s\n", *options_.hold);
+        std::fflush(stdout);
+        QTimer::singleShot(static_cast<int>(std::lround(*options_.hold * 1000.0)), this,
+                           [this] { timer_.start(); });
         return;
     }
     QString detail;

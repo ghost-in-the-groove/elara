@@ -201,10 +201,15 @@ if(TARGET elara)
   # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # A song shown, playing, held open for a second with nothing of the check
+  # running, as scripts/usage.py measures it; without an audio device (as in
+  # CI) playback does not start, and the window must still close cleanly.
+  add_test(NAME app.hold
+    COMMAND elara --hold 1 --play "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
   set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
     app.smoke_open_views app.smoke_open_missing
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
-    app.smoke_effects app.smoke_hold_still
+    app.smoke_effects app.hold app.smoke_hold_still
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
@@ -224,6 +229,7 @@ if(TARGET elara)
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(app.hold PROPERTIES PASS_REGULAR_EXPRESSION "hold: 1 s[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
 

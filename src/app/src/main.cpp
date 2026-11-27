@@ -144,6 +144,14 @@ int main(int argc, char* argv[]) {
         QStringLiteral("seek"),
         QCoreApplication::translate("main", "Move the playback cursor to this many seconds."),
         QStringLiteral("seconds"));
+    const QCommandLineOption playOption(
+        QStringLiteral("play"),
+        QCoreApplication::translate("main", "Start playback once the song is shown."));
+    const QCommandLineOption holdOption(
+        QStringLiteral("hold"),
+        QCoreApplication::translate("main", "Once the window is ready, stay open this many "
+                                            "seconds, then quit (for measuring)."),
+        QStringLiteral("seconds"));
     const QCommandLineOption tunerOption(
         QStringLiteral("tuner"), QCoreApplication::translate("main", "Open the tuner at start."));
     const QCommandLineOption songPaneOption(
@@ -223,6 +231,8 @@ int main(int argc, char* argv[]) {
     parser.addOptions({trackOption,
                        viewOption,
                        seekOption,
+                       playOption,
+                       holdOption,
                        smokeTest,
                        screenshot,
                        tunerOption,
@@ -286,6 +296,16 @@ int main(int argc, char* argv[]) {
         }
         options.seek = seconds;
     }
+    if (parser.isSet(holdOption)) {
+        bool number = false;
+        const double seconds = parser.value(holdOption).toDouble(&number);
+        if (!number || seconds <= 0.0 || seconds > 3600.0) {
+            std::fprintf(stderr, "elara: --hold takes a number of seconds, up to 3600\n");
+            return EXIT_FAILURE;
+        }
+        options.hold = seconds;
+    }
+    options.play = parser.isSet(playOption);
     if (parser.isSet(soundFontOption)) {
         options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
     }
@@ -346,7 +366,8 @@ int main(int argc, char* argv[]) {
     }
     options.tuner = parser.isSet(tunerOption);
     options.screenshot = parser.value(screenshot);
-    const bool checking = options.smokeTest || !options.screenshot.isEmpty();
+    const bool checking =
+        options.smokeTest || !options.screenshot.isEmpty() || options.hold.has_value();
     if (checking) {
         // The catalog the UI is shown with, which app.smoke_spanish checks.
         std::printf("ui language: %s\n", qPrintable(elaraTranslator.language()));
@@ -411,7 +432,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (checking || options.track || options.view || options.seek || options.continuous ||
-        options.size) {
+        options.size || options.play) {
         auto* startup = new elara::app::Startup(window, options, qmlWarnings);
         startup->start();
     }
