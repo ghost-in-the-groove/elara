@@ -12,11 +12,12 @@ add_library(elara_app_view STATIC
   src/recent_scores.cpp
   src/recovery_store.cpp
   src/score_painter.cpp
-  src/track_list.cpp)
+  src/track_list.cpp
+  src/window_state.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation PRIVATE elara::io)
 elara_source_warnings(src/command_search.cpp src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
-  src/score_painter.cpp src/track_list.cpp)
+  src/score_painter.cpp src/track_list.cpp src/window_state.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
 # its own: PNG images for the window, an .ico file for the Windows executable

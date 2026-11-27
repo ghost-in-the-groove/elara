@@ -7,6 +7,7 @@
 #include <QtQml/qqmlregistration.h>
 #include <command_search.hpp>
 #include <recent_scores.hpp>
+#include <window_state.hpp>
 
 namespace elara::app {
 
@@ -22,6 +23,13 @@ struct RecentScoresForeign {
     Q_GADGET
     QML_FOREIGN(RecentScores)
     QML_NAMED_ELEMENT(RecentScores)
+};
+
+/// WindowState, as `WindowState` in Elara.App.
+struct WindowStateForeign {
+    Q_GADGET
+    QML_FOREIGN(WindowState)
+    QML_NAMED_ELEMENT(WindowState)
 };
 
 } // namespace elara::app

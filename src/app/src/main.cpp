@@ -211,6 +211,13 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main",
                                     "With --smoke-test, edit a new song and quit as a crash "
                                     "would once its copy is written."));
+    const QCommandLineOption windowStateOption(
+        QStringLiteral("window-state"),
+        QCoreApplication::translate("main",
+                                    "Keep the window's place, size, panels, zoom, page and view "
+                                    "in this file instead of the settings, also with "
+                                    "--smoke-test."),
+        QStringLiteral("file"));
     parser.addOptions({trackOption,      viewOption,
                        seekOption,       smokeTest,
                        screenshot,       tunerOption,
@@ -222,7 +229,7 @@ int main(int argc, char* argv[]) {
                        soundFontOption,  includedSoundFontOption,
                        guitarSfzOption,  includedGuitarSfzOption,
                        bassSfzOption,    recoveryFolderOption,
-                       crashOption});
+                       crashOption,      windowStateOption});
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -294,6 +301,9 @@ int main(int argc, char* argv[]) {
             QDir::current().absoluteFilePath(parser.value(recoveryFolderOption));
     }
     options.crashAfterRecoveryCopy = parser.isSet(crashOption);
+    if (parser.isSet(windowStateOption)) {
+        options.windowState = QDir::current().absoluteFilePath(parser.value(windowStateOption));
+    }
     if (parser.isSet(sizeOption)) {
         const QStringList parts = parser.value(sizeOption).split(QLatin1Char('x'));
         bool width = false;
@@ -372,6 +382,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
                                  {QStringLiteral("initialBassSfz"), options.bassSfz},
                                  {QStringLiteral("recoveryFolder"), recoveryFolder},
+                                 {QStringLiteral("windowStateFile"), options.windowState},
                                  // Checks leave the settings of the person using the app alone.
                                  {QStringLiteral("rememberSettings"), !checking}});
     engine.loadFromModule("Elara.App", "Main");

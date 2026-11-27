@@ -2889,5 +2889,9 @@
         <source>With --smoke-test, edit a new song and quit as a crash would once its copy is written.</source>
         <translation>Con --smoke-test, editar una canción nueva y salir como en un cierre inesperado en cuanto se escriba su copia.</translation>
     </message>
+    <message>
+        <source>Keep the window&apos;s place, size, panels, zoom, page and view in this file instead of the settings, also with --smoke-test.</source>
+        <translation>Guardar la posición, el tamaño, los paneles, el zoom, la página y la vista de la ventana en este archivo en lugar de en los ajustes, también con --smoke-test.</translation>
+    </message>
 </context>
 </TS>

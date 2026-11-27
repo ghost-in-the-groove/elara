@@ -319,8 +319,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       paper the brightest surface, the palette's signs from the music font, the
       tuner docked beside the score, measure ticks on the song string, one side
       panel at a time in a narrow window
-- [ ] The window remembers its size, its panels, its zoom and the dark page
-      from one run to the next
+- [x] The window remembers its size, its panels, its zoom and the dark page
+      from one run to the next (ADR-0137)
 - [x] A command palette: every command by name, with its keys; recent ones
       first, a measure number, a section, "tempo 90" or "3/4" typed into it
       (ADR-0135)
@@ -344,3 +344,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
         smoke-tested by CI with `elara.py package --installers` (ADR-0065)
 - [x] Packages built with the vcpkg that CI tests, at the manifest's baseline
 - [ ] Release automation and 1.0
+  - [x] Releases drafted from a version tag: the version checked across the
+        sources, a changelog, the packages and their checksums on a draft
+        that is published by hand (`elara.py release`, ADR-0138)
+  - [ ] 1.0

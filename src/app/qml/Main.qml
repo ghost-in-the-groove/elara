@@ -42,6 +42,9 @@ ApplicationWindow {
     property bool rememberSettings: true
     /// Where unsaved songs are copied while the app runs (ADR-0106).
     property string recoveryFolder
+    /// A file the window's state is kept in instead of the settings, also
+    /// during checks (`--window-state`, ADR-0137).
+    property string windowStateFile
     readonly property bool hasScore: score.pageCount > 0
     readonly property bool dark: Material.theme === Material.Dark
     /// In the dark theme the page is dark too, its ink light (ADR-0114); off,
@@ -79,6 +82,8 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        windowState.remember = rememberSettings || windowStateFile.length > 0;
+        restoreWindowState();
         recent.remember = rememberSettings;
         if (initialFile.toString().length > 0)
             score.open(initialFile);
@@ -115,6 +120,28 @@ ApplicationWindow {
 
     function toggleTuner() {
         showTuner = !showTuner;
+    }
+
+    /// Opens the panels and sets the zoom, the page and the view as they were
+    /// when the app last quit (ADR-0137); what the command line asked for
+    /// stays. Then keeps them in `windowState` as they change.
+    function restoreWindowState() {
+        if (windowState.restored) {
+            palette.opened = windowState.effects;
+            if (!showTuner)
+                showSongPane = showSongPane || windowState.songPane;
+            darkPage = windowState.darkPage;
+            score.continuous = windowState.continuous;
+            scoreView.fit = windowState.zoomFit;
+            if (windowState.zoomFit.length === 0)
+                scoreView.setZoom(windowState.zoom);
+        }
+        windowState.effects = Qt.binding(() => palette.opened);
+        windowState.songPane = Qt.binding(() => window.showSongPane);
+        windowState.darkPage = Qt.binding(() => window.darkPage);
+        windowState.continuous = Qt.binding(() => score.continuous);
+        windowState.zoomFit = Qt.binding(() => scoreView.fit);
+        windowState.zoom = Qt.binding(() => scoreView.zoom);
     }
 
     /// Wide enough for a panel at each side of the score. Narrower, opening
@@ -226,11 +253,11 @@ ApplicationWindow {
         id: score
 
         recoveryFolder: window.recoveryFolder
-        // A new song starts at its top, its page across the view up to the
-        // reading zoom. A file opened or saved goes to the top of the recent
-        // scores.
+        // A new song starts at its top, at the zoom chosen last: by default
+        // its page across the view up to the reading zoom. A file opened or
+        // saved goes to the top of the recent scores.
         onSourceChanged: {
-            scoreView.fitPage();
+            scoreView.fitSong();
             scoreView.toTop();
             if (source.toString().length > 0)
                 recent.add(source);
@@ -258,6 +285,15 @@ ApplicationWindow {
 
     RecentScores {
         id: recent
+    }
+
+    // Where the window was, its panels, zoom, page and view, for the next
+    // start (ADR-0137).
+    WindowState {
+        id: windowState
+
+        appWindow: window
+        settingsFile: window.windowStateFile
     }
 
     CaretEditor {

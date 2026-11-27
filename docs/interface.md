@@ -59,10 +59,15 @@ panel at one side only: opening the palette closes the panel at the right, and
 opening that one closes the palette. The page keeps fitting the room between
 the panels until its zoom is chosen by hand.
 
+The window opens as it was last closed (ADR-0137): its place and size, or
+maximized, on the screen it was on while that screen is still there; the
+palette and the song panel open or closed; the zoom, the dark page and the
+continuous view. The tuner always starts closed.
+
 Nothing floats over the music but what the caret opened, and the command
-palette while it is asked for. A panel docks and the
-score makes room; an error slides up over the foot of the score and goes; what
-an import changed stays in the status bar for as long as the song is open.
+palette while it is asked for. A panel docks and the score makes room; an
+error slides up over the foot of the score and goes; what an import changed
+stays in the status bar for as long as the song is open.
 
 ## Colours
 
