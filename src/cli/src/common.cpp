@@ -25,49 +25,6 @@
 
 namespace elara::cli {
 
-std::string jsonEscape(std::string_view text) {
-    std::string out;
-    out.reserve(text.size() + 2);
-    for (const char c : text) {
-        switch (c) {
-        case '"':
-            out += "\\\"";
-            break;
-        case '\\':
-            out += "\\\\";
-            break;
-        case '\n':
-            out += "\\n";
-            break;
-        case '\r':
-            out += "\\r";
-            break;
-        case '\t':
-            out += "\\t";
-            break;
-        default:
-            if (static_cast<unsigned char>(c) < 0x20) {
-                out += std::format("\\u{:04x}", static_cast<unsigned>(c));
-            } else {
-                out += c;
-            }
-        }
-    }
-    return out;
-}
-
-std::string jsonNumber(double value) {
-    // Fixed-point, not the shortest form, which writes 0.0003 as "3e-04".
-    std::string text = std::format("{:.4f}", value);
-    if (text.find('.') != std::string::npos) {
-        text.erase(text.find_last_not_of('0') + 1);
-        if (text.back() == '.') {
-            text.pop_back();
-        }
-    }
-    return text == "-0" ? "0" : text;
-}
-
 std::filesystem::path executableDirectory() {
 #if defined(_WIN32)
     std::wstring buffer(260, L'\0');

@@ -104,7 +104,8 @@ target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_
   ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 # The steps of `elara-cli edit` against a song, without the executable.
-elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp LIBRARIES elara_cli_steps)
+elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp cli/test_json_writer.cpp
+  LIBRARIES elara_cli_steps elara_cli_json)
 
 add_subdirectory(cli)
 
