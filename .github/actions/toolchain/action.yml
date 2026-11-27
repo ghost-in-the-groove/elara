@@ -50,9 +50,11 @@ runs:
       uses: actions/cache@v6
       with:
         path: ${{ runner.temp }}/Qt
-        key: qt-${{ runner.os }}-${{ inputs.qt }}-${{ hashFiles('scripts/install_qt.py') }}
+        key: qt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.qt }}-${{ hashFiles('scripts/install_qt.py') }}
 
     # py7zr extracts what a cache miss downloads; a cached kit needs nothing.
+    # The macOS kit keeps only the runner's architecture, which halves the
+    # cache macOS restores on every run (ADR-0134).
     - name: Install Qt
       if: inputs.qt != ''
       shell: bash
@@ -61,7 +63,9 @@ runs:
         QT_CACHED: ${{ steps.qt-cache.outputs.cache-hit }}
       run: |
         if [ "$QT_CACHED" != true ]; then python -m pip install py7zr; fi
-        kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" 2>/dev/null | tail -n 1)
+        thin=()
+        if [ "$RUNNER_OS" = macOS ]; then thin=(--thin "$(uname -m)"); fi
+        kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" "${thin[@]}" 2>/dev/null | tail -n 1)
         echo "QT_ROOT_DIR=$kit" >> "$GITHUB_ENV"
 
     # vcpkg at the manifest's baseline: package ABIs hash vcpkg's own scripts,

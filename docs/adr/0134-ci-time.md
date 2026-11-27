@@ -71,6 +71,13 @@ Behind those numbers:
 - **The format check runs one clang-format per core.**
 - **py7zr is installed only when Qt is not in the cache**: it extracts what a
   cache miss downloads, nothing else.
+- **The macOS Qt kit keeps only the runner's architecture.** Qt ships it
+  universal, each binary an x86_64 and an arm64 build, and restoring its cache
+  was the longest step before the build on macOS (31 to 57 s).
+  `install_qt.py --thin` keeps the runner's slice of each universal file, as
+  `lipo -thin` does; the slice carries its own code signature, so it stays
+  valid. That takes the kit from 1695 to 894 MB, and the compressed cache from
+  about 378 to 206 MB. The Qt cache key names the runner's architecture.
 - **The actions run on Node 24**: checkout v7, setup-python v7, cache v6 and
   upload-artifact v7. None of the inputs the workflows use changed.
 - **One composite action, `.github/actions/toolchain`, sets up what the three
@@ -84,8 +91,6 @@ Not done:
   pull request #39 moved the job to Intel because arm64 runners were not
   acquired for over an hour. Worth trying again before the Intel image retires
   in 2027.
-- **Thinning the macOS Qt kit** to x86_64 would shrink its 471 MB cache, but
-  it rewrites signed frameworks for about 15 s.
 - **Skipping vcpkg's install** by caching `vcpkg_installed` would save the few
   seconds left, at the price of a second way to configure.
 
