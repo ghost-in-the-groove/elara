@@ -28,31 +28,53 @@ namespace {
 using core::Document;
 using core::Song;
 
-std::string jsonName(std::string_view name) {
-    return name.empty() ? std::string("null") : std::format("\"{}\"", jsonEscape(name));
+// `{"count":2,"next":"Add a note"}`, with "next" null when there is none.
+void writeHistory(JsonWriter& json, std::size_t count, std::string_view next) {
+    json.beginObject().field("count", count).key("next");
+    if (next.empty()) {
+        json.null();
+    } else {
+        json.string(next);
+    }
+    json.endObject();
 }
 
-std::string caretJson(const Song& song, const core::Caret& caret) {
+void writeCaret(JsonWriter& json, const Song& song, const core::Caret& caret) {
     if (!hasCaret(song)) {
-        return "null";
+        json.null();
+        return;
     }
-    return std::format(
-        R"({{"track":{},"staff":{},"measure":{},"voice":{},"beat":{},"string":{},"freeSlot":{}}})",
-        caret.track, caret.staff, caret.measure, caret.voice, caret.beat, caret.string,
-        core::onFreeSlot(song, caret));
+    json.beginObject()
+        .field("track", caret.track)
+        .field("staff", caret.staff)
+        .field("measure", caret.measure)
+        .field("voice", caret.voice)
+        .field("beat", caret.beat)
+        .field("string", caret.string)
+        .field("freeSlot", core::onFreeSlot(song, caret))
+        .endObject();
 }
 
 void printJson(const Document& doc, const core::EditSession& session) {
     const Song& song = doc.song();
-    std::cout
-        << std::format(
-               R"({{"title":"{}","tempo":{},"tracks":{},"measureCount":{},"measures":{},"issues":{},"caret":{},"input":"{}","undo":{{"count":{},"next":{}}},"redo":{{"count":{},"next":{}}},"historyBytes":{},"modified":{}}})",
-               jsonEscape(song.info().title), song.startTempo().bpm(), tracksJson(song),
-               song.measureCount(), measuresJson(song), issuesJson(core::validate(song)),
-               caretJson(song, session.caret()), session.input().toString(), doc.undoCount(),
-               jsonName(doc.undoName()), doc.redoCount(), jsonName(doc.redoName()),
-               doc.historyBytes(), doc.isModified())
-        << '\n';
+    JsonWriter out;
+    out.beginObject()
+        .field("title", song.info().title)
+        .field("tempo", song.startTempo().bpm())
+        .key("tracks");
+    writeTracks(out, song);
+    out.field("measureCount", song.measureCount()).key("measures");
+    writeMeasures(out, song);
+    out.key("issues");
+    writeIssues(out, core::validate(song));
+    out.key("caret");
+    writeCaret(out, song, session.caret());
+    out.field("input", session.input().toString()).key("undo");
+    writeHistory(out, doc.undoCount(), doc.undoName());
+    out.key("redo");
+    writeHistory(out, doc.redoCount(), doc.redoName());
+    out.field("historyBytes", doc.historyBytes()).field("modified", doc.isModified()).endObject();
+    std::cout << out.text() << '\n';
 }
 
 void printText(const Document& doc, const core::EditSession& session) {

@@ -73,10 +73,14 @@ int runNew(bool json, const NewOptions& options) {
         return fail(error.what());
     }
     if (json) {
-        std::cout << std::format(R"({{"file":"{}","title":"{}","tracks":{},"measures":{}}})",
-                                 jsonEscape(options.file), jsonEscape(song.info().title),
-                                 song.trackCount(), song.measureCount())
-                  << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("file", options.file)
+            .field("title", song.info().title)
+            .field("tracks", song.trackCount())
+            .field("measures", song.measureCount())
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("created {}: {} track(s), {} measure(s)\n", options.file,
                                  song.trackCount(), song.measureCount());
@@ -84,12 +88,21 @@ int runNew(bool json, const NewOptions& options) {
     return kExitOk;
 }
 
-std::string warningsJson(const std::vector<std::string>& warnings) {
-    std::string json = "[";
+void writeWarnings(JsonWriter& json, const std::vector<std::string>& warnings) {
+    json.key("warnings").beginArray();
     for (const std::string& warning : warnings) {
-        json += std::format("{}\"{}\"", json.size() > 1 ? "," : "", jsonEscape(warning));
+        json.value(warning);
     }
-    return json + ']';
+    json.endArray();
+}
+
+// `"song":{...},"durationSeconds":12.5,"issues":[...]`
+void writeSong(JsonWriter& json, const core::Song& song) {
+    json.key("song")
+        .raw(io::songToJson(song))
+        .field("durationSeconds", song.durationSeconds())
+        .key("issues");
+    writeIssues(json, core::validate(song));
 }
 
 // A native file's song, and what this Elara may not keep of it (ADR-0139).
@@ -100,12 +113,12 @@ int runDump(bool json, const std::string& file) {
     }
     const core::Song& song = opened->song;
     if (json) {
-        std::cout << std::format(R"({{"file":"{}","warnings":{},"song":{},)"
-                                 R"("durationSeconds":{:.3f},"issues":{}}})",
-                                 jsonEscape(file), warningsJson(opened->warnings),
-                                 io::songToJson(song), song.durationSeconds(),
-                                 issuesJson(core::validate(song)))
-                  << '\n';
+        JsonWriter out;
+        out.beginObject().field("file", file);
+        writeWarnings(out, opened->warnings);
+        writeSong(out, song);
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << file << '\n';
         printSongText(song);
@@ -200,15 +213,17 @@ int runImport(bool json, const ImportOptions& options) {
         }
     }
     if (json) {
-        const std::string warnings = warningsJson(imported->warnings);
-        const std::string out =
-            options.out.empty() ? "null" : std::format("\"{}\"", jsonEscape(options.out));
-        std::cout << std::format(R"({{"file":"{}","format":"{}","out":{},"warnings":{},)"
-                                 R"("song":{},"durationSeconds":{:.3f},"issues":{}}})",
-                                 jsonEscape(options.file), formatId(*format), out, warnings,
-                                 io::songToJson(song), song.durationSeconds(),
-                                 issuesJson(core::validate(song)))
-                  << '\n';
+        JsonWriter out;
+        out.beginObject().field("file", options.file).field("format", formatId(*format)).key("out");
+        if (options.out.empty()) {
+            out.null();
+        } else {
+            out.string(options.out);
+        }
+        writeWarnings(out, imported->warnings);
+        writeSong(out, song);
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("imported {} ({})\n", options.file, formatName(*format));
         printSongText(song);
@@ -255,12 +270,16 @@ int runExport(bool json, const ExportOptions& options) {
     std::error_code ignored;
     const auto bytes = std::filesystem::file_size(out, ignored);
     if (json) {
-        std::cout << std::format(R"({{"file":"{}","out":"{}","format":"{}",)"
-                                 R"("compressed":{},"bytes":{},"warnings":{}}})",
-                                 jsonEscape(options.file), jsonEscape(options.out),
-                                 midi ? "midi" : "musicxml", compressed, bytes,
-                                 warningsJson(warnings))
-                  << '\n';
+        JsonWriter report;
+        report.beginObject()
+            .field("file", options.file)
+            .field("out", options.out)
+            .field("format", midi ? "midi" : "musicxml")
+            .field("compressed", compressed)
+            .field("bytes", bytes);
+        writeWarnings(report, warnings);
+        report.endObject();
+        std::cout << report.text() << '\n';
     } else {
         std::cout << std::format("exported {} to {} ({}, {} bytes)\n", options.file, options.out,
                                  midi         ? "MIDI"
