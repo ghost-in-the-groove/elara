@@ -162,7 +162,7 @@
     </message>
     <message>
         <source>Bend %1</source>
-        <translation>Bending %1</translation>
+        <translation>Bend %1</translation>
     </message>
     <message>
         <source>Dynamic %1</source>
@@ -229,11 +229,11 @@
     </message>
     <message>
         <source>Time signature %1/%2 from measure %3</source>
-        <translation>Compás %1/%2 desde el compás %3</translation>
+        <translation>Indicación de compás %1/%2 desde el compás %3</translation>
     </message>
     <message>
         <source>%1/%2 is not a time signature.</source>
-        <translation>%1/%2 no es un compás.</translation>
+        <translation>%1/%2 no es una indicación de compás.</translation>
     </message>
     <message>
         <source>Used last</source>
