@@ -14,6 +14,7 @@
 #include "recent_scores.hpp"
 #include "score_page.hpp"
 #include "tuner_controller.hpp"
+#include "window_state.hpp"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QFile>
@@ -25,6 +26,7 @@
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
+#include <QRect>
 #include <QRectF>
 #include <QSize>
 #include <QStringList>
@@ -165,6 +167,10 @@ void Startup::queueSteps() {
         }
         if (options_.smokeTest && !options_.recoveryFolder.isEmpty()) {
             queueRecover();
+            return;
+        }
+        if (options_.smokeTest && !options_.windowState.isEmpty()) {
+            queueWindowState();
             return;
         }
         // Without a file the smoke test edits a new song.
@@ -641,6 +647,59 @@ void Startup::queueRecover() {
                   score_->source().isEmpty(),
               "the song recovered is not the song left");
         check(score_->recoverable().isEmpty(), "the copy recovered is still offered");
+        return false;
+    });
+}
+
+// The window's state kept in `--window-state`'s file (ADR-0137). A run that
+// finds nothing kept moves and resizes the window, closes the note effects
+// palette, opens the song panel, zooms in by hand, lightens the page and
+// shows the continuous view, then quits, which keeps them: "window state
+// kept: ...". The next run finds the window as that one left it: "window
+// state restored: ...".
+void Startup::queueWindowState() {
+    auto* state = window_->findChild<WindowState*>();
+    auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    auto* palette = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
+    if (state == nullptr || view == nullptr || palette == nullptr) {
+        steps_.emplace_back([this] {
+            failure_ = QStringLiteral("the window keeps no state");
+            return false;
+        });
+        return;
+    }
+    const bool restored = state->restored();
+    if (!restored) {
+        steps_.emplace_back([this, view, palette] {
+            // Inside the offscreen platform's one screen, 800 by 600.
+            window_->setGeometry(QRect(20, 40, 760, 480));
+            palette->setProperty("opened", false);
+            window_->setProperty("showSongPane", true);
+            window_->setProperty("darkPage", false);
+            score_->setContinuous(true);
+            QMetaObject::invokeMethod(view, "zoomIn");
+            return false;
+        });
+        // The place and size are kept once they have settled.
+        steps_.emplace_back([this, state] {
+            if (state->geometry() != window_->geometry()) {
+                again_ = true;
+            }
+            return false;
+        });
+    }
+    steps_.emplace_back([this, view, palette, restored] {
+        const QRect place = window_->geometry();
+        const bool byHand = view->property("fit").toString().isEmpty();
+        std::printf("window state %s: %dx%d at %d,%d, effects %s, song panel %s, zoom %s %% %s, "
+                    "%s page, %s view\n",
+                    restored ? "restored" : "kept", place.width(), place.height(), place.x(),
+                    place.y(), palette->property("opened").toBool() ? "open" : "closed",
+                    window_->property("showSongPane").toBool() ? "open" : "closed",
+                    qPrintable(QString::number(view->property("zoom").toDouble() * 100.0, 'f', 0)),
+                    byHand ? "by hand" : qPrintable(view->property("fit").toString()),
+                    window_->property("darkPage").toBool() ? "dark" : "light",
+                    score_->continuous() ? "continuous" : "page");
         return false;
     });
 }
@@ -2121,6 +2180,14 @@ void Startup::tick() {
         finish(false, editProblem_);
         return;
     }
+    // A window given another size lays its items out at that size once its
+    // resize event comes, which a loaded machine can deliver after the last
+    // step: the bars are measured then.
+    if (const QQuickItem* content = window_->contentItem();
+        content != nullptr && content->size() != QSizeF(window_->size()) &&
+        clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
+        return;
+    }
     if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
         finish(false, overlap);
         return;
@@ -2731,7 +2798,11 @@ QString Startup::overlappingBars() const {
             const QRectF rect =
                 item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
             if (rect.left() < -0.5 || rect.right() > window_->width() + 0.5) {
-                return QStringLiteral("%1 leaves the window").arg(name);
+                return QStringLiteral("%1 (from %2 to %3) leaves the window (%4 wide)")
+                    .arg(name)
+                    .arg(rect.left())
+                    .arg(rect.right())
+                    .arg(window_->width());
             }
             for (const auto& [other, otherRect] : shown) {
                 if (rect.intersects(otherRect)) {

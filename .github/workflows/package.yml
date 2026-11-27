@@ -4,7 +4,7 @@ name: package
 # and from pull requests that change how Elara installs, with the installers:
 # the MSI package on Windows and the AppImage on Linux (ADR-0065). Each is
 # smoke-tested from what it installs and kept as a workflow artifact; nothing is
-# published.
+# published. release.yml calls it to build a release's packages (ADR-0138).
 on:
   push:
     branches: [main]
@@ -17,6 +17,7 @@ on:
       - scripts/elara.py
       - .github/workflows/package.yml
       - .github/actions/**
+  workflow_call:
   workflow_dispatch:
 
 concurrency:

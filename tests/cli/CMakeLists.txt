@@ -12,7 +12,7 @@ set(_tone_wav "${CMAKE_CURRENT_BINARY_DIR}/tone.wav")
 add_test(NAME cli.render_tone
   COMMAND elara-cli --json render-tone --out "${_tone_wav}" --seconds 0.5 --sample-rate 48000)
 set_tests_properties(cli.render_tone PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"frames\":24000,\"sampleRate\":48000,\"channels\":1,\"peak\":0\\.2000"
+  PASS_REGULAR_EXPRESSION "\"frames\":24000,\"sampleRate\":48000,\"channels\":1,\"peak\":0\\.2}"
   FIXTURES_SETUP tone_wav)
 
 # 44-byte header + 24000 mono 16-bit frames.
@@ -88,7 +88,7 @@ set_tests_properties(cli.pitch_from_midi_with_flats PROPERTIES
 
 add_test(NAME cli.pitch_frequency COMMAND elara-cli --json pitch A4 --a4 432)
 set_tests_properties(cli.pitch_frequency PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"midi\":69,\"frequency\":432\\.0000}")
+  PASS_REGULAR_EXPRESSION "\"midi\":69,\"frequency\":432}")
 
 add_test(NAME cli.pitch_rejects_bad_text COMMAND elara-cli pitch H4)
 set_tests_properties(cli.pitch_rejects_bad_text PROPERTIES WILL_FAIL TRUE)
@@ -147,7 +147,7 @@ set_tests_properties(cli.spell_in_flat_key PROPERTIES
 add_test(NAME cli.meter_compound_time
   COMMAND elara-cli --json meter 6/8 --bpm 60 --beat-unit dotted-quarter)
 set_tests_properties(cli.meter_compound_time PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"measureLength\":\"3/4\",\"beatLength\":\"1/8\",\"tempo\":{\"bpm\":60,\"beatUnit\":\"dotted-quarter\"},\"secondsPerMeasure\":2\\.0000}")
+  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"measureLength\":\"3/4\",\"beatLength\":\"1/8\",\"tempo\":{\"bpm\":60,\"beatUnit\":\"dotted-quarter\"},\"secondsPerMeasure\":2}")
 
 add_test(NAME cli.meter_rejects_bad_meter COMMAND elara-cli meter 5/3)
 set_tests_properties(cli.meter_rejects_bad_meter PROPERTIES WILL_FAIL TRUE)
@@ -566,7 +566,7 @@ set_tests_properties(cli.edit_sets_fermatas PROPERTIES
 add_test(NAME cli.dump_fermatas COMMAND elara-cli --json dump "${ELARA_CLI_FERMATAS}")
 set_tests_properties(cli.dump_fermatas PROPERTIES
   FIXTURES_REQUIRED cli_fermatas
-  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.250")
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.25,")
 # Octave lines at the caret (ADR-0089): 8va on the C, 15mb on the D, 8vb on a
 # rest, and 15ma on the E that undo takes back. Each is drawn as a mark, its
 # dashes and a hook.
@@ -1128,7 +1128,7 @@ set_tests_properties(cli.new_creates_song PROPERTIES
 add_test(NAME cli.dump_reads_song COMMAND elara-cli --json dump "${ELARA_CLI_SONG}")
 set_tests_properties(cli.dump_reads_song PROPERTIES
   FIXTURES_REQUIRED cli_song
-  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16\\.000,\"issues\":\\[\\]}")
+  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16,\"issues\":\\[\\]}")
 
 add_test(NAME cli.new_refuses_to_overwrite COMMAND elara-cli new "${ELARA_CLI_SONG}")
 set_tests_properties(cli.new_refuses_to_overwrite PROPERTIES
@@ -1873,7 +1873,60 @@ add_test(NAME cli.render_symbol_at_nothing
           --layout page --symbol-at 0 1 1)
 set_tests_properties(cli.render_symbol_at_nothing PROPERTIES
   PASS_REGULAR_EXPRESSION "symbol at page 1, x 1, y 1: none there")
+# What the layout could not keep (ADR-0150): nothing on a corpus file, and
+# measures wider than a page of huge staff spaces.
+add_test(NAME cli.render_issues_none
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --view both --layout page --issues)
+set_tests_properties(cli.render_issues_none PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[\\],\"pages\":\\[")
+add_test(NAME cli.render_issues_measure_too_wide
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_measure_too_wide PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[{\"kind\":\"measureTooWide\",\"page\":0,\"measure\":0,\"roles\":\\[\\],\"box\":\\[[0-9.,]+\\]}\\],\"pages\"")
+add_test(NAME cli.render_issues_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issue: measure 1 on page 1 is [0-9.]+ staff spaces too wide")
+add_test(NAME cli.render_issues_none_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --issues)
+set_tests_properties(cli.render_issues_none_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issues: none")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES
   PASS_REGULAR_EXPRESSION "time at page 1, x 1, y 1: no measure there")
+
+# A song saved by a newer Elara (ADR-0139): dump says what saving here loses,
+# edit says it on stderr, and the song it saves holds only what this Elara
+# reads, under its own name.
+set(ELARA_CLI_NEWER "${CMAKE_CURRENT_BINARY_DIR}/cli-newer.elara")
+set(ELARA_CLI_NEWER_SAVED "${CMAKE_CURRENT_BINARY_DIR}/cli-newer-saved.elara")
+add_test(NAME cli.newer_file
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/newer_elara.py"
+          "${ELARA_CLI_CREDITS}" "${ELARA_CLI_NEWER}")
+set_tests_properties(cli.newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_credits
+  FIXTURES_SETUP cli_newer)
+add_test(NAME cli.dump_newer_file COMMAND elara-cli --json dump "${ELARA_CLI_NEWER}")
+set_tests_properties(cli.dump_newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_newer
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\"saved by Elara 99\\.0\\.0, newer than this one \\([^)]+\\): what it added is not shown, and saving here leaves it out\"\\],\"song\":{\"format\":\"elara\",\"formatVersion\":1,\"generator\":\"Elara [^\"]+\",\"info\":{\"title\":\"Etude\"")
+add_test(NAME cli.dump_own_file COMMAND elara-cli --json dump "${ELARA_CLI_CREDITS}")
+set_tests_properties(cli.dump_own_file PROPERTIES
+  FIXTURES_REQUIRED cli_credits
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],\"song\":{")
+add_test(NAME cli.edit_newer_file
+  COMMAND elara-cli edit --in "${ELARA_CLI_NEWER}" --out "${ELARA_CLI_NEWER_SAVED}"
+          "title Later")
+set_tests_properties(cli.edit_newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_newer
+  FIXTURES_SETUP cli_newer_saved
+  PASS_REGULAR_EXPRESSION "warning: [^\n]*cli-newer\\.elara: saved by Elara 99\\.0\\.0, newer than this one")
+add_test(NAME cli.dump_newer_file_saved COMMAND elara-cli --json dump "${ELARA_CLI_NEWER_SAVED}")
+set_tests_properties(cli.dump_newer_file_saved PROPERTIES
+  FIXTURES_REQUIRED cli_newer_saved
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],\"song\":{\"format\":\"elara\",\"formatVersion\":1,\"generator\":\"Elara [^\"]+\",\"info\":{\"title\":\"Later\",\"subtitle\":\"for two guitars\""
+  FAIL_REGULAR_EXPRESSION "comingLater|99\\.0\\.0")

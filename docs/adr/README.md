@@ -133,6 +133,11 @@ one that replaces them.
 | [0132](0132-the-caret-says-the-beat-and-the-string.md) | The caret says the beat and the string | Accepted |
 | [0133](0133-bold-marks-and-the-page-across-the-view.md) | Bold marks, and the page across the view | Accepted |
 | [0134](0134-ci-time.md) | Where CI's time goes | Accepted |
+| [0137](0137-the-window-remembers-its-state.md) | The window remembers its state | Accepted |
+| [0138](0138-releases-are-drafted-from-a-tag.md) | Releases are drafted from a tag | Accepted |
+| [0139](0139-a-song-from-a-newer-elara-says-what-it-may-lose.md) | A song from a newer Elara says what it may lose | Accepted |
+| [0150](0150-layout-issues.md) | Layout issues | Accepted |
+| [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
 
 ## Template
 

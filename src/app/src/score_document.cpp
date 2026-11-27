@@ -1701,9 +1701,12 @@ bool ScoreDocument::exportMusicXml(const QUrl& file) {
     const QString local = exportPath(file, {QLatin1StringView(".musicxml"),
                                             QLatin1StringView(".xml"), QLatin1StringView(".mxl")});
     try {
-        const bool compressed = local.endsWith(QStringLiteral(".mxl"), Qt::CaseInsensitive);
-        return writeExport(local, io::exportMusicXml(*song_, {.compressed = compressed}),
-                           tr("MusicXML"));
+        // Written by io (compressed for .mxl), straight from the parts it
+        // writes, without the whole file in memory at once.
+        reportExport(local,
+                     io::exportMusicXmlFile(*song_, std::filesystem::path(local.toStdU16String())),
+                     tr("MusicXML"));
+        return true;
     } catch (const std::exception& error) {
         emit editFailed(tr("Could not export %1: %2").arg(local, qstring(error.what())));
         return false;
@@ -1733,10 +1736,16 @@ bool ScoreDocument::writeExport(const QString& local, const io::ExportResult& re
         emit editFailed(tr("Could not export %1: %2").arg(local, out.errorString()));
         return false;
     }
+    reportExport(local, result.warnings, format);
+    return true;
+}
+
+void ScoreDocument::reportExport(const QString& local, const std::vector<std::string>& warnings,
+                                 const QString& format) {
     const QString name = QFileInfo(local).fileName();
     QStringList details;
-    details.reserve(static_cast<qsizetype>(result.warnings.size()));
-    for (const std::string& warning : result.warnings) {
+    details.reserve(static_cast<qsizetype>(warnings.size()));
+    for (const std::string& warning : warnings) {
         details.append(qstring(warning));
     }
     emit report(details.isEmpty()
@@ -1744,7 +1753,6 @@ bool ScoreDocument::writeExport(const QString& local, const io::ExportResult& re
                     : tr("Exported %1. %2 left out %n thing(s).", "", int(details.size()))
                           .arg(name, format),
                 details);
-    return true;
 }
 
 void ScoreDocument::exportPdf(const QUrl& file) {

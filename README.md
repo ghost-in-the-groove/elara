@@ -24,6 +24,8 @@ archive), macOS (a disk image) and Linux (an AppImage and a tarball), kept as
 artifacts of the `package` workflow's latest run on GitHub Actions. They are
 unsigned alpha builds: install or unpack them and run `elara`, or the
 command-line `elara-cli` next to it (on macOS, inside `elara.app/Contents/MacOS`).
+Versions will be published as GitHub releases ([CHANGELOG.md](CHANGELOG.md),
+[docs/releasing.md](docs/releasing.md)); none has been yet.
 
 ## Building
 

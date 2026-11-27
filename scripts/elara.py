@@ -13,6 +13,7 @@
     python scripts/elara.py cli -- ARGS...       run the built elara-cli
     python scripts/elara.py app [-- ARGS...]     run the built desktop app
     python scripts/elara.py translations         refresh the UI translation files (lupdate)
+    python scripts/elara.py release version|notes|prepare   versions and the changelog
     python scripts/elara.py ci                  what CI runs (fresh configure)
 
 On Windows the MSVC developer environment is loaded automatically (vswhere +
@@ -26,6 +27,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import contextlib
+import datetime
 import hashlib
 import os
 import platform
@@ -762,7 +764,13 @@ def cmd_package(args: argparse.Namespace) -> int:
     out = ROOT / "build" / "package"
     stage = out / "stage"
     shutil.rmtree(stage, ignore_errors=True)
-    if (code := run(["cmake", "--install", str(build_dir(preset)), "--prefix", str(stage)])) != 0:
+    install = ["cmake", "--install", str(build_dir(preset)), "--prefix", str(stage)]
+    if not IS_WINDOWS and not IS_MAC:
+        # The release preset builds with debug information; on Linux it would
+        # stay inside the programs (ADR-0145). Windows keeps it in .pdb files
+        # beside the build, macOS in the object files.
+        install.append("--strip")
+    if (code := run(install)) != 0:
         return code
     if not args.no_smoke_test and (code := _smoke_test_install(stage)) != 0:
         return code
@@ -787,6 +795,41 @@ def cmd_translations(args: argparse.Namespace) -> int:
     return run(["cmake", "--build", "--preset", args.preset, "--target", "update_translations"])
 
 
+def cmd_release(args: argparse.Namespace) -> int:
+    """Versions and the changelog (ADR-0138, docs/releasing.md). `version`
+    prints the version the sources carry, `notes` a version's section of
+    CHANGELOG.md (Unreleased by default), `prepare` sets a version in the
+    sources and turns Unreleased into its section. Never tags or pushes."""
+    import release
+    try:
+        if args.action == "version":
+            print(release.sources_version(ROOT))
+        elif args.action == "notes":
+            text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+            sys.stdout.write(release.changelog_section(text, args.version))
+        else:
+            if args.version is None:
+                log("release prepare needs a version, as 0.2.0")
+                return 2
+            day = datetime.date.fromisoformat(args.date) if args.date else datetime.date.today()
+            for name in release.prepare(ROOT, args.version, day):
+                log(f"changed {name}")
+            log(f"next: review CHANGELOG.md, then merge \"Release {args.version}\" through a pull "
+                f"request; tagging v{args.version} on main drafts the release (docs/releasing.md)")
+    except release.ReleaseError as error:
+        log(str(error))
+        return 1
+    return 0
+
+
+def cmd_scripts(_: argparse.Namespace) -> int:
+    """The scripts' own tests, and the version the sources carry."""
+    if (code := run([sys.executable, "-m", "unittest", "discover", "--start-directory",
+                     str(ROOT / "scripts"), "--pattern", "test_*.py", "--quiet"])) != 0:
+        return code
+    return cmd_release(argparse.Namespace(action="version", version=None, date=None))
+
+
 def _gate(steps: list[tuple[str, callable]]) -> int:
     results = []
     for name, step in steps:
@@ -808,6 +851,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     return _gate([
         ("format", lambda: cmd_format(ns)),
         ("guard", lambda: cmd_guard(ns)),
+        ("scripts", lambda: cmd_scripts(ns)),
         ("build", lambda: cmd_build(ns)),
         ("test", lambda: cmd_test(ns)),
     ])
@@ -818,6 +862,7 @@ def cmd_ci(args: argparse.Namespace) -> int:
     return _gate([
         ("format", lambda: cmd_format(ns)),
         ("guard", lambda: cmd_guard(ns)),
+        ("scripts", lambda: cmd_scripts(ns)),
         ("configure", lambda: configure(args.preset, fresh=True)),
         ("build", lambda: run(["cmake", "--build", "--preset", args.preset])),
         ("test", lambda: cmd_test(ns)),
@@ -849,6 +894,12 @@ def main() -> int:
     add("cli", cmd_cli, "run elara-cli").add_argument("args", nargs=argparse.REMAINDER)
     add("app", cmd_app, "run the desktop app").add_argument("args", nargs=argparse.REMAINDER)
     add("translations", cmd_translations, "refresh the UI translation files from the sources")
+    release = add("release", cmd_release, "versions and the changelog (never tags or pushes)",
+                  preset=False)
+    release.add_argument("action", choices=["version", "notes", "prepare"])
+    release.add_argument("version", nargs="?", help="X.Y.Z (notes: Unreleased when left out)")
+    release.add_argument("--date", help="the release's date for prepare, as 2027-01-15 "
+                                        "(default: today)")
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)

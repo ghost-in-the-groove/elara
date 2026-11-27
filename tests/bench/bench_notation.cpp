@@ -4,6 +4,7 @@
 #include <elara/io/compression.hpp>
 #include <elara/notation/caret.hpp>
 #include <elara/notation/font_outlines.hpp>
+#include <elara/notation/layout_issues.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
@@ -184,6 +185,13 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         const auto all = layoutPages(song, score, font, pages);
         std::printf("all 20 staves on A4: %zu pages, %.1f MB of geometry\n", all.size(),
                     static_cast<double>(geometryBytes(all)) / 1e6);
+        // Layout issues (ADR-0150): a sweep over every page; divide by the
+        // pages for the cost of one.
+        std::printf("layout issues of those pages: %zu\n",
+                    elara::notation::layoutIssues(all, font, pages).size());
+        BENCHMARK("find the layout issues of all 20 staves on A4 pages") {
+            return elara::notation::layoutIssues(all, font, pages);
+        };
     }
     pages.threads = 0;
     BENCHMARK("lay out all 20 staves of the large song on A4 pages") {

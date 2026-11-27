@@ -2249,7 +2249,49 @@ std::optional<Song> writtenOut(const Song& song, Warnings& warnings) {
     return written;
 }
 
-ExportResult exportMusicXml(const Song& original, const MusicXmlExportOptions& options) {
+namespace {
+
+/// A MusicXML document as written: its text holds the head (declaration, part
+/// list and the parts written on the calling thread) up to `head`, then the
+/// end; the parts written on other threads lie between, in score order.
+struct Document {
+    std::string text;
+    std::size_t head = 0;
+    std::vector<std::string> parts;
+    std::vector<std::string> warnings;
+
+    /// The document in reading order, without joining it.
+    [[nodiscard]] std::vector<std::string_view> pieces() const {
+        const std::string_view whole = text;
+        std::vector<std::string_view> result{whole.substr(0, head)};
+        result.insert(result.end(), parts.begin(), parts.end());
+        result.push_back(whole.substr(head));
+        return result;
+    }
+
+    /// The document as one text. The parts are joined one by one, each let go
+    /// once copied: they and the whole document are never all held at once.
+    [[nodiscard]] std::string joined() && {
+        if (parts.empty()) {
+            return std::move(text);
+        }
+        std::string end = text.substr(head);
+        text.resize(head);
+        std::size_t total = text.size() + end.size();
+        for (const std::string& part : parts) {
+            total += part.size();
+        }
+        text.reserve(total);
+        for (std::string& part : parts) {
+            text += part;
+            std::string().swap(part);
+        }
+        text += end;
+        return std::move(text);
+    }
+};
+
+Document writeDocument(const Song& original, const MusicXmlExportOptions& options) {
     Warnings scoreWarnings;
     const std::optional<Song> written = writtenOut(original, scoreWarnings);
     const Song& song = written ? *written : original;
@@ -2277,17 +2319,21 @@ ExportResult exportMusicXml(const Song& original, const MusicXmlExportOptions& o
         parts.emplace_back(song, t, grid, slot < 9 ? slot + 1 : slot + 2);
     }
 
+    // Beats and notes each part writes, twice for a track that gets a TAB staff.
+    std::vector<std::size_t> partWork(song.trackCount());
     std::size_t work = 0;
     for (std::size_t t = 0; t < song.trackCount(); ++t) {
         const bool tab = song.track(t).staffCount() == 1 && song.track(t).staff(0).isFretted();
-        work += songScan.work[t] * (tab ? 2 : 1);
+        partWork[t] = songScan.work[t] * (tab ? 2 : 1);
+        work += partWork[t];
     }
     constexpr std::size_t kBytesPerItem = 260;    // measured on the benchmark song
     constexpr std::size_t kParallelWork = 20'000; // beats + notes; measured
     const unsigned threads =
         parts.size() <= 1 ? 1U
                           : detail::threadsFor(options.threads, work, kParallelWork, parts.size());
-    std::string xml;
+    Document document;
+    std::string& xml = document.text;
     if (threads <= 1) {
         xml.reserve(work * kBytesPerItem + 4096);
     }
@@ -2299,57 +2345,47 @@ ExportResult exportMusicXml(const Song& original, const MusicXmlExportOptions& o
     }
     writer.close("part-list");
 
-    // Parts written on several threads, each to its own text, in score order.
-    std::vector<std::string> texts;
     if (threads <= 1) {
         for (PartWriter& part : parts) {
             XmlWriter partWriter(xml, 1, !options.compressed);
             part.writePart(partWriter);
         }
     } else {
-        // Parts only read the song: each is written on any thread.
-        texts.resize(parts.size());
+        // Parts only read the song: each is written on any thread, to its own
+        // text, and the texts stay apart (see Document).
+        document.parts.resize(parts.size());
         detail::forEachIndex(0, parts.size(), threads, [&](std::size_t i) {
-            texts[i].reserve(songScan.work[i] * kBytesPerItem * 2);
-            XmlWriter partWriter(texts[i], 1, !options.compressed);
+            document.parts[i].reserve(partWork[i] * kBytesPerItem);
+            XmlWriter partWriter(document.parts[i], 1, !options.compressed);
             parts[i].writePart(partWriter);
         });
     }
-    if (!texts.empty() && !options.compressed) {
-        // Joined into the document one by one, each let go once copied: the
-        // parts and the whole document are never all held at once.
-        std::size_t total = xml.size() + 64;
-        for (const std::string& text : texts) {
-            total += text.size();
-        }
-        xml.reserve(total);
-        for (std::string& text : texts) {
-            xml += text;
-            std::string().swap(text);
-        }
-        texts.clear();
-    }
-    const std::size_t head = xml.size();
+    document.head = xml.size();
     writer.close("score-partwise");
     xml += '\n';
 
     for (const PartWriter& part : parts) {
         scoreWarnings.append(part.warnings());
     }
-    ExportResult result{.data = {}, .warnings = scoreWarnings.lines()};
+    document.warnings = scoreWarnings.lines();
+    return document;
+}
+
+} // namespace
+
+ExportResult exportMusicXml(const Song& song, const MusicXmlExportOptions& options) {
+    Document document = writeDocument(song, options);
+    ExportResult result{.data = {}, .warnings = std::move(document.warnings)};
     if (options.compressed) {
         // The parts are packed where they lie, between the head and the end.
-        const std::string_view whole = xml;
-        std::vector<std::string_view> pieces{whole.substr(0, head)};
-        pieces.insert(pieces.end(), texts.begin(), texts.end());
-        pieces.push_back(whole.substr(head));
+        const std::vector<std::string_view> pieces = document.pieces();
         const std::array entries{
             detail::ZipEntry{.name = "mimetype", .content = detail::kMxlMimeType, .level = 0},
             detail::ZipEntry{.name = "META-INF/container.xml", .content = kMxlContainer},
             detail::ZipEntry{.name = "score.musicxml", .pieces = pieces}};
         result.data = detail::writeZip<std::string>(entries);
     } else {
-        result.data = std::move(xml);
+        result.data = std::move(document).joined();
     }
     return result;
 }
@@ -2358,9 +2394,16 @@ std::vector<std::string> exportMusicXmlFile(const Song& song, const std::filesys
                                             const MusicXmlExportOptions& options) {
     MusicXmlExportOptions chosen = options;
     chosen.compressed = lowercase(detail::displayPath(path.extension())) == ".mxl";
-    ExportResult result = exportMusicXml(song, chosen);
-    detail::writeFileAtomically(path, result.data);
-    return std::move(result.warnings);
+    if (chosen.compressed) {
+        ExportResult result = exportMusicXml(song, chosen);
+        detail::writeFileAtomically(path, result.data);
+        return std::move(result.warnings);
+    }
+    // The parts go to the disk where they lie: the file is never one text in
+    // memory, which for a large song is as big as the song's parts again.
+    Document document = writeDocument(song, chosen);
+    detail::writeFileAtomically(path, document.pieces());
+    return std::move(document.warnings);
 }
 
 } // namespace elara::io

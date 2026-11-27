@@ -8,6 +8,11 @@ target_include_directories(elara_cli_steps PUBLIC src)
 target_link_libraries(elara_cli_steps PUBLIC elara::core)
 elara_target_warnings(elara_cli_steps)
 
+# The --json output's writer (escaping, commas, numbers), tested on its own.
+add_library(elara_cli_json STATIC src/json_writer.cpp)
+target_include_directories(elara_cli_json PUBLIC src)
+elara_target_warnings(elara_cli_json)
+
 add_executable(elara-cli
   src/main.cpp
   src/common.cpp
@@ -20,6 +25,7 @@ add_executable(elara-cli
   src/theory_commands.cpp)
 
 target_link_libraries(elara-cli PRIVATE
+  elara_cli_json
   elara_cli_steps
   elara::core
   elara::io

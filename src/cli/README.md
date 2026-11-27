@@ -40,7 +40,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT] [--pdf OUT]
                            [--cursor-at SECONDS] [--time-at PAGE X Y]
-                           [--symbol-at PAGE X Y]
+                           [--symbol-at PAGE X Y] [--issues]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -62,9 +62,11 @@ with `--json`, at the end: `{"device", "sampleRate", "seconds", "peak",
 "note": null}` when the note stops. `devices` lists `"outputs"` and `"inputs"`.
 
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
-`--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
-where `song` is the file's complete `song.json`: the model snapshot later tests
-compare against. `import --json` prints `{"file", "format", "out", "warnings",
+`--force`. `dump --json` prints `{"file", "warnings", "song", "durationSeconds",
+"issues"}` where `song` is the file's complete `song.json`: the model snapshot
+later tests compare against; `warnings` says when a newer Elara saved the file,
+whose additions saving here leaves out (ADR-0139), which `edit --in` also says
+on stderr. `import --json` prints `{"file", "format", "out", "warnings",
 "song", "durationSeconds", "issues"}`, with `format` `musicxml`, `midi` or `guitarpro`:
 `warnings` lists what the file had that the model cannot hold yet (ADR-0007,
 ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes
@@ -125,6 +127,13 @@ they are drawn (a clef, a key or time signature, a tempo mark, a section, a
 chord symbol, a beat's text; ADR-0130), the measure it was laid out for, the
 box round its ink as `[x, y, width, height]` and the staff it is on as
 `{"track", "staff"}`; `role` is `null` where there is none.
+`--issues` adds `"issues": [{"kind", "page", "measure", "roles", "box"}]`: what
+the layout could not keep (ADR-0150). An `overlap` names the two roles whose
+ink goes into each other (noteheads, accidentals, fret numbers, syllables,
+chord names, dynamics) from the left, and the box they share; a
+`measureTooWide` (only on pages) has no roles and the part of its system past
+the right margin as its box. Measures count from 0 in JSON; the text output
+prints one line per issue, measures and pages from 1, or `issues: none`.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

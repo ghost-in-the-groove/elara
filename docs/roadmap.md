@@ -296,6 +296,26 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 - [x] The player prepared on a worker after edits, a new song or a new sound
       bank: events, buffers and new sounds off the interface thread (ADR-0112)
+- [ ] Layout adjustments: the automatic layout first, then what a writer may
+      change where it is not enough, stored on what it adjusts
+  - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
+        syllables, chord names and dynamics, and measures wider than the page,
+        found on finished pages and reported by `render --issues` (ADR-0150)
+  - [ ] Two voices on one staff a second apart or in unison do not collide
+  - [ ] No layout issue over the corpus and songs made at random
+  - [ ] System and page breaks stored per measure, in files and the CLI
+  - [ ] The line breaker keeps the stored breaks; the cache follows them
+  - [ ] Lock the breaks of a range, and unlock them
+  - [ ] Layout settings of a song: staff size, margins, spacing, in the CLI
+  - [ ] The app and PDF export read the layout settings; a dialog sets them
+  - [ ] Room before a beat
+  - [ ] Room survives edits, copy and paste
+  - [ ] A measure looser or tighter
+  - [ ] Clear the layout adjustments of a range
+  - [ ] A Layout menu: the commands at the caret, and marks on the score
+  - [ ] Layout issues found on the worker and shown in the status bar
+  - [ ] The caret's system keeps its place on screen after an edit
+  - [ ] Handles to drag breaks, room and spacing on the score
 
 ## The interface
 
@@ -319,8 +339,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       paper the brightest surface, the palette's signs from the music font, the
       tuner docked beside the score, measure ticks on the song string, one side
       panel at a time in a narrow window
-- [ ] The window remembers its size, its panels, its zoom and the dark page
-      from one run to the next
+- [x] The window remembers its size, its panels, its zoom and the dark page
+      from one run to the next (ADR-0137)
 - [ ] A command palette: every command by name, with its keys
 
 ## Milestone 6 - Practice tools
@@ -342,3 +362,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
         smoke-tested by CI with `elara.py package --installers` (ADR-0065)
 - [x] Packages built with the vcpkg that CI tests, at the manifest's baseline
 - [ ] Release automation and 1.0
+  - [x] Releases drafted from a version tag: the version checked across the
+        sources, a changelog, the packages and their checksums on a draft
+        that is published by hand (`elara.py release`, ADR-0138)
+  - [ ] 1.0

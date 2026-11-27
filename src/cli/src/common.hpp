@@ -5,6 +5,8 @@
 #include <elara/core/song.hpp>
 #include <elara/core/tuning.hpp>
 
+#include "json_writer.hpp"
+
 #include <expected>
 #include <filesystem>
 #include <optional>
@@ -27,13 +29,6 @@ struct Context {
     bool json = false;
     int exitCode = kExitUsage;
 };
-
-/// Escapes text for a JSON string literal (without the quotes).
-[[nodiscard]] std::string jsonEscape(std::string_view text);
-
-/// A length for JSON output: four decimals at most, no "-0", no exponent. Lengths computed
-/// from font metrics carry binary noise (3.2760000000000002).
-[[nodiscard]] std::string jsonNumber(double value);
 
 /// The directory holding the running executable (empty if the system will not
 /// say). Files shipped with Elara, such as fonts/, sit next to it.

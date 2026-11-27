@@ -97,14 +97,15 @@ elara_add_unit_tests(notation
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
   notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
-  notation/test_fingering_layout.cpp
+  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
   ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 # The steps of `elara-cli edit` against a song, without the executable.
-elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp LIBRARIES elara_cli_steps)
+elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp cli/test_json_writer.cpp
+  LIBRARIES elara_cli_steps elara_cli_json)
 
 add_subdirectory(cli)
 
@@ -123,7 +124,7 @@ if(TARGET elara)
   add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
     app/test_when_done.cpp app/test_app_icon.cpp app/test_included_sound.cpp
     app/test_recent_scores.cpp app/test_recovery_store.cpp app/test_job_lane.cpp
-    app/bench_score_painter.cpp)
+    app/test_window_state.cpp app/bench_score_painter.cpp)
   target_link_libraries(elara_app_tests PRIVATE elara_app_view elara_app_icon elara::io
     Qt6::Concurrent Catch2::Catch2)
   # The document and the transport, compiled again for the tests: their QML
@@ -251,6 +252,31 @@ if(TARGET elara)
     RUN_SERIAL TRUE
     FIXTURES_REQUIRED recovery_left
     PASS_REGULAR_EXPRESSION "recovery: Left by a crash[\r\n]+.*smoke-test: ok")
+
+  # The window's state from one run to the next (ADR-0137): a run that finds
+  # nothing kept moves and resizes the window, closes the effects palette,
+  # opens the song panel, zooms in by hand, lightens the page and shows the
+  # continuous view, and quits; the next run opens the window as it was left.
+  set(_window_state "${CMAKE_CURRENT_BINARY_DIR}/window-state-check.ini")
+  set(_window_state_line "760x480 at 20,40, effects closed, song panel open, zoom 125 % by hand, light page, continuous view")
+  add_test(NAME app.smoke_window_state_clean
+    COMMAND "${CMAKE_COMMAND}" -E rm -f "${_window_state}")
+  add_test(NAME app.smoke_window_state_keep
+    COMMAND elara --smoke-test --window-state "${_window_state}")
+  add_test(NAME app.smoke_window_state
+    COMMAND elara --smoke-test --window-state "${_window_state}")
+  set_tests_properties(app.smoke_window_state_clean PROPERTIES FIXTURES_SETUP window_state_clean)
+  set_tests_properties(app.smoke_window_state_keep app.smoke_window_state PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+    TIMEOUT 60)
+  set_tests_properties(app.smoke_window_state_keep PROPERTIES
+    FIXTURES_REQUIRED window_state_clean
+    FIXTURES_SETUP window_state_kept
+    PASS_REGULAR_EXPRESSION "window state kept: ${_window_state_line}[\r\n]+smoke-test: ok")
+  set_tests_properties(app.smoke_window_state PROPERTIES
+    FIXTURES_REQUIRED window_state_kept
+    PASS_REGULAR_EXPRESSION "window state restored: ${_window_state_line}[\r\n]+smoke-test: ok")
 
   # A SoundFont from the command line (ADR-0043), the test font of the CLI
   # tests: the window plays through it, keeps it when another file fails to
