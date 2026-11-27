@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+#include <elara/core/version.hpp>
 #include <elara/io/native_format.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -372,6 +375,42 @@ TEST_CASE("Unknown keys are ignored for forward compatibility", "[io][native]") 
         R"({"format":"elara","formatVersion":1,"futureFeature":{"x":1},"info":{"title":"T","mood":"calm"}})");
     REQUIRE(loaded.has_value());
     CHECK(loaded->info().title == "T");
+}
+
+TEST_CASE("A song saved by a newer Elara opens with a warning", "[io][native]") {
+    const auto read = [](std::string_view generator) {
+        return elara::io::readSongJson(std::format(
+            R"({{"format":"elara","formatVersion":1,"generator":"{}","info":{{"title":"T"}}}})",
+            generator));
+    };
+    const auto newer = read("Elara 99.0.0");
+    REQUIRE(newer.has_value());
+    CHECK(newer->song.info().title == "T");
+    REQUIRE(newer->warnings.size() == 1);
+    CHECK(newer->warnings[0] ==
+          std::format("saved by Elara 99.0.0, newer than this one ({}): what it added is not "
+                      "shown, and saving here leaves it out",
+                      core::version()));
+    const auto later = read("Elara 99.0.0-beta.2");
+    REQUIRE(later.has_value());
+    CHECK(later->warnings.size() == 1);
+
+    // This version, an older one and a generator without a version say nothing.
+    const std::string self = std::format("Elara {}", core::version());
+    for (const std::string_view generator :
+         {std::string_view(self), std::string_view("Elara 0.0.0"), std::string_view("Elara"),
+          std::string_view("Elara 99.1"), std::string_view("Elara x.y.z"),
+          std::string_view("Another 99.0.0"), std::string_view("")}) {
+        INFO(generator);
+        const auto quiet = read(generator);
+        REQUIRE(quiet.has_value());
+        CHECK(quiet->warnings.empty());
+    }
+    const auto written = elara::io::readSongJson(songToJson(richSong()));
+    REQUIRE(written.has_value());
+    CHECK(written->song == richSong());
+    CHECK(written->warnings.empty());
+    CHECK(elara::io::readNative(encodeNative(richSong()))->warnings.empty());
 }
 
 TEST_CASE("A native file is a zip with a mimetype and song.json", "[io][native]") {

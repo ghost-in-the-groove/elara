@@ -1877,3 +1877,35 @@ add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES
   PASS_REGULAR_EXPRESSION "time at page 1, x 1, y 1: no measure there")
+
+# A song saved by a newer Elara (ADR-0139): dump says what saving here loses,
+# edit says it on stderr, and the song it saves holds only what this Elara
+# reads, under its own name.
+set(ELARA_CLI_NEWER "${CMAKE_CURRENT_BINARY_DIR}/cli-newer.elara")
+set(ELARA_CLI_NEWER_SAVED "${CMAKE_CURRENT_BINARY_DIR}/cli-newer-saved.elara")
+add_test(NAME cli.newer_file
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/newer_elara.py"
+          "${ELARA_CLI_CREDITS}" "${ELARA_CLI_NEWER}")
+set_tests_properties(cli.newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_credits
+  FIXTURES_SETUP cli_newer)
+add_test(NAME cli.dump_newer_file COMMAND elara-cli --json dump "${ELARA_CLI_NEWER}")
+set_tests_properties(cli.dump_newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_newer
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\"saved by Elara 99\\.0\\.0, newer than this one \\([^)]+\\): what it added is not shown, and saving here leaves it out\"\\],\"song\":{\"format\":\"elara\",\"formatVersion\":1,\"generator\":\"Elara [^\"]+\",\"info\":{\"title\":\"Etude\"")
+add_test(NAME cli.dump_own_file COMMAND elara-cli --json dump "${ELARA_CLI_CREDITS}")
+set_tests_properties(cli.dump_own_file PROPERTIES
+  FIXTURES_REQUIRED cli_credits
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],\"song\":{")
+add_test(NAME cli.edit_newer_file
+  COMMAND elara-cli edit --in "${ELARA_CLI_NEWER}" --out "${ELARA_CLI_NEWER_SAVED}"
+          "title Later")
+set_tests_properties(cli.edit_newer_file PROPERTIES
+  FIXTURES_REQUIRED cli_newer
+  FIXTURES_SETUP cli_newer_saved
+  PASS_REGULAR_EXPRESSION "warning: [^\n]*cli-newer\\.elara: saved by Elara 99\\.0\\.0, newer than this one")
+add_test(NAME cli.dump_newer_file_saved COMMAND elara-cli --json dump "${ELARA_CLI_NEWER_SAVED}")
+set_tests_properties(cli.dump_newer_file_saved PROPERTIES
+  FIXTURES_REQUIRED cli_newer_saved
+  PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],\"song\":{\"format\":\"elara\",\"formatVersion\":1,\"generator\":\"Elara [^\"]+\",\"info\":{\"title\":\"Later\",\"subtitle\":\"for two guitars\""
+  FAIL_REGULAR_EXPRESSION "comingLater|99\\.0\\.0")
