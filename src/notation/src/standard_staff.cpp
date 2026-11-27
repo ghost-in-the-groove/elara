@@ -328,6 +328,9 @@ struct Chord {
     double ghostPad = 0.0;
     double left = 0.0; // ink extents from the chord's x
     double right = 0.0;
+    // From its column's x: a lower voice's chord moved beside an upper one's
+    // that starts with it (ADR-0151).
+    double shift = 0.0;
     double x = 0.0;
     double stemX = 0.0; // centre of the stem
     double stemStart = 0.0;
@@ -613,7 +616,7 @@ private:
         for (Column& column : columns_) {
             column.x = columnX(positions, column.start);
             for (const std::size_t c : column.chords) {
-                chords_[c].x = column.x;
+                chords_[c].x = column.x + chords_[c].shift;
             }
         }
         for (Chord& chord : chords_) {
@@ -938,11 +941,133 @@ private:
             column.left = std::min(column.left, chords_[c].left);
             column.right = std::max(column.right, chords_[c].right);
         }
+        if (voiceCount_ > 1) {
+            for (Column& column : columns_) {
+                if (column.chords.size() > 1) {
+                    separateVoices(column);
+                }
+            }
+        }
         if (rolls_) {
             for (Column& column : columns_) {
                 rollRoom(column);
             }
         }
+    }
+
+    // ---- Two voices on one staff (ADR-0151) ----
+
+    // How far right of its column `lower`, a chord of a voice with stems down,
+    // goes so that its noteheads clear those of `upper`, a chord of a voice
+    // with stems up that starts with it. Nothing when every note of one is a
+    // third or more from every note of the other, or their unisons share one
+    // notehead (the same notehead and dots). A second apart: beside it, the
+    // two stems in one line. Otherwise (a unison of different noteheads or
+    // dots, or a unison and a second together) right of its noteheads and
+    // dots.
+    [[nodiscard]] double voiceShift(const Chord& upper, const Chord& lower) const {
+        bool second = false;
+        bool unison = false;
+        bool apart = false;
+        for (const Head& high : upper.heads) {
+            for (const Head& low : lower.heads) {
+                const int steps = low.step - high.step;
+                if (steps == 0) {
+                    unison = true;
+                    apart = apart || high.glyph != low.glyph ||
+                            upper.duration.dots() != lower.duration.dots() || high.ghost ||
+                            low.ghost || high.dx != 0.0 || low.dx != 0.0;
+                } else if (steps == 1 || steps == -1) {
+                    second = true;
+                }
+            }
+        }
+        if (!second && !apart) {
+            return 0.0;
+        }
+        const bool stems = hasStem(upper.duration.value()) && hasStem(lower.duration.value());
+        const bool flippedOut =
+            std::ranges::any_of(upper.heads, [](const Head& head) { return head.dx > 0.0; }) ||
+            std::ranges::any_of(lower.heads, [](const Head& head) { return head.dx < 0.0; });
+        if (!unison && stems && upper.duration.dots() == 0 && !flippedOut &&
+            upper.ghostPad == 0.0 && lower.ghostPad == 0.0) {
+            const double up = stemAnchor(upper.heads.back(), true).x - defaults_.stemThickness;
+            return up - stemAnchor(lower.heads.front(), false).x;
+        }
+        double right = upper.headRight + upper.ghostPad;
+        if (upper.duration.dots() > 0) {
+            right += dotsWidth(upper.duration.dots()) + kDotGap;
+        }
+        return right - (lower.headLeft - lower.ghostPad);
+    }
+
+    // Moves the chords of lower voices in `column` beside the chords of upper
+    // voices their notes would collide with, and widens the column's ink.
+    void separateVoices(Column& column) {
+        bool moved = false;
+        for (const std::size_t l : column.chords) {
+            Chord& lower = chords_[l];
+            if (lower.rest || lower.stemUp || lower.heads.empty()) {
+                continue;
+            }
+            double shift = 0.0;
+            double clear = std::numeric_limits<double>::max();
+            for (const std::size_t u : column.chords) {
+                const Chord& upper = chords_[u];
+                if (upper.voice == lower.voice || upper.rest || !upper.stemUp ||
+                    upper.heads.empty()) {
+                    continue;
+                }
+                const double needed = voiceShift(upper, lower);
+                if (needed > 0.0) {
+                    shift = std::max(shift, needed);
+                    clear = std::min(clear, upper.left);
+                }
+            }
+            if (shift > 0.0) {
+                lower.shift = shift;
+                accidentalsLeftOf(lower, clear);
+                moved = true;
+            }
+        }
+        if (!moved) {
+            return;
+        }
+        column.left = std::numeric_limits<double>::max();
+        column.right = std::numeric_limits<double>::lowest();
+        for (const std::size_t c : column.chords) {
+            column.left = std::min(column.left, chords_[c].shift + chords_[c].left);
+            column.right = std::max(column.right, chords_[c].shift + chords_[c].right);
+        }
+    }
+
+    // The accidentals (and fingerings left of them) of a chord moved right of
+    // its column go back left of `clear`, where the ink it moved beside starts,
+    // from the column's x.
+    void accidentalsLeftOf(Chord& chord, double clear) {
+        double right = std::numeric_limits<double>::lowest();
+        for (const Head& head : chord.heads) {
+            if (head.accidental) {
+                right =
+                    std::max(right, head.accidentalX + metrics(*head.accidental).box.northEast.x);
+            }
+        }
+        if (right == std::numeric_limits<double>::lowest()) {
+            return;
+        }
+        const double by = clear - kAccidentalGap - chord.shift - right;
+        if (by >= 0.0) {
+            return;
+        }
+        for (Head& head : chord.heads) {
+            if (head.accidental) {
+                head.accidentalX += by;
+            }
+            if (head.fingering) {
+                head.fingeringX += by;
+            }
+        }
+        chord.left += by;
     }
 
     // A strum of a keyboard or another instrument without frets is a rolled
