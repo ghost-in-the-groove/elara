@@ -70,11 +70,15 @@ int runRenderTone(bool json, const RenderOptions& options) {
     }
     const auto peak = audio::peakLevel(samples);
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"path":"{}","frames":{},"sampleRate":{},"channels":1,"peak":{:.4f}}})",
-                   jsonEscape(options.out), samples.size(), options.sampleRate, peak)
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("path", options.out)
+            .field("frames", samples.size())
+            .field("sampleRate", options.sampleRate)
+            .field("channels", 1)
+            .field("peak", peak)
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("wrote {} ({} frames @ {} Hz, peak {:.4f})\n", options.out,
                                  samples.size(), options.sampleRate, peak);
@@ -82,34 +86,44 @@ int runRenderTone(bool json, const RenderOptions& options) {
     return kExitOk;
 }
 
-// One JSON array of devices, or one line per device.
+// One line per device.
 template <typename Device>
-std::string devicesText(const std::vector<Device>& devices, bool json) {
+std::string devicesText(const std::vector<Device>& devices) {
     std::string text;
     for (const auto& device : devices) {
-        if (json) {
-            text += std::format(R"({}{{"type":"{}","name":"{}","default":{}}})",
-                                text.empty() ? "" : ",", jsonEscape(device.type),
-                                jsonEscape(device.name), device.isDefault ? "true" : "false");
-        } else {
-            text += std::format("  {} {} / {}\n", device.isDefault ? '*' : ' ', device.type,
-                                device.name);
-        }
+        text +=
+            std::format("  {} {} / {}\n", device.isDefault ? '*' : ' ', device.type, device.name);
     }
     return text;
+}
+
+// A JSON array of devices.
+template <typename Device>
+void writeDevices(JsonWriter& json, const std::vector<Device>& devices) {
+    json.beginArray();
+    for (const auto& device : devices) {
+        json.beginObject()
+            .field("type", device.type)
+            .field("name", device.name)
+            .field("default", device.isDefault)
+            .endObject();
+    }
+    json.endArray();
 }
 
 int runDevices(bool json) {
     const auto outputs = audio::listOutputDevices();
     const auto inputs = audio::listInputDevices();
     if (json) {
-        std::cout << std::format(R"({{"outputs":[{}],"inputs":[{}]}})", devicesText(outputs, true),
-                                 devicesText(inputs, true))
-                  << '\n';
+        JsonWriter out;
+        out.beginObject().key("outputs");
+        writeDevices(out, outputs);
+        out.key("inputs");
+        writeDevices(out, inputs);
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else {
-        std::cout << "outputs:\n"
-                  << devicesText(outputs, false) << "inputs:\n"
-                  << devicesText(inputs, false);
+        std::cout << "outputs:\n" << devicesText(outputs) << "inputs:\n" << devicesText(inputs);
     }
     return kExitOk;
 }
@@ -137,10 +151,14 @@ int runTone(bool json, const DeviceToneOptions& options) {
     }
     const bool finished = !system.isPlaying();
     if (json) {
-        std::cout << std::format(R"({{"device":"{}","frequency":{},"seconds":{},"finished":{}}})",
-                                 jsonEscape(system.deviceDescription()), tone.frequencyHz,
-                                 tone.seconds, finished ? "true" : "false")
-                  << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("device", system.deviceDescription())
+            .field("frequency", tone.frequencyHz)
+            .field("seconds", tone.seconds)
+            .field("finished", finished)
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("played {} Hz for {} s on {}\n", tone.frequencyHz, tone.seconds,
                                  system.deviceDescription());
@@ -167,15 +185,16 @@ void addPracticeOptions(CLI::App& command, PracticeOptions& options) {
 }
 
 // `"speed":0.5,"metronome":true`
-std::string practiceJson(const audio::Sequence& sequence) {
-    return std::format(R"("speed":{},"metronome":{})", jsonNumber(sequence.speed()),
-                       sequence.metronome() ? "true" : "false");
+void writePractice(JsonWriter& json, const audio::Sequence& sequence) {
+    json.field("speed", sequence.speed()).field("metronome", sequence.metronome());
 }
 
 // `{"clicks":4,"interval":0.5}`
-std::string countInJson(const audio::CountIn& countIn) {
-    return std::format(R"({{"clicks":{},"interval":{}}})", countIn.clicks,
-                       jsonNumber(countIn.interval));
+void writeCountIn(JsonWriter& json, const audio::CountIn& countIn) {
+    json.beginObject()
+        .field("clicks", countIn.clicks)
+        .field("interval", countIn.interval)
+        .endObject();
 }
 
 struct SequenceOptions {
@@ -200,10 +219,11 @@ std::string_view kindName(audio::EventKind kind) {
     return "off";
 }
 
-// How a note is struck (ADR-0022), printed only when it is not normal.
-std::string touchJson(audio::Touch touch) {
-    return touch == audio::Touch::Normal ? std::string()
-                                         : std::format(R"(,"touch":"{}")", audio::touchName(touch));
+// How a note is struck (ADR-0022), written only when it is not normal.
+void writeTouch(JsonWriter& json, audio::Touch touch) {
+    if (touch != audio::Touch::Normal) {
+        json.field("touch", audio::touchName(touch));
+    }
 }
 
 std::string touchText(audio::Touch touch) {
@@ -215,15 +235,15 @@ std::string touchText(audio::Touch touch) {
 // with, the offset a pitch event moves to and how long it takes, or the
 // offset and velocity of a note joined to the key.
 template <typename Event>
-std::string eventJson(const Event& event) {
+void writeEvent(JsonWriter& json, const Event& event) {
     if (event.kind == audio::EventKind::Pitch) {
-        return std::format(R"("cents":{},"glide":{})", event.cents,
-                           jsonNumber(static_cast<double>(event.glide)));
+        json.field("cents", event.cents).field("glide", event.glide);
+    } else if (event.kind == audio::EventKind::Legato) {
+        json.field("cents", event.cents).field("velocity", event.velocity);
+    } else {
+        json.field("velocity", event.velocity);
+        writeTouch(json, event.touch);
     }
-    if (event.kind == audio::EventKind::Legato) {
-        return std::format(R"("cents":{},"velocity":{})", event.cents, event.velocity);
-    }
-    return std::format(R"("velocity":{}{})", event.velocity, touchJson(event.touch));
 }
 
 template <typename Event>
@@ -238,44 +258,59 @@ std::string eventText(const Event& event) {
 }
 
 std::string sequenceJson(const audio::Sequence& sequence, const SequenceOptions& options) {
-    std::string json = std::format(R"({{"file":"{}","duration":{},{},)", jsonEscape(options.file),
-                                   jsonNumber(sequence.duration()), practiceJson(sequence));
+    JsonWriter json;
+    json.beginObject().field("file", options.file).field("duration", sequence.duration());
+    writePractice(json, sequence);
     if (options.countInAt) {
-        json +=
-            std::format(R"("countIn":{},)", countInJson(sequence.countInAt(*options.countInAt)));
+        json.key("countIn");
+        writeCountIn(json, sequence.countInAt(*options.countInAt));
     }
-    json += R"("measures":[)";
-    for (std::size_t k = 0; k < sequence.measures().size(); ++k) {
-        const audio::PlayedMeasure& measure = sequence.measures()[k];
-        json += std::format(R"({}{{"measure":{},"start":{},"end":{}}})", k == 0 ? "" : ",",
-                            measure.measure, jsonNumber(measure.start), jsonNumber(measure.end));
+    json.key("measures").beginArray();
+    for (const audio::PlayedMeasure& measure : sequence.measures()) {
+        json.beginObject()
+            .field("measure", measure.measure)
+            .field("start", measure.start)
+            .field("end", measure.end)
+            .endObject();
     }
-    json += std::format(R"(],"noteCount":{},"eventCount":{})", sequence.notes().size(),
-                        sequence.eventCount());
+    json.endArray()
+        .field("noteCount", sequence.notes().size())
+        .field("eventCount", sequence.eventCount());
     if (options.notes) {
-        json += R"(,"notes":[)";
-        for (std::size_t i = 0; i < sequence.notes().size(); ++i) {
-            const audio::PlayedNote& note = sequence.notes()[i];
-            json += std::format(
-                R"({}{{"track":{},"staff":{},"voice":{},"pass":{},"start":{},"end":{},"key":{},"velocity":{}{}{}}})",
-                i == 0 ? "" : ",", note.track, note.staff, note.voice, note.pass,
-                jsonNumber(note.start), jsonNumber(note.end), note.key, note.velocity,
-                touchJson(note.touch), note.struck ? "" : R"(,"struck":false)");
+        json.key("notes").beginArray();
+        for (const audio::PlayedNote& note : sequence.notes()) {
+            json.beginObject()
+                .field("track", note.track)
+                .field("staff", note.staff)
+                .field("voice", note.voice)
+                .field("pass", note.pass)
+                .field("start", note.start)
+                .field("end", note.end)
+                .field("key", note.key)
+                .field("velocity", note.velocity);
+            writeTouch(json, note.touch);
+            if (!note.struck) {
+                json.field("struck", false);
+            }
+            json.endObject();
         }
-        json += ']';
+        json.endArray();
     }
     if (options.events) {
-        json += R"(,"events":[)";
-        const std::vector<audio::NoteEvent> events = sequence.events();
-        for (std::size_t i = 0; i < events.size(); ++i) {
-            const audio::NoteEvent& event = events[i];
-            json += std::format(R"({}{{"time":{},"kind":"{}","track":{},"key":{},{}}})",
-                                i == 0 ? "" : ",", jsonNumber(event.time), kindName(event.kind),
-                                event.track, event.key, eventJson(event));
+        json.key("events").beginArray();
+        for (const audio::NoteEvent& event : sequence.events()) {
+            json.beginObject()
+                .field("time", event.time)
+                .field("kind", kindName(event.kind))
+                .field("track", event.track)
+                .field("key", event.key);
+            writeEvent(json, event);
+            json.endObject();
         }
-        json += ']';
+        json.endArray();
     }
-    return json + '}';
+    json.endObject();
+    return json.text();
 }
 
 int runSequence(bool json, const SequenceOptions& options) {
@@ -353,13 +388,15 @@ sfzChoices(const std::vector<std::string>& values) {
 }
 
 // The instruments of --sfz as a JSON list of their files and tracks.
-std::string sfzJson(const std::vector<SfzChoice>& choices) {
-    std::string json = "[";
+void writeSfz(JsonWriter& json, const std::vector<SfzChoice>& choices) {
+    json.beginArray();
     for (const SfzChoice& choice : choices) {
-        json += std::format(R"({}{{"file":"{}","tracks":"{}"}})", json.size() == 1 ? "" : ",",
-                            jsonEscape(choice.file), audio::sfzTracksName(choice.tracks));
+        json.beginObject()
+            .field("file", choice.file)
+            .field("tracks", audio::sfzTracksName(choice.tracks))
+            .endObject();
     }
-    return json + ']';
+    json.endArray();
 }
 
 // The sound bank of --soundfont and --sfz: the built-in synthesizer when both
@@ -398,8 +435,13 @@ soundBankFrom(const std::string& soundFont, const std::vector<SfzChoice>& sfz = 
 }
 
 // A path as a JSON string, or null when it is empty.
-std::string jsonPath(const std::string& path) {
-    return path.empty() ? std::string("null") : '"' + jsonEscape(path) + '"';
+void writePath(JsonWriter& json, std::string_view name, const std::string& path) {
+    json.key(name);
+    if (path.empty()) {
+        json.null();
+    } else {
+        json.string(path);
+    }
 }
 
 constexpr const char* kSfzHelp =
@@ -475,28 +517,45 @@ int runRenderAudio(bool json, const RenderAudioOptions& options) {
     const auto& log = renderer.log();
 
     if (json) {
-        std::string body = std::format(
-            R"({{"file":"{}","out":{},"soundFont":{},"sfz":{},"sampleRate":{},"channels":2,"frames":{},"seconds":{},"peak":{:.4f},"rms":{:.4f},"tracks":[)",
-            jsonEscape(options.file), jsonPath(options.out), jsonPath(options.soundFont),
-            sfzJson(*sfz), options.sampleRate, frames, jsonNumber(seconds), peak, rms);
+        JsonWriter out;
+        out.beginObject().field("file", options.file);
+        writePath(out, "out", options.out);
+        writePath(out, "soundFont", options.soundFont);
+        out.key("sfz");
+        writeSfz(out, *sfz);
+        out.field("sampleRate", options.sampleRate)
+            .field("channels", 2)
+            .field("frames", frames)
+            .field("seconds", seconds)
+            .field("peak", peak)
+            .field("rms", rms)
+            .key("tracks")
+            .beginArray();
         for (std::size_t t = 0; t < renderer.timbres().size(); ++t) {
-            body += std::format(R"({}{{"track":{},"name":"{}","timbre":"{}","sound":"{}"}})",
-                                t == 0 ? "" : ",", t, jsonEscape(song->track(t).name()),
-                                audio::timbreName(renderer.timbres()[t]),
-                                jsonEscape(renderer.sounds()[t]));
+            out.beginObject()
+                .field("track", t)
+                .field("name", song->track(t).name())
+                .field("timbre", audio::timbreName(renderer.timbres()[t]))
+                .field("sound", renderer.sounds()[t])
+                .endObject();
         }
-        body += std::format(R"(],"eventCount":{})", log.size());
+        out.endArray().field("eventCount", log.size());
         if (options.events) {
-            body += R"(,"events":[)";
-            for (std::size_t i = 0; i < log.size(); ++i) {
-                const audio::LoggedEvent& event = log[i];
-                body += std::format(R"({}{{"frame":{},"kind":"{}","track":{},"key":{},{}}})",
-                                    i == 0 ? "" : ",", event.frame, kindName(event.kind),
-                                    event.track, event.key, eventJson(event));
+            out.key("events").beginArray();
+            for (const audio::LoggedEvent& event : log) {
+                out.beginObject()
+                    .field("frame", event.frame)
+                    .field("kind", kindName(event.kind))
+                    .field("track", event.track)
+                    .field("key", event.key);
+                writeEvent(out, event);
+                out.endObject();
             }
-            body += ']';
+            out.endArray();
         }
-        std::cout << body << ',' << practiceJson(sequence) << "}\n";
+        writePractice(out, sequence);
+        out.endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("rendered {:.3f} s ({} frames @ {} Hz, stereo), peak {:.4f}, "
@@ -600,15 +659,24 @@ int runPlay(bool json, const PlayOptions& options) {
     system.setSource(nullptr);
 
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"file":"{}","device":"{}","from":{},"to":{},"finished":{},{},"countIn":{},"loop":{}}})",
-                   jsonEscape(options.file), jsonEscape(system.deviceDescription()),
-                   jsonNumber(from), jsonNumber(to), finished ? "true" : "false",
-                   practiceJson(sequence), countInJson(countIn),
-                   looping ? std::format("[{},{}]", jsonNumber(loopFrom), jsonNumber(loopTo))
-                           : std::string("null"))
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("file", options.file)
+            .field("device", system.deviceDescription())
+            .field("from", from)
+            .field("to", to)
+            .field("finished", finished);
+        writePractice(out, sequence);
+        out.key("countIn");
+        writeCountIn(out, countIn);
+        out.key("loop");
+        if (looping) {
+            out.beginArray().value(loopFrom).value(loopTo).endArray();
+        } else {
+            out.null();
+        }
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("played {} from {:.3f} s to {:.3f} s on {}\n", options.file, from,
                                  to, system.deviceDescription());
@@ -628,13 +696,21 @@ int runSoundFont(bool json, const SoundFontOptions& options) {
     }
     const auto& presets = (*font)->presets();
     if (json) {
-        std::string body = std::format(R"({{"file":"{}","presetCount":{},"presets":[)",
-                                       jsonEscape(options.file), presets.size());
-        for (std::size_t i = 0; i < presets.size(); ++i) {
-            body += std::format(R"({}{{"bank":{},"program":{},"name":"{}"}})", i == 0 ? "" : ",",
-                                presets[i].bank, presets[i].program, jsonEscape(presets[i].name));
+        JsonWriter out;
+        out.beginObject()
+            .field("file", options.file)
+            .field("presetCount", presets.size())
+            .key("presets")
+            .beginArray();
+        for (const audio::SoundFontPreset& preset : presets) {
+            out.beginObject()
+                .field("bank", preset.bank)
+                .field("program", preset.program)
+                .field("name", preset.name)
+                .endObject();
         }
-        std::cout << body << "]}\n";
+        out.endArray().endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("{}: {} presets\n", options.file, presets.size());
@@ -649,12 +725,12 @@ struct SfzOptions {
 };
 
 // A JSON array of strings.
-std::string jsonStrings(const std::vector<std::string>& values) {
-    std::string body = "[";
-    for (std::size_t i = 0; i < values.size(); ++i) {
-        body += std::format(R"({}"{}")", i == 0 ? "" : ",", jsonEscape(values[i]));
+void writeStrings(JsonWriter& json, std::string_view name, const std::vector<std::string>& values) {
+    json.key(name).beginArray();
+    for (const std::string& value : values) {
+        json.value(value);
     }
-    return body + ']';
+    json.endArray();
 }
 
 // The touches an SFZ library can play itself, and its legato, with its
@@ -669,20 +745,25 @@ techniquesOf(const audio::SfzBank& bank) {
 }
 
 // {"palm-mute": {"keyswitch" or "cc": N, "label": ...} or null, ...}
-std::string techniquesJson(const audio::SfzBank& bank) {
-    std::string json = "{";
+void writeTechniques(JsonWriter& json, const audio::SfzBank& bank) {
+    json.beginObject();
     for (const auto& [touch, technique] : techniquesOf(bank)) {
-        json += std::format(R"({}"{}":)", json.size() == 1 ? "" : ",", touch);
+        json.key(touch);
         if (!technique->found()) {
-            json += "null";
+            json.null();
+        } else if (technique->keyswitch >= 0) {
+            json.beginObject()
+                .field("keyswitch", technique->keyswitch)
+                .field("label", technique->label)
+                .endObject();
         } else {
-            json += std::format(R"({{"{}":{},"label":"{}"}})",
-                                technique->keyswitch >= 0 ? "keyswitch" : "cc",
-                                technique->keyswitch >= 0 ? technique->keyswitch : technique->cc,
-                                jsonEscape(technique->label));
+            json.beginObject()
+                .field("cc", technique->cc)
+                .field("label", technique->label)
+                .endObject();
         }
     }
-    return json + '}';
+    json.endObject();
 }
 
 int runSfz(bool json, const SfzOptions& options) {
@@ -701,13 +782,22 @@ int runSfz(bool json, const SfzOptions& options) {
         highest = std::max(highest, region.hiKey);
     }
     if (json) {
-        std::cout << std::format(
-            R"({{"file":"{}","name":"{}","regions":{},"samples":{},"sampleBytes":{},"lowestKey":{},"highestKey":{},"missingSamples":{},"unknownOpcodes":{},"skippedHeaders":{},"techniques":{},"loadSeconds":{}}})"
-            "\n",
-            jsonEscape(options.file), jsonEscape((*bank)->name()), program.regions.size(),
-            (*bank)->sampleCount(), (*bank)->sampleBytes(), lowest, highest,
-            jsonStrings((*bank)->missingSamples()), jsonStrings(program.unknownOpcodes),
-            jsonStrings(program.skippedHeaders), techniquesJson(**bank), jsonNumber(loadSeconds));
+        JsonWriter out;
+        out.beginObject()
+            .field("file", options.file)
+            .field("name", (*bank)->name())
+            .field("regions", program.regions.size())
+            .field("samples", (*bank)->sampleCount())
+            .field("sampleBytes", (*bank)->sampleBytes())
+            .field("lowestKey", lowest)
+            .field("highestKey", highest);
+        writeStrings(out, "missingSamples", (*bank)->missingSamples());
+        writeStrings(out, "unknownOpcodes", program.unknownOpcodes);
+        writeStrings(out, "skippedHeaders", program.skippedHeaders);
+        out.key("techniques");
+        writeTechniques(out, **bank);
+        out.field("loadSeconds", loadSeconds).endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("{}: {} regions over keys {} to {}, {} samples ({:.1f} MB) read in "
@@ -804,18 +894,25 @@ int runTune(bool json, const TuneOptions& options) {
     }
 
     if (json) {
-        std::string out = std::format(
-            R"({{"file":"{}","sampleRate":{},"windows":{},"pitched":{},"a4":{},"frequency":{},"note":"{}","cents":{},"clarity":{})",
-            jsonEscape(options.file), wav->format.sampleRate, windows, heard.size(),
-            jsonNumber(options.a4Hz), jsonNumber(frequency), reading->note.toString(),
-            jsonNumber(reading->cents), jsonNumber(clarity));
+        JsonWriter out;
+        out.beginObject()
+            .field("file", options.file)
+            .field("sampleRate", wav->format.sampleRate)
+            .field("windows", windows)
+            .field("pitched", heard.size())
+            .field("a4", options.a4Hz)
+            .field("frequency", frequency)
+            .field("note", reading->note.toString())
+            .field("cents", reading->cents)
+            .field("clarity", clarity);
         if (tuning) {
-            out += std::format(R"(,"tuning":"{}","string":{},"stringPitch":"{}","stringCents":{})",
-                               tuning->toString(), reading->string,
-                               tuning->openString(reading->string).toString(),
-                               jsonNumber(reading->stringCents));
+            out.field("tuning", tuning->toString())
+                .field("string", reading->string)
+                .field("stringPitch", tuning->openString(reading->string).toString())
+                .field("stringCents", reading->stringCents);
         }
-        std::cout << out << "}\n";
+        out.endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("{} {} cents ({:.2f} Hz, clarity {:.2f}, {} of {} windows)\n",
@@ -836,19 +933,20 @@ struct ListenOptions {
 };
 
 // One reading of `listen`: what the tuner shows from `time` seconds on.
-std::string listenJson(double time, const std::optional<audio::TunerReading>& reading,
-                       const std::optional<core::Tuning>& tuning) {
+void writeReading(JsonWriter& json, double time, const std::optional<audio::TunerReading>& reading,
+                  const std::optional<core::Tuning>& tuning) {
+    json.beginObject().field("time", time).key("note");
     if (!reading) {
-        return std::format(R"({{"time":{},"note":null}})", jsonNumber(time));
+        json.null().endObject();
+        return;
     }
-    std::string out = std::format(R"({{"time":{},"note":"{}","cents":{},"frequency":{})",
-                                  jsonNumber(time), reading->note.toString(),
-                                  jsonNumber(reading->cents), jsonNumber(reading->frequency));
+    json.string(reading->note.toString())
+        .field("cents", reading->cents)
+        .field("frequency", reading->frequency);
     if (tuning) {
-        out += std::format(R"(,"string":{},"stringCents":{})", reading->string,
-                           jsonNumber(reading->stringCents));
+        json.field("string", reading->string).field("stringCents", reading->stringCents);
     }
-    return out + '}';
+    json.endObject();
 }
 
 // Listens to the default input for a while and reports each change of the
@@ -874,7 +972,8 @@ int runListen(bool json, const ListenOptions& options) {
     using namespace std::chrono_literals;
     const auto start = std::chrono::steady_clock::now();
     std::vector<float> block(8192);
-    std::string readings;
+    JsonWriter readings;
+    readings.beginArray();
     float peak = 0.0f;
     for (;;) {
         std::this_thread::sleep_for(20ms);
@@ -886,7 +985,7 @@ int runListen(bool json, const ListenOptions& options) {
             }
             const auto& reading = tuner.reading();
             if (json) {
-                readings += (readings.empty() ? "" : ",") + listenJson(time, reading, tuning);
+                writeReading(readings, time, reading, tuning);
             } else if (!reading) {
                 std::cout << std::format("{:7.2f} s  -\n", time) << std::flush;
             } else {
@@ -906,13 +1005,18 @@ int runListen(bool json, const ListenOptions& options) {
         }
     }
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"device":"{}","sampleRate":{},"seconds":{},"peak":{},"dropped":{},"readings":[{}]}})",
-                   jsonEscape(input.deviceDescription()), jsonNumber(input.sampleRate()),
-                   jsonNumber(options.seconds), jsonNumber(static_cast<double>(peak)),
-                   input.dropped(), readings)
-            << '\n';
+        readings.endArray();
+        JsonWriter out;
+        out.beginObject()
+            .field("device", input.deviceDescription())
+            .field("sampleRate", input.sampleRate())
+            .field("seconds", options.seconds)
+            .field("peak", peak)
+            .field("dropped", input.dropped())
+            .key("readings")
+            .raw(readings.text())
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("peak level {:.3f}\n", peak);
     }

@@ -12,7 +12,7 @@ set(_tone_wav "${CMAKE_CURRENT_BINARY_DIR}/tone.wav")
 add_test(NAME cli.render_tone
   COMMAND elara-cli --json render-tone --out "${_tone_wav}" --seconds 0.5 --sample-rate 48000)
 set_tests_properties(cli.render_tone PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"frames\":24000,\"sampleRate\":48000,\"channels\":1,\"peak\":0\\.2000"
+  PASS_REGULAR_EXPRESSION "\"frames\":24000,\"sampleRate\":48000,\"channels\":1,\"peak\":0\\.2}"
   FIXTURES_SETUP tone_wav)
 
 # 44-byte header + 24000 mono 16-bit frames.
