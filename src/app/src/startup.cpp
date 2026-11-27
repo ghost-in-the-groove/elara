@@ -127,7 +127,16 @@ void Startup::start() {
     if (options_.size && window_ != nullptr) {
         window_->resize(*options_.size);
     }
-    score_ = window_ != nullptr ? window_->findChild<ScoreDocument*>() : nullptr;
+    songs_ = window_ != nullptr ? window_->findChild<DocumentSet*>() : nullptr;
+    score_ = songs_ != nullptr ? songs_->current() : nullptr;
+    if (songs_ != nullptr) {
+        // A file that does not open closes its song again (ADR-0160).
+        connect(songs_, &DocumentSet::failed, this, [this](const QString& message) {
+            if (openFailure_.isEmpty()) {
+                openFailure_ = message;
+            }
+        });
+    }
     editor_ = window_ != nullptr ? window_->findChild<CaretEditor*>() : nullptr;
     if (score_ != nullptr) {
         connect(score_, &ScoreDocument::layoutChanged, this, [this] {
@@ -200,6 +209,10 @@ void Startup::queueSteps() {
             queueEffects();
             queueContinuous();
         }
+        return;
+    }
+    if (options_.smokeTest && options_.files.size() > 1) {
+        queueSongs();
         return;
     }
     if (options_.smokeTest && options_.tuner) {
@@ -548,29 +561,34 @@ void Startup::queueSave() {
         return true;
     });
     steps_.emplace_back([this] {
-        // A new song asked for while a save is written waits for it, and is
-        // made without asking once the save holds every change (ADR-0107).
-        // The edit before was laid out first, so that the new song's layout
-        // never takes the place of the edit's, whenever the save ends.
+        // A new song asked for while a save is written opens beside the song
+        // saved at once (ADR-0160), and the save goes on (ADR-0107).
         saved_.reset();
         score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("waiting"))));
         QMetaObject::invokeMethod(window_, "newSong");
         window_->setProperty("showSongPane", false);
-        return true;
+        return false;
     });
     steps_.emplace_back([this, check] {
-        // The save has ended and the new song made then is laid out, so that
-        // the next edit does not take the place of its layout.
-        if (!saved_ || score_->busy()) {
+        if (!saved_ || songs_->current()->busy()) {
             again_ = true;
             return false;
         }
         const auto* unsaved = window_->findChild<QObject*>(QStringLiteral("unsavedDialog"));
         check(unsaved != nullptr && !unsaved->property("visible").toBool(),
-              "a song saved while a new one waited was asked to be saved");
-        check(score_->songTitle() != QStringLiteral("Waiting") && score_->source().isEmpty() &&
-                  !score_->modified(),
-              "the new song asked for while saving was not made once the save ended");
+              "a song saved while a new one opened was asked to be saved");
+        check(songs_->count() == 2 && songs_->current() != score_ &&
+                  songs_->current()->song() != nullptr && !songs_->current()->modified(),
+              "the new song asked for while saving did not open beside it");
+        check(score_->songTitle() == QStringLiteral("Waiting") && !score_->modified(),
+              "the song saved while a new one opened is not saved");
+        // The new song, unchanged, closes without asking; the saved one shows.
+        QMetaObject::invokeMethod(window_, "closeSong");
+        return false;
+    });
+    steps_.emplace_back([this, check] {
+        check(songs_->count() == 1 && songs_->current() == score_,
+              "closing the new song did not show the song before it");
         // A song that replaces the one being saved is not marked saved by it.
         score_->setSongTitle(QStringLiteral("Replaced"));
         saved_.reset();
@@ -647,6 +665,83 @@ void Startup::queueRecover() {
                   score_->source().isEmpty(),
               "the song recovered is not the song left");
         check(score_->recoverable().isEmpty(), "the copy recovered is still offered");
+        return false;
+    });
+}
+
+// Several songs open at once (ADR-0160), given as files on the command line:
+// they load together, each in a tab; a measure copied in the first is pasted
+// in the second, shown by "Next song"; the second, changed, closes after the
+// unsaved changes are discarded, and the first shows again. Prints
+// "songs: ..." at each stage.
+void Startup::queueSongs() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("songs check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    const auto shown = [this](const char* name) {
+        const QQuickItem* item = findItem(window_->contentItem(), QString::fromLatin1(name));
+        return item != nullptr ? item->property("document").value<QObject*>() : nullptr;
+    };
+    steps_.emplace_back([this, check] {
+        // Every file was asked for at once: wait for the last to be laid out.
+        bool ready = songs_ != nullptr && songs_->count() == options_.files.size();
+        for (int i = 0; ready && i < songs_->count(); ++i) {
+            const ScoreDocument* song = songs_->at(i);
+            ready = song->status() == ScoreDocument::Status::Ready && !song->busy() &&
+                    song->pageCount() > 0;
+        }
+        if (!ready) {
+            again_ = true;
+            return false;
+        }
+        const QQuickItem* tabs = findItem(window_->contentItem(), QStringLiteral("songTabs"));
+        check(tabs != nullptr && tabs->isVisible(), "the tabs do not show with two songs open");
+        check(songs_->current() == score_, "the first file named is not the one shown");
+        std::printf("songs: %d open: %s | %s\n", songs_->count(),
+                    qPrintable(songs_->at(0)->title()), qPrintable(songs_->at(1)->title()));
+        // The caret's measure, the first, of the first song.
+        score_->copy();
+        QMetaObject::invokeMethod(window_, "nextSong");
+        return false;
+    });
+    steps_.emplace_back([this, check, shown] {
+        ScoreDocument* other = songs_->at(1);
+        check(songs_->current() == other, "Next song did not show the second song");
+        check(shown("scoreView") == other, "the score does not show the song shown");
+        const auto* audio = window_->findChild<AudioController*>();
+        check(audio != nullptr && audio->document() == other,
+              "the transport does not play the song shown");
+        check(other->canPaste(), "a measure copied in one song cannot be pasted in another");
+        other->moveCaret(ScoreDocument::CaretMove::NextMeasure);
+        other->paste(false);
+        const core::Song& to = *other->song();
+        const core::Song& from = *score_->song();
+        check(to.track(0).staff(0).measure(1) == from.track(0).staff(0).measure(0) &&
+                  other->modified(),
+              "the measure pasted from the other song is not the one copied");
+        std::printf("songs: pasted measure 1 of %s into measure 2 of %s\n",
+                    qPrintable(score_->title()), qPrintable(other->title()));
+        QMetaObject::invokeMethod(window_, "closeSong");
+        return false;
+    });
+    steps_.emplace_back([this, check] {
+        // Its unsaved changes are asked about first, and discarded here.
+        auto* unsaved = window_->findChild<QObject*>(QStringLiteral("unsavedDialog"));
+        check(unsaved != nullptr && unsaved->property("visible").toBool() && songs_->count() == 2,
+              "closing a song with unsaved changes did not ask first");
+        if (unsaved != nullptr) {
+            QMetaObject::invokeMethod(unsaved, "discarded");
+        }
+        return false;
+    });
+    steps_.emplace_back([this, check] {
+        check(songs_->count() == 1 && songs_->current() == score_ && !songs_->unsaved(),
+              "the song whose changes were discarded did not close");
+        const QQuickItem* tabs = findItem(window_->contentItem(), QStringLiteral("songTabs"));
+        check(tabs == nullptr || !tabs->isVisible(), "the tabs still show with one song open");
+        std::printf("songs: closed the second, %d open\n", songs_->count());
         return false;
     });
 }
@@ -2096,6 +2191,10 @@ void Startup::tick() {
     if (!options_.file.isEmpty() && score_ != nullptr &&
         score_->status() == ScoreDocument::Status::Error) {
         finish(false, score_->errorMessage());
+        return;
+    }
+    if (!options_.file.isEmpty() && !openFailure_.isEmpty()) {
+        finish(false, openFailure_);
         return;
     }
     if (waiting_) {

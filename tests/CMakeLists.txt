@@ -132,7 +132,9 @@ if(TARGET elara)
   # transport plays through a device of the tests' own (ADR-0126).
   target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp app/test_fret_entry.cpp
     app/test_score_editing.cpp app/test_caret_editor.cpp app/test_symbols.cpp
+    app/test_document_set.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/caret_editor.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/audio_controller.cpp")
   set_target_properties(elara_app_tests PROPERTIES AUTOMOC ON)
@@ -199,8 +201,14 @@ if(TARGET elara)
   # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # Several songs open at once (ADR-0160): two files named together load side
+  # by side in tabs, a measure copied in one is pasted in the other, and the
+  # changed one closes once its changes are discarded.
+  add_test(NAME app.smoke_songs
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/melody.gp3"
+      "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/dal-segno.gp5")
   set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
-    app.smoke_open_views app.smoke_open_missing
+    app.smoke_open_views app.smoke_open_missing app.smoke_songs
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
     app.smoke_effects
     PROPERTIES
@@ -208,7 +216,7 @@ if(TARGET elara)
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 60 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 59 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
@@ -222,6 +230,8 @@ if(TARGET elara)
   set_tests_properties(app.smoke_narrow app.smoke_menu PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(app.smoke_songs PROPERTIES
+    PASS_REGULAR_EXPRESSION "songs: 2 open: [^\r\n]+ \\| [^\r\n]+[\r\n]+songs: pasted measure 1 of [^\r\n]+ into measure 2 of [^\r\n]+[\r\n]+songs: closed the second, 1 open[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
 

@@ -3,8 +3,10 @@
 #pragma once
 
 #include "caret_editor.hpp"
+#include "document_set.hpp"
 #include "score_document.hpp"
 #include <QElapsedTimer>
+#include <QList>
 #include <QObject>
 #include <QPointF>
 #include <QPointer>
@@ -27,7 +29,8 @@ class Sequence;
 namespace elara::app {
 
 struct StartupOptions {
-    QUrl file;                ///< opened by the window as it loads
+    QUrl file;                ///< opened by the window as it loads: the first of files
+    QList<QUrl> files;        ///< every file named, each opened in a song of its own
     std::optional<int> track; ///< a track to show, or ScoreDocument::kAllTracks
     std::optional<ScoreDocument::View> view;
     std::optional<double> seek; ///< seconds to move the transport to, paused
@@ -107,14 +110,17 @@ private:
     void queueCrashAfterRecoveryCopy();
     void queueRecover();
     void queueWindowState();
+    void queueSongs();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
     QPointer<QQuickWindow> window_;
     StartupOptions options_;
     const bool& qmlWarnings_;
-    QPointer<ScoreDocument> score_;
-    QPointer<CaretEditor> editor_; ///< what is at score_'s caret
+    QPointer<ScoreDocument> score_; ///< the song the window opens with, its first
+    QPointer<CaretEditor> editor_;  ///< what is at the shown song's caret
+    QPointer<DocumentSet> songs_;   ///< every song open (ADR-0160)
+    QString openFailure_;           ///< why a file named did not open
     QTimer timer_;
     QElapsedTimer clock_;
     qint64 stepStarted_ = 0;

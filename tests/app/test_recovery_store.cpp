@@ -183,3 +183,26 @@ TEST_CASE("Recovery copies: what a run left besides a copy is cleared away", "[a
         QFileInfo(running.copyFile()).completeBaseName() + QStringLiteral(".lock");
     CHECK(folder.entryList(QDir::Files) == QStringList{runningLock});
 }
+
+TEST_CASE("Recovery copies: a copy let go of is offered by another store", "[app][recovery]") {
+    // Two songs open in one run, each with a store (ADR-0160): the copy one
+    // offered goes to the other once let go of, and stays on the disk.
+    const QTemporaryDir dir;
+    {
+        RecoveryStore crashed(dir.path());
+        REQUIRE(
+            crashed.write(songTitled("Riff"), QUrl(), QStringLiteral("Riff"), crashed.removals()));
+    }
+    RecoveryStore listing(dir.path());
+    RecoveryStore other(dir.path());
+    const auto left = listing.left();
+    REQUIRE(left.size() == 1);
+    CHECK(other.left().empty()); // held by the store that offered it
+    CHECK_FALSE(other.release(left[0].file));
+
+    CHECK(listing.release(left[0].file));
+    CHECK_FALSE(listing.release(left[0].file)); // once
+    REQUIRE(other.left().size() == 1);
+    CHECK(listing.left().empty());
+    CHECK(other.discard(left[0].file));
+}

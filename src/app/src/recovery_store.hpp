@@ -35,7 +35,9 @@ namespace elara::app {
 /// thread; it prepares the copy beside its place and renames it there, so the
 /// others never wait for the disk. left() also clears away what runs that are
 /// gone left besides a copy. Destroying the store releases its locks and keeps
-/// the copies.
+/// the copies. Each song open has a store of its own in the same folder
+/// (ADR-0160): the others' copies are locked by this run, so none of them
+/// offers another's.
 class RecoveryStore {
 public:
     /// A copy an earlier run left behind.
@@ -77,18 +79,27 @@ public:
     /// Removes a copy left() offered, once it is recovered or discarded.
     /// False for any other file.
     bool discard(const QString& file);
+    /// Lets go of a copy left() offered, keeping it, so that another store
+    /// in the folder offers it: the song recovered into another song open
+    /// (ADR-0160). False for any other file.
+    bool release(const QString& file);
 
 private:
     [[nodiscard]] QString pathOf(const QString& id, const char* extension) const;
     /// Removes the files named after `id`, but for its lock.
     void removeFilesOf(const QString& id) const;
 
+    using Taken = std::map<QString, std::unique_ptr<QLockFile>>;
+    /// The copy left() offered as `file`; taken_.end() for any other file.
+    /// With mutex_ held.
+    [[nodiscard]] Taken::iterator takenCopy(const QString& file);
+
     QString folder_;
     QString id_;                      ///< names this run's files
     mutable std::mutex mutex_;        ///< over the members below and the files' names
     std::mutex writing_;              ///< one write() at a time
     std::unique_ptr<QLockFile> lock_; ///< this run's, from its first write
-    std::map<QString, std::unique_ptr<QLockFile>> taken_; ///< left copies' locks, by id
+    Taken taken_;                     ///< left copies' locks, by id
     std::uint64_t removals_ = 0;
 };
 

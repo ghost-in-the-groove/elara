@@ -788,6 +788,12 @@ void ScoreDocument::discardRecovery(const QString& file) {
     }
 }
 
+void ScoreDocument::releaseRecovery(const QString& file) {
+    if (recovery_) {
+        recovery_->release(file);
+    }
+}
+
 void ScoreDocument::relayout() {
     if (!song_) {
         return;
@@ -2257,6 +2263,11 @@ void ScoreDocument::copy() {
     emit notice(copied.count == 1
                     ? tr("Copied measure %1.").arg(copied.first + 1)
                     : tr("Copied measures %1-%2.").arg(copied.first + 1).arg(copied.last() + 1));
+}
+
+void ScoreDocument::shareClipboard(std::shared_ptr<core::Clipboard> clipboard) {
+    session_.shareClipboard(std::move(clipboard));
+    emit clipboardChanged();
 }
 
 void ScoreDocument::paste(bool insert) {
