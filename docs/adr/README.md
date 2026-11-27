@@ -132,6 +132,7 @@ one that replaces them.
 | [0131](0131-the-scores-texts-follow-one-scale.md) | The score's texts follow one scale | Accepted |
 | [0132](0132-the-caret-says-the-beat-and-the-string.md) | The caret says the beat and the string | Accepted |
 | [0133](0133-bold-marks-and-the-page-across-the-view.md) | Bold marks, and the page across the view | Accepted |
+| [0134](0134-ci-time.md) | Where CI's time goes | Accepted |
 
 ## Template
 

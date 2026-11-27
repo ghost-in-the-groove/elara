@@ -1,0 +1,131 @@
+name: Elara toolchain
+description: >
+  What every workflow sets up before elara.py: Python and its tools, the Linux
+  packages, Qt, vcpkg at the manifest's baseline with its binary cache, and
+  ccache. Shared by ci.yml, sanitize.yml and package.yml, so they build with
+  the same vcpkg and share its cache (ADR-0134).
+
+inputs:
+  pip:
+    description: Python packages to install, separated by spaces
+    default: ninja
+  qt:
+    description: The Qt version to install, or empty for none
+    default: ""
+  ccache:
+    description: "\"true\" to put ccache on the PATH"
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: "3.13"
+
+    - name: Python tools
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.pip }}
+      # Unquoted on purpose: one argument per package.
+      run: python -m pip install $PACKAGES
+
+    # man-db rebuilds its index after every install, which takes longer than
+    # the install itself and serves no build.
+    - name: Linux packages
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo rm -f /var/lib/man-db/auto-update
+        sudo apt-get update
+        sudo apt-get install -y g++-14 libasound2-dev libfreetype-dev libfontconfig1-dev \
+          libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev \
+          libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 libegl1
+        echo "CXX=g++-14" >> "$GITHUB_ENV"
+        echo "CC=gcc-14" >> "$GITHUB_ENV"
+
+    - name: Cache Qt
+      if: inputs.qt != ''
+      id: qt-cache
+      uses: actions/cache@v6
+      with:
+        path: ${{ runner.temp }}/Qt
+        key: qt-${{ runner.os }}-${{ inputs.qt }}-${{ hashFiles('scripts/install_qt.py') }}
+
+    # py7zr extracts what a cache miss downloads; a cached kit needs nothing.
+    - name: Install Qt
+      if: inputs.qt != ''
+      shell: bash
+      env:
+        QT_VERSION: ${{ inputs.qt }}
+        QT_CACHED: ${{ steps.qt-cache.outputs.cache-hit }}
+      run: |
+        if [ "$QT_CACHED" != true ]; then python -m pip install py7zr; fi
+        kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" 2>/dev/null | tail -n 1)
+        echo "QT_ROOT_DIR=$kit" >> "$GITHUB_ENV"
+
+    # vcpkg at the manifest's baseline: package ABIs hash vcpkg's own scripts,
+    # so a newer checkout misses every package in the binary cache. Only that
+    # commit is fetched, not vcpkg's history.
+    #
+    # The default triplet goes without compiler tracking: the cache key below
+    # names the runner image, which fixes the compiler, so vcpkg need not
+    # configure a project on every run to hash it. vcpkg's downloads keep the
+    # CMake it unpacks for itself.
+    - name: vcpkg
+      id: vcpkg
+      shell: bash
+      run: |
+        root="$RUNNER_TEMP/vcpkg"
+        baseline=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+        git init -q "$root"
+        git -C "$root" remote add origin https://github.com/microsoft/vcpkg
+        git -C "$root" fetch -q --depth 1 origin "$baseline"
+        git -C "$root" checkout -q FETCH_HEAD
+        if [ "$RUNNER_OS" = "Windows" ]; then "$root/bootstrap-vcpkg.bat" -disableMetrics; else "$root/bootstrap-vcpkg.sh" -disableMetrics; fi
+        case "$RUNNER_OS" in
+          Windows) triplet=x64-windows ;;
+          macOS)   triplet=x64-osx ;;
+          Linux)   triplet=x64-linux ;;
+        esac
+        mkdir -p "$RUNNER_TEMP/vcpkg-triplets" "$RUNNER_TEMP/vcpkg-binary" "$RUNNER_TEMP/vcpkg-downloads"
+        { cat "$root/triplets/$triplet.cmake"; echo "set(VCPKG_DISABLE_COMPILER_TRACKING ON)"; } \
+          > "$RUNNER_TEMP/vcpkg-triplets/$triplet.cmake"
+        {
+          echo "VCPKG_ROOT=$root"
+          echo "VCPKG_OVERLAY_TRIPLETS=$RUNNER_TEMP/vcpkg-triplets"
+          echo "VCPKG_DEFAULT_BINARY_CACHE=$RUNNER_TEMP/vcpkg-binary"
+          echo "VCPKG_DOWNLOADS=$RUNNER_TEMP/vcpkg-downloads"
+        } >> "$GITHUB_ENV"
+        echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
+
+    - name: Cache vcpkg
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ runner.temp }}/vcpkg-binary
+          ${{ runner.temp }}/vcpkg-downloads
+        key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-untracked-${{ hashFiles('vcpkg.json', 'cmake/vcpkg-ports/**') }}
+
+    - name: ccache
+      if: inputs.ccache == 'true'
+      shell: bash
+      env:
+        CCACHE_VERSION: 4.14.2
+      run: |
+        case "$RUNNER_OS" in
+          Linux)   platform=linux-x86_64-glibc; ext=tar.xz; sha=bd1313f5316f594443dcb4113a4191c666ac6450e0cf016ff8cb8b080f46c160 ;;
+          macOS)   platform=darwin;             ext=tar.gz; sha=cf240009630b605b775c7c5c7b7105a3b196c79f31af322c1557969aa28003fc ;;
+          Windows) platform=windows-x86_64;     ext=zip;    sha=6993ce645e53192cec592ee23186200b574ac4c59097ecde8d9cfd681b47ae84 ;;
+        esac
+        name="ccache-$CCACHE_VERSION-$platform"
+        curl -fsSL -o "$RUNNER_TEMP/$name.$ext" "https://github.com/ccache/ccache/releases/download/v$CCACHE_VERSION/$name.$ext"
+        python - "$RUNNER_TEMP/$name.$ext" "$sha" "$RUNNER_TEMP" <<'EOF'
+        import hashlib, shutil, sys
+        archive, sha, outdir = sys.argv[1:]
+        with open(archive, "rb") as f:
+            if hashlib.sha256(f.read()).hexdigest() != sha:
+                sys.exit(f"{archive}: unexpected SHA-256")
+        shutil.unpack_archive(archive, outdir)
+        EOF
+        echo "$RUNNER_TEMP/$name" >> "$GITHUB_PATH"
