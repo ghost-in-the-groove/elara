@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Copying measures and pasting them elsewhere in a song (ADR-0027).
+// Copying measures and pasting them elsewhere in a song, or in another song
+// open beside it (ADR-0027, ADR-0160).
 #pragma once
 
 #include <elara/core/commands.hpp>
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
+#include <elara/core/shared_value.hpp>
 #include <elara/core/song.hpp>
 #include <elara/core/tuning.hpp>
 
@@ -12,15 +14,19 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace elara::core {
 
 /// One staff of a copied track: its measures and what its frets were played on.
+/// The measures are shared with the song they were copied from (ADR-0051):
+/// copying one costs a reference count, and pasting it where its frets need
+/// no other strings shares it again.
 struct ClipStaff {
     std::optional<Tuning> tuning{};
     int capo = 0;
-    std::vector<Measure> measures{};
+    std::vector<SharedValue<Measure>> measures{};
 
     friend bool operator==(const ClipStaff&, const ClipStaff&) = default;
 };
@@ -66,5 +72,27 @@ enum class PasteMode : std::uint8_t {
 [[nodiscard]] std::unique_ptr<Command> makePaste(const Song& song, const MeasureClip& clip,
                                                  std::size_t at, std::size_t track = 0,
                                                  PasteMode mode = PasteMode::Replace);
+
+/// What was copied last, shared by the editing sessions of every song open
+/// (ADR-0160): measures copied in one song are pasted in any of them. A copy
+/// replaces what it held. Not for use from several threads at once.
+class Clipboard {
+public:
+    /// Holds `clip` from now on, in place of what it held.
+    void hold(MeasureClip clip) {
+        clip_ = std::make_shared<const MeasureClip>(std::move(clip));
+        ++revision_;
+    }
+    /// What it holds; null before the first copy. It stays as it is while
+    /// later copies replace it, so a paste may go on using it.
+    [[nodiscard]] std::shared_ptr<const MeasureClip> clip() const noexcept { return clip_; }
+    [[nodiscard]] bool isEmpty() const noexcept { return clip_ == nullptr; }
+    /// How many copies it held so far: it changes with each.
+    [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
+
+private:
+    std::shared_ptr<const MeasureClip> clip_;
+    std::uint64_t revision_ = 0;
+};
 
 } // namespace elara::core

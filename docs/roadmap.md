@@ -296,6 +296,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 - [x] The player prepared on a worker after edits, a new song or a new sound
       bank: events, buffers and new sounds off the interface thread (ADR-0112)
+- [ ] Several songs open at once, in tabs, with measures copied between them
+      (ADR-0160)
+  - [x] One clipboard for every song open: measures copied in one song are
+        pasted in another, shared with the song they came from; the CLI
+        `edit --from` and `copy ... from` steps
+  - [ ] Songs in tabs: new, open, close and switch; files opened together
+        load in parallel; the transport follows the song shown
 
 ## The interface
 

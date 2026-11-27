@@ -83,6 +83,12 @@ public:
                    std::string name = "Edit measure")
         : track_(track), staff_(staff), measure_(measure), content_(std::move(content)),
           name_(std::move(name)) {}
+    /// Puts in `content` as it is shared (ADR-0051), copying none of it: a
+    /// pasted measure (ADR-0160).
+    ReplaceMeasure(std::size_t track, std::size_t staff, std::size_t measure,
+                   SharedValue<Measure> content, std::string name = "Edit measure")
+        : track_(track), staff_(staff), measure_(measure), content_(std::move(content)),
+          name_(std::move(name)) {}
     void apply(Song& song) override;
     void revert(Song& song) override { swapWith(song); }
     [[nodiscard]] std::string_view name() const noexcept override { return name_; }

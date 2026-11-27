@@ -103,23 +103,35 @@ bool EditSession::clearSelection() noexcept {
     return had;
 }
 
+EditSession::EditSession(std::shared_ptr<Clipboard> clipboard) {
+    shareClipboard(std::move(clipboard));
+}
+
+void EditSession::shareClipboard(std::shared_ptr<Clipboard> clipboard) {
+    clipboard_ = clipboard ? std::move(clipboard) : std::make_shared<Clipboard>();
+}
+
 EditSession::Measures EditSession::copy(const Song& song) {
     const Measures range = selection();
     // The track shown alone, or every track from the first.
-    clip_ = copyMeasures(song, range.first, range.count, shown_ ? caret_.track : 0, shown_ ? 1 : 0);
+    clipboard_->hold(
+        copyMeasures(song, range.first, range.count, shown_ ? caret_.track : 0, shown_ ? 1 : 0));
     return range;
 }
 
 bool EditSession::paste(Document& document, PasteMode mode) {
-    if (!clip_) {
+    // Held while it is pasted, whatever else is copied meanwhile.
+    const std::shared_ptr<const MeasureClip> clip = clipboard_->clip();
+    if (!clip) {
         throw std::logic_error("paste: nothing was copied");
     }
     const std::size_t at = selection().first;
-    // One copied track goes to the caret's; several to the tracks they came from.
-    const std::size_t track = clip_->tracks.size() == 1 ? caret_.track : 0;
-    std::unique_ptr<Command> command = makePaste(document.song(), *clip_, at, track, mode);
+    // One copied track goes to the caret's; several to the tracks of the same
+    // places from the first.
+    const std::size_t track = clip->tracks.size() == 1 ? caret_.track : 0;
+    std::unique_ptr<Command> command = makePaste(document.song(), *clip, at, track, mode);
     Caret caret = caret_;
-    caret.measure = at + clip_->measureCount() - 1;
+    caret.measure = at + clip->measureCount() - 1;
     caret.beat = 0;
     anchor_ = at;
     try {
