@@ -97,7 +97,7 @@ elara_add_unit_tests(notation
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
   notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
-  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp
+  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp notation/test_voice_layout.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
