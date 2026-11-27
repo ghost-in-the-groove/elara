@@ -3025,6 +3025,16 @@ void Startup::queueHoldStill() {
             again_ = true;
             return false;
         }
+        // The caret well inside the view first: a window that got shorter
+        // since the reveal can leave it under the bottom edge, where the view
+        // does not hold it and the reveal still pending scrolls to it.
+        const double height = view()->height();
+        if (const double y = screenY(); y > height - 120.0 && height > 240.0) {
+            auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+            pages->setProperty("contentY", scroll() + y - (height / 2.0));
+            again_ = true;
+            return false;
+        }
         heldY_ = screenY();
         heldTop_ = staffTop();
         heldScroll_ = scroll();
