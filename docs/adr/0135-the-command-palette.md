@@ -66,9 +66,13 @@ window, over the score, until a command runs or Escape closes it.
   Guitar Pro's commands with an argument and Dorico's popovers. The empty
   field says so, and so does the line shown when nothing matches.
 - **Keys inside it**: Up and Down choose, Enter runs and closes, Shift+Enter
-  runs and keeps it open for the next command, Escape closes. The command runs
-  once the palette has closed, so a popup it opens at the caret takes the
-  keyboard, and the caret is brought into view after an edit at it.
+  runs and keeps it open for the next command, Escape closes, and so does its
+  own key pressed again. The command runs once the palette has closed, so a
+  popup it opens at the caret takes the keyboard, and the caret is brought
+  into view after an edit at it. While it shows, the window's shortcuts are
+  held (a popup that closes on Escape holds them), Space among them, so the
+  palette carries its own Ctrl+E and Ctrl+Shift+P: they close it, or open it
+  again while it fades out.
 - A menu item that hides itself does it with `shown`, not `visible`: a closed
   menu's items all read as not visible.
 
@@ -78,9 +82,10 @@ measure's first beat ...` (`ScoreDocument::caretToMeasure`) and the smoke
 test, which types into the palette as a person does, Ctrl+E included: a
 note effect found and put on the caret's note, Ctrl+E and Enter repeating it,
 a number taking the caret and playback to its measure, "tempo 90" setting the
-tempo while the space typed plays nothing, and Escape doing nothing. The CLI
-has no counterpart: the palette runs the window's own commands, and every
-edit it makes is one the CLI's `edit` steps already make.
+tempo while the space typed plays nothing, Escape doing nothing, and Ctrl+E
+opening it again as it fades and closing it. The CLI has no counterpart: the
+palette runs the window's own commands, and every edit it makes is one the
+CLI's `edit` steps already make.
 
 ## Consequences
 
