@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -30,6 +31,8 @@ namespace {
 using namespace core;
 
 constexpr std::string_view kFormatName = "elara";
+// "generator" is this name and the version: "Elara 0.1.0".
+constexpr std::string_view kGeneratorName = "Elara ";
 
 // Enumerations are written by their names in the model (core::EnumNames), so
 // renaming one there changes the format.
@@ -73,7 +76,7 @@ public:
         yyjson_mut_doc_set_root(doc_, root);
         yyjson_mut_obj_add_str(doc_, root, "format", kFormatName.data());
         yyjson_mut_obj_add_int(doc_, root, "formatVersion", kNativeFormatVersion);
-        addText(root, "generator", std::format("Elara {}", version()));
+        addText(root, "generator", std::format("{}{}", kGeneratorName, version()));
         addInfo(root, song.info());
         add(root, "tempo", tempo(song.startTempo()));
 
@@ -546,8 +549,16 @@ public:
             Scope scope(*this, "tracks");
             forEach(tracks, [&](std::size_t, yyjson_val* track) { readTrack(track, song); });
         }
+        // Who wrote the file says nothing about the song: anything but text
+        // is left alone, as an unknown key would be.
+        if (yyjson_val* generator = yyjson_obj_get(root, "generator"); yyjson_is_str(generator)) {
+            generator_.assign(yyjson_get_str(generator), yyjson_get_len(generator));
+        }
         return song;
     }
+
+    /// The "generator" of the song last read ("Elara 0.1.0"), or nothing.
+    [[nodiscard]] const std::string& generator() const { return generator_; }
 
 private:
     class Scope {
@@ -1191,7 +1202,51 @@ private:
 
     JsonPath path_;
     detail::ChordPool chords_;
+    std::string generator_;
 };
+
+using Version = std::array<int, 3>;
+
+// The three numbers "X.Y.Z" start with, whatever follows them ("-beta.2").
+std::optional<Version> versionOf(std::string_view text) {
+    Version numbers{};
+    const char* at = text.data();
+    const char* const end = text.data() + text.size();
+    for (std::size_t i = 0; i < numbers.size(); ++i) {
+        if (i > 0) {
+            if (at == end || *at != '.') {
+                return std::nullopt;
+            }
+            ++at;
+        }
+        const auto [next, problem] = std::from_chars(at, end, numbers[i]);
+        if (problem != std::errc{} || next == at) {
+            return std::nullopt;
+        }
+        at = next;
+    }
+    return numbers;
+}
+
+// What reading a song written by `generator` cannot keep (ADR-0139): a newer
+// Elara can have added data this one does not read.
+std::optional<std::string> newerWarning(std::string_view generator) {
+    if (!generator.starts_with(kGeneratorName)) {
+        return std::nullopt;
+    }
+    const auto theirs = versionOf(generator.substr(kGeneratorName.size()));
+    const auto ours = versionOf(version());
+    if (!theirs || !ours || *theirs <= *ours) {
+        return std::nullopt;
+    }
+    return std::format("saved by {}, newer than this one ({}): what it added is not shown, and "
+                       "saving here leaves it out",
+                       generator, version());
+}
+
+Song songOf(ImportResult&& read) {
+    return std::move(read.song);
+}
 
 } // namespace
 
@@ -1200,7 +1255,7 @@ std::string songToJson(const Song& song) {
     return std::string(writer.write(song).view());
 }
 
-std::expected<Song, FormatError> songFromJson(std::string_view json) {
+std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
     yyjson_read_err error{};
     // Without YYJSON_READ_INSITU the input is only read, never modified.
     yyjson_doc* doc =
@@ -1212,10 +1267,18 @@ std::expected<Song, FormatError> songFromJson(std::string_view json) {
     const std::unique_ptr<yyjson_doc, decltype(&yyjson_doc_free)> owner(doc, yyjson_doc_free);
     try {
         Reader reader;
-        return reader.read(yyjson_doc_get_root(doc));
+        ImportResult result{.song = reader.read(yyjson_doc_get_root(doc)), .warnings = {}};
+        if (auto warning = newerWarning(reader.generator())) {
+            result.warnings.push_back(std::move(*warning));
+        }
+        return result;
     } catch (const ReadError& failure) {
         return std::unexpected(FormatError{failure.message});
     }
+}
+
+std::expected<Song, FormatError> songFromJson(std::string_view json) {
+    return readSongJson(json).transform(songOf);
 }
 
 std::vector<std::uint8_t> encodeNative(const Song& song) {
@@ -1226,7 +1289,7 @@ std::vector<std::uint8_t> encodeNative(const Song& song) {
     return detail::writeZip(entries);
 }
 
-std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
+std::expected<ImportResult, FormatError> readNative(std::span<const std::uint8_t> bytes) {
     try {
         detail::ZipReader zip(bytes);
         if (!zip.ok()) {
@@ -1241,10 +1304,14 @@ std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> byte
         if (!json) {
             return std::unexpected(FormatError{"not an Elara file (no song.json)"});
         }
-        return songFromJson(*json);
+        return readSongJson(*json);
     } catch (const FormatError& failure) {
         return std::unexpected(failure);
     }
+}
+
+std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
+    return readNative(bytes).transform(songOf);
 }
 
 void saveNative(const Song& song, const std::filesystem::path& path) {
@@ -1254,8 +1321,12 @@ void saveNative(const Song& song, const std::filesystem::path& path) {
 }
 
 std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {
+    return openNative(path).transform(songOf);
+}
+
+std::expected<ImportResult, FormatError> openNative(const std::filesystem::path& path) {
     return detail::readFile(path).and_then(
-        [](const std::vector<std::uint8_t>& bytes) { return decodeNative(bytes); });
+        [](const std::vector<std::uint8_t>& bytes) { return readNative(bytes); });
 }
 
 } // namespace elara::io
