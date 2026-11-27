@@ -133,6 +133,7 @@ one that replaces them.
 | [0132](0132-the-caret-says-the-beat-and-the-string.md) | The caret says the beat and the string | Accepted |
 | [0133](0133-bold-marks-and-the-page-across-the-view.md) | Bold marks, and the page across the view | Accepted |
 | [0134](0134-ci-time.md) | Where CI's time goes | Accepted |
+| [0137](0137-the-window-remembers-its-state.md) | The window remembers its state | Accepted |
 
 ## Template
 
