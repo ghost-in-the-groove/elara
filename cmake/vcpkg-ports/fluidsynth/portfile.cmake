@@ -2,6 +2,8 @@
 # through its own backend, so every audio and MIDI driver, the shell and the
 # optional system libraries stay off; libsndfile with Ogg/Vorbis reads SF3.
 # Based on the vcpkg port of the same version (MIT); fix-gcem.patch is its.
+# share-soundfonts.patch lets synthesizers on different threads play one
+# loaded SoundFont (ADR-0146).
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO FluidSynth/fluidsynth
@@ -10,6 +12,7 @@ vcpkg_from_github(
     HEAD_REF master
     PATCHES
         fix-gcem.patch
+        share-soundfonts.patch
 )
 # Use the dependencies' own CMake packages, not FluidSynth's find modules.
 file(REMOVE
