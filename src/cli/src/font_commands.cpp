@@ -37,6 +37,10 @@ std::string point(const notation::Point& p) {
     return std::format("[{},{}]", number(p.x), number(p.y));
 }
 
+void writePoint(JsonWriter& json, const notation::Point& p) {
+    json.beginArray().value(p.x).value(p.y).endArray();
+}
+
 std::string codepointText(Glyph glyph) {
     return std::format("U+{:04X}", static_cast<std::uint32_t>(notation::codepoint(glyph)));
 }
@@ -74,18 +78,23 @@ int printGlyph(bool json, const EngravingFont& font, Glyph glyph) {
         }
     }
     if (json) {
-        std::string anchorJson;
+        JsonWriter out;
+        out.beginObject()
+            .field("glyph", notation::glyphName(glyph))
+            .field("codepoint", codepointText(glyph))
+            .key("bbox")
+            .beginObject()
+            .key("sw");
+        writePoint(out, metrics.box.southWest);
+        out.key("ne");
+        writePoint(out, metrics.box.northEast);
+        out.endObject().field("advanceWidth", metrics.advanceWidth).key("anchors").beginObject();
         for (const auto& [name, at] : anchors) {
-            anchorJson +=
-                std::format("{}\"{}\":{}", anchorJson.empty() ? "" : ",", name, point(at));
+            out.key(name);
+            writePoint(out, at);
         }
-        std::cout
-            << std::format(
-                   R"({{"glyph":"{}","codepoint":"{}","bbox":{{"sw":{},"ne":{}}},"advanceWidth":{},)"
-                   R"("anchors":{{{}}}}})",
-                   notation::glyphName(glyph), codepointText(glyph), point(metrics.box.southWest),
-                   point(metrics.box.northEast), number(metrics.advanceWidth), anchorJson)
-            << '\n';
+        out.endObject().endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("{} ({})\n", notation::glyphName(glyph), codepointText(glyph));
@@ -103,23 +112,24 @@ int printFont(bool json, const EngravingFont& font, const std::filesystem::path&
     const std::vector<Glyph> missing = font.missingGlyphs();
     const auto described = notation::kGlyphCount - missing.size();
     if (json) {
-        std::string missingJson;
+        JsonWriter out;
+        out.beginObject()
+            .field("name", font.name())
+            .field("version", font.version())
+            .field("metadata", utf8(path))
+            .field("glyphs", notation::kGlyphCount)
+            .field("described", described)
+            .key("missing")
+            .beginArray();
         for (const Glyph glyph : missing) {
-            missingJson +=
-                std::format("{}\"{}\"", missingJson.empty() ? "" : ",", notation::glyphName(glyph));
+            out.value(notation::glyphName(glyph));
         }
-        std::string defaultsJson;
+        out.endArray().key("defaults").beginObject();
         for (const auto& [name, value] : defaultsOf(font.defaults())) {
-            defaultsJson +=
-                std::format("{}\"{}\":{}", defaultsJson.empty() ? "" : ",", name, number(value));
+            out.field(name, value);
         }
-        std::cout
-            << std::format(
-                   R"({{"name":"{}","version":"{}","metadata":"{}","glyphs":{},"described":{},)"
-                   R"("missing":[{}],"defaults":{{{}}}}})",
-                   jsonEscape(font.name()), jsonEscape(font.version()), jsonEscape(utf8(path)),
-                   notation::kGlyphCount, described, missingJson, defaultsJson)
-            << '\n';
+        out.endObject().endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     std::cout << std::format("{} {} ({})\n", font.name(), font.version(), utf8(path));

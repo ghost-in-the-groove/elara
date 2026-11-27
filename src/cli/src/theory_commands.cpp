@@ -47,6 +47,14 @@ SpellingPreference preferenceFor(bool flats) {
     return flats ? SpellingPreference::Flats : SpellingPreference::Sharps;
 }
 
+void writeStrings(JsonWriter& json, const std::vector<std::string>& items) {
+    json.beginArray();
+    for (const auto& item : items) {
+        json.value(item);
+    }
+    json.endArray();
+}
+
 // ---- pitch ------------------------------------------------------------------
 
 struct PitchOptions {
@@ -73,12 +81,16 @@ int runPitch(bool json, const PitchOptions& options) {
     const std::string text = pitch->toString();
     const double frequency = pitch->frequency(options.a4Hz);
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"pitch":"{}","step":"{}","alter":{},"octave":{},"midi":{},"frequency":{:.4f}}})",
-                   jsonEscape(text), text.front(), pitch->alter(), pitch->octave(),
-                   pitch->midiNumber(), frequency)
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("pitch", text)
+            .field("step", std::string_view(text).substr(0, 1))
+            .field("alter", pitch->alter())
+            .field("octave", pitch->octave())
+            .field("midi", pitch->midiNumber())
+            .field("frequency", frequency)
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("{}  MIDI {}  {:.4f} Hz\n", text, pitch->midiNumber(), frequency);
     }
@@ -110,12 +122,17 @@ int runFret(bool json, const FretOptions& options) {
     const int midi = tuning->midiAt(options.string, options.fret, options.capo);
     const auto pitch = Pitch::fromMidi(midi, preferenceFor(options.flats));
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"tuning":"{}","string":{},"fret":{},"capo":{},"midi":{},"pitch":"{}","frequency":{:.4f}}})",
-                   tuning->toString(), options.string, options.fret, options.capo, midi,
-                   pitch.toString(), pitch.frequency())
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("tuning", tuning->toString())
+            .field("string", options.string)
+            .field("fret", options.fret)
+            .field("capo", options.capo)
+            .field("midi", midi)
+            .field("pitch", pitch.toString())
+            .field("frequency", pitch.frequency())
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("string {} fret {} (capo {}): {}  MIDI {}\n", options.string,
                                  options.fret, options.capo, pitch.toString(), midi);
@@ -142,18 +159,22 @@ int runPositions(bool json, const PositionsOptions& options) {
     }
     const auto positions = tuning->positionsFor(*pitch, options.capo, options.maxFret);
     if (json) {
-        std::string list;
+        JsonWriter out;
+        out.beginObject()
+            .field("pitch", pitch->toString())
+            .field("midi", pitch->midiNumber())
+            .field("tuning", tuning->toString())
+            .field("capo", options.capo)
+            .key("positions")
+            .beginArray();
         for (const auto& position : positions) {
-            if (!list.empty()) {
-                list += ',';
-            }
-            list += std::format(R"({{"string":{},"fret":{}}})", position.string, position.fret);
+            out.beginObject()
+                .field("string", position.string)
+                .field("fret", position.fret)
+                .endObject();
         }
-        std::cout << std::format(
-                         R"({{"pitch":"{}","midi":{},"tuning":"{}","capo":{},"positions":[{}]}})",
-                         pitch->toString(), pitch->midiNumber(), tuning->toString(), options.capo,
-                         list)
-                  << '\n';
+        out.endArray().endObject();
+        std::cout << out.text() << '\n';
     } else {
         for (const auto& position : positions) {
             std::cout << std::format("string {} fret {}\n", position.string, position.fret);
@@ -163,20 +184,19 @@ int runPositions(bool json, const PositionsOptions& options) {
 }
 
 int runTunings(bool json) {
-    std::string list;
+    JsonWriter out;
+    out.beginObject().key("tunings").beginArray();
     for (const auto name : Tuning::presetNames()) {
         const auto strings = Tuning::preset(name)->toString();
         if (json) {
-            if (!list.empty()) {
-                list += ',';
-            }
-            list += std::format(R"({{"name":"{}","strings":"{}"}})", name, strings);
+            out.beginObject().field("name", name).field("strings", strings).endObject();
         } else {
             std::cout << std::format("{:<24} {}\n", name, strings);
         }
     }
     if (json) {
-        std::cout << R"({"tunings":[)" << list << "]}\n";
+        out.endArray().endObject();
+        std::cout << out.text() << '\n';
     }
     return kExitOk;
 }
@@ -195,25 +215,30 @@ int runKey(bool json, const std::string& name) {
         return usageError(
             std::format("not a key (expected e.g. \"D major\", \"Bb minor\"): {}", name));
     }
-    std::string accidentals;
+    std::vector<std::string> accidentals;
     for (const auto step : key->alteredSteps()) {
-        if (!accidentals.empty()) {
-            accidentals += json ? "," : " ";
-        }
-        const auto text = stepWithAlter(step, key->alterFor(step));
-        accidentals += json ? std::format("\"{}\"", text) : text;
+        accidentals.push_back(stepWithAlter(step, key->alterFor(step)));
     }
     const auto tonic = stepWithAlter(key->tonic(), key->tonicAlter());
     const std::string_view mode = key->mode() == core::KeyMode::Major ? "major" : "minor";
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"key":"{}","fifths":{},"mode":"{}","tonic":"{}","accidentals":[{}]}})",
-                   key->toString(), key->fifths(), mode, tonic, accidentals)
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("key", key->toString())
+            .field("fifths", key->fifths())
+            .field("mode", mode)
+            .field("tonic", tonic)
+            .key("accidentals");
+        writeStrings(out, accidentals);
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else {
+        std::string list;
+        for (const auto& accidental : accidentals) {
+            list += (list.empty() ? "" : " ") + accidental;
+        }
         std::cout << std::format("{}: {}\n", key->toString(),
-                                 accidentals.empty() ? "no accidentals" : accidentals);
+                                 list.empty() ? "no accidentals" : list);
     }
     return kExitOk;
 }
@@ -234,9 +259,13 @@ int runSpell(bool json, const SpellOptions& options) {
     }
     const auto pitch = key->spell(*midi);
     if (json) {
-        std::cout << std::format(R"({{"midi":{},"key":"{}","pitch":"{}"}})", *midi, key->toString(),
-                                 pitch.toString())
-                  << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("midi", *midi)
+            .field("key", key->toString())
+            .field("pitch", pitch.toString())
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << pitch.toString() << '\n';
     }
@@ -287,12 +316,19 @@ int runMeter(bool json, const MeterOptions& options) {
     const core::Tempo tempo(options.bpm, *beatUnit);
     const double seconds = tempo.secondsFor(time->measureLength());
     if (json) {
-        std::cout
-            << std::format(
-                   R"({{"time":"{}","measureLength":"{}","beatLength":"{}","tempo":{{"bpm":{},"beatUnit":"{}"}},"secondsPerMeasure":{:.4f}}})",
-                   time->toString(), time->measureLength().toString(),
-                   time->beatLength().toString(), options.bpm, options.beatUnit, seconds)
-            << '\n';
+        JsonWriter out;
+        out.beginObject()
+            .field("time", time->toString())
+            .field("measureLength", time->measureLength().toString())
+            .field("beatLength", time->beatLength().toString())
+            .key("tempo")
+            .beginObject()
+            .field("bpm", options.bpm)
+            .field("beatUnit", options.beatUnit)
+            .endObject()
+            .field("secondsPerMeasure", seconds)
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << std::format("{}: {} of a whole note, {:.4f} s per measure at {} = {}\n",
                                  time->toString(), time->measureLength().toString(), seconds,
@@ -320,14 +356,6 @@ std::string_view fillName(core::VoiceFill fill) {
         return "overfull";
     }
     return "unknown";
-}
-
-std::string jsonStrings(const std::vector<std::string>& items) {
-    std::string out = "[";
-    for (std::size_t i = 0; i < items.size(); ++i) {
-        out += std::format("{}\"{}\"", i == 0 ? "" : ",", jsonEscape(items[i]));
-    }
-    return out + "]";
 }
 
 int runRests(bool json, const RestsOptions& options) {
@@ -358,10 +386,13 @@ int runRests(bool json, const RestsOptions& options) {
         rests.push_back(voice.beats[i].duration.toString());
     }
     if (json) {
-        std::cout << std::format(R"({{"time":"{}","written":{},"fill":"{}","rests":{}}})",
-                                 time->toString(), jsonStrings(options.durations), fillName(fill),
-                                 jsonStrings(rests))
-                  << '\n';
+        JsonWriter out;
+        out.beginObject().field("time", time->toString()).key("written");
+        writeStrings(out, options.durations);
+        out.field("fill", fillName(fill)).key("rests");
+        writeStrings(out, rests);
+        out.endObject();
+        std::cout << out.text() << '\n';
     } else if (rests.empty()) {
         std::cout << std::format("{}: {}, no rests needed\n", time->toString(), fillName(fill));
     } else {
