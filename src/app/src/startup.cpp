@@ -2125,14 +2125,14 @@ void Startup::queueCommands() {
         QStringList popups;
         for (const QObject* object : window_->findChildren<QObject*>()) {
             if (object->inherits("QQuickPopup") && object->property("visible").toBool()) {
-                popups << QStringLiteral("%1 %2").arg(QLatin1StringView(object->metaObject()->className()),
-                                                      object->objectName());
+                popups << QStringLiteral("%1 %2").arg(
+                    QLatin1StringView(object->metaObject()->className()), object->objectName());
             }
         }
         return QStringLiteral("keys to %1, focus on %2 %3, popups: %4")
-            .arg(focused == window_    ? QStringLiteral("the window")
+            .arg(focused == window_   ? QStringLiteral("the window")
                  : focused == nullptr ? QStringLiteral("no window")
-                                       : QLatin1StringView(focused->metaObject()->className()),
+                                      : QLatin1StringView(focused->metaObject()->className()),
                  item != nullptr ? QLatin1StringView(item->metaObject()->className())
                                  : QLatin1StringView("nothing"),
                  item != nullptr ? item->objectName() : QString(),
