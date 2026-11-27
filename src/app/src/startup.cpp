@@ -180,6 +180,10 @@ void Startup::queueSteps() {
             queueWindowState();
             return;
         }
+        if (options_.smokeTest && options_.holdStill) {
+            queueHoldStill();
+            return;
+        }
         // Without a file the smoke test edits a new song.
         if (options_.smokeTest) {
             steps_.emplace_back([this] {
@@ -2997,6 +3001,192 @@ void Startup::queueExport() {
             "midi: %lld bytes, %lld warnings\n",
             static_cast<long long>(QFileInfo(folder.filePath(QStringLiteral("midi.mid"))).size()),
             static_cast<long long>(midiWarnings.size()));
+        return false;
+    });
+}
+
+// The view holds still while the layout changes: on a new song whose first
+// page is full, the caret's staff in a system down that page stays at its
+// height on screen while an edit makes the first system taller and while
+// undo takes that back. A measure inserted after the caret's, which takes
+// the caret on to the next system, shows it there, as the keys reveal it.
+void Startup::queueHoldStill() {
+    const auto view = [this] {
+        return window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    };
+    // The caret's bottom on screen, in the view's pixels.
+    const auto screenY = [view] {
+        QPointF point(0.0, -1.0);
+        QMetaObject::invokeMethod(view(), "caretPoint", Q_RETURN_ARG(QPointF, point));
+        return point.y();
+    };
+    // The caret's staff, in staff spaces from the top of the first page.
+    const auto staffTop = [this] {
+        const int page = score_->caretPage();
+        const QList<qreal> tops = score_->pageTops();
+        return page >= 0 && page < tops.size() ? tops[page] + score_->caretRect().y() : -1.0;
+    };
+    // How far the pages are scrolled, in the view's pixels.
+    const auto scroll = [view] {
+        const auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+        return pages != nullptr ? pages->property("contentY").toDouble() : -1.0;
+    };
+    // What a failure shows of the view, to tell why the caret moved.
+    const auto scene = [this, view, screenY, scroll] {
+        return QStringLiteral(
+                   "the caret at %1 px of %2 by %3, scrolled from %4 to %5 px, zoom from "
+                   "%6 to %7, held %8, a reveal pending: %9")
+            .arg(screenY())
+            .arg(view()->height())
+            .arg(view()->width())
+            .arg(heldScroll_)
+            .arg(scroll())
+            .arg(heldZoom_)
+            .arg(view()->property("shownZoom").toDouble())
+            .arg(heldBy_)
+            .arg(view()->property("revealPending").toBool());
+    };
+    const auto problem = [this](const QString& what) {
+        if (editProblem_.isEmpty()) {
+            editProblem_ = what;
+        }
+    };
+    steps_.emplace_back([this] {
+        score_->newSong(QStringLiteral("electric-guitar"));
+        connect(score_, &ScoreDocument::caretHeld, score_, [this](double spaces, int pages) {
+            heldBy_ = QStringLiteral("%1 staff spaces and %2 pages").arg(spaces).arg(pages);
+        });
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->setMeasureCount(150);
+        return true;
+    });
+    // The caret at the start of the fourth system of the first page, in view.
+    steps_.emplace_back([this, view] {
+        const auto first = score_->page(0);
+        if (!first || first->systems.size() < 5 || score_->pageCount() < 2) {
+            failure_ = QStringLiteral("the new song does not fill its first page: %1 systems on "
+                                      "it, %2 pages")
+                           .arg(first ? static_cast<qsizetype>(first->systems.size()) : 0)
+                           .arg(score_->pageCount());
+            return false;
+        }
+        const auto target = static_cast<int>(first->systems[3].firstMeasure);
+        for (int i = 0; i < 150 && score_->caretMeasure() > target; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::PreviousMeasure);
+        }
+        for (int i = 0; i < 150 && score_->caretMeasure() < target; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::NextMeasure);
+        }
+        QMetaObject::invokeMethod(view(), "reveal");
+        return false;
+    });
+    // A section mark makes the first system taller.
+    steps_.emplace_back([this, view, screenY, staffTop, scroll] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        // The caret well inside the view first: a window that got shorter
+        // since the reveal can leave it under the bottom edge, where the view
+        // does not hold it and the reveal still pending scrolls to it.
+        const double height = view()->height();
+        if (const double y = screenY(); y > height - 120.0 && height > 240.0) {
+            auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+            pages->setProperty("contentY", scroll() + y - (height / 2.0));
+            again_ = true;
+            return false;
+        }
+        heldY_ = screenY();
+        heldTop_ = staffTop();
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
+        score_->setSection(0, QStringLiteral("Intro"));
+        return true;
+    });
+    steps_.emplace_back([this, view, screenY, staffTop, scroll, scene, problem] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        std::printf("hold still: the staff moved %.2f staff spaces, the caret %.2f px\n",
+                    staffTop() - heldTop_, screenY() - heldY_);
+        if (std::abs(staffTop() - heldTop_) < 1.0) {
+            problem(QStringLiteral("the section moved the staff below it only %1 staff spaces")
+                        .arg(staffTop() - heldTop_));
+        } else if (std::abs(screenY() - heldY_) > 1.0) {
+            problem(QStringLiteral("the caret moved %1 px on screen as a system above it grew (%2)")
+                        .arg(screenY() - heldY_)
+                        .arg(scene()));
+        }
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, view, screenY, scene, problem] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (std::abs(screenY() - heldY_) > 1.0) {
+            problem(
+                QStringLiteral("the caret moved %1 px on screen as undo took the section back (%2)")
+                    .arg(screenY() - heldY_)
+                    .arg(scene()));
+        }
+        return false;
+    });
+    // A measure inserted after the last of the caret's system, the caret in
+    // it, until the caret goes on to another system: it is shown there, as the
+    // keys show it, instead of held where it was.
+    steps_.emplace_back([this, view, screenY, problem] {
+        if (view()->property("settling").toBool() || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        // The system holding `measure` on the pages shown: its page and its
+        // first measure, or -1.
+        const auto systemOf = [this](int measure) {
+            for (int p = 0; p < score_->pageCount(); ++p) {
+                for (const notation::SystemBox& box : score_->page(p)->systems) {
+                    const auto first = static_cast<int>(box.firstMeasure);
+                    if (measure >= first && measure < first + static_cast<int>(box.measureCount)) {
+                        return std::pair{p, first};
+                    }
+                }
+            }
+            return std::pair{-1, -1};
+        };
+        if (heldMeasure_ > 0 && score_->caretMeasure() == heldMeasure_ &&
+            systemOf(heldMeasure_) != systemOf(heldMeasure_ - 1)) {
+            const double y = screenY();
+            if (y < 0.0 || y > view()->height()) {
+                problem(QStringLiteral("the caret on another system is out of view, at %1 px of %2")
+                            .arg(y)
+                            .arg(view()->height()));
+            }
+            return false;
+        }
+        if (++insertions_ > 12) {
+            problem(QStringLiteral("inserted measures never took the caret to another system"));
+            return false;
+        }
+        const auto [page, first] = systemOf(score_->caretMeasure());
+        int last = first;
+        while (systemOf(last + 1) == std::pair{page, first}) {
+            ++last;
+        }
+        for (int i = 0; i < 150 && score_->caretMeasure() < last; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::NextMeasure);
+        }
+        heldMeasure_ = score_->caretMeasure() + 1;
+        score_->insertMeasure(true);
+        QMetaObject::invokeMethod(view(), "reveal");
+        again_ = true;
         return false;
     });
 }

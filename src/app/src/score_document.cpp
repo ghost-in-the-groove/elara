@@ -691,14 +691,14 @@ void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> re
                 return;
             }
             if (!recovered) {
-                apply(result);
+                apply(result, false);
                 return;
             }
             // The song the copy holds, with the file it came from and
             // changes no file holds.
             ScoreLayout layout = result;
             layout.source = recovered->source;
-            apply(layout);
+            apply(layout, false);
             if (source_ != recovered->source) {
                 source_ = recovered->source;
                 emit sourceChanged();
@@ -829,18 +829,25 @@ void ScoreDocument::discardRecovery(const QString& file) {
 }
 
 void ScoreDocument::relayout() {
+    requestLayout(false);
+}
+
+void ScoreDocument::requestLayout(bool edit) {
     if (!song_) {
         return;
+    }
+    if (!edit) {
+        reshaped_ = true;
     }
     layouts_->request(
         [song = song_, track = track_, view = view_, continuous = continuous_,
          memory = layoutMemory_] { return layOut(song, track, view, continuous, *memory); },
-        [this](const ScoreLayout& result) {
+        [this, edit](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
                 fail(result.error);
                 return;
             }
-            apply(result);
+            apply(result, edit);
         });
 }
 
@@ -890,7 +897,17 @@ const ScorePainter& ScoreDocument::painter() {
     return painter;
 }
 
-void ScoreDocument::apply(const ScoreLayout& layout) {
+void ScoreDocument::apply(const ScoreLayout& layout, bool edit) {
+    // An edit's layout keeps the caret's staff where it was on screen: where
+    // its box was is noted before the pages change (placeCaretBox()).
+    anchor_.reset();
+    if (edit && !reshaped_ && !layout.opened && layout.continuous == showsStrips_ &&
+        caretPage_ >= 0 && caretPage_ + 1 < pageTops_.size()) {
+        anchor_ = CaretAnchor{.top = pageTops_[caretPage_] + caretRect_.y(),
+                              .page = caretPage_,
+                              .measure = caretBoxMeasure_};
+    }
+    reshaped_ = false;
     if (layout.opened) {
         // An edit's sequence still being built belongs to the song before.
         sequences_->drop();
@@ -1965,7 +1982,7 @@ void ScoreDocument::edited() {
     // sequence is built beside the layout, on another worker, so the pages
     // show as soon as they are laid out instead of waiting for it.
     if (changes.notation) {
-        relayout();
+        requestLayout(true);
     }
     if (changes.sound) {
         resequence();
@@ -2320,6 +2337,26 @@ void ScoreDocument::placeCaretBox() {
     caretPage_ = page;
     caretRect_ = rect;
     caretColumn_ = column;
+    caretBoxMeasure_ = session_.caret().measure;
+    if (anchor_) {
+        const CaretAnchor anchor = *anchor_;
+        anchor_.reset();
+        // Held only while the caret stays in the system it was in: one that
+        // goes to another system is revealed as the keys reveal it.
+        const auto inSystem = [&] {
+            for (const notation::SystemBox& system :
+                 (*pages_)[static_cast<std::size_t>(page)].systems) {
+                const std::size_t end = system.firstMeasure + system.measureCount;
+                if (caretBoxMeasure_ >= system.firstMeasure && caretBoxMeasure_ < end) {
+                    return anchor.measure >= system.firstMeasure && anchor.measure < end;
+                }
+            }
+            return false;
+        };
+        if (page >= 0 && page < pageTops_.size() && inSystem()) {
+            emit caretHeld(pageTops_[page] + rect.y() - anchor.top, page - anchor.page);
+        }
+    }
     emit caretChanged();
     selectionMoved();
 }

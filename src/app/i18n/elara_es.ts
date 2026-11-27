@@ -2889,6 +2889,10 @@
         <translation>Abrir la afinación de la primera pista en el panel de canción al iniciar.</translation>
     </message>
     <message>
+        <source>With --smoke-test, edit a new song above the caret and check that the caret holds still on screen.</source>
+        <translation>Con --smoke-test, editar una canción nueva por encima del cursor y comprobar que el cursor no se mueve en la pantalla.</translation>
+    </message>
+    <message>
         <source>Open the note effects panel at the caret at start.</source>
         <translation>Abrir el panel de efectos de nota en el cursor al iniciar.</translation>
     </message>
