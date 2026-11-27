@@ -71,6 +71,11 @@ Behind those numbers:
 - **The format check runs one clang-format per core.**
 - **py7zr is installed only when Qt is not in the cache**: it extracts what a
   cache miss downloads, nothing else.
+- **The Linux packages come from Ubuntu's archive only.** The runner image
+  also lists other repositories (Microsoft's among them) that none of the
+  packages needs; one of them answering 403 failed `apt-get update` and the
+  job with it. They are removed before the update, and man-db no longer
+  rebuilds its index after the install.
 - **The macOS Qt kit keeps only the runner's architecture.** Qt ships it
   universal, each binary an x86_64 and an arm64 build, and restoring its cache
   was the longest step before the build on macOS (31 to 57 s).

@@ -32,11 +32,20 @@ runs:
 
     # man-db rebuilds its index after every install, which takes longer than
     # the install itself and serves no build.
+    #
+    # Only Ubuntu's own archive is read: the image's other repositories
+    # (Microsoft's among them) hold nothing these packages need, and one that
+    # does not answer fails apt-get update, as packages.microsoft.com did with
+    # a 403 on 2026-11-27.
     - name: Linux packages
       if: runner.os == 'Linux'
       shell: bash
       run: |
         sudo rm -f /var/lib/man-db/auto-update
+        for list in /etc/apt/sources.list.d/*; do
+          [ -f "$list" ] || continue
+          grep -qE 'ubuntu\.com|apt-mirrors\.txt' "$list" || sudo rm -f "$list"
+        done
         sudo apt-get update
         sudo apt-get install -y g++-14 libasound2-dev libfreetype-dev libfontconfig1-dev \
           libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev \
