@@ -303,7 +303,8 @@ std::vector<LayoutIssue> layoutIssues(std::span<const DisplayList> pages, const 
                 .kind = LayoutIssueKind::MeasureTooWide,
                 .page = p,
                 .measure = measure,
-                .box = {.x = limit, .y = system.y, .width = right - limit, .height = system.height}});
+                .box = {
+                    .x = limit, .y = system.y, .width = right - limit, .height = system.height}});
         }
         finder.page(page, p, issues);
     }

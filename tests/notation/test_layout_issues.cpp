@@ -35,9 +35,9 @@ using elara::notation::DisplayList;
 using elara::notation::EngravingFont;
 using elara::notation::Glyph;
 using elara::notation::GlyphItem;
-using elara::notation::layoutIssues;
 using elara::notation::LayoutIssue;
 using elara::notation::LayoutIssueKind;
+using elara::notation::layoutIssues;
 using elara::notation::layoutPages;
 using elara::notation::MeasureBox;
 using elara::notation::mustNotTouch;
@@ -77,7 +77,8 @@ DisplayList page() {
                                      .height = 4.0,
                                      .top = 4.0,
                                      .bottom = 20.0});
-    list.measures.push_back(MeasureBox{.index = 0, .x = 8.6, .width = 50.0, .y = 10.0, .height = 4.0});
+    list.measures.push_back(
+        MeasureBox{.index = 0, .x = 8.6, .width = 50.0, .y = 10.0, .height = 4.0});
     list.measures.push_back(
         MeasureBox{.index = 1, .x = 58.6, .width = 50.0, .y = 10.0, .height = 4.0});
     return list;
@@ -229,16 +230,13 @@ TEST_CASE("Layout issues: ink is compared within its own system", "[notation][is
     CHECK(of(list).empty());
 
     // Two pages are numbered apart.
-    const std::vector<DisplayList> pages{page(), [] {
-                                             DisplayList second = page();
-                                             second.glyphs.push_back(glyph(Glyph::NoteheadBlack,
-                                                                           Role::Notehead,
-                                                                           {20.0, 12.0}));
-                                             second.glyphs.push_back(glyph(Glyph::NoteheadBlack,
-                                                                           Role::Notehead,
-                                                                           {20.3, 12.0}));
-                                             return second;
-                                         }()};
+    const std::vector<DisplayList> pages{
+        page(), [] {
+            DisplayList second = page();
+            second.glyphs.push_back(glyph(Glyph::NoteheadBlack, Role::Notehead, {20.0, 12.0}));
+            second.glyphs.push_back(glyph(Glyph::NoteheadBlack, Role::Notehead, {20.3, 12.0}));
+            return second;
+        }()};
     const std::vector<LayoutIssue> found = overlaps(pages, bravura());
     REQUIRE(found.size() == 1);
     CHECK(found[0].page == 1);
@@ -279,7 +277,7 @@ TEST_CASE("Layout issues: a measure wider than the page is found", "[notation][i
     CHECK(wide[1].measure == 1);
     // The same measures on a page wide enough fit.
     const PageLayoutOptions wider{.height = 0.0, .credits = false};
-    CHECK(layoutIssues(layoutPages(song, std::span(&standard, 1), bravura(), wider), bravura(),
-                       wider)
-              .empty());
+    CHECK(
+        layoutIssues(layoutPages(song, std::span(&standard, 1), bravura(), wider), bravura(), wider)
+            .empty());
 }
