@@ -116,11 +116,16 @@ runs:
     # On a miss the packages are built here and their cache saved at once, so
     # a later step that fails (a test, say) does not make the next run build
     # them again. The configure then installs them from the binary cache.
+    # Outside Windows vcpkg passes the environment on to its builds, and the
+    # workflow's ccache launcher is not on the PATH yet. The packages are built
+    # once per cache entry, so ccache would save nothing on them.
     - name: Build vcpkg packages
       if: steps.vcpkg-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         TRIPLET: ${{ steps.vcpkg.outputs.triplet }}
+        CMAKE_C_COMPILER_LAUNCHER: ""
+        CMAKE_CXX_COMPILER_LAUNCHER: ""
       run: |
         "$VCPKG_ROOT/vcpkg" install --triplet "$TRIPLET" --host-triplet "$TRIPLET" \
           --x-install-root "$RUNNER_TEMP/vcpkg-installed"
