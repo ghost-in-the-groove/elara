@@ -427,6 +427,24 @@ Item {
         function onSourceChanged() {
             root.forceActiveFocus();
         }
+        // An edit's layout moved the caret's staff: scroll as far, so that it
+        // stays where it was on screen, when it was in view.
+        function onCaretHeld(spaces: real, pages: int) {
+            if (root.zooming || root.pageHeight <= 0)
+                return;
+            const scale = root.unit * root.shownZoom;
+            const shift = spaces * scale + pages * root.gap;
+            const caret = root.document.caretRect;
+            const y = scrollY.running ? scrollY.to : list.contentY;
+            const top = list.originY + root.pageY(root.document.caretPage) + caret.y * scale - shift;
+            if (shift === 0 || top < y || top + caret.height * scale > y + list.height)
+                return;
+            scrollY.stop();
+            followY.stop();
+            const highest = list.originY - list.topMargin;
+            const lowest = list.originY + list.contentHeight + list.bottomMargin - list.height;
+            list.contentY = Math.max(highest, Math.min(Math.max(highest, lowest), y + shift));
+        }
         function onCaretChanged() {
             if (root.revealPending) {
                 root.revealCaret();
@@ -510,6 +528,7 @@ Item {
     // view, so that only those near it hold a texture.
     Flickable {
         id: list
+        objectName: "pages"
 
         // How far above and below the view pages stay loaded: a page, but no
         // more than the view's own height, so that at a high zoom only the
