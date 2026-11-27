@@ -48,7 +48,10 @@ Qt on the path (ADR-0048), on all three platforms in the package workflow.
 
 ## Consequences
 
-- See `docs/performance.md` for the sizes before and after.
+- The Windows install folder loses 35.5 MB in 52 files: 19.6 MB of shader
+  compilers, 13.8 MB of Qt libraries (the styles), 1.7 MB of plugins and
+  0.4 MB of QML. With ADR-0144's smaller programs it went from 162 MB in 172
+  files to 113 MB in 120, and its zip from 83.0 MB to 68.4 MB.
 - A new Qt Quick Controls style for the app means taking its name out of the
   removal list in `src/app/CMakeLists.txt`.
 - Forcing Qt Quick onto Direct3D 12 (`QSG_RHI_BACKEND=d3d12`) in a package
