@@ -76,8 +76,9 @@ Behind those numbers:
   was the longest step before the build on macOS (31 to 57 s).
   `install_qt.py --thin` keeps the runner's slice of each universal file, as
   `lipo -thin` does; the slice carries its own code signature, so it stays
-  valid. That takes the kit from 1695 to 894 MB, and the compressed cache from
-  about 378 to 206 MB. The Qt cache key names the runner's architecture.
+  valid. That takes the kit from 1695 to 894 MB and its cache from 471 to
+  251 MB, which macOS restores in 25 s. The Qt cache key names the runner's
+  architecture.
 - **The actions run on Node 24**: checkout v7, setup-python v7, cache v6 and
   upload-artifact v7. None of the inputs the workflows use changed.
 - **One composite action, `.github/actions/toolchain`, sets up what the three
@@ -87,10 +88,18 @@ Behind those numbers:
 
 Not done:
 
-- **Arm64 macOS runners** (`macos-15`) are faster than the Intel ones, but
-  pull request #39 moved the job to Intel because arm64 runners were not
-  acquired for over an hour. Worth trying again before the Intel image retires
-  in 2027.
+- **Arm64 macOS runners** (`macos-15`) are faster, but not reliably there.
+  On 2026-11-23, until 09:25 UTC, 58 of 66 arm64 jobs got a runner within
+  seconds and took 1.7 to 3.9 minutes, while that day's Intel jobs took a
+  median 8.8; from 09:25 no arm64 runner was assigned, jobs were cancelled
+  after waiting 15 minutes, and pull request #39 moved the job to Intel. A
+  trial on 2026-11-27 (pull request #255) fared the same: its arm64 job was
+  cancelled after 15 minutes without a runner, while its Intel jobs started
+  at once. A required
+  check that can wait an hour for a runner holds up every pull request, and
+  with the Qt kit thinned the Intel job takes 2 to 5 minutes. The packages
+  stay on Intel in any case: built on arm64, the disk image would no longer
+  run on Intel Macs. To decide again before the Intel image retires in 2027.
 - **Skipping vcpkg's install** by caching `vcpkg_installed` would save the few
   seconds left, at the price of a second way to configure.
 
