@@ -1518,6 +1518,16 @@ foreach(_view IN ITEMS standard tab)
             "${_render_snapshots}/gp/guitar-techniques-${_view}" --view ${_view})
 endforeach()
 
+# The heavy-use measurement (scripts/usage.py) on tiny songs and the CLI only:
+# it writes its songs, runs every CLI scenario once through the operating
+# system's process counters and prints its table.
+add_test(NAME cli.usage_script
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/usage.py"
+          --bin "$<TARGET_FILE_DIR:elara-cli>" --no-app --tracks 2 --measures 4
+          --huge-measures 8 --runs 1)
+set_tests_properties(cli.usage_script PROPERTIES
+  PASS_REGULAR_EXPRESSION "[\r\n]\\| cli: export huge as MIDI \\| [0-9.]+ \\|")
+
 # The sequencer (ADR-0017): measures in play order with their times, notes and
 # note events.
 add_test(NAME cli.sequence_repeats
