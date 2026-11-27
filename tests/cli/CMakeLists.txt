@@ -88,7 +88,7 @@ set_tests_properties(cli.pitch_from_midi_with_flats PROPERTIES
 
 add_test(NAME cli.pitch_frequency COMMAND elara-cli --json pitch A4 --a4 432)
 set_tests_properties(cli.pitch_frequency PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"midi\":69,\"frequency\":432\\.0000}")
+  PASS_REGULAR_EXPRESSION "\"midi\":69,\"frequency\":432}")
 
 add_test(NAME cli.pitch_rejects_bad_text COMMAND elara-cli pitch H4)
 set_tests_properties(cli.pitch_rejects_bad_text PROPERTIES WILL_FAIL TRUE)
@@ -147,7 +147,7 @@ set_tests_properties(cli.spell_in_flat_key PROPERTIES
 add_test(NAME cli.meter_compound_time
   COMMAND elara-cli --json meter 6/8 --bpm 60 --beat-unit dotted-quarter)
 set_tests_properties(cli.meter_compound_time PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"measureLength\":\"3/4\",\"beatLength\":\"1/8\",\"tempo\":{\"bpm\":60,\"beatUnit\":\"dotted-quarter\"},\"secondsPerMeasure\":2\\.0000}")
+  PASS_REGULAR_EXPRESSION "\"time\":\"6/8\",\"measureLength\":\"3/4\",\"beatLength\":\"1/8\",\"tempo\":{\"bpm\":60,\"beatUnit\":\"dotted-quarter\"},\"secondsPerMeasure\":2}")
 
 add_test(NAME cli.meter_rejects_bad_meter COMMAND elara-cli meter 5/3)
 set_tests_properties(cli.meter_rejects_bad_meter PROPERTIES WILL_FAIL TRUE)
