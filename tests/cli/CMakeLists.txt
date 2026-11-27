@@ -246,6 +246,17 @@ add_test(NAME cli.edit_rejects_section_past_the_end
 set_tests_properties(cli.edit_rejects_section_past_the_end PROPERTIES
   PASS_REGULAR_EXPRESSION "section: no measure 5")
 
+# A track's name, to the end of the step; undoable as "Rename track".
+add_test(NAME cli.edit_renames_track
+  COMMAND elara-cli --json edit "add-track electric-bass" "rename-track 0 Bass, fingers")
+set_tests_properties(cli.edit_renames_track PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"name\":\"Bass, fingers\".*\"next\":\"Rename track\"")
+
+add_test(NAME cli.edit_rejects_rename_of_a_missing_track
+  COMMAND elara-cli edit "add-track electric-bass" "rename-track 3 Nobody")
+set_tests_properties(cli.edit_rejects_rename_of_a_missing_track PROPERTIES
+  PASS_REGULAR_EXPRESSION "step 2 \\(rename-track 3 Nobody\\)")
+
 add_test(NAME cli.edit_sets_track_mix
   COMMAND elara-cli --json edit "add-track electric-bass" "mix 0 0.5 -0.25 solo")
 set_tests_properties(cli.edit_sets_track_mix PROPERTIES

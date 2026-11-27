@@ -1302,6 +1302,10 @@
         <translation>Pistas</translation>
     </message>
     <message>
+        <source>Track name</source>
+        <translation>Nombre de la pista</translation>
+    </message>
+    <message>
         <source>Tuning and capo</source>
         <translation>Afinación y cejilla</translation>
     </message>
@@ -2167,6 +2171,10 @@
     <message>
         <source>Change mix</source>
         <translation>Cambiar la mezcla</translation>
+    </message>
+    <message>
+        <source>Rename track</source>
+        <translation>Renombrar pista</translation>
     </message>
     <message>
         <source>Change navigation marks</source>

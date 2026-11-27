@@ -133,6 +133,7 @@ private:
     QString popupProblem_;                 ///< a popup of the caret that left its view
     std::optional<QPointF> cursorRest_;    ///< where the playback cursor stood a tick ago
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
+    QString trackName_;                    ///< the first track's name before it was renamed
     QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
     QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()
     QVariantMap tempoBefore_;              ///< the second measure's tempo before it changed

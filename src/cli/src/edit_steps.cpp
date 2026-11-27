@@ -671,6 +671,12 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
         if (auto change = core::changeTripletFeel(song, measure, *feel)) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "rename-track") { // rename-track <track> [name]
+        const std::size_t track = step.index(1);
+        std::string name = step.has(2) ? step.rest(2) : std::string();
+        if (name != song.track(track).name()) {
+            doc.execute(std::make_unique<core::SetTrackName>(track, std::move(name)));
+        }
     } else if (verb == "mix") { // mix <track> <volume> <pan> [mute] [solo]
         core::TrackMix mix{.volume = step.decimal(2), .pan = step.decimal(3)};
         for (std::size_t i = 4; step.has(i); ++i) {

@@ -216,6 +216,13 @@ void SetTrackMix::swapWith(Song& song) {
     mix_ = previous;
 }
 
+void SetTrackName::swapWith(Song& song) {
+    Track& track = song.track(track_);
+    std::string previous = track.name();
+    track.setName(std::move(name_));
+    name_ = std::move(previous);
+}
+
 void SetStaffTuning::swapWith(Song& song) {
     Staff& staff = song.track(track_).staff(staff_);
     std::optional<Tuning> previous = staff.tuning();

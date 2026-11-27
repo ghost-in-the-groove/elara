@@ -1081,6 +1081,34 @@ void Startup::queueMix() {
               "undoing the mix did not restore the song");
         check(trackRow_ != nullptr, "a mix change made the song panel's rows again");
         sequenceBefore_.reset();
+        if (trackRow_ == nullptr) {
+            return false;
+        }
+        // The track's name typed in its row, as a double click on it starts.
+        trackName_ = score_->trackNames().front();
+        check(QMetaObject::invokeMethod(trackRow_, "rename") &&
+                  trackRow_->property("renaming").toBool(),
+              "a track's row does not take another name");
+        auto* field = trackRow_->findChild<QObject*>(QStringLiteral("trackNameField"));
+        check(field != nullptr, "a track's row has no field for its name");
+        if (field == nullptr) {
+            return false;
+        }
+        check(field->property("text").toString() == trackName_,
+              "the field does not start with the track's name");
+        field->setProperty("text", QStringLiteral("Renamed in the panel"));
+        QMetaObject::invokeMethod(field, "editingFinished");
+        check(score_->trackNames().front() == QStringLiteral("Renamed in the panel") &&
+                  !trackRow_->property("renaming").toBool(),
+              "the name typed in the row was not given to the track");
+        check(score_->undoName() == ScoreDocument::tr("Rename track"),
+              "renaming a track is not undoable");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        check(!score_->modified() && score_->trackNames().front() == trackName_,
+              "undoing the rename did not restore the song");
         return false;
     });
 }
