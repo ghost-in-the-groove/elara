@@ -1,0 +1,92 @@
+name: release
+
+# A release from a version tag (ADR-0138, docs/releasing.md). The tag, CMake,
+# vcpkg and the changelog must name the same version; package.yml builds and
+# smoke-tests the packages on the three platforms; they are attached with
+# their checksums and the changelog's section to a draft release, marked as a
+# pre-release while the major version is 0. A maintainer reads the draft and
+# publishes it by hand: nothing here publishes.
+#
+# Run by hand from any branch it is a rehearsal: the same checks and
+# packages, the notes taken from Unreleased, and no draft.
+on:
+  push:
+    tags: ["v[0-9]*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: The version the sources carry
+        id: version
+        run: |
+          version=$(python3 scripts/elara.py release version)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::the tag is $GITHUB_REF_NAME but the sources carry $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # A tag releases its version's section; a rehearsal, Unreleased.
+      - name: Release notes
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            python3 scripts/elara.py release notes "${{ steps.version.outputs.version }}" > notes.md
+          else
+            python3 scripts/elara.py release notes > notes.md
+          fi
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
+          retention-days: 14
+
+  package:
+    needs: version
+    uses: ./.github/workflows/package.yml
+
+  draft:
+    needs: [version, package]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: assets
+          merge-multiple: true
+
+      # One list for every package, in place of each package's own file.
+      - name: Checksums
+        working-directory: assets
+        run: |
+          rm -f Elara-*.sha256
+          sha256sum Elara-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          prerelease=""
+          case "$VERSION" in 0.*) prerelease="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag \
+            $prerelease --title "Elara $VERSION" --notes-file assets/notes.md \
+            assets/Elara-* assets/SHA256SUMS
