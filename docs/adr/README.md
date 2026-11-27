@@ -138,6 +138,7 @@ one that replaces them.
 | [0139](0139-a-song-from-a-newer-elara-says-what-it-may-lose.md) | A song from a newer Elara says what it may lose | Accepted |
 | [0144](0144-release-build-flags.md) | The release build optimised as MSVC's own release | Accepted |
 | [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
+| [0147](0147-song-json-is-written-as-it-is-walked.md) | song.json is written as it is walked | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 
 ## Template

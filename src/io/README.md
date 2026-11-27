@@ -18,6 +18,8 @@ that uses the model's names and text forms (`"8."`, `"F#3"`, `"6/8"`) and omits
 defaults; enumerations are written by their names in `elara_core`
 (`core::nameOf()`, `names.hpp`), and a header's signs as the flags `core::kSignFlags` lists (`signField()`), so renaming one there changes the format. Unzip a song to read or diff it. Any model change needs a matching
 change here and in the round-trip test (`tests/io/test_native_format.cpp`).
+yyjson reads `song.json`; it is written as the song is walked, in yyjson's compact
+form, with no tree of values in memory (ADR-0147).
 
 Every importer reads each track's starting volume, pan and, where the format
 has them, mute and solo into its `TrackMix`; MIDI and MusicXML export write the

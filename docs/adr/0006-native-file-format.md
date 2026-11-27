@@ -48,8 +48,9 @@ readers, which ignore entries they do not know.
   beats.
 
 **Libraries**, both MIT-licensed C libraries from vcpkg: **yyjson** (JSON read
-and write; one of the fastest parsers, small, no exceptions) and **miniz** (zip
-and deflate in one source file, no zlib dependency).
+and write, reading only since ADR-0147; one of the fastest parsers, small, no
+exceptions) and **miniz** (zip and deflate in one source file, no zlib
+dependency).
 
 **Module.** The format lives in `elara_io` with the importers. Errors are
 returned as `std::expected<Song, FormatError>` whose message names the JSON
@@ -68,4 +69,5 @@ every value through the model's own parsers and constructors.
 - Breaking changes to the JSON require `formatVersion: 2` and keeping a reader
   for version 1.
 - yyjson builds a DOM, so a song is held twice in memory while it is saved or
-  loaded; acceptable for scores (tens of MB at most), revisit for audio.
+  loaded; acceptable for scores (tens of MB at most), revisit for audio. Since
+  ADR-0147 saving builds none.
