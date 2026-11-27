@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// How subcommands describe a song: JSON fragments and a short text summary.
+// How subcommands describe a song: JSON values and a short text summary.
 #pragma once
 
 #include <elara/core/song.hpp>
 #include <elara/core/validation.hpp>
+
+#include "json_writer.hpp"
 
 #include <filesystem>
 #include <string>
@@ -14,16 +16,16 @@ namespace elara::cli {
 /// `[{"name":"Lead","mix":{...},"tuning":"E2 A2 D3 G3 B3 E4","capo":0,"staves":1,
 /// "beats":8,"notes":16}, ...]`: the tuning and capo of the first staff (tuning
 /// null without strings).
-[[nodiscard]] std::string tracksJson(const core::Song& song);
+void writeTracks(JsonWriter& json, const core::Song& song);
 
 /// `[{"time":"4/4","key":"C major"}, ...]`, one entry per measure, with
 /// `"signs":["segno","to-coda"]`, `"jump":"dal-segno"`, `"jumpThen":"al-coda"`
 /// and `"tripletFeel":"eighth"` where the measure has them, by their names in
 /// the model (core::EnumNames).
-[[nodiscard]] std::string measuresJson(const core::Song& song);
+void writeMeasures(JsonWriter& json, const core::Song& song);
 
 /// `[{"kind":"voice-incomplete","track":0,...,"beat":null,"note":null}, ...]`
-[[nodiscard]] std::string issuesJson(const std::vector<core::Issue>& issues);
+void writeIssues(JsonWriter& json, const std::vector<core::Issue>& issues);
 
 /// Title, tracks, length and validation issues, a few lines of text.
 void printSongText(const core::Song& song);

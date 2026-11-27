@@ -566,7 +566,7 @@ set_tests_properties(cli.edit_sets_fermatas PROPERTIES
 add_test(NAME cli.dump_fermatas COMMAND elara-cli --json dump "${ELARA_CLI_FERMATAS}")
 set_tests_properties(cli.dump_fermatas PROPERTIES
   FIXTURES_REQUIRED cli_fermatas
-  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.250")
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.25,")
 # Octave lines at the caret (ADR-0089): 8va on the C, 15mb on the D, 8vb on a
 # rest, and 15ma on the E that undo takes back. Each is drawn as a mark, its
 # dashes and a hook.
@@ -1128,7 +1128,7 @@ set_tests_properties(cli.new_creates_song PROPERTIES
 add_test(NAME cli.dump_reads_song COMMAND elara-cli --json dump "${ELARA_CLI_SONG}")
 set_tests_properties(cli.dump_reads_song PROPERTIES
   FIXTURES_REQUIRED cli_song
-  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16\\.000,\"issues\":\\[\\]}")
+  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16,\"issues\":\\[\\]}")
 
 add_test(NAME cli.new_refuses_to_overwrite COMMAND elara-cli new "${ELARA_CLI_SONG}")
 set_tests_properties(cli.new_refuses_to_overwrite PROPERTIES
