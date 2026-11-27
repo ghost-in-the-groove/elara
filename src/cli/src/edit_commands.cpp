@@ -79,11 +79,16 @@ struct EditOptions {
 int runEdit(bool json, const EditOptions& options) {
     Document doc;
     if (!options.in.empty()) {
-        auto loaded = io::loadNative(options.in);
+        auto loaded = io::openNative(options.in);
         if (!loaded) {
             return fail(std::format("{}: {}", options.in, loaded.error().message));
         }
-        doc = Document(std::move(*loaded));
+        // On stderr, which leaves --json's output alone: what a newer Elara
+        // added is lost when the song is saved here (ADR-0139).
+        for (const std::string& warning : loaded->warnings) {
+            std::cerr << std::format("warning: {}: {}\n", options.in, warning);
+        }
+        doc = Document(std::move(loaded->song));
     }
     const auto& steps = options.steps;
     StepState state;
