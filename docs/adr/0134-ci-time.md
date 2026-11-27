@@ -61,8 +61,10 @@ Behind those numbers:
   triplet that only CI uses). The binary cache key names the runner image,
   which fixes the compiler, so the hash vcpkg spent a configure on added
   nothing. The key also hashes the overlay ports now, which it missed before.
-- **vcpkg's downloads are cached with its binary packages**, so the CMake it
-  unpacks for itself is unpacked once per runner image. On a cache miss the
+- **vcpkg's tools are cached with its binary packages**, so the CMake it
+  unpacks for itself is unpacked once per runner image; the sources it builds
+  the packages from are left out, as only a cache miss needs them. On a cache
+  miss the
   packages are built and the cache saved before the build starts: saved at the
   end of the job, as before, a failing test cost the next run the same
   rebuild.
@@ -90,6 +92,16 @@ Not done:
 ## Consequences
 
 - A pull request's checks finish sooner; the slowest job sets the wait.
+  Measured on this change's own pull request, before main had a release
+  ccache to restore:
+
+  | Part | Before | After |
+  | --- | --- | --- |
+  | Tests, macOS | 110 s | 34 s |
+  | Tests, Windows | 122 s | 23 s |
+  | vcpkg on macOS (fetch, cache, install) | 68 to 80 s | 19 s |
+  | vcpkg install in the configure | 8 / 15 / 35 s | 0.4 / 1 / 2.2 s (Linux / Windows / macOS) |
+  | Format check, macOS | 9 s | 3 s |
 - The first run of each preset after this change compiles everything once,
   and so does the first run on each new runner image, which also rebuilds the
   vcpkg packages.
