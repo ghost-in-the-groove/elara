@@ -134,6 +134,7 @@ one that replaces them.
 | [0133](0133-bold-marks-and-the-page-across-the-view.md) | Bold marks, and the page across the view | Accepted |
 | [0134](0134-ci-time.md) | Where CI's time goes | Accepted |
 | [0137](0137-the-window-remembers-its-state.md) | The window remembers its state | Accepted |
+| [0138](0138-releases-are-drafted-from-a-tag.md) | Releases are drafted from a tag | Accepted |
 
 ## Template
 
