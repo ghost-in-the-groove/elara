@@ -732,6 +732,27 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
         if (auto change = core::changeSection(song, measure, step.has(2) ? step.rest(2) : "")) {
             doc.execute(std::move(change));
         }
+    } else if (verb == "break") { // break <m> <system|page|keep|auto> [track <t>] (ADR-0152)
+        const std::size_t measure = step.index(1);
+        const std::string_view name = step.word(2);
+        const std::optional<core::Break> kind = parseName<core::Break>(name);
+        if (!kind) {
+            throw StepSyntaxError(std::format("break: {}, not {}", choiceOf<core::Break>(), name));
+        }
+        core::LayoutScope scope = core::LayoutScope::song();
+        if (step.has(3)) {
+            if (step.word(3) != "track") {
+                throw StepSyntaxError(std::format("break: expected track: {}", step.word(3)));
+            }
+            scope = core::LayoutScope::ofTrack(step.index(4));
+        }
+        if (measure >= song.measureCount()) {
+            throw std::out_of_range(std::format("break: no measure {}", measure));
+        }
+        const std::pair<std::size_t, core::Break> one{measure, *kind};
+        if (auto change = core::changeBreaks(song, scope, std::span(&one, 1))) {
+            doc.execute(std::move(change));
+        }
     } else if (verb == "title") {
         SongInfo info = song.info();
         info.title = step.rest(1);

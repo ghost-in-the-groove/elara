@@ -72,10 +72,12 @@ std::int32_t bandOf(double y) noexcept {
     return static_cast<std::int32_t>(std::floor(y / kBand));
 }
 
-// Digits and the letters of a fret number stand on their baseline and reach
-// their cap height; other texts have ascenders and descenders.
+// Digits, the letters of a fret number and the angle brackets of a natural
+// harmonic's stand on their baseline and reach no higher than their cap
+// height; other texts have ascenders and descenders.
 bool capsOnly(std::string_view text) noexcept {
-    return std::ranges::all_of(text, [](char c) { return (c >= '0' && c <= '9') || c == 'X'; });
+    return std::ranges::all_of(
+        text, [](char c) { return (c >= '0' && c <= '9') || c == 'X' || c == '<' || c == '>'; });
 }
 
 Rect textBox(const TextItem& text) {

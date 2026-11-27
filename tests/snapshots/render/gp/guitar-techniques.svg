@@ -196,8 +196,8 @@
 <text class="t fretNumber" x="50.217" y="61.683" style="font-size:1.8px" text-anchor="middle" stroke="none">&lt;12&gt;</text>
 <rect class="knockout" x="60.74" y="58.743" width="1.289" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="61.385" y="60.183" style="font-size:1.8px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="69.556" y="58.743" width="2.488" height="1.584" fill="white" stroke="none"/>
-<text class="t fretNumber" x="70.8" y="60.183" style="font-size:1.8px" text-anchor="middle" stroke="none">(3)</text>
+<rect class="knockout" x="69.805" y="58.901" width="1.99" height="1.267" fill="white" stroke="none"/>
+<text class="t fretNumber" x="70.8" y="60.053" style="font-size:1.44px" text-anchor="middle" stroke="none">(3)</text>
 <rect class="knockout" x="76.713" y="66.243" width="1.489" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="77.457" y="67.683" style="font-size:1.8px" text-anchor="middle" stroke="none">X</text>
 <rect class="knockout" x="89.597" y="63.52" width="0.838" height="1.03" fill="white" stroke="none"/>

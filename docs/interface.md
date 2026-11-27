@@ -41,7 +41,7 @@ a long stretch. So:
 
 | Part | File | What it holds |
 |---|---|---|
-| Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, and the buttons of the palette, the song panel and the tuner, each lit while its panel shows. Dark in both themes. |
+| Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, the button of the command palette, and the buttons of the effects palette, the song panel and the tuner, each lit while its panel shows. Dark in both themes. |
 | Song string | `SongString.qml` | The lower edge of the command bar: the song as one line with a tick where measures start, lit as far as it has played, the measure at the position riding it (outlined at the start, filled once playback has moved), a taller tick at the caret's measure, the A-B loop as a band, the sections as inlays. Click or drag to move playback. |
 | Tool row | in `Main.qml`, `EntryBar.qml` | What typing uses at the left; the track and the staff view at the right. |
 | Note effects | `EffectsPalette.qml` | Every technique, articulation, dynamic and line the caret's note or beat can take, in named groups that fold (F2, ADR-0109). A tile is lit while the caret has what it sets. |
@@ -49,6 +49,7 @@ a long stretch. So:
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
 | Tuner | `TunerPane.qml` | The note heard, how far it is from in tune and the strings of the shown track (Ctrl+Shift+T). It docks where the song panel does, one of the two at a time, and listens only while it shows. |
 | Status bar | `StatusBar.qml` | Where the caret is, the page and the measures; the layout and the zoom. |
+| Command palette | `CommandPalette.qml` | Every command by name, with its keys (Ctrl+E, ADR-0135): the menus' items, the entry tools, the note effects, the places to go and the tracks. It floats at the top of the window only while asked for, like a popup of the caret. |
 
 Narrow windows drop what is offered elsewhere, never overlap: the command bar
 gives up the file tools, then the tempo and the time readings, then the
@@ -63,9 +64,10 @@ maximized, on the screen it was on while that screen is still there; the
 palette and the song panel open or closed; the zoom, the dark page and the
 continuous view. The tuner always starts closed.
 
-Nothing floats over the music but what the caret opened. A panel docks and the
-score makes room; an error slides up over the foot of the score and goes; what
-an import changed stays in the status bar for as long as the song is open.
+Nothing floats over the music but what the caret opened, and the command
+palette while it is asked for. A panel docks and the score makes room; an
+error slides up over the foot of the score and goes; what an import changed
+stays in the status bar for as long as the song is open.
 
 ## Colours
 
@@ -142,7 +144,11 @@ Rules that keep the parts one family:
   for longer than `calm`. The score's own scrolling, to the caret and after
   the playback cursor, has its timings in `ScoreView.qml`.
 - A new command goes into a menu first, then, if it is used all the time,
-  onto a bar.
+  onto a bar. A menu's commands are in the command palette by themselves; a
+  command that lives on a tile or a tool gets a line in `CommandPalette.qml`
+  (ADR-0135). Hide a menu item with `shown`, not `visible`.
+- The command palette is how a command is found by name: its rows show the
+  keys, dim what cannot run and say at their foot what it waits for.
 - A field has its name before it, not inside it: a placeholder only shows an
   example of what to type.
 - An empty list says what it is for, in a sentence: the recent scores before
@@ -167,6 +173,6 @@ python scripts/elara.py app -- song.gp --screenshot shot.png [--size 760x480]
                                               # the window as an image, at a size
 ```
 
-`--tuner`, `--song-pane`, `--measure`, `--lyrics`, `--effects` and `--tuning`
+`--tuner`, `--song-pane`, `--measure`, `--lyrics`, `--effects`, `--commands` and `--tuning`
 open a panel at start, and `--menu view` a menu, for screenshots of each. Set
 `QT_QUICK_CONTROLS_MATERIAL_THEME=Dark` or `Light` to see a theme; look at both.

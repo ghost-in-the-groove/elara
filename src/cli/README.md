@@ -162,7 +162,10 @@ or `sign <m> none`, `jump <m> <da-capo|dal-segno|dal-segno-segno|none>
 [al-fine|al-coda|al-double-coda]`, `repeat <m> [start] [end <times>]` or
 `repeat <m> none`, `ending <m> <time>...` or `ending <m> none`,
 `barline <m> double|single`,
-`section <m> [name]`, `undo`, `redo`,
+`section <m> [name]`, `break <m> system|page|keep|auto [track <t>]` (a system
+or page break before the measure, or keeping it beside the one before, in the
+measure layouts of the track when it is shown alone or of the song when several
+tracks are, ADR-0152), `undo`, `redo`,
 `save`. A malformed step exits with 2, a step the song rejects
 (missing track, nothing to undo) with 1. `time` and `key` change the signature
 from measure `m` until the next change of it, as the app does; a step that
@@ -173,6 +176,16 @@ as `elara_core` does (`core::nameOf()`, `names.hpp`), as the native file does.
 `feel` changes the triplet feel from measure `m` until the next change of it,
 one undo step, "Change triplet feel" (ADR-0104); the measures list it as
 `"tripletFeel":"eighth"`, and `sequence` plays it.
+
+`break` sets the break before measure `m` as one undo step, "Change breaks",
+that changes what is drawn and never what sounds (ADR-0152): `system` or `page`
+starts a system or a page there, `keep` keeps the measure on the system of the
+one before while it fits, `auto` leaves it to the line breaker. Without `track`
+it is the song's break, used when staves of several tracks are shown, and the
+measures of `edit` list it as `"break":"system"`; with `track <t>` it is that
+track's own, used when its staves are shown alone, and the tracks list theirs
+as `"breaks":[{"measure":4,"break":"page"}]`. `dump --json` shows both as the
+`"layout"` arrays of `song.json`.
 
 `sign` gives measure `m` exactly the signs and closing marks it lists (`none`
 clears them) and `jump` its jump, with what ends the music after it (ADR-0049).

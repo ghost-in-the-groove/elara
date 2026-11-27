@@ -7,6 +7,7 @@ qt_standard_project_setup(REQUIRES 6.12
 # Painting of display lists and the list models the views show, in a library
 # of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
+  src/command_search.cpp
   src/included_sound.cpp
   src/recent_scores.cpp
   src/recovery_store.cpp
@@ -15,7 +16,7 @@ add_library(elara_app_view STATIC
   src/window_state.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation PRIVATE elara::io)
-elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
+elara_source_warnings(src/command_search.cpp src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
   src/score_painter.cpp src/track_list.cpp src/window_state.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
@@ -89,6 +90,7 @@ qt_add_qml_module(elara
     qml/ScoreView.qml
     qml/EntryBar.qml
     qml/EffectsPalette.qml
+    qml/CommandPalette.qml
     qml/MeasurePopup.qml
     qml/RecoveryDialog.qml
     qml/WordsPopup.qml
