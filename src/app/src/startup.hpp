@@ -159,6 +159,9 @@ private:
     QString sectionBefore_;                ///< the first measure's section before it changed
     double heldY_ = 0.0;                   ///< the caret's height on screen before an edit
     double heldTop_ = 0.0;                 ///< its staff's, in staff spaces down the pages
+    double heldScroll_ = 0.0;              ///< the view's scroll position before an edit
+    double heldZoom_ = 0.0;                ///< and its zoom
+    QString heldBy_;                       ///< what the document last held still, if anything
     int heldMeasure_ = 0;                  ///< the caret's measure before an edit
     int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed

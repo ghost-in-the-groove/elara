@@ -2763,6 +2763,26 @@ void Startup::queueHoldStill() {
         const QList<qreal> tops = score_->pageTops();
         return page >= 0 && page < tops.size() ? tops[page] + score_->caretRect().y() : -1.0;
     };
+    // How far the pages are scrolled, in the view's pixels.
+    const auto scroll = [view] {
+        const auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+        return pages != nullptr ? pages->property("contentY").toDouble() : -1.0;
+    };
+    // What a failure shows of the view, to tell why the caret moved.
+    const auto scene = [this, view, screenY, scroll] {
+        return QStringLiteral(
+                   "the caret at %1 px of %2 by %3, scrolled from %4 to %5 px, zoom from "
+                   "%6 to %7, held %8, a reveal pending: %9")
+            .arg(screenY())
+            .arg(view()->height())
+            .arg(view()->width())
+            .arg(heldScroll_)
+            .arg(scroll())
+            .arg(heldZoom_)
+            .arg(view()->property("shownZoom").toDouble())
+            .arg(heldBy_)
+            .arg(view()->property("revealPending").toBool());
+    };
     const auto problem = [this](const QString& what) {
         if (editProblem_.isEmpty()) {
             editProblem_ = what;
@@ -2770,6 +2790,9 @@ void Startup::queueHoldStill() {
     };
     steps_.emplace_back([this] {
         score_->newSong(QStringLiteral("electric-guitar"));
+        connect(score_, &ScoreDocument::caretHeld, score_, [this](double spaces, int pages) {
+            heldBy_ = QStringLiteral("%1 staff spaces and %2 pages").arg(spaces).arg(pages);
+        });
         return true;
     });
     steps_.emplace_back([this] {
@@ -2797,17 +2820,20 @@ void Startup::queueHoldStill() {
         return false;
     });
     // A section mark makes the first system taller.
-    steps_.emplace_back([this, view, screenY, staffTop] {
+    steps_.emplace_back([this, view, screenY, staffTop, scroll] {
         if (view()->property("settling").toBool()) {
             again_ = true;
             return false;
         }
         heldY_ = screenY();
         heldTop_ = staffTop();
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
         score_->setSection(0, QStringLiteral("Intro"));
         return true;
     });
-    steps_.emplace_back([this, view, screenY, staffTop, problem] {
+    steps_.emplace_back([this, view, screenY, staffTop, scroll, scene, problem] {
         if (view()->property("settling").toBool()) {
             again_ = true;
             return false;
@@ -2818,20 +2844,26 @@ void Startup::queueHoldStill() {
             problem(QStringLiteral("the section moved the staff below it only %1 staff spaces")
                         .arg(staffTop() - heldTop_));
         } else if (std::abs(screenY() - heldY_) > 1.0) {
-            problem(QStringLiteral("the caret moved %1 px on screen as a system above it grew")
-                        .arg(screenY() - heldY_));
+            problem(QStringLiteral("the caret moved %1 px on screen as a system above it grew (%2)")
+                        .arg(screenY() - heldY_)
+                        .arg(scene()));
         }
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
         score_->undo();
         return true;
     });
-    steps_.emplace_back([this, view, screenY, problem] {
+    steps_.emplace_back([this, view, screenY, scene, problem] {
         if (view()->property("settling").toBool()) {
             again_ = true;
             return false;
         }
         if (std::abs(screenY() - heldY_) > 1.0) {
-            problem(QStringLiteral("the caret moved %1 px on screen as undo took the section back")
-                        .arg(screenY() - heldY_));
+            problem(
+                QStringLiteral("the caret moved %1 px on screen as undo took the section back (%2)")
+                    .arg(screenY() - heldY_)
+                    .arg(scene()));
         }
         return false;
     });

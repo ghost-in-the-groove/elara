@@ -528,6 +528,7 @@ Item {
     // view, so that only those near it hold a texture.
     Flickable {
         id: list
+        objectName: "pages"
 
         // How far above and below the view pages stay loaded: a page, but no
         // more than the view's own height, so that at a high zoom only the
