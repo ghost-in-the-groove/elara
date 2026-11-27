@@ -109,6 +109,8 @@ qt_add_qml_module(elara
     src/audio_controller.cpp
     src/key_names.hpp
     src/qml_types.hpp
+    src/quit_as_crash.hpp
+    src/quit_as_crash.cpp
     src/caret_editor.hpp
     src/caret_editor.cpp
     src/score_common.hpp
@@ -183,7 +185,7 @@ target_link_libraries(elara PRIVATE
 
 # Strict warnings for our sources only, not for moc/qmlcache output.
 elara_source_warnings(src/main.cpp src/audio_controller.cpp src/caret_editor.cpp
-  src/score_document.cpp
+  src/quit_as_crash.cpp src/score_document.cpp
   src/score_page.cpp src/startup.cpp src/tuner_controller.cpp)
 
 # Installing (ADR-0048): the app, then the Qt libraries, plugins and QML modules

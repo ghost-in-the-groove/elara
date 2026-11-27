@@ -24,6 +24,7 @@ Output is kept short: commands are echoed, tool output is shown as-is.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import contextlib
 import hashlib
 import os
@@ -383,10 +384,20 @@ def cmd_format(args: argparse.Namespace) -> int:
         return 1
     files = [str(p) for p in cpp_sources()]
     mode = ["--dry-run", "--Werror"] if args.check else ["-i"]
+
+    # One clang-format per core, each on its own share of the files; the
+    # reports are printed in file order once they have all finished.
+    def format_chunk(chunk: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run([clang_format, *mode, *chunk], cwd=ROOT, capture_output=True,
+                              text=True, errors="replace", check=False)
+
+    chunks = [files[start:start + 25] for start in range(0, len(files), 25)]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 1) as pool:
+        results = list(pool.map(format_chunk, chunks))
     status = 0
-    for start in range(0, len(files), 50):
-        chunk = files[start:start + 50]
-        result = subprocess.run([clang_format, *mode, *chunk], cwd=ROOT, check=False)
+    for result in results:
+        sys.stdout.write(result.stdout)
+        sys.stderr.write(result.stderr)
         status = status or result.returncode
     if args.check and status:
         log("formatting differs - run: python scripts/elara.py format")

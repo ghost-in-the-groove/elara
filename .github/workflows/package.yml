@@ -16,6 +16,7 @@ on:
       - src/cli/CMakeLists.txt
       - scripts/elara.py
       - .github/workflows/package.yml
+      - .github/actions/**
   workflow_dispatch:
 
 concurrency:
@@ -24,7 +25,14 @@ concurrency:
 
 env:
   QT_VERSION: 6.12.1
-  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+  # Compiled through ccache from the cache of ci.yml's last run on main, which
+  # builds the release preset on Windows and macOS: most of a package's objects
+  # come from there. Nothing is saved, so packages never evict CI's cache.
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_MAXSIZE: 500M
 
 jobs:
   package:
@@ -38,59 +46,21 @@ jobs:
           - { name: macos, os: macos-15-intel }
           - { name: linux, os: ubuntu-24.04 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # The same vcpkg and cache as ci.yml's: the packages are built with the
+      # vcpkg that CI tests.
+      - uses: ./.github/actions/toolchain
         with:
-          python-version: "3.13"
+          qt: ${{ env.QT_VERSION }}
+          ccache: "true"
 
-      - name: Python tools
-        run: python -m pip install py7zr ninja
-
-      - name: Linux packages
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y g++-14 libasound2-dev libfreetype-dev libfontconfig1-dev \
-            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev \
-            libgl1-mesa-dev libxkbcommon-dev libxkbcommon-x11-0 libegl1
-          echo "CXX=g++-14" >> "$GITHUB_ENV"
-          echo "CC=gcc-14" >> "$GITHUB_ENV"
-
-      - name: Cache Qt
-        uses: actions/cache@v4
+      - name: Restore ccache
+        uses: actions/cache/restore@v6
         with:
-          path: ${{ runner.temp }}/Qt
-          key: qt-${{ runner.os }}-${{ env.QT_VERSION }}-${{ hashFiles('scripts/install_qt.py') }}
-
-      - name: Install Qt
-        shell: bash
-        run: |
-          kit=$(python scripts/install_qt.py --version "$QT_VERSION" --outdir "$RUNNER_TEMP/Qt" 2>/dev/null | tail -n 1)
-          echo "QT_ROOT_DIR=$kit" >> "$GITHUB_ENV"
-
-      # vcpkg at the manifest's baseline, as ci.yml checks it out: the packages
-      # are built with the vcpkg that CI tests, and package ABIs hash vcpkg's
-      # own scripts, so a newer checkout would miss the binary cache.
-      - name: vcpkg
-        id: vcpkg
-        shell: bash
-        run: |
-          git clone https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
-          baseline=$(python -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
-          git -C "$RUNNER_TEMP/vcpkg" checkout -q "$baseline"
-          echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
-          if [ "$RUNNER_OS" = "Windows" ]; then "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics; else "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics; fi
-          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
-          mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
-
-      - name: Cache vcpkg packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
-          # The runner image fixes the compiler, which the ABIs hash too; the
-          # same key as ci.yml's, so a runner image both use shares the cache.
-          key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-${{ hashFiles('vcpkg.json') }}
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ runner.os }}-release-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-release-
 
       # The runner image has the WiX Toolset 3 (WIX), which CPack's MSI uses.
       - name: WiX Toolset
@@ -113,7 +83,7 @@ jobs:
       # packages (ADR-0069, ADR-0072), downloaded and checked by elara.py
       # package: kept between runs.
       - name: Cache the included sounds
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             build/downloads/soundfont
@@ -124,7 +94,7 @@ jobs:
       - name: Build, install, smoke-test and pack
         run: python scripts/elara.py package --installers
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: elara-${{ matrix.name }}
           path: |
