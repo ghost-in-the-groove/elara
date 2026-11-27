@@ -319,8 +319,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       paper the brightest surface, the palette's signs from the music font, the
       tuner docked beside the score, measure ticks on the song string, one side
       panel at a time in a narrow window
-- [ ] The window remembers its size, its panels, its zoom and the dark page
-      from one run to the next
+- [x] The window remembers its size, its panels, its zoom and the dark page
+      from one run to the next (ADR-0137)
 - [ ] A command palette: every command by name, with its keys
 
 ## Milestone 6 - Practice tools

@@ -129,6 +129,14 @@ Item {
         fit = "page";
         setZoom(Math.min(readingZoom, widthZoom()));
     }
+    /// Fits a song just opened as the zoom was last chosen: its page across
+    /// the view, its width, or the zoom chosen by hand kept (ADR-0137).
+    function fitSong() {
+        if (fit === "width")
+            fitWidth();
+        else if (fit === "page")
+            fitPage();
+    }
     /// Fits again once the view has its new width: a panel that slides in or
     /// out changes it on every frame, and each zoom paints the pages again.
     onWidthChanged: {

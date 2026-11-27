@@ -49,6 +49,9 @@ struct StartupOptions {
     /// The smoke test edits a new song and quits as a crash would once its
     /// recovery copy is written (`--crash-after-recovery-copy`).
     bool crashAfterRecoveryCopy = false;
+    /// Where the window keeps its state (`--window-state`); the smoke test
+    /// then changes it, or finds it as the run before left it (ADR-0137).
+    QString windowState;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -103,6 +106,7 @@ private:
     void queueSave();
     void queueCrashAfterRecoveryCopy();
     void queueRecover();
+    void queueWindowState();
     [[nodiscard]] QString overlappingBars() const;
     [[nodiscard]] bool checking() const;
 
