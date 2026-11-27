@@ -1873,6 +1873,27 @@ add_test(NAME cli.render_symbol_at_nothing
           --layout page --symbol-at 0 1 1)
 set_tests_properties(cli.render_symbol_at_nothing PROPERTIES
   PASS_REGULAR_EXPRESSION "symbol at page 1, x 1, y 1: none there")
+# What the layout could not keep (ADR-0150): nothing on a corpus file, and
+# measures wider than a page of huge staff spaces.
+add_test(NAME cli.render_issues_none
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --view both --layout page --issues)
+set_tests_properties(cli.render_issues_none PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[\\],\"pages\":\\[")
+add_test(NAME cli.render_issues_measure_too_wide
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_measure_too_wide PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[{\"kind\":\"measureTooWide\",\"page\":0,\"measure\":0,\"roles\":\\[\\],\"box\":\\[[0-9.,]+\\]}\\],\"pages\"")
+add_test(NAME cli.render_issues_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issue: measure 1 on page 1 is [0-9.]+ staff spaces too wide")
+add_test(NAME cli.render_issues_none_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --issues)
+set_tests_properties(cli.render_issues_none_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issues: none")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES
