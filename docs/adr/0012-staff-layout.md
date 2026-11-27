@@ -76,3 +76,5 @@ units, so snapshots do not depend on a renderer's font rasteriser.
 - ADR-0013 adds tablature, ties, articulations and staves aligned in systems.
   ADR-0040 adds tuplet numbers and brackets. Not covered yet: slurs, other markings, grace
   notes, notes of different voices colliding on one line, justification.
+  ADR-0151 moves the notes of different voices that would collide side by
+  side.

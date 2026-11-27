@@ -145,6 +145,27 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         return layoutPages(song, both, font, pages);
     };
 
+    // Two voices on one staff (ADR-0151): a second voice a whole step under the
+    // first on every beat, so that every column moves a chord aside.
+    const StaffSelection standard{.view = StaffView::Standard};
+    elara::core::Song voices = song;
+    for (std::size_t m = 0; m < voices.measureCount(); ++m) {
+        auto& measure = voices.track(0).staff(0).measure(m);
+        measure.voices[1].beats = measure.voices[0].beats;
+        for (auto& beat : measure.voices[1].beats) {
+            for (auto& note : beat.notes) {
+                note.pitch = elara::core::Pitch::fromMidi(note.pitch.midiNumber() - 2);
+                note.position.reset();
+            }
+        }
+    }
+    BENCHMARK("lay out the notation of one track on A4 pages, on one thread") {
+        return layoutPages(song, std::span(&standard, 1), font, pages);
+    };
+    BENCHMARK("the same with a second voice a step under the first") {
+        return layoutPages(voices, std::span(&standard, 1), font, pages);
+    };
+
     // Tempo context: a tempo change at the start of every measure, every other
     // one gradual, is the worst case for looking up the tempo in force before a
     // system and the end of each ramp.

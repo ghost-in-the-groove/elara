@@ -2648,6 +2648,14 @@
         <translation>Mover el cursor de reproducción a esos segundos.</translation>
     </message>
     <message>
+        <source>Start playback once the song is shown.</source>
+        <translation>Empieza a reproducir en cuanto se muestra la canción.</translation>
+    </message>
+    <message>
+        <source>Once the window is ready, stay open this many seconds, then quit (for measuring).</source>
+        <translation>Con la ventana lista, sigue abierta esos segundos y luego sale (para medir).</translation>
+    </message>
+    <message>
         <source>Open the tuner at start.</source>
         <translation>Abrir el afinador al iniciar.</translation>
     </message>
