@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -205,6 +206,33 @@ TEST_CASE("Tablature layout: notes without a position take the lowest fret", "[n
     CHECK_THAT(frets[1].origin.y, WithinAbs(fretBaseline(3), kEpsilon));
 }
 
+TEST_CASE("Tablature layout: notes without a position take a string their column leaves free",
+          "[notation][tab]") {
+    // C4 and D4 both have their lowest fret on the B string: D4 goes to the
+    // G string, so that the two numbers do not share a place.
+    const Note c4{.pitch = Pitch::fromMidi(60)};
+    const Note d4{.pitch = Pitch::fromMidi(62)};
+    const auto stringOf = [](const TextItem& item) {
+        return static_cast<int>(std::lround((item.origin.y - fretBaseline(1)) / kLineSpace)) + 1;
+    };
+    const auto frets = texts(tab(guitar({{beatOf({c4, d4})}})), Role::FretNumber);
+    REQUIRE(frets.size() == 2);
+    std::vector<std::pair<int, std::string>> placed{{stringOf(frets[0]), frets[0].text},
+                                                    {stringOf(frets[1]), frets[1].text}};
+    std::ranges::sort(placed);
+    CHECK(placed == std::vector<std::pair<int, std::string>>{{2, "1"}, {3, "7"}});
+
+    // A note of another voice that has its place keeps it: the C4 without
+    // one moves off its string.
+    Song voices = guitar({{beatOf({c4})}});
+    voices.track(0).staff(0).measure(0).voices[1].beats = {play(2, 3)};
+    const auto both = texts(tab(voices), Role::FretNumber);
+    REQUIRE(both.size() == 2);
+    placed = {{stringOf(both[0]), both[0].text}, {stringOf(both[1]), both[1].text}};
+    std::ranges::sort(placed);
+    CHECK(placed == std::vector<std::pair<int, std::string>>{{2, "3"}, {3, "5"}});
+}
+
 TEST_CASE("Tablature layout: notation and tablature line up", "[notation][tab]") {
     const Song song =
         guitar({{play(1, 3), play(2, 1, NoteValue::Eighth), play(2, 3, NoteValue::Eighth), rest(),
@@ -286,8 +314,15 @@ TEST_CASE("Tablature layout: dead, ghost, tied and harmonic notes", "[notation][
     node.effects.harmonic = {.kind = HarmonicKind::Natural, .fretTenths = 32};
     const Song song = guitar(
         {{beatOf({dead}), beatOf({ghost}), beatOf({tied}), beatOf({harmonic})}, {beatOf({node})}});
-    CHECK(contents(texts(tab(song), Role::FretNumber)) ==
-          std::vector<std::string>{"X", "(5)", "(5)", "<12>", "<3.2>"});
+    const auto frets = texts(tab(song), Role::FretNumber);
+    CHECK(contents(frets) == std::vector<std::string>{"X", "(5)", "(5)", "<12>", "<3.2>"});
+    // Parentheses are written smaller, so that they clear the strings
+    // beside them (ADR-0150).
+    REQUIRE(frets.size() == 5);
+    CHECK_THAT(frets[0].size, WithinAbs(kFretSize, kEpsilon));
+    CHECK_THAT(frets[1].size, WithinAbs(kFretSize * 0.8, kEpsilon));
+    CHECK_THAT(frets[2].size, WithinAbs(kFretSize * 0.8, kEpsilon));
+    CHECK_THAT(frets[3].size, WithinAbs(kFretSize, kEpsilon));
 }
 
 TEST_CASE("Tablature layout: hammer-ons and pull-offs", "[notation][tab]") {
