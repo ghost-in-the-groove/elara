@@ -150,6 +150,22 @@ void WindowState::putBack() {
     const QRect place = placed(geometry_, screens);
     if (place.isValid()) {
         window_->setGeometry(place);
+        // On a screen of another scale than the one the window was made on,
+        // the system scales its size and frame again as it moves there, a
+        // few pixels off each time: placed once more when it shows there.
+        const auto again = [this, place] {
+            QTimer::singleShot(0, this, [this, place] {
+                if (window_ != nullptr && window_->visibility() == QWindow::Windowed &&
+                    window_->geometry() != place) {
+                    window_->setGeometry(place);
+                }
+            });
+        };
+        if (window_->isVisible()) {
+            again();
+        } else {
+            connect(window_, &QWindow::visibleChanged, this, again, Qt::SingleShotConnection);
+        }
     }
     if (maximized_) {
         window_->showMaximized();
