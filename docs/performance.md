@@ -513,15 +513,17 @@ set / peak private MB.
 | App: open it with all its tracks | 1.91, 2.59; 354 / 418 | 1.91, 2.27; 347 / 417 |
 
 The app held open for 10 s (after only; `--hold` is new), with the share of
-one core it used and its working set meanwhile:
+one core it used over the last 4.5 s, once opening has settled, and its
+working set then. In the first seconds after a song opens the app paints the
+pages around the view (about 12 % of a core for 5 s on the large song).
 
 | App state | CPU | Working set |
 |---|---|---|
-| welcome pane, idle | 0.4 % | 132 MB |
-| the large song open, idle | 2.4 % | 251 MB |
-| playing it, built-in synthesizer | 11.6 % | 239 MB |
-| playing it through MuseScore General | 34.0 % | 564 MB |
-| playing it, guitars through the included SFZ | 7.6 % | 260 MB |
+| welcome pane, idle | 0.0 % | 132 MB |
+| the large song open, idle | 0.0 % | 250 MB |
+| playing it, built-in synthesizer | 9.0 % | 238 MB |
+| playing it through MuseScore General | 19.4 % | 562 MB |
+| playing it, guitars through the included SFZ | 14.9 % | 261 MB |
 
 Programs: `elara.exe` 16.7 to 8.4 MB, `elara-cli.exe` 9.1 to 3.1 MB. Install
 folder: 162.2 MB in 172 files to 112.4 MB in 120; zip 83.0 to 68.4 MB, of which
@@ -529,9 +531,10 @@ the SoundFont is 38.1 MB.
 
 What the numbers point at next:
 
-- MuseScore General costs the app about 325 MB and a third of a core for 20
-  tracks: every track has a synthesizer of its own, and each loads the
-  SoundFont's presets and instruments again (the samples are shared).
+- MuseScore General costs the app about 325 MB for 20 tracks. Rendering
+  through it with `elara-cli` takes 105 MB for one track and about 12 MB for
+  each track more: every track has a synthesizer of its own, and each loads
+  the SoundFont's 3861 preset and instrument zones again (the samples are
+  shared).
 - Opening a `.elara` file commits 341 MB for 206 MB used: yyjson reserves
   room for as many values as the text could hold.
-- The app with a song open and nothing playing still uses 2.4 % of a core.

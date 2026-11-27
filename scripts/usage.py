@@ -110,8 +110,9 @@ def _reader(stream, lines: list[str], hold_seen: threading.Event, ready: list[fl
 def measure(cmd: list[str], *, env: dict[str, str] | None = None, hold: float = 0.0,
             timeout: float = 900.0) -> Run:
     """Runs cmd to its end. With hold, the app prints `hold: N s` once it is
-    ready and stays open N seconds: the processor time and memory between that
-    line and a second before its end are reported apart."""
+    ready and stays open N seconds: the processor time and memory over the
+    second half of that time, once what opening started (pages painting) has
+    settled, are reported apart."""
     lines: list[str] = []
     hold_seen = threading.Event()
     ready: list[float] = []
@@ -123,7 +124,9 @@ def measure(cmd: list[str], *, env: dict[str, str] | None = None, hold: float = 
     window: dict[str, float] = {}
     # Not proc.poll() elsewhere: it would reap the child before wait4 reads its usage.
     if hold > 0 and hold_seen.wait(timeout) and (not WINDOWS or proc.poll() is None):
-        span = max(hold - 1.0, 0.5)
+        settle = hold / 2
+        span = max(hold - settle - 0.5, 0.5)
+        time.sleep(settle)
         if WINDOWS:
             handle = int(proc._handle)  # noqa: SLF001 - the process handle Popen holds
             cpu0, t0 = _cpu(handle), time.perf_counter()
