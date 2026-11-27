@@ -97,7 +97,7 @@ elara_add_unit_tests(notation
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
   notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
-  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp
+  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp notation/test_voice_layout.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
@@ -121,7 +121,8 @@ elara_target_warnings(elara_benchmarks)
 
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
-  add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
+  add_executable(elara_app_tests app/main.cpp app/test_command_search.cpp app/test_score_painter.cpp
+    app/test_track_list.cpp
     app/test_when_done.cpp app/test_app_icon.cpp app/test_included_sound.cpp
     app/test_recent_scores.cpp app/test_recovery_store.cpp app/test_job_lane.cpp
     app/test_window_state.cpp app/bench_score_painter.cpp)
@@ -196,19 +197,26 @@ if(TARGET elara)
   # closes for the click on the playback cursor.
   add_test(NAME app.smoke_menu
     COMMAND elara --smoke-test --menu view "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
+  # The caret holds still on screen while an edit above it changes the layout.
+  add_test(NAME app.smoke_hold_still COMMAND elara --smoke-test --hold-still)
   # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # A song shown, playing, held open for a second with nothing of the check
+  # running, as scripts/usage.py measures it; without an audio device (as in
+  # CI) playback does not start, and the window must still close cleanly.
+  add_test(NAME app.hold
+    COMMAND elara --hold 1 --play "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
   set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
     app.smoke_open_views app.smoke_open_missing
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
-    app.smoke_effects
+    app.smoke_effects app.hold app.smoke_hold_still
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 60 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 65 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
@@ -219,9 +227,10 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 58 layouts\\)")
-  set_tests_properties(app.smoke_narrow app.smoke_menu PROPERTIES
+  set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(app.hold PROPERTIES PASS_REGULAR_EXPRESSION "hold: 1 s[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")
 

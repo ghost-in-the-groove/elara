@@ -134,6 +134,7 @@ Windows 11, MSVC 19.44, `release` preset (RelWithDebInfo).
 | 2026-11-26 | the scans for the tempo in force: `Song::tempoAt()` from the start at each of the large song's 500 measures, a tempo change in every one; one track on A4 pages without tempo changes and with one in every measure, every other one gradual | 103 µs for the 500 lookups (0.2 µs each); 2.52 ms and 2.55 ms | no index of tempo or dynamic context: layout carries the tempo along a system and looks it up once per system, the ramp ends and the dynamic before a system stop at the nearest change or struck note, and nothing asks `tempoAt()` for every measure. A score of thousands of measures with a change in each is where to measure again |
 | 2026-11-26 | the geometry pages hold, vectors by capacity: notation and tablature of one track of the large song on A4, and all 20 staves; laying them out again after a one-note edit | 21 pages, 2.9 MB; 126 pages, 34.7 MB; 0.48 ms (1 of 125 systems laid out) and 3.78 ms (2 of 126) | the page cache keeps its systems besides the pages it returns, so the geometry is held twice, and an edit copies every system into new pages. Sharing it needs pages made of references to systems, which changes how the app paints them: not done while one track's pages hold a few MB and relaying them out takes half a millisecond; a full score of this size is where it would pay |
 | 2026-11-27 | find the layout issues of all 20 staves of the large song on A4 pages (126 pages, none found) | 31.2 ms, 0.25 ms a page (57 ms with one sweep per system) | first version (ADR-0150): the boxes of the roles that must not touch, swept from the left in bands two staff spaces high, so that a box of a 20-staff system meets the few at its height instead of every staff's. On one thread; the app will look only at the pages an edit changed |
+| 2026-11-27 | lay out the notation of one 500-measure track on A4 pages, on one thread: as it is; with a second voice a whole step under the first on every beat | 8.1 to 8.8 ms (unchanged); 16.05 ms and 17.15 ms against 15.79 ms and 16.82 ms without the rule, in two runs of each build in turn | two voices on one staff kept apart (ADR-0151): only columns with chords of several voices are looked at, their few chords against each other, nothing allocated. 2 % on the worst case, where every column moves a chord; nothing on one voice |
 
 The painting benchmarks (`-- "[app]"`) live with the app tests, which need Qt;
 `bench` builds and runs them after the others when the app is built.
@@ -468,3 +469,73 @@ rows compare best on the one-thread time.
 | write a track's 21 pages as PDF; compressed; the same on one thread | 1.5 ms; 4.1 ms; 8.5 ms; 44.0 ms | 1.3 ms; 3.8 ms; 8.3 ms; 43.4 ms |
 | one tuner window: low E, high E, noise | 0.39, 0.10, 1.10 ms | 0.39, 0.10, 1.07 ms |
 | find the caret; pick it from a click | 0.38 µs; 1.5 µs | 0.37 µs; 1.5 µs |
+
+## Heavy use
+
+The benchmarks time one function on a song built in memory. `scripts/usage.py`
+runs the packaged programs as a person would, on large songs it writes to disk
+(self-made guitar tracks), and records what each run costs the machine: wall
+and processor time (all threads), peak working set and committed private
+memory, bytes read and written, and the size of the programs and the install
+folder. With `--hold` and `--play` the app stays open on its welcome pane, on
+an open song, or playing it, and the script samples its processor and memory
+use meanwhile.
+
+```
+python scripts/elara.py usage                 # pack the app, then measure it
+python scripts/elara.py usage --no-package    # measure the last package again
+python scripts/usage.py --bin build/release/bin --no-app --only export
+```
+
+The large song has 20 guitar tracks of 500 measures (121k notes, 24.6 MB of
+MusicXML, 0.32 MB as `.elara`); the huge one 1500 measures (360k notes,
+73.3 MB of MusicXML, 0.95 MB as `.elara`). Each scenario runs three times and
+reports the median.
+
+**2026-11-27, Windows package.** Before: the package of `main` that morning.
+After: with the release build optimised as MSVC's release (ADR-0144), the
+packages trimmed (ADR-0145), XML element text kept in its element on import,
+and MusicXML files written from their parts. Both packages measured one after
+the other on the reference machine. Times: wall s, CPU s; memory: peak working
+set / peak private MB.
+
+| Scenario | Before | After |
+|---|---|---|
+| CLI: import the huge MusicXML, save `.elara` | 0.82, 1.41; 579 / 572 | 0.72, 1.27; 412 / 407 |
+| CLI: open the huge `.elara`, save it again | 0.82, 0.81; 209 / 342 | 0.65, 0.66; 206 / 341 |
+| CLI: transpose the huge song 20 times | 2.63, 2.64; 395 / 398 | 2.01, 1.98; 391 / 397 |
+| CLI: export the huge song as MusicXML (274 MB) | 0.66, 1.92; 353 / 609 | 0.56, 1.69; 337 / 334 |
+| CLI: export it as `.mxl` | 1.56, 2.48; 227 / 374 | 1.56, 3.59; 224 / 373 |
+| CLI: export it as MIDI | 0.42, 0.94; 194 / 219 | 0.40, 0.70; 191 / 219 |
+| CLI: render the large song's 1000 s of audio, built-in synthesizer | 3.28, 35.5; 72 / 75 | 3.34, 34.4; 69 / 75 |
+| the same through MuseScore General | 34.6, 478; 397 / 403 | 35.4, 478; 394 / 402 |
+| App: start, show the welcome pane, quit | 1.66, 0.70; 161 / 150 | 1.63, 0.72; 159 / 150 |
+| App: open the large song, first track | 1.77, 1.70; 258 / 336 | 1.77, 1.42; 266 / 341 |
+| App: open it with all its tracks | 1.91, 2.59; 354 / 418 | 1.91, 2.27; 347 / 417 |
+
+The app held open for 10 s (after only; `--hold` is new), with the share of
+one core it used over the last 4.5 s, once opening has settled, and its
+working set then. In the first seconds after a song opens the app paints the
+pages around the view (about 12 % of a core for 5 s on the large song).
+
+| App state | CPU | Working set |
+|---|---|---|
+| welcome pane, idle | 0.0 % | 132 MB |
+| the large song open, idle | 0.0 % | 250 MB |
+| playing it, built-in synthesizer | 9.0 % | 238 MB |
+| playing it through MuseScore General | 19.4 % | 562 MB |
+| playing it, guitars through the included SFZ | 14.9 % | 261 MB |
+
+Programs: `elara.exe` 16.7 to 8.4 MB, `elara-cli.exe` 9.1 to 3.1 MB. Install
+folder: 162.2 MB in 172 files to 112.4 MB in 120; zip 83.0 to 68.4 MB, of which
+the SoundFont is 38.1 MB.
+
+What the numbers point at next:
+
+- MuseScore General costs the app about 325 MB for 20 tracks. Rendering
+  through it with `elara-cli` takes 105 MB for one track and about 12 MB for
+  each track more: every track has a synthesizer of its own, and each loads
+  the SoundFont's 3861 preset and instrument zones again (the samples are
+  shared).
+- Opening a `.elara` file commits 341 MB for 206 MB used: yyjson reserves
+  room for as many values as the text could hold.
