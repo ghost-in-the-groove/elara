@@ -7,6 +7,7 @@
     python scripts/elara.py test  [--preset P] [-R REGEX] [--no-build]
     python scripts/elara.py check                fast gate: format check, guard, build, tests
     python scripts/elara.py bench [-- ARGS]      benchmarks in the release preset
+    python scripts/elara.py usage [-- ARGS]      pack, then measure the app and CLI under heavy use
     python scripts/elara.py format [--check]     clang-format every C++ source
     python scripts/elara.py guard                module-boundary check
     python scripts/elara.py tidy [FILES...]      clang-tidy (default: changed .cpp files)
@@ -468,6 +469,25 @@ def cmd_bench(args: argparse.Namespace) -> int:
                           env=env, check=False).returncode
 
 
+def cmd_usage(args: argparse.Namespace) -> int:
+    """Packs the app as `package` does, then measures what it installed under
+    heavy use (scripts/usage.py): what a person runs, with the SoundFont and
+    the guitar SFZ that come with it."""
+    stage = ROOT / "build" / "package" / "stage"
+    if not args.no_package:
+        package = argparse.Namespace(no_smoke_test=True, installers=False, no_soundfont=False,
+                                     no_guitar_sfz=False)
+        if (code := cmd_package(package)) != 0:
+            return code
+    if not (stage / "bin").is_dir():
+        log(f"{stage} missing - run: python scripts/elara.py package")
+        return 1
+    return subprocess.run([sys.executable, str(ROOT / "scripts" / "usage.py"),
+                           "--bin", str(stage / "bin"), "--stage", str(stage),
+                           *_strip_dashes(args.args)],
+                          cwd=ROOT, env=_without_qt_on_path(build_env()), check=False).returncode
+
+
 def cmd_app(args: argparse.Namespace) -> int:
     bin_dir = build_dir(args.preset) / "bin"
     exe = (bin_dir / "elara.app" / "Contents" / "MacOS" / "elara") if IS_MAC else bin_dir / f"elara{EXE}"
@@ -897,6 +917,12 @@ def main() -> int:
     add("ci", cmd_ci, "full CI sequence with a fresh configure")
     add("bench", cmd_bench, "build and run benchmarks (release preset)", preset=False).add_argument(
         "args", nargs=argparse.REMAINDER)
+    usage = add("usage", cmd_usage, "pack the app, then measure it under heavy use",
+                preset=False)
+    usage.add_argument("--no-package", action="store_true",
+                       help="measure the install folder the last package left")
+    usage.add_argument("args", nargs=argparse.REMAINDER,
+                       help="passed to scripts/usage.py after --")
     package = add("package", cmd_package, "build, smoke-test and pack the app (release preset)",
         preset=False)
     package.add_argument("--no-smoke-test", action="store_true",
