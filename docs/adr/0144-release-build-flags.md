@@ -42,7 +42,13 @@ Link-time optimisation stays off (`ELARA_IPO`).
 ## Consequences
 
 - On Windows x64: `elara.exe` 16.7 MB to 8.4 MB, `elara-cli.exe` 9.1 MB to
-  3.1 MB. Speed: see the benchmark comparison in `docs/performance.md`.
+  3.1 MB.
+- Faster, nowhere slower. The old and new `elara_benchmarks` ran
+  alternately on the same machine: over all 74 benchmarks the median time
+  fell 7 % (geometric mean 9 %); laying out notation and pages 10 to 45 %;
+  reading and writing `.elara` and JSON and importing GPIF 5 to 10 % (the
+  best of eight alternated runs each, which first looked slower in single
+  runs disturbed by other work on the machine).
 - A release link takes longer than an incremental one, and a change relinks in
   full. Developers build the `dev` preset, which is unchanged.
 - The objects CI's ccache holds for the release preset are compiled again once.
