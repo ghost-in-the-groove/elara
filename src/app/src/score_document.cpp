@@ -2028,6 +2028,10 @@ bool ScoreDocument::placeCaret(int index, double x, double y) {
 }
 
 void ScoreDocument::typeDigit(int digit) {
+    typeDigit(digit, core::EditSession::Clock::now());
+}
+
+void ScoreDocument::typeDigit(int digit, core::EditSession::Clock::time_point at) {
     if (!document_ || !hasCaret(document_->song()) || digit < 0 || digit > 9) {
         return;
     }
@@ -2041,7 +2045,7 @@ void ScoreDocument::typeDigit(int digit) {
     }
     bool changed = false;
     try {
-        changed = session_.typeDigit(*document_, digit, core::EditSession::Clock::now());
+        changed = session_.typeDigit(*document_, digit, at);
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
         return;

@@ -484,6 +484,9 @@ public:
     /// kTwoDigitMilliseconds on the same caret makes a two-digit fret, as one
     /// undo step.
     Q_INVOKABLE void typeDigit(int digit);
+    /// typeDigit() as if the key were pressed at `at`: what the window between
+    /// two digits measures, whatever time the first one's layout took.
+    void typeDigit(int digit, core::EditSession::Clock::time_point at);
     /// The input duration (1, 2, 4... 64), also given to the caret's beat.
     Q_INVOKABLE void setInputValue(int value);
     Q_INVOKABLE void toggleDot();
