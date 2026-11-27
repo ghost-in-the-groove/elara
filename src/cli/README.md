@@ -62,9 +62,11 @@ with `--json`, at the end: `{"device", "sampleRate", "seconds", "peak",
 "note": null}` when the note stops. `devices` lists `"outputs"` and `"inputs"`.
 
 `new` creates a `.elara` song (ADR-0006) and refuses to replace a file without
-`--force`. `dump --json` prints `{"file", "song", "durationSeconds", "issues"}`
-where `song` is the file's complete `song.json`: the model snapshot later tests
-compare against. `import --json` prints `{"file", "format", "out", "warnings",
+`--force`. `dump --json` prints `{"file", "warnings", "song", "durationSeconds",
+"issues"}` where `song` is the file's complete `song.json`: the model snapshot
+later tests compare against; `warnings` says when a newer Elara saved the file,
+whose additions saving here leaves out (ADR-0139), which `edit --in` also says
+on stderr. `import --json` prints `{"file", "format", "out", "warnings",
 "song", "durationSeconds", "issues"}`, with `format` `musicxml`, `midi` or `guitarpro`:
 `warnings` lists what the file had that the model cannot hold yet (ADR-0007,
 ADR-0009); `--out` also saves the song as `.elara`. `export --json` writes

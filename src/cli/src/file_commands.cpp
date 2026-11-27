@@ -84,20 +84,34 @@ int runNew(bool json, const NewOptions& options) {
     return kExitOk;
 }
 
-int runDump(bool json, const std::string& file) {
-    const auto song = io::loadNative(file);
-    if (!song) {
-        return fail(std::format("{}: {}", file, song.error().message));
+std::string warningsJson(const std::vector<std::string>& warnings) {
+    std::string json = "[";
+    for (const std::string& warning : warnings) {
+        json += std::format("{}\"{}\"", json.size() > 1 ? "," : "", jsonEscape(warning));
     }
+    return json + ']';
+}
+
+// A native file's song, and what this Elara may not keep of it (ADR-0139).
+int runDump(bool json, const std::string& file) {
+    const auto opened = io::openNative(file);
+    if (!opened) {
+        return fail(std::format("{}: {}", file, opened.error().message));
+    }
+    const core::Song& song = opened->song;
     if (json) {
-        std::cout << std::format(
-                         R"({{"file":"{}","song":{},"durationSeconds":{:.3f},"issues":{}}})",
-                         jsonEscape(file), io::songToJson(*song), song->durationSeconds(),
-                         issuesJson(core::validate(*song)))
+        std::cout << std::format(R"({{"file":"{}","warnings":{},"song":{},)"
+                                 R"("durationSeconds":{:.3f},"issues":{}}})",
+                                 jsonEscape(file), warningsJson(opened->warnings),
+                                 io::songToJson(song), song.durationSeconds(),
+                                 issuesJson(core::validate(song)))
                   << '\n';
     } else {
         std::cout << file << '\n';
-        printSongText(*song);
+        printSongText(song);
+        for (const std::string& warning : opened->warnings) {
+            std::cout << "warning: " << warning << '\n';
+        }
     }
     return kExitOk;
 }
@@ -159,14 +173,6 @@ std::string_view formatName(Foreign format) {
         break;
     }
     return "MusicXML";
-}
-
-std::string warningsJson(const std::vector<std::string>& warnings) {
-    std::string json = "[";
-    for (const std::string& warning : warnings) {
-        json += std::format("{}\"{}\"", json.size() > 1 ? "," : "", jsonEscape(warning));
-    }
-    return json + ']';
 }
 
 int runImport(bool json, const ImportOptions& options) {
