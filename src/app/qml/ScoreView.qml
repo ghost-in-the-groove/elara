@@ -503,8 +503,10 @@ Item {
     Flickable {
         id: list
 
-        // How far above and below the view pages stay loaded.
-        readonly property real buffer: Math.max(0, root.pageHeight)
+        // How far above and below the view pages stay loaded: a page, but no
+        // more than the view's own height, so that at a high zoom only the
+        // pages in and next to the view hold a texture (up to 128 MiB each).
+        readonly property real buffer: Math.max(0, Math.min(root.pageHeight, height))
 
         anchors.fill: parent
         topMargin: 24
