@@ -10,6 +10,7 @@
 #include <elara/notation/display_list.hpp>
 
 #include "audio_controller.hpp"
+#include "quit_as_crash.hpp"
 #include "recent_scores.hpp"
 #include "score_page.hpp"
 #include "tuner_controller.hpp"
@@ -604,7 +605,7 @@ void Startup::queueCrashAfterRecoveryCopy() {
         reportSmokeTest(true, QStringLiteral("left a recovery copy"));
         std::fflush(stdout);
         std::fflush(stderr);
-        std::_Exit(EXIT_SUCCESS);
+        quitAsCrash(EXIT_SUCCESS);
     });
 }
 

@@ -101,14 +101,37 @@ runs:
           echo "VCPKG_DOWNLOADS=$RUNNER_TEMP/vcpkg-downloads"
         } >> "$GITHUB_ENV"
         echo "image=$ImageVersion" >> "$GITHUB_OUTPUT"
+        echo "triplet=$triplet" >> "$GITHUB_OUTPUT"
 
-    - name: Cache vcpkg
-      uses: actions/cache@v6
+    - name: Restore vcpkg packages
+      id: vcpkg-cache
+      uses: actions/cache/restore@v6
       with:
         path: |
           ${{ runner.temp }}/vcpkg-binary
           ${{ runner.temp }}/vcpkg-downloads
         key: vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ steps.vcpkg.outputs.image }}-untracked-${{ hashFiles('vcpkg.json', 'cmake/vcpkg-ports/**') }}
+
+    # On a miss the packages are built here and their cache saved at once, so
+    # a later step that fails (a test, say) does not make the next run build
+    # them again. The configure then installs them from the binary cache.
+    - name: Build vcpkg packages
+      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        TRIPLET: ${{ steps.vcpkg.outputs.triplet }}
+      run: |
+        "$VCPKG_ROOT/vcpkg" install --triplet "$TRIPLET" --host-triplet "$TRIPLET" \
+          --x-install-root "$RUNNER_TEMP/vcpkg-installed"
+
+    - name: Save vcpkg packages
+      if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          ${{ runner.temp }}/vcpkg-binary
+          ${{ runner.temp }}/vcpkg-downloads
+        key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
     - name: ccache
       if: inputs.ccache == 'true'

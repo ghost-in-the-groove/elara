@@ -42,6 +42,15 @@ Behind those numbers:
   Sanitizer (ADR-0105), and `dev` is the preset everyone builds locally. Each
   preset has its own ccache key (`ccache-<os>-<preset>-<sha>`), so a job never
   restores objects compiled for another build type.
+
+  The release build showed one thing the debug one had hidden: the smoke test
+  that leaves a recovery copy (ADR-0106) quit with `std::_Exit`, which on
+  Windows is `ExitProcess`. That stops the other threads and then runs each
+  DLL's detach code, Qt's global destructors included; with the release DLLs
+  the process reported success and never ended, most likely in code waiting
+  for a thread already stopped, until the test timed out. The app now quits
+  there with `TerminateProcess` on Windows, which runs nothing, as a real
+  crash.
 - **The package workflow compiles through ccache too**, restoring the release
   cache that ci.yml's last run on main saved for Windows and macOS. It saves
   nothing, so packages never evict the caches pull requests restore.
@@ -53,7 +62,10 @@ Behind those numbers:
   which fixes the compiler, so the hash vcpkg spent a configure on added
   nothing. The key also hashes the overlay ports now, which it missed before.
 - **vcpkg's downloads are cached with its binary packages**, so the CMake it
-  unpacks for itself is unpacked once per runner image.
+  unpacks for itself is unpacked once per runner image. On a cache miss the
+  packages are built and the cache saved before the build starts: saved at the
+  end of the job, as before, a failing test cost the next run the same
+  rebuild.
 - **The format check runs one clang-format per core.**
 - **py7zr is installed only when Qt is not in the cache**: it extracts what a
   cache miss downloads, nothing else.
