@@ -2,6 +2,8 @@
 // What values of the model hold on the heap, for approximateBytes() (ADR-0121).
 #pragma once
 
+#include <elara/core/shared_value.hpp>
+
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -26,6 +28,12 @@ inline constexpr std::size_t kControlBlockBytes = (2 * sizeof(long)) + (2 * size
 template <class T>
 [[nodiscard]] constexpr std::size_t sharedBytes() noexcept {
     return sizeof(T) + kControlBlockBytes;
+}
+
+// A shared optional vector: nothing when empty.
+template <class T>
+[[nodiscard]] std::size_t sharedBytes(const SharedOptional<std::vector<T>>& values) noexcept {
+    return values ? sharedBytes<std::vector<T>>() + heapBytes(*values) : 0;
 }
 
 } // namespace elara::core::detail

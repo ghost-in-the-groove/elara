@@ -3,6 +3,7 @@
 
 #include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
+#include <elara/core/measure_layout.hpp>
 #include <elara/core/names.hpp>
 #include <elara/core/pitch.hpp>
 #include <elara/core/shared_value.hpp>
@@ -130,6 +131,10 @@ public:
     [[nodiscard]] Staff& staff(std::size_t index);
     [[nodiscard]] const Staff& staff(std::size_t index) const;
 
+    /// The measure layouts used when staves of this track only are shown
+    /// (ADR-0152): none, or one per measure. Song::setMeasureLayouts() sets them.
+    [[nodiscard]] const MeasureLayouts& measureLayouts() const noexcept { return layouts_; }
+
     friend bool operator==(const Track&, const Track&) = default;
 
 private:
@@ -139,6 +144,7 @@ private:
     Instrument instrument_;
     std::vector<Staff> staves_;
     TrackMix mix_;
+    MeasureLayouts layouts_;
 };
 
 /// Where a jump sends the music back to (ADR-0049).
@@ -410,8 +416,9 @@ public:
     [[nodiscard]] std::size_t measureCount() const noexcept { return headers_.size(); }
 
     /// Appends a track and returns its index. Its staves get measureCount() empty
-    /// measures. Throws std::invalid_argument if a staff already holds a different
-    /// number of measures (e.g. a track copied from another song).
+    /// measures. Throws std::invalid_argument if a staff, or its measure layouts,
+    /// already hold a different number of measures (e.g. a track copied from
+    /// another song).
     std::size_t addTrack(Track track) { return insertTrack(trackCount(), std::move(track)); }
 
     /// Inserts a track before track `at` (at == trackCount() appends), with the
@@ -444,6 +451,24 @@ public:
     /// Throws std::out_of_range for a missing measure.
     [[nodiscard]] MeasureHeader& measureHeader(std::size_t index);
     [[nodiscard]] const MeasureHeader& measureHeader(std::size_t index) const;
+
+    // ---- Layout adjustments (ADR-0152) -------------------------------------
+    // Each scope holds none, or one MeasureLayout per measure: measures
+    // inserted get the default, measures removed take theirs with them, and a
+    // scope whose entries are all the default holds none.
+
+    /// The measure layouts of `scope`. Throws std::out_of_range for a missing
+    /// track.
+    [[nodiscard]] const MeasureLayouts& measureLayouts(LayoutScope scope) const;
+
+    /// Measure m's layout in `scope`, the default when the scope holds none.
+    /// Throws std::out_of_range for a missing track or measure.
+    [[nodiscard]] MeasureLayout measureLayout(LayoutScope scope, std::size_t measure) const;
+
+    /// Replaces the measure layouts of `scope` as a whole; all of them the
+    /// default is stored as none. Throws std::out_of_range for a missing track
+    /// and std::invalid_argument when they are not one per measure.
+    void setMeasureLayouts(LayoutScope scope, MeasureLayouts layouts);
 
     // ---- Timeline ----------------------------------------------------------
     // Positions are (measure, offset in whole notes); measure == measureCount()
@@ -499,10 +524,13 @@ public:
 private:
     void checkPosition(std::size_t measure, const Fraction& offset) const;
 
+    [[nodiscard]] MeasureLayouts& layoutsOf(LayoutScope scope);
+
     SongInfo info_;
     Tempo startTempo_;
     std::vector<MeasureHeader> headers_;
     std::vector<Track> tracks_;
+    MeasureLayouts layouts_; // used when staves of several tracks are shown
 };
 
 /// The measure whose music measure `measure` of `staff`, a staff of `song`,

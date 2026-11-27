@@ -31,6 +31,9 @@ namespace {
 using namespace core;
 
 constexpr std::string_view kFormatName = "elara";
+// A measure's spacing, in percent of its ideal spaces (ADR-0152).
+constexpr std::int64_t kMinSpacing = 50;
+constexpr std::int64_t kMaxSpacing = 200;
 // "generator" is this name and the version: "Elara 0.1.0".
 constexpr std::string_view kGeneratorName = "Elara ";
 
@@ -85,6 +88,7 @@ public:
             yyjson_mut_arr_append(measures, header(song.measureHeader(m)));
         }
         add(root, "measures", measures);
+        addLayouts(root, song.measureLayouts(LayoutScope::song()));
 
         yyjson_mut_val* tracks = yyjson_mut_arr(doc_);
         for (std::size_t t = 0; t < song.trackCount(); ++t) {
@@ -148,6 +152,29 @@ private:
         addTextIfAny(object, "transcriber", info.transcriber);
         addTextIfAny(object, "notes", info.notes);
         add(root, "info", object);
+    }
+
+    // The measures of a scope whose layout is not the default (ADR-0152), as
+    // "layout"; nothing for a scope that holds none.
+    void addLayouts(yyjson_mut_val* object, const MeasureLayouts& value) {
+        if (!value) {
+            return;
+        }
+        yyjson_mut_val* entries = yyjson_mut_arr(doc_);
+        for (std::size_t m = 0; m < value->size(); ++m) {
+            const MeasureLayout& layout = (*value)[m];
+            if (layout.isDefault()) {
+                continue;
+            }
+            yyjson_mut_val* entry = yyjson_mut_obj(doc_);
+            addInt(entry, "measure", static_cast<std::int64_t>(m));
+            addEnumIfNot(entry, "break", layout.breakBefore, Break::Auto);
+            if (layout.spacing != MeasureLayout::kDefaultSpacing) {
+                addInt(entry, "spacing", layout.spacing);
+            }
+            yyjson_mut_arr_append(entries, entry);
+        }
+        add(object, "layout", entries);
     }
 
     yyjson_mut_val* tempo(const Tempo& value) {
@@ -234,6 +261,7 @@ private:
             addFlag(mixJson, "solo", mix.solo);
             add(object, "mix", mixJson);
         }
+        addLayouts(object, value.measureLayouts());
 
         yyjson_mut_val* staves = yyjson_mut_arr(doc_);
         for (std::size_t s = 0; s < value.staffCount(); ++s) {
@@ -545,6 +573,7 @@ public:
                 song.measureHeader(m) = readHeader(header);
             });
         }
+        readLayouts(root, song, LayoutScope::song());
         if (yyjson_val* tracks = optionalArray(root, "tracks")) {
             Scope scope(*this, "tracks");
             forEach(tracks, [&](std::size_t, yyjson_val* track) { readTrack(track, song); });
@@ -896,12 +925,36 @@ private:
 
         Track& track = song.track(index);
         track.setMix(mix);
+        readLayouts(object, song, LayoutScope::ofTrack(index));
         Scope stavesScope(*this, "staves");
         forEach(stavesJson, [&](std::size_t s, yyjson_val* staffJson) {
             readMeasures(staffJson, track.staff(s), song.measureCount());
             readClefs(staffJson, track.staff(s), song.measureCount());
             readRepeats(staffJson, track.staff(s), song.measureCount());
         });
+    }
+
+    // The measure layouts of a scope (ADR-0152): the measures that differ.
+    void readLayouts(yyjson_val* object, Song& song, LayoutScope scope) {
+        yyjson_val* entries = optionalArray(object, "layout");
+        if (entries == nullptr) {
+            return;
+        }
+        Scope where(*this, "layout");
+        const std::size_t count = song.measureCount();
+        std::vector<MeasureLayout> layouts(count);
+        forEach(entries, [&](std::size_t, yyjson_val* entry) {
+            if (!yyjson_is_obj(entry)) {
+                fail("expected an object");
+            }
+            const auto m = static_cast<std::size_t>(
+                integer(entry, "measure", 0, static_cast<std::int64_t>(count) - 1));
+            layouts[m].breakBefore = enumValue(entry, "break", Break::Auto);
+            layouts[m].spacing = static_cast<std::uint8_t>(
+                optionalInteger(entry, "spacing", kMinSpacing, kMaxSpacing)
+                    .value_or(MeasureLayout::kDefaultSpacing));
+        });
+        song.setMeasureLayouts(scope, MeasureLayouts(std::move(layouts)));
     }
 
     // The measures that change the staff's clef (ADR-0087).

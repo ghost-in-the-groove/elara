@@ -27,6 +27,26 @@ void writeOptional(JsonWriter& json, std::string_view name,
     }
 }
 
+// A track's own breaks (ADR-0152), as `"breaks":[...]`; nothing when it holds none.
+void writeBreaks(JsonWriter& json, const core::MeasureLayouts& layouts) {
+    if (!layouts) {
+        return;
+    }
+    bool any = false;
+    for (std::size_t m = 0; m < layouts->size(); ++m) {
+        if (const core::Break kind = (*layouts)[m].breakBefore; kind != core::Break::Auto) {
+            if (!any) {
+                json.key("breaks").beginArray();
+                any = true;
+            }
+            json.beginObject().field("measure", m).field("break", core::nameOf(kind)).endObject();
+        }
+    }
+    if (any) {
+        json.endArray();
+    }
+}
+
 } // namespace
 
 void writeTracks(JsonWriter& json, const core::Song& song) {
@@ -65,8 +85,9 @@ void writeTracks(JsonWriter& json, const core::Song& song) {
         json.field("capo", first.capo())
             .field("staves", track.staffCount())
             .field("beats", beats)
-            .field("notes", notes)
-            .endObject();
+            .field("notes", notes);
+        writeBreaks(json, track.measureLayouts());
+        json.endObject();
     }
     json.endArray();
 }
@@ -130,6 +151,11 @@ void writeMeasures(JsonWriter& json, const core::Song& song) {
         }
         if (!header.section.empty()) {
             json.field("section", header.section);
+        }
+        // The song's break before the measure (ADR-0152); the tracks list their own.
+        if (const core::Break kind = song.measureLayout(core::LayoutScope::song(), m).breakBefore;
+            kind != core::Break::Auto) {
+            json.field("break", core::nameOf(kind));
         }
         json.endObject();
     }

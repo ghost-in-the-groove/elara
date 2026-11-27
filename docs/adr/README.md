@@ -137,6 +137,7 @@ one that replaces them.
 | [0138](0138-releases-are-drafted-from-a-tag.md) | Releases are drafted from a tag | Accepted |
 | [0139](0139-a-song-from-a-newer-elara-says-what-it-may-lose.md) | A song from a newer Elara says what it may lose | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
+| [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
 
 ## Template
 
