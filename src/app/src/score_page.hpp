@@ -78,8 +78,9 @@ private:
     double shownScale_ = 0.0;
     double shownRatio_ = 0.0;
     ScoreColours shownColours_;
-    ScoreColours colours_; ///< what the next paint uses
-    QImage image_;         ///< painted, waiting to become a texture
+    ScoreColours colours_;     ///< what the next paint uses
+    QImage image_;             ///< painted, waiting to become a texture
+    bool imageOpaque_ = false; ///< `image_` was painted on opaque paper
     bool painted_ = false;
 };
 
