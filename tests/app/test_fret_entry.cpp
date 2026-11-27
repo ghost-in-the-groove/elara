@@ -10,12 +10,16 @@
 
 #include <chrono>
 #include <optional>
-#include <thread>
 
 namespace {
 
 using elara::app::CaretEditor;
 using elara::app::ScoreDocument;
+using Clock = elara::core::EditSession::Clock;
+
+// The two-digit window is measured between the times the keys are given, so
+// these tests type at chosen instants rather than at the clock's whim.
+const Clock::time_point kStart = Clock::now();
 
 // A new song of rests on `preset`, the caret on its first beat.
 struct Entry {
@@ -30,8 +34,8 @@ struct Entry {
     }
 
     void type(int first, int second) {
-        score.typeDigit(first);
-        score.typeDigit(second);
+        score.typeDigit(first, kStart);
+        score.typeDigit(second, kStart);
     }
 };
 
@@ -69,27 +73,27 @@ TEST_CASE("fret entry: a first digit 0 is fret 0, and the next digit a fret of i
 
 TEST_CASE("fret entry: a second digit after the caret moved starts a fret of its own") {
     Entry entry;
-    entry.score.typeDigit(1);
+    entry.score.typeDigit(1, kStart);
     entry.score.moveCaret(ScoreDocument::CaretMove::StringDown);
     entry.score.moveCaret(ScoreDocument::CaretMove::StringUp);
-    entry.score.typeDigit(2);
+    entry.score.typeDigit(2, kStart);
     CHECK(entry.editor.fretAtCaret() == 2);
 }
 
 TEST_CASE("fret entry: a second digit after an undo starts a fret of its own") {
     Entry entry;
-    entry.score.typeDigit(1);
+    entry.score.typeDigit(1, kStart);
     entry.score.undo();
-    entry.score.typeDigit(2);
+    entry.score.typeDigit(2, kStart);
     CHECK(entry.editor.fretAtCaret() == 2);
 }
 
 TEST_CASE("fret entry: a second digit too late starts a fret of its own") {
     Entry entry;
-    entry.score.typeDigit(1);
-    std::this_thread::sleep_for(std::chrono::milliseconds(ScoreDocument::kTwoDigitMilliseconds) +
-                                std::chrono::milliseconds(50));
-    entry.score.typeDigit(2);
+    entry.score.typeDigit(1, kStart);
+    entry.score.typeDigit(2, kStart +
+                                 std::chrono::milliseconds(ScoreDocument::kTwoDigitMilliseconds) +
+                                 std::chrono::milliseconds(1));
     CHECK(entry.editor.fretAtCaret() == 2);
     entry.score.undo();
     CHECK(entry.editor.fretAtCaret() == 1);

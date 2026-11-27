@@ -665,8 +665,11 @@ void Startup::queueEntry() {
                   score_->caret() == before,
               "a click on the caret moved it");
         score_->moveCaret(ScoreDocument::CaretMove::StringDown);
-        score_->typeDigit(1);
-        score_->typeDigit(2);
+        // Both keys at one instant: the first digit's layout can outlast the
+        // two-digit window on a loaded machine.
+        const auto pressed = core::EditSession::Clock::now();
+        score_->typeDigit(1, pressed);
+        score_->typeDigit(2, pressed);
         return true;
     });
     steps_.emplace_back([this, check] {
