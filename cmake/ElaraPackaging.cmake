@@ -80,5 +80,8 @@ elseif(APPLE)
   set(CPACK_DMG_FORMAT UDBZ)
 else()
   set(CPACK_GENERATOR TGZ)
+  # The programs without the debug information the release preset builds them
+  # with (ADR-0145), as `elara.py package` installs them for the AppImage.
+  set(CPACK_STRIP_FILES TRUE)
 endif()
 include(CPack)
