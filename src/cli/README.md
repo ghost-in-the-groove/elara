@@ -40,6 +40,7 @@ elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--f
                            [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
                            [--measures-per-system N] [--no-credits] [--svg OUT] [--pdf OUT]
                            [--cursor-at SECONDS] [--time-at PAGE X Y]
+                           [--symbol-at PAGE X Y]
 ```
 
 `pitch` accepts text (`F#3`, `Bb2`, `Cx4`) or a MIDI number and prints the
@@ -117,6 +118,12 @@ after the end. `--time-at PAGE X Y` (the page from 0, x and y as the cursor
 gives them) adds `"timeAt": {"page", "x", "y", "measure", "seconds"}`: where a
 click there starts playback, on the column of notes under it the first time
 its measure plays; `measure` and `seconds` are `null` away from every measure.
+`--symbol-at PAGE X Y` adds `"symbolAt": {"page", "x", "y", "role", "measure",
+"box", "staff"}`: the symbol drawn there among those that are edited where
+they are drawn (a clef, a key or time signature, a tempo mark, a section, a
+chord symbol, a beat's text; ADR-0130), the measure it was laid out for, the
+box round its ink as `[x, y, width, height]` and the staff it is on as
+`{"track", "staff"}`; `role` is `null` where there is none.
 
 `edit` applies quoted steps to a new song, or to `--in FILE`, through the undo
 history, saves the result to `--out FILE` if given, and prints the song, its

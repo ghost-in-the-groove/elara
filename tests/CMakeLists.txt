@@ -88,7 +88,7 @@ target_include_directories(elara_io_tests PRIVATE "${PROJECT_SOURCE_DIR}/src/io/
 
 elara_add_unit_tests(notation
   SOURCES notation/test_cursor.cpp notation/test_smufl.cpp notation/test_staff_layout.cpp notation/test_caret.cpp
-  notation/test_page_layout.cpp
+  notation/test_symbol.cpp notation/test_page_layout.cpp
   notation/test_tab_layout.cpp notation/test_repeat_layout.cpp notation/test_tempo_layout.cpp
   notation/test_dynamics_layout.cpp notation/test_navigation_layout.cpp
   notation/test_incremental_layout.cpp notation/test_pdf.cpp notation/test_chord_layout.cpp notation/test_beat_text_layout.cpp
@@ -130,7 +130,7 @@ if(TARGET elara)
   # types belong to the app's QML module, which a test cannot link. The
   # transport plays through a device of the tests' own (ADR-0126).
   target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp app/test_fret_entry.cpp
-    app/test_score_editing.cpp app/test_caret_editor.cpp
+    app/test_score_editing.cpp app/test_caret_editor.cpp app/test_symbols.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/caret_editor.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/audio_controller.cpp")

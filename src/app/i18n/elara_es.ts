@@ -1413,6 +1413,77 @@
     </message>
 </context>
 <context>
+    <name>SymbolCard</name>
+    <message>
+        <source>Time signature</source>
+        <translation>Compás</translation>
+    </message>
+    <message>
+        <source>Key signature</source>
+        <translation>Armadura</translation>
+    </message>
+    <message>
+        <source>Clef</source>
+        <translation>Clave</translation>
+    </message>
+    <message>
+        <source>Tempo</source>
+        <translation>Tempo</translation>
+    </message>
+    <message>
+        <source>Section</source>
+        <translation>Sección</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+    <message>
+        <source>Treble</source>
+        <translation>Sol</translation>
+    </message>
+    <message>
+        <source>Bass</source>
+        <translation>Fa</translation>
+    </message>
+    <message>
+        <source>Alto</source>
+        <translation>Do en 3.ª</translation>
+    </message>
+    <message>
+        <source>Tenor</source>
+        <translation>Do en 4.ª</translation>
+    </message>
+    <message>
+        <source>Beats per minute</source>
+        <translation>Pulsos por minuto</translation>
+    </message>
+    <message>
+        <source>Gradual</source>
+        <translation>Gradual</translation>
+    </message>
+    <message>
+        <source>Speed up or slow down to the next tempo change</source>
+        <translation>Acelerar o frenar hasta el siguiente cambio de tempo</translation>
+    </message>
+    <message>
+        <source>Remove the tempo change</source>
+        <translation>Quitar el cambio de tempo</translation>
+    </message>
+    <message>
+        <source>Intro, Verse, Chorus…</source>
+        <translation>Intro, estrofa, estribillo…</translation>
+    </message>
+    <message>
+        <source>From the first measure until the next change.</source>
+        <translation>Desde el primer compás hasta el siguiente cambio.</translation>
+    </message>
+    <message>
+        <source>From measure %1 until the next change.</source>
+        <translation>Desde el compás %1 hasta el siguiente cambio.</translation>
+    </message>
+</context>
+<context>
     <name>TunerController</name>
     <message>
         <source>Guitar, standard</source>

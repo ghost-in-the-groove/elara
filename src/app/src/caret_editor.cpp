@@ -987,7 +987,21 @@ int CaretEditor::caretClef() const {
         return -1;
     }
     const core::Caret caret = core::clampCaret(edited(), where());
-    switch (edited().track(caret.track).staff(caret.staff).clefAt(caret.measure)) {
+    return clefAt(static_cast<int>(caret.track), static_cast<int>(caret.staff),
+                  static_cast<int>(caret.measure));
+}
+
+int CaretEditor::clefAt(int track, int staff, int measure) const {
+    const core::Song* song = editedSong();
+    if (song == nullptr || track < 0 || staff < 0 || measure < 0 ||
+        std::cmp_greater_equal(track, song->trackCount()) ||
+        std::cmp_greater_equal(measure, song->measureCount()) ||
+        std::cmp_greater_equal(staff, song->track(static_cast<std::size_t>(track)).staffCount())) {
+        return -1;
+    }
+    switch (song->track(static_cast<std::size_t>(track))
+                .staff(static_cast<std::size_t>(staff))
+                .clefAt(static_cast<std::size_t>(measure))) {
     case core::Clef::Treble:
     case core::Clef::Treble8vb:
         return 0;
@@ -1010,6 +1024,25 @@ void CaretEditor::setClef(int clef) {
     }
     runEntry([this, chosen = kOfferedClefs.at(static_cast<std::size_t>(clef))](
                  const core::Song& song) { return core::setClef(song, where(), chosen); });
+}
+
+void CaretEditor::setClefFrom(int track, int staff, int measure, int clef) {
+    if (!editing() || clefAt(track, staff, measure) < 0 || clef < 0 ||
+        std::cmp_greater_equal(clef, kOfferedClefs.size())) {
+        return;
+    }
+    const core::Caret at{.track = static_cast<std::size_t>(track),
+                         .staff = static_cast<std::size_t>(staff),
+                         .measure = static_cast<std::size_t>(measure)};
+    document_->endTyping();
+    try {
+        core::Entry entry =
+            core::setClef(edited(), at, kOfferedClefs.at(static_cast<std::size_t>(clef)));
+        entry.caret = where(); // the edit is elsewhere: the caret stays
+        document_->enter(std::move(entry));
+    } catch (const std::exception& error) {
+        document_->refuse(qstring(error.what()));
+    }
 }
 
 int CaretEditor::caretRepeat() const {

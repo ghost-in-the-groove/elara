@@ -15,6 +15,9 @@ ColumnLayout {
     property int fifths: 0
     property bool minor: false
     property real labelWidth: 92
+    /// Which of the two it shows: both, unless a card is for one of them.
+    property bool showTime: true
+    property bool showKey: true
 
     signal timeChosen(int numerator, int denominator)
     signal keyChosen(int fifths, bool minor)
@@ -53,9 +56,11 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
+        visible: root.showTime
         spacing: 6
 
         FieldLabel {
+            visible: root.labelWidth > 0
             text: qsTr("Time signature")
         }
 
@@ -89,9 +94,11 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
+        visible: root.showKey
         spacing: 6
 
         FieldLabel {
+            visible: root.labelWidth > 0
             text: qsTr("Key signature")
         }
 
@@ -111,10 +118,11 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        visible: !root.modeBeside
+        visible: root.showKey && !root.modeBeside
         spacing: 6
 
         Item {
+            visible: root.labelWidth > 0
             Layout.preferredWidth: root.labelWidth
         }
         ModeSwitch {}

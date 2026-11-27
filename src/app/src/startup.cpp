@@ -7,6 +7,7 @@
 #include <elara/io/midi.hpp>
 #include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
+#include <elara/notation/display_list.hpp>
 
 #include "audio_controller.hpp"
 #include "recent_scores.hpp"
@@ -63,6 +64,31 @@ int laneOf(int key) {
 // them as they were.
 int pagesUpdated() {
     return ScorePage::paintCount() + ScorePage::keptCount();
+}
+
+// The highlight of the symbol under the pointer on page `index`, searching the
+// items `item` shows: it lies over that page's paper, whose coordinates it
+// shares. Null while the view has not made that page.
+QQuickItem* symbolHighlight(QQuickItem* item, int index) {
+    if (item == nullptr) {
+        return nullptr;
+    }
+    if (item->objectName() == QLatin1StringView("symbolHighlight")) {
+        // The page's delegate, some items above, says which page it is.
+        for (const QQuickItem* above = item->parentItem(); above != nullptr;
+             above = above->parentItem()) {
+            if (const QVariant page = above->property("index"); page.isValid()) {
+                return page.toInt() == index ? item : nullptr;
+            }
+        }
+        return nullptr;
+    }
+    for (QQuickItem* child : item->childItems()) {
+        if (QQuickItem* found = symbolHighlight(child, index)) {
+            return found;
+        }
+    }
+    return nullptr;
 }
 
 // The first item named `name` under `item`, searching the items it shows: a
@@ -162,6 +188,7 @@ void Startup::queueSteps() {
             queueTuning();
             queueTempo();
             queueSection();
+            queueSymbols();
             queueMeasureRepeat();
             queueEffects();
             queueContinuous();
@@ -227,6 +254,7 @@ void Startup::queueSteps() {
         queueTuning();
         queueTempo();
         queueSection();
+        queueSymbols();
         queueMeasureRepeat();
         queueEffects();
     }
@@ -242,6 +270,7 @@ void Startup::queueSteps() {
         });
     };
     if (options_.smokeTest) {
+        queueSymbolClick();
         seekTo(score_->duration() / 2.0);
         steps_.emplace_back([this] {
             clickCursor();
@@ -1208,6 +1237,175 @@ void Startup::queueRepeats() {
 // A section named from the measure popup (ADR-0062): the first measure's name
 // set, trimmed, as one undo step that the score draws; undone, the song must
 // end as it started.
+// A symbol edited where it is drawn (ADR-0130): the time signature of the
+// first page is found under a point of its ink, nothing is found in the page's
+// corner, and what a double click on it calls opens its card for the measure
+// the signature starts at. Nothing is changed.
+void Startup::queueSymbols() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("symbol check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        const auto page = score_->page(0);
+        auto* view = window_->findChild<QObject*>(QStringLiteral("scoreView"));
+        if (!page || view == nullptr) {
+            return false;
+        }
+        const auto digit = std::ranges::find(page->glyphs, notation::Role::TimeSignature,
+                                             &notation::GlyphItem::role);
+        if (digit == page->glyphs.end()) {
+            return false; // a view that writes none on its first page
+        }
+        const QVariantMap symbol = score_->symbolAt(0, digit->origin.x + 0.5, digit->origin.y);
+        check(symbol.value(QStringLiteral("kind")).toString() == QStringLiteral("time"),
+              "the time signature is not found where it is drawn");
+        check(symbol.value(QStringLiteral("rect"))
+                  .toRectF()
+                  .contains(QPointF(digit->origin.x + 0.5, digit->origin.y)),
+              "the time signature's box is not round it");
+        check(score_->symbolAt(0, 0.2, 0.2).isEmpty(), "a symbol was found in the page's corner");
+        check(QMetaObject::invokeMethod(view, "editSymbol", Q_ARG(int, 0),
+                                        Q_ARG(QVariant, QVariant(symbol))),
+              "the score view does not edit a symbol");
+        const auto* card = window_->findChild<QObject*>(QStringLiteral("symbolCard"));
+        check(card != nullptr && card->property("visible").toBool(),
+              "the time signature's card did not open");
+        if (card != nullptr) {
+            check(card->property("kind").toString() == QStringLiteral("time") &&
+                      card->property("measure").toInt() ==
+                          symbol.value(QStringLiteral("measure")).toInt(),
+                  "the card is not for the time signature of that measure");
+            const QVariantMap shown = card->property("signature").toMap();
+            const QVariantMap written =
+                score_->signatureAt(symbol.value(QStringLiteral("measure")).toInt());
+            check(!written.isEmpty() && shown == written,
+                  "the card does not show the measure's time signature");
+        }
+        return false;
+    });
+    steps_.emplace_back([this, check] {
+        // It closes as it opened, and the song is as it was.
+        if (auto* card = window_->findChild<QObject*>(QStringLiteral("symbolCard"));
+            card != nullptr && card->property("visible").toBool()) {
+            QMetaObject::invokeMethod(card, "close");
+        }
+        check(!score_->modified(), "opening a symbol's card changed the song");
+        return false;
+    });
+}
+
+// A symbol edited with the pointer, as a hand does it (ADR-0130): over the
+// first page's time signature the page lights it, and a double click there
+// opens its card. The clicks also put the caret and playback on that measure,
+// as any click on the page does; what follows moves both again.
+void Startup::queueSymbolClick() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("symbol click check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    const auto send = [this](QEvent::Type type, QPointF at) {
+        QMouseEvent event(type, at, at, window_->mapToGlobal(at),
+                          type == QEvent::MouseMove ? Qt::NoButton : Qt::LeftButton,
+                          type == QEvent::MouseButtonPress ? Qt::LeftButton : Qt::NoButton,
+                          Qt::NoModifier);
+        QCoreApplication::sendEvent(window_, &event);
+    };
+    // Where the time signature is in the window, and whether the song had
+    // unsaved changes; no point for a view that writes none on its first page.
+    struct Found {
+        std::optional<QPointF> at;
+        QPointF onPaper;
+        bool modified = false;
+    };
+    const auto found = std::make_shared<Found>();
+    steps_.emplace_back([this, found, send] {
+        const auto page = score_->page(0);
+        auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+        if (!page || view == nullptr) {
+            return false;
+        }
+        const auto digit = std::ranges::find(page->glyphs, notation::Role::TimeSignature,
+                                             &notation::GlyphItem::role);
+        if (digit == page->glyphs.end()) {
+            return false;
+        }
+        if (!uncoverScore()) {
+            return false;
+        }
+        // The view shows the top of the first page, and stands still there.
+        if (view->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        const QQuickItem* light = symbolHighlight(view, 0);
+        const double scale =
+            view->property("unit").toDouble() * view->property("shownZoom").toDouble();
+        const QPointF onPaper((digit->origin.x + 0.5) * scale, digit->origin.y * scale);
+        if (light == nullptr || light->parentItem() == nullptr ||
+            !view->contains(view->mapFromScene(light->parentItem()->mapToScene(onPaper)))) {
+            QMetaObject::invokeMethod(view, "toTop");
+            again_ = true;
+            return false;
+        }
+        found->onPaper = onPaper;
+        found->at = light->parentItem()->mapToScene(onPaper);
+        found->modified = score_->modified();
+        send(QEvent::MouseMove, *found->at);
+        return false;
+    });
+    steps_.emplace_back([this, found, send, check] {
+        if (!found->at) {
+            return false;
+        }
+        auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+        const QQuickItem* light = symbolHighlight(view, 0);
+        check(light != nullptr && light->isVisible(),
+              "the time signature under the pointer is not lit");
+        if (light != nullptr) {
+            check(QRectF(light->position(), light->size()).contains(found->onPaper),
+                  "what is lit is not round the pointer");
+        }
+        for (const QEvent::Type type : {QEvent::MouseButtonPress, QEvent::MouseButtonRelease,
+                                        QEvent::MouseButtonPress, QEvent::MouseButtonRelease}) {
+            send(type, *found->at);
+        }
+        return false;
+    });
+    steps_.emplace_back([this, found, send, check] {
+        if (!found->at) {
+            return false;
+        }
+        auto* card = window_->findChild<QObject*>(QStringLiteral("symbolCard"));
+        check(card != nullptr && card->property("visible").toBool() &&
+                  card->property("kind").toString() == QStringLiteral("time"),
+              "a double click on the time signature did not open its card");
+        if (card != nullptr) {
+            const QVariantMap written = score_->signatureAt(card->property("measure").toInt());
+            check(!written.isEmpty() && card->property("signature").toMap() == written,
+                  "the card does not show the time signature that was clicked");
+            QMetaObject::invokeMethod(card, "close");
+        }
+        // The pointer leaves the page.
+        send(QEvent::MouseMove, QPointF(1, 1));
+        return false;
+    });
+    steps_.emplace_back([this, found, check] {
+        if (!found->at) {
+            return false;
+        }
+        auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+        const QQuickItem* light = symbolHighlight(view, 0);
+        check(light == nullptr || !light->isVisible(),
+              "the time signature stays lit with the pointer away");
+        check(score_->modified() == found->modified, "a double click on a symbol changed the song");
+        return false;
+    });
+}
+
 void Startup::queueSection() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -1791,7 +1989,8 @@ void Startup::tick() {
     // short the window is: the measure popup scrolls rather than leave it.
     if (window_ != nullptr && popupProblem_.isEmpty()) {
         for (const QString& name : {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"),
-                                    QStringLiteral("textPopup"), QStringLiteral("lyricsPopup")}) {
+                                    QStringLiteral("textPopup"), QStringLiteral("lyricsPopup"),
+                                    QStringLiteral("symbolCard")}) {
             const auto* popup = window_->findChild<QObject*>(name);
             if (popup == nullptr || !popup->property("opened").toBool()) {
                 continue;
@@ -1923,6 +2122,32 @@ void Startup::tick() {
     }
 }
 
+// Nothing may cover the score where the pointer goes, as a popup open at the
+// caret or a menu can: they close first. False while one was still there, and
+// the step runs again once it is gone.
+bool Startup::uncoverScore() {
+    for (const QString& name :
+         {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
+          QStringLiteral("lyricsPopup"), QStringLiteral("symbolCard"), QStringLiteral("fileMenu"),
+          QStringLiteral("editMenu"), QStringLiteral("viewMenu"), QStringLiteral("soundMenu"),
+          QStringLiteral("helpMenu")}) {
+        if (auto* popup = window_->findChild<QObject*>(name);
+            popup != nullptr && popup->property("visible").toBool()) {
+            QMetaObject::invokeMethod(popup, "close");
+            again_ = true;
+            return false;
+        }
+    }
+    // Nor may a notice: in a short window it lies over the foot of the score.
+    if (auto* toast = window_->findChild<QQuickItem*>(QStringLiteral("toast"));
+        toast != nullptr && toast->isVisible()) {
+        toast->setProperty("shown", false);
+        again_ = true;
+        return false;
+    }
+    return true;
+}
+
 // Clicks in the middle of the playback cursor, as a user would on the score:
 // playback must move to where ScoreDocument::secondsAt puts that point, which
 // checks that the cursor is drawn where the pages say and that the click is
@@ -1934,24 +2159,7 @@ void Startup::clickCursor() {
         failure_ = QStringLiteral("no playback cursor");
         return;
     }
-    // Nothing may cover the cursor, as a popup open at the caret or a menu
-    // can: they close first, and the click waits until they are gone.
-    for (const QString& name :
-         {QStringLiteral("measurePopup"), QStringLiteral("chordPopup"), QStringLiteral("textPopup"),
-          QStringLiteral("lyricsPopup"), QStringLiteral("fileMenu"), QStringLiteral("editMenu"),
-          QStringLiteral("viewMenu"), QStringLiteral("soundMenu"), QStringLiteral("helpMenu")}) {
-        if (auto* popup = window_->findChild<QObject*>(name);
-            popup != nullptr && popup->property("visible").toBool()) {
-            QMetaObject::invokeMethod(popup, "close");
-            again_ = true;
-            return;
-        }
-    }
-    // Nor may a notice: in a short window it lies over the foot of the score.
-    if (auto* toast = window_->findChild<QQuickItem*>(QStringLiteral("toast"));
-        toast != nullptr && toast->isVisible()) {
-        toast->setProperty("shown", false);
-        again_ = true;
+    if (!uncoverScore()) {
         return;
     }
     const QVariantMap cursor = score_->cursorAt(audio->position());

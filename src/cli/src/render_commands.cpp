@@ -12,6 +12,7 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 #include <elara/notation/svg.hpp>
+#include <elara/notation/symbol.hpp>
 
 #include "common.hpp"
 #include <CLI/CLI.hpp>
@@ -60,8 +61,9 @@ struct RenderOptions {
     std::string svg;
     std::string pdf;
     std::string metadata;
-    double cursorAt = -1.0;     // seconds; negative for no cursor
-    std::vector<double> timeAt; // page (from 0), x and y in staff spaces; empty for none
+    double cursorAt = -1.0;       // seconds; negative for no cursor
+    std::vector<double> timeAt;   // page (from 0), x and y in staff spaces; empty for none
+    std::vector<double> symbolAt; // the same, for the symbol drawn there
 };
 
 /// The playback cursor at `seconds`, as JSON ("null" when no page shows the
@@ -124,6 +126,41 @@ CursorReport timeReport(const core::Song& song, std::span<const notation::Displa
             .text = std::format("time at page {}, x {}, y {}: measure {}, {} s\n",
                                 jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
                                 position->measure + 1, jsonNumber(*seconds))};
+}
+
+/// The symbol that is edited where it is drawn (ADR-0130) at `at` (page, x,
+/// y), as JSON, with its role "null" when there is none there.
+CursorReport symbolReport(std::span<const notation::DisplayList> pages,
+                          const notation::EngravingFont& font, std::span<const double> at) {
+    const double page = at[0];
+    const double x = at[1];
+    const double y = at[2];
+    std::optional<notation::Symbol> symbol;
+    const notation::DisplayList* list = nullptr;
+    if (page >= 0.0 && page == std::floor(page) && page < static_cast<double>(pages.size())) {
+        list = &pages[static_cast<std::size_t>(page)];
+        symbol = notation::symbolAt(*list, {x, y}, notation::kEditedRoles, font);
+    }
+    if (!symbol) {
+        return {.json = std::format(R"({{"page":{},"x":{},"y":{},"role":null}})", jsonNumber(page),
+                                    jsonNumber(x), jsonNumber(y)),
+                .text = std::format("symbol at page {}, x {}, y {}: none there\n",
+                                    jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y))};
+    }
+    std::string staff = "null";
+    if (symbol->staff) {
+        const notation::StaffBox& on = list->staves[*symbol->staff];
+        staff = std::format(R"({{"track":{},"staff":{}}})", on.track, on.staff);
+    }
+    return {
+        .json = std::format(
+            R"({{"page":{},"x":{},"y":{},"role":"{}","measure":{},"box":[{},{},{},{}],"staff":{}}})",
+            jsonNumber(page), jsonNumber(x), jsonNumber(y), notation::roleName(symbol->role),
+            symbol->measure, jsonNumber(symbol->box.x), jsonNumber(symbol->box.y),
+            jsonNumber(symbol->box.width), jsonNumber(symbol->box.height), staff),
+        .text = std::format("symbol at page {}, x {}, y {}: {} of measure {}\n",
+                            jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
+                            notation::roleName(symbol->role), symbol->measure + 1)};
 }
 
 std::string point(const notation::Point& p) {
@@ -497,6 +534,10 @@ int runRender(bool json, const RenderOptions& options) {
         if (!options.timeAt.empty()) {
             body += std::format(R"("timeAt":{},)", timeReport(*song, pages, options.timeAt).json);
         }
+        if (!options.symbolAt.empty()) {
+            body +=
+                std::format(R"("symbolAt":{},)", symbolReport(pages, *font, options.symbolAt).json);
+        }
         if (paged) {
             body += R"("pages":[)";
             for (std::size_t p = 0; p < pages.size(); ++p) {
@@ -555,6 +596,9 @@ int runRender(bool json, const RenderOptions& options) {
     }
     if (!options.timeAt.empty()) {
         std::cout << timeReport(*song, pages, options.timeAt).text;
+    }
+    if (!options.symbolAt.empty()) {
+        std::cout << symbolReport(pages, *font, options.symbolAt).text;
     }
     return kExitOk;
 }
@@ -619,6 +663,12 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->add_option("--time-at", options->timeAt,
                      "Report when playback would start for a click at PAGE X Y (the page from 0, "
                      "x and y in staff spaces, as the cursor reports them)")
+        ->expected(3);
+    render
+        ->add_option("--symbol-at", options->symbolAt,
+                     "Report the symbol drawn at PAGE X Y that is edited where it is drawn: a "
+                     "clef, a key or time signature, a tempo mark, a section, a chord symbol or "
+                     "a beat's text")
         ->expected(3);
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");

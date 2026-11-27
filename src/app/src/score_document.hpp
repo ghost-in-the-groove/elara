@@ -551,6 +551,21 @@ public:
     /// The painter of every page.
     [[nodiscard]] static const ScorePainter& painter();
 
+    // ---- Symbols edited where they are drawn (ADR-0130) -----------------------
+
+    /// The symbol drawn at (x, y) on page `index`, in staff spaces from the
+    /// page's top-left corner, among those a double click edits; an empty map
+    /// where there is none. "kind" is "clef", "key", "time", "tempo",
+    /// "section", "chord" or "text"; "rect" is the box round it on the page;
+    /// "shown" is the measure it is drawn in and "measure" the one its value
+    /// starts at, which is the one to change: a key signature written again at
+    /// the start of a system is the one set some measures before. "track" and
+    /// "staff" are the staff it is on.
+    Q_INVOKABLE [[nodiscard]] QVariantMap symbolAt(int index, double x, double y) const;
+    /// A measure's time and key signatures: "numerator", "denominator",
+    /// "fifths" and "minor"; empty for a measure the song lacks.
+    Q_INVOKABLE [[nodiscard]] QVariantMap signatureAt(int measure) const;
+
     // ---- For CaretEditor (ADR-0128) -------------------------------------------
     // What the editor of what is at the caret needs of the document. QML does
     // not call these.

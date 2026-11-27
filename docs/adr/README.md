@@ -128,6 +128,7 @@ one that replaces them.
 | [0127](0127-the-editing-session.md) | The editing session lives in core | Accepted |
 | [0128](0128-the-caret-editor.md) | What is at the caret has a class of its own | Accepted |
 | [0129](0129-the-model-keeps-its-value-types.md) | The model keeps its value types | Accepted |
+| [0130](0130-symbols-are-edited-where-they-are-drawn.md) | Symbols are edited where they are drawn | Accepted |
 
 ## Template
 

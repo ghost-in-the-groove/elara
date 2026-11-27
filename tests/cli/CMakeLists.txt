@@ -1849,6 +1849,25 @@ add_test(NAME cli.render_time_at_a_note
           --layout page --time-at 0 28.5 41.8)
 set_tests_properties(cli.render_time_at_a_note PROPERTIES
   PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":28.5,\"y\":41.8,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+# The symbol drawn at a point of a page, of those that are edited where they
+# are drawn (ADR-0130): the 3/4 that starts the third measure, with its
+# measure, the box round its two numbers and its staff; a key signature by its
+# name; and nothing in the page's corner.
+add_test(NAME cli.render_symbol_at_a_time_signature
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --symbol-at 0 53.6 41.5)
+set_tests_properties(cli.render_symbol_at_a_time_signature PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"symbolAt\":{\"page\":0,\"x\":53.6,\"y\":41.5,\"role\":\"timeSignature\",\"measure\":2,\"box\":\\[[0-9.,]+\\],\"staff\":{\"track\":0,\"staff\":0}},\"pages\":\\[")
+add_test(NAME cli.render_symbol_at_a_key_signature
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --symbol-at 0 13.2 40)
+set_tests_properties(cli.render_symbol_at_a_key_signature PROPERTIES
+  PASS_REGULAR_EXPRESSION "symbol at page 1, x 13.2, y 40: keySignature of measure 1")
+add_test(NAME cli.render_symbol_at_nothing
+  COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --layout page --symbol-at 0 1 1)
+set_tests_properties(cli.render_symbol_at_nothing PROPERTIES
+  PASS_REGULAR_EXPRESSION "symbol at page 1, x 1, y 1: none there")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES
