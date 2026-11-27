@@ -23,6 +23,6 @@
 <text class="notehead" x="24.079" y="23.292" stroke="none">&#xE0A4;</text>
 <text class="tempo" x="15.079" y="18.272" style="font-size:3.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Drums</text>
-<text class="t tempo" x="16.675" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="16.675" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
 </g>
 </svg>

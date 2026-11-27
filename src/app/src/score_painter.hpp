@@ -17,9 +17,11 @@ struct ScoreFonts {
     QByteArray music;  ///< the SMuFL music font (Bravura.otf)
     QByteArray text;   ///< the sans-serif text font (Arimo.ttf); empty: the system's
     QByteArray italic; ///< its italic (Arimo-Italic.ttf); empty: the system's
+    QByteArray bold;   ///< its bold (Arimo-Bold.ttf); empty: the system's
 
-    /// Bravura.otf, Arimo.ttf and Arimo-Italic.ttf from `directory` (a folder
-    /// or a resource prefix such as ":/fonts"); missing files stay empty.
+    /// Bravura.otf, Arimo.ttf, Arimo-Italic.ttf and Arimo-Bold.ttf from
+    /// `directory` (a folder or a resource prefix such as ":/fonts"); missing
+    /// files stay empty.
     [[nodiscard]] static ScoreFonts fromDirectory(const QString& directory);
 };
 

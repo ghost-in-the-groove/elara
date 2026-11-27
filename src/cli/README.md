@@ -101,6 +101,7 @@ list `"width", "top", "bottom", "counts", "systems", "staves", "measures",
 the top line of the first staff on a line and from the top of the page on a
 page; `counts` are per role (noteheads, fret numbers, bends, measure numbers,
 credits...); a glyph drawn at another size than the staff's has a `"scale"`;
+a text says its `"face"`, `"regular"`, `"italic"` or `"bold"` (ADR-0133);
 `columns` say where the notes starting at each time of a measure
 are placed (`measure`, `start` in whole notes, `x`), as the editor finds its
 beats (ADR-0032). `--svg OUT` also writes SVG, loading the music font from `fonts/`

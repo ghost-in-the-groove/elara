@@ -140,7 +140,8 @@ qt_add_resources(elara "fonts"
     "${ELARA_FONT_DIR}/Bravura.otf"
     "${ELARA_FONT_DIR}/Bravura.json"
     "${ELARA_FONT_DIR}/Arimo.ttf"
-    "${ELARA_FONT_DIR}/Arimo-Italic.ttf")
+    "${ELARA_FONT_DIR}/Arimo-Italic.ttf"
+    "${ELARA_FONT_DIR}/Arimo-Bold.ttf")
 qt_add_resources(elara "style"
   PREFIX "/"
   FILES qtquickcontrols2.conf)

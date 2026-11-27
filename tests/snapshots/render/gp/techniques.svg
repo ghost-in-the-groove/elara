@@ -84,10 +84,10 @@
 <line class="volta" x1="87.367" y1="33.73" x2="87.367" y2="35.73" stroke-width="0.16"/>
 <line class="volta" x1="89.387" y1="33.73" x2="110.169" y2="33.73" stroke-width="0.16"/>
 <line class="volta" x1="89.387" y1="33.73" x2="89.387" y2="35.73" stroke-width="0.16"/>
-<line class="section" x1="16.851" y1="24.695" x2="22.023" y2="24.695" stroke-width="0.16"/>
-<line class="section" x1="16.851" y1="27.515" x2="22.023" y2="27.515" stroke-width="0.16"/>
+<line class="section" x1="16.851" y1="24.695" x2="22.355" y2="24.695" stroke-width="0.16"/>
+<line class="section" x1="16.851" y1="27.515" x2="22.355" y2="27.515" stroke-width="0.16"/>
 <line class="section" x1="16.931" y1="24.695" x2="16.931" y2="27.515" stroke-width="0.16"/>
-<line class="section" x1="21.943" y1="24.695" x2="21.943" y2="27.515" stroke-width="0.16"/>
+<line class="section" x1="22.275" y1="24.695" x2="22.275" y2="27.515" stroke-width="0.16"/>
 <line class="barline" x1="8.651" y1="51.095" x2="8.651" y2="90.378" stroke-width="0.16"/>
 <polygon class="beam" stroke="none" points="23.907,51.852 30.511,51.088 30.511,51.588 23.907,52.352"/>
 <text class="clef" x="9.171" y="54.095" stroke="none">&#xE052;</text>
@@ -237,12 +237,12 @@
 <text class="t bend" x="35.2" y="81.376" style="font-size:1.45px" text-anchor="middle" stroke="none">full</text>
 <text class="t volta" x="65.126" y="35.305" style="font-size:1.7px" text-anchor="start" stroke="none">1.</text>
 <text class="t volta" x="89.787" y="35.305" style="font-size:1.7px" text-anchor="start" stroke="none">2.</text>
-<text class="t tempo" x="19.757" y="32.63" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
-<text class="t tempo" x="34.705" y="32.63" style="font-size:2px" text-anchor="start" stroke="none">= 80</text>
-<text class="t tempo" x="52.428" y="32.63" style="font-size:2px" text-anchor="start" stroke="none">=</text>
-<text class="t tempo" x="77.89" y="32.63" style="font-size:2px" text-anchor="start" stroke="none">=</text>
-<text class="t tempo" x="98.421" y="32.63" style="font-size:2px" text-anchor="start" stroke="none">=</text>
-<text class="t section" x="17.381" y="26.645" style="font-size:2px" text-anchor="start" stroke="none">Intro</text>
+<text class="t tempo" x="19.757" y="32.63" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 100</text>
+<text class="t tempo" x="34.705" y="32.63" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 80</text>
+<text class="t tempo" x="52.428" y="32.63" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">=</text>
+<text class="t tempo" x="77.89" y="32.63" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">=</text>
+<text class="t tempo" x="98.421" y="32.63" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">=</text>
+<text class="t section" x="17.381" y="26.645" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">Intro</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.437,56.895 C24.381,57.396 26.271,57.146 27.216,56.395 C26.271,57.226 24.381,57.476 23.437,56.895Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M49.671,52.445 C50.972,53.099 53.575,53.099 54.876,52.445 C53.575,53.179 50.972,53.179 49.671,52.445Z"/>

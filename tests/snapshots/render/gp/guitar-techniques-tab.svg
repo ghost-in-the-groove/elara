@@ -151,8 +151,8 @@
 <text class="t volta" x="36.489" y="24.451" style="font-size:1.7px" text-anchor="start" stroke="none">1., 2.</text>
 <text class="t volta" x="51.94" y="24.451" style="font-size:1.7px" text-anchor="start" stroke="none">3.</text>
 <text class="t repeat" x="49.12" y="24.451" style="font-size:1.7px" text-anchor="end" stroke="none">x3</text>
-<text class="t tempo" x="20.948" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
-<text class="t tempo" x="45.315" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 80</text>
+<text class="t tempo" x="20.948" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 100</text>
+<text class="t tempo" x="45.315" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 80</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M23.068,48.125 C23.439,47.485 24.18,47.485 24.55,48.125 C24.18,47.565 23.439,47.565 23.068,48.125Z"/>
 <path class="bend" fill="none" stroke-width="0.12" d="M28.74,45.923 C29.28,45.923 29.64,44.402 29.64,42.121"/>

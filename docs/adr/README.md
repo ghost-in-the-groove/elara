@@ -131,6 +131,7 @@ one that replaces them.
 | [0130](0130-symbols-are-edited-where-they-are-drawn.md) | Symbols are edited where they are drawn | Accepted |
 | [0131](0131-the-scores-texts-follow-one-scale.md) | The score's texts follow one scale | Accepted |
 | [0132](0132-the-caret-says-the-beat-and-the-string.md) | The caret says the beat and the string | Accepted |
+| [0133](0133-bold-marks-and-the-page-across-the-view.md) | Bold marks, and the page across the view | Accepted |
 
 ## Template
 

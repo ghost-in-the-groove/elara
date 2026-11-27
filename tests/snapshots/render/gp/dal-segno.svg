@@ -65,7 +65,7 @@
 <text class="t fretNumber" x="54.439" y="47.144" style="font-size:1.8px" text-anchor="middle" stroke="none">8</text>
 <text class="t navigation" x="37.115" y="31.899" style="font-size:1.9px;font-style:italic" text-anchor="end" stroke="none">To Coda</text>
 <text class="t navigation" x="45.035" y="28.008" style="font-size:1.9px;font-style:italic" text-anchor="end" stroke="none">D.S. al Coda</text>
-<text class="t tempo" x="17.831" y="25.164" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="17.831" y="25.164" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

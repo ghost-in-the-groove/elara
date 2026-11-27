@@ -51,6 +51,7 @@ using elara::notation::PolygonItem;
 using elara::notation::Role;
 using elara::notation::StaffSelection;
 using elara::notation::StaffView;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 
 namespace {
@@ -426,7 +427,7 @@ TEST_CASE("Tablature layout: palm mute and let ring run over their notes", "[not
     const auto marks = texts(list, Role::Technique);
     REQUIRE(contents(marks) == std::vector<std::string>{"P.M.", "let ring"});
     CHECK(marks[0].origin.y < 0.0);
-    CHECK(marks[1].italic);
+    CHECK(marks[1].face == TextFace::Italic);
     const auto frets = texts(list, Role::FretNumber);
     REQUIRE(frets.size() == 5);
     std::vector<LineItem> dashed;

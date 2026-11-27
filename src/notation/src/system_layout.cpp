@@ -573,7 +573,7 @@ void markNavigation(DisplayList& system, const core::Song& song,
             item.origin = {mark.right, baseline};
             item.size = kNavigationSize;
             item.align = TextAlign::Right;
-            item.italic = true;
+            item.face = TextFace::Italic;
             item.role = Role::Navigation;
             item.measure = mark.measure;
             system.texts.push_back(std::move(item));
@@ -599,7 +599,7 @@ void markSections(DisplayList& system, const core::Song& song, std::span<const M
             continue;
         }
         const double left = (i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset;
-        const double right = left + textWidth(name, kSectionSize) + 2 * kSectionPad;
+        const double right = left + textWidth(name, kSectionSize, TextFace::Bold) + 2 * kSectionPad;
         const auto line = static_cast<std::size_t>(
             std::ranges::find_if(lineEnds,
                                  [left](double end) { return end + kSectionGap <= left; }) -
@@ -618,6 +618,7 @@ void markSections(DisplayList& system, const core::Song& song, std::span<const M
         item.origin = {left + kSectionPad, bottom - kSectionPad - kTextDescent * kSectionSize};
         item.size = kSectionSize;
         item.align = TextAlign::Left;
+        item.face = TextFace::Bold;
         item.role = Role::Section;
         item.measure = m;
         system.texts.push_back(std::move(item));
@@ -693,9 +694,10 @@ double drawTempo(DisplayList& system, const EngravingFont& font, const core::Tem
     text.origin = {end + kTempoTextGap, baseline};
     text.size = kTempoSize;
     text.align = TextAlign::Left;
+    text.face = TextFace::Bold;
     text.role = Role::Tempo;
     text.measure = m;
-    end = text.origin.x + textWidth(text.text, kTempoSize);
+    end = text.origin.x + textWidth(text);
     system.texts.push_back(std::move(text));
     return end;
 }
@@ -741,9 +743,10 @@ double drawTripletFeel(DisplayList& system, const EngravingFont& font, core::Tri
                                     .origin = {at, baseline},
                                     .size = kTempoSize,
                                     .align = TextAlign::Left,
+                                    .face = TextFace::Bold,
                                     .role = Role::Tempo,
                                     .measure = m});
-    at += textWidth("=", kTempoSize) + kFeelEqualsGap;
+    at += textWidth("=", kTempoSize, TextFace::Bold) + kFeelEqualsGap;
     // The notes of a pair played long and short: a triplet's, or a dotted
     // note's and the note a third its length.
     const Glyph tripletLong = sixteenths ? Glyph::MetNote8thUp : Glyph::MetNoteQuarterUp;
@@ -960,7 +963,7 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
                                             .origin = {after, baseline},
                                             .size = kTempoSize,
                                             .align = TextAlign::Left,
-                                            .italic = true,
+                                            .face = TextFace::Italic,
                                             .role = Role::Tempo,
                                             .measure = mark.measure});
             after += textWidth(mark.word, kTempoSize);
@@ -1251,7 +1254,7 @@ DisplayList layoutLine(const core::Song& song, std::span<const StaffSelection> s
         number.origin = {0.0, kMeasureNumberY};
         number.size = kMeasureNumberSize;
         number.align = TextAlign::Left;
-        number.italic = true;
+        number.face = TextFace::Italic;
         number.role = Role::MeasureNumber;
         number.measure = first;
         system.top = std::min(system.top, number.origin.y - kTextAscent * kMeasureNumberSize);

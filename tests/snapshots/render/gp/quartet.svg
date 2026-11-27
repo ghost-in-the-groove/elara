@@ -193,9 +193,9 @@
 <text class="t lyric" x="46.37" y="101.641" style="font-size:1.9px" text-anchor="middle" stroke="none">oh</text>
 <text class="t volta" x="26.968" y="36.56" style="font-size:1.7px" text-anchor="start" stroke="none">1.</text>
 <text class="t volta" x="45.18" y="36.56" style="font-size:1.7px" text-anchor="start" stroke="none">2.</text>
-<text class="t tempo" x="30.541" y="33.885" style="font-size:2px" text-anchor="start" stroke="none">= 90</text>
-<text class="t tempo" x="39.547" y="33.885" style="font-size:2px" text-anchor="start" stroke="none">=</text>
-<text class="t tempo" x="47.375" y="29.05" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="30.541" y="33.885" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 90</text>
+<text class="t tempo" x="39.547" y="33.885" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">=</text>
+<text class="t tempo" x="47.375" y="29.05" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
 <text class="t trackName" x="14.908" y="50.539" style="font-size:1.9px" text-anchor="end" stroke="none">Bass</text>
 <text class="t trackName" x="14.908" y="65.414" style="font-size:1.9px" text-anchor="end" stroke="none">Piano</text>
 <text class="t trackName" x="14.908" y="78.93" style="font-size:1.9px" text-anchor="end" stroke="none">Drums</text>

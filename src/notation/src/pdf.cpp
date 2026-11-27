@@ -139,9 +139,23 @@ std::string textString(std::string_view text) {
     return out + ">";
 }
 
+// The resource name of the standard font a face is written in: Helvetica,
+// Helvetica-Oblique or Helvetica-Bold.
+std::string_view fontName(TextFace face) {
+    switch (face) {
+    case TextFace::Italic:
+        return "F2";
+    case TextFace::Bold:
+        return "F3";
+    case TextFace::Regular:
+        break;
+    }
+    return "F1";
+}
+
 // The left edge of a text drawn at its origin with its alignment.
 double textLeft(const TextItem& text) {
-    const double width = textWidth(text.text, text.size);
+    const double width = textWidth(text);
     switch (text.align) {
     case TextAlign::Left:
         return text.origin.x;
@@ -321,10 +335,10 @@ std::string pageContent(const DisplayList& page, const std::map<Glyph, std::size
             const double pad = kKnockoutPad * text.size;
             ops += std::format("1 g {} {} {} {} re f 0 g\n", number(left - pad),
                                number(text.origin.y - capHeight(text.size) - pad),
-                               number(textWidth(text.text, text.size) + 2 * pad),
+                               number(textWidth(text) + 2 * pad),
                                number(capHeight(text.size) + 2 * pad));
         }
-        ops += std::format("BT /{} 1 Tf {} 0 0 {} {} {} Tm {} Tj ET\n", text.italic ? "F2" : "F1",
+        ops += std::format("BT /{} 1 Tf {} 0 0 {} {} {} Tm {} Tj ET\n", fontName(text.face),
                            number(text.size), number(-text.size), number(left),
                            number(text.origin.y), literal(text.text));
     }
@@ -413,6 +427,8 @@ std::string toPdf(std::span<const DisplayList> pages, const FontOutlines& font,
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
     const std::size_t italic = document.add("<< /Type /Font /Subtype /Type1 /BaseFont "
                                             "/Helvetica-Oblique /Encoding /WinAnsiEncoding >>");
+    const std::size_t bold = document.add(
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
 
     // Each glyph used, once.
     std::map<Glyph, std::size_t> glyphs;
@@ -432,8 +448,9 @@ std::string toPdf(std::span<const DisplayList> pages, const FontOutlines& font,
     for (const auto& [glyph, object] : glyphs) {
         xobjects += std::format(" /G{} {} 0 R", static_cast<int>(glyph), object);
     }
-    const std::size_t resources = document.add(std::format(
-        "<< /Font << /F1 {} 0 R /F2 {} 0 R >> /XObject <<{} >> >>", regular, italic, xobjects));
+    const std::size_t resources = document.add(
+        std::format("<< /Font << /F1 {} 0 R /F2 {} 0 R /F3 {} 0 R >> /XObject <<{} >> >>", regular,
+                    italic, bold, xobjects));
 
     // Each page's content, written and compressed on every core.
     const double k = options.staffSpace;

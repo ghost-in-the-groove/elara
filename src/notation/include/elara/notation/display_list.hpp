@@ -102,6 +102,10 @@ struct BeamItem {
 
 enum class TextAlign : std::uint8_t { Left, Centre, Right };
 
+/// The face of the sans-serif font a text is set in (ADR-0133): bold for the
+/// tempo and the names of sections, italic for words such as "let ring".
+enum class TextFace : std::uint8_t { Regular, Italic, Bold };
+
 /// Text in the renderer's sans-serif font. `origin` is on the baseline, at the
 /// left, centre or right of the text as `align` says; `size` is the font size
 /// (an em) in staff spaces. A knocked-out text clears what is under it, as fret
@@ -111,7 +115,7 @@ struct TextItem {
     Point origin;
     double size = 1.0;
     TextAlign align = TextAlign::Centre;
-    bool italic = false;
+    TextFace face = TextFace::Regular;
     bool knockout = false;
     Role role{};
     std::size_t measure = 0;
@@ -226,9 +230,17 @@ struct DisplayList {
     friend bool operator==(const DisplayList&, const DisplayList&) = default;
 };
 
-/// The width layout assumes for `text` at `size`: the advance widths of a
-/// Helvetica-like sans-serif font. Renderers use it to size knockouts.
-[[nodiscard]] double textWidth(std::string_view text, double size) noexcept;
+/// The width layout assumes for `text` at `size` in `face`: the advance widths
+/// of a Helvetica-like sans-serif font, its bold for TextFace::Bold. Renderers
+/// use it to size knockouts.
+[[nodiscard]] double textWidth(std::string_view text, double size,
+                               TextFace face = TextFace::Regular) noexcept;
+
+/// The width layout assumes for `text`, in its size and face.
+[[nodiscard]] double textWidth(const TextItem& text) noexcept;
+
+/// The name of a face: "regular", "italic" or "bold".
+[[nodiscard]] std::string_view faceName(TextFace face) noexcept;
 
 /// The height of digits and capitals at `size` (0.72 em), for centring text on
 /// a line.

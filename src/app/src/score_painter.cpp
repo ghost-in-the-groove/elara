@@ -35,8 +35,12 @@ QPointF at(const notation::Point& p, double scale) {
     return {p.x * scale, p.y * scale};
 }
 
-// The text font from its bytes or, without them, the system's sans-serif.
-QRawFont textFont(const QByteArray& bytes, bool italic) {
+// A face of the text font from its bytes or, without them, the system's
+// sans-serif in that face.
+QRawFont textFont(const ScoreFonts& fonts, notation::TextFace face) {
+    const QByteArray& bytes = face == notation::TextFace::Italic ? fonts.italic
+                              : face == notation::TextFace::Bold ? fonts.bold
+                                                                 : fonts.text;
     if (!bytes.isEmpty()) {
         QRawFont font(bytes, 1.0, QFont::PreferNoHinting);
         if (font.isValid()) {
@@ -47,7 +51,8 @@ QRawFont textFont(const QByteArray& bytes, bool italic) {
     font.setFamilies(
         {QStringLiteral("Arial"), QStringLiteral("Helvetica"), QStringLiteral("Liberation Sans")});
     font.setStyleHint(QFont::SansSerif);
-    font.setItalic(italic);
+    font.setItalic(face == notation::TextFace::Italic);
+    font.setBold(face == notation::TextFace::Bold);
     return QRawFont::fromFont(font);
 }
 
@@ -155,17 +160,18 @@ void paintTexts(QPainter& painter, const DisplayList& list, double scale, const 
     if (list.texts.empty()) {
         return;
     }
-    const QRawFont upright = textFont(fonts.text, false);
-    QRawFont italic;
-    std::map<std::pair<long long, bool>, Outlines> faces;
-    const auto face = [&](double pixelSize, bool slanted) -> Outlines& {
-        const std::pair key{std::llround(pixelSize * 64.0), slanted};
+    // Each face of the font is read once, when a text first needs it.
+    std::array<QRawFont, 3> loaded;
+    std::map<std::pair<long long, notation::TextFace>, Outlines> faces;
+    const auto face = [&](double pixelSize, notation::TextFace textFace) -> Outlines& {
+        const std::pair key{std::llround(pixelSize * 64.0), textFace};
         auto found = faces.find(key);
         if (found == faces.end()) {
-            if (slanted && !italic.isValid()) {
-                italic = textFont(fonts.italic, true);
+            QRawFont& whole = loaded[static_cast<std::size_t>(textFace)];
+            if (!whole.isValid()) {
+                whole = textFont(fonts, textFace);
             }
-            QRawFont font = slanted ? italic : upright;
+            QRawFont font = whole;
             font.setPixelSize(pixelSize);
             found = faces.emplace(key, Outlines(std::move(font))).first;
         }
@@ -179,7 +185,7 @@ void paintTexts(QPainter& painter, const DisplayList& list, double scale, const 
     std::vector<Letter> letters;
     letters.reserve(list.texts.size() * 2);
     for (const notation::TextItem& item : list.texts) {
-        Outlines& outlines = face(item.size * scale, item.italic);
+        Outlines& outlines = face(item.size * scale, item.face);
         const QList<quint32> indexes = outlines.font().glyphIndexesForString(
             QString::fromUtf8(item.text.data(), static_cast<qsizetype>(item.text.size())));
         const QList<QPointF> advances =
@@ -258,7 +264,8 @@ void paintPolygons(QPainter& painter, const DisplayList& list, double scale) {
 ScoreFonts ScoreFonts::fromDirectory(const QString& directory) {
     return ScoreFonts{.music = readAll(directory + QStringLiteral("/Bravura.otf")),
                       .text = readAll(directory + QStringLiteral("/Arimo.ttf")),
-                      .italic = readAll(directory + QStringLiteral("/Arimo-Italic.ttf"))};
+                      .italic = readAll(directory + QStringLiteral("/Arimo-Italic.ttf")),
+                      .bold = readAll(directory + QStringLiteral("/Arimo-Bold.ttf"))};
 }
 
 ScorePainter::ScorePainter(ScoreFonts fonts) : fonts_(std::move(fonts)) {}

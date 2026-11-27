@@ -35,6 +35,7 @@ using elara::notation::Point;
 using elara::notation::PolygonItem;
 using elara::notation::Role;
 using elara::notation::TextAlign;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 
 namespace {
@@ -140,8 +141,14 @@ std::vector<DisplayList> twoPages() {
                                    .origin = {50.0, 10.0},
                                    .size = 2.0,
                                    .align = TextAlign::Centre,
-                                   .italic = true,
+                                   .face = TextFace::Italic,
                                    .role = Role::Credit});
+    first.texts.push_back(TextItem{.text = "Verse",
+                                   .origin = {10.0, 50.0},
+                                   .size = 2.0,
+                                   .align = TextAlign::Left,
+                                   .face = TextFace::Bold,
+                                   .role = Role::Section});
     first.curves.push_back(CurveItem{.from = {20.0, 25.0},
                                      .control1 = {22.0, 27.0},
                                      .control2 = {28.0, 27.0},
@@ -226,6 +233,10 @@ TEST_CASE("PDF: a page per display list, each object where the cross-reference t
     CHECK_THAT(left, WithinAbs(50.0 - elara::notation::textWidth("Título (1)", 2.0) / 2, 1e-3));
     const std::string_view after = " 10 Tm (T\xEDtulo \\(1\\)) Tj ET";
     CHECK(rest.substr(space, after.size()) == after);
+    // The bold text in Helvetica-Bold.
+    CHECK(pdf.find("/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding") != std::string::npos);
+    CHECK(pdf.find("/F3 ") != std::string::npos);
+    CHECK(count(pdf, "BT /F3 1 Tf 2 0 0 -2 10 50 Tm (Verse) Tj ET") == 2);
     CHECK(pdf.find("/Title <FEFF0053006F006E0067>") != std::string::npos);
 }
 

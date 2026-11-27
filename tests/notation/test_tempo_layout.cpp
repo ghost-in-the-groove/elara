@@ -43,6 +43,7 @@ using elara::notation::LineItem;
 using elara::notation::PageLayoutOptions;
 using elara::notation::Role;
 using elara::notation::StaffSelection;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 using elara::notation::textWidth;
 
@@ -137,6 +138,7 @@ TEST_CASE("Tempo marks: the starting tempo above the first note", "[notation][la
     const auto marks = texts(list, Role::Tempo);
     REQUIRE(contents(marks) == std::vector<std::string>{"= 120"});
     CHECK(marks[0].align == elara::notation::TextAlign::Left);
+    CHECK(marks[0].face == TextFace::Bold);
     CHECK(marks[0].origin.x > right(notes[0]));
     // Over the first note, above the staff, and inside the list's extents.
     const auto heads = glyphs(list, Role::Notehead);
@@ -247,10 +249,11 @@ TEST_CASE("Triplet feel marks: the pair as written equals the pair as played",
     REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "=", "=", "="});
     // On the tempo's line, after its text, the "=" between the pairs.
     const auto all = glyphs(list, Role::Tempo);
-    CHECK(left(all[1]) > marks[0].origin.x + textWidth("= 120", marks[0].size));
+    CHECK(left(all[1]) > marks[0].origin.x + textWidth(marks[0]));
     CHECK(marks[1].origin.y == marks[0].origin.y);
     CHECK(marks[1].origin.x > right(all[3]));
-    CHECK(left(all[4]) > marks[1].origin.x + textWidth("=", marks[1].size));
+    CHECK(marks[1].face == TextFace::Bold);
+    CHECK(left(all[4]) > marks[1].origin.x + textWidth(marks[1]));
     CHECK_THAT(bottom(all[1]), WithinAbs(marks[0].origin.y, 0.15));
     // Each mark starts over its measure's first note.
     const auto heads = glyphs(list, Role::Notehead);
@@ -310,8 +313,9 @@ TEST_CASE("Tempo marks: a gradual change says which way it goes", "[notation][la
         const DisplayList list = layout(song);
         const auto marks = texts(list, Role::Tempo);
         REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "rit.", "= 90"});
-        CHECK(marks[1].italic);
-        CHECK_FALSE(marks[2].italic);
+        CHECK(marks[0].face == TextFace::Bold);
+        CHECK(marks[1].face == TextFace::Italic);
+        CHECK(marks[2].face == TextFace::Bold);
         CHECK(marks[1].measure == 1);
         CHECK(marks[1].origin.y == marks[0].origin.y);
         const auto heads = glyphs(list, Role::Notehead);
@@ -374,7 +378,7 @@ TEST_CASE("Tempo marks: a gradual change goes on into the next systems",
             dashes.push_back(line);
         }
         for (const TextItem& text : texts(page, Role::Tempo)) {
-            if (text.italic) {
+            if (text.face == TextFace::Italic) {
                 words.push_back(text.text);
             }
         }

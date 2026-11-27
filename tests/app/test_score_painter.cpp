@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
+#include <string>
 #include <utility>
 
 using elara::app::ScoreColours;
@@ -31,6 +32,7 @@ using elara::notation::LineItem;
 using elara::notation::PolygonItem;
 using elara::notation::Role;
 using elara::notation::TextAlign;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 
 namespace {
@@ -96,6 +98,18 @@ double inkShare(const QImage& image) {
     return static_cast<double>(ink) / (static_cast<double>(image.width()) * image.height());
 }
 
+// The rightmost column with ink, -1 for none.
+int rightmostInk(const QImage& image) {
+    for (int x = image.width() - 1; x >= 0; --x) {
+        for (int y = 0; y < image.height(); ++y) {
+            if (qGray(image.pixel(x, y)) < 128) {
+                return x;
+            }
+        }
+    }
+    return -1;
+}
+
 } // namespace
 
 TEST_CASE("Score painter: the fonts it ships with", "[app]") {
@@ -104,7 +118,35 @@ TEST_CASE("Score painter: the fonts it ships with", "[app]") {
     CHECK_FALSE(fonts.music.isEmpty());
     CHECK_FALSE(fonts.text.isEmpty());
     CHECK_FALSE(fonts.italic.isEmpty());
+    CHECK_FALSE(fonts.bold.isEmpty());
     CHECK(ScoreFonts::fromDirectory(QStringLiteral("no/such/folder")).music.isEmpty());
+}
+
+TEST_CASE("Score painter: a bold text is in the bold face, as wide as layout takes it", "[app]") {
+    // ADR-0133: the tempo and the names of sections.
+    constexpr double kScale = 20.0;
+    constexpr double kLeft = 1.0;
+    const std::string text = "Chorus = 120";
+    const auto paint = [&](TextFace face) {
+        DisplayList list = blank(30.0, -3.0, 1.0);
+        list.texts.push_back(TextItem{.text = text,
+                                      .origin = {kLeft, 0.0},
+                                      .size = 2.0,
+                                      .align = TextAlign::Left,
+                                      .face = face,
+                                      .role = Role::Section});
+        return painter().render(list, kScale);
+    };
+    const QImage regular = paint(TextFace::Regular);
+    const QImage bold = paint(TextFace::Bold);
+    CHECK(inkShare(bold) > 1.3 * inkShare(regular));
+    // Its last letter ends where layout's bold widths end the text, which is
+    // further than the regular face's.
+    const double end = kLeft + elara::notation::textWidth(text, 2.0, TextFace::Bold);
+    CHECK(end > kLeft + elara::notation::textWidth(text, 2.0) + 0.5);
+    const double inkEnd = static_cast<double>(rightmostInk(bold) + 1) / kScale;
+    CHECK(inkEnd > end - 0.3);
+    CHECK(inkEnd < end + 0.05);
 }
 
 TEST_CASE("Score painter: an image of the list's size, white where nothing is drawn", "[app]") {

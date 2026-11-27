@@ -268,9 +268,9 @@ std::string displayListJson(const notation::DisplayList& list) {
     for (std::size_t i = 0; i < list.texts.size(); ++i) {
         const auto& item = list.texts[i];
         json += std::format(
-            R"({}{{"text":"{}","role":"{}","measure":{},"at":{},"size":{},"align":"{}","italic":{},"knockout":{}}})",
+            R"({}{{"text":"{}","role":"{}","measure":{},"at":{},"size":{},"align":"{}","face":"{}","knockout":{}}})",
             i == 0 ? "" : ",", jsonEscape(item.text), roleName(item.role), item.measure,
-            point(item.origin), jsonNumber(item.size), alignName(item.align), item.italic,
+            point(item.origin), jsonNumber(item.size), alignName(item.align), faceName(item.face),
             item.knockout);
     }
     json += R"(],"curves":[)";

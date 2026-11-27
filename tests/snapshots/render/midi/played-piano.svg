@@ -118,7 +118,7 @@
 <text class="tempo" x="21.119" y="18.272" style="font-size:3.6px" stroke="none">&#xECA5;</text>
 <text class="brace" x="9.047" y="36.083" style="font-size:14.778px" stroke="none">&#xE000;</text>
 <text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Played Piano</text>
-<text class="t tempo" x="22.715" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 92</text>
+<text class="t tempo" x="22.715" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 92</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

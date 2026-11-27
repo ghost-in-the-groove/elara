@@ -49,7 +49,7 @@
 <text class="tempo" x="16.235" y="20.7" style="font-size:3.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Melody</text>
 <text class="t credit" x="111.429" y="14.845" style="font-size:1.8px" text-anchor="end" stroke="none">Music by Ghost in the Groove</text>
-<text class="t tempo" x="17.831" y="21.2" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
+<text class="t tempo" x="17.831" y="21.2" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 100</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

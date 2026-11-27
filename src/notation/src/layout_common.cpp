@@ -193,7 +193,7 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
         edge(item.left, item.right, item.thickness / 2);
     }
     for (const TextItem& item : list.texts) {
-        const double width = textWidth(item.text, item.size);
+        const double width = textWidth(item);
         const double from = item.align == TextAlign::Left    ? item.origin.x
                             : item.align == TextAlign::Right ? item.origin.x - width
                                                              : item.origin.x - width / 2;
@@ -906,7 +906,7 @@ void TechniqueLanes::close(Lane lane) {
     item.origin = {left, -kLaneBaseline};
     item.size = kLaneTextSize;
     item.align = TextAlign::Left;
-    item.italic = lane == Lane::LetRing;
+    item.face = lane == Lane::LetRing ? TextFace::Italic : TextFace::Regular;
     item.role = Role::Technique;
     item.measure = run.measure;
     out.texts.push_back(std::move(item));
@@ -1052,7 +1052,6 @@ void AboveRow::place(DisplayList& list, double top) {
                                           .origin = {mark.centre, baseline},
                                           .size = kChordNameSize,
                                           .align = TextAlign::Centre,
-                                          .italic = false,
                                           .knockout = false,
                                           .role = Role::Chord,
                                           .measure = mark.measure});
@@ -1089,7 +1088,7 @@ void AboveRow::placeTexts(DisplayList& list, double top) {
                      .origin = {mark.left, lowest - (static_cast<double>(row) * rowHeight)},
                      .size = kBeatTextSize,
                      .align = TextAlign::Left,
-                     .italic = true,
+                     .face = TextFace::Italic,
                      .knockout = false,
                      .role = Role::BeatText,
                      .measure = mark.measure});
@@ -1132,7 +1131,6 @@ void AboveRow::diagram(DisplayList& list, const core::ChordDiagram& shape, doubl
                                 nut + kChordFretSpace / 2 + capHeight(kChordFretNumberSize) / 2},
                      .size = kChordFretNumberSize,
                      .align = TextAlign::Right,
-                     .italic = false,
                      .knockout = false,
                      .role = Role::Chord,
                      .measure = measure});
@@ -1385,7 +1383,6 @@ void LyricsRow::place(DisplayList& list, double bottom, double staffHeight, doub
                      .origin = {syllable.extend ? sung.left : sung.left + sung.width / 2, y},
                      .size = kLyricSize,
                      .align = syllable.extend ? TextAlign::Left : TextAlign::Centre,
-                     .italic = false,
                      .knockout = false,
                      .role = Role::Lyric,
                      .measure = sung.measure});

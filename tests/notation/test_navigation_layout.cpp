@@ -36,6 +36,7 @@ using elara::notation::layoutStaff;
 using elara::notation::MeasureBox;
 using elara::notation::Role;
 using elara::notation::TextAlign;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 using elara::notation::textWidth;
 
@@ -187,7 +188,7 @@ TEST_CASE("Navigation marks: jump texts end at their measure's barline",
     for (std::size_t i = 0; i < marks.size(); ++i) {
         const TextItem& mark = marks[i];
         CHECK(mark.measure == i + 1);
-        CHECK(mark.italic);
+        CHECK(mark.face == TextFace::Italic);
         CHECK(mark.align == TextAlign::Right);
         const MeasureBox& box = measureBox(list, mark.measure);
         CHECK(mark.origin.x > box.x + box.width - 1.0);
@@ -366,7 +367,7 @@ TEST_CASE("Section marks: a section's name in a box opens its measure, above eve
     REQUIRE(others < 0.0);
     for (const TextItem& name : names) {
         CHECK(name.align == TextAlign::Left);
-        CHECK_FALSE(name.italic);
+        CHECK(name.face == TextFace::Bold);
         const std::size_t first = name.measure == 0 ? 0 : 8; // the measure's first note
         const MeasureBox& measure = measureBox(list, name.measure);
         const Box box = sectionBox(list, name.measure);
@@ -375,7 +376,9 @@ TEST_CASE("Section marks: a section's name in a box opens its measure, above eve
         CHECK(box.left < left(heads[first]));
         // Around the name.
         CHECK(box.left < name.origin.x);
-        CHECK(box.right > name.origin.x + textWidth(name.text, name.size));
+        CHECK(box.right > name.origin.x + textWidth(name));
+        CHECK(box.right - (name.origin.x + textWidth(name)) ==
+              Catch::Approx(name.origin.x - box.left));
         CHECK(box.top < name.origin.y - 0.75 * name.size);
         CHECK(box.bottom > name.origin.y);
         // Above every other mark, inside the list's extents.

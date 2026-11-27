@@ -98,7 +98,7 @@
 <text class="t fretNumber" x="75.87" y="38.836" style="font-size:1.8px" text-anchor="middle" stroke="none">7</text>
 <rect class="knockout" x="102.28" y="37.396" width="1.289" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="102.924" y="38.836" style="font-size:1.8px" text-anchor="middle" stroke="none">3</text>
-<text class="t tempo" x="17.861" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="17.861" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

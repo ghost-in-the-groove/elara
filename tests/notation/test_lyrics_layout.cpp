@@ -49,6 +49,7 @@ using elara::notation::StaffLayoutOptions;
 using elara::notation::StaffSelection;
 using elara::notation::StaffView;
 using elara::notation::TextAlign;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 using elara::notation::textWidth;
 
@@ -219,7 +220,7 @@ TEST_CASE("Lyrics: syllables centred under their notes, a verse per line under t
     const std::array<std::size_t, 4> headOf{0, 0, 1, 2};
     for (std::size_t i = 0; i < found.size(); ++i) {
         CHECK(found[i].align == TextAlign::Centre);
-        CHECK_FALSE(found[i].italic);
+        CHECK(found[i].face == TextFace::Regular);
         CHECK_THAT(found[i].origin.x,
                    WithinAbs(heads[headOf[i]].origin.x + headWidth() / 2, kEpsilon));
         CHECK(found[i].measure == 0);

@@ -65,6 +65,16 @@ foreach(_entry IN ITEMS
   elara_fetch_file("${_arimo_url}/${_path}" "${_cached}" ${_hash} "Arimo: ${_name}")
   file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
 endforeach()
+# Its bold (ADR-0133), from a pinned commit of the font's own repository:
+# Google Fonts has Arimo only as a variable font, which QRawFont cannot set
+# to a weight. Same licence as the files above.
+set(_arimo_bold_commit 4a6255f269916ae7ad3fc2706b0935e7621396b8)
+set(_cached "${ELARA_DOWNLOAD_CACHE}/arimo-${_arimo_bold_commit}/Arimo-Bold.ttf")
+elara_fetch_file(
+  "https://raw.githubusercontent.com/googlefonts/Arimo/${_arimo_bold_commit}/fonts/ttf/Arimo-Bold.ttf"
+  "${_cached}" d7a8b187cf8444d4cfee102e8eae9e3043682fd5106d5d33ed677fe268a0e2ba
+  "Arimo: Arimo-Bold.ttf")
+file(COPY "${_cached}" DESTINATION "${ELARA_FONT_DIR}")
 
 find_package(CLI11 CONFIG REQUIRED)
 # FluidSynth (LGPL-2.1, ADR-0043): SoundFont playback.
