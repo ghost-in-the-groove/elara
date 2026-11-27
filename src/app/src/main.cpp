@@ -162,6 +162,9 @@ int main(int argc, char* argv[]) {
     const QCommandLineOption effectsOption(
         QStringLiteral("effects"),
         QCoreApplication::translate("main", "Open the note effects panel at the caret at start."));
+    const QCommandLineOption commandsOption(
+        QStringLiteral("commands"),
+        QCoreApplication::translate("main", "Open the command palette at start."));
     const QCommandLineOption continuousOption(
         QStringLiteral("continuous"),
         QCoreApplication::translate("main", "Show the score as one continuous scroll."));
@@ -218,6 +221,7 @@ int main(int argc, char* argv[]) {
                        measureOption,
                        lyricsOption,
                        effectsOption,
+                       commandsOption,
                        tuningOption,
                        continuousOption,
                        menuOption,
@@ -318,6 +322,7 @@ int main(int argc, char* argv[]) {
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
+    options.commands = parser.isSet(commandsOption);
     options.menu = parser.value(menuOption);
     if (!options.menu.isEmpty() &&
         !QStringList{QStringLiteral("file"), QStringLiteral("edit"), QStringLiteral("view"),
@@ -371,6 +376,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
                                  {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
                                  {QStringLiteral("showEffects"), options.effects},
+                                 {QStringLiteral("showCommands"), options.commands},
                                  {QStringLiteral("showMenu"), options.menu},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},

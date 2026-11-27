@@ -120,7 +120,8 @@ elara_target_warnings(elara_benchmarks)
 
 if(TARGET elara)
   # The app's painting, on the offscreen platform (main.cpp sets it).
-  add_executable(elara_app_tests app/main.cpp app/test_score_painter.cpp app/test_track_list.cpp
+  add_executable(elara_app_tests app/main.cpp app/test_command_search.cpp app/test_score_painter.cpp
+    app/test_track_list.cpp
     app/test_when_done.cpp app/test_app_icon.cpp app/test_included_sound.cpp
     app/test_recent_scores.cpp app/test_recovery_store.cpp app/test_job_lane.cpp
     app/bench_score_painter.cpp)

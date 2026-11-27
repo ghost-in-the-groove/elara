@@ -23,6 +23,9 @@ ApplicationWindow {
     property bool showLyrics: false
     // Open the note effects palette once there is a caret (`--effects`).
     property bool showEffects: false
+    /// Open the command palette once the window shows, or once there is a
+    /// caret when a file is opened (`--commands`).
+    property bool showCommands: false
     /// Open this menu once the window shows (`--menu`): file, edit, view,
     /// sound or help.
     property string showMenu
@@ -81,6 +84,10 @@ ApplicationWindow {
             score.open(initialFile);
         if (showMenu.length > 0)
             Qt.callLater(commandBar.openMenu, showMenu);
+        if (showCommands && initialFile.toString().length === 0) {
+            showCommands = false;
+            Qt.callLater(commandPalette.show, "");
+        }
         audio.rememberSound = rememberSettings;
         if (initialSoundFont.length > 0 || initialGuitarSfz.length > 0
                 || initialBassSfz.length > 0) {
@@ -279,6 +286,7 @@ ApplicationWindow {
     Connections {
         target: score
         enabled: window.showMeasure || window.showLyrics || window.showEffects
+                 || window.showCommands
 
         function onCaretChanged() {
             if (score.caretPage < 0) {
@@ -295,6 +303,10 @@ ApplicationWindow {
             if (window.showEffects) {
                 window.showEffects = false;
                 palette.open();
+            }
+            if (window.showCommands) {
+                window.showCommands = false;
+                commandPalette.show("");
             }
         }
     }
@@ -427,6 +439,20 @@ ApplicationWindow {
         }
     }
 
+    // Every command by name, with its keys (ADR-0135): Ctrl+E, as in other
+    // tablature editors, or Ctrl+Shift+P.
+    CommandPalette {
+        id: commandPalette
+
+        menus: menuBar
+        document: score
+        editor: caretEditor
+        playback: audio
+        view: scoreView
+        remember: window.rememberSettings
+        top: commandBar.height + 8
+    }
+
     RecoveryDialog {
         id: recoveryDialog
 
@@ -489,6 +515,7 @@ ApplicationWindow {
             onSaveRequested: window.save()
             onSongPaneToggled: window.showSongPane = !window.showSongPane
             onTunerRequested: window.toggleTuner()
+            onCommandsRequested: commandPalette.show("")
 
             /// Opens the menu named `name` (file, edit, view, sound, help).
             function openMenu(name: string) {
@@ -788,7 +815,7 @@ ApplicationWindow {
                     AppMenuItem {
                         // The SoundFont that comes with Elara (ADR-0069), back
                         // after another sound was chosen.
-                        visible: audio.includedSoundFont.length > 0
+                        shown: audio.includedSoundFont.length > 0
                         text: qsTr("Use the included SoundFont")
                         enabled: audio.soundFont !== audio.includedSoundFont
                                  && !audio.loadingSoundFont
@@ -807,7 +834,7 @@ ApplicationWindow {
                     AppMenuItem {
                         // The guitar SFZ instrument that comes with Elara
                         // (ADR-0072).
-                        visible: audio.includedGuitarSfz.length > 0
+                        shown: audio.includedGuitarSfz.length > 0
                         text: qsTr("Use the included guitar")
                         enabled: audio.guitarSfz !== audio.includedGuitarSfz
                                  && !audio.loadingSoundFont
@@ -854,7 +881,7 @@ ApplicationWindow {
                         }
                         AppMenuSeparator {}
                         AppMenuItem {
-                            visible: audio.outputDevices.length === 0
+                            shown: audio.outputDevices.length === 0
                             enabled: false
                             text: audio.listingOutputDevices ? qsTr("Looking for devices…")
                                                              : qsTr("No output device found")
@@ -889,6 +916,14 @@ ApplicationWindow {
                     objectName: "helpMenu"
                     title: qsTr("&Help")
 
+                    AppMenuItem {
+                        // Every command by name, with its keys (ADR-0135).
+                        objectName: "findCommand"
+                        text: qsTr("Find a command…")
+                        keys: KeyNames.native("Ctrl+E")
+                        onTriggered: commandPalette.show("")
+                    }
+                    AppMenuSeparator {}
                     AppMenuItem {
                         text: qsTr("About Elara")
                         onTriggered: about.open()
@@ -1352,6 +1387,10 @@ ApplicationWindow {
         sequences: [StandardKey.Redo, "Ctrl+Y"]
         enabled: score.canRedo
         onActivated: score.redo()
+    }
+    Shortcut {
+        sequences: ["Ctrl+E", "Ctrl+Shift+P"]
+        onActivated: commandPalette.opened ? commandPalette.close() : commandPalette.show("")
     }
     Shortcut {
         sequence: "F2"

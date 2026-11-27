@@ -2027,6 +2027,16 @@ bool ScoreDocument::placeCaret(int index, double x, double y) {
     return true;
 }
 
+void ScoreDocument::caretToMeasure(int measure) {
+    if (!document_ || !hasCaret(document_->song()) || measure < 0) {
+        return;
+    }
+    core::Caret caret = session_.caret();
+    caret.measure = static_cast<std::size_t>(measure);
+    caret.beat = 0;
+    placeCaretAt(caret);
+}
+
 void ScoreDocument::typeDigit(int digit) {
     typeDigit(digit, core::EditSession::Clock::now());
 }

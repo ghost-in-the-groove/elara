@@ -13,9 +13,14 @@ MenuItem {
     /// Marked as the one chosen, or as on; a click does not change it by
     /// itself, as `checkable` would.
     property bool chosen: false
+    /// Whether it is in its menu now. Hide an item with this, not with
+    /// `visible`: the command palette lists the menus' items while they are
+    /// closed, when every item reads as not visible (ADR-0135).
+    property bool shown: true
 
     readonly property color ink: Theme.ink
 
+    visible: shown
     implicitWidth: leftPadding + name.implicitWidth + rightPadding
                    + (keys.length > 0 ? keysLabel.implicitWidth + 28 : 0)
                    + (subMenu ? 16 : 0)

@@ -480,6 +480,9 @@ public:
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
     /// spaces from the page's top-left corner. Returns whether it moved there.
     Q_INVOKABLE bool placeCaret(int index, double x, double y);
+    /// Puts the caret on the first beat of `measure` (from 0), on its track,
+    /// staff, voice and string: a measure past the song's end is its last.
+    Q_INVOKABLE void caretToMeasure(int measure);
     /// Types a digit: a fret on the caret's string. A second digit within
     /// kTwoDigitMilliseconds on the same caret makes a two-digit fret, as one
     /// undo step.
