@@ -54,6 +54,8 @@ Qt 6.12 changed the layout of its online repository; aqtinstall 3.3.0 cannot
 read it and the official MaintenanceTool requires an interactive Qt account.
 The script downloads the same official archives from `download.qt.io`, checks
 their SHA-1 and extracts them to `<outdir>/<version>/<kit>`. CI uses it too.
+`--thin x86_64` (or `arm64`) keeps one architecture of the universal macOS kit,
+about half its size; CI does that for the runner's (ADR-0134).
 
 ## Build trees
 

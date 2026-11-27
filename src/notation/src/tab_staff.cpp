@@ -27,8 +27,12 @@ namespace {
 
 using core::Fraction;
 
-constexpr double kLineSpace = 1.5;      // between string lines
-constexpr double kFretSize = 1.8;       // font size of fret numbers
+constexpr double kLineSpace = 1.5; // between string lines
+constexpr double kFretSize = 1.8;  // font size of fret numbers
+// A fret number in parentheses (a ghost or tied note) is this much smaller, so
+// that its parentheses, which reach below the baseline and above the digits,
+// stay clear of the fret numbers on the strings next to it (ADR-0150).
+constexpr double kParenthesizedScale = 0.8;
 constexpr double kFretPadding = 0.12;   // around a fret number, in its column's ink
 constexpr double kArcGap = 0.15;        // between a fret number and a hammer-on arc
 constexpr double kArcHeight = 0.45;     // of hammer-on and pull-off arcs
@@ -53,6 +57,9 @@ constexpr double kRhythmDotGap = 0.3;  // between a rhythm stem and its dots
 constexpr double kRhythmDotRise = 0.9; // dots this far above the end of their stem
 constexpr double kDotSeparation = 0.25;
 constexpr double kGraceGap = 0.4; // between grace fret numbers, and before their column
+
+// The strings a column's notes are on, by number from 1.
+using Strings = std::array<bool, core::Tuning::kMaxStrings + 1>;
 
 struct TabNote {
     const core::Note* note = nullptr;
@@ -161,6 +168,9 @@ public:
                 column.beats.push_back(&beat);
                 column.longest = std::max(column.longest, beat.duration.length());
                 for (const core::Note& note : beat.notes) {
+                    if (!note.position) {
+                        continue; // placed below, once the column's strings are known
+                    }
                     if (std::optional<TabNote> tab = tabNote(note)) {
                         column.notes.push_back(std::move(*tab));
                         notes = true;
@@ -175,6 +185,33 @@ public:
                     }
                     if (!small.notes.empty()) {
                         column.graces.push_back(std::move(small));
+                    }
+                }
+                at += beat.duration.length();
+            }
+        }
+        // A note without a position (read from a file that has none) takes
+        // the lowest fret on a string no other note of its column is on, in
+        // any voice, so that two fret numbers never share a place (ADR-0150).
+        for (const core::Voice& voice : staff_.measure(m).voices) {
+            Fraction at;
+            for (const core::Beat& beat : voice.beats) {
+                if (std::ranges::any_of(beat.notes,
+                                        [](const core::Note& note) { return !note.position; })) {
+                    TabColumn& column = columnAt(at);
+                    Strings taken{};
+                    for (const TabNote& placed : column.notes) {
+                        taken[static_cast<std::size_t>(placed.string)] = true;
+                    }
+                    for (const core::Note& note : beat.notes) {
+                        if (note.position) {
+                            continue;
+                        }
+                        if (std::optional<TabNote> tab = tabNote(note, kFretSize, &taken)) {
+                            taken[static_cast<std::size_t>(tab->string)] = true;
+                            column.notes.push_back(std::move(*tab));
+                            notes = true;
+                        }
                     }
                 }
                 at += beat.duration.length();
@@ -507,10 +544,10 @@ private:
     }
 
     // Where the note is played (its position, or the lowest fret that sounds
-    // it) and what the tablature writes for it.
-    // The fret number of a note, its text `size` high.
-    [[nodiscard]] std::optional<TabNote> tabNote(const core::Note& note,
-                                                 double size = kFretSize) const {
+    // it, on a string not `taken` when one can) and what the tablature
+    // writes for it, its text `size` high.
+    [[nodiscard]] std::optional<TabNote> tabNote(const core::Note& note, double size = kFretSize,
+                                                 const Strings* taken = nullptr) const {
         core::FretPosition position;
         if (note.position) {
             position = *note.position;
@@ -520,7 +557,22 @@ private:
             if (all.empty()) {
                 return std::nullopt;
             }
-            position = *std::ranges::min_element(all, {}, &core::FretPosition::fret);
+            const auto free = [taken](const core::FretPosition& at) {
+                return taken == nullptr || at.string < 0 ||
+                       static_cast<std::size_t>(at.string) >= taken->size() ||
+                       !(*taken)[static_cast<std::size_t>(at.string)];
+            };
+            const auto lowest = [&all](auto&& keep) {
+                std::optional<core::FretPosition> best;
+                for (const core::FretPosition& at : all) {
+                    if (keep(at) && (!best || at.fret < best->fret)) {
+                        best = at;
+                    }
+                }
+                return best;
+            };
+            position =
+                lowest(free).value_or(*lowest([](const core::FretPosition&) { return true; }));
         }
         if (position.string < 1 || position.string > static_cast<int>(lineCount())) {
             return std::nullopt;
@@ -534,10 +586,11 @@ private:
         if (effects.harmonic.kind == core::HarmonicKind::Natural && !effects.deadNote) {
             tab.text = "<" + harmonicFret(effects.harmonic, position.fret) + ">";
         }
+        tab.size = size;
         if (effects.ghost || effects.tiedFromPrevious) {
             tab.text = "(" + tab.text + ")";
+            tab.size *= kParenthesizedScale;
         }
-        tab.size = size;
         tab.width = textWidth(tab.text, size);
         return tab;
     }

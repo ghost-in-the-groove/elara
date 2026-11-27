@@ -35,6 +35,7 @@ struct StartupOptions {
     std::optional<QSize> size;  ///< the window's size, in place of its own
     bool smokeTest = false;     ///< check the window (and the file), then quit
     bool effects = false;       ///< the note effects palette opens at the caret
+    bool commands = false;      ///< the command palette opens at start (`--commands`)
     QString menu;               ///< a menu opens as the window shows (`--menu`)
     bool tuner = false;         ///< the tuner opens at start
     QString screenshot;         ///< save the window here once shown, then quit
@@ -58,6 +59,9 @@ struct StartupOptions {
     std::optional<double> hold;
     /// Start playback once the window is ready (`--play`).
     bool play = false;
+    /// The smoke test edits a new song a page long above the caret and checks
+    /// that the caret holds still on screen (`--hold-still`).
+    bool holdStill = false;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -96,12 +100,19 @@ private:
     void queueSymbolClick();
     void queueMeasureRepeat();
     void queueEffects();
+    void queueCommands();
+    /// Presses and lets go of `key` as the system would, shortcuts included.
+    void pressKey(int key, Qt::KeyboardModifiers modifiers = Qt::NoModifier,
+                  const QString& text = {});
+    /// Types `text` a key at a time.
+    void typeText(const QString& text);
     void queueContinuous();
     void queueTunerFollowsTrack();
     void finish(bool ok, const QString& detail);
     void clickCursor();
     [[nodiscard]] bool uncoverScore();
     void queueKeepPosition();
+    void queueHoldStill();
     void queuePdf();
     void queueExport();
     void queuePractice();
@@ -145,6 +156,10 @@ private:
     QPointer<QObject> effectsPanel_;       ///< the note effects palette, watched for `--effects`
     bool effectsOpened_ = false;           ///< whether it has opened
     bool menuOpened_ = false;              ///< whether the menu `--menu` names has opened
+    bool commandsOpened_ = false;          ///< whether `--commands` opened the command palette
+    QPointer<QObject> commandPalette_;     ///< the command palette, for its steps
+    bool commanding_ = false;              ///< whether the command palette steps run
+    int commandMeasure_ = 0;               ///< the measure the palette was asked to go to
     QString popupProblem_;                 ///< a popup of the caret that left its view
     std::optional<QPointF> cursorRest_;    ///< where the playback cursor stood a tick ago
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
@@ -153,6 +168,13 @@ private:
     QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()
     QVariantMap tempoBefore_;              ///< the second measure's tempo before it changed
     QString sectionBefore_;                ///< the first measure's section before it changed
+    double heldY_ = 0.0;                   ///< the caret's height on screen before an edit
+    double heldTop_ = 0.0;                 ///< its staff's, in staff spaces down the pages
+    double heldScroll_ = 0.0;              ///< the view's scroll position before an edit
+    double heldZoom_ = 0.0;                ///< and its zoom
+    QString heldBy_;                       ///< what the document last held still, if anything
+    int heldMeasure_ = 0;                  ///< the caret's measure before an edit
+    int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
     bool entering_ = false;                ///< whether the shown track takes frets
