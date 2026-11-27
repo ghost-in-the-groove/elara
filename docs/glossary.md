@@ -15,6 +15,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | página | page | `layoutPages()`, `PageLayoutOptions` | Systems stacked between margins, with the title on the first (ADR-0014) |
 | salto de línea | line break | `LineBreaker` | Where one system ends and the next starts, chosen to space the systems evenly (ADR-0014) |
 | justificar | justify | stretch | Stretch or tighten a system's spacing so that it fills the width (ADR-0014) |
+| incidencia de maquetación | layout issue | `LayoutIssue`, `layoutIssues()` | What a laid-out page could not keep: ink that must never touch overlapping (noteheads, fret numbers, syllables...), or a measure wider than the page (ADR-0150). Not an `Issue` of `validate()`, which is about the song |
 | muelle | spring | `Spring` | The space after a column of notes: an ideal length and the least its ink needs (ADR-0014) |
 | créditos | credits | `Role::Credit` | Title, subtitle, artist, words and music by, copyright and page numbers |
 | lista de visualización | display list | `DisplayList` | What layout produces: glyphs, lines, beams, text and curves in staff spaces (ADR-0012) |
@@ -95,6 +96,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | dinámica | dynamic | `Dynamic`, `setDynamic()`, `dynamicAt()`, `Role::Dynamic` | How loud a note is played, ppp ... fff (mf by default); set at the caret, it holds until the next change (ADR-0047), and a mark under the staff shows where it changes (ADR-0044) |
 | regulador | hairpin (crescendo, diminuendo) | `Hairpin`, `BeatEffects::hairpin`, `Role::Hairpin` | A wedge under the staff over beats that get louder or softer; consecutive beats with the same hairpin share one (ADR-0078) |
 | calderón | fermata | `Fermata`, `BeatEffects::fermata`, `FermataHold`, `Role::Fermata` | A beat, a note or a rest, held longer than written while every voice waits: short (1.5 times), normal (twice) or long (three times) (ADR-0085) |
+| ornamento | ornament | `Ornament`, `NoteEffects::ornament` | A mordent or a turn on a note (and, apart, the trill); not a grace note, which is a "nota de adorno" (ADR-0091) |
 | mordente | mordent; upper mordent (inverted mordent) | `Ornament::Mordent`, `Ornament::UpperMordent`, `NoteEffects::ornament`, `semitonesToPreviousStep()` | Quick notes at the start of a note: down to the step below and back, or up to the step above and back (ADR-0091) |
 | grupeto | turn; inverted turn | `Ornament::Turn`, `Ornament::InvertedTurn`, `ornamentSteps()` | Quick notes going round a note, from the step above (or below) to the other side and back (ADR-0091) |
 | trino | trill | `Trill`, `NoteEffects::trill`, `semitonesToNextStep()`, `Role::Ornament` | A note alternated quickly with another, by default the next step up in the key, written "tr" over the note and a wavy line (ADR-0090) |

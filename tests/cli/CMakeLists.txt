@@ -566,7 +566,7 @@ set_tests_properties(cli.edit_sets_fermatas PROPERTIES
 add_test(NAME cli.dump_fermatas COMMAND elara-cli --json dump "${ELARA_CLI_FERMATAS}")
 set_tests_properties(cli.dump_fermatas PROPERTIES
   FIXTURES_REQUIRED cli_fermatas
-  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.250")
+  PASS_REGULAR_EXPRESSION "\"C5\"}\],\"effects\":{\"fermata\":\"long\"}}.*{\"duration\":\"4\",\"effects\":{\"fermata\":\"short\"}}.*\"E5\"}\]}.*\"durationSeconds\":3\\.25,")
 # Octave lines at the caret (ADR-0089): 8va on the C, 15mb on the D, 8vb on a
 # rest, and 15ma on the E that undo takes back. Each is drawn as a mark, its
 # dashes and a hook.
@@ -1155,7 +1155,7 @@ set_tests_properties(cli.new_creates_song PROPERTIES
 add_test(NAME cli.dump_reads_song COMMAND elara-cli --json dump "${ELARA_CLI_SONG}")
 set_tests_properties(cli.dump_reads_song PROPERTIES
   FIXTURES_REQUIRED cli_song
-  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16\\.000,\"issues\":\\[\\]}")
+  PASS_REGULAR_EXPRESSION "\"info\":{\"title\":\"Etude\"},\"tempo\":{\"bpm\":90},\"measures\":\\[{\"timeSignature\":\"6/8\",\"keySignature\":\"D major\"}.*\"durationSeconds\":16,\"issues\":\\[\\]}")
 
 add_test(NAME cli.new_refuses_to_overwrite COMMAND elara-cli new "${ELARA_CLI_SONG}")
 set_tests_properties(cli.new_refuses_to_overwrite PROPERTIES
@@ -1900,6 +1900,27 @@ add_test(NAME cli.render_symbol_at_nothing
           --layout page --symbol-at 0 1 1)
 set_tests_properties(cli.render_symbol_at_nothing PROPERTIES
   PASS_REGULAR_EXPRESSION "symbol at page 1, x 1, y 1: none there")
+# What the layout could not keep (ADR-0150): nothing on a corpus file, and
+# measures wider than a page of huge staff spaces.
+add_test(NAME cli.render_issues_none
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
+          --view both --layout page --issues)
+set_tests_properties(cli.render_issues_none PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[\\],\"pages\":\\[")
+add_test(NAME cli.render_issues_measure_too_wide
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_measure_too_wide PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"issues\":\\[{\"kind\":\"measureTooWide\",\"page\":0,\"measure\":0,\"roles\":\\[\\],\"box\":\\[[0-9.,]+\\]}\\],\"pages\"")
+add_test(NAME cli.render_issues_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --issues)
+set_tests_properties(cli.render_issues_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issue: measure 1 on page 1 is [0-9.]+ staff spaces too wide")
+add_test(NAME cli.render_issues_none_text
+  COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --issues)
+set_tests_properties(cli.render_issues_none_text PROPERTIES
+  PASS_REGULAR_EXPRESSION "issues: none")
 add_test(NAME cli.render_time_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --time-at 0 1 1)
 set_tests_properties(cli.render_time_at_nothing PROPERTIES

@@ -136,6 +136,7 @@ one that replaces them.
 | [0137](0137-the-window-remembers-its-state.md) | The window remembers its state | Accepted |
 | [0138](0138-releases-are-drafted-from-a-tag.md) | Releases are drafted from a tag | Accepted |
 | [0139](0139-a-song-from-a-newer-elara-says-what-it-may-lose.md) | A song from a newer Elara says what it may lose | Accepted |
+| [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0160](0160-several-songs-open-at-once.md) | Several songs open at once | Accepted |
 
 ## Template

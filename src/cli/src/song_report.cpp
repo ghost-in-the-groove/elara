@@ -10,19 +10,27 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace elara::cli {
 
 namespace {
 
-std::string jsonOptional(const std::optional<std::size_t>& value) {
-    return value ? std::to_string(*value) : std::string("null");
+// `"name":3`, or `"name":null` without a value.
+void writeOptional(JsonWriter& json, std::string_view name,
+                   const std::optional<std::size_t>& value) {
+    json.key(name);
+    if (value) {
+        json.value(*value);
+    } else {
+        json.null();
+    }
 }
 
 } // namespace
 
-std::string tracksJson(const core::Song& song) {
-    std::string out = "[";
+void writeTracks(JsonWriter& json, const core::Song& song) {
+    json.beginArray();
     for (std::size_t t = 0; t < song.trackCount(); ++t) {
         const auto& track = song.track(t);
         std::size_t beats = 0;
@@ -39,86 +47,109 @@ std::string tracksJson(const core::Song& song) {
         }
         const core::TrackMix& mix = track.mix();
         const core::Staff& first = track.staff(0);
-        out += std::format(
-            R"({}{{"name":"{}","mix":{{"volume":{},"pan":{},"mute":{},"solo":{}}},"tuning":{},"capo":{},"staves":{},"beats":{},"notes":{}}})",
-            t == 0 ? "" : ",", jsonEscape(track.name()), jsonNumber(mix.volume),
-            jsonNumber(mix.pan), mix.mute, mix.solo,
-            first.tuning() ? std::format("\"{}\"", first.tuning()->toString()) : "null",
-            first.capo(), track.staffCount(), beats, notes);
+        json.beginObject()
+            .field("name", track.name())
+            .key("mix")
+            .beginObject()
+            .field("volume", mix.volume)
+            .field("pan", mix.pan)
+            .field("mute", mix.mute)
+            .field("solo", mix.solo)
+            .endObject()
+            .key("tuning");
+        if (first.tuning()) {
+            json.string(first.tuning()->toString());
+        } else {
+            json.null();
+        }
+        json.field("capo", first.capo())
+            .field("staves", track.staffCount())
+            .field("beats", beats)
+            .field("notes", notes)
+            .endObject();
     }
-    return out + "]";
+    json.endArray();
 }
 
-std::string measuresJson(const core::Song& song) {
-    std::string out = "[";
+void writeMeasures(JsonWriter& json, const core::Song& song) {
+    json.beginArray();
     for (std::size_t m = 0; m < song.measureCount(); ++m) {
         const auto& header = song.measureHeader(m);
-        out += std::format(R"({}{{"time":"{}","key":"{}")", m == 0 ? "" : ",",
-                           header.timeSignature.toString(), header.keySignature.toString());
+        json.beginObject()
+            .field("time", header.timeSignature.toString())
+            .field("key", header.keySignature.toString());
         if (header.repeatStart) {
-            out += R"(,"repeatStart":true)";
+            json.field("repeatStart", true);
         }
         if (header.repeatEnd()) {
-            out += std::format(R"(,"repeatTimes":{})", header.repeatTimes);
+            json.field("repeatTimes", header.repeatTimes);
         }
         if (header.alternateEndings != 0) {
-            std::string endings;
+            json.key("endings").beginArray();
             for (int time = 1; time <= core::MeasureHeader::kMaxEnding; ++time) {
                 if (((header.alternateEndings >> (time - 1)) & 1U) != 0) {
-                    endings += std::format("{}{}", endings.empty() ? "" : ",", time);
+                    json.value(time);
                 }
             }
-            out += std::format(R"(,"endings":[{}])", endings);
+            json.endArray();
         }
         if (header.doubleBar) {
-            out += R"(,"doubleBar":true)";
+            json.field("doubleBar", true);
         }
         if (header.tripletFeel != core::TripletFeel::None) {
-            out += std::format(R"(,"tripletFeel":"{}")", core::nameOf(header.tripletFeel));
+            json.field("tripletFeel", core::nameOf(header.tripletFeel));
         }
-        std::string signs;
+        bool signs = false;
         for (const core::NavigationSign sign : core::enumValues<core::NavigationSign>()) {
             if (header.*core::signFlag(sign)) {
-                signs += std::format(R"({}"{}")", signs.empty() ? "" : ",", core::nameOf(sign));
+                if (!signs) {
+                    json.key("signs").beginArray();
+                    signs = true;
+                }
+                json.value(core::nameOf(sign));
             }
         }
-        if (!signs.empty()) {
-            out += std::format(R"(,"signs":[{}])", signs);
+        if (signs) {
+            json.endArray();
         }
         if (header.jump != core::JumpTo::None) {
-            out += std::format(R"(,"jump":"{}")", core::nameOf(header.jump));
+            json.field("jump", core::nameOf(header.jump));
             if (header.jumpThen != core::JumpThen::End) {
-                out += std::format(R"(,"jumpThen":"{}")", core::nameOf(header.jumpThen));
+                json.field("jumpThen", core::nameOf(header.jumpThen));
             }
         }
         // A tempo that starts the measure (ADR-0042); changes inside it are
         // kept but not listed here.
         for (const core::TempoChange& change : header.tempoChanges) {
             if (change.offset == core::Fraction{}) {
-                out += std::format(R"(,"tempo":{})", jsonNumber(change.tempo.bpm()));
+                json.field("tempo", change.tempo.bpm());
                 if (change.gradual) {
-                    out += R"(,"gradual":true)"; // ADR-0082
+                    json.field("gradual", true); // ADR-0082
                 }
             }
         }
         if (!header.section.empty()) {
-            out += std::format(R"(,"section":"{}")", jsonEscape(header.section));
+            json.field("section", header.section);
         }
-        out += "}";
+        json.endObject();
     }
-    return out + "]";
+    json.endArray();
 }
 
-std::string issuesJson(const std::vector<core::Issue>& issues) {
-    std::string out = "[";
-    for (std::size_t i = 0; i < issues.size(); ++i) {
-        const auto& issue = issues[i];
-        out += std::format(
-            R"({}{{"kind":"{}","track":{},"staff":{},"measure":{},"voice":{},"beat":{},"note":{}}})",
-            i == 0 ? "" : ",", core::issueName(issue.kind), issue.track, issue.staff, issue.measure,
-            issue.voice, jsonOptional(issue.beat), jsonOptional(issue.note));
+void writeIssues(JsonWriter& json, const std::vector<core::Issue>& issues) {
+    json.beginArray();
+    for (const auto& issue : issues) {
+        json.beginObject()
+            .field("kind", core::issueName(issue.kind))
+            .field("track", issue.track)
+            .field("staff", issue.staff)
+            .field("measure", issue.measure)
+            .field("voice", issue.voice);
+        writeOptional(json, "beat", issue.beat);
+        writeOptional(json, "note", issue.note);
+        json.endObject();
     }
-    return out + "]";
+    json.endArray();
 }
 
 void printSongText(const core::Song& song) {
