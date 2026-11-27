@@ -57,7 +57,7 @@ namespace {
 
 constexpr double kEpsilon = 1e-9;
 constexpr double kLineSpace = 1.5;
-constexpr double kFretSize = 1.6; // font size of fret numbers (ADR-0113)
+constexpr double kFretSize = 1.8; // font size of fret numbers (ADR-0131)
 
 const EngravingFont& bravura() {
     static const EngravingFont font = [] {

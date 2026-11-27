@@ -176,6 +176,32 @@ TEST_CASE("Tempo marks: a change shows where it happens", "[notation][layout][te
     }
 }
 
+TEST_CASE("Tempo marks: one that would run into the mark before it goes up a line",
+          "[notation][layout][tempo]") {
+    Song song = quarters(2);
+    song.measureHeader(0).tempoChanges = {
+        TempoChange{.offset = {}, .tempo = Tempo(100)},
+        TempoChange{.offset = Fraction(1, 4), .tempo = Tempo(110)}};
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 2), .tempo = Tempo(90)}};
+    const DisplayList list = layout(song);
+    const auto marks = texts(list, Role::Tempo);
+    REQUIRE(contents(marks) == std::vector<std::string>{"= 100", "= 110", "= 90"});
+    const auto notes = glyphs(list, Role::Tempo);
+    REQUIRE(notes.size() == 3);
+
+    // A beat later the first mark has not ended: the second stands over it,
+    // its note with its text, clear of the first's.
+    REQUIRE(left(notes[1]) < marks[0].origin.x + textWidth(marks[0].text, marks[0].size));
+    CHECK(marks[1].origin.y < top(notes[0]));
+    CHECK_THAT(bottom(notes[1]), WithinAbs(marks[1].origin.y, 0.15));
+    // The third has room on the first line again.
+    CHECK(marks[2].origin.y == marks[0].origin.y);
+    CHECK_THAT(bottom(notes[2]), WithinAbs(marks[2].origin.y, 0.15));
+    // The list's extents hold the higher line.
+    CHECK(list.top <= top(notes[1]) + kEpsilon);
+}
+
 TEST_CASE("Triplet feel marks: the pair as written equals the pair as played",
           "[notation][layout][tempo][feel]") {
     // ADR-0104: after the tempo mark where the feel starts, alone where it

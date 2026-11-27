@@ -116,6 +116,7 @@ class ScoreDocument : public QObject {
     // Keyboard entry (ADR-0021).
     Q_PROPERTY(int caretPage READ caretPage NOTIFY caretChanged)
     Q_PROPERTY(QRectF caretRect READ caretRect NOTIFY caretChanged)
+    Q_PROPERTY(QRectF caretColumn READ caretColumn NOTIFY caretChanged)
     Q_PROPERTY(int inputValue READ inputValue NOTIFY inputChanged)
     Q_PROPERTY(bool inputDotted READ inputDotted NOTIFY inputChanged)
     Q_PROPERTY(int inputTuplet READ inputTuplet NOTIFY inputChanged)
@@ -455,6 +456,10 @@ public:
     [[nodiscard]] int caretPage() const { return caretPage_; }
     /// The caret on its page, in staff spaces from the page's top-left corner.
     [[nodiscard]] QRectF caretRect() const { return caretRect_; }
+    /// The caret's beat across its staff on that page, the notation and the
+    /// tablature when both are shown (notation::caretColumn): the band the
+    /// caret's box stands in.
+    [[nodiscard]] QRectF caretColumn() const { return caretColumn_; }
     /// The duration typing uses: 1 a whole note, 2 a half note... 64.
     [[nodiscard]] int inputValue() const;
     [[nodiscard]] bool inputDotted() const { return session_.input().dots() > 0; }
@@ -690,6 +695,7 @@ private:
     core::EditSession session_;
     int caretPage_ = -1;
     QRectF caretRect_;
+    QRectF caretColumn_;
     int selectionRevision_ = 0;
     int track_ = 0;
     View view_ = View::Both;

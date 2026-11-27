@@ -2158,6 +2158,7 @@ void ScoreDocument::clampCaret() {
 void ScoreDocument::placeCaretBox() {
     int page = -1;
     QRectF rect;
+    QRectF column;
     const notation::EngravingFont* font = musicMetrics();
     if (pages_ && pagesSong_ && font != nullptr) {
         for (std::size_t i = 0; i < pages_->size(); ++i) {
@@ -2165,12 +2166,16 @@ void ScoreDocument::placeCaretBox() {
                     notation::caretBox((*pages_)[i], *pagesSong_, session_.caret(), *font)) {
                 page = static_cast<int>(i);
                 rect = QRectF(box->x, box->y, box->width, box->height);
+                const auto band =
+                    notation::caretColumn((*pages_)[i], *pagesSong_, session_.caret(), *font);
+                column = band ? QRectF(band->x, band->y, band->width, band->height) : rect;
                 break;
             }
         }
     }
     caretPage_ = page;
     caretRect_ = rect;
+    caretColumn_ = column;
     emit caretChanged();
     selectionMoved();
 }

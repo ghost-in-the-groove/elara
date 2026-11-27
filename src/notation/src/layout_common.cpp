@@ -24,7 +24,7 @@ namespace {
 
 // Technique lanes, in staff spaces.
 constexpr double kLaneGap = 0.6;        // between the staff's ink and the first lane
-constexpr double kLaneTextSize = 1.25;  // "P.M.", "let ring", harmonic labels
+constexpr double kLaneTextSize = 1.55;  // "P.M.", "let ring", harmonic labels
 constexpr double kLaneBaseline = 0.2;   // text baseline above the bottom of its lane
 constexpr double kLaneGlyphScale = 0.7; // strum arrows and tremolo slashes in their lanes
 constexpr double kRunDash = 0.3;        // dashes of the line after "P.M."
@@ -33,15 +33,15 @@ constexpr double kRunHook = 0.4;        // the line's closing hook
 constexpr double kRunLineGap = 0.25;    // between the text and its line
 constexpr double kVibratoLift = 0.25;   // vibrato strokes above the bottom of their lane
 // One per lane, in the order of `Lane`.
-constexpr std::array kLaneHeight{1.5, 2.55, 1.2, 1.45, 1.45, 1.45, 1.35, 1.35, 2.3, 1.9, 1.9};
+constexpr std::array kLaneHeight{1.7, 2.75, 1.2, 1.7, 1.7, 1.7, 1.6, 1.6, 2.3, 1.9, 1.9};
 static_assert(kLaneHeight.size() == kLaneCount);
 // The whammy-bar lane (ADR-0061): its label on top, the curve under it.
-constexpr double kWhammyLow = 0.25;     // the lowest pitch of the curve above the lane's bottom
-constexpr double kWhammyHigh = 1.25;    // its highest
-constexpr double kWhammyBaseline = 1.5; // the label's baseline
-constexpr double kWhammyTextSize = 1.1; // "w/bar -1 1/2"
-constexpr double kWhammyMinWidth = 1.0; // a curve is at least this wide
-constexpr double kWhammyEndGap = 0.3;   // between a curve and the next column
+constexpr double kWhammyLow = 0.25;      // the lowest pitch of the curve above the lane's bottom
+constexpr double kWhammyHigh = 1.25;     // its highest
+constexpr double kWhammyBaseline = 1.5;  // the label's baseline
+constexpr double kWhammyTextSize = 1.35; // "w/bar -1 1/2"
+constexpr double kWhammyMinWidth = 1.0;  // a curve is at least this wide
+constexpr double kWhammyEndGap = 0.3;    // between a curve and the next column
 
 // Dynamics marks, in staff spaces (ADR-0044).
 constexpr double kDynamicBaseline = 2.8;  // the baseline at least this far under the staff
@@ -53,19 +53,19 @@ constexpr double kHairpinEndGap = 0.4;    // before the column or barline a wedg
 constexpr double kHairpinMinLength = 1.0;
 
 // Chord symbols, in staff spaces (ADR-0080).
-constexpr double kChordNameSize = 1.5;       // font size of a name
+constexpr double kChordNameSize = 2.0;       // font size of a name
 constexpr double kChordInkGap = 0.6;         // between the ink below and the row
-constexpr double kChordNameGap = 0.3;        // between a name and its diagram
-constexpr double kChordStringSpace = 0.85;   // between the strings of a diagram
-constexpr double kChordFretSpace = 1.0;      // between its frets
+constexpr double kChordNameGap = 0.4;        // between a name and its diagram
+constexpr double kChordStringSpace = 1.0;    // between the strings of a diagram
+constexpr double kChordFretSpace = 1.2;      // between its frets
 constexpr int kChordMinFrets = 4;            // a diagram shows at least this many frets
-constexpr double kChordMarkScale = 0.95;     // of the dots and the open and muted marks
+constexpr double kChordMarkScale = 1.1;      // of the dots and the open and muted marks
 constexpr double kChordMarkGap = 0.2;        // between the open and muted marks and the nut
 constexpr double kChordLineThickness = 0.1;  // strings and frets
-constexpr double kChordNutThickness = 0.3;   // the nut, at the first fret
-constexpr double kChordFretNumberSize = 1.2; // font size of the first fret's number
+constexpr double kChordNutThickness = 0.35;  // the nut, at the first fret
+constexpr double kChordFretNumberSize = 1.4; // font size of the first fret's number
 constexpr double kChordFretNumberGap = 0.3;  // between that number and the strings
-constexpr double kBeatTextSize = 1.4;        // font size of a beat's text
+constexpr double kBeatTextSize = 1.8;        // font size of a beat's text
 constexpr double kBeatTextInkGap = 0.6;      // between the ink below and the lowest row
 constexpr double kBeatTextSpace = 1.0;       // between two texts on one row
 constexpr double kBeatTextRowGap = 0.2;      // between rows
@@ -1164,7 +1164,7 @@ void AboveRow::diagram(DisplayList& list, const core::ChordDiagram& shape, doubl
 
 namespace {
 
-constexpr double kLyricSize = 1.5;           // font size of a syllable
+constexpr double kLyricSize = 1.9;           // font size of a syllable
 constexpr double kLyricInkGap = 0.8;         // between the ink above and the first verse
 constexpr double kLyricLineGap = 0.3;        // between the lines of two verses
 constexpr double kHyphenLength = 0.5;        // a hyphen between two syllables

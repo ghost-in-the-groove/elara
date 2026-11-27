@@ -129,6 +129,8 @@ one that replaces them.
 | [0128](0128-the-caret-editor.md) | What is at the caret has a class of its own | Accepted |
 | [0129](0129-the-model-keeps-its-value-types.md) | The model keeps its value types | Accepted |
 | [0130](0130-symbols-are-edited-where-they-are-drawn.md) | Symbols are edited where they are drawn | Accepted |
+| [0131](0131-the-scores-texts-follow-one-scale.md) | The score's texts follow one scale | Accepted |
+| [0132](0132-the-caret-says-the-beat-and-the-string.md) | The caret says the beat and the string | Accepted |
 
 ## Template
 

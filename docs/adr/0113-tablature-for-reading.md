@@ -28,6 +28,9 @@ ADR-0013 drew the time signature on every tablature staff.
 
 ## Decision
 
+ADR-0131 put every text of the score on one scale and raised these sizes
+again; the time signature's place stands as decided here.
+
 - **Fret numbers at 1.6 staff spaces** (7.9 pt on paper): their capitals are
   1.15 staff spaces high between lines 1.5 apart, so a number still clears the
   lines above and below it. Grace numbers stay at 0.65 of that.

@@ -33,6 +33,15 @@ struct Rect {
 [[nodiscard]] std::optional<Rect> caretBox(const DisplayList& list, const core::Song& song,
                                            const core::Caret& caret, const EngravingFont& font);
 
+/// The beat `caret` is on, across the staff it is on: a band as wide as the
+/// caret's box and at the same place across, from above the first line to
+/// below the last of every view of the caret's staff in its system, the
+/// notation and the tablature when the list shows both. It says where in the
+/// measure typing goes, as caretBox() says on which string. Empty when
+/// caretBox() is.
+[[nodiscard]] std::optional<Rect> caretColumn(const DisplayList& list, const core::Song& song,
+                                              const core::Caret& caret, const EngravingFont& font);
+
 /// The caret a click at `point` on `list` picks: in the measure under the point,
 /// the staff nearest to it, on tablature the nearest string, on a percussion
 /// staff the nearest lane (of lanes in the same place, the current one when the

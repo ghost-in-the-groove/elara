@@ -42,6 +42,7 @@ using elara::core::Track;
 using elara::core::Tuning;
 using elara::notation::caretAt;
 using elara::notation::caretBox;
+using elara::notation::caretColumn;
 using elara::notation::ColumnBox;
 using elara::notation::DisplayList;
 using elara::notation::EngravingFont;
@@ -290,6 +291,43 @@ TEST_CASE("On standard notation the caret spans the staff", "[notation][caret]")
     REQUIRE(onTab.has_value());
     const auto& tabStaff = both.staves[1];
     CHECK_THAT(centreOf(*onTab).y, WithinAbs(tabStaff.y + kLineSpace * 2, kEpsilon));
+}
+
+TEST_CASE("The caret's band says its beat across every view of its staff", "[notation][caret]") {
+    const Song song = guitar({{play(1, 0), play(2, 1)}});
+    const Caret caret{.beat = 1, .string = 3};
+
+    // On a tablature the band runs over all its strings, the box on one.
+    const DisplayList onTab = tab(song);
+    const auto cell = caretBox(onTab, song, caret, bravura());
+    const auto band = caretColumn(onTab, song, caret, bravura());
+    REQUIRE(cell.has_value());
+    REQUIRE(band.has_value());
+    CHECK_THAT(band->x, WithinAbs(cell->x, kEpsilon));
+    CHECK_THAT(band->width, WithinAbs(cell->width, kEpsilon));
+    CHECK(band->y < onTab.staves[0].y);
+    CHECK(band->y + band->height > onTab.staves[0].y + onTab.staves[0].height);
+    CHECK(band->y <= cell->y);
+    CHECK(band->y + band->height >= cell->y + cell->height);
+    // Another string of the beat moves the box and leaves the band.
+    CHECK(caretColumn(onTab, song, Caret{.beat = 1, .string = 6}, bravura()) == band);
+
+    // With both views it runs from over the notation to under the tablature.
+    const DisplayList both = notationAndTab(song);
+    REQUIRE(both.staves.size() == 2);
+    const auto over = caretColumn(both, song, caret, bravura());
+    REQUIRE(over.has_value());
+    CHECK(over->y < both.staves[0].y);
+    CHECK(over->y + over->height > both.staves[1].y + both.staves[1].height);
+
+    // On notation alone the box already spans the staff: the band is the box.
+    const DisplayList standard = elara::notation::layoutStaff(song, 0, 0, bravura());
+    CHECK(caretColumn(standard, song, caret, bravura()) ==
+          caretBox(standard, song, caret, bravura()));
+
+    // None where there is no box.
+    CHECK_FALSE(caretColumn(onTab, song, Caret{.track = 1}, bravura()).has_value());
+    CHECK_FALSE(caretColumn(onTab, song, Caret{.measure = 4}, bravura()).has_value());
 }
 
 TEST_CASE("No caret box for a measure or staff the list does not show", "[notation][caret]") {

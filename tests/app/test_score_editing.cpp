@@ -13,6 +13,7 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QObject>
+#include <QRectF>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
@@ -120,6 +121,29 @@ TEST_CASE("editing: the input duration follows the beat the caret moves to") {
     CHECK(editing.score.caret().beat == 2);
     CHECK(editing.score.inputValue() == 2);
     CHECK(editing.score.inputDotted());
+}
+
+TEST_CASE("editing: the caret's band holds its box, and stays when the string changes") {
+    Editing editing;
+    REQUIRE(settle([&editing] { return editing.score.caretPage() == 0; }));
+    const QRectF box = editing.score.caretRect();
+    const QRectF band = editing.score.caretColumn();
+    REQUIRE(box.isValid());
+    // Notation over tablature: the band runs over both, the box sits on a string.
+    CHECK(band.left() == box.left());
+    CHECK(band.width() == box.width());
+    CHECK(band.top() < box.top());
+    CHECK(band.bottom() > box.bottom());
+    CHECK(band.height() > 3 * box.height());
+
+    editing.move(Move::StringDown);
+    CHECK(editing.score.caretRect().top() > box.top());
+    CHECK(editing.score.caretColumn() == band);
+
+    // Notation alone: the box spans the staff, and the band is the box.
+    editing.score.setView(ScoreDocument::View::Standard);
+    REQUIRE(settle([&editing] { return !editing.score.busy(); }));
+    CHECK(editing.score.caretColumn() == editing.score.caretRect());
 }
 
 TEST_CASE("editing: an input duration given on a beat is given to the beat, as one undo step") {

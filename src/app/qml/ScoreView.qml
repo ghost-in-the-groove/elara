@@ -668,21 +668,28 @@ Item {
                                 border.width: 1
                             }
 
-                            // The caret: where typing goes. It glides between beats on a
-                            // page, and keeps up with zooming without gliding.
-                            Rectangle {
-                                readonly property real scale: root.unit * root.shownZoom
-                                readonly property rect box: root.document.caretRect
+                            // The caret: where typing goes. A soft band says its beat
+                            // across the staff, the notation and the tablature alike,
+                            // and a cell on the band the string (or the drum, or the
+                            // whole of a staff of notation). It glides between beats
+                            // on a page, and keeps up with zooming without gliding.
+                            Item {
+                                id: caret
 
+                                readonly property real scale: root.unit * root.shownZoom
+                                readonly property rect cell: root.document.caretRect
+                                readonly property rect column: root.document.caretColumn
+                                // Faint while the keys go elsewhere; stronger on a
+                                // dark page, where a wash of the accent hardly shows.
+                                readonly property bool lit: root.activeFocus
+                                readonly property real strength: root.darkPage ? 1.8 : 1.0
+                                // On notation alone the cell is the band: its frame.
+                                readonly property bool whole: cell.height >= column.height - 0.01
+
+                                objectName: "caret"
                                 visible: root.document.caretPage === sheet.index
-                                x: box.x * scale
-                                y: box.y * scale
-                                width: box.width * scale
-                                height: box.height * scale
-                                radius: Math.min(width, height) * 0.22
-                                color: Qt.alpha(Theme.accent, root.activeFocus ? 0.22 : 0.1)
-                                border.color: Qt.alpha(Theme.accent, root.activeFocus ? 0.9 : 0.4)
-                                border.width: 1.5
+                                x: cell.x * scale
+                                width: cell.width * scale
 
                                 Behavior on x {
                                     enabled: root.shownZoom === root.zoom
@@ -691,11 +698,35 @@ Item {
                                         easing.type: Easing.OutCubic
                                     }
                                 }
-                                Behavior on y {
-                                    enabled: root.shownZoom === root.zoom
-                                    NumberAnimation {
-                                        duration: 90
-                                        easing.type: Easing.OutCubic
+
+                                Rectangle {
+                                    objectName: "caretBand"
+                                    y: caret.column.y * caret.scale
+                                    width: caret.width
+                                    height: caret.column.height * caret.scale
+                                    radius: Math.min(width / 2, 0.6 * caret.scale)
+                                    color: Qt.alpha(Theme.accent,
+                                                    (caret.lit ? 0.12 : 0.05) * caret.strength)
+                                }
+                                Rectangle {
+                                    objectName: "caretCell"
+                                    y: caret.cell.y * caret.scale
+                                    width: caret.width
+                                    height: caret.cell.height * caret.scale
+                                    radius: Math.min(width, height) * 0.24
+                                    color: caret.whole ? "transparent" : Qt.alpha(
+                                                             Theme.accent, (caret.lit ? 0.16 : 0.06)
+                                                             * caret.strength)
+                                    border.color: Qt.alpha(Theme.accent, caret.lit ? 1.0 : 0.45)
+                                    border.width: caret.lit
+                                                  ? Math.max(1.5, Math.min(3, 0.3 * caret.scale)) : 1
+
+                                    Behavior on y {
+                                        enabled: root.shownZoom === root.zoom
+                                        NumberAnimation {
+                                            duration: 90
+                                            easing.type: Easing.OutCubic
+                                        }
                                     }
                                 }
                             }
