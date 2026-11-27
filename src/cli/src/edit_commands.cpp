@@ -155,7 +155,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
         "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
         "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"tempo-gradual <m> <on|off>\", "
-        "\"section <m> [name]\", "
+        "\"section <m> [name]\", \"break <m> <system|page|keep|auto> [track <t>]\", "
         "\"title <text>\", "
         "\"credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> "
         "[text]\", "

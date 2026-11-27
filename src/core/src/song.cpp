@@ -83,6 +83,35 @@ decltype(auto) checkedAt(Container& items, std::size_t index, const char* what) 
     return items[index];
 }
 
+// `layouts`, none when every entry is the default.
+MeasureLayouts normalised(std::vector<MeasureLayout> layouts) {
+    if (std::ranges::all_of(layouts, &MeasureLayout::isDefault)) {
+        return {};
+    }
+    return MeasureLayouts(std::move(layouts));
+}
+
+// `layouts` with `count` default entries inserted at `at`; none stays none.
+MeasureLayouts withInserted(const MeasureLayouts& layouts, std::size_t at, std::size_t count) {
+    if (!layouts || count == 0) {
+        return layouts;
+    }
+    std::vector<MeasureLayout> next = *layouts;
+    next.insert(next.begin() + static_cast<std::ptrdiff_t>(at), count, MeasureLayout{});
+    return MeasureLayouts(std::move(next));
+}
+
+// `layouts` without the entries [at, at + count); none stays none.
+MeasureLayouts withRemoved(const MeasureLayouts& layouts, std::size_t at, std::size_t count) {
+    if (!layouts || count == 0) {
+        return layouts;
+    }
+    std::vector<MeasureLayout> next = *layouts;
+    next.erase(next.begin() + static_cast<std::ptrdiff_t>(at),
+               next.begin() + static_cast<std::ptrdiff_t>(at + count));
+    return normalised(std::move(next));
+}
+
 } // namespace
 
 // ---- Staff ----------------------------------------------------------------
@@ -152,7 +181,7 @@ std::size_t approximateBytes(const Track& track) noexcept {
                      approximateBytes(staff.measure(m));
         }
     }
-    return bytes;
+    return bytes + detail::sharedBytes(track.measureLayouts());
 }
 
 Track::Track(std::string name, Instrument instrument, std::vector<Staff> staves)
@@ -204,6 +233,9 @@ std::size_t Song::insertTrack(std::size_t at, Track track) {
             throw std::invalid_argument("Song: track has a different number of measures");
         }
     }
+    if (track.layouts_ && track.layouts_->size() != headers_.size()) {
+        throw std::invalid_argument("Song: track has a different number of measure layouts");
+    }
     tracks_.insert(tracks_.begin() + static_cast<std::ptrdiff_t>(at), std::move(track));
     return at;
 }
@@ -252,7 +284,9 @@ void Song::insertMeasures(std::size_t at, std::size_t count) {
         for (auto& staff : track.staves_) {
             staff.measures_.insert(staff.measures_.begin() + offset, count, empty);
         }
+        track.layouts_ = withInserted(track.layouts_, at, count);
     }
+    layouts_ = withInserted(layouts_, at, count);
 }
 
 void Song::removeMeasures(std::size_t at, std::size_t count) {
@@ -266,7 +300,9 @@ void Song::removeMeasures(std::size_t at, std::size_t count) {
         for (auto& staff : track.staves_) {
             staff.measures_.erase(staff.measures_.begin() + first, staff.measures_.begin() + last);
         }
+        track.layouts_ = withRemoved(track.layouts_, at, count);
     }
+    layouts_ = withRemoved(layouts_, at, count);
 }
 
 void checkRepeatTimes(int times) {
@@ -291,6 +327,35 @@ MeasureHeader& Song::measureHeader(std::size_t index) {
 
 const MeasureHeader& Song::measureHeader(std::size_t index) const {
     return checkedAt(headers_, index, "Song: no such measure");
+}
+
+// ---- Layout adjustments -----------------------------------------------------
+
+MeasureLayouts& Song::layoutsOf(LayoutScope scope) {
+    return scope.track ? checkedAt(tracks_, *scope.track, "Song: no such track").layouts_
+                       : layouts_;
+}
+
+const MeasureLayouts& Song::measureLayouts(LayoutScope scope) const {
+    return scope.track ? checkedAt(tracks_, *scope.track, "Song: no such track").layouts_
+                       : layouts_;
+}
+
+MeasureLayout Song::measureLayout(LayoutScope scope, std::size_t measure) const {
+    const MeasureLayouts& layouts = measureLayouts(scope);
+    checkedAt(headers_, measure, "Song: no such measure");
+    return layouts ? (*layouts)[measure] : MeasureLayout{};
+}
+
+void Song::setMeasureLayouts(LayoutScope scope, MeasureLayouts layouts) {
+    MeasureLayouts& held = layoutsOf(scope);
+    if (layouts && layouts->size() != headers_.size()) {
+        throw std::invalid_argument("Song: measure layouts are one per measure");
+    }
+    if (layouts && std::ranges::all_of(*layouts, &MeasureLayout::isDefault)) {
+        layouts.reset();
+    }
+    held = std::move(layouts);
 }
 
 // ---- Timeline ---------------------------------------------------------------

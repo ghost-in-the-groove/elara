@@ -1491,6 +1491,16 @@ foreach(_view IN ITEMS standard tab)
             "${_render_snapshots}/gp/guitar-techniques-${_view}" --view ${_view})
 endforeach()
 
+# The heavy-use measurement (scripts/usage.py) on tiny songs and the CLI only:
+# it writes its songs, runs every CLI scenario once through the operating
+# system's process counters and prints its table.
+add_test(NAME cli.usage_script
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/scripts/usage.py"
+          --bin "$<TARGET_FILE_DIR:elara-cli>" --no-app --tracks 2 --measures 4
+          --huge-measures 8 --runs 1)
+set_tests_properties(cli.usage_script PROPERTIES
+  PASS_REGULAR_EXPRESSION "[\r\n]\\| cli: export huge as MIDI \\| [0-9.]+ \\|")
+
 # The sequencer (ADR-0017): measures in play order with their times, notes and
 # note events.
 add_test(NAME cli.sequence_repeats
@@ -1930,3 +1940,38 @@ set_tests_properties(cli.dump_newer_file_saved PROPERTIES
   FIXTURES_REQUIRED cli_newer_saved
   PASS_REGULAR_EXPRESSION "\"warnings\":\\[\\],\"song\":{\"format\":\"elara\",\"formatVersion\":1,\"generator\":\"Elara [^\"]+\",\"info\":{\"title\":\"Later\",\"subtitle\":\"for two guitars\""
   FAIL_REGULAR_EXPRESSION "comingLater|99\\.0\\.0")
+
+# Breaks (ADR-0152): the song's on its measures, a track's own on the track.
+# Removing a measure before them moves them with their measures.
+set(ELARA_CLI_BREAKS "${CMAKE_CURRENT_BINARY_DIR}/cli-breaks.elara")
+add_test(NAME cli.edit_breaks
+  COMMAND elara-cli --json edit --out "${ELARA_CLI_BREAKS}" "add-track electric-guitar"
+    "add-track electric-guitar" "append-measures 8" "break 4 system" "break 6 page track 1"
+    "break 5 keep track 1" "remove-measures 1")
+set_tests_properties(cli.edit_breaks PROPERTIES
+  FIXTURES_SETUP cli_breaks
+  PASS_REGULAR_EXPRESSION "\"notes\":0},.*\"notes\":0,\"breaks\":\\[{\"measure\":4,\"break\":\"keep\"},{\"measure\":5,\"break\":\"page\"}\\]}\\],.*\"measures\":\\[{[^}]*},{[^}]*},{[^}]*},{[^}]*\"break\":\"system\"},.*\"undo\":{\"count\":7,\"next\":\"Remove measures\"}")
+add_test(NAME cli.dump_breaks COMMAND elara-cli --json dump "${ELARA_CLI_BREAKS}")
+set_tests_properties(cli.dump_breaks PROPERTIES
+  FIXTURES_REQUIRED cli_breaks
+  PASS_REGULAR_EXPRESSION "\"layout\":\\[{\"measure\":3,\"break\":\"system\"}\\],\"tracks\":\\[.*\"layout\":\\[{\"measure\":4,\"break\":\"keep\"},{\"measure\":5,\"break\":\"page\"}\\],\"staves\"")
+# Removing the measure that holds a break removes it; undo brings it back.
+add_test(NAME cli.edit_breaks_undo
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "break 2 page"
+    "remove-measures 2" undo)
+set_tests_properties(cli.edit_breaks_undo PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{[^}]*},{[^}]*},{[^}]*\"break\":\"page\"},{[^}]*}\\],")
+add_test(NAME cli.edit_breaks_removed
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 4" "break 2 page"
+    "remove-measures 2")
+set_tests_properties(cli.edit_breaks_removed PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"measures\":\\[{[^}]*},{[^}]*},{[^}]*}\\],"
+  FAIL_REGULAR_EXPRESSION "\"break\"")
+add_test(NAME cli.edit_rejects_break_word
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "break 1 line")
+set_tests_properties(cli.edit_rejects_break_word PROPERTIES
+  PASS_REGULAR_EXPRESSION "break: auto, system, page or keep, not line")
+add_test(NAME cli.edit_rejects_break_measure
+  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "break 2 system")
+set_tests_properties(cli.edit_rejects_break_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "break: no measure 2")

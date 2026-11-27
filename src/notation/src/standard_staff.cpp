@@ -328,6 +328,9 @@ struct Chord {
     double ghostPad = 0.0;
     double left = 0.0; // ink extents from the chord's x
     double right = 0.0;
+    // From its column's x: a lower voice's chord moved beside an upper one's
+    // that starts with it (ADR-0151).
+    double shift = 0.0;
     double x = 0.0;
     double stemX = 0.0; // centre of the stem
     double stemStart = 0.0;
@@ -453,6 +456,13 @@ struct Column {
     double x = 0.0;
     core::Strum roll = core::Strum::None; // a strum written as an arpeggio line
     double rollX = 0.0;                   // the line's centre, from the column's x
+};
+
+// An accidental of a column's chords of several voices, and the column of
+// accidentals it stands in, from the right.
+struct HeldAccidental {
+    Head* head = nullptr;
+    std::size_t column = 0;
 };
 
 class StandardWriter final : public StaffWriter {
@@ -613,7 +623,7 @@ private:
         for (Column& column : columns_) {
             column.x = columnX(positions, column.start);
             for (const std::size_t c : column.chords) {
-                chords_[c].x = column.x;
+                chords_[c].x = column.x + chords_[c].shift;
             }
         }
         for (Chord& chord : chords_) {
@@ -938,11 +948,261 @@ private:
             column.left = std::min(column.left, chords_[c].left);
             column.right = std::max(column.right, chords_[c].right);
         }
+        if (voiceCount_ > 1) {
+            for (Column& column : columns_) {
+                if (column.chords.size() > 1) {
+                    separateVoices(column);
+                }
+            }
+        }
         if (rolls_) {
             for (Column& column : columns_) {
                 rollRoom(column);
             }
         }
+    }
+
+    // ---- Two voices on one staff (ADR-0151) ----
+
+    // How far right of its column `lower`, a chord of a voice with stems down,
+    // goes so that its noteheads clear those of `upper`, a chord of a voice
+    // with stems up that starts with it. Nothing when every note of one is a
+    // third or more from every note of the other, or their unisons share one
+    // notehead (the same notehead and dots). A second apart: beside it, the
+    // two stems in one line. Otherwise (a unison of different noteheads or
+    // dots, or a unison and a second together) right of its noteheads and
+    // dots.
+    [[nodiscard]] double voiceShift(const Chord& upper, const Chord& lower) const {
+        bool second = false;
+        bool unison = false;
+        bool apart = false;
+        for (const Head& high : upper.heads) {
+            for (const Head& low : lower.heads) {
+                const int steps = low.step - high.step;
+                if (steps == 0) {
+                    unison = true;
+                    apart = apart || high.glyph != low.glyph ||
+                            upper.duration.dots() != lower.duration.dots() || high.ghost ||
+                            low.ghost || high.dx != 0.0 || low.dx != 0.0;
+                } else if (steps == 1 || steps == -1) {
+                    second = true;
+                }
+            }
+        }
+        if (!second && !apart) {
+            return 0.0;
+        }
+        const bool stems = hasStem(upper.duration.value()) && hasStem(lower.duration.value());
+        const bool flippedOut =
+            std::ranges::any_of(upper.heads, [](const Head& head) { return head.dx > 0.0; }) ||
+            std::ranges::any_of(lower.heads, [](const Head& head) { return head.dx < 0.0; });
+        if (!unison && stems && upper.duration.dots() == 0 && !flippedOut &&
+            upper.ghostPad == 0.0 && lower.ghostPad == 0.0) {
+            const double up = stemAnchor(upper.heads.back(), true).x - defaults_.stemThickness;
+            return up - stemAnchor(lower.heads.front(), false).x;
+        }
+        double right = upper.headRight + upper.ghostPad;
+        if (upper.duration.dots() > 0) {
+            right += dotsWidth(upper.duration.dots()) + kDotGap;
+        }
+        return right - (lower.headLeft - lower.ghostPad);
+    }
+
+    // Moves the chords of lower voices in `column` beside the chords of upper
+    // voices their notes would collide with, stacks the accidentals of the
+    // chords that stay as one chord's, and widens the column's ink.
+    void separateVoices(Column& column) {
+        // Each lower chord that moves, beside each upper chord it moves for.
+        std::array<std::pair<std::size_t, std::size_t>, 16> beside{};
+        std::size_t besides = 0;
+        for (const std::size_t l : column.chords) {
+            Chord& lower = chords_[l];
+            if (lower.rest || lower.stemUp || lower.heads.empty()) {
+                continue;
+            }
+            for (const std::size_t u : column.chords) {
+                const Chord& upper = chords_[u];
+                if (upper.voice == lower.voice || upper.rest || !upper.stemUp ||
+                    upper.heads.empty()) {
+                    continue;
+                }
+                const double needed = voiceShift(upper, lower);
+                if (needed > 0.0 && besides < beside.size()) {
+                    lower.shift = std::max(lower.shift, needed);
+                    beside[besides++] = {l, u};
+                }
+            }
+        }
+        const bool stacked = stackAccidentals(column);
+        // The accidentals of a chord that moved go left of the ink of the
+        // chords it moved beside, accidentals stacked above included.
+        for (std::size_t b = 0; b < besides;) {
+            const std::size_t l = beside[b].first;
+            double clear = std::numeric_limits<double>::max();
+            for (; b < besides && beside[b].first == l; ++b) {
+                clear = std::min(clear, chords_[beside[b].second].left);
+            }
+            accidentalsLeftOf(chords_[l], clear);
+        }
+        if (besides == 0 && !stacked) {
+            return;
+        }
+        column.left = std::numeric_limits<double>::max();
+        column.right = std::numeric_limits<double>::lowest();
+        for (const std::size_t c : column.chords) {
+            column.left = std::min(column.left, chords_[c].shift + chords_[c].left);
+            column.right = std::max(column.right, chords_[c].shift + chords_[c].right);
+        }
+    }
+
+    // The accidentals (and fingerings left of them) of a chord moved right of
+    // its column go back left of `clear`, where the ink it moved beside starts,
+    // from the column's x.
+    void accidentalsLeftOf(Chord& chord, double clear) {
+        double right = std::numeric_limits<double>::lowest();
+        for (const Head& head : chord.heads) {
+            if (head.accidental) {
+                right =
+                    std::max(right, head.accidentalX + metrics(*head.accidental).box.northEast.x);
+            }
+        }
+        if (right == std::numeric_limits<double>::lowest()) {
+            return;
+        }
+        const double by = clear - kAccidentalGap - chord.shift - right;
+        if (by >= 0.0) {
+            return;
+        }
+        for (Head& head : chord.heads) {
+            if (head.accidental) {
+                head.accidentalX += by;
+            }
+            if (head.fingering) {
+                head.fingeringX += by;
+            }
+        }
+        chord.left += by;
+    }
+
+    // The left of the ink of `chord`'s accidentals from its x, or of its
+    // noteheads when it has none.
+    [[nodiscard]] double accidentalsLeft(const Chord& chord) const {
+        double left = chord.headLeft - chord.ghostPad;
+        for (const Head& head : chord.heads) {
+            if (head.accidental) {
+                left = std::min(left, head.accidentalX + metrics(*head.accidental).box.southWest.x);
+            }
+        }
+        return left;
+    }
+
+    // Stacks the accidentals of the chords of `column` that stay at its x, of
+    // several voices, as placeAccidentals() stacks one chord's: in columns
+    // left of the leftmost notehead, two in one column three staff spaces
+    // apart, so that the accidentals of one voice never sit on another's. A
+    // unison's accidental, the same on both notes, is drawn once there. What
+    // was left of a chord's accidentals goes left of them all, so that the
+    // grace notes or fingerings of one voice never sit on the accidentals of
+    // another. Returns whether there were accidentals and chords of two voices.
+    bool stackAccidentals(Column& column) {
+        std::size_t stay = 0;
+        std::size_t holders = 0;
+        for (const std::size_t c : column.chords) {
+            const Chord& chord = chords_[c];
+            if (chord.shift != 0.0 || chord.rest || chord.heads.empty()) {
+                continue;
+            }
+            ++stay;
+            holders += std::ranges::any_of(
+                chord.heads, [](const Head& head) { return head.accidental.has_value(); });
+        }
+        if (stay < 2 || holders == 0) {
+            return false;
+        }
+        std::vector<HeldAccidental>& held = heldAccidentals_;
+        std::vector<double>& columns = accidentalColumns_; // widths, then right edges
+        held.clear();
+        columns.clear();
+        double edge = std::numeric_limits<double>::max();       // where the noteheads start
+        std::array<double, core::Measure::kMaxVoices> before{}; // each chord's accidentals' left
+        std::size_t staying = 0;
+        for (const std::size_t c : column.chords) {
+            Chord& chord = chords_[c];
+            if (chord.shift != 0.0 || chord.rest || chord.heads.empty()) {
+                continue;
+            }
+            edge = std::min(edge, chord.headLeft - chord.ghostPad);
+            before[std::min(staying++, before.size() - 1)] = accidentalsLeft(chord);
+            for (Head& head : chord.heads) {
+                if (head.accidental) {
+                    held.push_back(HeldAccidental{.head = &head});
+                }
+            }
+        }
+        std::ranges::stable_sort(held, {}, [](const HeldAccidental& h) { return h.head->step; });
+        for (std::size_t i = 0; i < held.size(); ++i) {
+            const Head& head = *held[i].head;
+            // Whether an accidental placed before this one in column `c` passes `test`.
+            const auto any = [&](std::size_t c, auto&& test) {
+                return std::any_of(held.begin(), held.begin() + static_cast<std::ptrdiff_t>(i),
+                                   [&](const HeldAccidental& other) {
+                                       return other.column == c && test(*other.head);
+                                   });
+            };
+            const auto shared = [&](const Head& other) {
+                return other.step == head.step && other.accidental == head.accidental;
+            };
+            const auto near = [&](const Head& other) {
+                return std::abs(other.step - head.step) < kAccidentalClearance;
+            };
+            std::size_t c = 0;
+            while (c < columns.size() && !any(c, shared) && any(c, near)) {
+                ++c;
+            }
+            if (c == columns.size()) {
+                columns.push_back(0.0);
+            }
+            columns[c] = std::max(columns[c], widthOf(*head.accidental));
+            held[i].column = c;
+        }
+        double right = edge - kAccidentalGap;
+        for (double& at : columns) {
+            const double width = at;
+            at = right;
+            right -= width + kAccidentalColumnGap;
+        }
+        for (const HeldAccidental& accidental : held) {
+            Head& head = *accidental.head;
+            head.accidentalX =
+                columns[accidental.column] - metrics(*head.accidental).box.northEast.x;
+        }
+        const double left = right + kAccidentalColumnGap; // of them all
+        // What each chord had left of its own accidentals (fingerings, room
+        // for a slide in, grace notes) goes left of them all, and its ink
+        // reaches as far.
+        staying = 0;
+        for (const std::size_t c : column.chords) {
+            Chord& chord = chords_[c];
+            if (chord.shift != 0.0 || chord.rest || chord.heads.empty()) {
+                continue;
+            }
+            const double was = before[std::min(staying++, before.size() - 1)];
+            const double by = std::min(0.0, left - was);
+            if (chord.left < was && by < 0.0) {
+                for (Head& head : chord.heads) {
+                    if (head.fingering) {
+                        head.fingeringX += by;
+                    }
+                }
+                for (Chord& grace : chord.graces) {
+                    grace.x += by;
+                }
+                chord.left += by;
+            } else {
+                chord.left = std::min(chord.left, accidentalsLeft(chord));
+            }
+        }
+        return true;
     }
 
     // A strum of a keyboard or another instrument without frets is a rolled
@@ -2753,6 +3013,8 @@ private:
     std::array<bool, core::Measure::kMaxVoices> voiceUp_{};
     std::vector<Chord> chords_;
     std::vector<Column> columns_;
+    std::vector<HeldAccidental> heldAccidentals_; // stackAccidentals()' buffers, kept
+    std::vector<double> accidentalColumns_;
     std::vector<std::vector<std::size_t>> beamGroups_;
     std::vector<BeamLine> beamLines_; // of the beam groups, as drawn
     std::vector<TupletSpan> tuplets_;

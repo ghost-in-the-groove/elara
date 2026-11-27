@@ -5,6 +5,7 @@
 #include <elara/core/song.hpp>
 
 #include <cstddef>
+#include <vector>
 
 namespace elara::bench {
 
@@ -29,6 +30,21 @@ inline elara::core::Song largeSong() {
                          .notes = {staff.frettedNote(6, b % 5), staff.frettedNote(5, b % 5)}});
             }
         }
+    }
+    return song;
+}
+
+// `song` with a system break before every measure, in the song's measure
+// layouts and in each track's (ADR-0152): the most layout adjustments hold.
+inline elara::core::Song withBreaksEverywhere(elara::core::Song song) {
+    using namespace elara::core;
+    const auto everywhere = [&] {
+        return MeasureLayouts(std::vector<MeasureLayout>(
+            song.measureCount(), MeasureLayout{.breakBefore = Break::System}));
+    };
+    song.setMeasureLayouts(LayoutScope::song(), everywhere());
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        song.setMeasureLayouts(LayoutScope::ofTrack(t), everywhere());
     }
     return song;
 }

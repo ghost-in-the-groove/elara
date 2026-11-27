@@ -144,6 +144,14 @@ int main(int argc, char* argv[]) {
         QStringLiteral("seek"),
         QCoreApplication::translate("main", "Move the playback cursor to this many seconds."),
         QStringLiteral("seconds"));
+    const QCommandLineOption playOption(
+        QStringLiteral("play"),
+        QCoreApplication::translate("main", "Start playback once the song is shown."));
+    const QCommandLineOption holdOption(
+        QStringLiteral("hold"),
+        QCoreApplication::translate("main", "Once the window is ready, stay open this many "
+                                            "seconds, then quit (for measuring)."),
+        QStringLiteral("seconds"));
     const QCommandLineOption tunerOption(
         QStringLiteral("tuner"), QCoreApplication::translate("main", "Open the tuner at start."));
     const QCommandLineOption songPaneOption(
@@ -159,9 +167,17 @@ int main(int argc, char* argv[]) {
         QStringLiteral("tuning"),
         QCoreApplication::translate("main",
                                     "Open the first track's tuning in the song panel at start."));
+    const QCommandLineOption holdStillOption(
+        QStringLiteral("hold-still"),
+        QCoreApplication::translate("main",
+                                    "With --smoke-test, edit a new song above the caret and check "
+                                    "that the caret holds still on screen."));
     const QCommandLineOption effectsOption(
         QStringLiteral("effects"),
         QCoreApplication::translate("main", "Open the note effects panel at the caret at start."));
+    const QCommandLineOption commandsOption(
+        QStringLiteral("commands"),
+        QCoreApplication::translate("main", "Open the command palette at start."));
     const QCommandLineOption continuousOption(
         QStringLiteral("continuous"),
         QCoreApplication::translate("main", "Show the score as one continuous scroll."));
@@ -215,29 +231,20 @@ int main(int argc, char* argv[]) {
                                     "in this file instead of the settings, also with "
                                     "--smoke-test."),
         QStringLiteral("file"));
-    parser.addOptions({trackOption,
-                       viewOption,
-                       seekOption,
-                       smokeTest,
-                       screenshot,
-                       tunerOption,
-                       songPaneOption,
-                       measureOption,
-                       lyricsOption,
-                       effectsOption,
-                       tuningOption,
-                       continuousOption,
-                       menuOption,
-                       sizeOption,
-                       languageOption,
-                       soundFontOption,
-                       includedSoundFontOption,
-                       guitarSfzOption,
-                       includedGuitarSfzOption,
-                       bassSfzOption,
-                       recoveryFolderOption,
-                       crashOption,
-                       windowStateOption});
+    parser.addOptions({trackOption,      viewOption,
+                       seekOption,       playOption,
+                       holdOption,       smokeTest,
+                       screenshot,       tunerOption,
+                       songPaneOption,   measureOption,
+                       lyricsOption,     effectsOption,
+                       commandsOption,   tuningOption,
+                       continuousOption, menuOption,
+                       sizeOption,       languageOption,
+                       soundFontOption,  includedSoundFontOption,
+                       guitarSfzOption,  includedGuitarSfzOption,
+                       bassSfzOption,    recoveryFolderOption,
+                       crashOption,      windowStateOption});
+    parser.addOption(holdStillOption);
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -280,6 +287,16 @@ int main(int argc, char* argv[]) {
         }
         options.seek = seconds;
     }
+    if (parser.isSet(holdOption)) {
+        bool number = false;
+        const double seconds = parser.value(holdOption).toDouble(&number);
+        if (!number || seconds <= 0.0 || seconds > 3600.0) {
+            std::fprintf(stderr, "elara: --hold takes a number of seconds, up to 3600\n");
+            return EXIT_FAILURE;
+        }
+        options.hold = seconds;
+    }
+    options.play = parser.isSet(playOption);
     if (parser.isSet(soundFontOption)) {
         options.soundFont = QDir::current().absoluteFilePath(parser.value(soundFontOption));
     }
@@ -329,6 +346,8 @@ int main(int argc, char* argv[]) {
     options.continuous = parser.isSet(continuousOption);
     options.smokeTest = parser.isSet(smokeTest);
     options.effects = parser.isSet(effectsOption);
+    options.commands = parser.isSet(commandsOption);
+    options.holdStill = parser.isSet(holdStillOption);
     options.menu = parser.value(menuOption);
     if (!options.menu.isEmpty() &&
         !QStringList{QStringLiteral("file"), QStringLiteral("edit"), QStringLiteral("view"),
@@ -339,7 +358,8 @@ int main(int argc, char* argv[]) {
     }
     options.tuner = parser.isSet(tunerOption);
     options.screenshot = parser.value(screenshot);
-    const bool checking = options.smokeTest || !options.screenshot.isEmpty();
+    const bool checking =
+        options.smokeTest || !options.screenshot.isEmpty() || options.hold.has_value();
     if (checking) {
         // The catalog the UI is shown with, which app.smoke_spanish checks.
         std::printf("ui language: %s\n", qPrintable(elaraTranslator.language()));
@@ -382,6 +402,7 @@ int main(int argc, char* argv[]) {
                                  {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
                                  {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
                                  {QStringLiteral("showEffects"), options.effects},
+                                 {QStringLiteral("showCommands"), options.commands},
                                  {QStringLiteral("showMenu"), options.menu},
                                  {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
                                  {QStringLiteral("initialSoundFont"), options.soundFont},
@@ -404,7 +425,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (checking || options.track || options.view || options.seek || options.continuous ||
-        options.size) {
+        options.size || options.play) {
         auto* startup = new elara::app::Startup(window, options, qmlWarnings);
         startup->start();
     }
