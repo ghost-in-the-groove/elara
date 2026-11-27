@@ -638,7 +638,7 @@ int runRender(bool json, const RenderOptions& options) {
             out.key("symbolAt").raw(symbolReport(pages, *font, options.symbolAt).json);
         }
         if (options.issues) {
-            body += std::format(R"("issues":{},)", issuesReport(pages, *font, laidOut).json);
+            out.key("issues").raw(issuesReport(pages, *font, laidOut).json);
         }
         if (paged) {
             out.key("pages").beginArray();
