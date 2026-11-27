@@ -37,7 +37,9 @@ continuous view. The view stacks the strips on one sheet with one shadow and no
 gap between them, and hides the page number. `ScoreDocument` reports where
 each page or strip starts (`pageTops`), and the view places every page from it
 instead of assuming pages of one height. Only pages near the view are loaded,
-so only those hold a texture, as with pages.
+so only those hold a texture, as with pages: those within a page's height of
+the view, and never further than the view's own height, so that a high zoom
+does not keep three or four whole pages' textures alive to show one.
 
 ## Consequences
 
