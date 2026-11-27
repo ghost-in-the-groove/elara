@@ -314,7 +314,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [ ] Clear the layout adjustments of a range
   - [ ] A Layout menu: the commands at the caret, and marks on the score
   - [ ] Layout issues found on the worker and shown in the status bar
-  - [ ] The caret's system keeps its place on screen after an edit
+  - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
 
 ## The interface

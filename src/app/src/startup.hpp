@@ -52,6 +52,9 @@ struct StartupOptions {
     /// Where the window keeps its state (`--window-state`); the smoke test
     /// then changes it, or finds it as the run before left it (ADR-0137).
     QString windowState;
+    /// The smoke test edits a new song a page long above the caret and checks
+    /// that the caret holds still on screen (`--hold-still`).
+    bool holdStill = false;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -96,6 +99,7 @@ private:
     void clickCursor();
     [[nodiscard]] bool uncoverScore();
     void queueKeepPosition();
+    void queueHoldStill();
     void queuePdf();
     void queueExport();
     void queuePractice();
@@ -145,6 +149,10 @@ private:
     QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()
     QVariantMap tempoBefore_;              ///< the second measure's tempo before it changed
     QString sectionBefore_;                ///< the first measure's section before it changed
+    double heldY_ = 0.0;                   ///< the caret's height on screen before an edit
+    double heldTop_ = 0.0;                 ///< its staff's, in staff spaces down the pages
+    int heldMeasure_ = 0;                  ///< the caret's measure before an edit
+    int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
     bool entering_ = false;                ///< whether the shown track takes frets
