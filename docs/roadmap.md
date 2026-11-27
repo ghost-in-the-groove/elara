@@ -304,7 +304,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Two voices on one staff a second apart or in unison do not collide
         (ADR-0151)
   - [x] No layout issue over the corpus and songs made at random (ADR-0150)
-  - [ ] System and page breaks stored per measure, in files and the CLI
+  - [x] System and page breaks stored per measure, in files and the CLI (ADR-0152)
   - [ ] The line breaker keeps the stored breaks; the cache follows them
   - [ ] Lock the breaks of a range, and unlock them
   - [ ] Layout settings of a song: staff size, margins, spacing, in the CLI

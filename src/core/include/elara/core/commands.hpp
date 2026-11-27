@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -45,6 +46,8 @@ private:
     std::vector<MeasureHeader> headers_;
     // Track by track, staff by staff, shared as the song held them (ADR-0051).
     std::vector<SharedValue<Measure>> measures_;
+    // The song's measure layouts, then each track's, as they were (ADR-0152).
+    std::vector<MeasureLayouts> layouts_;
 };
 
 /// Inserts a track before track `at` (see Song::insertTrack).
@@ -211,6 +214,29 @@ private:
     int capo_;
 };
 
+/// Replaces the measure layouts of one scope as a whole (ADR-0152). Changes
+/// what is drawn, never what sounds.
+class SetMeasureLayouts final : public Command {
+public:
+    SetMeasureLayouts(LayoutScope scope, MeasureLayouts layouts,
+                      std::string_view name = "Change breaks")
+        : scope_(scope), layouts_(std::move(layouts)), name_(name) {}
+    void apply(Song& song) override { swapWith(song); }
+    void revert(Song& song) override { swapWith(song); }
+    [[nodiscard]] std::string_view name() const noexcept override { return name_; }
+    [[nodiscard]] std::size_t heldBytes() const noexcept override;
+    [[nodiscard]] Changes changes() const noexcept override {
+        return {.notation = true, .sound = false};
+    }
+
+private:
+    void swapWith(Song& song);
+
+    LayoutScope scope_;
+    MeasureLayouts layouts_; // the new ones before apply(), the old ones after
+    std::string_view name_;
+};
+
 /// Several commands as one undo step, applied in order and reverted in reverse.
 /// If one fails, the ones already applied are reverted and the error propagates.
 class CommandGroup final : public Command {
@@ -298,5 +324,14 @@ private:
 /// "Change barline"; it does not change the sound.
 [[nodiscard]] std::unique_ptr<Command> changeBarline(const Song& song, std::size_t measure,
                                                      bool doubleBar);
+
+/// Sets the break before each measure of `breaks`, {measure, break}, in the
+/// measure layouts of `scope` (ADR-0152), as one undo step, "Change breaks";
+/// a later entry for the same measure wins. Null when every measure has its
+/// break already. Throws std::out_of_range for a missing track or measure and
+/// std::invalid_argument for a break that is no enumerator.
+[[nodiscard]] std::unique_ptr<Command>
+changeBreaks(const Song& song, LayoutScope scope,
+             std::span<const std::pair<std::size_t, Break>> breaks);
 
 } // namespace elara::core

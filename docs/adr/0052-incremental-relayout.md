@@ -65,3 +65,6 @@ workers; calls run one at a time.
 - A new dependency of a system's layout on something outside its measures and
   their neighbours must be added to the reuse conditions; the property test is
   the guard.
+- The breaks a writer stores (ADR-0152) are part of what the pages depend on:
+  the commands that change them are notation changes, and once the line
+  breaker reads them the reuse conditions must too.

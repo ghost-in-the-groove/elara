@@ -141,6 +141,7 @@ one that replaces them.
 | [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
+| [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
 
 ## Template
 

@@ -106,6 +106,23 @@ TEST_CASE("song benchmarks", "[benchmark][core][song]") {
         });
     };
 
+    // Layout adjustments (ADR-0152): the song's and every track's.
+    const elara::core::Song broken = elara::bench::withBreaksEverywhere(song);
+
+    BENCHMARK("copy the large song, a break before every measure of every scope") {
+        elara::core::Song copy = broken;
+        return copy.trackCount();
+    };
+
+    BENCHMARK_ADVANCED("insert a measure at the start of the same")
+    (Catch::Benchmark::Chronometer meter) {
+        std::vector<elara::core::Song> songs(static_cast<std::size_t>(meter.runs()), broken);
+        meter.measure([&](int i) {
+            songs[static_cast<std::size_t>(i)].insertMeasures(0);
+            return songs[static_cast<std::size_t>(i)].measureCount();
+        });
+    };
+
     BENCHMARK("seconds at the end of the large song (tempo map walk)") {
         return song.durationSeconds();
     };
