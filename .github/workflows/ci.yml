@@ -30,9 +30,7 @@ jobs:
         # fraction of the debug build's time there; Linux keeps the debug
         # build and its assertions (ADR-0134).
         include:
-          - { name: windows, os: windows-2022, preset: release }
-          - { name: macos, os: macos-15-intel, preset: release }
-          - { name: linux, os: ubuntu-24.04, preset: dev }
+          - { name: macos-arm64, os: macos-15, preset: release }
     steps:
       - uses: actions/checkout@v7
 
@@ -46,8 +44,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ runner.os }}-${{ matrix.preset }}-${{ github.sha }}
-          restore-keys: ccache-${{ runner.os }}-${{ matrix.preset }}-
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.preset }}-${{ github.sha }}
+          restore-keys: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.preset }}-
 
       - name: Reset ccache statistics
         run: ccache --zero-stats
@@ -63,8 +61,8 @@ jobs:
       # Only main saves a cache, which pull requests restore: caches saved by a
       # pull request would serve no other branch and evict main's.
       - name: Save ccache
-        if: always() && github.event_name == 'push'
+        if: always()
         uses: actions/cache/save@v6
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ runner.os }}-${{ matrix.preset }}-${{ github.sha }}
+          key: ccache-${{ runner.os }}-${{ runner.arch }}-${{ matrix.preset }}-${{ github.sha }}

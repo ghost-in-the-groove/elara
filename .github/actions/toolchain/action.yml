@@ -90,7 +90,7 @@ runs:
         if [ "$RUNNER_OS" = "Windows" ]; then "$root/bootstrap-vcpkg.bat" -disableMetrics; else "$root/bootstrap-vcpkg.sh" -disableMetrics; fi
         case "$RUNNER_OS" in
           Windows) triplet=x64-windows ;;
-          macOS)   triplet=x64-osx ;;
+          macOS)   [ "$(uname -m)" = arm64 ] && triplet=arm64-osx || triplet=x64-osx ;;
           Linux)   triplet=x64-linux ;;
         esac
         # x64-osx is one of vcpkg's community triplets.
