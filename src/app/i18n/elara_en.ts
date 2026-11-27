@@ -12,6 +12,16 @@
     </message>
 </context>
 <context>
+    <name>CommandPalette</name>
+    <message numerus="yes">
+        <source>The song has %n measure(s).</source>
+        <translation>
+            <numerusform>The song has %n measure.</numerusform>
+            <numerusform>The song has %n measures.</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>SongPane</name>
     <message numerus="yes">
         <source>%n measure(s)</source>
