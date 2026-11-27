@@ -47,6 +47,13 @@
             <numerusform>%n changes on import</numerusform>
         </translation>
     </message>
+    <message numerus="yes">
+        <source>%n layout issue(s)</source>
+        <translation>
+            <numerusform>%n layout issue</numerusform>
+            <numerusform>%n layout issues</numerusform>
+        </translation>
+    </message>
 </context>
 <context>
     <name>elara::app::ScoreDocument</name>

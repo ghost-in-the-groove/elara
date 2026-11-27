@@ -48,7 +48,7 @@ a long stretch. So:
 | Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the popups the caret opens. |
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
 | Tuner | `TunerPane.qml` | The note heard, how far it is from in tune and the strings of the shown track (Ctrl+Shift+T). It docks where the song panel does, one of the two at a time, and listens only while it shows. |
-| Status bar | `StatusBar.qml` | Where the caret is, the page and the measures; the layout and the zoom. |
+| Status bar | `StatusBar.qml` | Where the caret is, the page and the measures, what an import changed and what the layout could not keep (each a count to click, shown only when there is one); the layout and the zoom. |
 | Command palette | `CommandPalette.qml` | Every command by name, with its keys (Ctrl+E, ADR-0135): the menus' items, the entry tools, the note effects, the places to go and the tracks. It floats at the top of the window only while asked for, like a popup of the caret. |
 
 Narrow windows drop what is offered elsewhere, never overlap: the command bar
@@ -67,7 +67,9 @@ continuous view. The tuner always starts closed.
 Nothing floats over the music but what the caret opened, and the command
 palette while it is asked for. A panel docks and the score makes room; an
 error slides up over the foot of the score and goes; what an import changed
-stays in the status bar for as long as the song is open.
+stays in the status bar for as long as the song is open, and what the layout
+could not keep (ADR-0150) for as long as the pages have it: a click lists
+it, and choosing a line takes the caret there.
 
 ## Colours
 

@@ -47,6 +47,10 @@ checked a whole page of any song for the faults a reader notices first:
   holds its top. Without bands every staff of a system is open at once, and a
   box of a 20-staff system meets some forty others. O(n log n) per page; its
   buffers are reused from page to page.
+- The app finds them on its layout worker for the pages a layout changed,
+  a page laid out the same keeping the list found before; the status bar
+  counts them, a click lists them, and choosing one takes the caret to its
+  measure, on the staff nearest the ink.
 - `elara-cli render ... --issues` reports them, as `"issues":[...]` in JSON
   (`kind`, `page`, `measure`, `roles`, `box`) and one line each in text. With
   the one-line layout there is no page, so only overlaps are reported.

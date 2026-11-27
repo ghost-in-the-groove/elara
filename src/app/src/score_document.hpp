@@ -12,6 +12,7 @@
 #include <elara/core/song.hpp>
 #include <elara/io/result.hpp>
 #include <elara/notation/display_list.hpp>
+#include <elara/notation/layout_issues.hpp>
 #include <elara/notation/page_layout.hpp>
 
 #include "job_lane.hpp"
@@ -42,7 +43,12 @@
 namespace elara::app {
 
 struct ScoreLayout;
+struct LayoutMemory;
 struct SequenceResult;
+
+/// The layout issues of one page (ADR-0150): a layout that leaves the page as
+/// it was keeps the same list.
+using PageIssues = std::shared_ptr<const std::vector<notation::LayoutIssue>>;
 
 /// A song opened from a file, or new, and laid out on A4 pages. Opening and
 /// laying out run on worker threads; the window keeps showing the previous
@@ -90,6 +96,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(QList<qreal> pageTops READ pageTops NOTIFY layoutChanged)
     Q_PROPERTY(double staffSpace READ staffSpace CONSTANT)
     Q_PROPERTY(int layoutMilliseconds READ layoutMilliseconds NOTIFY layoutChanged)
+    Q_PROPERTY(int layoutIssueCount READ layoutIssueCount NOTIFY layoutIssuesChanged)
     Q_PROPERTY(QStringList nameFilters READ nameFilters CONSTANT)
     // Editing.
     Q_PROPERTY(QString songTitle READ songTitle NOTIFY songChanged)
@@ -224,6 +231,18 @@ public:
     /// Millimetres per staff space on paper.
     [[nodiscard]] static double staffSpace();
     [[nodiscard]] int layoutMilliseconds() const { return layoutMilliseconds_; }
+    /// How many layout issues the pages shown have (ADR-0150): what the
+    /// layout could not keep from overlapping or within the margins.
+    [[nodiscard]] int layoutIssueCount() const { return layoutIssueCount_; }
+    /// The layout issues of each page shown, found on the layout worker for
+    /// the pages a layout changed; a page left as it was keeps its list.
+    [[nodiscard]] const std::vector<PageIssues>& pageIssues() const { return pageIssues_; }
+    /// The layout issues, one line each, page by page ("Measure 12 is wider
+    /// than the page").
+    Q_INVOKABLE QStringList layoutIssueList() const;
+    /// Puts the caret on the measure of issue `index` of layoutIssueList(),
+    /// on the staff whose ink it is.
+    Q_INVOKABLE void showLayoutIssue(int index);
     /// File dialog filters for the files open() reads.
     [[nodiscard]] static QStringList nameFilters();
 
@@ -614,6 +633,9 @@ signals:
     void viewChanged();
     void continuousChanged();
     void layoutChanged();
+    /// The layout issues changed: a layout changed a page that had some, or
+    /// found some on a page it changed.
+    void layoutIssuesChanged();
     void historyChanged();
     void caretChanged();
     void inputChanged();
@@ -695,10 +717,12 @@ private:
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
-    /// What the last layout laid out, so an edit lays out only what it changed
-    /// (ADR-0052); shared with the layouts running on workers.
-    std::shared_ptr<notation::PageLayoutCache> layoutCache_ =
-        std::make_shared<notation::PageLayoutCache>();
+    /// What the last layout laid out and found, so an edit lays out and checks
+    /// only what it changed (ADR-0052, ADR-0150); shared with the layouts
+    /// running on workers.
+    std::shared_ptr<LayoutMemory> layoutMemory_;
+    std::vector<PageIssues> pageIssues_; ///< of each of pages_
+    int layoutIssueCount_ = 0;
     /// The caret, the input duration, the digit waiting for a second one, the
     /// selection and the measures copied (ADR-0127).
     core::EditSession session_;

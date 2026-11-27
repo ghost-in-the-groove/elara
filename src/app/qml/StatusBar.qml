@@ -17,6 +17,8 @@ Rectangle {
 
     /// A click on the changes made on import asks to read them.
     signal importWarningsRequested
+    /// A click on the count of layout issues asks to list them (ADR-0150).
+    signal layoutIssuesRequested
 
     component Dot: Rectangle {
         implicitWidth: 3
@@ -119,6 +121,39 @@ Rectangle {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: root.importWarningsRequested()
+            }
+        }
+        // What the layout could not keep (ADR-0150): made only while there is
+        // something to tell.
+        Loader {
+            active: root.document.layoutIssueCount > 0
+            visible: active
+
+            sourceComponent: Row {
+                spacing: 9
+
+                Dot {
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Label {
+                    objectName: "layoutIssuesLabel"
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("%n layout issue(s)", "", root.document.layoutIssueCount)
+                    font.pixelSize: Theme.fontSmall
+                    font.underline: layoutIssuesArea.containsMouse
+                    color: Theme.warning
+                    Accessible.role: Accessible.Button
+                    Accessible.name: text
+
+                    MouseArea {
+                        id: layoutIssuesArea
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.layoutIssuesRequested()
+                    }
+                }
             }
         }
         Item {
