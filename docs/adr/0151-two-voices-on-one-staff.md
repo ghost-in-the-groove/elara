@@ -49,6 +49,11 @@ resolution"):
 - The column's ink is the union of its chords' ink as they stand, so spacing
   makes room for the chord that moved. The column's x, where its caret, lyrics
   and dynamics are, does not change.
+- Chords of several voices that stay at their column's x (a third or more
+  apart) and carry accidentals have them stacked together, as one chord's
+  are: in columns left of the leftmost notehead, two in one column three staff
+  spaces apart, the same accidental of a unison once. What stood left of each
+  chord's accidentals (its fingerings, its grace notes) goes left of them all.
 - Tablature is not affected: frets of different voices are on their own
   strings.
 - Only columns with chords of several voices are looked at, in one pass over

@@ -30,8 +30,9 @@ checked a whole page of any song for the faults a reader notices first:
   dynamic. Lines, beams and curves are left out: their boxes are too coarse
   to judge by.
 - **Ink.** Glyphs are where the font's bounding boxes put them; texts where
-  layout assumes they are (`textWidth()`, its ascent and descent), digits from
-  their baseline up to their cap height. Items are compared only within the
+  layout assumes they are (`textWidth()`, its ascent and descent); digits, the
+  X of a dead note and the angle brackets of a natural harmonic from their
+  baseline up to their cap height. Items are compared only within the
   system whose ink holds them; ink outside every system (credits) is not
   looked at.
 - **Overlap** means going into each other by more than 0.15 staff space in both
@@ -60,7 +61,15 @@ checked a whole page of any song for the faults a reader notices first:
 - Every later layout change has an oracle: a property test can lay out the
   corpus, or songs made at random, and require no issue. The corpus, laid out
   on A4 as notation, tablature and both, has none today, and a test keeps it
-  so.
+  so; another lays each file out again after each of 50 random edits (the
+  incremental layout test's, with lyrics, chord symbols and a second voice
+  added) and checks the pages each edit changed. What it found the engine now
+  does by itself: the accidentals of two voices' chords stand together
+  (ADR-0151); a fret number in parentheses (a ghost or tied note) is written
+  at 0.8 of the size of the others, so that its parentheses, which reach
+  below the line, clear the numbers on the strings beside it; a note read
+  without a fret position takes the lowest fret on a string no other note of
+  its column is on, in any voice.
 - Two voices of one staff a second apart, or in unison with different
   noteheads, do collide (ADR-0012 lists it as not covered): the oracle finds
   it on a song written for it. No corpus file has the case.
