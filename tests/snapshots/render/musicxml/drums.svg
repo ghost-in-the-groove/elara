@@ -2,27 +2,27 @@
 <style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
 <rect x="0" y="0" width="120" height="169.714" fill="white"/>
 <g fill="black" stroke="black">
-<line class="staffLine" x1="8.571" y1="20.444" x2="28.139" y2="20.444" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="21.444" x2="28.139" y2="21.444" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="22.444" x2="28.139" y2="22.444" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="23.444" x2="28.139" y2="23.444" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="24.444" x2="28.139" y2="24.444" stroke-width="0.13"/>
-<line class="stem" x1="16.199" y1="23.776" x2="16.199" y2="20.444" stroke-width="0.12"/>
-<line class="stem" x1="19.199" y1="21.776" x2="19.199" y2="18.444" stroke-width="0.12"/>
-<line class="stem" x1="22.199" y1="23.776" x2="22.199" y2="18.444" stroke-width="0.12"/>
-<line class="stem" x1="25.199" y1="21.776" x2="25.199" y2="18.444" stroke-width="0.12"/>
-<line class="barline" x1="27.159" y1="20.444" x2="27.159" y2="24.444" stroke-width="0.16"/>
-<line class="barline" x1="27.889" y1="20.444" x2="27.889" y2="24.444" stroke-width="0.5"/>
-<text class="clef" x="9.171" y="22.444" stroke="none">&#xE069;</text>
-<text class="timeSignature" x="11.599" y="21.444" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="11.599" y="23.444" stroke="none">&#xE084;</text>
-<text class="notehead" x="15.079" y="23.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="18.079" y="21.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="21.079" y="21.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="21.079" y="23.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="24.079" y="21.944" stroke="none">&#xE0A4;</text>
-<text class="tempo" x="15.079" y="17.2" style="font-size:2.6px" stroke="none">&#xECA5;</text>
-<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Drums</text>
-<text class="t tempo" x="16.243" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 120</text>
+<line class="staffLine" x1="8.571" y1="21.792" x2="28.139" y2="21.792" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="22.792" x2="28.139" y2="22.792" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="23.792" x2="28.139" y2="23.792" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="24.792" x2="28.139" y2="24.792" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="25.792" x2="28.139" y2="25.792" stroke-width="0.13"/>
+<line class="stem" x1="16.199" y1="25.124" x2="16.199" y2="21.792" stroke-width="0.12"/>
+<line class="stem" x1="19.199" y1="23.124" x2="19.199" y2="19.792" stroke-width="0.12"/>
+<line class="stem" x1="22.199" y1="25.124" x2="22.199" y2="19.792" stroke-width="0.12"/>
+<line class="stem" x1="25.199" y1="23.124" x2="25.199" y2="19.792" stroke-width="0.12"/>
+<line class="barline" x1="27.159" y1="21.792" x2="27.159" y2="25.792" stroke-width="0.16"/>
+<line class="barline" x1="27.889" y1="21.792" x2="27.889" y2="25.792" stroke-width="0.5"/>
+<text class="clef" x="9.171" y="23.792" stroke="none">&#xE069;</text>
+<text class="timeSignature" x="11.599" y="22.792" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="11.599" y="24.792" stroke="none">&#xE084;</text>
+<text class="notehead" x="15.079" y="25.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="18.079" y="23.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="21.079" y="23.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="21.079" y="25.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="24.079" y="23.292" stroke="none">&#xE0A4;</text>
+<text class="tempo" x="15.079" y="18.272" style="font-size:3.6px" stroke="none">&#xECA5;</text>
+<text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Drums</text>
+<text class="t tempo" x="16.675" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
 </g>
 </svg>

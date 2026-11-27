@@ -2,54 +2,54 @@
 <style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
 <rect x="0" y="0" width="120" height="169.714" fill="white"/>
 <g fill="black" stroke="black">
-<line class="staffLine" x1="8.571" y1="21.884" x2="65.578" y2="21.884" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="22.884" x2="65.578" y2="22.884" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="23.884" x2="65.578" y2="23.884" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="24.884" x2="65.578" y2="24.884" stroke-width="0.13"/>
-<line class="staffLine" x1="8.571" y1="25.884" x2="65.578" y2="25.884" stroke-width="0.13"/>
-<line class="ledgerLine" x1="15.835" y1="26.884" x2="17.815" y2="26.884" stroke-width="0.16"/>
-<line class="stem" x1="17.355" y1="26.716" x2="17.355" y2="23.384" stroke-width="0.12"/>
-<line class="stem" x1="20.355" y1="26.216" x2="20.355" y2="22.884" stroke-width="0.12"/>
-<line class="stem" x1="28.253" y1="24.716" x2="28.253" y2="21.384" stroke-width="0.12"/>
-<line class="stem" x1="23.355" y1="25.716" x2="23.355" y2="22.134" stroke-width="0.12"/>
-<line class="stem" x1="26.131" y1="25.216" x2="26.131" y2="21.884" stroke-width="0.12"/>
-<line class="barline" x1="30.213" y1="21.884" x2="30.213" y2="25.884" stroke-width="0.16"/>
-<line class="stem" x1="32.613" y1="24.216" x2="32.613" y2="20.884" stroke-width="0.12"/>
-<line class="stem" x1="38.795" y1="24.052" x2="38.795" y2="27.384" stroke-width="0.12"/>
-<line class="barline" x1="41.815" y1="21.884" x2="41.815" y2="25.884" stroke-width="0.16"/>
-<line class="stem" x1="47.831" y1="24.052" x2="47.831" y2="27.384" stroke-width="0.12"/>
-<line class="stem" x1="52.566" y1="24.216" x2="52.566" y2="20.884" stroke-width="0.12"/>
-<line class="stem" x1="55.082" y1="24.716" x2="55.082" y2="21.384" stroke-width="0.12"/>
-<line class="barline" x1="57.042" y1="21.884" x2="57.042" y2="25.884" stroke-width="0.16"/>
-<line class="barline" x1="64.598" y1="21.884" x2="64.598" y2="25.884" stroke-width="0.16"/>
-<line class="barline" x1="65.328" y1="21.884" x2="65.328" y2="25.884" stroke-width="0.5"/>
-<polygon class="beam" stroke="none" points="23.295,22.14 26.191,21.879 26.191,22.379 23.295,22.64"/>
-<text class="clef" x="9.171" y="24.884" stroke="none">&#xE050;</text>
-<text class="timeSignature" x="12.755" y="22.884" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="12.755" y="24.884" stroke="none">&#xE084;</text>
-<text class="notehead" x="16.235" y="26.884" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="19.235" y="26.384" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="22.235" y="25.884" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="25.011" y="25.384" stroke="none">&#xE0A4;</text>
-<text class="accidental" x="23.815" y="25.384" stroke="none">&#xE262;</text>
-<text class="notehead" x="27.133" y="24.884" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="31.493" y="24.384" stroke="none">&#xE0A3;</text>
-<text class="rest" x="35.731" y="23.884" stroke="none">&#xE4E5;</text>
-<text class="notehead" x="38.735" y="23.884" stroke="none">&#xE0A4;</text>
-<text class="accidental" x="37.631" y="23.884" stroke="none">&#xE260;</text>
-<text class="keySignature" x="42.795" y="21.884" stroke="none">&#xE262;</text>
-<text class="timeSignature" x="44.789" y="22.884" stroke="none">&#xE083;</text>
-<text class="timeSignature" x="44.691" y="24.884" stroke="none">&#xE084;</text>
-<text class="notehead" x="47.771" y="23.884" stroke="none">&#xE0A4;</text>
-<text class="dot" x="49.251" y="23.384" stroke="none">&#xE1E7;</text>
-<text class="notehead" x="51.446" y="24.384" stroke="none">&#xE0A4;</text>
-<text class="flag" x="52.506" y="20.844" stroke="none">&#xE240;</text>
-<text class="notehead" x="53.962" y="24.884" stroke="none">&#xE0A4;</text>
-<text class="rest" x="60.256" y="22.884" stroke="none">&#xE4E3;</text>
-<text class="tempo" x="16.235" y="19.24" style="font-size:2.6px" stroke="none">&#xECA5;</text>
-<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Melody</text>
-<text class="t credit" x="111.429" y="14.136" style="font-size:1.5px" text-anchor="end" stroke="none">Music by Ghost in the Groove</text>
-<text class="t tempo" x="17.399" y="19.59" style="font-size:1.4px" text-anchor="start" stroke="none">= 100</text>
-<text class="t credit" x="60" y="165.429" style="font-size:1.5px" text-anchor="middle" stroke="none">CC0 1.0</text>
+<line class="staffLine" x1="8.571" y1="23.62" x2="65.578" y2="23.62" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="24.62" x2="65.578" y2="24.62" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="25.62" x2="65.578" y2="25.62" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="26.62" x2="65.578" y2="26.62" stroke-width="0.13"/>
+<line class="staffLine" x1="8.571" y1="27.62" x2="65.578" y2="27.62" stroke-width="0.13"/>
+<line class="ledgerLine" x1="15.835" y1="28.62" x2="17.815" y2="28.62" stroke-width="0.16"/>
+<line class="stem" x1="17.355" y1="28.452" x2="17.355" y2="25.12" stroke-width="0.12"/>
+<line class="stem" x1="20.355" y1="27.952" x2="20.355" y2="24.62" stroke-width="0.12"/>
+<line class="stem" x1="28.253" y1="26.452" x2="28.253" y2="23.12" stroke-width="0.12"/>
+<line class="stem" x1="23.355" y1="27.452" x2="23.355" y2="23.87" stroke-width="0.12"/>
+<line class="stem" x1="26.131" y1="26.952" x2="26.131" y2="23.62" stroke-width="0.12"/>
+<line class="barline" x1="30.213" y1="23.62" x2="30.213" y2="27.62" stroke-width="0.16"/>
+<line class="stem" x1="32.613" y1="25.952" x2="32.613" y2="22.62" stroke-width="0.12"/>
+<line class="stem" x1="38.795" y1="25.788" x2="38.795" y2="29.12" stroke-width="0.12"/>
+<line class="barline" x1="41.815" y1="23.62" x2="41.815" y2="27.62" stroke-width="0.16"/>
+<line class="stem" x1="47.831" y1="25.788" x2="47.831" y2="29.12" stroke-width="0.12"/>
+<line class="stem" x1="52.566" y1="25.952" x2="52.566" y2="22.62" stroke-width="0.12"/>
+<line class="stem" x1="55.082" y1="26.452" x2="55.082" y2="23.12" stroke-width="0.12"/>
+<line class="barline" x1="57.042" y1="23.62" x2="57.042" y2="27.62" stroke-width="0.16"/>
+<line class="barline" x1="64.598" y1="23.62" x2="64.598" y2="27.62" stroke-width="0.16"/>
+<line class="barline" x1="65.328" y1="23.62" x2="65.328" y2="27.62" stroke-width="0.5"/>
+<polygon class="beam" stroke="none" points="23.295,23.876 26.191,23.615 26.191,24.115 23.295,24.376"/>
+<text class="clef" x="9.171" y="26.62" stroke="none">&#xE050;</text>
+<text class="timeSignature" x="12.755" y="24.62" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="12.755" y="26.62" stroke="none">&#xE084;</text>
+<text class="notehead" x="16.235" y="28.62" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="19.235" y="28.12" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="22.235" y="27.62" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="25.011" y="27.12" stroke="none">&#xE0A4;</text>
+<text class="accidental" x="23.815" y="27.12" stroke="none">&#xE262;</text>
+<text class="notehead" x="27.133" y="26.62" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="31.493" y="26.12" stroke="none">&#xE0A3;</text>
+<text class="rest" x="35.731" y="25.62" stroke="none">&#xE4E5;</text>
+<text class="notehead" x="38.735" y="25.62" stroke="none">&#xE0A4;</text>
+<text class="accidental" x="37.631" y="25.62" stroke="none">&#xE260;</text>
+<text class="keySignature" x="42.795" y="23.62" stroke="none">&#xE262;</text>
+<text class="timeSignature" x="44.789" y="24.62" stroke="none">&#xE083;</text>
+<text class="timeSignature" x="44.691" y="26.62" stroke="none">&#xE084;</text>
+<text class="notehead" x="47.771" y="25.62" stroke="none">&#xE0A4;</text>
+<text class="dot" x="49.251" y="25.12" stroke="none">&#xE1E7;</text>
+<text class="notehead" x="51.446" y="26.12" stroke="none">&#xE0A4;</text>
+<text class="flag" x="52.506" y="22.58" stroke="none">&#xE240;</text>
+<text class="notehead" x="53.962" y="26.62" stroke="none">&#xE0A4;</text>
+<text class="rest" x="60.256" y="24.62" stroke="none">&#xE4E3;</text>
+<text class="tempo" x="16.235" y="20.7" style="font-size:3.6px" stroke="none">&#xECA5;</text>
+<text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Melody</text>
+<text class="t credit" x="111.429" y="14.845" style="font-size:1.8px" text-anchor="end" stroke="none">Music by Ghost in the Groove</text>
+<text class="t tempo" x="17.831" y="21.2" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
+<text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 </g>
 </svg>

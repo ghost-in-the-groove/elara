@@ -39,11 +39,11 @@ constexpr std::size_t kParallelMeasures = 48;
 // track's 21 pages (40k items) copy faster than threads start.
 constexpr std::size_t kParallelItems = 200'000;
 
-constexpr double kTitleSize = 4.0;
-constexpr double kSubtitleSize = 2.4;
-constexpr double kArtistSize = 2.0;
-constexpr double kCreditSize = 1.5;   // words, music, copyright and page numbers
-constexpr double kCreditGap = 0.6;    // between lines of credits
+constexpr double kTitleSize = 4.4;
+constexpr double kSubtitleSize = 2.8;
+constexpr double kArtistSize = 2.4;
+constexpr double kCreditSize = 1.8;   // words, music, copyright and page numbers
+constexpr double kCreditGap = 0.7;    // between lines of credits
 constexpr double kCreditsBelow = 3.0; // between the credits and the first system
 
 // A system: measures [first, last) of the laid out range, at `stretch`.

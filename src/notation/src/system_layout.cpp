@@ -36,45 +36,47 @@ using core::Fraction;
 
 constexpr double kStaffDistance = 4.0;     // at least between the lines of neighbouring staves
 constexpr double kStaffInkGap = 1.0;       // at least between their ink
-constexpr double kMeasureNumberSize = 1.2; // font size of a system's first measure number
+constexpr double kMeasureNumberSize = 1.5; // font size of a system's first measure number
 constexpr double kMeasureNumberY = -2.0;   // its baseline, above the clef
-constexpr double kTrackNameSize = 1.6;     // font size of the track names of the first system
+constexpr double kTrackNameSize = 1.9;     // font size of the track names of the first system
 constexpr double kTrackNameGap = 1.0;      // between a track name and its staves
 constexpr double kVoltaLowest = -3.0;      // the bracket of an alternate ending at least this high
 constexpr double kVoltaHook = 2.0;         // the length of its hooks
 constexpr double kVoltaInset = 0.2;        // between its hooks and the barlines
 constexpr double kVoltaLabelInset = 0.4;   // between its start hook and its numbers
-constexpr double kVoltaSize = 1.4;         // font size of its numbers and of repeat counts
+constexpr double kVoltaSize = 1.7;         // font size of its numbers and of repeat counts
 constexpr double kVoltaTextGap = 0.3;      // between the bracket and its numbers
 constexpr double kVoltaInkGap = 0.5;       // at least between its numbers and the staff's ink
 constexpr double kTempoLowest = -1.5;      // the baseline of a tempo mark at least this high
 constexpr double kTempoInkGap = 0.6;       // at least between a tempo mark and the ink below
-constexpr double kTempoSize = 1.4;         // font size of its text
-constexpr double kTempoNoteScale = 0.65;   // of its note, from the staff's size
-constexpr double kTempoNoteLift = 0.35;    // the note's head above the text's baseline
-constexpr double kTempoDotGap = 0.15;      // between the note and its dot
-constexpr double kTempoTextGap = 0.3;      // between the note (or dot) and "= 120"
-constexpr double kRampWordGap = 0.6;       // between "= 120" and "accel."
-constexpr double kFeelGap = 0.8;           // between a tempo mark and a triplet feel mark
-constexpr double kFeelEqualsGap = 0.3;     // on each side of the triplet feel mark's "="
-constexpr double kFeelNoteGap = 0.15;      // between its unbeamed notes
+constexpr double kTempoSize = 2.0;         // font size of its text
+constexpr double kTempoNoteScale = 0.9;    // of its note, from the staff's size
+constexpr double kTempoNoteLift = 0.5;     // the note's head above the text's baseline
+constexpr double kTempoDotGap = 0.2;       // between the note and its dot
+constexpr double kTempoTextGap = 0.4;      // between the note (or dot) and "= 120"
+constexpr double kRampWordGap = 0.8;       // between "= 120" and "accel."
+constexpr double kFeelGap = 1.0;           // between a tempo mark and a triplet feel mark
+constexpr double kFeelEqualsGap = 0.4;     // on each side of the triplet feel mark's "="
+constexpr double kFeelNoteGap = 0.2;       // between its unbeamed notes
+constexpr double kTempoMarkGap = 0.5;      // at least between two marks on one line
+constexpr double kTempoRowGap = 0.4;       // between a line of marks and the one above
 constexpr double kRampGap = 0.5;           // around the dashed line of a gradual change
 constexpr double kRampMinLine = 1.0;       // shorter dashed lines are left out
-constexpr double kRampLift = 0.35;         // the dashed line above the baseline
+constexpr double kRampLift = 0.5;          // the dashed line above the baseline
 constexpr double kRampThickness = 0.1;
 constexpr double kRampDash = 0.6;           // length of a dash and of a gap
 constexpr double kNavigationLowest = -1.5;  // the line of signs and jumps at least this high
 constexpr double kNavigationInkGap = 0.6;   // at least between them and the ink below
-constexpr double kNavigationSize = 1.4;     // font size of a jump's text
-constexpr double kNavigationScale = 0.65;   // of a segno or coda, from the staff's size
+constexpr double kNavigationSize = 1.9;     // font size of a jump's text
+constexpr double kNavigationScale = 0.85;   // of a segno or coda, from the staff's size
 constexpr double kNavigationInset = 0.4;    // between the barline and the first sign
 constexpr double kNavigationGap = 0.25;     // between two signs
 constexpr double kNavigationTextGap = 1.0;  // between two texts closing one measure
 constexpr double kNavigationLineGap = 0.3;  // between a line of them and the one above
 constexpr double kSectionLowest = -2.0;     // the bottom of a section's box at least this high
 constexpr double kSectionInkGap = 0.6;      // at least between its box and the ink below
-constexpr double kSectionSize = 1.5;        // font size of its name
-constexpr double kSectionPad = 0.35;        // between the name and its box
+constexpr double kSectionSize = 2.0;        // font size of its name
+constexpr double kSectionPad = 0.45;        // between the name and its box
 constexpr double kSectionGap = 0.5;         // between two boxes on one line
 constexpr double kSectionLineGap = 0.4;     // between a line of boxes and the one above
 constexpr double kBraceRoom = 1.8;          // left of a system's staves for a grand staff's brace
@@ -925,7 +927,23 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
     const double baseline =
         std::min(kTempoLowest, system.top - kTempoInkGap - kTextDescent * kTempoSize);
     double highest = baseline - kTextAscent * kTempoSize;
+    // What each mark drew and where it ends, to lift the ones that do not fit
+    // beside the mark before them.
+    struct Drawn {
+        std::size_t glyphs = 0; // the first of its items in the system's lists
+        std::size_t texts = 0;
+        std::size_t lines = 0;
+        double from = 0.0;
+        double to = 0.0;
+    };
+    std::vector<Drawn> drawn;
+    drawn.reserve(marks.size());
     for (const Mark& mark : marks) {
+        drawn.push_back(Drawn{.glyphs = system.glyphs.size(),
+                              .texts = system.texts.size(),
+                              .lines = system.lines.size(),
+                              .from = mark.x,
+                              .to = mark.x});
         double after = mark.x; // where what follows the mark goes
         if (mark.tempo) {
             after = drawTempo(system, font, *mark.tempo, mark.measure, mark.x, baseline, highest);
@@ -951,6 +969,7 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
         const double from =
             mark.tempo || mark.feel || !mark.word.empty() ? after + kRampGap : after;
         const double to = mark.rampEnd - kRampGap;
+        drawn.back().to = after;
         if (to - from >= kRampMinLine) {
             const double y = baseline - kRampLift;
             system.lines.push_back(LineItem{.from = {from, y},
@@ -959,7 +978,46 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
                                             .role = Role::Tempo,
                                             .measure = mark.measure,
                                             .dash = kRampDash});
+            drawn.back().to = to;
         }
+    }
+    // A mark that would run into the one before it on its line goes up a line,
+    // as high as the tallest mark: two changes in short measures, or a triplet
+    // feel mark before one.
+    const double rowHeight = baseline - highest + kTempoRowGap;
+    std::vector<double> ends; // where each line's last mark ends, from the lowest
+    for (std::size_t i = 0; i < drawn.size(); ++i) {
+        const Drawn& mark = drawn[i];
+        std::size_t row = 0;
+        while (row < ends.size() && mark.from < ends[row] + kTempoMarkGap - kEpsilon) {
+            ++row;
+        }
+        if (row == ends.size()) {
+            ends.push_back(mark.to);
+        } else {
+            ends[row] = mark.to;
+        }
+        if (row == 0) {
+            continue;
+        }
+        const double lift = static_cast<double>(row) * rowHeight;
+        const bool last = i + 1 == drawn.size();
+        const auto until = [&](std::size_t Drawn::* first, std::size_t all) {
+            return last ? all : drawn[i + 1].*first;
+        };
+        for (std::size_t g = mark.glyphs; g < until(&Drawn::glyphs, system.glyphs.size()); ++g) {
+            system.glyphs[g].origin.y -= lift;
+        }
+        for (std::size_t t = mark.texts; t < until(&Drawn::texts, system.texts.size()); ++t) {
+            system.texts[t].origin.y -= lift;
+        }
+        for (std::size_t l = mark.lines; l < until(&Drawn::lines, system.lines.size()); ++l) {
+            system.lines[l].from.y -= lift;
+            system.lines[l].to.y -= lift;
+        }
+    }
+    if (!ends.empty()) {
+        highest -= static_cast<double>(ends.size() - 1) * rowHeight;
     }
     system.top = std::min(system.top, highest);
 }

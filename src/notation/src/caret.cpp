@@ -13,7 +13,7 @@ namespace elara::notation {
 
 namespace {
 
-constexpr double kCaretWidth = 1.8;    // room for a two-digit fret number
+constexpr double kCaretWidth = 2.4;    // room for a two-digit fret number
 constexpr double kStaffOverhang = 1.0; // the caret above and below a standard staff
 constexpr double kFirstSlot = 1.0;     // a slot with no column before it, from the measure's start
 constexpr double kSlotGap = 2.5;       // the free slot after the last column, at least
@@ -219,6 +219,24 @@ std::optional<Rect> caretBox(const DisplayList& list, const core::Song& song,
                 .y = staff->y - kStaffOverhang,
                 .width = kCaretWidth,
                 .height = staff->height + 2 * kStaffOverhang};
+}
+
+std::optional<Rect> caretColumn(const DisplayList& list, const core::Song& song,
+                                const core::Caret& caret, const EngravingFont& font) {
+    const std::optional<Rect> box = caretBox(list, song, caret, font);
+    const MeasureBox* measure = measureBox(list, caret.measure);
+    if (!box || measure == nullptr) {
+        return std::nullopt;
+    }
+    double top = box->y;
+    double bottom = box->y + box->height;
+    for (const StaffBox& staff : list.staves) {
+        if (staff.track == caret.track && staff.staff == caret.staff && inSystem(staff, *measure)) {
+            top = std::min(top, staff.y - kStaffOverhang);
+            bottom = std::max(bottom, staff.y + staff.height + kStaffOverhang);
+        }
+    }
+    return Rect{.x = box->x, .y = top, .width = box->width, .height = bottom - top};
 }
 
 std::optional<core::Caret> caretAt(const DisplayList& list, const core::Song& song, Point point,

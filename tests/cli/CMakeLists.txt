@@ -1344,7 +1344,7 @@ set_tests_properties(cli.render_rejects_missing_track PROPERTIES WILL_FAIL TRUE)
 add_test(NAME cli.render_tab
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view tab)
 set_tests_properties(cli.render_tab PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,\"accidental\":0,\"dot\":1,\"stem\":11,\"flag\":1,\"beam\":1,\"rest\":1,\"fretNumber\":12,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":5,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
+  PASS_REGULAR_EXPRESSION "\"view\":\"tab\",.*\"notehead\":0,\"accidental\":0,\"dot\":1,\"stem\":11,\"flag\":1,\"beam\":1,\"rest\":1,\"fretNumber\":12,\"tie\":0,\"slur\":1,\"technique\":4,\"bend\":3,\"slide\":1,\"vibrato\":6,.*\"staves\":\\[{\"track\":0,\"staff\":0,\"view\":\"tablature\",\"x\":0,\"y\":0,\"width\":[1-9][0-9.]*,\"height\":7\\.5,\"lines\":6}\\].*\"texts\":\\[{\"text\":\"0\",\"role\":\"fretNumber\",.*{\"text\":\"<12>\",.*{\"text\":\"P\\.M\\.\",.*{\"text\":\"full\",\"role\":\"bend\"")
 
 add_test(NAME cli.render_both
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --view both)
@@ -1385,12 +1385,12 @@ set_tests_properties(cli.render_scroll PROPERTIES
 # other two whole; one SVG per strip.
 add_test(NAME cli.render_strips
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 63 --no-credits)
+          --width 40 --strip-height 68 --no-credits)
 set_tests_properties(cli.render_strips PROPERTIES
   PASS_REGULAR_EXPRESSION "\"layout\":\"strips\",\"pages\":\\[{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":0,[^{]*}\\],\"staves\".*},{\"width\":40,\"top\":0,\"bottom\":[0-9.]+,\"counts\":{[^}]*},\"systems\":\\[{\"firstMeasure\":1,[^{]*{\"firstMeasure\":2,[^{]*}\\],\"staves\"")
 add_test(NAME cli.render_strips_svg
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --layout strips
-          --width 40 --strip-height 63 --no-credits
+          --width 40 --strip-height 68 --no-credits
           --svg "${CMAKE_CURRENT_BINARY_DIR}/strips.svg")
 set_tests_properties(cli.render_strips_svg PROPERTIES
   PASS_REGULAR_EXPRESSION "measures 0 to 2 of 3: 3 systems on 2 strips.*saved .*strips-1\\.svg.*saved .*strips-2\\.svg")
@@ -1846,23 +1846,23 @@ set_tests_properties(cli.render_cursor_after_the_end PROPERTIES
 # starts playback on the same column the first time through: at 1 s.
 add_test(NAME cli.render_time_at_a_note
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --time-at 0 28.5 41.8)
+          --layout page --time-at 0 29.9 45.7)
 set_tests_properties(cli.render_time_at_a_note PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":28.5,\"y\":41.8,\"measure\":0,\"seconds\":1},\"pages\":\\[")
+  PASS_REGULAR_EXPRESSION "\"timeAt\":{\"page\":0,\"x\":29.9,\"y\":45.7,\"measure\":0,\"seconds\":1},\"pages\":\\[")
 # The symbol drawn at a point of a page, of those that are edited where they
 # are drawn (ADR-0130): the 3/4 that starts the third measure, with its
 # measure, the box round its two numbers and its staff; a key signature by its
 # name; and nothing in the page's corner.
 add_test(NAME cli.render_symbol_at_a_time_signature
   COMMAND elara-cli --json render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --symbol-at 0 53.6 41.5)
+          --layout page --symbol-at 0 54.6 45.5)
 set_tests_properties(cli.render_symbol_at_a_time_signature PROPERTIES
-  PASS_REGULAR_EXPRESSION "\"symbolAt\":{\"page\":0,\"x\":53.6,\"y\":41.5,\"role\":\"timeSignature\",\"measure\":2,\"box\":\\[[0-9.,]+\\],\"staff\":{\"track\":0,\"staff\":0}},\"pages\":\\[")
+  PASS_REGULAR_EXPRESSION "\"symbolAt\":{\"page\":0,\"x\":54.6,\"y\":45.5,\"role\":\"timeSignature\",\"measure\":2,\"box\":\\[[0-9.,]+\\],\"staff\":{\"track\":0,\"staff\":0}},\"pages\":\\[")
 add_test(NAME cli.render_symbol_at_a_key_signature
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
-          --layout page --symbol-at 0 13.2 40)
+          --layout page --symbol-at 0 13.2 44)
 set_tests_properties(cli.render_symbol_at_a_key_signature PROPERTIES
-  PASS_REGULAR_EXPRESSION "symbol at page 1, x 13.2, y 40: keySignature of measure 1")
+  PASS_REGULAR_EXPRESSION "symbol at page 1, x 13.2, y 44: keySignature of measure 1")
 add_test(NAME cli.render_symbol_at_nothing
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/guitar-techniques.gp" --tracks all
           --layout page --symbol-at 0 1 1)

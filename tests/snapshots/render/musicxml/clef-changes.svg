@@ -2,147 +2,147 @@
 <style>@font-face{font-family:"Bravura";src:url("Bravura.otf")}text{font-family:"Bravura";font-size:4px}text.t{font-family:Arial,Helvetica,sans-serif}</style>
 <rect x="0" y="0" width="120" height="169.714" fill="white"/>
 <g fill="black" stroke="black">
-<line class="staffLine" x1="15.552" y1="20.444" x2="111.429" y2="20.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="21.444" x2="111.429" y2="21.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="22.444" x2="111.429" y2="22.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="23.444" x2="111.429" y2="23.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="24.444" x2="111.429" y2="24.444" stroke-width="0.13"/>
-<line class="stem" x1="24.408" y1="22.776" x2="24.408" y2="19.444" stroke-width="0.12"/>
-<line class="stem" x1="26.648" y1="22.612" x2="26.648" y2="25.944" stroke-width="0.12"/>
-<line class="stem" x1="29.949" y1="22.112" x2="29.949" y2="25.444" stroke-width="0.12"/>
-<line class="stem" x1="33.249" y1="21.612" x2="33.249" y2="24.944" stroke-width="0.12"/>
-<line class="barline" x1="39.166" y1="20.444" x2="39.166" y2="24.444" stroke-width="0.16"/>
-<line class="stem" x1="41.566" y1="22.776" x2="41.566" y2="19.444" stroke-width="0.12"/>
-<line class="stem" x1="43.806" y1="22.612" x2="43.806" y2="25.944" stroke-width="0.12"/>
-<line class="stem" x1="47.106" y1="22.112" x2="47.106" y2="25.444" stroke-width="0.12"/>
-<line class="stem" x1="50.406" y1="21.612" x2="50.406" y2="24.944" stroke-width="0.12"/>
-<line class="barline" x1="56.239" y1="20.444" x2="56.239" y2="24.444" stroke-width="0.16"/>
-<line class="stem" x1="57.579" y1="21.112" x2="57.579" y2="24.444" stroke-width="0.12"/>
-<line class="stem" x1="60.88" y1="20.612" x2="60.88" y2="23.944" stroke-width="0.12"/>
-<line class="stem" x1="64.18" y1="20.112" x2="64.18" y2="23.444" stroke-width="0.12"/>
-<line class="ledgerLine" x1="67.02" y1="19.444" x2="69" y2="19.444" stroke-width="0.16"/>
-<line class="stem" x1="67.48" y1="19.612" x2="67.48" y2="22.944" stroke-width="0.12"/>
-<line class="barline" x1="70.8" y1="20.444" x2="70.8" y2="24.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="71.68" y1="19.444" x2="73.66" y2="19.444" stroke-width="0.16"/>
-<line class="stem" x1="72.14" y1="19.112" x2="72.14" y2="22.444" stroke-width="0.12"/>
-<line class="stem" x1="78.74" y1="20.612" x2="78.74" y2="23.944" stroke-width="0.12"/>
-<line class="barline" x1="87.928" y1="20.444" x2="87.928" y2="24.444" stroke-width="0.16"/>
-<line class="stem" x1="89.268" y1="22.612" x2="89.268" y2="25.944" stroke-width="0.12"/>
-<line class="stem" x1="93.628" y1="22.776" x2="93.628" y2="19.444" stroke-width="0.12"/>
-<line class="stem" x1="96.928" y1="23.276" x2="96.928" y2="19.944" stroke-width="0.12"/>
-<line class="stem" x1="100.228" y1="23.776" x2="100.228" y2="20.444" stroke-width="0.12"/>
-<line class="barline" x1="102.488" y1="20.444" x2="102.488" y2="24.444" stroke-width="0.16"/>
-<line class="barline" x1="110.449" y1="20.444" x2="110.449" y2="24.444" stroke-width="0.16"/>
-<line class="barline" x1="111.179" y1="20.444" x2="111.179" y2="24.444" stroke-width="0.5"/>
-<line class="staffLine" x1="15.552" y1="29.444" x2="111.429" y2="29.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="30.444" x2="111.429" y2="30.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="31.444" x2="111.429" y2="31.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="32.444" x2="111.429" y2="32.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="33.444" x2="111.429" y2="33.444" stroke-width="0.13"/>
-<line class="barline" x1="39.166" y1="29.444" x2="39.166" y2="33.444" stroke-width="0.16"/>
-<line class="barline" x1="56.239" y1="29.444" x2="56.239" y2="33.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="57.119" y1="28.444" x2="59.607" y2="28.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="57.119" y1="27.444" x2="59.607" y2="27.444" stroke-width="0.16"/>
-<line class="barline" x1="70.8" y1="29.444" x2="70.8" y2="33.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="71.68" y1="28.444" x2="74.168" y2="28.444" stroke-width="0.16"/>
-<line class="barline" x1="87.928" y1="29.444" x2="87.928" y2="33.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="88.808" y1="28.444" x2="91.296" y2="28.444" stroke-width="0.16"/>
-<line class="barline" x1="102.488" y1="29.444" x2="102.488" y2="33.444" stroke-width="0.16"/>
-<line class="barline" x1="110.449" y1="29.444" x2="110.449" y2="33.444" stroke-width="0.16"/>
-<line class="barline" x1="111.179" y1="29.444" x2="111.179" y2="33.444" stroke-width="0.5"/>
-<line class="staffLine" x1="15.552" y1="37.444" x2="111.429" y2="37.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="38.444" x2="111.429" y2="38.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="39.444" x2="111.429" y2="39.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="40.444" x2="111.429" y2="40.444" stroke-width="0.13"/>
-<line class="staffLine" x1="15.552" y1="41.444" x2="111.429" y2="41.444" stroke-width="0.13"/>
-<line class="stem" x1="24.408" y1="39.776" x2="24.408" y2="36.444" stroke-width="0.12"/>
-<line class="stem" x1="29.949" y1="38.112" x2="29.949" y2="41.444" stroke-width="0.12"/>
-<line class="barline" x1="39.166" y1="37.444" x2="39.166" y2="41.444" stroke-width="0.16"/>
-<line class="stem" x1="40.506" y1="39.112" x2="40.506" y2="42.444" stroke-width="0.12"/>
-<line class="stem" x1="47.106" y1="37.112" x2="47.106" y2="40.444" stroke-width="0.12"/>
-<line class="barline" x1="56.239" y1="37.444" x2="56.239" y2="41.444" stroke-width="0.16"/>
-<line class="ledgerLine" x1="57.119" y1="42.444" x2="59.099" y2="42.444" stroke-width="0.16"/>
-<line class="stem" x1="58.639" y1="42.276" x2="58.639" y2="38.944" stroke-width="0.12"/>
-<line class="stem" x1="61.94" y1="41.276" x2="61.94" y2="37.944" stroke-width="0.12"/>
-<line class="stem" x1="65.24" y1="40.276" x2="65.24" y2="36.944" stroke-width="0.12"/>
-<line class="stem" x1="67.48" y1="39.112" x2="67.48" y2="42.444" stroke-width="0.12"/>
-<line class="barline" x1="70.8" y1="37.444" x2="70.8" y2="41.444" stroke-width="0.16"/>
-<line class="stem" x1="72.14" y1="38.612" x2="72.14" y2="41.944" stroke-width="0.12"/>
-<line class="stem" x1="75.44" y1="39.612" x2="75.44" y2="42.944" stroke-width="0.12"/>
-<line class="stem" x1="79.8" y1="40.276" x2="79.8" y2="36.944" stroke-width="0.12"/>
-<line class="stem" x1="83.101" y1="41.776" x2="83.101" y2="38.444" stroke-width="0.12"/>
-<line class="barline" x1="87.928" y1="37.444" x2="87.928" y2="41.444" stroke-width="0.16"/>
-<line class="stem" x1="89.268" y1="38.612" x2="89.268" y2="41.944" stroke-width="0.12"/>
-<line class="stem" x1="95.868" y1="39.612" x2="95.868" y2="42.944" stroke-width="0.12"/>
-<line class="barline" x1="102.488" y1="37.444" x2="102.488" y2="41.444" stroke-width="0.16"/>
-<line class="barline" x1="110.449" y1="37.444" x2="110.449" y2="41.444" stroke-width="0.16"/>
-<line class="barline" x1="111.179" y1="37.444" x2="111.179" y2="41.444" stroke-width="0.5"/>
-<line class="barline" x1="15.632" y1="20.444" x2="15.632" y2="41.444" stroke-width="0.16"/>
-<line class="barline" x1="39.166" y1="33.444" x2="39.166" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="56.239" y1="33.444" x2="56.239" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="70.8" y1="33.444" x2="70.8" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="87.928" y1="33.444" x2="87.928" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="102.488" y1="33.444" x2="102.488" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="110.449" y1="33.444" x2="110.449" y2="37.444" stroke-width="0.16"/>
-<line class="barline" x1="111.179" y1="33.444" x2="111.179" y2="37.444" stroke-width="0.5"/>
-<text class="clef" x="16.172" y="21.444" stroke="none">&#xE062;</text>
-<text class="timeSignature" x="19.808" y="21.444" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="19.808" y="23.444" stroke="none">&#xE084;</text>
-<text class="notehead" x="23.288" y="22.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="26.588" y="22.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="29.889" y="21.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="33.189" y="21.444" stroke="none">&#xE0A4;</text>
-<text class="clef" x="36.489" y="21.444" style="font-size:3px" stroke="none">&#xE05C;</text>
-<text class="notehead" x="40.446" y="22.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="43.746" y="22.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="47.046" y="21.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="50.346" y="21.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="57.519" y="20.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="60.82" y="20.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="64.12" y="19.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="67.42" y="19.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="72.08" y="18.944" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="78.68" y="20.444" stroke="none">&#xE0A3;</text>
-<text class="clef" x="85.296" y="21.444" style="font-size:3px" stroke="none">&#xE062;</text>
-<text class="notehead" x="89.208" y="22.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="92.508" y="22.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="95.808" y="23.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="99.108" y="23.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="103.768" y="24.444" stroke="none">&#xE0A2;</text>
-<text class="clef" x="16.152" y="32.444" stroke="none">&#xE050;</text>
-<text class="timeSignature" x="19.736" y="30.444" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="19.736" y="32.444" stroke="none">&#xE084;</text>
-<text class="notehead" x="23.288" y="29.944" stroke="none">&#xE0A2;</text>
-<text class="notehead" x="40.446" y="28.944" stroke="none">&#xE0A2;</text>
-<text class="notehead" x="57.519" y="27.444" stroke="none">&#xE0A2;</text>
-<text class="notehead" x="72.08" y="27.944" stroke="none">&#xE0A2;</text>
-<text class="notehead" x="89.208" y="28.444" stroke="none">&#xE0A2;</text>
-<text class="notehead" x="103.768" y="28.944" stroke="none">&#xE0A2;</text>
-<text class="clef" x="16.172" y="38.444" stroke="none">&#xE062;</text>
-<text class="timeSignature" x="19.808" y="38.444" stroke="none">&#xE084;</text>
-<text class="timeSignature" x="19.808" y="40.444" stroke="none">&#xE084;</text>
-<text class="notehead" x="23.288" y="39.944" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="29.889" y="37.944" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="40.446" y="38.944" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="47.046" y="36.944" stroke="none">&#xE0A3;</text>
-<text class="clef" x="53.646" y="40.444" style="font-size:3px" stroke="none">&#xE050;</text>
-<text class="notehead" x="57.519" y="42.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="60.82" y="41.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="64.12" y="40.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="67.42" y="38.944" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="72.08" y="38.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="75.38" y="39.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="78.68" y="40.444" stroke="none">&#xE0A4;</text>
-<text class="notehead" x="81.981" y="41.944" stroke="none">&#xE0A4;</text>
-<text class="clef" x="85.296" y="38.444" style="font-size:3px" stroke="none">&#xE062;</text>
-<text class="notehead" x="89.208" y="38.444" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="95.808" y="39.444" stroke="none">&#xE0A3;</text>
-<text class="notehead" x="103.768" y="41.444" stroke="none">&#xE0A2;</text>
-<text class="tempo" x="23.288" y="17.2" style="font-size:2.6px" stroke="none">&#xECA5;</text>
-<text class="brace" x="14.421" y="41.437" style="font-size:11.985px" stroke="none">&#xE000;</text>
-<text class="t credit" x="60" y="11.571" style="font-size:4px" text-anchor="middle" stroke="none">Corpus Clef Changes</text>
-<text class="t tempo" x="24.451" y="17.55" style="font-size:1.4px" text-anchor="start" stroke="none">= 120</text>
-<text class="t trackName" x="12.752" y="23.02" style="font-size:1.6px" text-anchor="end" stroke="none">Cello</text>
-<text class="t trackName" x="12.752" y="36.02" style="font-size:1.6px" text-anchor="end" stroke="none">Piano</text>
+<line class="staffLine" x1="16.336" y1="21.792" x2="111.429" y2="21.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="22.792" x2="111.429" y2="22.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="23.792" x2="111.429" y2="23.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="24.792" x2="111.429" y2="24.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="25.792" x2="111.429" y2="25.792" stroke-width="0.13"/>
+<line class="stem" x1="25.192" y1="24.124" x2="25.192" y2="20.792" stroke-width="0.12"/>
+<line class="stem" x1="27.397" y1="23.96" x2="27.397" y2="27.292" stroke-width="0.12"/>
+<line class="stem" x1="30.661" y1="23.46" x2="30.661" y2="26.792" stroke-width="0.12"/>
+<line class="stem" x1="33.926" y1="22.96" x2="33.926" y2="26.292" stroke-width="0.12"/>
+<line class="barline" x1="39.807" y1="21.792" x2="39.807" y2="25.792" stroke-width="0.16"/>
+<line class="stem" x1="42.207" y1="24.124" x2="42.207" y2="20.792" stroke-width="0.12"/>
+<line class="stem" x1="44.412" y1="23.96" x2="44.412" y2="27.292" stroke-width="0.12"/>
+<line class="stem" x1="47.676" y1="23.46" x2="47.676" y2="26.792" stroke-width="0.12"/>
+<line class="stem" x1="50.941" y1="22.96" x2="50.941" y2="26.292" stroke-width="0.12"/>
+<line class="barline" x1="56.738" y1="21.792" x2="56.738" y2="25.792" stroke-width="0.16"/>
+<line class="stem" x1="58.078" y1="22.46" x2="58.078" y2="25.792" stroke-width="0.12"/>
+<line class="stem" x1="61.343" y1="21.96" x2="61.343" y2="25.292" stroke-width="0.12"/>
+<line class="stem" x1="64.607" y1="21.46" x2="64.607" y2="24.792" stroke-width="0.12"/>
+<line class="ledgerLine" x1="67.412" y1="20.792" x2="69.392" y2="20.792" stroke-width="0.16"/>
+<line class="stem" x1="67.872" y1="20.96" x2="67.872" y2="24.292" stroke-width="0.12"/>
+<line class="barline" x1="71.156" y1="21.792" x2="71.156" y2="25.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="72.036" y1="20.792" x2="74.016" y2="20.792" stroke-width="0.16"/>
+<line class="stem" x1="72.496" y1="20.46" x2="72.496" y2="23.792" stroke-width="0.12"/>
+<line class="stem" x1="79.025" y1="21.96" x2="79.025" y2="25.292" stroke-width="0.12"/>
+<line class="barline" x1="88.141" y1="21.792" x2="88.141" y2="25.792" stroke-width="0.16"/>
+<line class="stem" x1="89.481" y1="23.96" x2="89.481" y2="27.292" stroke-width="0.12"/>
+<line class="stem" x1="93.806" y1="24.124" x2="93.806" y2="20.792" stroke-width="0.12"/>
+<line class="stem" x1="97.07" y1="24.624" x2="97.07" y2="21.292" stroke-width="0.12"/>
+<line class="stem" x1="100.335" y1="25.124" x2="100.335" y2="21.792" stroke-width="0.12"/>
+<line class="barline" x1="102.56" y1="21.792" x2="102.56" y2="25.792" stroke-width="0.16"/>
+<line class="barline" x1="110.449" y1="21.792" x2="110.449" y2="25.792" stroke-width="0.16"/>
+<line class="barline" x1="111.179" y1="21.792" x2="111.179" y2="25.792" stroke-width="0.5"/>
+<line class="staffLine" x1="16.336" y1="30.792" x2="111.429" y2="30.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="31.792" x2="111.429" y2="31.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="32.792" x2="111.429" y2="32.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="33.792" x2="111.429" y2="33.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="34.792" x2="111.429" y2="34.792" stroke-width="0.13"/>
+<line class="barline" x1="39.807" y1="30.792" x2="39.807" y2="34.792" stroke-width="0.16"/>
+<line class="barline" x1="56.738" y1="30.792" x2="56.738" y2="34.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="57.618" y1="29.792" x2="60.106" y2="29.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="57.618" y1="28.792" x2="60.106" y2="28.792" stroke-width="0.16"/>
+<line class="barline" x1="71.156" y1="30.792" x2="71.156" y2="34.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="72.036" y1="29.792" x2="74.524" y2="29.792" stroke-width="0.16"/>
+<line class="barline" x1="88.141" y1="30.792" x2="88.141" y2="34.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="89.021" y1="29.792" x2="91.509" y2="29.792" stroke-width="0.16"/>
+<line class="barline" x1="102.56" y1="30.792" x2="102.56" y2="34.792" stroke-width="0.16"/>
+<line class="barline" x1="110.449" y1="30.792" x2="110.449" y2="34.792" stroke-width="0.16"/>
+<line class="barline" x1="111.179" y1="30.792" x2="111.179" y2="34.792" stroke-width="0.5"/>
+<line class="staffLine" x1="16.336" y1="38.792" x2="111.429" y2="38.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="39.792" x2="111.429" y2="39.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="40.792" x2="111.429" y2="40.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="41.792" x2="111.429" y2="41.792" stroke-width="0.13"/>
+<line class="staffLine" x1="16.336" y1="42.792" x2="111.429" y2="42.792" stroke-width="0.13"/>
+<line class="stem" x1="25.192" y1="41.124" x2="25.192" y2="37.792" stroke-width="0.12"/>
+<line class="stem" x1="30.661" y1="39.46" x2="30.661" y2="42.792" stroke-width="0.12"/>
+<line class="barline" x1="39.807" y1="38.792" x2="39.807" y2="42.792" stroke-width="0.16"/>
+<line class="stem" x1="41.147" y1="40.46" x2="41.147" y2="43.792" stroke-width="0.12"/>
+<line class="stem" x1="47.676" y1="38.46" x2="47.676" y2="41.792" stroke-width="0.12"/>
+<line class="barline" x1="56.738" y1="38.792" x2="56.738" y2="42.792" stroke-width="0.16"/>
+<line class="ledgerLine" x1="57.618" y1="43.792" x2="59.598" y2="43.792" stroke-width="0.16"/>
+<line class="stem" x1="59.138" y1="43.624" x2="59.138" y2="40.292" stroke-width="0.12"/>
+<line class="stem" x1="62.403" y1="42.624" x2="62.403" y2="39.292" stroke-width="0.12"/>
+<line class="stem" x1="65.667" y1="41.624" x2="65.667" y2="38.292" stroke-width="0.12"/>
+<line class="stem" x1="67.872" y1="40.46" x2="67.872" y2="43.792" stroke-width="0.12"/>
+<line class="barline" x1="71.156" y1="38.792" x2="71.156" y2="42.792" stroke-width="0.16"/>
+<line class="stem" x1="72.496" y1="39.96" x2="72.496" y2="43.292" stroke-width="0.12"/>
+<line class="stem" x1="75.761" y1="40.96" x2="75.761" y2="44.292" stroke-width="0.12"/>
+<line class="stem" x1="80.085" y1="41.624" x2="80.085" y2="38.292" stroke-width="0.12"/>
+<line class="stem" x1="83.35" y1="43.124" x2="83.35" y2="39.792" stroke-width="0.12"/>
+<line class="barline" x1="88.141" y1="38.792" x2="88.141" y2="42.792" stroke-width="0.16"/>
+<line class="stem" x1="89.481" y1="39.96" x2="89.481" y2="43.292" stroke-width="0.12"/>
+<line class="stem" x1="96.01" y1="40.96" x2="96.01" y2="44.292" stroke-width="0.12"/>
+<line class="barline" x1="102.56" y1="38.792" x2="102.56" y2="42.792" stroke-width="0.16"/>
+<line class="barline" x1="110.449" y1="38.792" x2="110.449" y2="42.792" stroke-width="0.16"/>
+<line class="barline" x1="111.179" y1="38.792" x2="111.179" y2="42.792" stroke-width="0.5"/>
+<line class="barline" x1="16.416" y1="21.792" x2="16.416" y2="42.792" stroke-width="0.16"/>
+<line class="barline" x1="39.807" y1="34.792" x2="39.807" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="56.738" y1="34.792" x2="56.738" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="71.156" y1="34.792" x2="71.156" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="88.141" y1="34.792" x2="88.141" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="102.56" y1="34.792" x2="102.56" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="110.449" y1="34.792" x2="110.449" y2="38.792" stroke-width="0.16"/>
+<line class="barline" x1="111.179" y1="34.792" x2="111.179" y2="38.792" stroke-width="0.5"/>
+<text class="clef" x="16.956" y="22.792" stroke="none">&#xE062;</text>
+<text class="timeSignature" x="20.592" y="22.792" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="20.592" y="24.792" stroke="none">&#xE084;</text>
+<text class="notehead" x="24.072" y="24.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="27.337" y="23.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="30.601" y="23.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="33.866" y="22.792" stroke="none">&#xE0A4;</text>
+<text class="clef" x="37.13" y="22.792" style="font-size:3px" stroke="none">&#xE05C;</text>
+<text class="notehead" x="41.087" y="24.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="44.352" y="23.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="47.616" y="23.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="50.881" y="22.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="58.018" y="22.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="61.283" y="21.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="64.547" y="21.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="67.812" y="20.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="72.436" y="20.292" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="78.965" y="21.792" stroke="none">&#xE0A3;</text>
+<text class="clef" x="85.509" y="22.792" style="font-size:3px" stroke="none">&#xE062;</text>
+<text class="notehead" x="89.421" y="23.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="92.686" y="24.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="95.95" y="24.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="99.215" y="25.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="103.84" y="25.792" stroke="none">&#xE0A2;</text>
+<text class="clef" x="16.936" y="33.792" stroke="none">&#xE050;</text>
+<text class="timeSignature" x="20.52" y="31.792" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="20.52" y="33.792" stroke="none">&#xE084;</text>
+<text class="notehead" x="24.072" y="31.292" stroke="none">&#xE0A2;</text>
+<text class="notehead" x="41.087" y="30.292" stroke="none">&#xE0A2;</text>
+<text class="notehead" x="58.018" y="28.792" stroke="none">&#xE0A2;</text>
+<text class="notehead" x="72.436" y="29.292" stroke="none">&#xE0A2;</text>
+<text class="notehead" x="89.421" y="29.792" stroke="none">&#xE0A2;</text>
+<text class="notehead" x="103.84" y="30.292" stroke="none">&#xE0A2;</text>
+<text class="clef" x="16.956" y="39.792" stroke="none">&#xE062;</text>
+<text class="timeSignature" x="20.592" y="39.792" stroke="none">&#xE084;</text>
+<text class="timeSignature" x="20.592" y="41.792" stroke="none">&#xE084;</text>
+<text class="notehead" x="24.072" y="41.292" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="30.601" y="39.292" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="41.087" y="40.292" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="47.616" y="38.292" stroke="none">&#xE0A3;</text>
+<text class="clef" x="54.145" y="41.792" style="font-size:3px" stroke="none">&#xE050;</text>
+<text class="notehead" x="58.018" y="43.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="61.283" y="42.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="64.547" y="41.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="67.812" y="40.292" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="72.436" y="39.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="75.701" y="40.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="78.965" y="41.792" stroke="none">&#xE0A4;</text>
+<text class="notehead" x="82.23" y="43.292" stroke="none">&#xE0A4;</text>
+<text class="clef" x="85.509" y="39.792" style="font-size:3px" stroke="none">&#xE062;</text>
+<text class="notehead" x="89.421" y="39.792" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="95.95" y="40.792" stroke="none">&#xE0A3;</text>
+<text class="notehead" x="103.84" y="42.792" stroke="none">&#xE0A2;</text>
+<text class="tempo" x="24.072" y="18.272" style="font-size:3.6px" stroke="none">&#xECA5;</text>
+<text class="brace" x="15.205" y="42.785" style="font-size:11.985px" stroke="none">&#xE000;</text>
+<text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Clef Changes</text>
+<text class="t tempo" x="25.667" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t trackName" x="13.536" y="24.476" style="font-size:1.9px" text-anchor="end" stroke="none">Cello</text>
+<text class="t trackName" x="13.536" y="37.476" style="font-size:1.9px" text-anchor="end" stroke="none">Piano</text>
 </g>
 </svg>
