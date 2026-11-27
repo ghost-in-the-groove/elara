@@ -93,6 +93,7 @@ qt_add_qml_module(elara
     qml/WordsPopup.qml
     qml/LyricsPopup.qml
     qml/SignatureFields.qml
+    qml/SymbolCard.qml
     qml/WelcomePane.qml
     qml/SegmentedControl.qml
     qml/IconButton.qml

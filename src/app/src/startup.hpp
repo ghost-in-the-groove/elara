@@ -83,12 +83,15 @@ private:
     void queueTuning();
     void queueTempo();
     void queueSection();
+    void queueSymbols();
+    void queueSymbolClick();
     void queueMeasureRepeat();
     void queueEffects();
     void queueContinuous();
     void queueTunerFollowsTrack();
     void finish(bool ok, const QString& detail);
     void clickCursor();
+    [[nodiscard]] bool uncoverScore();
     void queueKeepPosition();
     void queuePdf();
     void queueExport();

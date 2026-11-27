@@ -93,10 +93,10 @@ Item {
     /// Whether the view is still moving by itself: scrolling after the caret
     /// or the playback cursor, or zooming to fit.
     readonly property bool settling: scrollY.running || scrollX.running || followY.running
-    /// Whether one of the sheets at the caret is open.
-    readonly property bool sheetOpen: measurePopup.visible || chordPopup.visible || textPopup.visible
-                                      || lyricsPopup.visible
                                      || followX.running || refit.running || shownZoom !== zoom
+    /// Whether one of the sheets over the score is open.
+    readonly property bool sheetOpen: measurePopup.visible || chordPopup.visible || textPopup.visible
+                                      || lyricsPopup.visible || symbolCard.visible
     /// What the zoom follows as the room for the pages changes: the paper's
     /// size ("paper", as a song opens), the page's width ("width"), or nothing
     /// once it was chosen by hand ("").
@@ -230,6 +230,35 @@ Item {
                 ? Math.max(8, height - lyricsPopup.implicitHeight - 16)
                 : 8;
         lyricsPopup.open();
+    }
+    /// Edits `symbol` (ScoreDocument::symbolAt()) of page `page` where it is
+    /// drawn (ADR-0130): the chord symbol or the text of its beat in their
+    /// popups, any other in the card of that symbol, under it.
+    function editSymbol(page: int, symbol: var) {
+        if (symbol.kind === undefined)
+            return;
+        const scale = unit * shownZoom;
+        const box = symbol.rect;
+        if (symbol.kind === "chord" || symbol.kind === "text") {
+            // The caret goes to the symbol's beat: a chord's name is centred
+            // over it, a text starts at it. Both stand above their staff.
+            const x = symbol.kind === "chord" ? box.x + box.width / 2 : box.x + 0.1;
+            if (!document.placeCaret(page, x, box.y + box.height + 2))
+                return;
+            if (symbol.kind === "chord")
+                openChordPopupAtCaret();
+            else
+                openTextPopupAtCaret();
+            return;
+        }
+        const left = list.originX + (list.contentWidth - pageWidth) / 2 + box.x * scale
+                     - list.contentX;
+        const top = list.y + list.originY + pageY(page) + box.y * scale - list.contentY;
+        const below = top + box.height * scale + 10;
+        symbolCard.show(symbol);
+        symbolCard.x = Math.max(8, Math.min(width - symbolCard.width - 8, left - 14));
+        symbolCard.y = below + symbolCard.implicitHeight <= height - 8
+                ? below : Math.max(8, top - symbolCard.implicitHeight - 10);
     }
     function openWordsPopupAtCaret(popup) {
         if (document.caretPage < 0)
@@ -529,6 +558,9 @@ Item {
                 id: sheet
 
                 required property int index
+                /// The symbol under the pointer on this page that a double click
+                /// edits (ScoreDocument::symbolAt()); empty while there is none.
+                property var symbol: ({})
 
                 y: root.pageY(index)
                 width: list.contentWidth
@@ -618,6 +650,24 @@ Item {
                                 }
                             }
 
+                            // The symbol under the pointer that a double click edits
+                            // (ADR-0130): lit over the page, which is not painted again.
+                            Rectangle {
+                                readonly property real scale: root.unit * root.shownZoom
+                                readonly property rect box: sheet.symbol.rect ?? Qt.rect(0, 0, 0, 0)
+
+                                objectName: "symbolHighlight"
+                                visible: sheet.symbol.kind !== undefined
+                                x: box.x * scale - 3
+                                y: box.y * scale - 3
+                                width: box.width * scale + 6
+                                height: box.height * scale + 6
+                                radius: 4
+                                color: Qt.alpha(Theme.accent, 0.12)
+                                border.color: Qt.alpha(Theme.accent, 0.55)
+                                border.width: 1
+                            }
+
                             // The caret: where typing goes. It glides between beats on a
                             // page, and keeps up with zooming without gliding.
                             Rectangle {
@@ -647,6 +697,22 @@ Item {
                                         duration: 90
                                         easing.type: Easing.OutCubic
                                     }
+                                }
+                            }
+
+                            // The pointer over the page finds the symbol under it.
+                            HoverHandler {
+                                cursorShape: sheet.symbol.kind !== undefined ? Qt.PointingHandCursor
+                                                                             : Qt.ArrowCursor
+                                onPointChanged: {
+                                    const scale = root.unit * root.shownZoom;
+                                    sheet.symbol = root.document.symbolAt(
+                                                sheet.index, point.position.x / scale,
+                                                point.position.y / scale);
+                                }
+                                onHoveredChanged: {
+                                    if (!hovered)
+                                        sheet.symbol = ({});
                                 }
                             }
 
@@ -681,6 +747,13 @@ Item {
                                     if (seconds >= 0)
                                         root.seekRequested(seconds);
                                 }
+                                // A second click on a symbol edits it where it is.
+                                onDoubleTapped: eventPoint => {
+                                    const scale = root.unit * root.shownZoom;
+                                    root.editSymbol(sheet.index, root.document.symbolAt(
+                                                        sheet.index, eventPoint.position.x / scale,
+                                                        eventPoint.position.y / scale));
+                                }
                             }
                         }
                     }
@@ -702,6 +775,15 @@ Item {
             if (visible)
                 root.keepInside(measurePopup);
         }
+    }
+
+    SymbolCard {
+        id: symbolCard
+        objectName: "symbolCard"
+
+        document: root.document
+        editor: root.editor
+        onClosed: root.forceActiveFocus()
     }
 
     WordsPopup {

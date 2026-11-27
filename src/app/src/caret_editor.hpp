@@ -263,6 +263,14 @@ public:
     /// Changes the clef of the caret's staff from the caret's measure on, `clef`
     /// numbered as caretClef(); the staff keeps its octave (ADR-0087).
     Q_INVOKABLE void setClef(int clef);
+    /// The clef in force on staff `staff` of track `track` at `measure`,
+    /// numbered as caretClef(); -1 on a drum staff or for a place the song
+    /// does not have.
+    Q_INVOKABLE [[nodiscard]] int clefAt(int track, int staff, int measure) const;
+    /// Changes the clef of that staff from `measure` on, as setClef() does at
+    /// the caret, the caret staying where it is: for a clef picked on the
+    /// page (ADR-0130).
+    Q_INVOKABLE void setClefFrom(int track, int staff, int measure, int clef);
     /// How many measures the sign on the caret's measure repeats: 0 without
     /// one, 1 or 2 (ADR-0102).
     [[nodiscard]] int caretRepeat() const;

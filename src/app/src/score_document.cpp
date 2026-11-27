@@ -22,6 +22,7 @@
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
+#include <elara/notation/symbol.hpp>
 
 #include "score_common.hpp"
 #include "when_done.hpp"
@@ -1285,6 +1286,110 @@ void ScoreDocument::setRepeats(int measure, const QVariantMap& repeats) {
         found != repeats.cend()) {
         execute(core::changeBarline(document_->song(), m, found->toBool()));
     }
+}
+
+QVariantMap ScoreDocument::signatureAt(int measure) const {
+    QVariantMap signature;
+    if (!document_ || measure < 0 ||
+        measure >= static_cast<int>(document_->song().measureCount())) {
+        return signature;
+    }
+    const core::MeasureHeader& header =
+        document_->song().measureHeader(static_cast<std::size_t>(measure));
+    signature.insert(QStringLiteral("numerator"), header.timeSignature.numerator());
+    signature.insert(QStringLiteral("denominator"), header.timeSignature.denominator());
+    signature.insert(QStringLiteral("fifths"), header.keySignature.fifths());
+    signature.insert(QStringLiteral("minor"), header.keySignature.mode() == core::KeyMode::Minor);
+    return signature;
+}
+
+QVariantMap ScoreDocument::symbolAt(int index, double x, double y) const {
+    const notation::EngravingFont* font = musicMetrics();
+    if (!pages_ || !pagesSong_ || font == nullptr || index < 0 ||
+        index >= static_cast<int>(pages_->size())) {
+        return {};
+    }
+    const notation::DisplayList& page = (*pages_)[static_cast<std::size_t>(index)];
+    const std::optional<notation::Symbol> symbol =
+        notation::symbolAt(page, {x, y}, notation::kEditedRoles, *font);
+    if (!document_ || !symbol || !symbol->staff) {
+        return {};
+    }
+    // The pages show this song, which an edit still being laid out is ahead
+    // of: what is found has to be in the song being edited as well.
+    const core::Song& song = *pagesSong_;
+    const notation::StaffBox& on = page.staves[*symbol->staff];
+    const auto has = [&symbol, &on](const core::Song& in) {
+        return symbol->measure < in.measureCount() && on.track < in.trackCount() &&
+               on.staff < in.track(on.track).staffCount();
+    };
+    if (!has(song) || !has(document_->song())) {
+        return {};
+    }
+    // What is drawn may be written again where a system starts: the measure
+    // to change is the one its value starts at.
+    std::size_t from = symbol->measure;
+    const auto startOfRun = [&song, &from](auto&& same) {
+        while (from > 0 && same(song.measureHeader(from - 1), song.measureHeader(from))) {
+            --from;
+        }
+    };
+    QString kind;
+    switch (symbol->role) {
+    case notation::Role::TimeSignature:
+        kind = QStringLiteral("time");
+        startOfRun([](const core::MeasureHeader& a, const core::MeasureHeader& b) {
+            return a.timeSignature == b.timeSignature;
+        });
+        break;
+    case notation::Role::KeySignature:
+        kind = QStringLiteral("key");
+        startOfRun([](const core::MeasureHeader& a, const core::MeasureHeader& b) {
+            return a.keySignature == b.keySignature;
+        });
+        break;
+    case notation::Role::Clef: {
+        // The "TAB" of a tablature and the clef of the drums are not chosen.
+        const core::Staff& staff = song.track(on.track).staff(on.staff);
+        if (on.view == notation::StaffView::Tablature ||
+            staff.clefAt(from) == core::Clef::Percussion) {
+            return {};
+        }
+        kind = QStringLiteral("clef");
+        while (from > 0 && !staff.measure(from).clef) {
+            --from;
+        }
+        break;
+    }
+    case notation::Role::Tempo:
+        // A swing mark is drawn as a tempo is; only the tempo is edited here.
+        if (from != 0 && std::ranges::none_of(song.measureHeader(from).tempoChanges,
+                                              [](const core::TempoChange& change) {
+                                                  return change.offset == core::Fraction{};
+                                              })) {
+            return {};
+        }
+        kind = QStringLiteral("tempo");
+        break;
+    case notation::Role::Section:
+        kind = QStringLiteral("section");
+        break;
+    case notation::Role::Chord:
+        kind = QStringLiteral("chord");
+        break;
+    case notation::Role::BeatText:
+        kind = QStringLiteral("text");
+        break;
+    default:
+        return {};
+    }
+    return {{QStringLiteral("kind"), kind},
+            {QStringLiteral("measure"), static_cast<int>(from)},
+            {QStringLiteral("shown"), static_cast<int>(symbol->measure)},
+            {QStringLiteral("rect"),
+             QRectF(symbol->box.x, symbol->box.y, symbol->box.width, symbol->box.height)},
+            {QStringLiteral("track"), static_cast<int>(on.track)},
+            {QStringLiteral("staff"), static_cast<int>(on.staff)}};
 }
 
 QVariantMap ScoreDocument::tempoAt(int measure) const {
