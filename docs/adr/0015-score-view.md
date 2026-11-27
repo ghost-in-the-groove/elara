@@ -25,7 +25,7 @@ than one large path (a page of notation and tablature in 5 ms instead of 28 ms,
 `docs/performance.md`).
 
 **Bundled fonts.** The app embeds Bravura (music) and Arimo (text, regular and
-italic) as Qt resources, so it paints the same wherever it is installed and
+italic, and bold since ADR-0133) as Qt resources, so it paints the same wherever it is installed and
 without system fonts. Arimo is metric-compatible with Arial and Helvetica, the
 widths that layout assumes for text (`textWidth()`). Both are SIL OFL 1.1,
 downloaded at configure time as pinned files checked against their SHA-256.

@@ -49,7 +49,7 @@
 <text class="t chord" x="49.672" y="26.048" style="font-size:2px" text-anchor="middle" stroke="none">F</text>
 <text class="t chord" x="57.032" y="26.048" style="font-size:2px" text-anchor="middle" stroke="none">C</text>
 <text class="t beatText" x="41.358" y="23.57" style="font-size:1.8px;font-style:italic" text-anchor="start" stroke="none">softly</text>
-<text class="t tempo" x="17.831" y="21.2" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="17.831" y="21.2" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M17.535,29.111 C18.241,28.605 19.652,28.605 20.358,29.111 C19.652,28.685 18.241,28.685 17.535,29.111Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M27.381,28.611 C27.776,28.105 28.566,28.105 28.961,28.611 C28.566,28.185 27.776,28.185 27.381,28.611Z"/>

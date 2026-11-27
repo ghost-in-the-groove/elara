@@ -72,7 +72,7 @@
 <text class="t chord" x="20.501" y="23.62" style="font-size:2px" text-anchor="middle" stroke="none">F</text>
 <text class="t beatText" x="36.646" y="21.142" style="font-size:1.8px;font-style:italic" text-anchor="start" stroke="none">Calmer</text>
 <text class="t lyric" x="37.236" y="36.365" style="font-size:1.9px" text-anchor="middle" stroke="none">la</text>
-<text class="t tempo" x="21.507" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 120</text>
-<text class="t tempo" x="38.241" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 80</text>
+<text class="t tempo" x="21.507" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 120</text>
+<text class="t tempo" x="38.241" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 80</text>
 </g>
 </svg>

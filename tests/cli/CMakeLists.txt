@@ -994,6 +994,11 @@ add_test(NAME cli.render_gradual_tempo COMMAND elara-cli --json render "${ELARA_
 set_tests_properties(cli.render_gradual_tempo PROPERTIES
   FIXTURES_REQUIRED cli_gradual
   PASS_REGULAR_EXPRESSION "\"tempo\":8,")
+# Each text says its face (ADR-0133): the tempo in bold, "accel." in italics.
+add_test(NAME cli.render_text_faces COMMAND elara-cli --json render "${ELARA_CLI_GRADUAL}")
+set_tests_properties(cli.render_text_faces PROPERTIES
+  FIXTURES_REQUIRED cli_gradual
+  PASS_REGULAR_EXPRESSION "{\"text\":\"= 60\",\"role\":\"tempo\",[^}]*\"face\":\"bold\",[^}]*},{\"text\":\"accel\\.\",\"role\":\"tempo\",[^}]*\"face\":\"italic\",")
 add_test(NAME cli.edit_rejects_gradual_word
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-gradual 1 maybe")
 set_tests_properties(cli.edit_rejects_gradual_word PROPERTIES

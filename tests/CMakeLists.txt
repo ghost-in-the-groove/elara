@@ -145,7 +145,8 @@ if(TARGET elara)
       "${ELARA_FONT_DIR}/Bravura.otf"
       "${ELARA_FONT_DIR}/Bravura.json"
       "${ELARA_FONT_DIR}/Arimo.ttf"
-      "${ELARA_FONT_DIR}/Arimo-Italic.ttf")
+      "${ELARA_FONT_DIR}/Arimo-Italic.ttf"
+      "${ELARA_FONT_DIR}/Arimo-Bold.ttf")
   target_compile_definitions(elara_app_tests PRIVATE
     ELARA_APP_ICON_SVG="${PROJECT_SOURCE_DIR}/src/app/icons/elara.svg"
     ELARA_FONT_DIR="${ELARA_FONT_DIR}"

@@ -199,6 +199,29 @@ void Startup::queueSteps() {
         queueTunerFollowsTrack();
     }
     if (options_.smokeTest) {
+        // The song opened with its page across the view, at most at the
+        // reading zoom (ADR-0133).
+        steps_.emplace_back([this] {
+            auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+            if (view == nullptr) {
+                failure_ = QStringLiteral("no score view");
+                return false;
+            }
+            if (view->property("settling").toBool()) {
+                again_ = true;
+                return false;
+            }
+            double across = 0.0;
+            QMetaObject::invokeMethod(view, "widthZoom", Q_RETURN_ARG(double, across));
+            const double expected = std::min(view->property("readingZoom").toDouble(), across);
+            const double zoom = view->property("zoom").toDouble();
+            if (expected <= 0.0 || std::abs(zoom - expected) > 1e-6) {
+                failure_ = QStringLiteral("the song opened at %1 %, not %2 %")
+                               .arg(zoom * 100.0)
+                               .arg(expected * 100.0);
+            }
+            return false;
+        });
         // The file opened went to the top of the recent scores (kept only in
         // memory during a check), and the welcome pane's list shows it.
         steps_.emplace_back([this] {

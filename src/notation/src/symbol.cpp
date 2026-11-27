@@ -83,7 +83,7 @@ std::vector<Piece> piecesOf(const DisplayList& list, std::span<const Role> roles
         if (!wanted(roles, text.role) || text.text.empty()) {
             continue;
         }
-        const double width = textWidth(text.text, text.size);
+        const double width = textWidth(text);
         const double left = text.align == TextAlign::Left     ? text.origin.x
                             : text.align == TextAlign::Centre ? text.origin.x - (width / 2.0)
                                                               : text.origin.x - width;

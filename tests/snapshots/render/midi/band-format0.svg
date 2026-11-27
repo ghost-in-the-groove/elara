@@ -268,8 +268,8 @@
 <rect class="knockout" x="100.649" y="52.988" width="1.289" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="101.294" y="54.428" style="font-size:1.8px" text-anchor="middle" stroke="none">3</text>
 <text class="t lyric" x="40.292" y="71.187" style="font-size:1.9px" text-anchor="middle" stroke="none">la</text>
-<text class="t tempo" x="41.297" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
-<text class="t tempo" x="73.578" y="18.772" style="font-size:2px" text-anchor="start" stroke="none">= 80</text>
+<text class="t tempo" x="41.297" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 100</text>
+<text class="t tempo" x="73.578" y="18.772" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 80</text>
 <text class="t trackName" x="28.107" y="30.281" style="font-size:1.9px" text-anchor="end" stroke="none">Electric Bass (finger)</text>
 <text class="t trackName" x="28.107" y="50.025" style="font-size:1.9px" text-anchor="end" stroke="none">Acoustic Guitar (steel)</text>
 <text class="t trackName" x="28.107" y="64.964" style="font-size:1.9px" text-anchor="end" stroke="none">Flute</text>

@@ -62,9 +62,22 @@ std::string_view anchor(TextAlign align) {
     return "middle";
 }
 
+// What the style of a text adds for its face.
+std::string_view faceStyle(TextFace face) {
+    switch (face) {
+    case TextFace::Italic:
+        return ";font-style:italic";
+    case TextFace::Bold:
+        return ";font-weight:bold";
+    case TextFace::Regular:
+        break;
+    }
+    return "";
+}
+
 // The left edge of a text drawn at its origin with its alignment.
 double textLeft(const TextItem& text) {
-    const double width = textWidth(text.text, text.size);
+    const double width = textWidth(text);
     switch (text.align) {
     case TextAlign::Left:
         return text.origin.x;
@@ -158,15 +171,13 @@ std::string toSvg(const DisplayList& list, const SvgOptions& options) {
                 R"(<rect class="knockout" x="{}" y="{}" width="{}" height="{}" fill="white" stroke="none"/>)"
                 "\n",
                 number(textLeft(text) - pad), number(text.origin.y - capHeight(text.size) - pad),
-                number(textWidth(text.text, text.size) + 2 * pad),
-                number(capHeight(text.size) + 2 * pad));
+                number(textWidth(text) + 2 * pad), number(capHeight(text.size) + 2 * pad));
         }
         svg += std::format(
             R"(<text class="t {}" x="{}" y="{}" style="font-size:{}px{}" text-anchor="{}" stroke="none">{}</text>)"
             "\n",
             roleName(text.role), number(text.origin.x), number(text.origin.y), number(text.size),
-            text.italic ? ";font-style:italic" : "", anchor(text.align),
-            escapeAttribute(text.text));
+            faceStyle(text.face), anchor(text.align), escapeAttribute(text.text));
     }
     for (const CurveItem& curve : list.curves) {
         writeCurve(svg, curve);

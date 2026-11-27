@@ -219,10 +219,11 @@ ApplicationWindow {
         id: score
 
         recoveryFolder: window.recoveryFolder
-        // A new song starts at its top, at paper size when it fits. A file
-        // opened or saved goes to the top of the recent scores.
+        // A new song starts at its top, its page across the view up to the
+        // reading zoom. A file opened or saved goes to the top of the recent
+        // scores.
         onSourceChanged: {
-            scoreView.fitPaper();
+            scoreView.fitPage();
             scoreView.toTop();
             if (source.toString().length > 0)
                 recent.add(source);

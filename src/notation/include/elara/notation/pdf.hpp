@@ -29,8 +29,9 @@ struct PdfOptions {
 /// from x = 0 to its width and from its top to its bottom, `margin` around,
 /// at `staffSpace` points per staff space. Glyphs are shapes drawn from
 /// `font`'s outlines, each written once and placed where it is used; texts
-/// are in the PDF's standard Helvetica (Helvetica-Oblique for italics), in
-/// the Windows Latin-1 encoding ("?" for other characters).
+/// are in the PDF's standard Helvetica (Helvetica-Oblique for italics,
+/// Helvetica-Bold for bold), in the Windows Latin-1 encoding ("?" for other
+/// characters).
 [[nodiscard]] std::string toPdf(std::span<const DisplayList> pages, const FontOutlines& font,
                                 const PdfOptions& options = {});
 

@@ -48,6 +48,7 @@ using elara::notation::roleName;
 using elara::notation::StaffSelection;
 using elara::notation::StaffView;
 using elara::notation::TextAlign;
+using elara::notation::TextFace;
 using elara::notation::TextItem;
 using elara::notation::textWidth;
 
@@ -168,7 +169,7 @@ TEST_CASE("Beat text: starts at its beat, in italics, above the staff",
     REQUIRE(heads.size() == 2);
     for (std::size_t i = 0; i < 2; ++i) {
         CHECK(found[i].align == TextAlign::Left);
-        CHECK(found[i].italic);
+        CHECK(found[i].face == TextFace::Italic);
         CHECK_THAT(found[i].origin.x, WithinAbs(heads[i].origin.x, kEpsilon));
         CHECK(found[i].measure == 0);
         CHECK(textBottom(found[i]) < glyphTop(heads[i]));

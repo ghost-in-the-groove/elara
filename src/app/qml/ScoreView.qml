@@ -97,10 +97,13 @@ Item {
     /// Whether one of the sheets over the score is open.
     readonly property bool sheetOpen: measurePopup.visible || chordPopup.visible || textPopup.visible
                                       || lyricsPopup.visible || symbolCard.visible
-    /// What the zoom follows as the room for the pages changes: the paper's
-    /// size ("paper", as a song opens), the page's width ("width"), or nothing
-    /// once it was chosen by hand ("").
-    property string fit: "paper"
+    /// What the zoom follows as the room for the pages changes: the page's
+    /// width up to the reading zoom ("page", as a song opens), the page's
+    /// width ("width"), or nothing once it was chosen by hand ("").
+    property string fit: "page"
+    /// The largest a song opens at (ADR-0133): its page across the view, but
+    /// no larger than this on a wide screen.
+    readonly property real readingZoom: 1.5
 
     function setZoom(value: real) {
         zoom = Math.max(minZoom, Math.min(maxZoom, value));
@@ -121,10 +124,10 @@ Item {
         fit = "width";
         setZoom(widthZoom());
     }
-    /// Paper size, or smaller when the view is narrower.
-    function fitPaper() {
-        fit = "paper";
-        setZoom(Math.min(1.0, widthZoom()));
+    /// The page across the view, up to the reading zoom.
+    function fitPage() {
+        fit = "page";
+        setZoom(Math.min(readingZoom, widthZoom()));
     }
     /// Fits again once the view has its new width: a panel that slides in or
     /// out changes it on every frame, and each zoom paints the pages again.
@@ -140,8 +143,8 @@ Item {
         onTriggered: {
             if (root.fit === "width")
                 root.setZoom(root.widthZoom());
-            else if (root.fit === "paper")
-                root.setZoom(Math.min(1.0, root.widthZoom()));
+            else if (root.fit === "page")
+                root.setZoom(Math.min(root.readingZoom, root.widthZoom()));
         }
     }
     function toTop() {

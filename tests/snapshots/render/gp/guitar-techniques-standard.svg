@@ -152,8 +152,8 @@
 <text class="t volta" x="38.289" y="24.451" style="font-size:1.7px" text-anchor="start" stroke="none">1., 2.</text>
 <text class="t volta" x="53.74" y="24.451" style="font-size:1.7px" text-anchor="start" stroke="none">3.</text>
 <text class="t repeat" x="50.92" y="24.451" style="font-size:1.7px" text-anchor="end" stroke="none">x3</text>
-<text class="t tempo" x="23.884" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 100</text>
-<text class="t tempo" x="47.116" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 80</text>
+<text class="t tempo" x="23.884" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 100</text>
+<text class="t tempo" x="47.116" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 80</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M25.879,50.221 C26.573,50.722 27.961,50.472 28.655,49.721 C27.961,50.552 26.573,50.802 25.879,50.221Z"/>
 <path class="tie" stroke-width="0.1" stroke-linejoin="round" d="M42.578,42.571 C43.283,42.064 44.695,42.064 45.4,42.571 C44.695,42.144 43.283,42.144 42.578,42.571Z"/>

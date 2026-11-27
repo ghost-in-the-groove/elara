@@ -77,7 +77,7 @@
 <text class="t lyric" x="41.924" y="32.045" style="font-size:1.9px" text-anchor="middle" stroke="none">song</text>
 <text class="t lyric" x="45.481" y="32.045" style="font-size:1.9px" text-anchor="middle" stroke="none">of</text>
 <text class="t lyric" x="49.038" y="32.045" style="font-size:1.9px" text-anchor="middle" stroke="none">mine</text>
-<text class="t tempo" x="27.275" y="21.776" style="font-size:2px" text-anchor="start" stroke="none">= 96</text>
+<text class="t tempo" x="27.275" y="21.776" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 96</text>
 <text class="t trackName" x="14.908" y="26.872" style="font-size:1.9px" text-anchor="end" stroke="none">Melody</text>
 <text class="t trackName" x="14.908" y="45.302" style="font-size:1.9px" text-anchor="end" stroke="none">Piano</text>
 </g>

@@ -149,7 +149,7 @@
 <text class="t bend" x="46.389" y="59.439" style="font-size:1.35px" text-anchor="start" stroke="none">w/bar -1/2</text>
 <text class="t technique" x="42.415" y="56.789" style="font-size:1.55px;font-style:italic" text-anchor="start" stroke="none">let ring</text>
 <text class="t technique" x="28.3" y="55.089" style="font-size:1.55px" text-anchor="middle" stroke="none">T</text>
-<text class="t tempo" x="19.468" y="24.204" style="font-size:2px" text-anchor="start" stroke="none">= 75</text>
+<text class="t tempo" x="19.468" y="24.204" style="font-size:2px;font-weight:bold" text-anchor="start" stroke="none">= 75</text>
 <text class="t credit" x="60" y="165.429" style="font-size:1.8px" text-anchor="middle" stroke="none">CC0 1.0</text>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M22.3,37.948 C23.05,37.718 24.55,38.673 25.3,39.857 C24.55,38.753 23.05,37.798 22.3,37.948Z"/>
 <path class="slur" stroke-width="0.1" stroke-linejoin="round" d="M48.699,46.782 C49.18,47.528 50.142,48.115 50.623,47.957 C50.142,48.144 49.18,47.556 48.699,46.782Z"/>
