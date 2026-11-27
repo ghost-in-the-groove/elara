@@ -142,6 +142,7 @@ one that replaces them.
 | [0146](0146-tracks-share-a-soundfont.md) | Tracks share a SoundFont | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
+| [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
 
 ## Template
 
