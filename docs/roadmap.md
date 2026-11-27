@@ -342,7 +342,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       panel at a time in a narrow window
 - [x] The window remembers its size, its panels, its zoom and the dark page
       from one run to the next (ADR-0137)
-- [ ] A command palette: every command by name, with its keys
+- [x] A command palette: every command by name, with its keys; recent ones
+      first, a measure number, a section, "tempo 90" or "3/4" typed into it
+      (ADR-0135)
 
 ## Milestone 6 - Practice tools
 

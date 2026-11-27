@@ -101,6 +101,26 @@ TEST_CASE("editing: a fret typed on the free slot adds a beat of the input durat
     CHECK(editing.beats(0)[1].duration.value() == NoteValue::Eighth);
 }
 
+TEST_CASE("editing: the caret goes to a measure's first beat, and stays in the song") {
+    Editing editing;
+    editing.fret(3);
+    editing.move(Move::NextBeat);
+    editing.fret(5);
+    editing.move(Move::StringDown);
+    REQUIRE(editing.score.caret().string == 2);
+
+    // What "go to measure 5" does: the first beat, on the same string.
+    editing.score.caretToMeasure(4);
+    CHECK(editing.score.caret() == Caret{.measure = 4, .string = 2});
+    editing.score.caretToMeasure(0);
+    CHECK(editing.score.caret() == Caret{.string = 2});
+    // A measure past the end is the last; none before the first.
+    editing.score.caretToMeasure(100);
+    CHECK(editing.score.caretMeasure() == static_cast<int>(editing.measures()) - 1);
+    editing.score.caretToMeasure(-1);
+    CHECK(editing.score.caretMeasure() == static_cast<int>(editing.measures()) - 1);
+}
+
 TEST_CASE("editing: the input duration follows the beat the caret moves to") {
     Editing editing;
     editing.score.setInputValue(8);
