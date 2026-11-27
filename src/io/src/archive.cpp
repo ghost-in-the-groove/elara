@@ -30,11 +30,11 @@ namespace elara::io::detail {
 
 namespace {
 
-// Writes `content` to `path`, replacing it, and returns once the system has
-// put the data on the disk: renaming a file whose data still sits in a cache
-// can, after a power cut, leave the new name over an empty or partial file on
-// some file systems. False on any failure.
-bool writeToDisk(const std::filesystem::path& path, std::string_view content) {
+// Writes `pieces`, one after the other, to `path`, replacing it, and returns
+// once the system has put the data on the disk: renaming a file whose data
+// still sits in a cache can, after a power cut, leave the new name over an
+// empty or partial file on some file systems. False on any failure.
+bool writeToDisk(const std::filesystem::path& path, std::span<const std::string_view> pieces) {
 #if defined(_WIN32)
     const HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                     FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -42,12 +42,15 @@ bool writeToDisk(const std::filesystem::path& path, std::string_view content) {
         return false;
     }
     bool ok = true;
-    for (std::size_t done = 0; ok && done < content.size();) {
-        const auto chunk =
-            static_cast<DWORD>(std::min<std::size_t>(content.size() - done, 1U << 30U));
-        DWORD written = 0;
-        ok = WriteFile(file, content.data() + done, chunk, &written, nullptr) != 0 && written > 0;
-        done += written;
+    for (const std::string_view content : pieces) {
+        for (std::size_t done = 0; ok && done < content.size();) {
+            const auto chunk =
+                static_cast<DWORD>(std::min<std::size_t>(content.size() - done, 1U << 30U));
+            DWORD written = 0;
+            ok = WriteFile(file, content.data() + done, chunk, &written, nullptr) != 0 &&
+                 written > 0;
+            done += written;
+        }
     }
     ok = ok && FlushFileBuffers(file) != 0;
     return CloseHandle(file) != 0 && ok;
@@ -57,14 +60,16 @@ bool writeToDisk(const std::filesystem::path& path, std::string_view content) {
         return false;
     }
     bool ok = true;
-    for (std::size_t done = 0; ok && done < content.size();) {
-        const ssize_t written = ::write(file, content.data() + done, content.size() - done);
-        if (written < 0 && errno == EINTR) {
-            continue;
-        }
-        ok = written > 0;
-        if (ok) {
-            done += static_cast<std::size_t>(written);
+    for (const std::string_view content : pieces) {
+        for (std::size_t done = 0; ok && done < content.size();) {
+            const ssize_t written = ::write(file, content.data() + done, content.size() - done);
+            if (written < 0 && errno == EINTR) {
+                continue;
+            }
+            ok = written > 0;
+            if (ok) {
+                done += static_cast<std::size_t>(written);
+            }
         }
     }
 #if defined(__APPLE__)
@@ -262,9 +267,14 @@ template std::vector<std::uint8_t> writeZip(std::span<const ZipEntry> entries);
 template std::string writeZip(std::span<const ZipEntry> entries);
 
 void writeFileAtomically(const std::filesystem::path& path, std::string_view content) {
+    writeFileAtomically(path, std::span(&content, 1));
+}
+
+void writeFileAtomically(const std::filesystem::path& path,
+                         std::span<const std::string_view> pieces) {
     std::filesystem::path temporary = path;
     temporary += ".saving";
-    if (!writeToDisk(temporary, content)) {
+    if (!writeToDisk(temporary, pieces)) {
         std::error_code ignored;
         std::filesystem::remove(temporary, ignored);
         throw std::runtime_error(std::format("cannot write {}", displayPath(path)));

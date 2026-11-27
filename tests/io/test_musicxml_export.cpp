@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <fstream>
+#include <ios>
 #include <random>
 #include <span>
 #include <stdexcept>
@@ -1510,6 +1512,27 @@ TEST_CASE("MusicXML export: parts written on several threads give the same docum
         CHECK(parallel.data == serial.data);
         CHECK(parallel.warnings == serial.warnings);
     }
+}
+
+TEST_CASE("MusicXML export: a file written from parts on several threads holds the same document",
+          "[musicxml][export]") {
+    // The parts go to the disk one after the other without being joined first.
+    const core::Song song = everythingSong();
+    const ExportResult serial = exportMusicXml(song, {.threads = 1});
+    const auto directory = std::filesystem::temp_directory_path() / "elara-musicxml-parts-test";
+    std::filesystem::remove_all(directory);
+    std::filesystem::create_directories(directory);
+    for (const unsigned threads : {1U, 2U, 3U, 8U}) {
+        INFO(threads << " threads");
+        const auto path = directory / std::format("song-{}.musicxml", threads);
+        CHECK(exportMusicXmlFile(song, path, {.threads = threads}) == serial.warnings);
+        std::ifstream in(path, std::ios::binary | std::ios::ate);
+        std::string written(static_cast<std::size_t>(in.tellg()), ' ');
+        in.seekg(0);
+        in.read(written.data(), static_cast<std::streamsize>(written.size()));
+        CHECK(written == serial.data);
+    }
+    std::filesystem::remove_all(directory);
 }
 
 TEST_CASE("MusicXML export: an .mxl packed from parts written on several threads holds the score",
