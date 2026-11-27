@@ -2180,6 +2180,14 @@ void Startup::tick() {
         finish(false, editProblem_);
         return;
     }
+    // A window given another size lays its items out at that size once its
+    // resize event comes, which a loaded machine can deliver after the last
+    // step: the bars are measured then.
+    if (const QQuickItem* content = window_->contentItem();
+        content != nullptr && content->size() != QSizeF(window_->size()) &&
+        clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
+        return;
+    }
     if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
         finish(false, overlap);
         return;
@@ -2790,7 +2798,11 @@ QString Startup::overlappingBars() const {
             const QRectF rect =
                 item->mapRectToScene(QRectF(0.0, 0.0, item->width(), item->height()));
             if (rect.left() < -0.5 || rect.right() > window_->width() + 0.5) {
-                return QStringLiteral("%1 leaves the window").arg(name);
+                return QStringLiteral("%1 (from %2 to %3) leaves the window (%4 wide)")
+                    .arg(name)
+                    .arg(rect.left())
+                    .arg(rect.right())
+                    .arg(window_->width());
             }
             for (const auto& [other, otherRect] : shown) {
                 if (rect.intersects(otherRect)) {
