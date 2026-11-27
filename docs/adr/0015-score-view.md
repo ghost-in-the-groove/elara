@@ -33,6 +33,10 @@ downloaded at configure time as pinned files checked against their SHA-256.
 **Pages as textures.** `ScorePage` (a `QQuickItem`) shows one page: it paints
 the page on a worker thread (`QtConcurrent`) into a `QImage` at its size in
 device pixels and hands it to the scene graph as a texture (`QSGImageNode`).
+A page on opaque paper is opaque everywhere, so its texture is marked opaque
+(`QQuickWindow::TextureIsOpaque`): the scene graph draws it in its opaque pass,
+without blending, and skips the paper under it, fill rate that integrated GPUs
+notice on large windows.
 While its size changes (zooming), the last texture is stretched by the GPU and
 the page is painted again once the size has not changed for 120 ms. Textures
 are capped at 8192 pixels a side and 32 million pixels; past that a page is
