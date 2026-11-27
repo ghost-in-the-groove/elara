@@ -9,7 +9,6 @@
 #include <CLI/CLI.hpp>
 
 #include <exception>
-#include <format>
 #include <iostream>
 
 #ifdef _WIN32
@@ -22,8 +21,12 @@ namespace {
 
 int runVersion(bool json) {
     if (json) {
-        std::cout << std::format(R"({{"name":"elara","version":"{}"}})", elara::core::version())
-                  << '\n';
+        elara::cli::JsonWriter out;
+        out.beginObject()
+            .field("name", "elara")
+            .field("version", elara::core::version())
+            .endObject();
+        std::cout << out.text() << '\n';
     } else {
         std::cout << "elara " << elara::core::version() << '\n';
     }
