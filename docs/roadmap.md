@@ -301,7 +301,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
         syllables, chord names and dynamics, and measures wider than the page,
         found on finished pages and reported by `render --issues` (ADR-0150)
-  - [ ] Two voices on one staff a second apart or in unison do not collide
+  - [x] Two voices on one staff a second apart or in unison do not collide
+        (ADR-0151)
   - [ ] No layout issue over the corpus and songs made at random
   - [ ] System and page breaks stored per measure, in files and the CLI
   - [ ] The line breaker keeps the stored breaks; the cache follows them

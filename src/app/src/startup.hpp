@@ -53,6 +53,12 @@ struct StartupOptions {
     /// Where the window keeps its state (`--window-state`); the smoke test
     /// then changes it, or finds it as the run before left it (ADR-0137).
     QString windowState;
+    /// Once the window is ready, stay open this many seconds doing nothing of
+    /// the check's own, then quit (`--hold`): what the app costs meanwhile is
+    /// measured from outside (scripts/usage.py).
+    std::optional<double> hold;
+    /// Start playback once the window is ready (`--play`).
+    bool play = false;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -137,6 +143,8 @@ private:
     QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
+    bool played_ = false;         ///< `--play` started playback
+    bool held_ = false;           ///< `--hold` has held the window open
     qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
     double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
     /// What playback played before the mix changed.
