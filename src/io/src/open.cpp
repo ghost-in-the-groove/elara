@@ -11,7 +11,6 @@
 #include <initializer_list>
 #include <span>
 #include <string>
-#include <utility>
 
 namespace elara::io {
 
@@ -34,11 +33,7 @@ std::expected<ImportResult, FormatError> openFile(const std::filesystem::path& p
     std::ranges::transform(extension, extension.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (extension == ".elara") {
-        auto song = loadNative(path);
-        if (!song) {
-            return std::unexpected(std::move(song.error()));
-        }
-        return ImportResult{.song = std::move(*song), .warnings = {}};
+        return openNative(path);
     }
     if (among(extension, {".musicxml", ".xml", ".mxl"})) {
         return importMusicXmlFile(path);
