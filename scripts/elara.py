@@ -784,7 +784,13 @@ def cmd_package(args: argparse.Namespace) -> int:
     out = ROOT / "build" / "package"
     stage = out / "stage"
     shutil.rmtree(stage, ignore_errors=True)
-    if (code := run(["cmake", "--install", str(build_dir(preset)), "--prefix", str(stage)])) != 0:
+    install = ["cmake", "--install", str(build_dir(preset)), "--prefix", str(stage)]
+    if not IS_WINDOWS and not IS_MAC:
+        # The release preset builds with debug information; on Linux it would
+        # stay inside the programs (ADR-0145). Windows keeps it in .pdb files
+        # beside the build, macOS in the object files.
+        install.append("--strip")
+    if (code := run(install)) != 0:
         return code
     if not args.no_smoke_test and (code := _smoke_test_install(stage)) != 0:
         return code

@@ -1604,7 +1604,10 @@ namespace {
 std::expected<ImportResult, FormatError> importScore(std::span<char> xml, std::string_view parts,
                                                      const GuitarProOptions& options) {
     pugi::xml_document document;
-    const pugi::xml_parse_result parsed = document.load_buffer_inplace(xml.data(), xml.size());
+    // Each element's text kept in the element (see musicxml.cpp): about half
+    // the nodes for a score whose elements nearly all hold one value.
+    const pugi::xml_parse_result parsed = document.load_buffer_inplace(
+        xml.data(), xml.size(), pugi::parse_default | pugi::parse_embed_pcdata);
     if (!parsed) {
         return std::unexpected(FormatError{std::format("Guitar Pro: damaged score: {} at byte {}",
                                                        parsed.description(), parsed.offset)});

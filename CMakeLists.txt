@@ -31,6 +31,25 @@ endif()
 # Every executable (app, CLI, tests) lands in build/<preset>/bin.
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
+# The optimised build with debug information (the release preset, which the
+# packages and the benchmarks use) as MSVC's own release build (ADR-0144):
+# CMake's flags for it inline only functions marked inline (/Ob1), and its
+# /DEBUG link is incremental, which pads every function and keeps unreferenced
+# and identical code (/DEBUG turns /OPT:REF and /OPT:ICF off). The debug
+# information still goes to the .pdb beside each program.
+if(MSVC)
+  foreach(lang C CXX)
+    string(REPLACE "/Ob1" "/Ob2" CMAKE_${lang}_FLAGS_RELWITHDEBINFO
+      "${CMAKE_${lang}_FLAGS_RELWITHDEBINFO}")
+  endforeach()
+  foreach(kind EXE SHARED MODULE)
+    string(REPLACE "/INCREMENTAL" "" _elara_link_flags
+      "${CMAKE_${kind}_LINKER_FLAGS_RELWITHDEBINFO}")
+    set(CMAKE_${kind}_LINKER_FLAGS_RELWITHDEBINFO
+      "${_elara_link_flags} /INCREMENTAL:NO /OPT:REF /OPT:ICF")
+  endforeach()
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
 include(ElaraWarnings)
