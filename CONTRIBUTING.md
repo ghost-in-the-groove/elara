@@ -16,7 +16,7 @@ Always go through the task runner (use `py` instead of `python` on Windows):
 | Command | What it does |
 |---|---|
 | `python scripts/elara.py doctor` | Check the toolchain; run first if anything fails to configure |
-| `python scripts/elara.py check` | **The gate.** Format check, architecture guard, build, all tests |
+| `python scripts/elara.py check` | **The gate.** Format check, architecture guard, the scripts' tests and version, build, all tests |
 | `python scripts/elara.py build` | Configure (first time) and build the `dev` preset |
 | `python scripts/elara.py test -R audio` | Build, then run tests whose name matches a regex |
 | `python scripts/elara.py test --preset sanitize` | Build and run every test but the app's with AddressSanitizer and UndefinedBehaviorSanitizer (GCC or Clang; CI's `sanitize` job, ADR-0105) |
@@ -26,6 +26,7 @@ Always go through the task runner (use `py` instead of `python` on Windows):
 | `python scripts/elara.py cli -- --json version` | Run the headless CLI |
 | `python scripts/elara.py app` | Launch the desktop app |
 | `python scripts/elara.py translations` | Refresh the UI translation files after changing UI strings |
+| `python scripts/elara.py release version` | Print the version the sources carry; `release prepare X.Y.Z` sets a new one and dates the changelog's Unreleased section, never tagging or pushing (`docs/releasing.md`, ADR-0138) |
 
 The runner loads MSVC on Windows by itself; do not hand-roll `cmake`/`vcvars` calls.
 Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:

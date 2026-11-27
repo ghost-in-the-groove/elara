@@ -342,3 +342,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
         smoke-tested by CI with `elara.py package --installers` (ADR-0065)
 - [x] Packages built with the vcpkg that CI tests, at the manifest's baseline
 - [ ] Release automation and 1.0
+  - [x] Releases drafted from a version tag: the version checked across the
+        sources, a changelog, the packages and their checksums on a draft
+        that is published by hand (`elara.py release`, ADR-0138)
+  - [ ] 1.0
