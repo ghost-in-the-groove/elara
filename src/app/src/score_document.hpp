@@ -651,6 +651,9 @@ private:
     void keepRecovery();
     bool execute(std::unique_ptr<core::Command> command);
     bool writeExport(const QString& local, const io::ExportResult& result, const QString& format);
+    /// Tells that `local` was exported, and what its format left out.
+    void reportExport(const QString& local, const std::vector<std::string>& warnings,
+                      const QString& format);
     void setImportWarnings(const QStringList& warnings);
     /// Another song: the session starts on its track `track`.
     void startSession(std::size_t track);

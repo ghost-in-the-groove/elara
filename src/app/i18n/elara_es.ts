@@ -272,19 +272,19 @@
     </message>
     <message>
         <source>Bend</source>
-        <translation>Bending</translation>
+        <translation>Bend</translation>
     </message>
     <message>
         <source>Bend and release</source>
-        <translation>Bending y vuelta</translation>
+        <translation>Bend y vuelta</translation>
     </message>
     <message>
         <source>Pre-bend</source>
-        <translation>Pre-bending</translation>
+        <translation>Pre-bend</translation>
     </message>
     <message>
         <source>Pre-bend and release</source>
-        <translation>Pre-bending y vuelta</translation>
+        <translation>Pre-bend y vuelta</translation>
     </message>
     <message>
         <source>Slide</source>
@@ -296,7 +296,7 @@
     </message>
     <message>
         <source>Vibrato, accent and ornaments</source>
-        <translation>Vibrato, acento y adornos</translation>
+        <translation>Vibrato, acento y ornamentos</translation>
     </message>
     <message>
         <source>Slight vibrato</source>
@@ -360,7 +360,7 @@
     </message>
     <message>
         <source>Slur to the next note</source>
-        <translation>Ligadura con la nota siguiente</translation>
+        <translation>Ligadura de expresión con la nota siguiente</translation>
     </message>
     <message>
         <source>Grace note</source>
@@ -424,15 +424,15 @@
     </message>
     <message>
         <source>Tremolo picking in eighths</source>
-        <translation>Trémolo en corcheas</translation>
+        <translation>Trémolo de púa en corcheas</translation>
     </message>
     <message>
         <source>Tremolo picking in sixteenths</source>
-        <translation>Trémolo en semicorcheas</translation>
+        <translation>Trémolo de púa en semicorcheas</translation>
     </message>
     <message>
         <source>Tremolo picking in thirty-seconds</source>
-        <translation>Trémolo en fusas</translation>
+        <translation>Trémolo de púa en fusas</translation>
     </message>
     <message>
         <source>Whammy bar</source>
@@ -483,7 +483,7 @@
     </message>
     <message>
         <source>Triplet (Ctrl+3); a right click for other tuplets (Ctrl+2 to Ctrl+9)</source>
-        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos (Ctrl+2 a Ctrl+9)</translation>
+        <translation>Tresillo (Ctrl+3); clic derecho para otros grupos irregulares (Ctrl+2 a Ctrl+9)</translation>
     </message>
     <message>
         <source>Duplet (2 in the time of 3)</source>
@@ -547,7 +547,7 @@
     </message>
     <message>
         <source>Measure: signatures, insert, delete (Ctrl+M)</source>
-        <translation>Compás: armadura, compás, insertar, borrar (Ctrl+M)</translation>
+        <translation>Compás: indicación de compás y armadura, insertar, borrar (Ctrl+M)</translation>
     </message>
 </context>
 <context>
@@ -617,7 +617,7 @@
     </message>
     <message>
         <source>Choose a SoundFont</source>
-        <translation>Elige una SoundFont</translation>
+        <translation>Elegir una SoundFont</translation>
     </message>
     <message>
         <source>SoundFonts (*.sf2 *.sf3)</source>
@@ -625,11 +625,11 @@
     </message>
     <message>
         <source>Choose an SFZ instrument for the guitars</source>
-        <translation>Elige un instrumento SFZ para las guitarras</translation>
+        <translation>Elegir un instrumento SFZ para las guitarras</translation>
     </message>
     <message>
         <source>Choose an SFZ instrument for the basses</source>
-        <translation>Elige un instrumento SFZ para los bajos</translation>
+        <translation>Elegir un instrumento SFZ para los bajos</translation>
     </message>
     <message>
         <source>SFZ instruments (*.sfz)</source>
@@ -765,7 +765,7 @@
     </message>
     <message>
         <source>Undo %1</source>
-        <translation>Deshacer %1</translation>
+        <translation>Deshacer: %1</translation>
     </message>
     <message>
         <source>Undo</source>
@@ -773,7 +773,7 @@
     </message>
     <message>
         <source>Redo %1</source>
-        <translation>Rehacer %1</translation>
+        <translation>Rehacer: %1</translation>
     </message>
     <message>
         <source>Redo</source>
@@ -809,7 +809,7 @@
     </message>
     <message>
         <source>Chord symbol…</source>
-        <translation>Acorde…</translation>
+        <translation>Cifrado…</translation>
     </message>
     <message>
         <source>Text…</source>
@@ -877,7 +877,7 @@
     </message>
     <message>
         <source>Count-in</source>
-        <translation>Cuenta de entrada</translation>
+        <translation>Cuenta previa</translation>
     </message>
     <message>
         <source>Opening the SoundFont…</source>
@@ -893,7 +893,7 @@
     </message>
     <message>
         <source>Use the included SoundFont</source>
-        <translation>Usar el SoundFont incluido</translation>
+        <translation>Usar la SoundFont incluida</translation>
     </message>
     <message>
         <source>Guitars: %1</source>
@@ -1188,7 +1188,7 @@
     </message>
     <message>
         <source>Endings</source>
-        <translation>Finales</translation>
+        <translation>Casillas</translation>
     </message>
     <message>
         <source>%1.</source>
@@ -1575,7 +1575,7 @@
     </message>
     <message>
         <source>Fit the page width (Ctrl+0)</source>
-        <translation>Ajustar al ancho de página (Ctrl+0)</translation>
+        <translation>Ajustar al ancho de la página (Ctrl+0)</translation>
     </message>
     <message>
         <source>Zoom in (Ctrl++)</source>
@@ -1586,7 +1586,7 @@
     <name>SymbolCard</name>
     <message>
         <source>Time signature</source>
-        <translation>Compás</translation>
+        <translation>Indicación de compás</translation>
     </message>
     <message>
         <source>Key signature</source>
@@ -1665,7 +1665,7 @@
     </message>
     <message>
         <source>Guitar, half step down</source>
-        <translation>Guitarra, un semitono abajo</translation>
+        <translation>Guitarra, medio tono abajo</translation>
     </message>
     <message>
         <source>Guitar, DADGAD</source>
@@ -1780,7 +1780,7 @@
     </message>
     <message>
         <source>Reference A4</source>
-        <translation>La4 de referencia</translation>
+        <translation>A4 de referencia</translation>
     </message>
     <message>
         <source>%1 Hz</source>
@@ -1788,7 +1788,7 @@
     </message>
     <message>
         <source>Reference pitch of A4</source>
-        <translation>Frecuencia de referencia del La4</translation>
+        <translation>Frecuencia de referencia de A4</translation>
     </message>
     <message>
         <source>Input</source>
@@ -1896,11 +1896,11 @@
     <name>elara::app::CaretEditor</name>
     <message>
         <source>Tie</source>
-        <translation>Ligadura</translation>
+        <translation>Ligadura de prolongación</translation>
     </message>
     <message>
         <source>Hammer-on or pull-off</source>
-        <translation>Hammer-on o pull-off</translation>
+        <translation>Ligado ascendente o descendente</translation>
     </message>
     <message>
         <source>Slide</source>
@@ -1908,7 +1908,7 @@
     </message>
     <message>
         <source>Bend</source>
-        <translation>Bending</translation>
+        <translation>Bend</translation>
     </message>
     <message>
         <source>Vibrato</source>
@@ -1916,7 +1916,7 @@
     </message>
     <message>
         <source>Palm mute</source>
-        <translation>Apagado con la palma</translation>
+        <translation>Palm mute</translation>
     </message>
     <message>
         <source>Dead note</source>
@@ -2092,7 +2092,7 @@
     </message>
     <message>
         <source>Tremolo picking 1/%1</source>
-        <translation>Trémolo 1/%1</translation>
+        <translation>Trémolo de púa 1/%1</translation>
     </message>
     <message>
         <source>Crescendo</source>
@@ -2232,7 +2232,7 @@
     </message>
     <message>
         <source>Dynamics go on notes: put the caret on one.</source>
-        <translation>Las dinámicas van en notas: pon el cursor en una.</translation>
+        <translation>Las dinámicas van sobre notas: pon el cursor en una.</translation>
     </message>
     <message>
         <source>Slide in from below</source>
@@ -2284,23 +2284,23 @@
     </message>
     <message>
         <source>Bend %1</source>
-        <translation>Bending %1</translation>
+        <translation>Bend %1</translation>
     </message>
     <message>
         <source>Bend and release %1</source>
-        <translation>Bending y vuelta %1</translation>
+        <translation>Bend y vuelta %1</translation>
     </message>
     <message>
         <source>Pre-bend %1</source>
-        <translation>Pre-bending %1</translation>
+        <translation>Pre-bend %1</translation>
     </message>
     <message>
         <source>Pre-bend and release %1</source>
-        <translation>Pre-bending y vuelta %1</translation>
+        <translation>Pre-bend y vuelta %1</translation>
     </message>
     <message>
         <source>Bend (custom curve)</source>
-        <translation>Bending (curva propia)</translation>
+        <translation>Bend (curva propia)</translation>
     </message>
 </context>
 <context>
@@ -2403,15 +2403,15 @@
     </message>
     <message>
         <source>Edit song info</source>
-        <translation>Editar los datos de la canción</translation>
+        <translation>Editar datos de la canción</translation>
     </message>
     <message>
         <source>Change tempo</source>
-        <translation>Cambiar el tempo</translation>
+        <translation>Cambiar tempo</translation>
     </message>
     <message>
         <source>Change mix</source>
-        <translation>Cambiar la mezcla</translation>
+        <translation>Cambiar mezcla</translation>
     </message>
     <message>
         <source>Rename track</source>
@@ -2427,11 +2427,11 @@
     </message>
     <message>
         <source>Change time signature</source>
-        <translation>Cambiar el compás</translation>
+        <translation>Cambiar indicación de compás</translation>
     </message>
     <message>
         <source>Change key signature</source>
-        <translation>Cambiar la armadura</translation>
+        <translation>Cambiar armadura</translation>
     </message>
     <message>
         <source>Enter note</source>
@@ -2479,19 +2479,19 @@
     </message>
     <message>
         <source>Guitar, open G</source>
-        <translation>Guitarra, Sol abierto</translation>
+        <translation>Guitarra, open G</translation>
     </message>
     <message>
         <source>Guitar, open D</source>
-        <translation>Guitarra, Re abierto</translation>
+        <translation>Guitarra, open D</translation>
     </message>
     <message>
         <source>Seven-string guitar</source>
-        <translation>Guitarra de siete cuerdas</translation>
+        <translation>Guitarra de 7 cuerdas</translation>
     </message>
     <message>
         <source>Eight-string guitar</source>
-        <translation>Guitarra de ocho cuerdas</translation>
+        <translation>Guitarra de 8 cuerdas</translation>
     </message>
     <message>
         <source>Bass, standard</source>
@@ -2503,11 +2503,11 @@
     </message>
     <message>
         <source>Five-string bass</source>
-        <translation>Bajo de cinco cuerdas</translation>
+        <translation>Bajo de 5 cuerdas</translation>
     </message>
     <message>
         <source>Six-string bass</source>
-        <translation>Bajo de seis cuerdas</translation>
+        <translation>Bajo de 6 cuerdas</translation>
     </message>
     <message>
         <source>Paste</source>
@@ -2535,7 +2535,7 @@
     </message>
     <message>
         <source>Change bend</source>
-        <translation>Cambiar bending</translation>
+        <translation>Cambiar bend</translation>
     </message>
     <message>
         <source>Change beat effects</source>
@@ -2563,7 +2563,7 @@
     </message>
     <message>
         <source>Change ornament</source>
-        <translation>Cambiar adorno</translation>
+        <translation>Cambiar ornamento</translation>
     </message>
     <message>
         <source>Change fingering</source>
@@ -2615,7 +2615,7 @@
     </message>
     <message>
         <source>Write out measure repeat</source>
-        <translation>Escribir la repetición de compás</translation>
+        <translation>Desplegar repetición de compás</translation>
     </message>
     <message numerus="yes">
         <source>%n strings</source>
@@ -2673,11 +2673,11 @@
     </message>
     <message>
         <source>%1/%2 is not a time signature.</source>
-        <translation>%1/%2 no es un compás válido.</translation>
+        <translation>%1/%2 no es una indicación de compás válida.</translation>
     </message>
     <message>
         <source>Endings are the times through a repeat, 1 to %1.</source>
-        <translation>Los finales son las veces que se pasa por una repetición, de 1 a %1.</translation>
+        <translation>Las casillas son las veces que se pasa por una repetición, de 1 a %1.</translation>
     </message>
     <message>
         <source>A repeated section plays 2 to 255 times, not %1.</source>
@@ -2815,7 +2815,7 @@
     </message>
     <message>
         <source>Move the playback cursor to this many seconds.</source>
-        <translation>Mueve el cursor de reproducción a esos segundos.</translation>
+        <translation>Mover el cursor de reproducción a esos segundos.</translation>
     </message>
     <message>
         <source>Open the tuner at start.</source>
@@ -2835,7 +2835,7 @@
     </message>
     <message>
         <source>Open the first track&apos;s tuning in the song panel at start.</source>
-        <translation>Abrir al inicio la afinación de la primera pista en el panel de canción.</translation>
+        <translation>Abrir la afinación de la primera pista en el panel de canción al iniciar.</translation>
     </message>
     <message>
         <source>Open the note effects panel at the caret at start.</source>
@@ -2851,11 +2851,11 @@
     </message>
     <message>
         <source>Open a menu at start: file, edit, view, sound or help.</source>
-        <translation>Abre un menú al arrancar: file, edit, view, sound o help.</translation>
+        <translation>Abrir un menú al iniciar: file, edit, view, sound o help.</translation>
     </message>
     <message>
         <source>Open the window at this size, as WIDTHxHEIGHT.</source>
-        <translation>Abre la ventana con este tamaño, como ANCHOxALTO.</translation>
+        <translation>Abrir la ventana con este tamaño, como ANCHOxALTO.</translation>
     </message>
     <message>
         <source>Show the interface in this language (en, es).</source>
@@ -2867,7 +2867,7 @@
     </message>
     <message>
         <source>Play through the SoundFont that comes with Elara.</source>
-        <translation>Reproducir con el SoundFont que incluye Elara.</translation>
+        <translation>Tocar con la SoundFont que incluye Elara.</translation>
     </message>
     <message>
         <source>Play the guitars through the SFZ instrument that comes with Elara.</source>

@@ -296,6 +296,26 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 - [x] The player prepared on a worker after edits, a new song or a new sound
       bank: events, buffers and new sounds off the interface thread (ADR-0112)
+- [ ] Layout adjustments: the automatic layout first, then what a writer may
+      change where it is not enough, stored on what it adjusts
+  - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
+        syllables, chord names and dynamics, and measures wider than the page,
+        found on finished pages and reported by `render --issues` (ADR-0150)
+  - [ ] Two voices on one staff a second apart or in unison do not collide
+  - [ ] No layout issue over the corpus and songs made at random
+  - [ ] System and page breaks stored per measure, in files and the CLI
+  - [ ] The line breaker keeps the stored breaks; the cache follows them
+  - [ ] Lock the breaks of a range, and unlock them
+  - [ ] Layout settings of a song: staff size, margins, spacing, in the CLI
+  - [ ] The app and PDF export read the layout settings; a dialog sets them
+  - [ ] Room before a beat
+  - [ ] Room survives edits, copy and paste
+  - [ ] A measure looser or tighter
+  - [ ] Clear the layout adjustments of a range
+  - [ ] A Layout menu: the commands at the caret, and marks on the score
+  - [ ] Layout issues found on the worker and shown in the status bar
+  - [ ] The caret's system keeps its place on screen after an edit
+  - [ ] Handles to drag breaks, room and spacing on the score
 
 ## The interface
 

@@ -11,6 +11,7 @@ add_library(elara_notation STATIC
   src/drum_map.cpp
   src/font_outlines.cpp
   src/layout_common.cpp
+  src/layout_issues.cpp
   src/page_layout.cpp
   src/pdf.cpp
   src/smufl.cpp

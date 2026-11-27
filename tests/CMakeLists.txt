@@ -97,14 +97,15 @@ elara_add_unit_tests(notation
   notation/test_clef_layout.cpp notation/test_octave_layout.cpp
   notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
-  notation/test_fingering_layout.cpp
+  notation/test_fingering_layout.cpp notation/test_layout_issues.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
   ELARA_CORPUS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/corpus")
 
 # The steps of `elara-cli edit` against a song, without the executable.
-elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp LIBRARIES elara_cli_steps)
+elara_add_unit_tests(cli SOURCES cli/test_edit_steps.cpp cli/test_json_writer.cpp
+  LIBRARIES elara_cli_steps elara_cli_json)
 
 add_subdirectory(cli)
 

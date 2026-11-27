@@ -7,6 +7,7 @@
 #include <elara/notation/cursor.hpp>
 #include <elara/notation/display_list.hpp>
 #include <elara/notation/font_outlines.hpp>
+#include <elara/notation/layout_issues.hpp>
 #include <elara/notation/page_layout.hpp>
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
@@ -58,6 +59,7 @@ struct RenderOptions {
     double stripHeight = 0.0; // staff spaces, for the strips layout; 0: the paper's height
     std::size_t measuresPerSystem = 0;
     bool noCredits = false;
+    bool issues = false; // report what the layout could not keep (ADR-0150)
     std::string svg;
     std::string pdf;
     std::string metadata;
@@ -90,10 +92,17 @@ CursorReport cursorReport(const core::Song& song, std::span<const notation::Disp
                 .text = std::format("cursor at {} s: measure {} is not shown\n", seconds,
                                     measure.measure + 1)};
     }
-    return {.json = std::format(
-                R"({{"seconds":{},"played":{},"measure":{},"page":{},"x":{},"y":{},"height":{}}})",
-                jsonNumber(seconds), played, measure.measure, cursor->page, jsonNumber(cursor->x),
-                jsonNumber(cursor->y), jsonNumber(cursor->height)),
+    JsonWriter out;
+    out.beginObject()
+        .field("seconds", seconds)
+        .field("played", played)
+        .field("measure", measure.measure)
+        .field("page", cursor->page)
+        .field("x", cursor->x)
+        .field("y", cursor->y)
+        .field("height", cursor->height)
+        .endObject();
+    return {.json = out.text(),
             .text = std::format("cursor at {} s: measure {}, page {}, x {}, y {}\n", seconds,
                                 measure.measure + 1, cursor->page + 1, jsonNumber(cursor->x),
                                 jsonNumber(cursor->y))};
@@ -114,18 +123,53 @@ CursorReport timeReport(const core::Song& song, std::span<const notation::Displa
     if (position) {
         seconds = audio::Sequence(song).secondsAt(position->measure, position->fraction);
     }
+    JsonWriter out;
+    out.beginObject().field("page", page).field("x", x).field("y", y);
     if (!position || !seconds) {
-        return {.json = std::format(R"({{"page":{},"x":{},"y":{},"measure":null,"seconds":null}})",
-                                    jsonNumber(page), jsonNumber(x), jsonNumber(y)),
+        out.key("measure").null().key("seconds").null().endObject();
+        return {.json = out.text(),
                 .text = std::format("time at page {}, x {}, y {}: no measure there\n",
                                     jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y))};
     }
-    return {.json = std::format(R"({{"page":{},"x":{},"y":{},"measure":{},"seconds":{}}})",
-                                jsonNumber(page), jsonNumber(x), jsonNumber(y), position->measure,
-                                jsonNumber(*seconds)),
+    out.field("measure", position->measure).field("seconds", *seconds).endObject();
+    return {.json = out.text(),
             .text = std::format("time at page {}, x {}, y {}: measure {}, {} s\n",
                                 jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
                                 position->measure + 1, jsonNumber(*seconds))};
+}
+
+/// What the layout of `pages` could not keep (ADR-0150): overlaps, and on pages
+/// laid out with `page` the measures wider than the page, as a JSON array and
+/// a line each.
+CursorReport issuesReport(std::span<const notation::DisplayList> pages,
+                          const notation::EngravingFont& font,
+                          const std::optional<notation::PageLayoutOptions>& page) {
+    const std::vector<notation::LayoutIssue> issues =
+        page ? notation::layoutIssues(pages, font, *page) : notation::overlaps(pages, font);
+    CursorReport report{.json = "[", .text = {}};
+    for (std::size_t i = 0; i < issues.size(); ++i) {
+        const notation::LayoutIssue& issue = issues[i];
+        const bool overlap = issue.kind == notation::LayoutIssueKind::Overlap;
+        const std::string roles =
+            overlap ? std::format(R"(["{}","{}"])", roleName(issue.first), roleName(issue.second))
+                    : std::string("[]");
+        report.json += std::format(
+            R"({}{{"kind":"{}","page":{},"measure":{},"roles":{},"box":[{},{},{},{}]}})",
+            i == 0 ? "" : ",", notation::issueKindName(issue.kind), issue.page, issue.measure,
+            roles, jsonNumber(issue.box.x), jsonNumber(issue.box.y), jsonNumber(issue.box.width),
+            jsonNumber(issue.box.height));
+        report.text +=
+            overlap ? std::format("issue: {} overlaps {} in measure {} on page {} at x {}, y {}\n",
+                                  roleName(issue.first), roleName(issue.second), issue.measure + 1,
+                                  issue.page + 1, jsonNumber(issue.box.x), jsonNumber(issue.box.y))
+                    : std::format("issue: measure {} on page {} is {} staff spaces too wide\n",
+                                  issue.measure + 1, issue.page + 1, jsonNumber(issue.box.width));
+    }
+    report.json += ']';
+    if (issues.empty()) {
+        report.text = "issues: none\n";
+    }
+    return report;
 }
 
 /// The symbol that is edited where it is drawn (ADR-0130) at `at` (page, x,
@@ -141,30 +185,39 @@ CursorReport symbolReport(std::span<const notation::DisplayList> pages,
         list = &pages[static_cast<std::size_t>(page)];
         symbol = notation::symbolAt(*list, {x, y}, notation::kEditedRoles, font);
     }
+    JsonWriter out;
+    out.beginObject().field("page", page).field("x", x).field("y", y).key("role");
     if (!symbol) {
-        return {.json = std::format(R"({{"page":{},"x":{},"y":{},"role":null}})", jsonNumber(page),
-                                    jsonNumber(x), jsonNumber(y)),
+        out.null().endObject();
+        return {.json = out.text(),
                 .text = std::format("symbol at page {}, x {}, y {}: none there\n",
                                     jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y))};
     }
-    std::string staff = "null";
+    out.string(notation::roleName(symbol->role))
+        .field("measure", symbol->measure)
+        .key("box")
+        .beginArray()
+        .value(symbol->box.x)
+        .value(symbol->box.y)
+        .value(symbol->box.width)
+        .value(symbol->box.height)
+        .endArray()
+        .key("staff");
     if (symbol->staff) {
         const notation::StaffBox& on = list->staves[*symbol->staff];
-        staff = std::format(R"({{"track":{},"staff":{}}})", on.track, on.staff);
+        out.beginObject().field("track", on.track).field("staff", on.staff).endObject();
+    } else {
+        out.null();
     }
-    return {
-        .json = std::format(
-            R"({{"page":{},"x":{},"y":{},"role":"{}","measure":{},"box":[{},{},{},{}],"staff":{}}})",
-            jsonNumber(page), jsonNumber(x), jsonNumber(y), notation::roleName(symbol->role),
-            symbol->measure, jsonNumber(symbol->box.x), jsonNumber(symbol->box.y),
-            jsonNumber(symbol->box.width), jsonNumber(symbol->box.height), staff),
-        .text = std::format("symbol at page {}, x {}, y {}: {} of measure {}\n",
-                            jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
-                            notation::roleName(symbol->role), symbol->measure + 1)};
+    out.endObject();
+    return {.json = out.text(),
+            .text = std::format("symbol at page {}, x {}, y {}: {} of measure {}\n",
+                                jsonNumber(page + 1.0), jsonNumber(x), jsonNumber(y),
+                                notation::roleName(symbol->role), symbol->measure + 1)};
 }
 
-std::string point(const notation::Point& p) {
-    return std::format("[{},{}]", jsonNumber(p.x), jsonNumber(p.y));
+void writePoint(JsonWriter& json, const notation::Point& p) {
+    json.beginArray().value(p.x).value(p.y).endArray();
 }
 
 std::string_view viewName(notation::StaffView view) {
@@ -199,100 +252,141 @@ std::array<std::size_t, kRoleCount> countRoles(const notation::DisplayList& list
     return counts;
 }
 
-std::string displayListJson(const notation::DisplayList& list) {
+// The display list's fields, written into the object that holds them.
+void writeDisplayList(JsonWriter& json, const notation::DisplayList& list) {
     const auto counts = countRoles(list);
-    std::string json =
-        std::format(R"("width":{},"top":{},"bottom":{},"counts":{{)", jsonNumber(list.width),
-                    jsonNumber(list.top), jsonNumber(list.bottom));
+    json.field("width", list.width)
+        .field("top", list.top)
+        .field("bottom", list.bottom)
+        .key("counts")
+        .beginObject();
     for (std::size_t r = 0; r < kRoleCount; ++r) {
-        json += std::format(R"({}"{}":{})", r == 0 ? "" : ",", roleName(static_cast<Role>(r)),
-                            counts[r]);
+        json.field(roleName(static_cast<Role>(r)), counts[r]);
     }
-    json += R"(},"systems":[)";
-    for (std::size_t i = 0; i < list.systems.size(); ++i) {
-        const auto& box = list.systems[i];
-        json += std::format(
-            R"({}{{"firstMeasure":{},"measureCount":{},"x":{},"y":{},"width":{},"height":{},"top":{},"bottom":{}}})",
-            i == 0 ? "" : ",", box.firstMeasure, box.measureCount, jsonNumber(box.x),
-            jsonNumber(box.y), jsonNumber(box.width), jsonNumber(box.height), jsonNumber(box.top),
-            jsonNumber(box.bottom));
+    json.endObject().key("systems").beginArray();
+    for (const auto& box : list.systems) {
+        json.beginObject()
+            .field("firstMeasure", box.firstMeasure)
+            .field("measureCount", box.measureCount)
+            .field("x", box.x)
+            .field("y", box.y)
+            .field("width", box.width)
+            .field("height", box.height)
+            .field("top", box.top)
+            .field("bottom", box.bottom)
+            .endObject();
     }
-    json += R"(],"staves":[)";
-    for (std::size_t i = 0; i < list.staves.size(); ++i) {
-        const auto& box = list.staves[i];
-        json += std::format(
-            R"({}{{"track":{},"staff":{},"view":"{}","x":{},"y":{},"width":{},"height":{},"lines":{}}})",
-            i == 0 ? "" : ",", box.track, box.staff, viewName(box.view), jsonNumber(box.x),
-            jsonNumber(box.y), jsonNumber(box.width), jsonNumber(box.height), box.lines);
+    json.endArray().key("staves").beginArray();
+    for (const auto& box : list.staves) {
+        json.beginObject()
+            .field("track", box.track)
+            .field("staff", box.staff)
+            .field("view", viewName(box.view))
+            .field("x", box.x)
+            .field("y", box.y)
+            .field("width", box.width)
+            .field("height", box.height)
+            .field("lines", box.lines)
+            .endObject();
     }
-    json += R"(],"measures":[)";
-    for (std::size_t i = 0; i < list.measures.size(); ++i) {
-        const auto& box = list.measures[i];
-        json += std::format(R"({}{{"index":{},"x":{},"width":{},"y":{},"height":{}}})",
-                            i == 0 ? "" : ",", box.index, jsonNumber(box.x), jsonNumber(box.width),
-                            jsonNumber(box.y), jsonNumber(box.height));
+    json.endArray().key("measures").beginArray();
+    for (const auto& box : list.measures) {
+        json.beginObject()
+            .field("index", box.index)
+            .field("x", box.x)
+            .field("width", box.width)
+            .field("y", box.y)
+            .field("height", box.height)
+            .endObject();
     }
-    json += R"(],"columns":[)";
-    for (std::size_t i = 0; i < list.columns.size(); ++i) {
-        const auto& column = list.columns[i];
-        json += std::format(R"({}{{"measure":{},"start":"{}","x":{}}})", i == 0 ? "" : ",",
-                            column.measure, column.start.toString(), jsonNumber(column.x));
+    json.endArray().key("columns").beginArray();
+    for (const auto& column : list.columns) {
+        json.beginObject()
+            .field("measure", column.measure)
+            .field("start", column.start.toString())
+            .field("x", column.x)
+            .endObject();
     }
-    json += R"(],"glyphs":[)";
-    for (std::size_t i = 0; i < list.glyphs.size(); ++i) {
-        const auto& item = list.glyphs[i];
-        const std::string scale = item.scale == 1.0
-                                      ? std::string()
-                                      : std::format(R"(,"scale":{})", jsonNumber(item.scale));
-        json += std::format(R"({}{{"glyph":"{}","role":"{}","measure":{},"at":{}{}}})",
-                            i == 0 ? "" : ",", notation::glyphName(item.glyph), roleName(item.role),
-                            item.measure, point(item.origin), scale);
-    }
-    json += R"(],"lines":[)";
-    for (std::size_t i = 0; i < list.lines.size(); ++i) {
-        const auto& item = list.lines[i];
-        const std::string dash =
-            item.dash > 0.0 ? std::format(R"(,"dash":{})", jsonNumber(item.dash)) : "";
-        json += std::format(R"({}{{"role":"{}","measure":{},"from":{},"to":{},"thickness":{}{}}})",
-                            i == 0 ? "" : ",", roleName(item.role), item.measure, point(item.from),
-                            point(item.to), jsonNumber(item.thickness), dash);
-    }
-    json += R"(],"beams":[)";
-    for (std::size_t i = 0; i < list.beams.size(); ++i) {
-        const auto& item = list.beams[i];
-        json += std::format(R"({}{{"measure":{},"left":{},"right":{},"thickness":{}}})",
-                            i == 0 ? "" : ",", item.measure, point(item.left), point(item.right),
-                            jsonNumber(item.thickness));
-    }
-    json += R"(],"texts":[)";
-    for (std::size_t i = 0; i < list.texts.size(); ++i) {
-        const auto& item = list.texts[i];
-        json += std::format(
-            R"({}{{"text":"{}","role":"{}","measure":{},"at":{},"size":{},"align":"{}","face":"{}","knockout":{}}})",
-            i == 0 ? "" : ",", jsonEscape(item.text), roleName(item.role), item.measure,
-            point(item.origin), jsonNumber(item.size), alignName(item.align), faceName(item.face),
-            item.knockout);
-    }
-    json += R"(],"curves":[)";
-    for (std::size_t i = 0; i < list.curves.size(); ++i) {
-        const auto& item = list.curves[i];
-        json += std::format(
-            R"({}{{"role":"{}","measure":{},"from":{},"control1":{},"control2":{},"to":{},"thickness":{},"endThickness":{}}})",
-            i == 0 ? "" : ",", roleName(item.role), item.measure, point(item.from),
-            point(item.control1), point(item.control2), point(item.to), jsonNumber(item.thickness),
-            jsonNumber(item.endThickness));
-    }
-    json += R"(],"polygons":[)";
-    for (std::size_t i = 0; i < list.polygons.size(); ++i) {
-        const auto& item = list.polygons[i];
-        std::string points;
-        for (const auto& p : item.points) {
-            points += (points.empty() ? "" : ",") + point(p);
+    json.endArray().key("glyphs").beginArray();
+    for (const auto& item : list.glyphs) {
+        json.beginObject()
+            .field("glyph", notation::glyphName(item.glyph))
+            .field("role", roleName(item.role))
+            .field("measure", item.measure)
+            .key("at");
+        writePoint(json, item.origin);
+        if (item.scale != 1.0) {
+            json.field("scale", item.scale);
         }
-        json += std::format(R"({}{{"role":"{}","measure":{},"points":[{}]}})", i == 0 ? "" : ",",
-                            roleName(item.role), item.measure, points);
+        json.endObject();
     }
-    return json + ']';
+    json.endArray().key("lines").beginArray();
+    for (const auto& item : list.lines) {
+        json.beginObject()
+            .field("role", roleName(item.role))
+            .field("measure", item.measure)
+            .key("from");
+        writePoint(json, item.from);
+        json.key("to");
+        writePoint(json, item.to);
+        json.field("thickness", item.thickness);
+        if (item.dash > 0.0) {
+            json.field("dash", item.dash);
+        }
+        json.endObject();
+    }
+    json.endArray().key("beams").beginArray();
+    for (const auto& item : list.beams) {
+        json.beginObject().field("measure", item.measure).key("left");
+        writePoint(json, item.left);
+        json.key("right");
+        writePoint(json, item.right);
+        json.field("thickness", item.thickness).endObject();
+    }
+    json.endArray().key("texts").beginArray();
+    for (const auto& item : list.texts) {
+        json.beginObject()
+            .field("text", item.text)
+            .field("role", roleName(item.role))
+            .field("measure", item.measure)
+            .key("at");
+        writePoint(json, item.origin);
+        json.field("size", item.size)
+            .field("align", alignName(item.align))
+            .field("face", faceName(item.face))
+            .field("knockout", item.knockout)
+            .endObject();
+    }
+    json.endArray().key("curves").beginArray();
+    for (const auto& item : list.curves) {
+        json.beginObject()
+            .field("role", roleName(item.role))
+            .field("measure", item.measure)
+            .key("from");
+        writePoint(json, item.from);
+        json.key("control1");
+        writePoint(json, item.control1);
+        json.key("control2");
+        writePoint(json, item.control2);
+        json.key("to");
+        writePoint(json, item.to);
+        json.field("thickness", item.thickness)
+            .field("endThickness", item.endThickness)
+            .endObject();
+    }
+    json.endArray().key("polygons").beginArray();
+    for (const auto& item : list.polygons) {
+        json.beginObject()
+            .field("role", roleName(item.role))
+            .field("measure", item.measure)
+            .key("points")
+            .beginArray();
+        for (const auto& p : item.points) {
+            writePoint(json, p);
+        }
+        json.endArray().endObject();
+    }
+    json.endArray();
 }
 
 // How the SVG finds the font file: relative to the SVG when possible, so the
@@ -419,8 +513,10 @@ int runRender(bool json, const RenderOptions& options) {
     }
     const bool paged = options.layout != "line";
     std::vector<notation::DisplayList> pages;
+    std::optional<notation::PageLayoutOptions> laidOut;
     if (paged) {
         const notation::PageLayoutOptions page = pageLayoutOptions(options);
+        laidOut = page;
         if (page.width <= 2 * page.margin) {
             return usageError("the margins leave no room on the page");
         }
@@ -493,66 +589,70 @@ int runRender(bool json, const RenderOptions& options) {
         shown += page.measures.size();
         systems += page.systems.size();
     }
-    std::string staves;
-    if (options.tracks.empty()) {
-        staves = std::format(R"("track":{},"staff":{})", options.track, options.staff);
-    } else {
-        staves = R"("tracks":[)";
-        std::size_t previous = notation::kAllMeasures;
-        bool firstTrack = true;
-        for (const notation::StaffSelection& each : *selection) {
-            if (each.track != previous) {
-                staves += std::format("{}{}", firstTrack ? "" : ",", each.track);
-                previous = each.track;
-                firstTrack = false;
-            }
-        }
-        staves += ']';
-    }
     if (json) {
-        std::string svg = "null";
-        if (!written.empty()) {
-            if (split) {
-                svg = "[";
-                for (std::size_t i = 0; i < written.size(); ++i) {
-                    svg += std::format(R"({}"{}")", i == 0 ? "" : ",", jsonEscape(written[i]));
+        JsonWriter out;
+        out.beginObject().field("file", options.file);
+        if (options.tracks.empty()) {
+            out.field("track", options.track).field("staff", options.staff);
+        } else {
+            out.key("tracks").beginArray();
+            std::size_t previous = notation::kAllMeasures;
+            for (const notation::StaffSelection& each : *selection) {
+                if (each.track != previous) {
+                    out.value(each.track);
+                    previous = each.track;
                 }
-                svg += ']';
-            } else {
-                svg = std::format("\"{}\"", jsonEscape(options.svg));
             }
+            out.endArray();
         }
-        const std::string pdf = options.pdf.empty()
-                                    ? std::string("null")
-                                    : std::format(R"({{"file":"{}","pages":{},"bytes":{}}})",
-                                                  jsonEscape(options.pdf), pages.size(), pdfBytes);
-        std::string body;
+        out.field("first", options.first).field("count", shown).key("svg");
+        if (written.empty()) {
+            out.null();
+        } else if (split) {
+            out.beginArray();
+            for (const std::string& file : written) {
+                out.value(file);
+            }
+            out.endArray();
+        } else {
+            out.string(options.svg);
+        }
+        out.key("pdf");
+        if (options.pdf.empty()) {
+            out.null();
+        } else {
+            out.beginObject()
+                .field("file", options.pdf)
+                .field("pages", pages.size())
+                .field("bytes", pdfBytes)
+                .endObject();
+        }
+        out.field("view", options.view).field("layout", options.layout);
         if (options.cursorAt >= 0.0) {
-            body =
-                std::format(R"("cursor":{},)", cursorReport(*song, pages, options.cursorAt).json);
+            out.key("cursor").raw(cursorReport(*song, pages, options.cursorAt).json);
         }
         if (!options.timeAt.empty()) {
-            body += std::format(R"("timeAt":{},)", timeReport(*song, pages, options.timeAt).json);
+            out.key("timeAt").raw(timeReport(*song, pages, options.timeAt).json);
         }
         if (!options.symbolAt.empty()) {
-            body +=
-                std::format(R"("symbolAt":{},)", symbolReport(pages, *font, options.symbolAt).json);
+            out.key("symbolAt").raw(symbolReport(pages, *font, options.symbolAt).json);
+        }
+        if (options.issues) {
+            out.key("issues").raw(issuesReport(pages, *font, laidOut).json);
         }
         if (paged) {
-            body += R"("pages":[)";
-            for (std::size_t p = 0; p < pages.size(); ++p) {
-                body += std::format("{}{{{}}}", p == 0 ? "" : ",", displayListJson(pages[p]));
+            out.key("pages").beginArray();
+            for (const notation::DisplayList& page : pages) {
+                out.beginObject();
+                writeDisplayList(out, page);
+                out.endObject();
             }
-            body += ']';
+            out.endArray();
         } else {
-            body += displayListJson(pages.front());
+            writeDisplayList(out, pages.front());
         }
-        std::cout
-            << std::format(
-                   R"({{"file":"{}",{},"first":{},"count":{},"svg":{},"pdf":{},"view":"{}","layout":"{}",{}}})",
-                   jsonEscape(options.file), staves, options.first, shown, svg, pdf, options.view,
-                   options.layout, body)
-            << '\n';
+        out.endObject();
+        std::cout << out.text() << '\n';
         return kExitOk;
     }
     const std::string what = options.tracks.empty()
@@ -599,6 +699,9 @@ int runRender(bool json, const RenderOptions& options) {
     }
     if (!options.symbolAt.empty()) {
         std::cout << symbolReport(pages, *font, options.symbolAt).text;
+    }
+    if (options.issues) {
+        std::cout << issuesReport(pages, *font, laidOut).text;
     }
     return kExitOk;
 }
@@ -672,6 +775,10 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->expected(3);
     render->add_flag("--no-credits", options->noCredits,
                      "Leave out the title, credits and page numbers");
+    render->add_flag("--issues", options->issues,
+                     "Report what the layout could not keep: noteheads, accidentals, fret "
+                     "numbers, syllables or chord names whose ink overlaps, and measures wider "
+                     "than the page");
     render->add_option("--svg", options->svg,
                        "Also write SVG; with --layout page or strips and several pages or "
                        "strips, one file each (name-1.svg, ...)");

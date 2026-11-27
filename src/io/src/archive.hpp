@@ -75,6 +75,11 @@ extern template std::string writeZip(std::span<const ZipEntry> entries);
 /// that name. Throws std::runtime_error with the path.
 void writeFileAtomically(const std::filesystem::path& path, std::string_view content);
 
+/// The same, with the file's text in pieces, written one after the other: a
+/// text made of parts goes to the disk without being joined in memory first.
+void writeFileAtomically(const std::filesystem::path& path,
+                         std::span<const std::string_view> pieces);
+
 /// The whole file. Errors: "cannot open the file", "cannot read the file".
 [[nodiscard]] std::expected<std::vector<std::uint8_t>, FormatError>
 readFile(const std::filesystem::path& path);
