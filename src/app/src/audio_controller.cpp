@@ -159,6 +159,7 @@ void AudioController::deviceOpened(const QString& error) {
     if (!deviceOpen_) {
         setErrorMessage(tr("Audio device unavailable: %1").arg(error));
         playWhenOpen_ = false;
+        playWhenLoaded_ = false;
         toneWhenOpen_.reset();
         if (player_) {
             player_->pause();
@@ -188,14 +189,17 @@ QString AudioController::outputDeviceName() const {
     return QString::fromStdString(outputDevice_.name);
 }
 
-// The player renders at the device's rate and plays the document's song.
+// The player renders at the device's rate and plays the document's song,
+// which is prepared on a worker as an edited one is: a SoundFont's sounds
+// read their samples as they are made, a second for a band through MuseScore
+// General, and the interface goes on meanwhile. The player is silent until
+// the song is published.
 void AudioController::makePlayer() {
     player_ = std::make_unique<elara::audio::Player>(audio_->sampleRate());
     player_->setSoundBank(bank_);
     preparing_.drop();
-    loadSequenceNow();
-    player_->seek(position_);
     audio_->setSource(player_.get());
+    loadSequence();
 }
 
 // The song was edited. When it plays as before (the document kept its
@@ -207,9 +211,10 @@ void AudioController::songEdited() {
     if (!document_ || !document_->song() || !document_->sequence()) {
         return;
     }
-    if (!player_) {
-        // The position waits for the device, at the same place in the music
-        // when only the timing changed, and inside the song.
+    if (!player_ || !loaded_) {
+        // The position waits for the device, or for the player to have the
+        // song, at the same place in the music when only the timing changed,
+        // and inside the song.
         const auto& sequence = document_->sequence();
         const double position = placed_
                                     ? elara::audio::carriedPosition(*placed_, position_, *sequence)
@@ -221,6 +226,11 @@ void AudioController::songEdited() {
         if (position != position_) {
             position_ = position;
             emit positionChanged();
+        }
+        // A song whose sounds are being made is brought up to date once it
+        // is published, with those sounds kept, rather than made again.
+        if (player_ && !preparing_.busy()) {
+            loadSequence();
         }
         return;
     }
@@ -256,38 +266,41 @@ void AudioController::loadSequence() {
         });
 }
 
-// load() at once, for a player that has nothing to play yet.
-void AudioController::loadSequenceNow() {
-    publishSequence(document_->sequence(),
-                    player_->preparer()(*document_->sequenceSong(), *document_->sequence()));
-}
-
 void AudioController::publishSequence(const std::shared_ptr<const elara::audio::Sequence>& sequence,
                                       elara::audio::PreparedSong prepared) {
     // Another speed or a tempo edit moves the time of every note: playback
-    // goes on from the same place in the music.
-    const double before = player_->position();
-    const double after =
-        loaded_ ? elara::audio::carriedPosition(*loaded_, before, *sequence) : before;
+    // goes on from the same place in the music. A player without the
+    // document's song yet starts where the transport was put meanwhile.
+    const double before = loaded_ ? player_->position() : position_;
+    const auto& from = loaded_ ? loaded_ : placed_;
+    const double after = from ? elara::audio::carriedPosition(*from, before, *sequence) : before;
     if (!player_->publish(std::move(prepared))) {
         return; // prepared for the player before a device rate change
     }
     if (placed_) {
         carryLoop(*placed_, *sequence); // so does the loop
     }
-    if (after != before) {
+    if (after != player_->position()) {
         player_->seek(after);
     }
     loaded_ = sequence;
     placed_ = sequence;
     player_->updateMix(*document_->song());
     applyLoop();
+    if (document_->sequence() && document_->sequence() != sequence && !preparing_.busy()) {
+        loadSequence(); // edited while it was prepared: the sounds are kept now
+    }
+    if (playWhenLoaded_) {
+        playWhenLoaded_ = false;
+        playLoaded();
+    }
 }
 
-// A new song (or none): the transport goes back to its start.
+// A new song (or none): the transport goes back to its start, paused.
 void AudioController::loadSong() {
     clearLoop();
     loaded_.reset();
+    playWhenLoaded_ = false;
     placed_ = document_ ? document_->sequence() : nullptr;
     if (player_) {
         player_->pause();
@@ -323,9 +336,25 @@ void AudioController::togglePlayback() {
         followDeviceRate(); // the device may have restarted while paused
     }
     setErrorMessage({});
+    // The player does not have the document's song yet (the first time,
+    // another song): playback starts once it has, and a second press while
+    // it is prepared takes that back.
+    if (!loaded_) {
+        playWhenLoaded_ = !playWhenLoaded_;
+        return;
+    }
     if (player_->isPlaying()) {
         player_->pause();
-    } else if (countIn_ && loaded_) {
+        pollTransport();
+    } else {
+        playLoaded();
+    }
+}
+
+// The player plays the song it has from where it is, after a measure of
+// clicks when asked.
+void AudioController::playLoaded() {
+    if (countIn_) {
         player_->play(loaded_->countInAt(player_->position()));
     } else {
         player_->play();
@@ -336,6 +365,7 @@ void AudioController::togglePlayback() {
 
 void AudioController::stopPlayback() {
     playWhenOpen_ = false;
+    playWhenLoaded_ = false;
     if (player_) {
         player_->pause();
         player_->seek(0.0);
@@ -348,12 +378,12 @@ void AudioController::stopPlayback() {
 }
 
 void AudioController::seek(double seconds) {
-    if (player_) {
+    if (player_ && loaded_) {
         player_->seek(seconds);
         transportTimer_.start();
         pollTransport();
     } else if (document_) {
-        // Remembered until the device opens.
+        // Remembered until the device opens and the player has the song.
         const double clamped = std::clamp(seconds, 0.0, document_->duration());
         if (clamped != position_) {
             position_ = clamped;
@@ -369,8 +399,9 @@ void AudioController::pollTransport() {
     followDeviceRate();
     player_->tidy();
     const bool playing = player_->isPlaying();
-    const double position = player_->position();
-    if (position != position_) {
+    // Until the player has the document's song, the position is the one the
+    // transport keeps for it.
+    if (const double position = player_->position(); loaded_ && position != position_) {
         position_ = position;
         emit positionChanged();
     }
@@ -391,22 +422,48 @@ void AudioController::pollTransport() {
 // that restarts at another one (headphones plugged in, Bluetooth switching
 // profiles, the system's format changed) would play the music at the wrong
 // pitch and speed: a player made at the new rate takes over, from the same
-// place in the music.
+// place in the music. Its sounds are made on a worker meanwhile, as the
+// first Play's are.
 void AudioController::followDeviceRate() {
     const double rate = deviceReady() ? audio_->sampleRate() : 0.0;
     if (rate <= 0.0 || rate == player_->sampleRate() || !document_ || !loaded_ ||
-        loaded_ != document_->sequence() || !document_->sequenceSong()) {
-        return;
+        loaded_ != document_->sequence() || !document_->sequenceSong() ||
+        (next_ && next_->sampleRate() == rate)) {
+        return; // nothing to follow, or a player for that rate is on its way
     }
-    auto next = std::make_unique<elara::audio::Player>(rate);
-    next->setSoundBank(bank_);
-    next->load(*document_->sequenceSong(), *loaded_);
-    next->updateMix(*document_->song());
-    next->takeOver(*player_);
-    // Once the device plays the new player, the old one is no longer called.
-    audio_->setSource(next.get());
-    player_ = std::move(next);
-    preparing_.drop();
+    next_ = std::make_unique<elara::audio::Player>(rate);
+    next_->setSoundBank(bank_);
+    switching_.request(
+        [prepare = next_->preparer(), song = document_->sequenceSong(), sequence = loaded_] {
+            return std::make_shared<elara::audio::PreparedSong>(prepare(*song, *sequence));
+        },
+        [this, sequence = loaded_,
+         bank = bank_](const std::shared_ptr<elara::audio::PreparedSong>& prepared) {
+            std::unique_ptr<elara::audio::Player> next = std::move(next_);
+            if (!player_ || !next || !document_ || !document_->song()) {
+                return;
+            }
+            // The device, the song or its sound changed while it was
+            // prepared: a player for what is current now, if any.
+            if (!deviceReady() || audio_->sampleRate() != next->sampleRate() ||
+                loaded_ != sequence || bank_ != bank) {
+                followDeviceRate();
+                return;
+            }
+            next->publish(std::move(*prepared));
+            next->updateMix(*document_->song());
+            next->takeOver(*player_);
+            // Once the device plays the new player, the old one is no longer
+            // called.
+            audio_->setSource(next.get());
+            player_ = std::move(next);
+            // A song still being prepared for the old player is prepared
+            // again for this one.
+            if (preparing_.busy()) {
+                preparing_.drop();
+                loadSequence();
+            }
+        });
 }
 
 void AudioController::setCountIn(bool countIn) {
@@ -594,6 +651,11 @@ void AudioController::useBuiltinSound() {
         setSoundPart(*part, nullptr, {});
     }
     useSoundBank(); // once, for the three parts
+}
+
+void AudioController::setSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank) {
+    ++soundFont_.request; // a SoundFont still opening is no longer wanted
+    useSoundPart(soundFont_, std::move(bank), {});
 }
 
 void AudioController::restoreSound() {

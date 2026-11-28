@@ -117,7 +117,7 @@ one that replaces them.
 | [0109](0109-note-effects-palette.md) | The note effects palette | Accepted |
 | [0110](0110-job-lanes.md) | One running job and the newest request per flow | Accepted |
 | [0111](0111-change-kinds.md) | Edits say what they change | Accepted |
-| [0112](0112-preparing-the-player.md) | Preparing the player on a worker | Accepted |
+| [0112](0112-preparing-the-player.md) | Preparing the player on a worker | Accepted; the first Play superseded by 0148 |
 | [0113](0113-tablature-for-reading.md) | Tablature for reading: larger numbers, and the time signature only when it stands alone | Accepted |
 | [0114](0114-dark-page.md) | The page in the dark theme | Accepted |
 | [0120](0120-sounds-kept-by-source.md) | Sounds kept by their source when the bank changes | Accepted |
@@ -141,6 +141,7 @@ one that replaces them.
 | [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
 | [0146](0146-tracks-share-a-soundfont.md) | Tracks share a SoundFont | Accepted |
 | [0147](0147-song-json-is-written-as-it-is-walked.md) | song.json is written as it is walked | Accepted |
+| [0148](0148-the-first-play-is-prepared-on-a-worker.md) | The first Play is prepared on a worker | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
