@@ -2,6 +2,9 @@
 // Internal: the warnings readers and writers give for what a format cannot hold.
 #pragma once
 
+#include <elara/core/measure_layout.hpp>
+#include <elara/core/song.hpp>
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -107,5 +110,30 @@ private:
 
     std::vector<Entry> entries_;
 };
+
+/// Adds what a format without layout adjustments (ADR-0152) leaves out of
+/// `song`: its stored system and page breaks and measure spacings, the song's
+/// under no name and each track's under the track's, once per measure.
+inline void reportLayoutDropped(const core::Song& song, Warnings& warnings) {
+    const auto report = [&warnings](std::string_view who, const core::MeasureLayouts& layouts) {
+        if (!layouts) {
+            return;
+        }
+        for (std::size_t m = 0; m < layouts->size(); ++m) {
+            const core::MeasureLayout& layout = (*layouts)[m];
+            // A break before the first measure means nothing.
+            if (m > 0 && layout.breakBefore != core::Break::Auto) {
+                warnings.add(who, "system and page breaks dropped", m);
+            }
+            if (layout.spacing != core::MeasureLayout::kDefaultSpacing) {
+                warnings.add(who, "measure spacing dropped", m);
+            }
+        }
+    };
+    report({}, song.measureLayouts(core::LayoutScope::song()));
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        report(song.track(t).name(), song.track(t).measureLayouts());
+    }
+}
 
 } // namespace elara::io::detail

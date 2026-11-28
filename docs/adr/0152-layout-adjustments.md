@@ -74,7 +74,8 @@ adjustment on.
   and nothing when a scope is empty, so a song without adjustments is written
   byte for byte as before. `formatVersion` stays 1: an older reader ignores
   it, and ADR-0139 warns before it is lost. MusicXML and MIDI export write
-  none of it.
+  none of it, and their warnings say so: "system and page breaks dropped" and
+  "measure spacing dropped", for the song and for each track.
 - `elara-cli edit` has the step `break <measure> <system|page|keep|auto>
   [track <n>]`; `dump --json` shows each scope's breaks.
 

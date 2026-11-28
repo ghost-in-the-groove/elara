@@ -1570,3 +1570,32 @@ TEST_CASE("MusicXML export: songs without tracks or measures", "[musicxml][expor
     REQUIRE(back.song.trackCount() == 1);
     CHECK(back.song.track(0).name() == "Piano");
 }
+
+TEST_CASE("MusicXML export: stored system and page breaks are named as left out",
+          "[musicxml][export]") {
+    // ADR-0152: only the native format keeps the layout adjustments.
+    using elara::core::LayoutScope;
+    using elara::core::MeasureLayouts;
+    core::Song song;
+    song.appendMeasures(4);
+    song.addTrack(core::Track::fromPreset(*core::findInstrumentPreset("electric-guitar")));
+    std::vector<core::MeasureLayout> layouts(4);
+    layouts[0].breakBefore = core::Break::Page; // before the first measure: means nothing
+    layouts[2].breakBefore = core::Break::System;
+    song.setMeasureLayouts(core::LayoutScope::song(), core::MeasureLayouts(layouts));
+    layouts = std::vector<core::MeasureLayout>(4);
+    layouts[1].breakBefore = core::Break::Page;
+    layouts[3].breakBefore = core::Break::Keep;
+    song.setMeasureLayouts(core::LayoutScope::ofTrack(0), core::MeasureLayouts(layouts));
+    const std::vector<std::string> warnings = exportMusicXml(song).warnings;
+    CHECK(std::ranges::count(warnings, std::string("system and page breaks dropped (measure 3)")) ==
+          1);
+    CHECK(std::ranges::count(warnings, std::string("Electric Guitar: system and page breaks "
+                                                   "dropped (2 times, first in measure 2)")) == 1);
+    // Without them, nothing is said.
+    song.setMeasureLayouts(LayoutScope::song(), MeasureLayouts());
+    song.setMeasureLayouts(LayoutScope::ofTrack(0), MeasureLayouts());
+    for (const std::string& warning : exportMusicXml(song).warnings) {
+        CHECK(warning.find("breaks") == std::string::npos);
+    }
+}
