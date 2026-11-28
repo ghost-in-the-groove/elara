@@ -32,6 +32,8 @@ class ScorePage : public QQuickItem {
     /// What the page is painted in (ADR-0114): black on white unless set.
     Q_PROPERTY(QColor paper READ paper WRITE setPaper NOTIFY coloursChanged)
     Q_PROPERTY(QColor ink READ ink WRITE setInk NOTIFY coloursChanged)
+    /// The staves' lines (ADR-0174): the ink unless set.
+    Q_PROPERTY(QColor staff READ staff WRITE setStaff NOTIFY coloursChanged)
 
 public:
     explicit ScorePage(QQuickItem* parent = nullptr);
@@ -46,6 +48,8 @@ public:
     void setPaper(const QColor& paper);
     [[nodiscard]] QColor ink() const { return colours_.ink; }
     void setInk(const QColor& ink);
+    [[nodiscard]] QColor staff() const { return colours_.staff; }
+    void setStaff(const QColor& staff);
 
     /// Pages painted since the program started (for `elara --smoke-test`).
     [[nodiscard]] static int paintCount();

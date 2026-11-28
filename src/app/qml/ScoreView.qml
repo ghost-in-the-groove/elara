@@ -20,6 +20,9 @@ Item {
     /// The page turned dark, its ink light (ADR-0114): for the dark theme.
     property bool darkPage: false
     readonly property color paper: darkPage ? Theme.nightPage : "white"
+    /// The staves' lines, dimmer than the ink on the dark page so that the
+    /// notes and the fret numbers stand out from them (ADR-0174).
+    readonly property color staffInk: darkPage ? Theme.nightStaff : "black"
     readonly property color ink: darkPage ? Theme.nightInk : "black"
     /// Seconds into the song where playback stands; negative for nowhere.
     property real cursorSeconds: -1
@@ -839,6 +842,7 @@ Item {
                                 index: sheet.index
                                 paper: root.paper
                                 ink: root.ink
+                                staff: root.staffInk
                                 opacity: painted ? 1.0 : 0.0
 
                                 Behavior on opacity {

@@ -97,10 +97,13 @@ private:
     QHash<quint32, QPainterPath> outlines_;
 };
 
-void paintLines(QPainter& painter, const DisplayList& list, double scale, const QColor& ink) {
-    QPen pen(ink);
+void paintLines(QPainter& painter, const DisplayList& list, double scale,
+                const ScoreColours& colours) {
+    const QColor& staff = colours.staff.isValid() ? colours.staff : colours.ink;
+    QPen pen(colours.ink);
     pen.setCapStyle(Qt::FlatCap);
     for (const notation::LineItem& line : list.lines) {
+        pen.setColor(line.role == notation::Role::StaffLine ? staff : colours.ink);
         pen.setWidthF(line.thickness * scale);
         if (line.dash > 0.0 && line.thickness > 0.0) {
             // Dash patterns are in pen widths.
@@ -282,7 +285,7 @@ void ScorePainter::paint(QPainter& painter, const DisplayList& list, double scal
     painter.setBrush(colours.ink);
     // The order of the SVG writer: knockouts clear lines and glyphs, curves
     // and polygons go on top.
-    paintLines(painter, list, scale, colours.ink);
+    paintLines(painter, list, scale, colours);
     paintBeams(painter, list, scale);
     paintGlyphs(painter, list, scale, fonts_.music, colours.ink);
     paintTexts(painter, list, scale, fonts_, colours);
