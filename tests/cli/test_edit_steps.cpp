@@ -25,6 +25,7 @@ using elara::core::JumpThen;
 using elara::core::JumpTo;
 using elara::core::Song;
 using elara::core::Strum;
+using elara::core::Tempo;
 
 namespace {
 
@@ -134,6 +135,24 @@ TEST_CASE("Edit steps: malformed steps and steps the song rejects fail apart", "
 }
 
 // ---- The session the steps share with the app (ADR-0127) -----------------------
+
+TEST_CASE("Edit steps: the song's tempo keeps the beat it counts in", "[cli][edit]") {
+    // ADR-0042: in 6/8 counted in dotted quarters, "tempo" and "tempo-from 0"
+    // set the dotted quarters a minute, as the app's measure popup does.
+    const elara::core::Duration dottedQuarter(elara::core::NoteValue::Quarter, 1);
+    Song song;
+    song.appendMeasures(2);
+    song.setStartTempo(Tempo(60, dottedQuarter));
+    Document doc(song);
+    StepState state;
+    runStep(doc, "tempo 80", state);
+    CHECK(doc.song().startTempo() == Tempo(80, dottedQuarter));
+    runStep(doc, "tempo-from 0 70", state);
+    CHECK(doc.song().startTempo() == Tempo(70, dottedQuarter));
+    CHECK(doc.song().measureHeader(0).tempoChanges.empty());
+    runStep(doc, "tempo-from 0 none", state); // the first measure always has one
+    CHECK(doc.song().startTempo() == Tempo(70, dottedQuarter));
+}
 
 TEST_CASE("Edit steps: the input duration follows the beat the caret moves to", "[cli][edit]") {
     using elara::core::Duration;

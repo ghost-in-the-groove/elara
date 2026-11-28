@@ -84,9 +84,14 @@ Entry unchanged(const Caret& caret) {
     return Entry{.command = nullptr, .caret = caret};
 }
 
+/// The edit is not made, for `why` (ADR-0180).
+Entry refuse(const Caret& caret, Refusal why) {
+    return Entry{.command = nullptr, .caret = caret, .refused = why};
+}
+
 /// Nothing changed because nothing at the caret takes the edit (ADR-0123).
 Entry missed(const Caret& caret) {
-    return Entry{.command = nullptr, .caret = caret, .missed = true};
+    return refuse(caret, Refusal::NothingAtCaret);
 }
 
 /// Where the caret's beat (or the free slot) starts in its measure.
@@ -201,9 +206,10 @@ const Note* previousNote(const Song& song, const Caret& caret) {
 }
 
 /// Where a note of `pitch` goes on a fretted staff: the caret's string when it
-/// reaches it, otherwise the nearest string that does, skipping `taken` strings.
-FretPosition placeOnString(const Staff& staff, const Pitch& pitch, int caretString,
-                           const std::vector<int>& taken) {
+/// reaches it, otherwise the nearest string that does, skipping `taken` strings;
+/// none when no string can play it.
+std::optional<FretPosition> placeOnString(const Staff& staff, const Pitch& pitch, int caretString,
+                                          const std::vector<int>& taken) {
     std::optional<FretPosition> best;
     for (const FretPosition& position : staff.tuning()->positionsFor(pitch, staff.capo())) {
         if (std::ranges::find(taken, int{position.string}) != taken.end()) {
@@ -214,10 +220,7 @@ FretPosition placeOnString(const Staff& staff, const Pitch& pitch, int caretStri
             best = position;
         }
     }
-    if (!best) {
-        throw std::out_of_range("enterPitch: no string can play the note");
-    }
-    return *best;
+    return best;
 }
 
 /// The step index of a new note on `step`: above `top` within an octave for a
@@ -383,7 +386,10 @@ Entry enterFret(const Song& song, const Caret& at, int fret, Duration duration) 
     const Caret caret = clampCaret(song, at);
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     if (!staff.isFretted()) {
-        throw std::logic_error("enterFret: the staff has no tuning");
+        return refuse(caret, Refusal::NeedsStrings);
+    }
+    if (fret < 0 || staff.capo() + fret > Tuning::kMaxFret) {
+        return refuse(caret, Refusal::OffTheNeck);
     }
     Note note = staff.frettedNote(caret.string, fret);
     note.pitch = song.measureHeader(caret.measure).keySignature.spell(note.pitch.midiNumber());
@@ -419,7 +425,7 @@ Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration
     const Track& track = song.track(caret.track);
     const Staff& staff = track.staff(caret.staff);
     if (staff.clef() == Clef::Percussion || track.instrument().kind == InstrumentKind::Percussion) {
-        throw std::logic_error("enterPitch: a percussion staff has no note names");
+        return refuse(caret, Refusal::NoNoteNames);
     }
     const Interval toWritten = writtenInterval(track.instrument().writtenOffset);
     const KeySignature writtenKey =
@@ -447,12 +453,12 @@ Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration
     const int alter = writtenKey.alterFor(step);
     const int midi = (octave + 1) * 12 + Pitch(step, 0, 4).midiNumber() - 60 + alter;
     if (midi < 0 || midi > 127) {
-        throw std::out_of_range("enterPitch: the note leaves the MIDI range");
+        return refuse(caret, Refusal::OutOfRange);
     }
     const std::optional<Pitch> sounding =
         transposed(Pitch(step, alter, octave), inverse(toWritten));
     if (!sounding) {
-        throw std::out_of_range("enterPitch: the note leaves the MIDI range");
+        return refuse(caret, Refusal::OutOfRange);
     }
 
     Note note{.pitch = *sounding};
@@ -467,6 +473,9 @@ Entry enterPitch(const Song& song, const Caret& at, Step step, Duration duration
             }
         }
         note.position = placeOnString(staff, note.pitch, caret.string, taken);
+        if (!note.position) {
+            return refuse(caret, Refusal::NoString);
+        }
         caret.string = note.position->string;
     }
 
@@ -510,7 +519,7 @@ Entry shiftPitch(const Song& song, const Caret& at, int semitones) {
             }
             const int fret = note.position->fret + semitones;
             if (fret < 0 || staff.capo() + fret > Tuning::kMaxFret) {
-                throw std::out_of_range("shiftPitch: the note leaves the neck");
+                return refuse(caret, Refusal::OffTheNeck);
             }
             const Note moved = staff.frettedNote(caret.string, fret);
             note.pitch = key.spell(moved.pitch.midiNumber());
@@ -518,7 +527,7 @@ Entry shiftPitch(const Song& song, const Caret& at, int semitones) {
         } else {
             const int midi = note.pitch.midiNumber() + semitones;
             if (midi < 0 || midi > 127) {
-                throw std::out_of_range("shiftPitch: the note leaves the MIDI range");
+                return refuse(caret, Refusal::OutOfRange);
             }
             note.pitch = key.spell(midi);
         }
@@ -595,7 +604,7 @@ Entry insertRest(const Song& song, const Caret& at, Duration duration) {
 Entry toggleDrum(const Song& song, const Caret& at, Duration duration) {
     const Caret caret = clampCaret(song, at);
     if (!isDrumStaff(song.track(caret.track).staff(caret.staff))) {
-        throw std::logic_error("toggleDrum: the staff is not a percussion staff");
+        return refuse(caret, Refusal::NeedsDrums);
     }
     const int key = laneKey(caret.string);
     Note hit{.pitch = Pitch::fromMidi(key)};
@@ -625,7 +634,7 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
     constexpr int kTenths = 10;
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
-        return unchanged(caret);
+        return missed(caret);
     }
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     const bool fretted = staff.isFretted();
@@ -637,12 +646,12 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
         }
     }
     if (targets.empty()) {
-        return unchanged(caret);
+        return missed(caret);
     }
     const bool on = std::ranges::any_of(
         targets, [effect](const Note* note) { return !hasEffect(note->effects, effect); });
     if (on && !fretted && needsStrings(effect)) {
-        throw std::logic_error("toggleEffect: a technique of strings on a staff without them");
+        return refuse(caret, Refusal::NeedsStrings);
     }
     const Beat* previous = effect == NoteEffect::Tie && on ? beatBefore(song, caret) : nullptr;
     for (Note* note : targets) {
@@ -652,7 +661,7 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
             if (on) {
                 const Note* from = tiedTo(previous, *note, fretted);
                 if (from == nullptr) {
-                    throw std::logic_error("toggleEffect: no note to tie to");
+                    return refuse(caret, Refusal::NoNoteToTie);
                 }
                 note->pitch = from->pitch;
                 note->position = from->position;
@@ -685,7 +694,7 @@ Entry toggleEffect(const Song& song, const Caret& at, NoteEffect effect) {
             if (on) {
                 const int fret = note->position->fret;
                 if (!naturalHarmonicSemitones(fret)) {
-                    throw std::out_of_range("toggleEffect: no natural harmonic at that fret");
+                    return refuse(caret, Refusal::NoNaturalHarmonic);
                 }
                 fx.harmonic = Harmonic{.kind = HarmonicKind::Natural,
                                        .fretTenths = static_cast<std::int16_t>(fret * kTenths)};
@@ -806,7 +815,7 @@ Entry setAccent(const Song& song, const Caret& at, Accent accent) {
 
 Entry setTrill(const Song& song, const Caret& at, Trill trill) {
     if (std::abs(trill.semitones) > Trill::kMaxSemitones) {
-        throw std::out_of_range("setTrill: a trill goes at most an octave away");
+        return refuse(clampCaret(song, at), Refusal::TrillTooWide);
     }
     return changeEffects(song, at, "Change trill",
                          [trill](Note& note) { note.effects.trill = trill; });
@@ -860,7 +869,7 @@ Entry setFingering(const Song& song, const Caret& at, std::span<const Finger> fi
 Entry setPluck(const Song& song, const Caret& at, Finger finger) {
     const Caret caret = clampCaret(song, at);
     if (!song.track(caret.track).staff(caret.staff).isFretted()) {
-        throw std::logic_error("setPluck: a plucking finger needs strings");
+        return refuse(caret, Refusal::NeedsStrings);
     }
     return changeEffects(song, caret, "Change plucking finger",
                          [finger](Note& note) { note.effects.pluck = finger; });
@@ -870,19 +879,27 @@ Entry setHarmonic(const Song& song, const Caret& at, HarmonicKind kind) {
     constexpr std::int16_t kOctave = 120; // tenths of a fret above the fretted note
     constexpr int kTenths = 10;
     const Caret caret = clampCaret(song, at);
-    if (kind != HarmonicKind::None && !song.track(caret.track).staff(caret.staff).isFretted()) {
-        throw std::logic_error("setHarmonic: a harmonic needs strings");
+    const Staff& staff = song.track(caret.track).staff(caret.staff);
+    if (kind != HarmonicKind::None && !staff.isFretted()) {
+        return refuse(caret, Refusal::NeedsStrings);
     }
-    return changeEffects(song, caret, "Change harmonic", [kind](Note& note) {
+    const auto fretOf = [](const Note& note) {
+        return note.position ? note.position->fret : -1;
+    };
+    if (kind == HarmonicKind::Natural && !onFreeSlot(song, caret)) {
+        for (const Note& note : voiceAt(song, caret).beats[caret.beat].notes) {
+            if (isEffectTarget(note, staff, caret.string) &&
+                !naturalHarmonicSemitones(fretOf(note))) {
+                return refuse(caret, Refusal::NoNaturalHarmonic);
+            }
+        }
+    }
+    return changeEffects(song, caret, "Change harmonic", [kind, &fretOf](Note& note) {
         Harmonic harmonic{.kind = kind,
                           .fretTenths =
                               static_cast<std::int16_t>(kind == HarmonicKind::None ? 0 : kOctave)};
         if (kind == HarmonicKind::Natural) {
-            const int fret = note.position ? note.position->fret : -1;
-            if (!naturalHarmonicSemitones(fret)) {
-                throw std::out_of_range("setHarmonic: no natural harmonic at that fret");
-            }
-            harmonic.fretTenths = static_cast<std::int16_t>(fret * kTenths);
+            harmonic.fretTenths = static_cast<std::int16_t>(fretOf(note) * kTenths);
         }
         note.effects.harmonic = harmonic;
     });
@@ -928,7 +945,7 @@ Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration du
                    bool onBeat) {
     const Caret caret = clampCaret(song, at);
     if (onFreeSlot(song, caret)) {
-        return unchanged(caret);
+        return missed(caret);
     }
     const Staff& staff = song.track(caret.track).staff(caret.staff);
     const KeySignature& key = song.measureHeader(caret.measure).keySignature;
@@ -937,7 +954,7 @@ Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration du
     const auto target = std::ranges::find_if(
         beat.notes, [&](const Note& note) { return isEffectTarget(note, staff, caret.string); });
     if (target == beat.notes.end()) {
-        return unchanged(caret);
+        return missed(caret);
     }
     Note grace;
     if (isDrumStaff(staff)) {
@@ -946,7 +963,7 @@ Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration du
     } else if (staff.isFretted()) {
         const int fret = target->position->fret + semitones;
         if (fret < 0 || staff.capo() + fret > Tuning::kMaxFret) {
-            throw std::out_of_range("addGraceNote: the grace note leaves the neck");
+            return refuse(caret, Refusal::OffTheNeck);
         }
         grace = staff.frettedNote(caret.string, fret);
         grace.pitch = key.spell(grace.pitch.midiNumber());
@@ -955,7 +972,7 @@ Entry addGraceNote(const Song& song, const Caret& at, int semitones, Duration du
         const Note& top = highest(beat.notes);
         const int midi = top.pitch.midiNumber() + semitones;
         if (midi < 0 || midi > 127) {
-            throw std::out_of_range("addGraceNote: the grace note leaves the MIDI range");
+            return refuse(caret, Refusal::OutOfRange);
         }
         grace.pitch = key.spell(midi);
         grace.effects.dynamic = top.effects.dynamic;
@@ -1313,7 +1330,7 @@ Entry setDynamic(const Song& song, const Caret& at, Dynamic dynamic) {
         }
     }
     if (!passage) {
-        return unchanged(caret);
+        return missed(caret); // no note from the caret on
     }
     const auto inPassage = [&](std::size_t m, const Fraction& start) {
         if (m == caret.measure && start < from) {

@@ -5,8 +5,10 @@
 // to them.
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
 #include <elara/core/measure.hpp>
 #include <elara/core/song.hpp>
+#include <elara/io/native_format.hpp>
 #include <elara/notation/display_list.hpp>
 
 #include "caret_editor.hpp"
@@ -17,12 +19,14 @@
 #include <QRectF>
 #include <QString>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QUrl>
 #include <QVariantList>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cstddef>
+#include <filesystem>
 #include <vector>
 
 namespace {
@@ -547,4 +551,29 @@ TEST_CASE("editing: measure spans are a rectangle a system, over the measures as
     CHECK(score.measureSpans(0, from, from).size() == 1);
     CHECK(score.measureSpans(0, to, from).isEmpty());
     CHECK(score.measureSpans(99, 0, 3).isEmpty());
+}
+
+TEST_CASE("editing: the song's tempo keeps the beat it counts in") {
+    // ADR-0042: in 6/8 counted in dotted quarters, the song pane's tempo and
+    // the first measure's set the dotted quarters a minute.
+    using elara::core::Tempo;
+    const elara::core::Duration dottedQuarter(NoteValue::Quarter, 1);
+    elara::core::Song song;
+    song.appendMeasures(2);
+    song.addTrack(elara::core::Track::fromPreset(*elara::core::findInstrumentPreset("piano")));
+    song.setStartTempo(Tempo(60, dottedQuarter));
+    const QTemporaryDir folder;
+    REQUIRE(folder.isValid());
+    const QString file = folder.filePath(QStringLiteral("dotted.elara"));
+    elara::io::saveNative(song, std::filesystem::path(file.toStdU16String()));
+
+    ScoreDocument score;
+    score.open(QUrl::fromLocalFile(file));
+    REQUIRE(
+        settle([&] { return score.status() == ScoreDocument::Status::Ready && !score.busy(); }));
+    score.setTempo(80);
+    CHECK(score.song()->startTempo() == Tempo(80, dottedQuarter));
+    score.setTempoFrom(0, 70);
+    CHECK(score.song()->startTempo() == Tempo(70, dottedQuarter));
+    CHECK(score.undoName() == QStringLiteral("Change tempo"));
 }

@@ -1306,7 +1306,9 @@ void ScoreDocument::setTempo(int bpm) {
         bpm > static_cast<int>(core::Tempo::kMaxBpm)) {
         return;
     }
-    execute(std::make_unique<core::SetStartTempo>(core::Tempo(bpm)));
+    // In the beat the song counts in (ADR-0042).
+    execute(std::make_unique<core::SetStartTempo>(
+        core::Tempo(bpm, document_->song().startTempo().beatUnit())));
 }
 
 void ScoreDocument::setTimeSignature(int numerator, int denominator) {
@@ -1612,26 +1614,15 @@ void ScoreDocument::setTempoFrom(int measure, int bpm) {
         measure >= static_cast<int>(document_->song().measureCount())) {
         return;
     }
-    const core::Song& song = document_->song();
     const bool removing = bpm <= 0;
     if (!removing && (bpm < static_cast<int>(core::Tempo::kMinBpm) ||
                       bpm > static_cast<int>(core::Tempo::kMaxBpm))) {
         return;
     }
-    if (measure == 0) {
-        // The song's tempo, counted in the beat it already counts in; the
-        // first measure always has one.
-        if (removing) {
-            return;
-        }
-        const core::Tempo tempo(bpm, song.startTempo().beatUnit());
-        if (tempo != song.startTempo()) {
-            execute(std::make_unique<core::SetStartTempo>(tempo));
-        }
-        return;
-    }
+    // On the first measure, core sets the song's tempo in the beat it counts in.
     const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
-    if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+    if (auto change =
+            core::changeTempo(document_->song(), static_cast<std::size_t>(measure), bpmOrNone)) {
         execute(std::move(change));
     }
 }
@@ -2222,14 +2213,11 @@ void ScoreDocument::typeDigit(int digit, core::EditSession::Clock::time_point at
         emit editFailed(tr("Frets are typed on a track with strings."));
         return;
     }
-    bool changed = false;
-    try {
-        changed = session_.typeDigit(*document_, digit, at);
-    } catch (const std::exception& error) {
-        emit editFailed(qstring(error.what()));
-        return;
+    const core::EntryResult typed = session_.typeDigit(*document_, digit, at);
+    if (typed.refused) {
+        emit editFailed(refusalText(*typed.refused));
     }
-    showEdit(changed);
+    showEdit(typed.changed);
 }
 
 void ScoreDocument::setInputValue(int value) {
@@ -2276,13 +2264,42 @@ void ScoreDocument::shorterDuration() {
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
-    bool changed = false;
+    core::EntryResult entered;
     try {
-        changed = session_.enter(*document_, std::move(entry));
+        entered = session_.enter(*document_, std::move(entry));
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
     }
-    return showEdit(changed);
+    if (entered.refused) {
+        emit editFailed(refusalText(*entered.refused));
+    }
+    return showEdit(entered.changed);
+}
+
+QString ScoreDocument::refusalText(core::Refusal why) {
+    switch (why) {
+    case core::Refusal::NothingAtCaret:
+        return tr("That goes on a note: put the caret on one.");
+    case core::Refusal::NeedsStrings:
+        return tr("That needs a track with strings.");
+    case core::Refusal::NeedsDrums:
+        return tr("Hits are typed on a drum track.");
+    case core::Refusal::NoNoteNames:
+        return tr("Drums take no note names.");
+    case core::Refusal::NoString:
+        return tr("No string can play that note.");
+    case core::Refusal::OffTheNeck:
+        return tr("The note would leave the neck.");
+    case core::Refusal::OutOfRange:
+        return tr("That note is out of range.");
+    case core::Refusal::NoNoteToTie:
+        return tr("There is no note to tie to.");
+    case core::Refusal::NoNaturalHarmonic:
+        return tr("That fret has no natural harmonic.");
+    case core::Refusal::TrillTooWide:
+        return tr("A trill goes at most an octave away.");
+    }
+    return {};
 }
 
 bool ScoreDocument::showEdit(bool changed) {
@@ -2311,14 +2328,14 @@ void ScoreDocument::giveInput(core::Duration duration) {
         return;
     }
     const core::Duration before = session_.input();
-    bool changed = false;
+    core::EntryResult given;
     try {
-        changed = session_.setInput(*document_, duration);
+        given = session_.setInput(*document_, duration);
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
     }
     inputMaybeChanged(before);
-    showEdit(changed);
+    showEdit(given.changed);
 }
 
 void ScoreDocument::placeCaretAt(const core::Caret& caret) {

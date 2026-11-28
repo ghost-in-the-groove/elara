@@ -50,6 +50,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | deshacer / rehacer | undo / redo | `undo()`, `redo()` | |
 | sesión de edición | editing session | `EditSession` | What keyboard entry keeps from one action to the next: the caret, the input duration, the digit waiting for a second one, the selection and the measures copied, kept inside the song they edit (ADR-0127) |
 | cursor de edición | caret | `Caret` | Beat and string where typing enters notes; the free slot follows the last beat of a short measure (ADR-0021) |
+| rechazo | refusal | `Refusal`, `Entry::refused`, `EntryResult` | Why an edit at the caret was not made: nothing at the caret takes it, it needs strings or drums, the note would leave the neck, ...; returned as a value, never thrown (ADR-0180) |
 | punto de guardado | save point | `markSaved()`, `isModified()` | |
 | archivo nativo | native file | `.elara`, `saveNative()`, `loadNative()` | Zip with `song.json` (ADR-0006) |
 | importación / aviso | import / warning | `ImportResult`, `warnings` | A foreign file read into the model; each warning is a feature it had that the model cannot hold yet (ADR-0007) |

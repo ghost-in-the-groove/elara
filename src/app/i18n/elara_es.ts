@@ -2181,42 +2181,6 @@
         <translation>Notas de adorno</translation>
     </message>
     <message>
-        <source>Drums take no note names.</source>
-        <translation>La batería no admite nombres de nota.</translation>
-    </message>
-    <message>
-        <source>No string can play that note.</source>
-        <translation>Ninguna cuerda puede tocar esa nota.</translation>
-    </message>
-    <message>
-        <source>That note is out of range.</source>
-        <translation>Esa nota está fuera de rango.</translation>
-    </message>
-    <message>
-        <source>The note would leave the neck.</source>
-        <translation>La nota se saldría del mástil.</translation>
-    </message>
-    <message>
-        <source>Hits are typed on a drum track.</source>
-        <translation>Los golpes se escriben en una pista de batería.</translation>
-    </message>
-    <message>
-        <source>Effects go on notes: put the caret on one.</source>
-        <translation>Los efectos van sobre notas: pon el cursor en una.</translation>
-    </message>
-    <message>
-        <source>That fret has no natural harmonic.</source>
-        <translation>Ese traste no tiene armónico natural.</translation>
-    </message>
-    <message>
-        <source>There is no note to tie to.</source>
-        <translation>No hay ninguna nota a la que ligar.</translation>
-    </message>
-    <message>
-        <source>%1 needs strings.</source>
-        <translation>%1 necesita cuerdas.</translation>
-    </message>
-    <message>
         <source>Dive %1</source>
         <translation>Hundimiento %1</translation>
     </message>
@@ -2263,14 +2227,6 @@
     <message>
         <source>Pop</source>
         <translation>Pop</translation>
-    </message>
-    <message>
-        <source>Harmonics need strings.</source>
-        <translation>Los armónicos necesitan cuerdas.</translation>
-    </message>
-    <message>
-        <source>Dynamics go on notes: put the caret on one.</source>
-        <translation>Las dinámicas van sobre notas: pon el cursor en una.</translation>
     </message>
     <message>
         <source>Slide in from below</source>
@@ -2830,6 +2786,46 @@
     <message>
         <source>MIDI (*.mid *.midi *.smf *.kar)</source>
         <translation>MIDI (*.mid *.midi *.smf *.kar)</translation>
+    </message>
+    <message>
+        <source>That goes on a note: put the caret on one.</source>
+        <translation>Eso va sobre una nota: pon el cursor en una.</translation>
+    </message>
+    <message>
+        <source>That needs a track with strings.</source>
+        <translation>Eso necesita una pista con cuerdas.</translation>
+    </message>
+    <message>
+        <source>Hits are typed on a drum track.</source>
+        <translation>Los golpes se escriben en una pista de batería.</translation>
+    </message>
+    <message>
+        <source>Drums take no note names.</source>
+        <translation>La batería no admite nombres de nota.</translation>
+    </message>
+    <message>
+        <source>No string can play that note.</source>
+        <translation>Ninguna cuerda puede tocar esa nota.</translation>
+    </message>
+    <message>
+        <source>The note would leave the neck.</source>
+        <translation>La nota se saldría del mástil.</translation>
+    </message>
+    <message>
+        <source>That note is out of range.</source>
+        <translation>Esa nota está fuera de rango.</translation>
+    </message>
+    <message>
+        <source>There is no note to tie to.</source>
+        <translation>No hay ninguna nota a la que ligar.</translation>
+    </message>
+    <message>
+        <source>That fret has no natural harmonic.</source>
+        <translation>Ese traste no tiene armónico natural.</translation>
+    </message>
+    <message>
+        <source>A trill goes at most an octave away.</source>
+        <translation>Un trino llega como mucho a una octava.</translation>
     </message>
     <message>
         <source>Copied measure %1.</source>
