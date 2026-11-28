@@ -90,10 +90,9 @@ private:
     void queueSteps();
     void queueMeasurePopup();
     void queueTuningFields();
-    void queueSelection();
     void queueLyricsPopup();
     void queueEffectsPalette();
-    void queueMix();
+    void queueTrackRow();
     void queueSymbols();
     void queueSymbolClick();
     void queueCommands();
@@ -102,7 +101,6 @@ private:
                   const QString& text = {});
     /// Types `text` a key at a time.
     void typeText(const QString& text);
-    void queueContinuous();
     void queueLayoutIssues();
     void queueTunerFollowsTrack();
     void finish(bool ok, const QString& detail);
@@ -184,10 +182,6 @@ private:
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
     double positionBefore_ = 0.0;          ///< playback's position before an edit
-    bool selecting_ = false;               ///< whether the selection steps run
-    int lengthBefore_ = 0;                 ///< the song's length before pasting
-    int pasteAt_ = 0;                      ///< the measure pasted at
-    int pagesBefore_ = 0;                  ///< pages before the continuous view was shown
     bool recoveryWritten_ = false;         ///< ScoreDocument::recoveryWritten() came
     std::optional<QTemporaryDir> scratch_; ///< where checks save and export, made once
     std::optional<bool> saved_;            ///< what ScoreDocument::saveFinished() last said

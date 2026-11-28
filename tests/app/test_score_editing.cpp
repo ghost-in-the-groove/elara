@@ -840,3 +840,88 @@ TEST_CASE("editing: a capo a fret higher keeps the frets, and taking it off keep
     CHECK(score.trackTuning(0) == before);
     CHECK(song.unchanged());
 }
+
+TEST_CASE("editing: two measures selected are copied, pasted before the caret's and transposed") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    const int length = score.measureCount();
+    REQUIRE(length > 1);
+
+    // Shift+Right, or Shift+Left on the last measure (ADR-0036): the page
+    // tints both, and the status says so.
+    const bool last = score.caretMeasure() + 1 >= length;
+    score.extendSelection(last ? -1 : 1);
+    REQUIRE(score.hasSelection());
+    CHECK(score.selectionLast() == score.selectionFirst() + 1);
+    CHECK(score.selectionBoxes(score.caretPage()).size() == 2);
+    CHECK(song.editor.caretStatus().startsWith(CaretEditor::tr("Measures %1-%2 selected")
+                                                   .arg(score.selectionFirst() + 1)
+                                                   .arg(score.selectionLast() + 1)));
+
+    // Copied, let go, and pasted as new measures before the caret's, which
+    // end up selected.
+    score.copy();
+    CHECK(score.canPaste());
+    score.clearSelection();
+    const int at = score.caretMeasure();
+    score.paste(true);
+    REQUIRE(song.laidOut());
+    CHECK(score.measureCount() == length + 2);
+    CHECK(score.hasSelection());
+    CHECK(score.selectionFirst() == at);
+    CHECK(score.selectionLast() == at + 1);
+
+    score.transposeSelection(2);
+    REQUIRE(song.laidOut());
+    CHECK(score.undoName() == ScoreDocument::tr("Transpose"));
+    // Escape lets go of them.
+    score.clearSelection();
+    CHECK_FALSE(score.hasSelection());
+    CHECK(score.selectionBoxes(score.caretPage()).isEmpty());
+    score.undo();
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(score.measureCount() == length);
+    CHECK(song.unchanged());
+}
+
+TEST_CASE(
+    "editing: a fader is heard before it is let go, and a mix set is one edit playback keeps") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    const auto sequence = score.sequence();
+    const auto tracks = static_cast<std::size_t>(score.tracks().size());
+
+    // The mixer (ADR-0039): a fader moved is previewed, not an edit.
+    score.previewTrackMix(0, 0.25, 0.5);
+    REQUIRE(score.previewMixes().size() == tracks);
+    CHECK(score.previewMixes().front().volume == 0.25);
+    CHECK_FALSE(score.modified());
+
+    // Let go: one edit, neither drawn nor sequenced (ADR-0111), and
+    // playback goes on with the sequence it has.
+    const std::uint64_t layouts = score.layoutWork().asked;
+    const std::uint64_t sequences = score.sequenceWork().asked;
+    score.setTrackMix(0, 0.25, -0.5, false, true);
+    CHECK(score.layoutWork().asked == layouts);
+    CHECK(score.sequenceWork().asked == sequences);
+    const QVariantMap first = score.tracks().front().toMap();
+    CHECK(first.value(QStringLiteral("volume")).toDouble() == 0.25);
+    CHECK(first.value(QStringLiteral("pan")).toDouble() == -0.5);
+    CHECK(first.value(QStringLiteral("solo")).toBool());
+    CHECK(score.undoName() == ScoreDocument::tr("Change mix"));
+    CHECK(score.sequence() == sequence);
+    REQUIRE(song.laidOut());
+    // The solo silences the other tracks.
+    const QVariantList mixed = score.tracks();
+    CHECK((mixed.size() < 2 || !mixed.at(1).toMap().value(QStringLiteral("audible")).toBool()));
+
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK_FALSE(score.tracks().front().toMap().value(QStringLiteral("solo")).toBool());
+    CHECK(song.unchanged());
+}

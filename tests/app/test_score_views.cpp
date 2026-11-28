@@ -2,11 +2,18 @@
 // The views of a song shown before come back as they were (ADR-0175): the
 // layout worker keeps a memory of each, so that going to another track and
 // back lays out only what was edited meanwhile, and nothing when nothing was.
+// The continuous view shows the song in strips in place of pages (ADR-0057).
 #include "score_document.hpp"
+#include "songs_to_edit.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QList>
 #include <QString>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
+
+#include <cmath>
 
 using elara::app::ScoreDocument;
 using Move = ScoreDocument::CaretMove;
@@ -164,4 +171,39 @@ TEST_CASE("views: only the views shown last are kept, and the others are laid ou
     score.newSong(QStringLiteral("electric-guitar"));
     REQUIRE(views.laidOut());
     CHECK(score.layoutsKept() == kept + 1);
+}
+
+TEST_CASE("views: the continuous view shows strips no higher than a page, then the pages again") {
+    using elara::app::testing::kSongsToEdit;
+    using elara::app::testing::SongToEdit;
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    const int pages = score.pageCount();
+    REQUIRE_FALSE(score.continuous());
+    REQUIRE_FALSE(score.showsStrips());
+
+    // ADR-0057: strips of one endless page, stacked without gaps.
+    score.setContinuous(true);
+    CHECK(score.continuous());
+    REQUIRE(song.laidOut());
+    CHECK(score.showsStrips());
+    const double height = score.pageSize().height();
+    const QList<qreal> strips = score.pageTops();
+    REQUIRE(strips.size() == score.pageCount() + 1);
+    CHECK(strips.front() == 0.0);
+    for (qsizetype s = 1; s < strips.size(); ++s) {
+        CHECK(strips[s] > strips[s - 1]);
+        CHECK(strips[s] - strips[s - 1] <= height + 1e-6);
+    }
+
+    // The pages come back as they were, a page high each.
+    score.setContinuous(false);
+    REQUIRE(song.laidOut());
+    CHECK_FALSE(score.showsStrips());
+    CHECK(score.pageCount() == pages);
+    const QList<qreal> tops = score.pageTops();
+    REQUIRE(tops.size() == pages + 1);
+    CHECK(std::abs(tops.back() - height * pages) < 1e-6);
 }
