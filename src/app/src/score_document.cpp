@@ -2384,6 +2384,18 @@ QVariantList ScoreDocument::selectionBoxes(int index) const {
     return boxes;
 }
 
+QRectF ScoreDocument::measureBox(int index, int measure) const {
+    if (!pages_ || index < 0 || index >= static_cast<int>(pages_->size()) || measure < 0) {
+        return {};
+    }
+    for (const notation::MeasureBox& box : (*pages_)[static_cast<std::size_t>(index)].measures) {
+        if (box.index == static_cast<std::size_t>(measure)) {
+            return {box.x, box.y, box.width, box.height};
+        }
+    }
+    return {};
+}
+
 void ScoreDocument::selectionMoved() {
     ++selectionRevision_;
     emit selectionChanged();

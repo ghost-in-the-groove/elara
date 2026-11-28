@@ -125,7 +125,8 @@ ZipReader::~ZipReader() {
     }
 }
 
-std::optional<std::string> ZipReader::entry(const std::string& name, std::size_t limit) {
+std::optional<std::string> ZipReader::entry(const std::string& name, std::size_t limit,
+                                            std::size_t padding) {
     const int index = mz_zip_reader_locate_file(&zip_, name.c_str(), nullptr, 0);
     if (index < 0) {
         return std::nullopt;
@@ -138,8 +139,9 @@ std::optional<std::string> ZipReader::entry(const std::string& name, std::size_t
     if (stat.m_uncomp_size > limit) {
         throw FormatError{std::format("{} is too large ({} bytes)", name, stat.m_uncomp_size)};
     }
-    std::string content(static_cast<std::size_t>(stat.m_uncomp_size), '\0');
-    if (mz_zip_reader_extract_to_mem(&zip_, file, content.data(), content.size(), 0) == 0) {
+    const auto size = static_cast<std::size_t>(stat.m_uncomp_size);
+    std::string content(size + padding, '\0');
+    if (mz_zip_reader_extract_to_mem(&zip_, file, content.data(), size, 0) == 0) {
         throw FormatError{std::format("{} is damaged", name)};
     }
     return content;

@@ -304,7 +304,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Two voices on one staff a second apart or in unison do not collide
         (ADR-0151)
   - [x] No layout issue over the corpus and songs made at random (ADR-0150)
-  - [ ] System and page breaks stored per measure, in files and the CLI
+  - [x] System and page breaks stored per measure, in files and the CLI (ADR-0152)
   - [ ] The line breaker keeps the stored breaks; the cache follows them
   - [ ] Lock the breaks of a range, and unlock them
   - [ ] Layout settings of a song: staff size, margins, spacing, in the CLI
@@ -317,6 +317,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Layout issues found on the worker and shown in the status bar (ADR-0150)
   - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
+- [ ] Several songs open at once, in tabs, with measures copied between them
+      (ADR-0160)
+  - [x] One clipboard for every song open: measures copied in one song are
+        pasted in another, shared with the song they came from; the CLI
+        `edit --from` and `copy ... from` steps
+  - [ ] Songs in tabs: new, open, close and switch; files opened together
+        load in parallel; the transport follows the song shown
 
 ## The interface
 
@@ -345,6 +352,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] A command palette: every command by name, with its keys; recent ones
       first, a measure number, a section, "tempo 90" or "3/4" typed into it
       (ADR-0135)
+- [x] Following playback a system at a time, held off by a scroll by hand; the
+      caret marks where playback starts while it is stopped, and the measure
+      playing or the caret's is shaded across every staff (ADR-0170)
 
 ## Milestone 6 - Practice tools
 

@@ -876,6 +876,10 @@
         <translation>Marcar el punto A del bucle</translation>
     </message>
     <message>
+        <source>Follow playback</source>
+        <translation>Seguir la reproducción</translation>
+    </message>
+    <message>
         <source>Metronome</source>
         <translation>Metrónomo</translation>
     </message>
@@ -2891,6 +2895,10 @@
     <message>
         <source>With --smoke-test, edit a new song above the caret and check that the caret holds still on screen.</source>
         <translation>Con --smoke-test, editar una canción nueva por encima del cursor y comprobar que el cursor no se mueve en la pantalla.</translation>
+    </message>
+    <message>
+        <source>With --smoke-test, move playback through a new song as it plays and check that the view follows it.</source>
+        <translation>Con --smoke-test, mover la reproducción por una canción nueva como al reproducirla y comprobar que la vista la sigue.</translation>
     </message>
     <message>
         <source>Open the note effects panel at the caret at start.</source>

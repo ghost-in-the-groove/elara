@@ -179,6 +179,14 @@ core::Song richSong() {
     song.track(2).staff(0).measure(4).repeat = MeasureRepeat::TwoSecond;
     song.track(3).staff(0).measure(4).voices[0].beats = {
         beat("breve", {Note{.pitch = Pitch::fromMidi(36)}, Note{.pitch = Pitch::fromMidi(42)}})};
+    // Layout adjustments (ADR-0152): the song's, and the bass's own.
+    std::vector<MeasureLayout> layouts(5);
+    layouts[2].breakBefore = Break::System;
+    layouts[4] = MeasureLayout{.breakBefore = Break::Page, .spacing = 120};
+    song.setMeasureLayouts(LayoutScope::song(), MeasureLayouts(layouts));
+    std::vector<MeasureLayout> bassLayouts(5);
+    bassLayouts[3].breakBefore = Break::Keep;
+    song.setMeasureLayouts(LayoutScope::ofTrack(1), MeasureLayouts(bassLayouts));
     return song;
 }
 
@@ -314,6 +322,35 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(mixes == 2);
 }
 
+TEST_CASE("song.json escapes text as JSON and keeps UTF-8 as it is", "[io][native]") {
+    core::Song song = richSong();
+    song.info().title = "A \"quoted\" back\\slash/,\ttab,\nline,\r\b\f \x01\x1F\x7F "
+                        "\xC3\xA9t\xC3\xA9 \xE2\x99\xAA \xF0\x9F\x8E\xB8";
+    song.track(0).setMix(
+        core::TrackMix{.volume = 0.1, .pan = 1.0 / 3.0, .mute = false, .solo = false});
+    const auto json = songToJson(song);
+    // Quotes, backslashes and control characters are escaped (\u00XX unless
+    // they have a short form); "/", DEL and multi-byte UTF-8 are not.
+    const std::string title =
+        R"("title":"A \"quoted\" back\\slash/,\ttab,\nline,\r\b\f \u0001\u001F)"
+        "\x7F \xC3\xA9t\xC3\xA9 \xE2\x99\xAA \xF0\x9F\x8E\xB8\"";
+    CHECK(json.find(title) != std::string::npos);
+    // Numbers as the shortest text that reads back the same.
+    CHECK(json.find(R"("mix":{"volume":0.1,"pan":0.3333333333333333})") != std::string::npos);
+    const auto read = songFromJson(json);
+    REQUIRE(read.has_value());
+    CHECK(*read == song);
+
+    // Text that is not UTF-8 cannot be written: a lone continuation byte, an
+    // overlong form, a surrogate, a code point past U+10FFFF, a cut sequence.
+    for (const std::string_view bad :
+         {"\x80", "\xC0\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "\xE2\x99"}) {
+        song.info().title = std::string("x") + std::string(bad);
+        CHECK_THROWS(songToJson(song));
+        CHECK_THROWS(encodeNative(song));
+    }
+}
+
 TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     const auto error = [](std::string_view json) {
         const auto result = songFromJson(json);
@@ -368,6 +405,72 @@ TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     CHECK(error(R"({"format":"elara","formatVersion":1,"measures":[{}],"tracks":[{"name":"x",
         "instrument":{"kind":"pitched"},"staves":[{"clef":"treble","measures":[[],[]]}]}]})")
               .starts_with("tracks[0].staves[0].measures:"));
+}
+
+TEST_CASE("Measure layouts are written as the measures that differ, in each scope",
+          "[io][native]") {
+    // A11.
+    const auto json = songToJson(richSong());
+    CHECK(
+        json.find(
+            R"("layout":[{"measure":2,"break":"system"},{"measure":4,"break":"page","spacing":120}],"tracks":[)") !=
+        std::string::npos);
+    CHECK(json.find(R"("layout":[{"measure":3,"break":"keep"}],"staves":[)") != std::string::npos);
+    std::size_t scopes = 0; // the other tracks hold none: no "layout" at all
+    for (auto at = json.find(R"("layout":)"); at != std::string::npos;
+         at = json.find(R"("layout":)", at + 1)) {
+        ++scopes;
+    }
+    CHECK(scopes == 2);
+
+    const auto loaded = songFromJson(json);
+    REQUIRE(loaded.has_value());
+    const core::LayoutScope bass = core::LayoutScope::ofTrack(1);
+    CHECK(loaded->measureLayout(core::LayoutScope::song(), 4) ==
+          core::MeasureLayout{.breakBefore = core::Break::Page, .spacing = 120});
+    CHECK(loaded->measureLayout(bass, 3).breakBefore == core::Break::Keep);
+    CHECK_FALSE(loaded->measureLayouts(core::LayoutScope::ofTrack(0)));
+    CHECK(*loaded == richSong());
+}
+
+TEST_CASE("A song without measure layouts is written and read as before", "[io][native]") {
+    core::Song song = richSong();
+    song.setMeasureLayouts(core::LayoutScope::song(), {});
+    song.setMeasureLayouts(core::LayoutScope::ofTrack(1), {});
+    const auto json = songToJson(song);
+    CHECK(json.find(R"("layout")") == std::string::npos);
+    const auto loaded = songFromJson(json);
+    REQUIRE(loaded.has_value());
+    CHECK_FALSE(loaded->measureLayouts(core::LayoutScope::song()));
+    CHECK(*loaded == song);
+
+    // An empty "layout", or one of default entries only, holds none.
+    const auto empty = songFromJson(
+        R"({"format":"elara","formatVersion":1,"measures":[{},{}],"layout":[{"measure":1}]})");
+    REQUIRE(empty.has_value());
+    CHECK_FALSE(empty->measureLayouts(core::LayoutScope::song()));
+}
+
+TEST_CASE("Measure layouts are checked as they are read", "[io][native]") {
+    const auto error = [](std::string_view layout) {
+        const auto result = songFromJson(std::format(
+            R"({{"format":"elara","formatVersion":1,"measures":[{{}},{{}}],"layout":{}}})",
+            layout));
+        REQUIRE_FALSE(result.has_value());
+        return result.error().message;
+    };
+    CHECK(error(R"([{"measure":2,"break":"system"}])").starts_with("layout[0].measure:"));
+    CHECK(error(R"([{"break":"system"}])") == R"(layout[0]: missing "measure")");
+    CHECK(error(R"([{"measure":1,"break":"line"}])").starts_with("layout[0].break:"));
+    CHECK(error(R"([{"measure":1,"spacing":20}])").starts_with("layout[0].spacing:"));
+    CHECK(error(R"([3])").starts_with("layout[0]:"));
+    CHECK(error(R"({"measure":1})").starts_with("layout:"));
+
+    const auto track = songFromJson(R"({"format":"elara","formatVersion":1,"measures":[{}],
+        "tracks":[{"name":"x","instrument":{"kind":"pitched"},"layout":[{"measure":1}],
+        "staves":[{"clef":"treble"}]}]})");
+    REQUIRE_FALSE(track.has_value());
+    CHECK(track.error().message.starts_with("tracks[0].layout[0].measure:"));
 }
 
 TEST_CASE("Unknown keys are ignored for forward compatibility", "[io][native]") {
@@ -433,6 +536,24 @@ TEST_CASE("A native file is a zip with a mimetype and song.json", "[io][native]"
     broken.resize(broken.size() / 2);
     CHECK_FALSE(decodeNative(broken).has_value());
     CHECK_FALSE(decodeNative(std::vector<std::uint8_t>{1, 2, 3}).has_value());
+}
+
+TEST_CASE("Text with escapes reads back the same from a native file", "[io][native]") {
+    // song.json is read where it was inflated, its escapes undone in place.
+    core::Song song = richSong();
+    song.info().title = "A \"quoted\" back\\slash,\ttab,\nline, \x01, "
+                        "\xC3\xA9t\xC3\xA9 \xF0\x9F\x8E\xB8 end";
+    song.info().artist = std::string(3000, '\\');
+    const auto decoded = decodeNative(encodeNative(song));
+    REQUIRE(decoded.has_value());
+    CHECK(*decoded == song);
+
+    const auto path = tempFile("elara-test-native-escapes.elara");
+    saveNative(song, path);
+    const auto opened = elara::io::openNative(path);
+    std::filesystem::remove(path);
+    REQUIRE(opened.has_value());
+    CHECK(opened->song == song);
 }
 
 TEST_CASE("Native files are saved atomically and loaded back", "[io][native]") {

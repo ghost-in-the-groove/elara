@@ -33,6 +33,7 @@
 #include <QTemporaryDir>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QWheelEvent>
 #include <QWindow>
 
 #include <algorithm>
@@ -99,6 +100,21 @@ QQuickItem* symbolHighlight(QQuickItem* item, int index) {
         }
     }
     return nullptr;
+}
+
+// The items named `name` that `item` shows, itself included, searching what
+// it draws as symbolHighlight() does: the pages' items are no QObject
+// children of the window.
+void shownItems(QQuickItem* item, QLatin1StringView name, QList<QQuickItem*>& found) {
+    if (item == nullptr || !item->isVisible()) {
+        return;
+    }
+    if (item->objectName() == name) {
+        found.append(item);
+    }
+    for (QQuickItem* child : item->childItems()) {
+        shownItems(child, name, found);
+    }
 }
 
 // The first item named `name` under `item`, searching the items it shows: a
@@ -182,6 +198,10 @@ void Startup::queueSteps() {
         }
         if (options_.smokeTest && options_.holdStill) {
             queueHoldStill();
+            return;
+        }
+        if (options_.smokeTest && options_.follow) {
+            queueFollow();
             return;
         }
         // Without a file the smoke test edits a new song.
@@ -319,6 +339,7 @@ void Startup::queueSteps() {
             clickCursor();
             return false;
         });
+        queueParking();
         queuePdf();
         queueExport();
         queuePractice();
@@ -3187,6 +3208,255 @@ void Startup::queueHoldStill() {
         score_->insertMeasure(true);
         QMetaObject::invokeMethod(view(), "reveal");
         again_ = true;
+        return false;
+    });
+}
+
+// Following playback (ADR-0170), in a new song several pages long: playback is
+// moved every tick as it moves while it plays. The view must bring the
+// cursor's system in while the cursor goes on moving, hold still once scrolled
+// by hand until the cursor goes into another system, and not follow at all
+// with following off.
+void Startup::queueFollow() {
+    const auto view = [this] {
+        return window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    };
+    const auto pages = [view] {
+        return view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+    };
+    const auto audio = [this] {
+        return window_->findChild<AudioController*>();
+    };
+    // Where the playback cursor is in the view, in its pixels; empty when hidden.
+    const auto cursor = [this, view]() -> QRectF {
+        auto* playhead = window_->findChild<QQuickItem*>(QStringLiteral("playhead"));
+        if (playhead == nullptr || !playhead->isVisible()) {
+            return {};
+        }
+        return playhead->mapRectToItem(view(),
+                                       QRectF(0.0, 0.0, playhead->width(), playhead->height()));
+    };
+    const auto inView = [view, cursor] {
+        const QRectF at = cursor();
+        return !at.isEmpty() && at.top() >= 0.0 && at.bottom() <= view()->height();
+    };
+    const auto scene = [view, pages, cursor] {
+        const QRectF at = cursor();
+        return QStringLiteral("the cursor from %1 to %2 px in a view %3 px high, scrolled to %4")
+            .arg(at.top())
+            .arg(at.bottom())
+            .arg(view()->height())
+            .arg(pages()->property("contentY").toDouble());
+    };
+    const auto seek = [audio](double seconds) {
+        if (auto* controller = audio(); controller != nullptr) {
+            controller->seek(seconds);
+        }
+    };
+    // The first measure of system `system` of page `page`, from 0; -1 when
+    // there is none.
+    const auto measureOf = [this](int page, std::size_t system) {
+        const auto list = score_->page(page);
+        return list && list->systems.size() > system
+                   ? static_cast<int>(list->systems[system].firstMeasure)
+                   : -1;
+    };
+    steps_.emplace_back([this] {
+        score_->newSong(QStringLiteral("electric-guitar"));
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->setMeasureCount(300);
+        return true;
+    });
+    // Playback moves to the second system of the second page, out of view.
+    steps_.emplace_back([this, view, measureOf, seek] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        const int measure = measureOf(1, 1);
+        if (measure < 0 || measureOf(1, 2) < 0 || score_->pageCount() < 3) {
+            failure_ = QStringLiteral("the new song has %1 pages").arg(score_->pageCount());
+            return false;
+        }
+        followSeconds_ = score_->measureStart(measure);
+        followTicks_ = 0;
+        seek(followSeconds_);
+        return false;
+    });
+    // It goes on moving every tick, as it does while playing, a little longer
+    // than the view takes to scroll: the cursor's system must be in view by then.
+    // The measure playing is shaded across its system, where the pages say it is.
+    steps_.emplace_back([this, view, audio, inView, scene, seek] {
+        if (++followTicks_ < 40) {
+            seek(followSeconds_ + followTicks_ * 0.01);
+            again_ = true;
+            return false;
+        }
+        if (!inView()) {
+            failure_ = QStringLiteral("the view did not follow playback: %1").arg(scene());
+            return false;
+        }
+        const double position = audio()->position();
+        const int playing = score_->measureAt(position);
+        const QRectF expected = score_->measureBox(
+            score_->cursorAt(position).value(QStringLiteral("page")).toInt(), playing);
+        QList<QQuickItem*> shades;
+        shownItems(view(), QLatin1StringView("measureShade"), shades);
+        if (expected.isEmpty() || shades.size() != 1 ||
+            shades.front()->property("box").toRectF() != expected) {
+            failure_ = QStringLiteral("%1 shades show, none on measure %2, which plays")
+                           .arg(shades.size())
+                           .arg(playing + 1);
+        }
+        std::printf("follow: in view after %d ticks\n", followTicks_);
+        return false;
+    });
+    // Scrolled by hand with the wheel, up and away from the cursor.
+    steps_.emplace_back([this, view] {
+        const QPointF at = view()->mapToScene(QPointF(view()->width() / 2, view()->height() / 2));
+        QWheelEvent wheel(at, window_->mapToGlobal(at), QPoint(), QPoint(0, 1200), Qt::NoButton,
+                          Qt::NoModifier, Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(window_, &wheel);
+        followWheelAt_ = clock_.elapsed();
+        return false;
+    });
+    steps_.emplace_back([this, view, pages, inView, scene] {
+        if (pages()->property("moving").toBool() || view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (!view()->property("heldByHand").toBool()) {
+            failure_ = QStringLiteral("the wheel did not count as a scroll by hand");
+        } else if (inView()) {
+            failure_ = QStringLiteral("the wheel left the cursor in view: %1").arg(scene());
+        }
+        followScroll_ = pages()->property("contentY").toDouble();
+        followTicks_ = 0;
+        return false;
+    });
+    // Playback goes on in the same system: the view stays where the hand left it.
+    steps_.emplace_back([this, pages, seek] {
+        if (++followTicks_ < 15) {
+            seek(followSeconds_ + 0.5 + followTicks_ * 0.01);
+            again_ = true;
+            return false;
+        }
+        const double scrolled = pages()->property("contentY").toDouble();
+        if (std::abs(scrolled - followScroll_) > 0.5) {
+            failure_ = QStringLiteral("the view went from %1 to %2 px after a scroll by hand, "
+                                      "with the cursor in the same system")
+                           .arg(followScroll_)
+                           .arg(scrolled);
+        }
+        return false;
+    });
+    // Once the pause is over, playback going into the next system brings the
+    // view back to it.
+    steps_.emplace_back([this, view, measureOf, seek] {
+        if (clock_.elapsed() - followWheelAt_ <
+            view()->property("followPause").toInt() + 2 * kTickMilliseconds) {
+            again_ = true;
+            return false;
+        }
+        seek(score_->measureStart(measureOf(1, 2)));
+        return false;
+    });
+    steps_.emplace_back([this, view, inView, scene] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (!inView()) {
+            failure_ = QStringLiteral("the view did not follow playback into the next system "
+                                      "after a scroll by hand: %1")
+                           .arg(scene());
+        }
+        return false;
+    });
+    // With following off, playback far away leaves the view where it is.
+    steps_.emplace_back([this, view, pages, measureOf, seek] {
+        view()->setProperty("followCursor", false);
+        followScroll_ = pages()->property("contentY").toDouble();
+        seek(score_->measureStart(measureOf(score_->pageCount() - 1, 0)));
+        return false;
+    });
+    steps_.emplace_back([this, view, pages, scene] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (std::abs(pages()->property("contentY").toDouble() - followScroll_) > 0.5) {
+            failure_ =
+                QStringLiteral("the view followed playback with following off: %1").arg(scene());
+        }
+        // Back on, it goes to the cursor at once.
+        view()->setProperty("followCursor", true);
+        return false;
+    });
+    steps_.emplace_back([this, view, inView, scene] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (!inView()) {
+            failure_ =
+                QStringLiteral("following turned on did not go to the cursor: %1").arg(scene());
+        }
+        return false;
+    });
+}
+
+// A click on the score while playback is stopped puts the caret there and
+// playback with it (ADR-0170): the cursor hides, since the caret marks the
+// place, and the caret's measure is shaded across its system. The arrow keys
+// move playback with the caret too.
+void Startup::queueParking() {
+    const auto view = [this] {
+        return window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    };
+    // The shaded measure, from the shade drawn on its page: its box in staff
+    // spaces, or an empty one when no shade shows or several do.
+    const auto shade = [view] {
+        QList<QQuickItem*> shades;
+        shownItems(view(), QLatin1StringView("measureShade"), shades);
+        return shades.size() == 1 ? shades.front()->property("box").toRectF() : QRectF();
+    };
+    const auto check = [this, view, shade](const char* after) {
+        const QRectF expected = score_->measureBox(score_->caretPage(), score_->caretMeasure());
+        if (view()->property("cursorShown").toBool()) {
+            failure_ = QStringLiteral("the playback cursor shows after %1 with playback stopped")
+                           .arg(QLatin1StringView(after));
+        } else if (expected.isEmpty() || shade() != expected) {
+            failure_ = QStringLiteral("after %1 the shade is at %2, %3, %4 by %5, not on the "
+                                      "caret's measure %6")
+                           .arg(QLatin1StringView(after))
+                           .arg(shade().x())
+                           .arg(shade().y())
+                           .arg(shade().width())
+                           .arg(shade().height())
+                           .arg(score_->caretMeasure() + 1);
+        }
+    };
+    steps_.emplace_back([this, check] {
+        check("a click on the score");
+        pressKey(Qt::Key_Right);
+        return false;
+    });
+    steps_.emplace_back([this, check] {
+        check("the right arrow");
+        const QRectF caret = score_->caretRect();
+        const double expected =
+            score_->secondsAt(score_->caretPage(), caret.center().x(), caret.center().y());
+        const auto* audio = window_->findChild<AudioController*>();
+        if (failure_.isEmpty() &&
+            (audio == nullptr || expected < 0.0 || std::abs(audio->position() - expected) > 1e-6)) {
+            failure_ = QStringLiteral("the right arrow left playback at %1 s, not at the caret's "
+                                      "beat, %2 s")
+                           .arg(audio != nullptr ? audio->position() : -1.0)
+                           .arg(expected);
+        }
         return false;
     });
 }

@@ -82,3 +82,6 @@ names, so that the app can find what is under the pointer.
   braces for two-staff instruments, abbreviated track names on later systems,
   hammer-on arcs and slides across a system break, line and page breaks stored
   in the song, tempo marks, and incremental relayout (milestone 3).
+- Breaks a writer asks for (a system or a page starting at a measure, or a
+  measure kept beside the one before) are stored per measure in the song since
+  ADR-0152; the line breaker reads them once that ADR's next step lands.
