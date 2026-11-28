@@ -91,10 +91,11 @@ private:
     void queueMeasurePopup();
     void queueTuningFields();
     void queueSelection();
+    void queueLyricsPopup();
+    void queueEffectsPalette();
     void queueMix();
     void queueSymbols();
     void queueSymbolClick();
-    void queueEffects();
     void queueCommands();
     /// Presses and lets go of `key` as the system would, shortcuts included.
     void pressKey(int key, Qt::KeyboardModifiers modifiers = Qt::NoModifier,
@@ -165,6 +166,8 @@ private:
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
     QString trackName_;                    ///< the first track's name before it was renamed
     QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
+    bool singing_ = false;                 ///< whether the lyrics popup steps run
+    std::optional<QStringList> litBefore_; ///< the palette's tiles lit before its steps
     bool measuring_ = false;               ///< whether the measure popup steps run
     std::optional<int> capoBefore_;        ///< the capo the tuning fields showed first
     double heldY_ = 0.0;                   ///< the caret's height on screen before an edit
@@ -184,8 +187,6 @@ private:
     bool selecting_ = false;               ///< whether the selection steps run
     int lengthBefore_ = 0;                 ///< the song's length before pasting
     int pasteAt_ = 0;                      ///< the measure pasted at
-    bool effecting_ = false;               ///< whether the note effect steps run
-    int effectsBefore_ = 0;                ///< the caret's effects before they were toggled
     int pagesBefore_ = 0;                  ///< pages before the continuous view was shown
     bool recoveryWritten_ = false;         ///< ScoreDocument::recoveryWritten() came
     std::optional<QTemporaryDir> scratch_; ///< where checks save and export, made once
