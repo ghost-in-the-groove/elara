@@ -139,6 +139,7 @@ one that replaces them.
 | [0139](0139-a-song-from-a-newer-elara-says-what-it-may-lose.md) | A song from a newer Elara says what it may lose | Accepted |
 | [0144](0144-release-build-flags.md) | The release build optimised as MSVC's own release | Accepted |
 | [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
+| [0146](0146-tracks-share-a-soundfont.md) | Tracks share a SoundFont | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |

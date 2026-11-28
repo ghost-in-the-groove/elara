@@ -25,6 +25,7 @@
 
 using Catch::Matchers::ContainsSubstring;
 using Catch::Matchers::WithinRel;
+using elara::audio::builtinBank;
 using elara::audio::OfflineRenderer;
 using elara::audio::peakLevel;
 using elara::audio::Sequence;
@@ -268,4 +269,90 @@ TEST_CASE("Offline rendering: a song through a SoundFont", "[audio][soundfont]")
         left.push_back(stereo[2 * i]);
     }
     CHECK_THAT(pitchOf(left, kRate), WithinRel(keyFrequency(57), 0.005));
+}
+
+TEST_CASE("SoundFont: its sounds play on whatever goes first", "[audio][soundfont]") {
+    // Every sound plays the one copy of the font that opening loaded.
+    auto font = testFont();
+    auto guitar = font->sound(kGuitar, kRate);
+    auto bass = font->sound(pitched(33), kRate);
+    auto drums = font->sound(kDrums, 44100.0);
+    font.reset();
+    guitar->noteOn(57, 100, Touch::Normal);
+    bass->noteOn(45, 100, Touch::Normal);
+    drums->noteOn(38, 100, Touch::Normal);
+    static_cast<void>(render(*bass, 0.1));
+    static_cast<void>(render(*drums, 0.1));
+    bass.reset(); // while its note sounds
+    drums.reset();
+    CHECK_THAT(pitchAtEnd(render(*guitar, 0.3), 0.2), WithinRel(keyFrequency(57), 0.005));
+}
+
+TEST_CASE("SoundFont: a sound made after the others went reads its samples again",
+          "[audio][soundfont]") {
+    const auto font = testFont();
+    {
+        const auto first = font->sound(kGuitar, kRate);
+        first->noteOn(57, 100, Touch::Normal);
+        static_cast<void>(render(*first, 0.05));
+    } // the last sound of the samples lets them go
+    const auto again = font->sound(pitched(33), kRate);
+    again->noteOn(45, 100, Touch::Normal);
+    CHECK_THAT(pitchAtEnd(render(*again, 0.3), 0.2), WithinRel(keyFrequency(45), 0.005));
+}
+
+TEST_CASE("SoundFont: without its file, a sound plays on the built-in synthesizer",
+          "[audio][soundfont]") {
+    // Opening reads no samples; the first sound that needs them finds the file gone.
+    std::shared_ptr<const SoundFont> font;
+    {
+        const TemporaryFile file(".sf2");
+        writeTestSoundFont(file.path(), defaultTestPresets());
+        auto opened = SoundFont::open(file.path());
+        REQUIRE(opened.has_value());
+        font = *opened;
+    }
+    const auto sound = font->sound(kGuitar, kRate);
+    const auto builtin = builtinBank()->sound(kGuitar, kRate);
+    for (TrackSound* each : {sound.get(), builtin.get()}) {
+        each->noteOn(57, 100, Touch::Normal);
+    }
+    const std::vector<float> played = render(*sound, 0.2);
+    CHECK(peakLevel(played) > 0.01f);
+    CHECK(played == render(*builtin, 0.2));
+}
+
+TEST_CASE("Offline rendering: tracks of one SoundFont render alike on any number of threads",
+          "[audio][soundfont]") {
+    // Each track's synth plays the font's shared presets and samples.
+    const std::vector<Instrument> parts{kGuitar,     pitched(33), kDrums,  kGuitar,
+                                        pitched(33), kDrums,      kGuitar, pitched(0)};
+    Song song;
+    for (const Instrument& part : parts) {
+        song.addTrack(Track(part.name, part, {Staff{}}));
+    }
+    constexpr std::size_t kMeasures = 2;
+    song.appendMeasures(kMeasures);
+    for (std::size_t t = 0; t < parts.size(); ++t) {
+        for (std::size_t m = 0; m < kMeasures; ++m) {
+            std::vector<Beat>& beats = song.track(t).staff(0).measure(m).voices[0].beats;
+            beats.clear();
+            for (std::size_t i = 0; i < 8; ++i) {
+                const auto key = static_cast<int>(40 + ((t * 5 + m * 3 + i * 7) % 30));
+                beats.push_back(Beat{.duration = Duration(NoteValue::Eighth),
+                                     .notes = {Note{.pitch = Pitch::fromMidi(key)}}});
+            }
+        }
+    }
+    const Sequence sequence(song);
+    const auto font = testFont();
+    OfflineRenderer one(song, sequence,
+                        {.sampleRate = kRate, .tail = 0.5, .threads = 1, .bank = font});
+    const std::vector<float> expected = one.renderRest();
+    CHECK(peakLevel(expected) > 0.05f);
+    for (int round = 0; round < 2; ++round) {
+        OfflineRenderer many(song, sequence,
+                             {.sampleRate = kRate, .tail = 0.5, .threads = 8, .bank = font});
+        CHECK(many.renderRest() == expected);
+    }
 }
