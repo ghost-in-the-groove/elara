@@ -704,7 +704,7 @@ std::vector<DisplayList> PageLayoutCache::layout(std::shared_ptr<const core::Son
 
     // What a system reads from before its first measure: the tempo, if a
     // header before it changed, and on each staff whose notes before it
-    // changed, the dynamic in force.
+    // changed, the dynamic in force and the syllables held into it.
     std::optional<std::vector<core::Tempo>> temposWere;
     std::optional<std::vector<core::Tempo>> temposAre;
     const auto sameContext = [&](std::size_t first) {
@@ -720,10 +720,11 @@ std::vector<DisplayList> PageLayoutCache::layout(std::shared_ptr<const core::Son
         for (std::size_t i = 0; i < staves.size(); ++i) {
             if (changes.firstOn[i] < first) {
                 const StaffSelection& selection = staves[i];
-                if (detail::dynamicBefore(
-                        before->song->track(selection.track).staff(selection.staff), first) !=
-                    detail::dynamicBefore(now.track(selection.track).staff(selection.staff),
-                                          first)) {
+                const core::Staff& was =
+                    before->song->track(selection.track).staff(selection.staff);
+                const core::Staff& is = now.track(selection.track).staff(selection.staff);
+                if (detail::dynamicBefore(was, first) != detail::dynamicBefore(is, first) ||
+                    detail::heldInto(was, first) != detail::heldInto(is, first)) {
                     return false;
                 }
             }

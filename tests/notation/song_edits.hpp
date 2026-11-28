@@ -173,22 +173,28 @@ inline std::string edit(core::Song& song, std::mt19937& random) {
                 note->effects.slideOut == SlideOut::None ? SlideOut::Shift : SlideOut::None;
         }
         return did("a slide toggled");
-    case 14: { // a syllable on every note of the first voice, or none (ADR-0084)
+    case 14: { // a syllable on every note of the first voice, one held over them
+               // and the notes after, or none (ADR-0084)
         constexpr std::array<std::string_view, 4> kWords{"la", "Hal", "le", "lujah"};
-        const bool sung = pick(random, 3) != 0;
+        const std::size_t kind = pick(random, 3); // none, words, held
+        const bool sung = kind != 0;
         if (std::vector<Beat>* beats = firstVoiceWithNotes(staff.measure(m))) {
             std::size_t word = pick(random, kWords.size());
+            bool first = true;
             for (Beat& beat : *beats) {
-                if (beat.notes.empty() || !sung) {
+                if (beat.notes.empty() || !sung || (kind == 2 && !first)) {
                     beat.lyrics = {};
                     continue;
                 }
-                beat.lyrics = SharedOptional(std::vector<Syllable>{
-                    Syllable{.text = std::string(kWords[word]), .hyphen = word % 2 == 0}});
+                beat.lyrics = SharedOptional(
+                    std::vector<Syllable>{Syllable{.text = std::string(kWords[word]),
+                                                   .hyphen = kind == 1 && word % 2 == 0,
+                                                   .extend = kind == 2}});
                 word = (word + 1) % kWords.size();
+                first = false;
             }
         }
-        return did(sung ? "lyrics" : "the lyrics removed");
+        return did(kind == 2 ? "a held syllable" : sung ? "lyrics" : "the lyrics removed");
     }
     case 15: { // a chord symbol on every other beat, or none
         constexpr std::array<std::string_view, 4> kNames{"Cmaj7", "F#m7b5", "G7sus4", "Bb"};
