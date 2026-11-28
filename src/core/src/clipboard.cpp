@@ -9,6 +9,25 @@
 
 namespace elara::core {
 
+namespace {
+
+/// Whether a note of `measure` has a string and a fret.
+bool hasFrets(const Measure& measure) {
+    const auto fretted = [](const std::vector<Note>& notes) {
+        return std::ranges::any_of(notes,
+                                   [](const Note& note) { return note.position.has_value(); });
+    };
+    return std::ranges::any_of(measure.voices, [&](const Voice& voice) {
+        return std::ranges::any_of(voice.beats, [&](const Beat& beat) {
+            return fretted(beat.notes) || std::ranges::any_of(beat.graces, [&](const Grace& grace) {
+                       return fretted(grace.notes);
+                   });
+        });
+    });
+}
+
+} // namespace
+
 MeasureClip copyMeasures(const Song& song, std::size_t first, std::size_t count, std::size_t track,
                          std::size_t trackCount) {
     if (count == 0 || first >= song.measureCount() || count > song.measureCount() - first) {
@@ -31,8 +50,9 @@ MeasureClip copyMeasures(const Song& song, std::size_t first, std::size_t count,
         for (std::size_t s = 0; s < from.staffCount(); ++s) {
             const Staff& staff = from.staff(s);
             ClipStaff copied{.tuning = staff.tuning(), .capo = staff.capo()};
+            copied.measures.reserve(count);
             for (std::size_t m = first; m < first + count; ++m) {
-                copied.measures.push_back(staff.measure(m));
+                copied.measures.push_back(staff.sharedMeasure(m)); // a reference count
             }
             part.staves.push_back(std::move(copied));
         }
@@ -80,7 +100,14 @@ std::unique_ptr<Command> makePaste(const Song& song, const MeasureClip& clip, st
                 to.tuning() && (to.tuning() != from.tuning || to.capo() != from.capo);
             detail::FollowedByVoice followed{};
             for (std::size_t m = 0; m < count; ++m) {
-                Measure content = from.measures[m];
+                const SharedValue<Measure>& copied = from.measures[m];
+                if (!place && (to.tuning() || !hasFrets(copied.get()))) {
+                    // Its frets stay as they are: the measure is shared, not copied.
+                    commands.push_back(
+                        std::make_unique<ReplaceMeasure>(track + i, s, at + m, copied));
+                    continue;
+                }
+                Measure content = copied.get();
                 if (!to.tuning()) {
                     for (Voice& voice : content.voices) {
                         for (Beat& beat : voice.beats) {

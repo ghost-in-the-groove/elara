@@ -609,9 +609,10 @@ std::unique_ptr<core::Command> markStep(const Song& song, const Step& step) {
     return changeBarline(song, measure, kind == "double");
 }
 
-// `clipboard` holds what the last copy step copied.
+// `clipboard` holds what the last copy step copied, from the song edited or
+// one of `sources`.
 void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard,
-                   core::EditSession& session) {
+                   core::EditSession& session, std::span<const core::Song> sources) {
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
@@ -786,17 +787,33 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
                 throw std::runtime_error("the voice cannot be completed with rests");
             }
         }));
-    } else if (verb == "copy") { // copy <m> <n> [track <t> [<count>]]
+    } else if (verb == "copy") { // copy <m> <n> [track <t> [<count>]] [from <song>]
         std::size_t track = 0;
         std::size_t tracks = 0; // every track
-        if (step.has(3)) {
-            if (step.word(3) != "track") {
-                throw StepSyntaxError(std::format("copy: expected track: {}", step.word(3)));
+        const Song* source = &song;
+        for (std::size_t i = 3; step.has(i);) {
+            if (step.word(i) == "track") {
+                track = step.index(i + 1);
+                tracks = 1;
+                i += 2;
+                if (step.has(i) && step.word(i) != "from") {
+                    tracks = step.index(i++);
+                }
+            } else if (step.word(i) == "from") {
+                const std::size_t number = step.index(i + 1);
+                if (number == 0 || number > sources.size()) {
+                    throw std::out_of_range(
+                        std::format("copy: no song {} open beside it ({} with --from)", number,
+                                    sources.size()));
+                }
+                source = &sources[number - 1];
+                i += 2;
+            } else {
+                throw StepSyntaxError(
+                    std::format("copy: expected track or from: {}", step.word(i)));
             }
-            track = step.index(4);
-            tracks = step.has(5) ? step.index(5) : 1;
         }
-        clipboard = copyMeasures(song, step.index(1), step.index(2), track, tracks);
+        clipboard = copyMeasures(*source, step.index(1), step.index(2), track, tracks);
     } else if (verb == "paste") { // paste <m> [track <t>] [insert]
         std::size_t track = 0;
         PasteMode mode = PasteMode::Replace;
@@ -881,7 +898,7 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
 } // namespace
 
 void runStep(core::Document& doc, std::string_view text, StepState& state) {
-    runParsedStep(doc, Step(text), state.clipboard, state.session);
+    runParsedStep(doc, Step(text), state.clipboard, state.session, state.sources);
     // Undo, removals and other edits can take the caret's beat away.
     state.session.songChanged(doc.song());
 }

@@ -77,7 +77,7 @@ base speaks one vocabulary. American terms follow MusicXML.
 | nombre de nota | step | `Step` | C D E F G A B |
 | enarmonía | enharmonic | `isEnharmonicWith` | Same sound, different spelling |
 | intervalo | interval | `Interval` | Diatonic steps and semitones: a major second is {1, 2} |
-| portapapeles | clipboard | `MeasureClip`, `copyMeasures()`, `makePaste()` | Copied measures of some tracks, pasted over measures or into new ones (ADR-0027) |
+| portapapeles | clipboard | `Clipboard`, `MeasureClip`, `copyMeasures()`, `makePaste()` | Copied measures of some tracks, pasted over measures or into new ones (ADR-0027), in the song they came from or any other open (ADR-0160) |
 | transposición | transposition | `Transposition`, `makeTranspose()` | Moving notes by an interval; keys follow when every pitched track moves (ADR-0026) |
 | afinación | tuning | `Tuning` | |
 | reafinar | retune | `Retuning`, `makeRetune()` | A new tuning or capo for a fretted staff, keeping the pitches or the frets (ADR-0046) |

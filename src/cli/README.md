@@ -153,7 +153,7 @@ pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
 `title`, `subtitle`, `artist`, `album`, `words`, `music`, `copyright`,
 `transcriber` or `notes`; no text clears it, ADR-0059),
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
-`fill <track> <m>`, `copy <m> <n> [track <t> [<count>]]`,
+`fill <track> <m>`, `copy <m> <n> [track <t> [<count>]] [from <song>]`,
 `paste <m> [track <t>] [insert]`,
 `transpose <semitones> [measures <m> <n>] [tracks <t>...]`,
 `tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]`,
@@ -210,7 +210,10 @@ undoable edit. `paste` puts them over the measures from `m` of track `t` and
 the tracks after it, appending measures past the end, or into new measures
 before `m` with the copied time and key signatures (`insert`). Fretted notes
 find strings again on another tuning or capo, and lose their frets on a staff
-without one; drums paste only into drum tracks (ADR-0027).
+without one; drums paste only into drum tracks (ADR-0027). `from <song>`
+copies from a song open beside the one edited instead: `--from <file>` opens
+one, the first being song 1, and repeated opens several, all at once on the
+shared workers (ADR-0160).
 
 `transpose` moves pitched notes up (or down, when negative) by that many
 semitones, over every measure or `n` measures from `m`, of every track or the
