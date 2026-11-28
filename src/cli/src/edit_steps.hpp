@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
 namespace elara::cli {
 
@@ -28,6 +29,9 @@ struct StepState {
     /// What the last copy step copied. The copy and paste steps name their
     /// measures and tracks, so they do not use the session's selection.
     core::MeasureClip clipboard;
+    /// Songs open beside the one edited, numbered from 1, that a copy step
+    /// copies from with `from <song>` (ADR-0160).
+    std::vector<core::Song> sources;
 };
 
 /// Runs one step, its words separated by spaces ("repeat 1 end 3"), on `doc`,

@@ -83,9 +83,10 @@ TEST_CASE("Copied measures keep their content, headers and tunings", "[core][cli
     CHECK(clip.tracks[0].kind == InstrumentKind::Fretted);
     REQUIRE(clip.tracks[0].staves.size() == 1);
     CHECK(clip.tracks[0].staves[0].tuning == Tuning::standardGuitar());
-    CHECK(
-        clip.tracks[0].staves[0].measures ==
-        std::vector<Measure>{song.track(0).staff(0).measure(0), song.track(0).staff(0).measure(1)});
+    // Shared with the song, not copied (ADR-0160).
+    REQUIRE(clip.tracks[0].staves[0].measures.size() == 2);
+    CHECK(clip.tracks[0].staves[0].measures[0].shares(song.track(0).staff(0).sharedMeasure(0)));
+    CHECK(clip.tracks[0].staves[0].measures[1].shares(song.track(0).staff(0).sharedMeasure(1)));
 
     CHECK(copyMeasures(song, 1, 3).tracks.size() == 4); // every track
     CHECK(copyMeasures(song, 1, 3, 2).tracks.size() == 2);
@@ -201,5 +202,37 @@ TEST_CASE("Pasting goes only where it fits", "[core][clipboard]") {
         Document doc{Song(keys)};
         doc.execute(makePaste(doc.song(), copyMeasures(keys, 0, 1, 0, 1), 0, 1));
         CHECK(doc.song().track(1).staff(0).measure(0) == keys.track(0).staff(0).measure(0));
+    }
+}
+
+TEST_CASE("Pasting into another song shares the measures whose frets stay", "[core][clipboard]") {
+    const Song song = band();
+    const MeasureClip clip = copyMeasures(song, 0, 2); // every track
+    Document doc{band()};                              // another song
+    doc.execute(makePaste(doc.song(), clip, 2));
+
+    const auto shared = [&](std::size_t track, std::size_t measure) {
+        return doc.song()
+            .track(track)
+            .staff(0)
+            .sharedMeasure(2 + measure)
+            .shares(song.track(track).staff(0).sharedMeasure(measure));
+    };
+    // The same tuning, no tuning without frets, and drums: shared.
+    CHECK(shared(0, 0));
+    CHECK(shared(0, 1));
+    CHECK(shared(1, 0));
+    CHECK(shared(2, 1));
+    CHECK(shared(3, 0));
+
+    SECTION("frets placed again or taken off make measures of their own") {
+        Document placed{band()};
+        placed.execute(makePaste(placed.song(), copyMeasures(song, 0, 1, 0, 1), 0, 1));
+        CHECK_FALSE(placed.song().track(1).staff(0).sharedMeasure(0).shares(
+            song.track(0).staff(0).sharedMeasure(0)));
+        CHECK(positionIn(placed.song(), 1, 0) == at(6, 2));
+        placed.execute(makePaste(placed.song(), copyMeasures(song, 0, 1, 0, 1), 0, 2));
+        CHECK(positionIn(placed.song(), 2, 0) == std::nullopt);
+        CHECK(positionIn(song, 0, 0) == at(6, 0)); // the copy kept its frets
     }
 }

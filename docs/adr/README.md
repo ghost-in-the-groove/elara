@@ -144,6 +144,7 @@ one that replaces them.
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
+| [0160](0160-several-songs-open-at-once.md) | Several songs open at once | Accepted |
 
 ## Template
 

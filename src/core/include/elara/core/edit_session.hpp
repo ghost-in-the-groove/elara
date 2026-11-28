@@ -14,13 +14,15 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 namespace elara::core {
 
 /// The caret, the duration typing uses, the digit waiting for a second one,
 /// the selected measures and the measures copied; all but the last kept
-/// inside the song they edit.
+/// inside the song they edit. The measures copied are in a Clipboard that the
+/// sessions of several songs may share (ADR-0160).
 ///
 /// The session holds no song: each action takes the song, or the document it
 /// edits, and leaves the caret on a place that song has. A song without
@@ -114,15 +116,30 @@ public:
 
     // ---- The clipboard (ADR-0027) and transposing (ADR-0026) ----------------
 
-    [[nodiscard]] bool canPaste() const noexcept { return clip_.has_value(); }
+    /// A session with a clipboard of its own.
+    EditSession() = default;
+    /// A session that copies into, and pastes from, `clipboard`, which other
+    /// sessions may share; a null one is replaced by one of its own.
+    explicit EditSession(std::shared_ptr<Clipboard> clipboard);
+
+    /// The clipboard copy() fills and paste() reads.
+    [[nodiscard]] const std::shared_ptr<Clipboard>& clipboard() const noexcept {
+        return clipboard_;
+    }
+    /// Copies into, and pastes from, `clipboard` from now on; a null one is
+    /// replaced by one of its own.
+    void shareClipboard(std::shared_ptr<Clipboard> clipboard);
+
+    [[nodiscard]] bool canPaste() const noexcept { return !clipboard_->isEmpty(); }
 
     /// Copies selection() from the track shown alone, or from every track,
     /// and returns the measures copied.
     Measures copy(const Song& song);
 
-    /// Pastes what was copied at the first measure of selection(): over the
-    /// measures from it, or into new ones before it (makePaste()). One copied
-    /// track goes to the caret's, several to the tracks they came from. What
+    /// Pastes what was copied, in this song or another one, at the first
+    /// measure of selection(): over the measures from it, or into new ones
+    /// before it (makePaste()). One copied track goes to the caret's, several
+    /// to the tracks of the same places from the first. What
     /// was pasted is selected, the caret on its last measure. Throws
     /// std::logic_error when nothing was copied and what makePaste() throws
     /// for measures that do not fit; nothing changes then.
@@ -185,7 +202,8 @@ private:
     std::optional<std::size_t> shown_; ///< the track shown alone
     std::optional<Typed> typed_;
     std::optional<std::size_t> anchor_; ///< the measure the selection started at
-    std::optional<MeasureClip> clip_;   ///< the measures copied
+    /// The measures copied, maybe shared with other songs' sessions.
+    std::shared_ptr<Clipboard> clipboard_ = std::make_shared<Clipboard>();
 };
 
 } // namespace elara::core

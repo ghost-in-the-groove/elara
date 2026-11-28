@@ -26,6 +26,8 @@ guitar tablature and scores, on Windows, macOS and Linux.
 - Import and export MusicXML and MIDI.
 - Export the score as PDF (planned for 1.1, written early: ADR-0074).
 - Versioned native project format.
+- Several songs open at once, in tabs, with measures copied from one to
+  another (ADR-0160).
 
 **Sound**
 - FluidSynth with MuseScore General SF3 for every instrument.

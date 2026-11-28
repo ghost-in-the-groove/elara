@@ -519,6 +519,34 @@ TEST_CASE("Session: what was copied can be pasted into another song", "[core][se
     CHECK(voice(other.song(), 2) == voice(doc.song(), 0));
 }
 
+TEST_CASE("Session: sessions that share a clipboard paste what either copied", "[core][session]") {
+    // Two songs open at once, each with its session (ADR-0160).
+    auto clipboard = std::make_shared<Clipboard>();
+    Document first(bandSong());
+    Document second(bandSong());
+    EditSession copying(clipboard);
+    EditSession pasting(clipboard);
+    CHECK_FALSE(pasting.canPaste());
+
+    copying.showTrack(first.song(), 0);
+    copying.copy(first.song());
+    CHECK(pasting.canPaste());
+    CHECK(clipboard->revision() == 1);
+    CHECK(pasting.clipboard() == clipboard);
+
+    pasting.showTrack(second.song(), 0);
+    pasting.place(second.song(), Caret{.measure = 2});
+    CHECK(pasting.paste(second, PasteMode::Replace));
+    CHECK(voice(second.song(), 2) == voice(first.song(), 0));
+    CHECK_FALSE(first.canUndo()); // pasted into the second song only
+
+    // A session with a clipboard of its own sees none of it.
+    CHECK_FALSE(EditSession().canPaste());
+    pasting.shareClipboard(nullptr);
+    CHECK_FALSE(pasting.canPaste());
+    CHECK(copying.canPaste());
+}
+
 TEST_CASE("Session: a paste that cannot be changes nothing", "[core][session]") {
     Song song = bandSong();
     song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
