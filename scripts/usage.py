@@ -39,7 +39,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 WINDOWS = os.name == "nt"
 EXE = ".exe" if WINDOWS else ""
-MB = 1024 * 1024
+MIB = 1024 * 1024  # sizes are reported in MiB
 
 # ---------------------------------------------------------------------------
 # Process counters
@@ -50,10 +50,10 @@ class Run:
     exit_code: int
     wall: float                      # seconds
     cpu: float                       # seconds of processor time, user and kernel
-    peak_ws: float                   # MB: peak working set (resident set elsewhere)
-    peak_private: float | None       # MB: peak committed private bytes (Windows)
-    read: float | None               # MB read (all I/O on Windows, block input elsewhere)
-    written: float | None            # MB written
+    peak_ws: float                   # MiB: peak working set (resident set elsewhere)
+    peak_private: float | None       # MiB: peak committed private bytes (Windows)
+    read: float | None               # MiB read (all I/O on Windows, block input elsewhere)
+    written: float | None            # MiB written
     hold: dict[str, float] = field(default_factory=dict)  # a window while the app held
     output: str = ""
 
@@ -134,7 +134,7 @@ def measure(cmd: list[str], *, env: dict[str, str] | None = None, hold: float = 
             cpu1, t1 = _cpu(handle), time.perf_counter()
             memory = _memory(handle)
             window = {"cpu_percent": 100.0 * (cpu1 - cpu0) / (t1 - t0),
-                      "ws": memory.WorkingSetSize / MB, "private": memory.PrivateUsage / MB}
+                      "ws": memory.WorkingSetSize / MIB, "private": memory.PrivateUsage / MIB}
         else:
             time.sleep(span)
         window["ready_s"] = ready[0] - start
@@ -147,16 +147,16 @@ def measure(cmd: list[str], *, env: dict[str, str] | None = None, hold: float = 
         wall = time.perf_counter() - start
         handle = int(proc._handle)  # noqa: SLF001
         memory, io = _memory(handle), _io(handle)
-        run = Run(proc.returncode, wall, _cpu(handle), memory.PeakWorkingSetSize / MB,
-                  memory.PeakPagefileUsage / MB, io.ReadTransferCount / MB,
-                  io.WriteTransferCount / MB, window)
+        run = Run(proc.returncode, wall, _cpu(handle), memory.PeakWorkingSetSize / MIB,
+                  memory.PeakPagefileUsage / MIB, io.ReadTransferCount / MIB,
+                  io.WriteTransferCount / MIB, window)
     else:
         _, status, usage = os.wait4(proc.pid, 0)
         wall = time.perf_counter() - start
         proc.returncode = os.waitstatus_to_exitcode(status)
-        peak = usage.ru_maxrss / (MB if sys.platform == "darwin" else 1024)
+        peak = usage.ru_maxrss / (MIB if sys.platform == "darwin" else 1024)
         run = Run(proc.returncode, wall, usage.ru_utime + usage.ru_stime, peak, None,
-                  usage.ru_inblock * 512 / MB, usage.ru_oublock * 512 / MB, window)
+                  usage.ru_inblock * 512 / MIB, usage.ru_oublock * 512 / MIB, window)
     reader.join(5)
     run.output = "".join(lines)
     return run
@@ -284,7 +284,7 @@ def run_scenarios(scenarios: list[Scenario], runs: int, env: dict[str, str]) -> 
                 break
             samples.append(run)
             if scenario.output is not None and scenario.output.exists():
-                size = scenario.output.stat().st_size / MB
+                size = scenario.output.stat().st_size / MIB
         if not samples:
             results.append({"name": scenario.name, "failed": True})
             continue
@@ -293,11 +293,11 @@ def run_scenarios(scenarios: list[Scenario], runs: int, env: dict[str, str]) -> 
             "runs": len(samples),
             "wall_s": _median([r.wall for r in samples]),
             "cpu_s": _median([r.cpu for r in samples]),
-            "peak_ws_mb": _median([r.peak_ws for r in samples]),
-            "peak_private_mb": _median([r.peak_private for r in samples]),
-            "read_mb": _median([r.read for r in samples]),
-            "written_mb": _median([r.written for r in samples]),
-            "output_mb": size,
+            "peak_ws_mib": _median([r.peak_ws for r in samples]),
+            "peak_private_mib": _median([r.peak_private for r in samples]),
+            "read_mib": _median([r.read for r in samples]),
+            "written_mib": _median([r.written for r in samples]),
+            "output_mib": size,
         }
         if scenario.hold:
             for key in ("ready_s", "cpu_percent", "ws", "private"):
@@ -315,20 +315,21 @@ def _line(row: dict) -> str:
     if row.get("failed"):
         return f"{row['name']}: failed"
     text = (f"{row['name']}: {_fmt(row['wall_s'], 2)} s, cpu {_fmt(row['cpu_s'], 2)} s, "
-            f"peak {_fmt(row['peak_ws_mb'])} MB ws / {_fmt(row['peak_private_mb'])} MB private, "
-            f"read {_fmt(row['read_mb'])} MB, wrote {_fmt(row['written_mb'])} MB")
-    if row.get("output_mb") is not None:
-        text += f", file {_fmt(row['output_mb'], 2)} MB"
+            f"peak {_fmt(row['peak_ws_mib'])} MiB ws / "
+            f"{_fmt(row['peak_private_mib'])} MiB private, "
+            f"read {_fmt(row['read_mib'])} MiB, wrote {_fmt(row['written_mib'])} MiB")
+    if row.get("output_mib") is not None:
+        text += f", file {_fmt(row['output_mib'], 2)} MiB"
     if "hold_cpu_percent" in row:
         text += (f"; ready after {_fmt(row['hold_ready_s'], 2)} s, held: "
                  f"cpu {_fmt(row['hold_cpu_percent'], 2)} % of a core, "
-                 f"{_fmt(row['hold_ws'])} MB ws / {_fmt(row['hold_private'])} MB private")
+                 f"{_fmt(row['hold_ws'])} MiB ws / {_fmt(row['hold_private'])} MiB private")
     return text
 
 
 def markdown(results: list[dict]) -> str:
-    head = ("| Scenario | Wall s | CPU s | Peak working set MB | Peak private MB | Read MB "
-            "| Written MB | File MB | Held: ready s, CPU % of a core, WS MB, private MB |\n"
+    head = ("| Scenario | Wall s | CPU s | Peak working set MiB | Peak private MiB | Read MiB "
+            "| Written MiB | File MiB | Held: ready s, CPU % of a core, WS MiB, private MiB |\n"
             "|---|---|---|---|---|---|---|---|---|\n")
     rows = []
     for row in results:
@@ -341,9 +342,9 @@ def markdown(results: list[dict]) -> str:
                     f"{_fmt(row['hold_ws'])}, "
                     f"{_fmt(row['hold_private'])}")
         rows.append(f"| {row['name']} | {_fmt(row['wall_s'], 2)} | {_fmt(row['cpu_s'], 2)} | "
-                    f"{_fmt(row['peak_ws_mb'])} | {_fmt(row['peak_private_mb'])} | "
-                    f"{_fmt(row['read_mb'])} | {_fmt(row['written_mb'])} | "
-                    f"{_fmt(row['output_mb'], 2)} | {held} |")
+                    f"{_fmt(row['peak_ws_mib'])} | {_fmt(row['peak_private_mib'])} | "
+                    f"{_fmt(row['read_mib'])} | {_fmt(row['written_mib'])} | "
+                    f"{_fmt(row['output_mib'], 2)} | {held} |")
     return head + "\n".join(rows) + "\n"
 
 
@@ -388,22 +389,22 @@ def sizes(bin_dir: Path, stage: Path | None) -> dict:
     for name in (f"elara{EXE}", f"elara-cli{EXE}"):
         path = bin_dir / name
         if path.exists():
-            report["programs"][name] = path.stat().st_size / MB
+            report["programs"][name] = path.stat().st_size / MIB
     if stage is not None and stage.is_dir():
         parts: dict[str, float] = {}
         files: list[tuple[float, str]] = []
         for f in stage.rglob("*"):
             if f.is_file():
                 relative = f.relative_to(stage).as_posix()
-                size = f.stat().st_size / MB
+                size = f.stat().st_size / MIB
                 parts[_stage_part(relative)] = parts.get(_stage_part(relative), 0.0) + size
                 files.append((size, relative))
-        report["stage_mb"] = sum(parts.values())
+        report["stage_mib"] = sum(parts.values())
         report["stage_files"] = len(files)
         report["stage_parts"] = dict(sorted(parts.items(), key=lambda kv: -kv[1]))
         report["largest"] = [(round(s, 2), n) for s, n in sorted(files, reverse=True)[:25]]
         archives = sorted(stage.parent.glob("Elara-*.zip")) + sorted(stage.parent.glob("*.msi"))
-        report["archives"] = {a.name: a.stat().st_size / MB for a in archives}
+        report["archives"] = {a.name: a.stat().st_size / MIB for a in archives}
     return report
 
 
@@ -462,10 +463,10 @@ def main(argv: list[str] | None = None) -> int:
         report["songs"] = {
             "large": {"tracks": args.tracks, "measures": args.measures,
                       "notes": write_song(large_xml, args.tracks, args.measures),
-                      "musicxml_mb": large_xml.stat().st_size / MB},
+                      "musicxml_mib": large_xml.stat().st_size / MIB},
             "huge": {"tracks": args.tracks, "measures": args.huge_measures,
                      "notes": write_song(huge_xml, args.tracks, args.huge_measures),
-                     "musicxml_mb": huge_xml.stat().st_size / MB},
+                     "musicxml_mib": huge_xml.stat().st_size / MIB},
         }
         large, huge = work / "large.elara", work / "huge.elara"
         for xml, song in ((large_xml, large), (huge_xml, huge)):
@@ -478,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         subprocess.run([str(cli), "export", str(huge), str(huge_mid), "--force"], env=env,
                        check=True, capture_output=True)
         for key, song in (("large", large), ("huge", huge)):
-            report["songs"][key]["elara_mb"] = song.stat().st_size / MB
+            report["songs"][key]["elara_mib"] = song.stat().st_size / MIB
 
         out = work / "out"
         out.mkdir(exist_ok=True)
@@ -570,17 +571,17 @@ def main(argv: list[str] | None = None) -> int:
     print()
     print("Songs: " + "; ".join(
         f"{k} {v['tracks']} tracks x {v['measures']} measures, {v['notes']} notes, "
-        f"{_fmt(v['musicxml_mb'])} MB MusicXML, {_fmt(v['elara_mb'], 2)} MB .elara"
+        f"{_fmt(v['musicxml_mib'])} MiB MusicXML, {_fmt(v['elara_mib'], 2)} MiB .elara"
         for k, v in report["songs"].items()))
     print()
     print(markdown(report["results"]))
     sz = report["sizes"]
-    print("Programs: " + ", ".join(f"{k} {_fmt(v, 2)} MB" for k, v in sz["programs"].items()))
-    if "stage_mb" in sz:
-        print(f"Install folder: {_fmt(sz['stage_mb'])} MB in {sz['stage_files']} files; "
-              + ", ".join(f"{k} {_fmt(v)} MB" for k, v in sz["stage_parts"].items()))
+    print("Programs: " + ", ".join(f"{k} {_fmt(v, 2)} MiB" for k, v in sz["programs"].items()))
+    if "stage_mib" in sz:
+        print(f"Install folder: {_fmt(sz['stage_mib'])} MiB in {sz['stage_files']} files; "
+              + ", ".join(f"{k} {_fmt(v)} MiB" for k, v in sz["stage_parts"].items()))
         if sz["archives"]:
-            print("Archives: " + ", ".join(f"{k} {_fmt(v)} MB" for k, v in sz["archives"].items()))
+            print("Archives: " + ", ".join(f"{k} {_fmt(v)} MiB" for k, v in sz["archives"].items()))
     if args.json:
         args.json.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 1 if any(r.get("failed") for r in report["results"]) else 0

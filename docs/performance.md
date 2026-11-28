@@ -480,9 +480,9 @@ runs the packaged programs as a person would, on large songs it writes to disk
 (self-made guitar tracks), and records what each run costs the machine: wall
 and processor time (all threads), peak working set and committed private
 memory, bytes read and written, and the size of the programs and the install
-folder. With `--hold` and `--play` the app stays open on its welcome pane, on
-an open song, or playing it, and the script samples its processor and memory
-use meanwhile.
+folder, in MiB (1024 x 1024 bytes). With `--hold` and `--play` the app stays
+open on its welcome pane, on an open song, or playing it, and the script
+samples its processor and memory use meanwhile.
 
 ```
 python scripts/elara.py usage                 # pack the app, then measure it
@@ -490,9 +490,9 @@ python scripts/elara.py usage --no-package    # measure the last package again
 python scripts/usage.py --bin build/release/bin --no-app --only export
 ```
 
-The large song has 20 guitar tracks of 500 measures (121k notes, 24.6 MB of
-MusicXML, 0.32 MB as `.elara`); the huge one 1500 measures (360k notes,
-73.3 MB of MusicXML, 0.95 MB as `.elara`). Each scenario runs three times and
+The large song has 20 guitar tracks of 500 measures (121k notes, 24.6 MiB of
+MusicXML, 0.32 MiB as `.elara`); the huge one 1500 measures (360k notes,
+73.3 MiB of MusicXML, 0.95 MiB as `.elara`). Each scenario runs three times and
 reports the median.
 
 **2026-11-27, Windows package.** Before: the package of `main` that morning.
@@ -500,14 +500,14 @@ After: with the release build optimised as MSVC's release (ADR-0144), the
 packages trimmed (ADR-0145), XML element text kept in its element on import,
 and MusicXML files written from their parts. Both packages measured one after
 the other on the reference machine. Times: wall s, CPU s; memory: peak working
-set / peak private MB.
+set / peak private MiB.
 
 | Scenario | Before | After |
 |---|---|---|
 | CLI: import the huge MusicXML, save `.elara` | 0.82, 1.41; 579 / 572 | 0.72, 1.27; 412 / 407 |
 | CLI: open the huge `.elara`, save it again | 0.82, 0.81; 209 / 342 | 0.65, 0.66; 206 / 341 |
 | CLI: transpose the huge song 20 times | 2.63, 2.64; 395 / 398 | 2.01, 1.98; 391 / 397 |
-| CLI: export the huge song as MusicXML (274 MB) | 0.66, 1.92; 353 / 609 | 0.56, 1.69; 337 / 334 |
+| CLI: export the huge song as MusicXML (274 MiB) | 0.66, 1.92; 353 / 609 | 0.56, 1.69; 337 / 334 |
 | CLI: export it as `.mxl` | 1.56, 2.48; 227 / 374 | 1.56, 3.59; 224 / 373 |
 | CLI: export it as MIDI | 0.42, 0.94; 194 / 219 | 0.40, 0.70; 191 / 219 |
 | CLI: render the large song's 1000 s of audio, built-in synthesizer | 3.28, 35.5; 72 / 75 | 3.34, 34.4; 69 / 75 |
@@ -523,21 +523,21 @@ pages around the view (about 12 % of a core for 5 s on the large song).
 
 | App state | CPU | Working set |
 |---|---|---|
-| welcome pane, idle | 0.0 % | 132 MB |
-| the large song open, idle | 0.0 % | 250 MB |
-| playing it, built-in synthesizer | 9.0 % | 238 MB |
-| playing it through MuseScore General | 19.4 % | 562 MB |
-| playing it, guitars through the included SFZ | 14.9 % | 261 MB |
+| welcome pane, idle | 0.0 % | 132 MiB |
+| the large song open, idle | 0.0 % | 250 MiB |
+| playing it, built-in synthesizer | 9.0 % | 238 MiB |
+| playing it through MuseScore General | 19.4 % | 562 MiB |
+| playing it, guitars through the included SFZ | 14.9 % | 261 MiB |
 
-Programs: `elara.exe` 16.7 to 8.4 MB, `elara-cli.exe` 9.1 to 3.1 MB. Install
-folder: 162.2 MB in 172 files to 112.4 MB in 120; zip 83.0 to 68.4 MB, of which
-the SoundFont is 38.1 MB.
+Programs: `elara.exe` 16.7 to 8.4 MiB, `elara-cli.exe` 9.1 to 3.1 MiB. Install
+folder: 162.2 MiB in 172 files to 112.4 MiB in 120; zip 83.0 to 68.4 MiB, of which
+the SoundFont is 38.1 MiB.
 
 **2026-11-28, Windows package.** Before: the package measured as "After"
 above. After: the tracks' synthesizers share one loaded SoundFont
 (ADR-0146), and a `.elara` file's `song.json` is read where it was inflated
 and written as the song is walked (ADR-0147). Both packages measured one
-after the other on the reference machine; peak working set / peak private MB.
+after the other on the reference machine; peak working set / peak private MiB.
 The times did not change beyond what they vary from run to run.
 
 | Scenario | Before | After |
@@ -549,10 +549,10 @@ The times did not change beyond what they vary from run to run.
 | CLI: render the large song through MuseScore General | 394 / 402 | 209 / 217 |
 | App: playing it through MuseScore General, held 10 s | 560 / 618, 20.5 % of a core | 379 / 433, 16.7 % of a core |
 
-Rendering through MuseScore General with `elara-cli` now takes about 2.6 MB
-for each track past the first, against 12.3 MB before. Programs and install
-folder: within 0.3 MB of the package before (`elara.exe` 8.7 MB, install
-folder 112.7 MB in 120 files).
+Rendering through MuseScore General with `elara-cli` now takes about 2.6 MiB
+for each track past the first, against 12.3 MiB before. Programs and install
+folder: within 0.3 MiB of the package before (`elara.exe` 8.7 MiB, install
+folder 112.7 MiB in 120 files).
 
 What the numbers point at next:
 
@@ -561,10 +561,10 @@ What the numbers point at next:
   of a core for each track, where the built-in synthesizer takes 30 s for
   the same song. The time goes to FluidSynth's voices; building its DSP in
   single precision did not make it faster (measured, not kept).
-- Importing the huge MusicXML peaks at 412 MB for 73 MB of XML: pugixml holds
+- Importing the huge MusicXML peaks at 412 MiB for 73 MiB of XML: pugixml holds
   the whole document as a tree while the song is built from it.
-- Exporting the huge song as `.mxl` commits 373 MB: the parts' text is held
+- Exporting the huge song as `.mxl` commits 373 MiB: the parts' text is held
   whole while it is deflated into the file.
-- The app holds about 120 MB more with the large song open than on its
+- The app holds about 120 MiB more with the large song open than on its
   welcome pane; part of it is the laid-out pages' geometry, held twice (the
   2026-11-26 row in Results).
