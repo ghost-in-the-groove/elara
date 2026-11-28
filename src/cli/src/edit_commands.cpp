@@ -3,6 +3,7 @@
 // a .elara file).
 #include <elara/core/document.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/parallel.hpp>
 #include <elara/core/validation.hpp>
 #include <elara/io/native_format.hpp>
 
@@ -13,9 +14,11 @@
 
 #include <cstddef>
 #include <exception>
+#include <expected>
 #include <format>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -93,10 +96,34 @@ void printText(const Document& doc, const core::EditSession& session) {
 }
 
 struct EditOptions {
-    std::string in;  // start from this file instead of a new song
-    std::string out; // save the result here
+    std::string in;                // start from this file instead of a new song
+    std::string out;               // save the result here
+    std::vector<std::string> from; // songs open beside it, that copy steps copy from
     std::vector<std::string> steps;
 };
+
+/// Opens the songs open beside the one edited, all at once on the shared
+/// workers (ADR-0160): what opening one says is lost goes to stderr. Returns
+/// the message of the first that does not open.
+std::expected<std::vector<Song>, std::string> openSources(const std::vector<std::string>& files) {
+    std::vector<std::optional<std::expected<io::ImportResult, io::FormatError>>> opened(
+        files.size());
+    core::forEachIndex(0, files.size(), core::threadsFor(0, files.size(), 2, files.size()),
+                       [&](std::size_t i) { opened[i] = io::openNative(files[i]); });
+    std::vector<Song> songs;
+    songs.reserve(files.size());
+    for (std::size_t i = 0; i < files.size(); ++i) {
+        auto& result = *opened[i];
+        if (!result) {
+            return std::unexpected(std::format("{}: {}", files[i], result.error().message));
+        }
+        for (const std::string& warning : result->warnings) {
+            std::cerr << std::format("warning: {}: {}\n", files[i], warning);
+        }
+        songs.push_back(std::move(result->song));
+    }
+    return songs;
+}
 
 int runEdit(bool json, const EditOptions& options) {
     Document doc;
@@ -114,6 +141,11 @@ int runEdit(bool json, const EditOptions& options) {
     }
     const auto& steps = options.steps;
     StepState state;
+    auto sources = openSources(options.from);
+    if (!sources) {
+        return fail(sources.error());
+    }
+    state.sources = std::move(*sources);
     for (std::size_t i = 0; i < steps.size(); ++i) {
         try {
             runStep(doc, steps[i], state);
@@ -147,6 +179,12 @@ void addEditCommands(CLI::App& app, Context& context) {
         "edit", "Apply undoable edits to a song and print the result and its history");
     editCommand->add_option("--in", options->in, "Start from this .elara file (default: new song)");
     editCommand->add_option("--out", options->out, "Save the result to this .elara file");
+    // One file each time it is given, so that the steps after it stay steps.
+    editCommand
+        ->add_option("--from", options->from,
+                     "Another .elara file open beside it, which \"copy ... from <n>\" "
+                     "copies from: the first is song 1 (repeat for more)")
+        ->allow_extra_args(false);
     editCommand->add_option(
         "steps", options->steps,
         "Steps in order, each quoted: \"add-track <preset> [at]\", "
@@ -161,7 +199,7 @@ void addEditCommands(CLI::App& app, Context& context) {
         "[text]\", "
         "\"note <track> <m> <string> <fret> "
         "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
-        "\"copy <m> <n> [track <t> [<count>]]\", \"paste <m> [track <t>] [insert]\", "
+        "\"copy <m> <n> [track <t> [<count>]] [from <song>]\", \"paste <m> [track <t>] [insert]\", "
         "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
         "\"caret <track> <m> <beat> [string]\", \"voice <1-4>\", right, left, up, down, "
         "next-measure, "

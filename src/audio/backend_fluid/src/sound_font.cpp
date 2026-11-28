@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <format>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <system_error>
@@ -37,7 +38,8 @@ constexpr int kMutedGuitar = 28; // General MIDI: electric guitar (muted)
 constexpr int kGuitarHarmonics = 31;
 constexpr int kFirstGuitar = 24;
 constexpr int kLastGuitar = 31;
-constexpr int kFamilySize = 8; // General MIDI programs come in families of eight
+constexpr int kFamilySize = 8;        // General MIDI programs come in families of eight
+constexpr double kHostRate = 44100.0; // the synth that loads a font never plays
 
 // The first error FluidSynth logged on this thread since it was cleared, which
 // names the cause; nothing is printed. A fixed buffer, since FluidSynth may
@@ -77,24 +79,24 @@ std::string utf8(const std::filesystem::path& path) {
     return {text.begin(), text.end()};
 }
 
-/// A synth at `sampleRate` with the file loaded: the settings outlive it.
-struct LoadedSynth {
+/// A synth and its settings, which outlive it.
+struct OwnedSynth {
     SettingsPtr settings;
     SynthPtr synth;
-    int font = -1;
 };
 
-std::expected<LoadedSynth, std::string> loadSynth(const std::filesystem::path& path,
-                                                  double sampleRate) {
+/// A synth at `sampleRate` with `polyphony` voices and no SoundFont; none
+/// when FluidSynth cannot make it.
+std::optional<OwnedSynth> makeSynth(double sampleRate, int polyphony) {
     quietLogs();
-    LoadedSynth loaded{.settings = SettingsPtr(new_fluid_settings()), .synth = nullptr, .font = -1};
-    fluid_settings_t* settings = loaded.settings.get();
+    OwnedSynth made{.settings = SettingsPtr(new_fluid_settings()), .synth = nullptr};
+    fluid_settings_t* settings = made.settings.get();
     if (settings == nullptr ||
         fluid_settings_setnum(settings, "synth.sample-rate", sampleRate) != FLUID_OK) {
-        return std::unexpected(std::format("no SoundFont synthesizer at {} Hz", sampleRate));
+        return std::nullopt;
     }
     fluid_settings_setint(settings, "synth.midi-channels", kChannels);
-    fluid_settings_setint(settings, "synth.polyphony", kPolyphony);
+    fluid_settings_setint(settings, "synth.polyphony", polyphony);
     fluid_settings_setint(settings, "synth.reverb.active", 0);
     fluid_settings_setint(settings, "synth.chorus.active", 0);
     fluid_settings_setint(settings, "synth.dynamic-sample-loading", 1); // only what plays
@@ -102,19 +104,32 @@ std::expected<LoadedSynth, std::string> loadSynth(const std::filesystem::path& p
     fluid_settings_setint(settings, "synth.cpu-cores", 1);
     fluid_settings_setint(settings, "synth.lock-memory", 0);
     fluid_settings_setnum(settings, "synth.gain", kGain);
-    loaded.synth = SynthPtr(new_fluid_synth(settings));
-    if (!loaded.synth) {
-        return std::unexpected(std::string("no SoundFont synthesizer"));
+    made.synth = SynthPtr(new_fluid_synth(settings));
+    if (!made.synth) {
+        return std::nullopt;
     }
-    firstError[0] = '\0';
-    loaded.font = fluid_synth_sfload(loaded.synth.get(), utf8(path).c_str(), 0);
-    if (loaded.font == FLUID_FAILED) {
-        const std::string_view reason(firstError.data());
-        return std::unexpected(std::format("{}: could not load the SoundFont{}{}", utf8(path),
-                                           reason.empty() ? "" : ": ", reason));
-    }
-    return loaded;
+    return made;
 }
+
+} // namespace
+
+namespace detail {
+
+/// The file's presets and instruments, loaded once into a synth that never
+/// plays (the host, which deletes them with itself) and added to the synth of
+/// every track's sound (ADR-0146). FluidSynth counts in the font the channels
+/// that select each preset and the selected presets that need each sample,
+/// and loads and unloads samples by these counts, so `mutex` lets one synth
+/// at a time select presets or let them go. Voices use samples without it.
+struct LoadedSoundFont {
+    OwnedSynth host;
+    fluid_sfont_t* font = nullptr;
+    std::mutex mutex;
+};
+
+} // namespace detail
+
+namespace {
 
 /// Which presets a note plays on: the track's own, or a guitar's muted or
 /// harmonics preset.
@@ -126,14 +141,60 @@ struct ChannelRange {
 };
 
 /// A track's sound: one FluidSynth synth with sixteen channels on the
-/// track's presets. Each note takes a channel of its own, the one held least
-/// recently, so a glide bends only the notes of its key.
+/// track's presets, from the SoundFont's shared copy. Each note takes a
+/// channel of its own, the one held least recently, so a glide bends only the
+/// notes of its key.
 class FluidSound final : public TrackSound {
 public:
-    FluidSound(LoadedSynth loaded, double sampleRate, bool drums,
-               std::array<ChannelRange, kGroups> groups) noexcept
-        : settings_(std::move(loaded.settings)), synth_(std::move(loaded.synth)),
-          sampleRate_(sampleRate), drums_(drums), groups_(groups) {}
+    FluidSound(std::shared_ptr<detail::LoadedSoundFont> font, OwnedSynth synth, double sampleRate,
+               bool drums, std::array<ChannelRange, kGroups> groups) noexcept
+        : font_(std::move(font)), settings_(std::move(synth.settings)),
+          synth_(std::move(synth.synth)), sampleRate_(sampleRate), drums_(drums), groups_(groups) {}
+
+    ~FluidSound() override {
+        // Lets the presets go and ends the voices while no other synth
+        // selects presets; the font stays loaded for them.
+        const std::scoped_lock hold(font_->mutex);
+        fluid_synth_remove_sfont(synth_.get(), font_->font);
+        synth_.reset();
+    }
+
+    FluidSound(const FluidSound&) = delete;
+    FluidSound& operator=(const FluidSound&) = delete;
+    FluidSound(FluidSound&&) = delete;
+    FluidSound& operator=(FluidSound&&) = delete;
+
+    /// Gives each channel the preset of its group, then adds the font, which
+    /// selects them all at once: no channel loads the font's first preset on
+    /// the way. False when a preset is missing or a sample cannot be read.
+    [[nodiscard]] bool select(const std::array<const SoundFontPreset*, kGroups>& presets) noexcept {
+        fluid_synth_t* synth = synth_.get();
+        for (std::size_t g = 0; g < kGroups; ++g) {
+            for (int c = groups_[g].first; c < groups_[g].first + groups_[g].count; ++c) {
+                if (drums_) {
+                    fluid_synth_set_channel_type(synth, c, CHANNEL_TYPE_DRUM);
+                }
+                fluid_synth_pitch_wheel_sens(synth, c, kBendRange);
+                fluid_synth_bank_select(synth, c, presets[g]->bank);
+                fluid_synth_program_change(synth, c, presets[g]->program);
+            }
+        }
+        const std::scoped_lock hold(font_->mutex);
+        firstError[0] = '\0';
+        const int id = fluid_synth_add_sfont(synth, font_->font);
+        if (id == FLUID_FAILED) {
+            return false;
+        }
+        for (std::size_t g = 0; g < kGroups; ++g) {
+            for (int c = groups_[g].first; c < groups_[g].first + groups_[g].count; ++c) {
+                if (fluid_synth_program_select(synth, c, id, presets[g]->bank,
+                                               presets[g]->program) != FLUID_OK) {
+                    return false;
+                }
+            }
+        }
+        return firstError[0] == '\0'; // FluidSynth says when a sample cannot be read
+    }
 
     void noteOn(int key, int velocity, Touch touch) noexcept override {
         const int c = pick(rangeFor(touch));
@@ -292,7 +353,8 @@ private:
         }
     }
 
-    SettingsPtr settings_; // outlives the synth
+    std::shared_ptr<detail::LoadedSoundFont> font_; // outlives the synth
+    SettingsPtr settings_;                          // outlives the synth
     SynthPtr synth_;
     double sampleRate_;
     bool drums_;
@@ -304,8 +366,9 @@ private:
 
 } // namespace
 
-SoundFont::SoundFont(std::filesystem::path path, std::vector<SoundFontPreset> presets)
-    : path_(std::move(path)), presets_(std::move(presets)) {}
+SoundFont::SoundFont(std::filesystem::path path, std::vector<SoundFontPreset> presets,
+                     std::shared_ptr<detail::LoadedSoundFont> loaded)
+    : path_(std::move(path)), presets_(std::move(presets)), loaded_(std::move(loaded)) {}
 
 std::expected<std::shared_ptr<const SoundFont>, std::string>
 SoundFont::open(const std::filesystem::path& path) {
@@ -317,14 +380,27 @@ SoundFont::open(const std::filesystem::path& path) {
     if (fluid_is_soundfont(utf8(path).c_str()) == 0) {
         return std::unexpected(std::format("{}: not a SoundFont (SF2 or SF3)", utf8(path)));
     }
-    auto loaded = loadSynth(path, 44100.0);
-    if (!loaded) {
-        return std::unexpected(loaded.error());
+    auto host = makeSynth(kHostRate, 1);
+    if (!host) {
+        return std::unexpected(std::string("no SoundFont synthesizer"));
     }
+    // No channel of the host selects a preset, so loading reads no samples.
+    for (int c = 0; c < kChannels; ++c) {
+        fluid_synth_unset_program(host->synth.get(), c);
+    }
+    firstError[0] = '\0';
+    const int id = fluid_synth_sfload(host->synth.get(), utf8(path).c_str(), 0);
+    if (id == FLUID_FAILED) {
+        const std::string_view reason(firstError.data());
+        return std::unexpected(std::format("{}: could not load the SoundFont{}{}", utf8(path),
+                                           reason.empty() ? "" : ": ", reason));
+    }
+    auto loaded = std::make_shared<detail::LoadedSoundFont>();
+    loaded->font = fluid_synth_get_sfont_by_id(host->synth.get(), id);
+    loaded->host = *std::move(host);
     std::vector<SoundFontPreset> presets;
-    fluid_sfont_t* font = fluid_synth_get_sfont_by_id(loaded->synth.get(), loaded->font);
-    fluid_sfont_iteration_start(font);
-    while (fluid_preset_t* preset = fluid_sfont_iteration_next(font)) {
+    fluid_sfont_iteration_start(loaded->font);
+    while (fluid_preset_t* preset = fluid_sfont_iteration_next(loaded->font)) {
         const char* name = fluid_preset_get_name(preset);
         presets.push_back({.bank = fluid_preset_get_banknum(preset),
                            .program = fluid_preset_get_num(preset),
@@ -336,7 +412,8 @@ SoundFont::open(const std::filesystem::path& path) {
     std::ranges::sort(presets, {}, [](const SoundFontPreset& preset) {
         return std::pair(preset.bank, preset.program);
     });
-    return std::shared_ptr<const SoundFont>(new SoundFont(path, std::move(presets)));
+    return std::shared_ptr<const SoundFont>(
+        new SoundFont(path, std::move(presets), std::move(loaded)));
 }
 
 const SoundFontPreset* SoundFont::find(int bank, int program) const noexcept {
@@ -385,10 +462,6 @@ std::string SoundFont::soundName(const core::Instrument& instrument) const {
 
 std::unique_ptr<TrackSound> SoundFont::sound(const core::Instrument& instrument,
                                              double sampleRate) const {
-    auto loaded = loadSynth(path_, sampleRate);
-    if (!loaded) {
-        return builtinBank()->sound(instrument, sampleRate);
-    }
     const bool drums = instrument.kind == core::InstrumentKind::Percussion;
     const bool guitar =
         !drums && instrument.midiProgram >= kFirstGuitar && instrument.midiProgram <= kLastGuitar;
@@ -410,20 +483,14 @@ std::unique_ptr<TrackSound> SoundFont::sound(const core::Instrument& instrument,
     groups[kMuted].first = groups[kNormal].count;
     groups[kHarmonics].first = groups[kMuted].first + groups[kMuted].count;
 
-    fluid_synth_t* synth = loaded->synth.get();
-    for (std::size_t g = 0; g < kGroups; ++g) {
-        for (int c = groups[g].first; c < groups[g].first + groups[g].count; ++c) {
-            if (drums) {
-                fluid_synth_set_channel_type(synth, c, CHANNEL_TYPE_DRUM);
-            }
-            fluid_synth_pitch_wheel_sens(synth, c, kBendRange);
-            if (fluid_synth_program_select(synth, c, loaded->font, presets[g]->bank,
-                                           presets[g]->program) != FLUID_OK) {
-                return builtinBank()->sound(instrument, sampleRate);
-            }
+    if (auto synth = makeSynth(sampleRate, kPolyphony)) {
+        auto made =
+            std::make_unique<FluidSound>(loaded_, *std::move(synth), sampleRate, drums, groups);
+        if (made->select(presets)) {
+            return made;
         }
     }
-    return std::make_unique<FluidSound>(*std::move(loaded), sampleRate, drums, groups);
+    return builtinBank()->sound(instrument, sampleRate);
 }
 
 } // namespace elara::audio

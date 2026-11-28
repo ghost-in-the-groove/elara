@@ -317,6 +317,13 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [ ] Layout issues found on the worker and shown in the status bar
   - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
+- [ ] Several songs open at once, in tabs, with measures copied between them
+      (ADR-0160)
+  - [x] One clipboard for every song open: measures copied in one song are
+        pasted in another, shared with the song they came from; the CLI
+        `edit --from` and `copy ... from` steps
+  - [ ] Songs in tabs: new, open, close and switch; files opened together
+        load in parallel; the transport follows the song shown
 
 ## The interface
 
