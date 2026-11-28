@@ -1306,7 +1306,9 @@ void ScoreDocument::setTempo(int bpm) {
         bpm > static_cast<int>(core::Tempo::kMaxBpm)) {
         return;
     }
-    execute(std::make_unique<core::SetStartTempo>(core::Tempo(bpm)));
+    // In the beat the song counts in (ADR-0042).
+    execute(std::make_unique<core::SetStartTempo>(
+        core::Tempo(bpm, document_->song().startTempo().beatUnit())));
 }
 
 void ScoreDocument::setTimeSignature(int numerator, int denominator) {
@@ -1612,26 +1614,15 @@ void ScoreDocument::setTempoFrom(int measure, int bpm) {
         measure >= static_cast<int>(document_->song().measureCount())) {
         return;
     }
-    const core::Song& song = document_->song();
     const bool removing = bpm <= 0;
     if (!removing && (bpm < static_cast<int>(core::Tempo::kMinBpm) ||
                       bpm > static_cast<int>(core::Tempo::kMaxBpm))) {
         return;
     }
-    if (measure == 0) {
-        // The song's tempo, counted in the beat it already counts in; the
-        // first measure always has one.
-        if (removing) {
-            return;
-        }
-        const core::Tempo tempo(bpm, song.startTempo().beatUnit());
-        if (tempo != song.startTempo()) {
-            execute(std::make_unique<core::SetStartTempo>(tempo));
-        }
-        return;
-    }
+    // On the first measure, core sets the song's tempo in the beat it counts in.
     const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
-    if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+    if (auto change =
+            core::changeTempo(document_->song(), static_cast<std::size_t>(measure), bpmOrNone)) {
         execute(std::move(change));
     }
 }
