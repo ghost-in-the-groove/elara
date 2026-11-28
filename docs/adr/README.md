@@ -153,6 +153,7 @@ one that replaces them.
 | [0174](0174-the-staves-lines-are-dimmer-on-the-dark-page.md) | The staves' lines are dimmer on the dark page | Accepted |
 | [0175](0175-a-view-shown-before-comes-back-as-it-was.md) | A view shown before comes back as it was | Accepted |
 | [0176](0176-nothing-runs-past-the-right-margin.md) | Nothing runs past the right margin | Accepted |
+| [0177](0177-guitar-pro-6-drums-by-kit-element.md) | Guitar Pro 6 drums by kit element | Accepted |
 | [0180](0180-edits-at-the-caret-say-why-they-are-refused.md) | Edits at the caret say why they are refused | Accepted |
 
 ## Template

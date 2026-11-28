@@ -227,6 +227,40 @@ struct TrackLayout {
     bool percussion = false;
 };
 
+/// The General MIDI key of a Guitar Pro 6 drum note, which names an element of
+/// the program's own kit and one of its variations (ADR-0177); nothing for an
+/// element or a variation the kit does not have.
+std::optional<int> kitElementKey(std::optional<int> element, std::optional<int> variation) {
+    // Per element, in the order Guitar Pro 6 lists its kit, the keys of its
+    // variations. General MIDI has one cowbell, and no half-open hi-hat, ride
+    // edge or choked cymbal: those sound as the piece's plain hit or open.
+    constexpr std::array<std::array<int, 3>, 17> kKit{{
+        {36, 36, 36}, // kick
+        {38, 40, 37}, // snare: hit, rim shot, side stick
+        {56, 56, 56}, // cowbell low: hit, tip
+        {56, 56, 56}, // cowbell medium
+        {56, 56, 56}, // cowbell high
+        {41, 41, 41}, // tom very low
+        {43, 43, 43}, // tom low
+        {45, 45, 45}, // tom medium
+        {48, 48, 48}, // tom high
+        {50, 50, 50}, // tom very high
+        {42, 46, 46}, // hi-hat: closed, half open, open
+        {44, 44, 44}, // pedal hi-hat
+        {49, 49, 49}, // crash medium: hit, choke
+        {57, 57, 57}, // crash high: hit, choke
+        {55, 55, 55}, // splash: hit, choke
+        {51, 51, 53}, // ride: middle, edge, bell
+        {52, 52, 52}, // china: hit, choke
+    }};
+    const int which = variation.value_or(0);
+    if (!element || *element < 0 || std::cmp_greater_equal(*element, kKit.size()) || which < 0 ||
+        std::cmp_greater_equal(which, kKit[0].size())) {
+        return std::nullopt;
+    }
+    return kKit[static_cast<std::size_t>(*element)][static_cast<std::size_t>(which)];
+}
+
 /// The chord symbols of a `DiagramCollection` (ADR-0080). A diagram counts
 /// its strings from the lowest; its frets go from string 1, the highest, down,
 /// over the staff's `strings` or, on a staff without a tuning (0), over as many
@@ -619,7 +653,7 @@ private:
 struct NoteFields {
     pugi::xml_node tie, vibrato, accent, articulation;
     pugi::xml_node string, fret, midi, concertPitch, slide, harmonicType, harmonicFret;
-    pugi::xml_node trill, ornament;
+    pugi::xml_node trill, ornament, element, variation;
     bool letRing = false, ghost = false;
     bool palmMuted = false, muted = false, hopoDestination = false, bended = false, tapped = false;
 
@@ -665,6 +699,10 @@ private:
                 harmonicType = node;
             } else if (name == "HarmonicFret") {
                 harmonicFret = node;
+            } else if (name == "Element") {
+                element = node;
+            } else if (name == "Variation") {
+                variation = node;
             } else {
                 palmMuted = palmMuted || name == "PalmMuted";
                 muted = muted || name == "Muted";
@@ -999,8 +1037,16 @@ private:
                     drum = layout.drumKeys[static_cast<std::size_t>(*articulation)];
                 }
             }
+            if (!drum && fields.element) {
+                // Guitar Pro 6 names an element of its own kit instead.
+                drum = kitElementKey(intOf(textOf(fields.element.child("Element"))),
+                                     intOf(textOf(fields.variation.child("Variation"))));
+                if (!drum) {
+                    warnings_.add(who, "drum notes of unknown kit elements dropped", m);
+                    return std::nullopt;
+                }
+            }
             if (!drum || *drum < 0 || *drum > 127) {
-                // Guitar Pro 6 names drums by kit element instead (not read yet).
                 warnings_.add(who, "drum notes without a MIDI key dropped", m);
                 return std::nullopt;
             }

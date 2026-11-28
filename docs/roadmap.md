@@ -58,6 +58,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
 - [x] Guitar Pro 6 (`.gpx`) import
   - [x] Arpeggios of Guitar Pro 6-8 as rolled chords: a strum spread from the
         lowest note upwards, from the highest downwards (ADR-0025, ADR-0076)
+  - [x] Drum notes that name an element of the program's kit and a variation,
+        as the General MIDI key of that piece (ADR-0177)
 - [x] Guitar Pro 3/4/5 (binary) import
   - [x] Keyboards reaching into both clefs on a grand staff, split at middle C
         (ADR-0075)

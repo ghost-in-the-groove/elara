@@ -48,6 +48,7 @@
 <line class="barline" x1="47.159" y1="57.919" x2="47.159" y2="61.919" stroke-width="0.16"/>
 <line class="ledgerLine" x1="48.039" y1="56.919" x2="50.175" y2="56.919" stroke-width="0.16"/>
 <line class="stem" x1="49.559" y1="61.251" x2="49.559" y2="53.419" stroke-width="0.12"/>
+<line class="stem" x1="53.802" y1="59.251" x2="53.802" y2="55.919" stroke-width="0.12"/>
 <line class="barline" x1="57.004" y1="57.919" x2="57.004" y2="61.919" stroke-width="0.16"/>
 <line class="barline" x1="57.734" y1="57.919" x2="57.734" y2="61.919" stroke-width="0.5"/>
 <line class="barline" x1="22.005" y1="32.729" x2="22.005" y2="61.919" stroke-width="0.16"/>
@@ -82,7 +83,7 @@
 <text class="notehead" x="44.079" y="57.419" stroke="none">&#xE0A9;</text>
 <text class="notehead" x="48.439" y="56.919" stroke="none">&#xE0A8;</text>
 <text class="notehead" x="48.439" y="61.419" stroke="none">&#xE0A3;</text>
-<text class="rest" x="52.682" y="59.919" stroke="none">&#xE4E4;</text>
+<text class="notehead" x="52.682" y="59.419" stroke="none">&#xE0A3;</text>
 <text class="tempo" x="35.079" y="21.276" style="font-size:3.6px" stroke="none">&#xECA5;</text>
 <text class="t credit" x="60" y="11.871" style="font-size:4.4px" text-anchor="middle" stroke="none">Corpus Duet</text>
 <text class="t credit" x="60" y="15.295" style="font-size:2.4px" text-anchor="middle" stroke="none">Ghost in the Groove</text>
