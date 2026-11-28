@@ -346,7 +346,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The welcome pane as a home: what to do at the left, the recent scores
       beside it
 - [x] The page in the dark theme: dark paper and light ink, black on white
-      when it leaves the program (ADR-0114)
+      when it leaves the program (ADR-0114); the staves' lines dimmer than the
+      notes and the fret numbers on them (ADR-0174)
 - [x] After a review of the whole window: one look for whatever is chosen, the
       paper the brightest surface, the palette's signs from the music font, the
       tuner docked beside the score, measure ticks on the song string, one side

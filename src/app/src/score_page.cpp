@@ -77,6 +77,15 @@ void ScorePage::setInk(const QColor& ink) {
     repaint();
 }
 
+void ScorePage::setStaff(const QColor& staff) {
+    if (staff == colours_.staff) {
+        return;
+    }
+    colours_.staff = staff;
+    emit coloursChanged();
+    repaint();
+}
+
 void ScorePage::setIndex(int index) {
     if (index == index_) {
         return;

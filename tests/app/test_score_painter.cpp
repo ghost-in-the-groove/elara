@@ -256,6 +256,40 @@ TEST_CASE("Score painter: a dark page has its paper, its ink and knockouts of it
     CHECK(inkAt(day, list, kScale, 3.0, 2.0));
 }
 
+TEST_CASE("Score painter: the staves' lines take their own colour, everything else the ink",
+          "[app]") {
+    // On a dark page the lines are dimmer than what they carry (ADR-0174): a
+    // staff line and a ledger line cross a stem; only the staff line is dim.
+    DisplayList list = blank();
+    list.lines.push_back(
+        LineItem{.from = {0.0, 1.0}, .to = {20.0, 1.0}, .thickness = 0.2, .role = Role::StaffLine});
+    list.lines.push_back(LineItem{
+        .from = {0.0, 2.0}, .to = {20.0, 2.0}, .thickness = 0.2, .role = Role::LedgerLine});
+    list.lines.push_back(
+        LineItem{.from = {15.0, 0.0}, .to = {15.0, 3.0}, .thickness = 0.4, .role = Role::Stem});
+    constexpr double kScale = 20.0;
+    const ScoreColours night{.paper = QColor(0x27, 0x26, 0x2e),
+                             .ink = QColor(0xe7, 0xe5, 0xec),
+                             .staff = QColor(0x8c, 0x8a, 0x96)};
+    const QImage image = painter().render(list, kScale, 1.0, night);
+    const auto colourAt = [&](double x, double y) {
+        return image.pixelColor(static_cast<int>(std::floor(x * kScale)),
+                                static_cast<int>(std::floor((y - list.top) * kScale)));
+    };
+    CHECK(colourAt(3.0, 1.0) == night.staff);
+    CHECK(colourAt(3.0, 2.0) == night.ink);
+    CHECK(colourAt(15.0, 0.5) == night.ink);
+    // Lines are painted in the order of the list: the stem lies over the
+    // staff line it crosses.
+    CHECK(colourAt(15.0, 1.0) == night.ink);
+
+    // Without a colour of their own the lines are in the ink, as printed.
+    const ScoreColours plain{.paper = night.paper, .ink = night.ink};
+    const QImage same = painter().render(list, kScale, 1.0, plain);
+    CHECK(same.pixelColor(60, static_cast<int>(std::floor((1.0 - list.top) * kScale))) ==
+          night.ink);
+}
+
 TEST_CASE("Score painter: a page on opaque paper is opaque everywhere", "[app]") {
     // What lets ScorePage hand the page to the scene graph as an opaque
     // texture, drawn without blending: nothing painted leaves a hole, not

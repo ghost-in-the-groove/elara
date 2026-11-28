@@ -30,6 +30,10 @@ struct ScoreFonts {
 struct ScoreColours {
     QColor paper{Qt::white};
     QColor ink{Qt::black};
+    /// The lines of the staves, of notation and of tablature: the ink unless
+    /// set. On a dark page they are dimmer than the notes and the fret
+    /// numbers they carry (ADR-0174).
+    QColor staff{};
     friend bool operator==(const ScoreColours&, const ScoreColours&) = default;
 };
 
