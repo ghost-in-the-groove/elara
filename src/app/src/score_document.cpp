@@ -73,18 +73,65 @@ struct ScoreLayout {
     double staffSpace = 1.75; ///< mm the staves were laid out with (ADR-0171)
     int milliseconds = 0;
     QString error;
+    bool kept = false;    ///< the pages are those this view laid out before (ADR-0175)
     bool opened = false;  ///< a song just read from `source`, to edit from now on
     QStringList warnings; ///< what reading `source` approximated or dropped
 };
 
-// What the layout worker keeps from one layout to the next: the systems it
-// laid out (ADR-0052), and the pages it laid out last with their layout
-// issues (ADR-0150), so that the next layout checks only the pages it
+// What the layout worker keeps of one view from one layout to the next: the
+// systems it laid out (ADR-0052), and the pages it laid out last with their
+// layout issues (ADR-0150), so that the next layout checks only the pages it
 // changed. Used by one layout at a time: the layout lane runs one job at once.
 struct LayoutMemory {
     notation::PageLayoutCache cache;
+    /// The song `pages` are the layout of; empty until a layout succeeds.
+    std::shared_ptr<const core::Song> song;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     std::vector<PageIssues> issues; ///< of each of pages
+    int issueCount = 0;
+    double staffSpace = 0.0;
+    bool hasTablature = false;
+};
+
+// The memories of the views of a song shown last (ADR-0175): a track or every
+// track, as notation, tablature or both, on pages or as one continuous page.
+// Going back to a view shown before lays out only what was edited since, and
+// nothing when nothing was. The views used longest ago are let go past
+// `kMost`, so that a song of many tracks does not keep a layout of each.
+class LayoutMemories {
+public:
+    struct View {
+        int track = 0;
+        ScoreDocument::View view = ScoreDocument::View::Both;
+        bool continuous = false;
+        friend bool operator==(const View&, const View&) = default;
+    };
+
+    static constexpr std::size_t kMost = 6;
+
+    /// The memory of `view`, a new one when it was not shown lately.
+    [[nodiscard]] LayoutMemory& of(const View& view) {
+        const auto found = std::ranges::find(kept_, view, &Kept::view);
+        if (found != kept_.end()) {
+            std::rotate(kept_.begin(), found, found + 1); // the latest first
+        } else {
+            if (kept_.size() >= kMost) {
+                kept_.pop_back();
+            }
+            kept_.insert(kept_.begin(), Kept{view, std::make_unique<LayoutMemory>()});
+        }
+        return *kept_.front().memory;
+    }
+
+    /// Another song is shown: nothing kept is of use.
+    void clear() { kept_.clear(); }
+
+private:
+    struct Kept {
+        View view;
+        std::unique_ptr<LayoutMemory> memory;
+    };
+    std::vector<Kept> kept_; // the view used last first
 };
 
 // An edited song's sequence, or why it could not be built.
@@ -210,15 +257,17 @@ void findIssues(ScoreLayout& result, const notation::EngravingFont& font,
     }
     memory.pages = result.pages;
     memory.issues = result.issues;
+    memory.issueCount = result.issueCount;
 }
 
 // Lays out `track` (or every track) of `song` as `view` on A4 pages or, when
 // `continuous`, on one endless page cut into strips as high as A4 pages
-// (ADR-0057), and finds their layout issues. Goes through `memory` so that
-// only what changed since its last layout is laid out and checked again. Runs
-// on a worker thread and never throws.
+// (ADR-0057), and finds their layout issues. Goes through the memory of that
+// view so that only what changed since its last layout is laid out and checked
+// again, and gives the pages back as they are when nothing did. Runs on a
+// worker thread and never throws.
 ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view,
-                   bool continuous, LayoutMemory& memory) {
+                   bool continuous, LayoutMemories& memories) {
     ScoreLayout result;
     result.song = song;
     result.track = track;
@@ -229,6 +278,20 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.error = QObject::tr("The music font is missing.");
         return result;
     }
+    LayoutMemory& memory = memories.of({.track = track, .view = view, .continuous = continuous});
+    if (memory.song == song && memory.pages) {
+        // The song as this view last laid it out: its pages are those.
+        result.pages = memory.pages;
+        result.issues = memory.issues;
+        result.issueCount = memory.issueCount;
+        result.staffSpace = memory.staffSpace;
+        result.hasTablature = memory.hasTablature;
+        result.kept = true;
+        return result;
+    }
+    // Until this layout is done the memory holds no song's pages: a layout
+    // that fails leaves its cache empty.
+    memory.song.reset();
     try {
         const auto tracks = shownTracks(*song, track);
         result.hasTablature = notation::hasTablature(*song, tracks);
@@ -249,6 +312,9 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
         result.pages = std::make_shared<const std::vector<notation::DisplayList>>(std::move(pages));
         findIssues(result, *font, pageOptions(result.staffSpace), memory);
+        memory.staffSpace = result.staffSpace;
+        memory.hasTablature = result.hasTablature;
+        memory.song = std::move(song);
     } catch (const std::exception& error) {
         result.error =
             QObject::tr("The score could not be laid out: %1").arg(qstring(error.what()));
@@ -259,7 +325,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
 ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, bool continuous,
-                          LayoutMemory& memory) {
+                          LayoutMemories& memories) {
     ScoreLayout result;
     result.source = file;
     try {
@@ -278,7 +344,8 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, boo
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
         auto sequence = std::make_shared<const audio::Sequence>(*song, practice);
-        result = layOut(std::move(song), 0, view, continuous, memory);
+        memories.clear(); // the views of the song shown before
+        result = layOut(std::move(song), 0, view, continuous, memories);
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
@@ -475,7 +542,7 @@ QString trackDetail(const core::Track& track) {
 } // namespace
 
 ScoreDocument::ScoreDocument(QObject* parent)
-    : QObject(parent), layoutMemory_(std::make_shared<LayoutMemory>()),
+    : QObject(parent), layoutMemories_(std::make_shared<LayoutMemories>()),
       layouts_(std::make_unique<JobLane<ScoreLayout>>(this, [this] { updateBusy(); })),
       sequences_(std::make_unique<JobLane<SequenceResult>>(this, [this] { updateBusy(); })) {
     // Connected first, so that the list is up to date for whoever else hears it.
@@ -693,8 +760,8 @@ void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> re
     errorMessage_.clear();
     emit statusChanged();
     layouts_->request(
-        [file, practice = practice_, continuous = continuous_, memory = layoutMemory_] {
-            return openAndLayOut(file, practice, continuous, *memory);
+        [file, practice = practice_, continuous = continuous_, memories = layoutMemories_] {
+            return openAndLayOut(file, practice, continuous, *memories);
         },
         [this, recovered = std::move(recovered)](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
@@ -858,7 +925,7 @@ void ScoreDocument::requestLayout(bool edit) {
     }
     layouts_->request(
         [song = song_, track = track_, view = view_, continuous = continuous_,
-         memory = layoutMemory_] { return layOut(song, track, view, continuous, *memory); },
+         memories = layoutMemories_] { return layOut(song, track, view, continuous, *memories); },
         [this, edit](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
                 fail(result.error);
@@ -982,6 +1049,9 @@ void ScoreDocument::apply(const ScoreLayout& layout, bool edit) {
     hasTablature_ = layout.hasTablature;
     staffSpace_ = layout.staffSpace;
     layoutMilliseconds_ = layout.milliseconds;
+    if (layout.kept) {
+        ++layoutsKept_;
+    }
     // The same lists, page for page, when the layout found nothing new.
     const bool issuesMoved = layout.issues != pageIssues_;
     pageIssues_ = layout.issues;
@@ -1251,6 +1321,9 @@ void ScoreDocument::newSong(const QString& presetId) {
     layouts_->drop();   // a file still opening must not replace the new song
     sequences_->drop(); // nor an edit's sequence still being built
     sequencing_.reset();
+    // The views of the song shown before are of no use to this one; a layout
+    // still running keeps the memories it was given.
+    layoutMemories_ = std::make_shared<LayoutMemories>();
     document_.emplace(std::move(song));
     ++documentsMade_;
     song_ = std::make_shared<const core::Song>(document_->song());
