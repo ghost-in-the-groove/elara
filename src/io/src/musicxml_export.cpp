@@ -2293,6 +2293,7 @@ struct Document {
 
 Document writeDocument(const Song& original, const MusicXmlExportOptions& options) {
     Warnings scoreWarnings;
+    detail::reportLayoutDropped(original, scoreWarnings);
     const std::optional<Song> written = writtenOut(original, scoreWarnings);
     const Song& song = written ? *written : original;
     const SongScan songScan = scan(song);
