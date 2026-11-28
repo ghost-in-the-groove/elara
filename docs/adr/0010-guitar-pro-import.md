@@ -126,8 +126,8 @@ instrument as in Guitar Pro 3-5; its tuning, capo and flat spelling are
 properties of the track itself; and since it has no transposition, guitars
 and basses get the 8vb clef and an octave of written offset, as in every
 other version. Drum notes that give a MIDI key keep it. Guitar Pro 6 also
-names drums by kit element and variation, a table this reader does not have
-yet, so such notes are dropped with a warning.
+names drums by an element of its built-in kit and a variation, read through
+the kit's table since ADR-0177.
 
 **Threads.** A GPIF score is parsed once; then each staff is read on its own,
 measure by measure, on every core when the score has more than 20 000 notes
@@ -152,8 +152,8 @@ on what its GPIF shares with Guitar Pro 7-8.
 
 - Guitarists can open the files of every Guitar Pro version from 3 to 8
   through one entry point.
-- Guitar Pro 6 drum tracks that name their notes by kit element lose them
-  until the element table is added; the warning says so.
+- Guitar Pro 6 drum tracks that name their notes by kit element keep them
+  since ADR-0177.
 - Where the meaning of a GPIF value is inferred (bend scale, tempo position,
   accent flags, slide flags), the guess is written down here and in the code;
   a file that shows otherwise becomes a corpus case and a fix.

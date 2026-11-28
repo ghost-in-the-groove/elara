@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
+#include <format>
 #include <span>
 #include <string>
 #include <string_view>
@@ -120,6 +121,34 @@ std::string bassScore() {
            R"(<Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm></Rhythms></GPIF>)";
 }
 
+// A Guitar Pro 6 score with one drum kit and one 4/4 bar: a whole beat whose
+// notes name an element of the kit and one of its variations each, as Guitar
+// Pro 6 writes every drum note.
+std::string drumScore(const std::vector<std::pair<int, int>>& pieces) {
+    std::string ids;
+    std::string notes;
+    for (std::size_t i = 0; i < pieces.size(); ++i) {
+        ids += std::format("{}{}", i == 0 ? "" : " ", i);
+        notes += std::format(R"(<Note id="{}"><Properties><Property name="Element">)"
+                             R"(<Element>{}</Element></Property><Property name="Variation">)"
+                             "<Variation>{}</Variation></Property></Properties></Note>",
+                             i, pieces[i].first, pieces[i].second);
+    }
+    return R"(<?xml version="1.0" encoding="utf-8"?><GPIF><GPRevision>0</GPRevision>)"
+           "<Score><Title><![CDATA[Kit]]></Title></Score><MasterTrack><Tracks>0</Tracks>"
+           R"(</MasterTrack><Tracks><Track id="0"><Name><![CDATA[Drums]]></Name>)"
+           R"(<GeneralMidi table="Percussion"><Program>0</Program>)"
+           "<PrimaryChannel>9</PrimaryChannel></GeneralMidi></Track></Tracks>"
+           "<MasterBars><MasterBar><Key><AccidentalCount>0</AccidentalCount><Mode>Major</Mode>"
+           "</Key><Time>4/4</Time><Bars>0</Bars></MasterBar></MasterBars><Bars>"
+           R"(<Bar id="0"><Clef>Neutral</Clef><Voices>0 -1 -1 -1</Voices></Bar></Bars><Voices>)"
+           R"(<Voice id="0"><Beats>0</Beats></Voice></Voices><Beats><Beat id="0">)"
+           R"(<Rhythm ref="0"/><Notes>)" +
+           ids + "</Notes></Beat></Beats><Notes>" + notes +
+           R"(</Notes><Rhythms><Rhythm id="0"><NoteValue>Whole</NoteValue></Rhythm></Rhythms>)"
+           "</GPIF>";
+}
+
 std::string error(std::span<const std::uint8_t> bytes) {
     const auto imported = importGuitarPro(bytes);
     REQUIRE_FALSE(imported.has_value());
@@ -154,8 +183,7 @@ TEST_CASE("Guitar Pro 6: a compressed file keeps its tracks, tunings and drums",
     }
     const ImportResult& result = *loaded;
     const core::Song& song = result.song;
-    CHECK(result.warnings ==
-          std::vector<std::string>{"Drums: drum notes without a MIDI key dropped (measure 2)"});
+    CHECK(result.warnings.empty());
     REQUIRE(song.trackCount() == 2);
     CHECK(song.track(0).mix() == core::TrackMix{.volume = 0.7, .pan = -0.5});
     CHECK(song.track(1).mix() == core::TrackMix{.volume = 0.795, .pan = 0.0, .mute = true});
@@ -188,8 +216,8 @@ TEST_CASE("Guitar Pro 6: a compressed file keeps its tracks, tunings and drums",
     CHECK(bar1[2].duration == Duration(NoteValue::Half));
     CHECK(bar1[2].notes[0].effects.letRing);
 
-    // Drum notes give their MIDI key; the one that names only a kit element is
-    // dropped, which leaves its beat a rest.
+    // Drum notes give their MIDI key, or name an element of the kit and its
+    // variation, here the snare's hit (ADR-0177).
     const core::Track& drums = song.track(1);
     CHECK(drums.instrument().kind == core::InstrumentKind::Percussion);
     CHECK(drums.staff(0).clef() == core::Clef::Percussion);
@@ -201,7 +229,64 @@ TEST_CASE("Guitar Pro 6: a compressed file keeps its tracks, tunings and drums",
     const auto& kit2 = drums.staff(0).measure(1).voices[0].beats;
     REQUIRE(kit2.size() == 2);
     CHECK(kit2[0].notes[0].pitch.midiNumber() == 49);
-    CHECK(kit2[1].isRest());
+    REQUIRE(kit2[1].notes.size() == 1);
+    CHECK(kit2[1].notes[0].pitch.midiNumber() == 38);
+}
+
+TEST_CASE("Guitar Pro 6: a drum note naming a kit element sounds that piece's General MIDI key",
+          "[io][guitarpro]") {
+    struct Piece {
+        int element;
+        int variation;
+        int key;
+    };
+    // The kit as Guitar Pro 6 lists it (ADR-0177).
+    const std::vector<Piece> kit{
+        {.element = 0, .variation = 0, .key = 36},  // kick
+        {.element = 1, .variation = 0, .key = 38},  // snare: hit,
+        {.element = 1, .variation = 1, .key = 40},  // rim shot,
+        {.element = 1, .variation = 2, .key = 37},  // side stick
+        {.element = 2, .variation = 0, .key = 56},  // cowbells: low,
+        {.element = 3, .variation = 1, .key = 56},  // medium (tip),
+        {.element = 4, .variation = 0, .key = 56},  // high
+        {.element = 5, .variation = 0, .key = 41},  // toms, from the lowest
+        {.element = 6, .variation = 0, .key = 43},  //
+        {.element = 7, .variation = 0, .key = 45},  //
+        {.element = 8, .variation = 0, .key = 48},  //
+        {.element = 9, .variation = 0, .key = 50},  // to the highest
+        {.element = 10, .variation = 0, .key = 42}, // hi-hat: closed,
+        {.element = 10, .variation = 1, .key = 46}, // half open,
+        {.element = 10, .variation = 2, .key = 46}, // open
+        {.element = 11, .variation = 0, .key = 44}, // pedal hi-hat
+        {.element = 12, .variation = 0, .key = 49}, // crashes: medium,
+        {.element = 13, .variation = 1, .key = 57}, // high (choked)
+        {.element = 14, .variation = 0, .key = 55}, // splash
+        {.element = 15, .variation = 0, .key = 51}, // ride: middle,
+        {.element = 15, .variation = 1, .key = 51}, // edge,
+        {.element = 15, .variation = 2, .key = 53}, // bell
+        {.element = 16, .variation = 0, .key = 52}, // china
+    };
+    for (const Piece& piece : kit) {
+        CAPTURE(piece.element, piece.variation);
+        const auto imported = importGuitarPro(
+            fileSystem({{"score.gpif", drumScore({{piece.element, piece.variation}})}}));
+        REQUIRE(imported.has_value());
+        CHECK(imported->warnings.empty());
+        const core::Beat& beat = imported->song.track(0).staff(0).measure(0).voices[0].beats[0];
+        REQUIRE(beat.notes.size() == 1);
+        CHECK(beat.notes[0].pitch.midiNumber() == piece.key);
+    }
+
+    // Elements and variations the kit does not have are dropped, with a warning.
+    const auto imported =
+        importGuitarPro(fileSystem({{"score.gpif", drumScore({{0, 0}, {17, 0}, {12, 3}})}}));
+    REQUIRE(imported.has_value());
+    CHECK(imported->warnings ==
+          std::vector<std::string>{
+              "Drums: drum notes of unknown kit elements dropped (2 times, first in measure 1)"});
+    const core::Beat& beat = imported->song.track(0).staff(0).measure(0).voices[0].beats[0];
+    REQUIRE(beat.notes.size() == 1);
+    CHECK(beat.notes[0].pitch.midiNumber() == 36);
 }
 
 TEST_CASE("Guitar Pro 6: plain and literal-only containers hold the same score",
