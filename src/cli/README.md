@@ -371,6 +371,9 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
   is not well formed (exit 2) and lets what the song refuses through (exit 1).
   The caret and the input duration of a run of steps are a `core::EditSession`,
   the one the app's keys use (ADR-0127).
+  An entry step core refuses fails with `refused: <name>`, the `Refusal`'s
+  name (`off-the-neck`, `needs-strings`, ...); one that nothing at the caret
+  takes is a warning on stderr, and the steps go on (ADR-0180).
   `tests/cli/test_edit_steps.cpp` runs steps against a song with Catch2; the
   `cli.edit_rejects_*` CTests check the message each step fails with.
 
