@@ -16,6 +16,7 @@
 
 using Catch::Matchers::Message;
 using elara::cli::runStep;
+using elara::cli::stepForms;
 using elara::cli::StepState;
 using elara::cli::StepSyntaxError;
 using elara::core::BeatEffects;
@@ -134,6 +135,21 @@ TEST_CASE("Edit steps: malformed steps and steps the song rejects fail apart", "
 }
 
 // ---- The session the steps share with the app (ADR-0127) -----------------------
+
+TEST_CASE("Edit steps: the help lists every step there is, and only those", "[cli][edit]") {
+    // A step whose verb no form starts with is unknown, so every step that
+    // runs is listed; and each verb listed runs as a step, if not bare.
+    for (const std::string_view form : stepForms()) {
+        CAPTURE(form);
+        const std::string_view verb = form.substr(0, form.find(' '));
+        Run run;
+        try {
+            runStep(run.doc, verb, run.state);
+        } catch (const std::exception& error) {
+            CHECK_FALSE(std::string_view(error.what()).starts_with("unknown step"));
+        }
+    }
+}
 
 TEST_CASE("Edit steps: the input duration follows the beat the caret moves to", "[cli][edit]") {
     using elara::core::Duration;
