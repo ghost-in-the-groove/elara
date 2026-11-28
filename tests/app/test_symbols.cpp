@@ -8,6 +8,7 @@
 
 #include "caret_editor.hpp"
 #include "score_document.hpp"
+#include "songs_to_edit.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QObject>
@@ -17,7 +18,10 @@
 #include <QStringList>
 #include <QVariantMap>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <vector>
@@ -150,6 +154,25 @@ TEST_CASE("symbols: the time signature is found where it is drawn, and nothing w
     CHECK(pages.score.symbolAt(-1, digits.front().x + 0.5, digits.front().y).isEmpty());
     CHECK(pages.score.symbolAt(pages.score.pageCount(), digits.front().x + 0.5, digits.front().y)
               .isEmpty());
+}
+
+TEST_CASE("symbols: in each song the first time signature is found where it is drawn") {
+    const char* source = GENERATE(from_range(elara::app::testing::kSongsToEdit));
+    INFO(source);
+    elara::app::testing::SongToEdit song(source);
+    const ScoreDocument& score = song.score;
+    const auto page = score.page(0);
+    REQUIRE(page);
+    const auto digit =
+        std::ranges::find(page->glyphs, Role::TimeSignature, &elara::notation::GlyphItem::role);
+    REQUIRE(digit != page->glyphs.end());
+
+    const QPointF ink(digit->origin.x + 0.5, digit->origin.y);
+    const QVariantMap symbol = score.symbolAt(0, ink.x(), ink.y());
+    CHECK(symbol.value(QStringLiteral("kind")).toString().toStdString() == "time");
+    CHECK(symbol.value(QStringLiteral("rect")).toRectF().contains(ink));
+    CHECK_FALSE(score.signatureAt(measureOf(symbol)).isEmpty());
+    CHECK(score.symbolAt(0, 0.2, 0.2).isEmpty());
 }
 
 TEST_CASE("symbols: before a song is open nothing is found") {
