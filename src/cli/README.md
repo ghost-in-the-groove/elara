@@ -152,7 +152,7 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `rename-track <i> [name]`
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
-(ADR-0042), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
+(ADR-0042: on measure 0, as `tempo`, the song's tempo in the beat it counts in), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
 `title`, `subtitle`, `artist`, `album`, `words`, `music`, `copyright`,
 `transcriber` or `notes`; no text clears it, ADR-0059),
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
@@ -371,6 +371,9 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
   is not well formed (exit 2) and lets what the song refuses through (exit 1).
   The caret and the input duration of a run of steps are a `core::EditSession`,
   the one the app's keys use (ADR-0127).
+  `stepForms()` lists every form of step, which `edit --help` prints: a
+  step whose verb no form starts with is unknown, so a new step needs its
+  form there before it runs.
   An entry step core refuses fails with `refused: <name>`, the `Refusal`'s
   name (`off-the-neck`, `needs-strings`, ...); one that nothing at the caret
   takes is a warning on stderr, and the steps go on (ADR-0180).

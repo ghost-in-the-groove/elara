@@ -39,6 +39,100 @@ namespace elara::cli {
 
 namespace {
 
+// Every form of step, in the order the help lists them.
+constexpr auto kStepForms = std::to_array<std::string_view>({
+    "add-track <preset> [at]",
+    "remove-track <i>",
+    "rename-track <i> [name]",
+    "insert-measures <at> [n]",
+    "append-measures <n>",
+    "remove-measures <at> [n]",
+    "time <m> <N/D>",
+    "key <m> <key>",
+    "mix <track> <volume 0..1> <pan -1..1> [mute] [solo]",
+    "tempo <bpm>",
+    "tempo-from <m> <bpm|none>",
+    "tempo-gradual <m> <on|off>",
+    "feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|"
+    "scottish-sixteenth>",
+    "sign <m> <segno|segno-segno|coda|double-coda|fine|to-coda|to-double-coda>...",
+    "sign <m> none",
+    "jump <m> <da-capo|dal-segno|dal-segno-segno|none> [al-fine|al-coda|al-double-coda]",
+    "repeat <m> [start] [end <times>]",
+    "repeat <m> none",
+    "ending <m> <time>...",
+    "ending <m> none",
+    "barline <m> <double|single>",
+    "section <m> [name]",
+    "break <m> <system|page|keep|auto> [track <t>]",
+    "title <text>",
+    "credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> [text]",
+    "tuning <track> [<preset>|<notes>] [capo <n>] [staff <s>] [frets]",
+    "note <track> <m> <string> <fret> <duration>",
+    "rest <track> <m> <duration>",
+    "fill <track> <m>",
+    "copy <m> <n> [track <t> [<count>]] [from <song>]",
+    "paste <m> [track <t>] [insert]",
+    "transpose <semitones> [measures <m> <n>] [tracks <t>...]",
+    "caret <track> <m> <beat> [string]",
+    "voice <1-4>",
+    "right",
+    "left",
+    "up",
+    "down",
+    "next-measure",
+    "previous-measure",
+    "fret <n>",
+    "pitch <C..B> [add]",
+    "shift <semitones>",
+    "duration <d>",
+    "delete",
+    "delete-beat",
+    "insert-rest",
+    "drum [key]",
+    "effect <name>",
+    "bend <form> [cents]",
+    "strum <down|up|none>",
+    "pick <down|up|none>",
+    "tremolo <8|16|32|none>",
+    "whammy <dive|dip|pre-dive|return|none> [cents]",
+    "bass <tap|slap|pop|none>",
+    "grace <semitones> [duration] [on]",
+    "grace none",
+    "dynamic <ppp..fff>",
+    "hairpin <crescendo|diminuendo|none>",
+    "fermata <short|normal|long|none>",
+    "slur <on|none>",
+    "ottava <8va|8vb|15ma|15mb|none>",
+    "pedal <down|change|none>",
+    "breath <comma|caesura|none>",
+    "chord <name|none>",
+    "text <words|none>",
+    "lyrics <verse> <measure> <text>",
+    "lyrics <verse> none",
+    "clef <treble|treble-8vb|bass|bass-8vb|alto|tenor>",
+    "simile <1|2|none>",
+    "slide-in <from-below|from-above|none>",
+    "slide-out <shift|legato|downwards|upwards|none>",
+    "vibrato <slight|wide|none>",
+    "accent <accent|marcato|none>",
+    "trill <on|semitones|none> [16|32|64]",
+    "ornament <mordent|upper-mordent|turn|inverted-turn|none>",
+    "fingering <1-5|t|none>...",
+    "pluck <p|i|m|a|c|none>",
+    "harmonic <natural|artificial|pinch|tapped|semi|none>",
+    "undo",
+    "redo",
+    "save",
+});
+
+// Whether a form of step starts with `verb`.
+bool knownVerb(std::string_view verb) {
+    return std::ranges::any_of(kStepForms, [verb](std::string_view form) {
+        return form.substr(0, form.find(' ')) == verb;
+    });
+}
+
 using core::Document;
 using core::Song;
 
@@ -623,6 +717,9 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
     using namespace core;
     const Song& song = doc.song();
     const std::string_view verb = step.verb();
+    if (!knownVerb(verb)) {
+        throw StepSyntaxError(std::format("unknown step: {}", verb));
+    }
 
     if (runEntryStep(doc, step, session)) {
         return;
@@ -698,14 +795,11 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
             }
         }
         doc.execute(std::make_unique<core::SetTrackMix>(step.index(1), mix));
-    } else if (verb == "tempo") {
-        doc.execute(std::make_unique<SetStartTempo>(Tempo(step.number<int>(1))));
+    } else if (verb == "tempo") { // the song's own tempo, in the beat it counts in
+        doc.execute(std::make_unique<SetStartTempo>(
+            Tempo(step.number<int>(1), song.startTempo().beatUnit())));
     } else if (verb == "tempo-from") { // tempo-from <m> <bpm> | none
         const std::size_t measure = step.index(1);
-        if (measure == 0) {
-            throw StepSyntaxError("tempo-from: the first measure plays at the song's tempo "
-                                  "(\"tempo <bpm>\")");
-        }
         std::optional<double> bpm;
         if (step.word(2) != "none") {
             const int value = step.number<int>(2);
@@ -903,6 +997,10 @@ void runParsedStep(Document& doc, const Step& step, core::MeasureClip& clipboard
 }
 
 } // namespace
+
+std::span<const std::string_view> stepForms() noexcept {
+    return kStepForms;
+}
 
 void runStep(core::Document& doc, std::string_view text, StepState& state) {
     runParsedStep(doc, Step(text), state.clipboard, state.session, state.sources);

@@ -2,6 +2,8 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/svg.hpp>
 
+#include "ink.hpp"
+
 #include <cstdint>
 #include <format>
 #include <string>
@@ -75,19 +77,7 @@ std::string_view faceStyle(TextFace face) {
     return "";
 }
 
-// The left edge of a text drawn at its origin with its alignment.
-double textLeft(const TextItem& text) {
-    const double width = textWidth(text);
-    switch (text.align) {
-    case TextAlign::Left:
-        return text.origin.x;
-    case TextAlign::Right:
-        return text.origin.x - width;
-    case TextAlign::Centre:
-        break;
-    }
-    return text.origin.x - width / 2;
-}
+using detail::textLeft;
 
 void writeCurve(std::string& svg, const CurveItem& curve) {
     const std::string_view role = roleName(curve.role);
