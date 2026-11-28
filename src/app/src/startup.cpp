@@ -236,7 +236,6 @@ void Startup::queueSteps() {
                 score_->newSong(QStringLiteral("electric-guitar"));
                 return true;
             });
-            queueRecoveryCopy();
             queueSave();
             queueTrackRow();
             queueSymbols();
@@ -460,48 +459,12 @@ void Startup::queueLayoutIssues() {
     });
 }
 
-// The song's recovery copy (ADR-0106): written once the song has unsaved
-// changes, holding the song as it is then, and gone once they are undone.
-void Startup::queueRecoveryCopy() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("recovery check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this] {
-        recoveryWritten_ = false;
-        score_->setSongTitle(QStringLiteral("Recovery copy"));
-        score_->writeRecovery();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        const RecoveryStore* store = score_->recovery();
-        if (store == nullptr) {
-            check(false, "no recovery folder");
-            return false;
-        }
-        if (!recoveryWritten_ || !store->hasCopy()) {
-            again_ = true;
-            return false;
-        }
-        const auto copy = io::loadNative(std::filesystem::path(store->copyFile().toStdU16String()));
-        check(copy && copy->info().title == "Recovery copy", "the copy does not hold the song");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(!score_->modified() && !score_->recovery()->hasCopy(),
-              "the copy outlived the changes");
-        return false;
-    });
-}
-
-// Saving on a worker (ADR-0107): the file holds the song as it was when the
-// save started, and an edit made while it is written stays unsaved; undoing
-// that edit returns to the state saved. A new song asked for in the window
-// while a save is written waits for it, and a save that ends after another
-// song replaced the one it wrote marks nothing. The steps after these edit a
-// new song.
+// A new song asked for in the window while a save is written (ADR-0107,
+// ADR-0160) opens beside the song saved at once, which is not asked to be
+// saved, and the save goes on; the new song, unchanged, closes without asking
+// and the saved one shows again. The steps after these edit a new song. What
+// a save writes and marks is checked in tests/app/test_score_saving.cpp
+// (ADR-0181).
 void Startup::queueSave() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -509,42 +472,13 @@ void Startup::queueSave() {
         }
     };
     steps_.emplace_back([this] {
-        score_->setSongTitle(QStringLiteral("Saved"));
+        score_->setSongTitle(QStringLiteral("Waiting"));
         return true;
     });
     steps_.emplace_back([this] {
         if (!scratch_) {
             scratch_.emplace();
         }
-        saved_.reset();
-        score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("saved"))));
-        // Before the save can be done: its result comes through the event loop.
-        score_->setSongTitle(QStringLiteral("Edited while saving"));
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!saved_) {
-            again_ = true;
-            return false;
-        }
-        const QString file = scratch_->filePath(QStringLiteral("saved.elara"));
-        check(*saved_ && !score_->saving(), "the save failed");
-        check(score_->source() == QUrl::fromLocalFile(file), "the song is not the file saved");
-        check(score_->modified(), "the edit made while saving was marked saved");
-        const auto song = io::loadNative(std::filesystem::path(file.toStdU16String()));
-        check(song && song->info().title == "Saved", "the file does not hold the song saved");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->songTitle() == QStringLiteral("Saved") && !score_->modified(),
-              "undoing the edit made while saving did not return to the state saved");
-        score_->setSongTitle(QStringLiteral("Waiting"));
-        return true;
-    });
-    steps_.emplace_back([this] {
-        // A new song asked for while a save is written opens beside the song
-        // saved at once (ADR-0160), and the save goes on (ADR-0107).
         saved_.reset();
         score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("waiting"))));
         QMetaObject::invokeMethod(window_, "newSong");
@@ -562,30 +496,16 @@ void Startup::queueSave() {
         check(songs_->count() == 2 && songs_->current() != score_ &&
                   songs_->current()->song() != nullptr && !songs_->current()->modified(),
               "the new song asked for while saving did not open beside it");
-        check(score_->songTitle() == QStringLiteral("Waiting") && !score_->modified(),
+        check(*saved_ && score_->songTitle() == QStringLiteral("Waiting") && !score_->modified(),
               "the song saved while a new one opened is not saved");
-        // The new song, unchanged, closes without asking; the saved one shows.
         QMetaObject::invokeMethod(window_, "closeSong");
         return false;
     });
     steps_.emplace_back([this, check] {
         check(songs_->count() == 1 && songs_->current() == score_,
               "closing the new song did not show the song before it");
-        // A song that replaces the one being saved is not marked saved by it.
-        score_->setSongTitle(QStringLiteral("Replaced"));
-        saved_.reset();
-        score_->save(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("replaced"))));
         score_->newSong(QStringLiteral("electric-guitar"));
         return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!saved_) {
-            again_ = true;
-            return false;
-        }
-        check(*saved_ && score_->source().isEmpty() && !score_->modified(),
-              "a save marked the song that replaced the one it wrote");
-        return false;
     });
 }
 
