@@ -140,6 +140,7 @@ one that replaces them.
 | [0144](0144-release-build-flags.md) | The release build optimised as MSVC's own release | Accepted |
 | [0145](0145-what-the-packages-leave-out.md) | What the packages leave out | Accepted |
 | [0146](0146-tracks-share-a-soundfont.md) | Tracks share a SoundFont | Accepted |
+| [0147](0147-song-json-is-written-as-it-is-walked.md) | song.json is written as it is walked | Accepted |
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |

@@ -322,6 +322,35 @@ TEST_CASE("song.json uses text forms and omits defaults", "[io][native]") {
     CHECK(mixes == 2);
 }
 
+TEST_CASE("song.json escapes text as JSON and keeps UTF-8 as it is", "[io][native]") {
+    core::Song song = richSong();
+    song.info().title = "A \"quoted\" back\\slash/,\ttab,\nline,\r\b\f \x01\x1F\x7F "
+                        "\xC3\xA9t\xC3\xA9 \xE2\x99\xAA \xF0\x9F\x8E\xB8";
+    song.track(0).setMix(
+        core::TrackMix{.volume = 0.1, .pan = 1.0 / 3.0, .mute = false, .solo = false});
+    const auto json = songToJson(song);
+    // Quotes, backslashes and control characters are escaped (\u00XX unless
+    // they have a short form); "/", DEL and multi-byte UTF-8 are not.
+    const std::string title =
+        R"("title":"A \"quoted\" back\\slash/,\ttab,\nline,\r\b\f \u0001\u001F)"
+        "\x7F \xC3\xA9t\xC3\xA9 \xE2\x99\xAA \xF0\x9F\x8E\xB8\"";
+    CHECK(json.find(title) != std::string::npos);
+    // Numbers as the shortest text that reads back the same.
+    CHECK(json.find(R"("mix":{"volume":0.1,"pan":0.3333333333333333})") != std::string::npos);
+    const auto read = songFromJson(json);
+    REQUIRE(read.has_value());
+    CHECK(*read == song);
+
+    // Text that is not UTF-8 cannot be written: a lone continuation byte, an
+    // overlong form, a surrogate, a code point past U+10FFFF, a cut sequence.
+    for (const std::string_view bad :
+         {"\x80", "\xC0\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "\xE2\x99"}) {
+        song.info().title = std::string("x") + std::string(bad);
+        CHECK_THROWS(songToJson(song));
+        CHECK_THROWS(encodeNative(song));
+    }
+}
+
 TEST_CASE("Reading song.json reports what is wrong and where", "[io][native]") {
     const auto error = [](std::string_view json) {
         const auto result = songFromJson(json);

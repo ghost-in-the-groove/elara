@@ -399,22 +399,23 @@ int main(int argc, char* argv[]) {
         &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
         [] { QCoreApplication::exit(EXIT_FAILURE); }, Qt::QueuedConnection);
 
-    engine.setInitialProperties({{QStringLiteral("initialFiles"), QVariant::fromValue(options.files)},
-                                 {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
-                                 {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
-                                 {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
-                                 {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
-                                 {QStringLiteral("showEffects"), options.effects},
-                                 {QStringLiteral("showCommands"), options.commands},
-                                 {QStringLiteral("showMenu"), options.menu},
-                                 {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
-                                 {QStringLiteral("initialSoundFont"), options.soundFont},
-                                 {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
-                                 {QStringLiteral("initialBassSfz"), options.bassSfz},
-                                 {QStringLiteral("recoveryFolder"), recoveryFolder},
-                                 {QStringLiteral("windowStateFile"), options.windowState},
-                                 // Checks leave the settings of the person using the app alone.
-                                 {QStringLiteral("rememberSettings"), !checking}});
+    engine.setInitialProperties(
+        {{QStringLiteral("initialFiles"), QVariant::fromValue(options.files)},
+         {QStringLiteral("showTuner"), parser.isSet(tunerOption)},
+         {QStringLiteral("showSongPane"), parser.isSet(songPaneOption)},
+         {QStringLiteral("showMeasure"), parser.isSet(measureOption)},
+         {QStringLiteral("showLyrics"), parser.isSet(lyricsOption)},
+         {QStringLiteral("showEffects"), options.effects},
+         {QStringLiteral("showCommands"), options.commands},
+         {QStringLiteral("showMenu"), options.menu},
+         {QStringLiteral("showTuning"), parser.isSet(tuningOption)},
+         {QStringLiteral("initialSoundFont"), options.soundFont},
+         {QStringLiteral("initialGuitarSfz"), options.guitarSfz},
+         {QStringLiteral("initialBassSfz"), options.bassSfz},
+         {QStringLiteral("recoveryFolder"), recoveryFolder},
+         {QStringLiteral("windowStateFile"), options.windowState},
+         // Checks leave the settings of the person using the app alone.
+         {QStringLiteral("rememberSettings"), !checking}});
     engine.loadFromModule("Elara.App", "Main");
 
     auto* window = engine.rootObjects().isEmpty()
