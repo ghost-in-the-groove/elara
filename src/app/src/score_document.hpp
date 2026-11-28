@@ -43,7 +43,7 @@
 namespace elara::app {
 
 struct ScoreLayout;
-struct LayoutMemory;
+class LayoutMemories;
 struct SequenceResult;
 
 /// The layout issues of one page (ADR-0150): a layout that leaves the page as
@@ -237,6 +237,9 @@ public:
     /// layout; pageSize() is in these staff spaces.
     [[nodiscard]] double staffSpace() const;
     [[nodiscard]] int layoutMilliseconds() const { return layoutMilliseconds_; }
+    /// How many times a view shown before came back with the pages it had,
+    /// nothing laid out again (ADR-0175).
+    [[nodiscard]] int layoutsKept() const noexcept { return layoutsKept_; }
     /// How many layout issues the pages shown have (ADR-0150): what the
     /// layout could not keep from overlapping or within the margins.
     [[nodiscard]] int layoutIssueCount() const { return layoutIssueCount_; }
@@ -751,10 +754,11 @@ private:
     std::optional<core::Document> document_;          ///< the song being edited
     std::shared_ptr<const std::vector<notation::DisplayList>> pages_;
     std::shared_ptr<const core::Song> pagesSong_; ///< the song the pages show
-    /// What the last layout laid out and found, so an edit lays out and checks
-    /// only what it changed (ADR-0052, ADR-0150); shared with the layouts
-    /// running on workers.
-    std::shared_ptr<LayoutMemory> layoutMemory_;
+    /// What the last layouts of each view shown laid out and found, so that an
+    /// edit lays out and checks only what it changed (ADR-0052, ADR-0150) and
+    /// a view shown before comes back as it was (ADR-0175); shared with the
+    /// layouts running on workers.
+    std::shared_ptr<LayoutMemories> layoutMemories_;
     std::vector<PageIssues> pageIssues_; ///< of each of pages_
     int layoutIssueCount_ = 0;
     /// The caret, the input duration, the digit waiting for a second one, the
@@ -784,6 +788,7 @@ private:
     bool hasTablature_ = false;
     double staffSpace_ = 1.75; ///< of the pages shown
     int layoutMilliseconds_ = 0;
+    int layoutsKept_ = 0;
     bool busy_ = false;
     /// Opening and laying out: only the newest is shown (ADR-0110).
     std::unique_ptr<JobLane<ScoreLayout>> layouts_;
