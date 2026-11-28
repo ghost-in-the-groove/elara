@@ -23,7 +23,9 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QImage>
+#include <QJSValue>
 #include <QList>
+#include <QMetaType>
 #include <QMouseEvent>
 #include <QPointF>
 #include <QQuickItem>
@@ -63,6 +65,13 @@ constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
 // The title of the song app.smoke_recovery_crash leaves a copy of.
 constexpr char kCrashedTitle[] = "Left by a crash";
+
+// A map a QML item holds in a `var` property, as the document gave it.
+QVariantMap mapOf(const QVariant& value) {
+    return value.metaType() == QMetaType::fromType<QJSValue>()
+               ? value.value<QJSValue>().toVariant().toMap()
+               : value.toMap();
+}
 
 // Pages brought up to date so far: painted, or kept because a relayout left
 // them as they were.
@@ -212,19 +221,11 @@ void Startup::queueSteps() {
                 score_->newSong(QStringLiteral("electric-guitar"));
                 return true;
             });
-            queueEdits();
             queueRecoveryCopy();
             queueSave();
-            queueMeasures();
             queueSelection();
             queueMix();
-            queueNavigation();
-            queueRepeats();
-            queueTuning();
-            queueTempo();
-            queueSection();
             queueSymbols();
-            queueMeasureRepeat();
             queueEffects();
             queueCommands();
             queueContinuous();
@@ -316,17 +317,11 @@ void Startup::queueSteps() {
             return true;
         });
         queueContinuous();
-        queueEdits();
-        queueMeasures();
+        queueMeasurePopup();
         queueSelection();
         queueMix();
-        queueNavigation();
-        queueRepeats();
-        queueTuning();
-        queueTempo();
-        queueSection();
+        queueTuningFields();
         queueSymbols();
-        queueMeasureRepeat();
         queueEffects();
     }
     // Moving the transport shows the cursor; it needs no relayout. The device
@@ -491,81 +486,6 @@ void Startup::queueContinuous() {
                   std::abs(tops.back() - height * pagesBefore_) < 1e-6,
               "the pages are not a page high each");
         return false;
-    });
-}
-
-// Edits, undone and redone: a track added and shown, the time signature
-// changed, both undone, the track redone and undone again. Each step is laid
-// out and painted; the song must end as it started.
-void Startup::queueEdits() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("edit check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    // A line of the credits (ADR-0059) is one edit, and undo takes it back.
-    steps_.emplace_back([this, check] {
-        const std::uint64_t sequences = score_->sequenceWork().asked;
-        score_->setCredit(static_cast<int>(core::Credit::Subtitle),
-                          QStringLiteral("Smoke credits"));
-        // Drawn, but not heard (ADR-0111).
-        check(score_->sequenceWork().asked == sequences, "a credit was sequenced");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        const QStringList credits = score_->credits();
-        check(credits.size() == static_cast<int>(core::Credit::Notes) + 1 &&
-                  credits.at(static_cast<int>(core::Credit::Subtitle)) ==
-                      QStringLiteral("Smoke credits"),
-              "the subtitle did not change");
-        check(score_->undoName() == ScoreDocument::tr("Edit song info"),
-              "the credit is not one edit");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this] {
-        tracksBefore_ = score_->trackNames().size();
-        score_->addTrack(QStringLiteral("electric-bass"));
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->trackNames().size() == tracksBefore_ + 1, "the track was not added");
-        check(score_->track() == tracksBefore_, "the new track is not shown");
-        durationBefore_ = score_->duration();
-        score_->setTimeSignature(5, 8);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->timeNumerator() == 5 && score_->timeDenominator() == 8,
-              "the time signature did not change");
-        check(score_->duration() != durationBefore_, "playback did not follow the edit");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this] {
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->trackNames().size() == tracksBefore_, "undo left the track");
-        check(score_->timeNumerator() != 5 && !score_->canUndo() && score_->canRedo(),
-              "undo did not restore the song");
-        score_->redo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->trackNames().size() == tracksBefore_ + 1, "redo did not add the track");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->trackNames().size() == tracksBefore_ && !score_->modified(),
-              "the song did not end as it started");
-        if (score_->track() == 0) {
-            return false;
-        }
-        score_->setTrack(0);
-        return true;
     });
 }
 
@@ -890,60 +810,131 @@ void Startup::queueWindowState() {
     });
 }
 
-// Measures at the caret: one inserted after it, given its own time and key
-// signatures, deleted again; then everything is undone.
-void Startup::queueMeasures() {
+// The measure popup open at the caret (`--measure`, ADR-0033) shows the
+// caret's measure as the song changes under it: a measure inserted after the
+// caret takes the popup with it, its measure repeat comes and goes, and the
+// signatures, signs, repeats, section and tempo set on it show in the popup
+// until they are undone. The edits themselves are the document's, checked in
+// tests/app/test_score_editing.cpp (ADR-0181).
+void Startup::queueMeasurePopup() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("measure check failed: %1").arg(QLatin1StringView(what));
+            editProblem_ =
+                QStringLiteral("measure popup check failed: %1").arg(QLatin1StringView(what));
         }
     };
-    steps_.emplace_back([this] {
-        if (score_->caretPage() < 0) {
+    const auto popup = [this]() -> const QObject* {
+        const auto* found = window_->findChild<QObject*>(QStringLiteral("measurePopup"));
+        return found != nullptr && found->property("opened").toBool() ? found : nullptr;
+    };
+    // Whether the popup shows what the document says of the caret's measure.
+    const auto showsCaret = [this](const QObject* open) {
+        return open != nullptr && mapOf(open->property("marks")) == score_->caretNavigation() &&
+               mapOf(open->property("repeats")) == score_->caretRepeats() &&
+               mapOf(open->property("tempo")) == score_->caretTempo();
+    };
+    steps_.emplace_back([this, popup] {
+        measuring_ = popup() != nullptr;
+        if (!measuring_) {
             return false;
         }
-        measuresBefore_ = score_->measureCount();
-        firstNumerator_ = score_->timeNumerator();
         score_->insertMeasure(true);
+        editor_->setMeasureRepeat(1);
         return true;
     });
-    steps_.emplace_back([this, check] {
-        if (measuresBefore_ == 0) {
+    steps_.emplace_back([this, popup, showsCaret, check] {
+        if (!measuring_) {
             return false;
         }
-        check(score_->measureCount() == measuresBefore_ + 1, "the measure was not inserted");
-        check(score_->caretMeasure() == 1, "the caret is not on the new measure");
-        score_->setTimeSignatureFrom(score_->caretMeasure(), 3, 4);
-        score_->setKeySignatureFrom(score_->caretMeasure(), 2, false);
+        check(popup() != nullptr && score_->caretMeasure() == 1 && editor_->caretRepeat() == 1,
+              "it did not stay open on the measure inserted after the caret");
+        editor_->setMeasureRepeat(0);
+        const int measure = score_->caretMeasure();
+        score_->setTimeSignatureFrom(measure, 3, 4);
+        score_->setKeySignatureFrom(measure, 2, false);
+        score_->setNavigation(measure, {{QStringLiteral("segno"), true}});
+        score_->setRepeats(measure, {{QStringLiteral("start"), true},
+                                     {QStringLiteral("times"), 3},
+                                     {QStringLiteral("doubleBar"), true}});
+        score_->setSection(measure, QStringLiteral("Chorus"));
+        score_->setTempoFrom(measure, 90);
+        score_->setTempoGradual(measure, true);
+        score_->setTripletFeelFrom(measure, 1);
+        check(showsCaret(popup()), "it does not show the measure's edits");
         return true;
     });
-    steps_.emplace_back([this, check] {
-        if (measuresBefore_ == 0) {
+    steps_.emplace_back([this, popup, showsCaret, check] {
+        if (!measuring_) {
             return false;
         }
-        check(score_->caretTimeNumerator() == 3 && score_->caretTimeDenominator() == 4,
-              "the time signature did not change at the caret");
-        check(score_->caretKeyFifths() == 2, "the key signature did not change at the caret");
-        check(score_->timeNumerator() == firstNumerator_, "the first measure changed");
-        score_->removeMeasure();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (measuresBefore_ == 0) {
-            return false;
-        }
-        check(score_->measureCount() == measuresBefore_, "the measure was not deleted");
-        for (int i = 0; i < 8 && score_->modified() && score_->canUndo(); ++i) {
+        const QObject* open = popup();
+        check(showsCaret(open) &&
+                  mapOf(open->property("marks")).value(QStringLiteral("segno")).toBool() &&
+                  mapOf(open->property("repeats")).value(QStringLiteral("times")).toInt() == 3 &&
+                  mapOf(open->property("tempo")).value(QStringLiteral("bpm")).toInt() == 90,
+              "it does not show the segno, the repeat and the tempo set on its measure");
+        for (int i = 0; i < 16 && score_->modified() && score_->canUndo(); ++i) {
             score_->undo();
         }
         return true;
     });
-    steps_.emplace_back([this, check] {
-        if (measuresBefore_ == 0) {
+    steps_.emplace_back([this, popup, showsCaret, check] {
+        if (!measuring_) {
             return false;
         }
-        check(!score_->modified() && score_->measureCount() == measuresBefore_,
-              "undoing the measure edits did not restore the song");
+        check(!score_->modified() && showsCaret(popup()),
+              "it does not show the caret's measure once the edits are undone");
+        return false;
+    });
+}
+
+// The song panel open on a track's tuning (`--tuning`, ADR-0046) shows it as
+// it changes: a capo a fret higher shows in its fields, and goes on undo. The
+// tunings themselves are the document's, checked in
+// tests/app/test_score_editing.cpp (ADR-0181).
+void Startup::queueTuningFields() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("tuning fields check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    const auto fields = [this]() -> const QQuickItem* {
+        QList<QQuickItem*> found;
+        shownItems(window_->contentItem(), QLatin1StringView("tuningFields"), found);
+        return found.isEmpty() ? nullptr : found.front();
+    };
+    const auto capo = [fields] {
+        const QQuickItem* shown = fields();
+        return shown != nullptr ? shown->property("capo").toInt() : -1;
+    };
+    steps_.emplace_back([this, fields, capo] {
+        const QQuickItem* shown = fields();
+        capoBefore_.reset();
+        if (shown == nullptr) {
+            return false;
+        }
+        capoBefore_ = capo();
+        const int track = shown->property("track").toInt();
+        const QVariantMap tuning = score_->trackTuning(track);
+        score_->setTrackTuning(track, tuning.value(QStringLiteral("notes")).toString(),
+                               tuning.value(QStringLiteral("capo")).toInt() + 1, true);
+        return true;
+    });
+    steps_.emplace_back([this, capo, check] {
+        if (!capoBefore_) {
+            return false;
+        }
+        check(capo() == *capoBefore_ + 1, "they do not show the capo a fret higher");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, capo, check] {
+        if (!capoBefore_) {
+            return false;
+        }
+        check(capo() == *capoBefore_ && !score_->modified(),
+              "they do not show the capo back where it was");
         return false;
     });
 }
@@ -1096,101 +1087,6 @@ void Startup::queueMix() {
     });
 }
 
-// Signs and jumps from the measure popup (ADR-0049): a segno on the first
-// measure, then a D.S. al Coda on it, each one undo step named for them; both
-// undone, the song must end as it started.
-void Startup::queueNavigation() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ =
-                QStringLiteral("navigation check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        score_->setNavigation(0, {{QStringLiteral("segno"), true}});
-        check(score_->navigationAt(0).value(QStringLiteral("segno")).toBool(),
-              "the segno was not set");
-        check(score_->undoName() == ScoreDocument::tr("Change navigation marks"),
-              "the marks are not one undo step");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        score_->setNavigation(0, {{QStringLiteral("jump"), 2}, {QStringLiteral("jumpThen"), 2}});
-        const QVariantMap marks = score_->navigationAt(0);
-        check(marks.value(QStringLiteral("jump")).toInt() == 2 &&
-                  marks.value(QStringLiteral("jumpThen")).toInt() == 2 &&
-                  marks.value(QStringLiteral("segno")).toBool(),
-              "the jump was not set beside the segno");
-        score_->undo();
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        const QVariantMap marks = score_->navigationAt(0);
-        check(!score_->modified() && !marks.value(QStringLiteral("segno")).toBool() &&
-                  marks.value(QStringLiteral("jump")).toInt() == 0,
-              "undoing the marks did not restore the song");
-        return false;
-    });
-}
-
-// Repeats from the measure popup (ADR-0016): the first measure's start
-// barline toggled with its end repeat played a different number of times,
-// then other endings and its double barline (ADR-0103), each one undo step;
-// all undone, the song must end as it started.
-void Startup::queueRepeats() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("repeats check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        repeatsBefore_ = score_->repeatsAt(0);
-        const bool start = !repeatsBefore_.value(QStringLiteral("start")).toBool();
-        const int times = repeatsBefore_.value(QStringLiteral("times")).toInt() == 3 ? 4 : 3;
-        score_->setRepeats(0, {{QStringLiteral("start"), start}, {QStringLiteral("times"), times}});
-        const QVariantMap repeats = score_->repeatsAt(0);
-        check(repeats.value(QStringLiteral("start")).toBool() == start &&
-                  repeats.value(QStringLiteral("times")).toInt() == times,
-              "the repeat was not set");
-        check(score_->undoName() == ScoreDocument::tr("Change repeats"),
-              "the repeat is not one undo step");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        const QVariantList first{1, 2};
-        const QVariantList endings =
-            repeatsBefore_.value(QStringLiteral("endings")).toList() == first ? QVariantList{2, 3}
-                                                                              : first;
-        const int times = score_->repeatsAt(0).value(QStringLiteral("times")).toInt();
-        score_->setRepeats(0, {{QStringLiteral("endings"), endings}});
-        const QVariantMap repeats = score_->repeatsAt(0);
-        check(repeats.value(QStringLiteral("endings")).toList() == endings &&
-                  repeats.value(QStringLiteral("times")).toInt() == times,
-              "the endings were not set beside the repeat");
-        // The double barline (ADR-0103) toggles on its own.
-        const bool doubleBar = !repeats.value(QStringLiteral("doubleBar")).toBool();
-        score_->setRepeats(0, {{QStringLiteral("doubleBar"), doubleBar}});
-        check(score_->repeatsAt(0).value(QStringLiteral("doubleBar")).toBool() == doubleBar &&
-                  score_->repeatsAt(0).value(QStringLiteral("endings")).toList() == endings,
-              "the double barline was not set beside the endings");
-        check(score_->undoName() == ScoreDocument::tr("Change barline"),
-              "the double barline is not one undo step");
-        score_->undo();
-        score_->undo();
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(!score_->modified() && score_->repeatsAt(0) == repeatsBefore_,
-              "undoing the repeats did not restore the song");
-        return false;
-    });
-}
-
-// A section named from the measure popup (ADR-0062): the first measure's name
-// set, trimmed, as one undo step that the score draws; undone, the song must
-// end as it started.
 // A symbol edited where it is drawn (ADR-0130): the time signature of the
 // first page is found under a point of its ink, nothing is found in the page's
 // corner, and what a double click on it calls opens its card for the measure
@@ -1360,142 +1256,6 @@ void Startup::queueSymbolClick() {
     });
 }
 
-void Startup::queueSection() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("section check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        sectionBefore_ = score_->sectionAt(0);
-        const QString name = sectionBefore_ == QStringLiteral("Chorus") ? QStringLiteral("Verse")
-                                                                        : QStringLiteral("Chorus");
-        score_->setSection(0, QStringLiteral("  ") + name + QStringLiteral(" "));
-        check(score_->sectionAt(0) == name, "the section was not named, trimmed");
-        check(score_->undoName() == ScoreDocument::tr("Change section"),
-              "the section is not one undo step");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        // The song string marks it where it first plays: at the start.
-        const QVariantList marks = score_->sectionMarks();
-        const QVariantMap first = marks.isEmpty() ? QVariantMap{} : marks.front().toMap();
-        check(first.value(QStringLiteral("name")).toString() == score_->sectionAt(0) &&
-                  first.value(QStringLiteral("seconds"), -1.0).toDouble() == 0.0,
-              "the song string does not mark where the section starts");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(!score_->modified() && score_->sectionAt(0) == sectionBefore_,
-              "undoing the section did not restore the song");
-        return false;
-    });
-}
-
-// A measure repeat from the measure popup (ADR-0102): a measure inserted after
-// the caret's repeats it, one undo step; taking the sign away writes out what
-// it played; all undone, the song must end as it started.
-void Startup::queueMeasureRepeat() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ =
-                QStringLiteral("measure repeat check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        score_->insertMeasure(true);
-        editor_->setMeasureRepeat(1);
-        check(editor_->caretRepeat() == 1 &&
-                  score_->undoName() == ScoreDocument::tr("Repeat measure"),
-              "the new measure does not repeat the one before");
-        editor_->setMeasureRepeat(0);
-        check(editor_->caretRepeat() == 0 &&
-                  score_->undoName() == ScoreDocument::tr("Write out measure repeat"),
-              "taking the sign away did not write out its music");
-        return true;
-    });
-    steps_.emplace_back([this] {
-        score_->undo();
-        score_->undo();
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(!score_->modified(), "undoing the measure repeat did not restore the song");
-        return false;
-    });
-}
-
-// A tempo change from the measure popup (ADR-0042): 90 beats per minute from
-// the second measure, one undo step named for it that leaves the first
-// measure's tempo alone, then taken away again; both undone, the song must end
-// as it started.
-void Startup::queueTempo() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("tempo check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        if (score_->measureCount() < 2) {
-            return false;
-        }
-        tempoBefore_ = score_->tempoAt(1);
-        const QVariantMap first = score_->tempoAt(0);
-        score_->setTempoFrom(1, 90);
-        const QVariantMap tempo = score_->tempoAt(1);
-        check(tempo.value(QStringLiteral("bpm")).toInt() == 90 &&
-                  tempo.value(QStringLiteral("own")).toBool(),
-              "the second measure does not start at 90");
-        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
-              "the tempo is not one undo step");
-        check(score_->tempoAt(0) == first, "the first measure's tempo changed");
-        // Gradual to the next change (ADR-0082), keeping its tempo.
-        score_->setTempoGradual(1, true);
-        const QVariantMap gradual = score_->tempoAt(1);
-        check(gradual.value(QStringLiteral("gradual")).toBool() &&
-                  gradual.value(QStringLiteral("bpm")).toInt() == 90,
-              "the tempo change did not become gradual");
-        check(score_->undoName() == ScoreDocument::tr("Change tempo"),
-              "making the tempo gradual is not one undo step");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (score_->measureCount() < 2) {
-            return false;
-        }
-        score_->setTempoFrom(1, 0);
-        check(!score_->tempoAt(1).value(QStringLiteral("own")).toBool(),
-              "the tempo change was not taken away");
-        // The triplet feel (ADR-0104) from the second measure on, one undo
-        // step, leaving the first measure's.
-        const int feelBefore = score_->tripletFeelAt(0);
-        const int feel = score_->tripletFeelAt(1) == 1 ? 3 : 1;
-        score_->setTripletFeelFrom(1, feel);
-        check(score_->tripletFeelAt(1) == feel && score_->tripletFeelAt(0) == feelBefore,
-              "the second measure did not take the triplet feel");
-        check(score_->undoName() == ScoreDocument::tr("Change triplet feel"),
-              "the triplet feel is not one undo step");
-        score_->undo();
-        score_->undo();
-        score_->undo();
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (score_->measureCount() < 2) {
-            return false;
-        }
-        check(!score_->modified() && score_->tempoAt(1) == tempoBefore_,
-              "undoing the tempo did not restore the song");
-        return false;
-    });
-}
-
-// The first track's tuning from the song panel (ADR-0046): a capo a fret
-// higher keeping the frets, then the capo taken off keeping the sound, each
-// one undo step; both undone, the song must end as it started.
 // The tuner open over a track with strings tunes to them: by its preset,
 // or by an entry of the track's own for a tuning no preset has, and back
 // when the tuning comes back. Prints "tuner: <strings>" each time.
@@ -1538,57 +1298,6 @@ void Startup::queueTunerFollowsTrack() {
         check(tuner != nullptr && !tuner->tuningLabels().last().startsWith(
                                       TunerController::tr("Track: %1").arg(QString())),
               "the track's own entry outlived its tuning");
-        return false;
-    });
-}
-
-void Startup::queueTuning() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("tuning check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        tuningBefore_ = score_->trackTuning(0);
-        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
-            return false;
-        }
-        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
-        const int capo = tuningBefore_.value(QStringLiteral("capo")).toInt() + 1;
-        score_->setTrackTuning(0, notes, capo, true);
-        const QVariantMap tuning = score_->trackTuning(0);
-        check(tuning.value(QStringLiteral("notes")).toString() == notes &&
-                  tuning.value(QStringLiteral("capo")).toInt() == capo,
-              "the capo was not moved");
-        const bool changed = score_->undoName() == ScoreDocument::tr("Change tuning");
-        check(changed, "the tuning is not one undo step");
-        return changed;
-    });
-    steps_.emplace_back([this, check] {
-        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
-            return false;
-        }
-        // By its preset when it has one, else by its notes.
-        const QString notes = tuningBefore_.value(QStringLiteral("notes")).toString();
-        const QString preset = tuningBefore_.value(QStringLiteral("preset")).toString();
-        score_->setTrackTuning(0, preset.isEmpty() ? notes : preset, 0, false);
-        const QVariantMap tuning = score_->trackTuning(0);
-        const bool changed = tuning.value(QStringLiteral("notes")).toString() == notes &&
-                             tuning.value(QStringLiteral("capo")).toInt() == 0;
-        check(changed, "the capo was not taken off");
-        if (!changed) {
-            return false;
-        }
-        score_->undo();
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!tuningBefore_.value(QStringLiteral("fretted")).toBool()) {
-            return false;
-        }
-        check(!score_->modified() && score_->trackTuning(0) == tuningBefore_,
-              "undoing the tunings did not restore the song");
         return false;
     });
 }

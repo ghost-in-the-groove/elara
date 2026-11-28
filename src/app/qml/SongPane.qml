@@ -622,6 +622,7 @@ Rectangle {
                             opacity: row.tuningOpen ? 1.0 : 0.0
 
                             sourceComponent: TuningFields {
+                                objectName: "tuningFields"
                                 document: root.document
                                 track: row.index
                                 info: row.modelData

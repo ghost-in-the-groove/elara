@@ -168,8 +168,9 @@ if(TARGET elara)
 
   # The window without a screen: it loads cleanly and, given a file, lays it
   # out, paints its first page and shows it in every view and with all tracks.
-  # Then it edits the song (a new one without a file): adds a track, changes
-  # the time signature, undoes, redoes, and checks the song ends as it began.
+  # Then it edits the song (a new one without a file) through the window and
+  # checks what the window shows; what the edits do to the song is checked in
+  # the app.editing and app.caret editor tests (ADR-0181).
   # The groups of the command bar and of the tool row must each fit in the
   # window beside the others of their bar.
   add_test(NAME app.smoke COMMAND elara --smoke-test)
@@ -190,11 +191,13 @@ if(TARGET elara)
   # the track's own when the bass is tuned a whole step down, and back on undo.
   add_test(NAME app.smoke_tuner_track
     COMMAND elara --smoke-test --tuner "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
-  # The song panel open, with the first track's tuning, while the song is edited.
+  # The song panel open, with the first track's tuning, while the song is
+  # edited: its fields show the capo as it moves and comes back.
   add_test(NAME app.smoke_song_pane
     COMMAND elara --smoke-test --tuning "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
-  # The measure popup open at the caret while the measures are edited; it
-  # must stay inside the view, scrolling when it is taller than it.
+  # The measure popup open at the caret while the measures are edited: it
+  # shows the caret's measure as it changes, and must stay inside the view,
+  # scrolling when it is taller than it.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   # The lyrics popup open over a staff that sings while a verse is typed.
@@ -234,17 +237,22 @@ if(TARGET elara)
   # The new song's edits end in a song with a measure wider than the page: the
   # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 47 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 23 layouts\\)")
+  # Two more than quartet.gp4 lays out alone: the tuning fields follow a capo
+  # moved and undone.
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 43 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 20 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
   # things its import dropped, and the
   # score exports as a PDF document of its one page (ADR-0074), as MusicXML
   # with its four tracks and as MIDI, each telling what it left out.
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 43 layouts\\)")
-  set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 40 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
+  set_tests_properties(app.smoke_open_views app.smoke_effects PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 16 layouts\\)")
+  # Three more: the measure popup follows a measure inserted, edited and undone.
+  set_tests_properties(app.smoke_measure PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_follow PROPERTIES
