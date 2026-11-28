@@ -63,6 +63,8 @@ struct ScoreLayout {
     /// Built on the worker for a song just opened.
     std::shared_ptr<const audio::Sequence> sequence;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
+    std::vector<PageIssues> issues; ///< of each page (ADR-0150)
+    int issueCount = 0;
     int track = 0;
     ScoreDocument::View view = ScoreDocument::View::Both;
     bool continuous = false; ///< the pages are strips of one endless page
@@ -71,6 +73,16 @@ struct ScoreLayout {
     QString error;
     bool opened = false;  ///< a song just read from `source`, to edit from now on
     QStringList warnings; ///< what reading `source` approximated or dropped
+};
+
+// What the layout worker keeps from one layout to the next: the systems it
+// laid out (ADR-0052), and the pages it laid out last with their layout
+// issues (ADR-0150), so that the next layout checks only the pages it
+// changed. Used by one layout at a time: the layout lane runs one job at once.
+struct LayoutMemory {
+    notation::PageLayoutCache cache;
+    std::shared_ptr<const std::vector<notation::DisplayList>> pages;
+    std::vector<PageIssues> issues; ///< of each of pages
 };
 
 // An edited song's sequence, or why it could not be built.
@@ -166,12 +178,39 @@ std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
     return sequence;
 }
 
+// Finds the layout issues of the pages of `result` (ADR-0150): a page the
+// last layout laid out the same keeps the list found then, so that an edit
+// checks only the pages it changed.
+void findIssues(ScoreLayout& result, const notation::EngravingFont& font, LayoutMemory& memory) {
+    static const PageIssues none = std::make_shared<const std::vector<notation::LayoutIssue>>();
+    const std::vector<notation::DisplayList>& pages = *result.pages;
+    const std::vector<notation::DisplayList>* before = memory.pages.get();
+    result.issues.reserve(pages.size());
+    for (std::size_t p = 0; p < pages.size(); ++p) {
+        if (before != nullptr && p < before->size() && p < memory.issues.size() &&
+            (*before)[p] == pages[p]) {
+            result.issues.push_back(memory.issues[p]);
+        } else {
+            std::vector<notation::LayoutIssue> found =
+                notation::layoutIssues(std::span(&pages[p], 1), font, pageOptions());
+            result.issues.push_back(
+                found.empty()
+                    ? none
+                    : std::make_shared<const std::vector<notation::LayoutIssue>>(std::move(found)));
+        }
+        result.issueCount += static_cast<int>(result.issues.back()->size());
+    }
+    memory.pages = result.pages;
+    memory.issues = result.issues;
+}
+
 // Lays out `track` (or every track) of `song` as `view` on A4 pages or, when
 // `continuous`, on one endless page cut into strips as high as A4 pages
-// (ADR-0057). Goes through `cache` so that only what changed since its last
-// layout is laid out again. Runs on a worker thread and never throws.
+// (ADR-0057), and finds their layout issues. Goes through `memory` so that
+// only what changed since its last layout is laid out and checked again. Runs
+// on a worker thread and never throws.
 ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view,
-                   bool continuous, notation::PageLayoutCache& cache) {
+                   bool continuous, LayoutMemory& memory) {
     ScoreLayout result;
     result.song = song;
     result.track = track;
@@ -191,7 +230,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         if (continuous) {
             options.height = 0.0;
         }
-        auto pages = cache.layout(song, staves, *font, options);
+        auto pages = memory.cache.layout(song, staves, *font, options);
         if (continuous) {
             pages = notation::cutIntoStrips(pages.front(), pageOptions().height);
         }
@@ -199,6 +238,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.milliseconds = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
         result.pages = std::make_shared<const std::vector<notation::DisplayList>>(std::move(pages));
+        findIssues(result, *font, memory);
     } catch (const std::exception& error) {
         result.error =
             QObject::tr("The score could not be laid out: %1").arg(qstring(error.what()));
@@ -209,7 +249,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
 ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, bool continuous,
-                          notation::PageLayoutCache& cache) {
+                          LayoutMemory& memory) {
     ScoreLayout result;
     result.source = file;
     try {
@@ -228,7 +268,7 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, boo
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
         auto sequence = std::make_shared<const audio::Sequence>(*song, practice);
-        result = layOut(std::move(song), 0, view, continuous, cache);
+        result = layOut(std::move(song), 0, view, continuous, memory);
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
@@ -425,7 +465,7 @@ QString trackDetail(const core::Track& track) {
 } // namespace
 
 ScoreDocument::ScoreDocument(QObject* parent)
-    : QObject(parent),
+    : QObject(parent), layoutMemory_(std::make_shared<LayoutMemory>()),
       layouts_(std::make_unique<JobLane<ScoreLayout>>(this, [this] { updateBusy(); })),
       sequences_(std::make_unique<JobLane<SequenceResult>>(this, [this] { updateBusy(); })) {
     // Connected first, so that the list is up to date for whoever else hears it.
@@ -642,8 +682,8 @@ void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> re
     errorMessage_.clear();
     emit statusChanged();
     layouts_->request(
-        [file, practice = practice_, continuous = continuous_, cache = layoutCache_] {
-            return openAndLayOut(file, practice, continuous, *cache);
+        [file, practice = practice_, continuous = continuous_, memory = layoutMemory_] {
+            return openAndLayOut(file, practice, continuous, *memory);
         },
         [this, recovered = std::move(recovered)](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
@@ -801,7 +841,7 @@ void ScoreDocument::requestLayout(bool edit) {
     }
     layouts_->request(
         [song = song_, track = track_, view = view_, continuous = continuous_,
-         cache = layoutCache_] { return layOut(song, track, view, continuous, *cache); },
+         memory = layoutMemory_] { return layOut(song, track, view, continuous, *memory); },
         [this, edit](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
                 fail(result.error);
@@ -924,7 +964,14 @@ void ScoreDocument::apply(const ScoreLayout& layout, bool edit) {
     }
     hasTablature_ = layout.hasTablature;
     layoutMilliseconds_ = layout.milliseconds;
+    // The same lists, page for page, when the layout found nothing new.
+    const bool issuesMoved = layout.issues != pageIssues_;
+    pageIssues_ = layout.issues;
+    layoutIssueCount_ = layout.issueCount;
     emit layoutChanged();
+    if (issuesMoved) {
+        emit layoutIssuesChanged();
+    }
     clampCaret();
     placeCaretBox();
     if (status_ != Status::Ready) {
@@ -946,6 +993,81 @@ void ScoreDocument::setImportWarnings(const QStringList& warnings) {
     if (warnings != importWarnings_) {
         importWarnings_ = warnings;
         emit importWarningsChanged();
+    }
+}
+
+// ---- Layout issues (ADR-0150) -------------------------------------------------
+
+QStringList ScoreDocument::layoutIssueList() const {
+    const auto ink = [](notation::Role role) {
+        switch (role) {
+        case notation::Role::Notehead:
+            return tr("notehead");
+        case notation::Role::Accidental:
+            return tr("accidental");
+        case notation::Role::FretNumber:
+            return tr("fret number");
+        case notation::Role::Lyric:
+            return tr("syllable");
+        case notation::Role::Chord:
+            return tr("chord name");
+        case notation::Role::Dynamic:
+            return tr("dynamic");
+        default:
+            return qstring(notation::roleName(role));
+        }
+    };
+    QStringList lines;
+    lines.reserve(layoutIssueCount_);
+    for (const PageIssues& page : pageIssues_) {
+        for (const notation::LayoutIssue& issue : *page) {
+            const auto measure = static_cast<qulonglong>(issue.measure + 1);
+            lines.append(issue.kind == notation::LayoutIssueKind::MeasureTooWide
+                             ? tr("Measure %1 is wider than the page").arg(measure)
+                             : tr("Measure %1: %2 and %3 overlap")
+                                   .arg(measure)
+                                   .arg(ink(issue.first), ink(issue.second)));
+        }
+    }
+    return lines;
+}
+
+void ScoreDocument::showLayoutIssue(int index) {
+    if (!document_ || !pages_ || index < 0) {
+        return;
+    }
+    auto left = static_cast<std::size_t>(index);
+    for (std::size_t p = 0; p < pageIssues_.size() && p < pages_->size(); ++p) {
+        const std::vector<notation::LayoutIssue>& issues = *pageIssues_[p];
+        if (left >= issues.size()) {
+            left -= issues.size();
+            continue;
+        }
+        const notation::LayoutIssue& issue = issues[left];
+        core::Caret caret = session_.caret();
+        caret.measure = issue.measure;
+        caret.beat = 0;
+        // An overlap is on the staff nearest its ink; a measure too wide
+        // keeps the caret on its staff.
+        if (issue.kind == notation::LayoutIssueKind::Overlap) {
+            const double middle = issue.box.y + (issue.box.height / 2.0);
+            const notation::StaffBox* nearest = nullptr;
+            double distance = 0.0;
+            for (const notation::StaffBox& staff : (*pages_)[p].staves) {
+                const double off =
+                    std::max({0.0, staff.y - middle, middle - staff.y - staff.height});
+                if (nearest == nullptr || off < distance) {
+                    nearest = &staff;
+                    distance = off;
+                }
+            }
+            if (nearest != nullptr) {
+                caret.track = nearest->track;
+                caret.staff = nearest->staff;
+            }
+        }
+        placeCaretAt(caret);
+        return;
     }
 }
 
