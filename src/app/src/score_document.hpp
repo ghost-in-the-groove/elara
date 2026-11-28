@@ -94,7 +94,7 @@ class ScoreDocument : public QObject {
     Q_PROPERTY(bool continuous READ continuous WRITE setContinuous NOTIFY continuousChanged)
     Q_PROPERTY(bool showsStrips READ showsStrips NOTIFY layoutChanged)
     Q_PROPERTY(QList<qreal> pageTops READ pageTops NOTIFY layoutChanged)
-    Q_PROPERTY(double staffSpace READ staffSpace CONSTANT)
+    Q_PROPERTY(double staffSpace READ staffSpace NOTIFY layoutChanged)
     Q_PROPERTY(int layoutMilliseconds READ layoutMilliseconds NOTIFY layoutChanged)
     Q_PROPERTY(int layoutIssueCount READ layoutIssueCount NOTIFY layoutIssuesChanged)
     Q_PROPERTY(QStringList nameFilters READ nameFilters CONSTANT)
@@ -228,8 +228,10 @@ public:
     /// Where each page (or strip) starts, in staff spaces from the top of the
     /// first, stacked without gaps, and where the last one ends.
     [[nodiscard]] QList<qreal> pageTops() const { return pageTops_; }
-    /// Millimetres per staff space on paper.
-    [[nodiscard]] static double staffSpace();
+    /// Millimetres per staff space on paper: smaller as more staves are shown
+    /// at once, so that two systems fit a page (ADR-0171). It follows the
+    /// layout; pageSize() is in these staff spaces.
+    [[nodiscard]] double staffSpace() const;
     [[nodiscard]] int layoutMilliseconds() const { return layoutMilliseconds_; }
     /// How many layout issues the pages shown have (ADR-0150): what the
     /// layout could not keep from overlapping or within the margins.
@@ -758,6 +760,7 @@ private:
     bool showsStrips_ = false;
     QList<qreal> pageTops_;
     bool hasTablature_ = false;
+    double staffSpace_ = 1.75; ///< of the pages shown
     int layoutMilliseconds_ = 0;
     bool busy_ = false;
     /// Opening and laying out: only the newest is shown (ADR-0110).

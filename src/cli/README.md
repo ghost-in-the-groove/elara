@@ -37,8 +37,8 @@ elara-cli [--json] soundfont <FILE.sf2>                       # a SoundFont's pr
 elara-cli [--json] sfz <FILE.sfz>                             # what Elara plays of an SFZ
 elara-cli [--json] render <FILE> [--track 0] [--staff 0 | --tracks all|0,2] [--first 0]
                            [--count N] [--view standard|tab|both] [--layout line|page|scroll|strips]
-                           [--paper a4|letter] [--staff-space 1.75] [--margin 15] [--width W]
-                           [--measures-per-system N] [--no-credits] [--svg OUT] [--pdf OUT]
+                           [--paper a4|letter] [--staff-space 1.75] [--fit-staves] [--margin 15]
+                           [--width W] [--measures-per-system N] [--no-credits] [--svg OUT] [--pdf OUT]
                            [--cursor-at SECONDS] [--time-at PAGE X Y]
                            [--symbol-at PAGE X Y] [--issues]
 ```
@@ -89,6 +89,9 @@ a staff has a tuning). `--layout line` (the default) puts the measures on one
 line at their natural spacing; `--layout page` breaks them into systems on
 pages of `--paper` with staff spaces `--staff-space` mm apart and `--margin` mm
 margins, with the title and credits on the first page (unless `--no-credits`);
+`--fit-staves` makes the staff space smaller when the staves shown would not
+leave two systems a page, as the app does for every track at once, and reports
+it as `"staffSpace"` (ADR-0171);
 `--layout scroll` stacks the systems on one page as long as the music,
 `--width` staff spaces wide (ADR-0014); `--layout strips` cuts that page into
 strips of whole systems no higher than `--strip-height` staff spaces (the

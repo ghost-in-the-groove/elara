@@ -463,6 +463,15 @@ Item {
         function onSourceChanged() {
             root.forceActiveFocus();
         }
+        // Another track or view lays the pages out anew, maybe with another
+        // staff size (ADR-0171): the caret comes back into view once they are,
+        // and the playback cursor's system while it plays.
+        function onTrackChanged() {
+            root.revealPending = !root.playing;
+        }
+        function onViewChanged() {
+            root.revealPending = !root.playing;
+        }
         // An edit's layout moved the caret's staff: scroll as far, so that it
         // stays where it was on screen, when it was in view.
         function onCaretHeld(spaces: real, pages: int) {

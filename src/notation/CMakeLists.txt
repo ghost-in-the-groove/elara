@@ -15,6 +15,7 @@ add_library(elara_notation STATIC
   src/page_layout.cpp
   src/pdf.cpp
   src/smufl.cpp
+  src/staff_size.cpp
   src/standard_staff.cpp
   src/svg.cpp
   src/symbol.cpp
