@@ -148,6 +148,7 @@ one that replaces them.
 | [0170](0170-following-playback-and-the-caret-marks-where-it-starts.md) | Following playback, and the caret marks where it starts | Accepted |
 | [0171](0171-staff-size-follows-the-staves-shown.md) | The staff size follows the staves shown | Accepted |
 | [0172](0172-the-a-b-loop-on-the-score.md) | The A-B loop on the score | Accepted |
+| [0173](0173-the-caret-frames-what-it-marks.md) | The caret frames what it marks, and the cursor hides while the score is worked on | Accepted |
 
 ## Template
 

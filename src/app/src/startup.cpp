@@ -272,6 +272,18 @@ void Startup::queueSteps() {
                 failure_ = QStringLiteral("the song opened at %1 %, not %2 %")
                                .arg(zoom * 100.0)
                                .arg(expected * 100.0);
+                return false;
+            }
+            // Zooming to fit left the view at the top of the first page, its
+            // title whole (ADR-0173).
+            const auto* pages = view->findChild<QQuickItem*>(QStringLiteral("pages"));
+            const double top = pages != nullptr ? pages->property("originY").toDouble() -
+                                                      pages->property("topMargin").toDouble()
+                                                : 0.0;
+            const double at = pages != nullptr ? pages->property("contentY").toDouble() : -1e9;
+            if (std::abs(at - top) > 1.0) {
+                failure_ = QStringLiteral("the song opened scrolled %1 px from its top")
+                               .arg(at - top);
             }
             return false;
         });
@@ -3640,6 +3652,68 @@ void Startup::queueParking() {
         }
         return false;
     });
+    // The caret's cell frames the fret number or the note and never covers it
+    // (ADR-0173): no fill, and a line of two pixels at most.
+    steps_.emplace_back([this, view] {
+        QList<QQuickItem*> cells;
+        shownItems(view(), QLatin1StringView("caretCell"), cells);
+        if (cells.size() != 1) {
+            failure_ = QStringLiteral("the caret shows %1 cells").arg(cells.size());
+            return false;
+        }
+        const QColor fill = cells.front()->property("color").value<QColor>();
+        const auto* border = cells.front()->property("border").value<QObject*>();
+        const double line = border != nullptr ? border->property("width").toDouble() : -1.0;
+        if (fill.alpha() != 0 || line < 1.0 || line > 2.0) {
+            failure_ = QStringLiteral("the caret's cell is filled %1 of 255 inside a line of %2 "
+                                      "px: it covers what it marks")
+                           .arg(fill.alpha())
+                           .arg(line);
+        }
+        return false;
+    });
+    // Playback moved by the transport shows its cursor again; a key that
+    // moves the caret, here to the next string, hides it and takes playback
+    // to the caret's beat.
+    steps_.emplace_back([this] {
+        if (auto* audio = window_->findChild<AudioController*>()) {
+            audio->seek(audio->position() > 1.0 ? audio->position() - 1.0
+                                                : audio->position() + 1.0);
+        }
+        return false;
+    });
+    steps_.emplace_back([this, view] {
+        if (view()->property("settling").toBool()) {
+            again_ = true; // the view follows the cursor to its system first
+            return false;
+        }
+        if (!view()->property("cursorShown").toBool()) {
+            failure_ = QStringLiteral("the playback cursor stays hidden after the transport "
+                                      "moved playback");
+            return false;
+        }
+        pressKey(Qt::Key_Down);
+        return false;
+    });
+    steps_.emplace_back([this, view, check] {
+        if (view()->property("settling").toBool()) {
+            again_ = true; // back to the caret
+            return false;
+        }
+        check("the down arrow");
+        const QRectF caret = score_->caretRect();
+        const double expected =
+            score_->secondsAt(score_->caretPage(), caret.center().x(), caret.center().y());
+        const auto* audio = window_->findChild<AudioController*>();
+        if (failure_.isEmpty() &&
+            (audio == nullptr || expected < 0.0 || std::abs(audio->position() - expected) > 1e-6)) {
+            failure_ = QStringLiteral("the down arrow left playback at %1 s, not at the caret's "
+                                      "beat, %2 s")
+                           .arg(audio != nullptr ? audio->position() : -1.0)
+                           .arg(expected);
+        }
+        return false;
+    });
 }
 
 void Startup::queueKeepPosition() {
@@ -3658,6 +3732,11 @@ void Startup::queueKeepPosition() {
             return false;
         }
         positionBefore_ = audio->position();
+        // The loop's marks moved playback: its cursor shows until an edit.
+        const auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+        if (view != nullptr && !view->property("cursorShown").toBool() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("the playback cursor does not show before an edit");
+        }
         score_->addTrack(QStringLiteral("electric-bass"));
         return true;
     });
@@ -3666,6 +3745,13 @@ void Startup::queueKeepPosition() {
         auto* audio = window_->findChild<AudioController*>();
         if (audio != nullptr && !audio->looping() && editProblem_.isEmpty()) {
             editProblem_ = QStringLiteral("an edit ended the loop");
+        }
+        // An edit made while playback is stopped hides the cursor: the caret
+        // marks the place while the score is worked on (ADR-0173).
+        const auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+        if (view != nullptr && view->property("cursorShown").toBool() && editProblem_.isEmpty()) {
+            editProblem_ = QStringLiteral("the playback cursor shows after an edit with "
+                                          "playback stopped");
         }
         score_->undo();
         return true;
