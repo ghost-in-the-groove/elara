@@ -348,15 +348,13 @@ void Startup::queueSteps() {
             return false;
         });
         queueParking();
-        queuePractice();
-        queueLoop();
         if (!options_.soundFont.isEmpty()) {
             queueSoundFont();
         }
         if (!options_.guitarSfz.isEmpty() || !options_.bassSfz.isEmpty()) {
             queueSfz();
         }
-        queueKeepPosition();
+        queueCursorAfterEdit();
     }
     if (options_.track) {
         steps_.emplace_back([this, track = *options_.track] {
@@ -1700,162 +1698,6 @@ void Startup::clickCursor() {
     }
 }
 
-// Practice (ADR-0024): half speed with the metronome, then back. Each builds
-// the sequence again without a relayout, and playback keeps its place in the
-// music: at half speed every time doubles.
-void Startup::queuePractice() {
-    const auto check = [this](bool ok, const QString& what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("practice check failed: %1").arg(what);
-        }
-    };
-    // Waits for a sequence other than sequenceBefore_; false while there is none.
-    const auto arrived = [this] {
-        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
-            again_ = true;
-            return false;
-        }
-        return true;
-    };
-    steps_.emplace_back([this] {
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio == nullptr || !score_->sequence()) {
-            return false;
-        }
-        sequenceBefore_ = score_->sequence();
-        positionBefore_ = audio->position();
-        score_->setSpeed(50);
-        score_->setMetronome(true);
-        return false;
-    });
-    steps_.emplace_back([this, check, arrived] {
-        if (!sequenceBefore_ || !arrived()) {
-            return false;
-        }
-        const auto sequence = score_->sequence();
-        const double position = window_->findChild<AudioController*>()->position();
-        check(score_->speed() == 50 && score_->metronome() && sequence->speed() == 0.5 &&
-                  sequence->metronome(),
-              QStringLiteral("half speed with the metronome was not played"));
-        check(std::abs(position - 2.0 * positionBefore_) < 1e-6,
-              QStringLiteral("half speed moved playback from %1 s to %2 s, not %3 s")
-                  .arg(positionBefore_)
-                  .arg(position)
-                  .arg(2.0 * positionBefore_));
-        sequenceBefore_ = sequence;
-        score_->setSpeed(100);
-        score_->setMetronome(false);
-        return false;
-    });
-    steps_.emplace_back([this, check, arrived] {
-        if (!sequenceBefore_ || !arrived()) {
-            return false;
-        }
-        const double position = window_->findChild<AudioController*>()->position();
-        check(*score_->sequence() == audio::Sequence(*score_->song()),
-              QStringLiteral("full speed did not play the song as written"));
-        check(std::abs(position - positionBefore_) < 1e-6,
-              QStringLiteral("full speed left playback at %1 s, not %2 s")
-                  .arg(position)
-                  .arg(positionBefore_));
-        sequenceBefore_.reset();
-        return false;
-    });
-}
-
-// The A-B loop is marked at playback's position, A then B; B before A marks A
-// again, and a third mark ends the loop. It keeps its place in the music when
-// the speed changes. The loop is left marked, for queueKeepPosition() to check
-// that an edit keeps it and a new song forgets it, and playback where it was.
-void Startup::queueLoop() {
-    const auto check = [this](bool ok, const QString& what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("loop check failed: %1").arg(what);
-        }
-    };
-    const auto arrived = [this] {
-        if (score_->sequence() == sequenceBefore_ || score_->busy()) {
-            again_ = true;
-            return false;
-        }
-        return true;
-    };
-    const auto near = [](double a, double b) {
-        return std::abs(a - b) < 1e-6;
-    };
-    steps_.emplace_back([this, check, near] {
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio == nullptr || !score_->sequence()) {
-            return false;
-        }
-        positionBefore_ = audio->position();
-        const double quarter = score_->duration() / 4.0;
-        audio->seek(quarter);
-        audio->markLoop();
-        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
-              QStringLiteral("A was not marked at %1 s").arg(quarter));
-        audio->seek(2.0 * quarter);
-        audio->markLoop();
-        check(audio->looping() && near(audio->loopFrom(), quarter) &&
-                  near(audio->loopTo(), 2.0 * quarter),
-              QStringLiteral("A-B is %1 s to %2 s, not %3 s to %4 s")
-                  .arg(audio->loopFrom())
-                  .arg(audio->loopTo())
-                  .arg(quarter)
-                  .arg(2.0 * quarter));
-        sequenceBefore_ = score_->sequence();
-        score_->setSpeed(50);
-        return false;
-    });
-    steps_.emplace_back([this, check, arrived, near] {
-        if (!sequenceBefore_ || !arrived()) {
-            return false;
-        }
-        auto* audio = window_->findChild<AudioController*>();
-        const double quarter = score_->duration() / 8.0; // the song lasts twice as long
-        check(audio->looping() && near(audio->loopFrom(), 2.0 * quarter) &&
-                  near(audio->loopTo(), 4.0 * quarter),
-              QStringLiteral("at half speed A-B is %1 s to %2 s, not %3 s to %4 s")
-                  .arg(audio->loopFrom())
-                  .arg(audio->loopTo())
-                  .arg(2.0 * quarter)
-                  .arg(4.0 * quarter));
-        sequenceBefore_ = score_->sequence();
-        score_->setSpeed(100);
-        return false;
-    });
-    steps_.emplace_back([this, check, arrived, near] {
-        if (!sequenceBefore_ || !arrived()) {
-            return false;
-        }
-        sequenceBefore_.reset();
-        auto* audio = window_->findChild<AudioController*>();
-        const double quarter = score_->duration() / 4.0;
-        check(audio->looping() && near(audio->loopFrom(), quarter) &&
-                  near(audio->loopTo(), 2.0 * quarter),
-              QStringLiteral("back at full speed A-B is %1 s to %2 s")
-                  .arg(audio->loopFrom())
-                  .arg(audio->loopTo()));
-        audio->markLoop();
-        check(!audio->looping() && !audio->loopMarked(),
-              QStringLiteral("a third mark did not end the loop"));
-        audio->seek(2.0 * quarter);
-        audio->markLoop();
-        audio->seek(quarter);
-        audio->markLoop();
-        check(audio->loopMarked() && !audio->looping() && near(audio->loopFrom(), quarter),
-              QStringLiteral("B before A did not mark A again"));
-        audio->seek(2.0 * quarter);
-        audio->markLoop();
-        check(audio->looping(), QStringLiteral("A-B was not marked again"));
-        audio->setCountIn(true);
-        check(audio->countIn(), QStringLiteral("the count-in did not turn on"));
-        audio->setCountIn(false);
-        audio->seek(positionBefore_);
-        return false;
-    });
-}
-
 // The SoundFont given with `--soundfont` opens on a worker; once it has, the
 // window plays through it and prints its name. A file that is no SoundFont
 // then fails with a message and leaves it in place, and the built-in
@@ -2539,74 +2381,41 @@ void Startup::queueParking() {
     });
 }
 
-// An edit keeps playback where it is: a track added, then undone, each give
-// playback a new sequence and leave it where the click on the cursor put it.
-// A new song then starts playback from its beginning. The A-B loop that
-// queueLoop() left stays through the edit and goes with the new song.
-void Startup::queueKeepPosition() {
-    const auto check = [this](const char* what) {
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio != nullptr && audio->position() != positionBefore_ && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("%1 moved playback to %2 s, not %3 s")
-                               .arg(QLatin1StringView(what))
-                               .arg(audio->position())
-                               .arg(positionBefore_);
+// Playback moved by the transport, here by the A-B loop's marks, shows its
+// cursor; an edit made while playback is stopped hides it, since the caret
+// marks the place while the score is worked on (ADR-0173). What an edit does
+// to playback's place and to the loop is checked in
+// tests/app/test_audio_controller.cpp (ADR-0181).
+void Startup::queueCursorAfterEdit() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("playback cursor check failed: %1").arg(QLatin1StringView(what));
         }
     };
-    steps_.emplace_back([this] {
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio == nullptr) {
-            return false;
-        }
-        positionBefore_ = audio->position();
-        // The loop's marks moved playback: its cursor shows until an edit.
+    const auto cursorShown = [this] {
         const auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
-        if (view != nullptr && !view->property("cursorShown").toBool() && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("the playback cursor does not show before an edit");
-        }
-        score_->addTrack(QStringLiteral("electric-bass"));
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check("an edit");
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio != nullptr && !audio->looping() && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("an edit ended the loop");
-        }
-        // An edit made while playback is stopped hides the cursor: the caret
-        // marks the place while the score is worked on (ADR-0173).
-        const auto* view = window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
-        if (view != nullptr && view->property("cursorShown").toBool() && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("the playback cursor shows after an edit with "
-                                          "playback stopped");
-        }
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check("an undo");
-        // Made while an edit's sequence is still being built, the new song
-        // must still be what playback plays once everything settles.
-        score_->addTrack(QStringLiteral("electric-bass"));
-        score_->newSong(QStringLiteral("electric-guitar"));
-        return true;
-    });
-    // Another song plays from its start, without the warnings of the file
-    // opened before it.
+        return view != nullptr && view->property("cursorShown").toBool();
+    };
     steps_.emplace_back([this] {
-        if (!score_->importWarnings().isEmpty() && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("a new song kept the import warnings");
-        }
-        auto* audio = window_->findChild<AudioController*>();
-        if (audio != nullptr && audio->position() != 0.0 && editProblem_.isEmpty()) {
-            editProblem_ =
-                QStringLiteral("a new song left playback at %1 s").arg(audio->position());
-        }
-        if (audio != nullptr && (audio->looping() || audio->loopMarked()) &&
-            editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("a new song kept the loop");
+        if (auto* audio = window_->findChild<AudioController*>()) {
+            const double quarter = score_->duration() / 4.0;
+            audio->seek(quarter);
+            audio->markLoop();
+            audio->seek(2.0 * quarter);
+            audio->markLoop();
         }
         return false;
+    });
+    steps_.emplace_back([this, check, cursorShown] {
+        check(cursorShown(), "it does not show before an edit");
+        score_->addTrack(QStringLiteral("electric-bass"));
+        return true;
+    });
+    steps_.emplace_back([this, check, cursorShown] {
+        check(!cursorShown(), "it shows after an edit with playback stopped");
+        score_->undo();
+        return true;
     });
 }
 

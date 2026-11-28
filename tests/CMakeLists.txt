@@ -245,21 +245,21 @@ if(TARGET elara)
   # Two more than quartet.gp4 lays out alone: the tuning fields follow a capo
   # moved and undone.
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 14 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 13 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
   # things its import dropped. What its exports hold is checked in the
   # app.exporting tests (ADR-0181).
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 11 layouts\\)")
   set_tests_properties(app.smoke_open_views PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 10 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 9 layouts\\)")
   # Three more: the measure popup follows a measure inserted, edited and undone.
   set_tests_properties(app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 13 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
   # Three more: the note effects palette lights the tiles of effects set on a
   # note typed, and puts them out again on undo.
   set_tests_properties(app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 13 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_follow PROPERTIES

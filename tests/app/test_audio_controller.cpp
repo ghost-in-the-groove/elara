@@ -2,23 +2,30 @@
 // The transport (ADR-0019, ADR-0122) through a device of the tests' own: it
 // opens on a worker when told to, fails when told to, changes its rate, and
 // plays the source as the audio thread would, a number of seconds at a time.
+// Paused on a song to edit, it keeps its place in the music, and the A-B
+// loop's, through practice (ADR-0024) and edits.
 #include <elara/audio/audio_source.hpp>
 #include <elara/audio/output_device.hpp>
+#include <elara/audio/sequence.hpp>
 #include <elara/audio/sound_bank.hpp>
 
 #include "audio_controller.hpp"
 #include "score_document.hpp"
+#include "songs_to_edit.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QThread>
 #include <QVariantMap>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -27,6 +34,9 @@
 
 namespace {
 
+using elara::app::ScoreDocument;
+using elara::app::testing::kSongsToEdit;
+using elara::app::testing::SongToEdit;
 using elara::audio::OutputDeviceChoice;
 using elara::audio::OutputDeviceInfo;
 
@@ -191,6 +201,31 @@ struct Rig {
         return settle([this, seconds] { return std::abs(audio.position() - seconds) < 0.02; });
     }
 };
+
+// A song to edit and a transport on it, paused: its device stays closed.
+struct Paused {
+    SongToEdit song;
+    AudioController audio;
+
+    explicit Paused(const char* source)
+        : song(source), audio([] { return std::make_unique<FakeDevice>(); }) {
+        audio.setDocument(&song.score);
+    }
+
+    // Waits for playback to be given a sequence other than `before`, built
+    // without a relayout.
+    [[nodiscard]] bool sequencedAfter(const std::shared_ptr<const elara::audio::Sequence>& before) {
+        const std::uint64_t layouts = song.score.layoutWork().asked;
+        return settle([this, &before] {
+                   return song.score.sequence() != before && !song.score.busy();
+               }) &&
+               song.score.layoutWork().asked == layouts;
+    }
+};
+
+bool samePlace(double a, double b) {
+    return std::abs(a - b) < 1e-6;
+}
 
 } // namespace
 
@@ -451,4 +486,133 @@ TEST_CASE("transport: the outputs are looked for on a worker") {
     CHECK(phones[QStringLiteral("isDefault")] == false);
     // Looking for the outputs opens no device.
     CHECK(rig.device.opened().empty());
+}
+
+TEST_CASE("transport: practice at half speed with the metronome keeps the place in the music") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    Paused paused(source);
+    ScoreDocument& score = paused.song.score;
+    AudioController& audio = paused.audio;
+    audio.seek(score.duration() / 2.0);
+    const double before = audio.position();
+    REQUIRE(before > 0.0);
+
+    // Practice (ADR-0024): a sequence of its own, without a relayout, in
+    // which every place in the music comes twice as late.
+    auto sequence = score.sequence();
+    score.setSpeed(50);
+    score.setMetronome(true);
+    REQUIRE(paused.sequencedAfter(sequence));
+    sequence = score.sequence();
+    CHECK(score.speed() == 50);
+    CHECK(score.metronome());
+    CHECK(sequence->speed() == 0.5);
+    CHECK(sequence->metronome());
+    CHECK(samePlace(audio.position(), 2.0 * before));
+
+    // Back at full speed playback plays the song as written, from where it was.
+    score.setSpeed(100);
+    score.setMetronome(false);
+    REQUIRE(paused.sequencedAfter(sequence));
+    CHECK(*score.sequence() == elara::audio::Sequence(*score.song()));
+    CHECK(samePlace(audio.position(), before));
+    CHECK(paused.song.unchanged());
+
+    audio.setCountIn(true);
+    CHECK(audio.countIn());
+    audio.setCountIn(false);
+    CHECK_FALSE(audio.countIn());
+}
+
+TEST_CASE(
+    "transport: the A-B loop is marked A then B, follows the speed, and a third mark ends it") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    Paused paused(source);
+    ScoreDocument& score = paused.song.score;
+    AudioController& audio = paused.audio;
+    const double quarter = score.duration() / 4.0;
+
+    // Marked where playback is, A then B.
+    audio.seek(quarter);
+    audio.markLoop();
+    CHECK(audio.loopMarked());
+    CHECK_FALSE(audio.looping());
+    CHECK(samePlace(audio.loopFrom(), quarter));
+    audio.seek(2.0 * quarter);
+    audio.markLoop();
+    REQUIRE(audio.looping());
+    CHECK(samePlace(audio.loopFrom(), quarter));
+    CHECK(samePlace(audio.loopTo(), 2.0 * quarter));
+
+    // It keeps its place in the music: at half speed it comes twice as late.
+    auto sequence = score.sequence();
+    score.setSpeed(50);
+    REQUIRE(paused.sequencedAfter(sequence));
+    CHECK(audio.looping());
+    CHECK(samePlace(audio.loopFrom(), 2.0 * quarter));
+    CHECK(samePlace(audio.loopTo(), 4.0 * quarter));
+    sequence = score.sequence();
+    score.setSpeed(100);
+    REQUIRE(paused.sequencedAfter(sequence));
+    CHECK(audio.looping());
+    CHECK(samePlace(audio.loopFrom(), quarter));
+    CHECK(samePlace(audio.loopTo(), 2.0 * quarter));
+
+    audio.markLoop();
+    CHECK_FALSE(audio.looping());
+    CHECK_FALSE(audio.loopMarked());
+
+    // B before A marks A again.
+    audio.seek(2.0 * quarter);
+    audio.markLoop();
+    audio.seek(quarter);
+    audio.markLoop();
+    CHECK(audio.loopMarked());
+    CHECK_FALSE(audio.looping());
+    CHECK(samePlace(audio.loopFrom(), quarter));
+    audio.seek(2.0 * quarter);
+    audio.markLoop();
+    CHECK(audio.looping());
+}
+
+TEST_CASE("transport: an edit keeps playback's place and the loop, and a new song starts afresh") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    Paused paused(source);
+    ScoreDocument& score = paused.song.score;
+    AudioController& audio = paused.audio;
+    const double quarter = score.duration() / 4.0;
+    audio.seek(quarter);
+    audio.markLoop();
+    audio.seek(2.0 * quarter);
+    audio.markLoop();
+    REQUIRE(audio.looping());
+    audio.seek(1.5 * quarter);
+    const double before = audio.position();
+
+    // A track added, then undone, each give playback a new sequence.
+    score.addTrack(QStringLiteral("electric-bass"));
+    REQUIRE(paused.song.laidOut());
+    CHECK(audio.position() == before);
+    CHECK(audio.looping());
+    score.undo();
+    REQUIRE(paused.song.laidOut());
+    CHECK(audio.position() == before);
+    CHECK(audio.looping());
+    CHECK(paused.song.unchanged());
+
+    // Made while an edit's sequence is still being built, the new song is
+    // what playback plays once everything settles (SongToEdit::laidOut()),
+    // from its beginning, without the loop or the warnings of the file
+    // opened before it.
+    score.addTrack(QStringLiteral("electric-bass"));
+    score.newSong(QStringLiteral("electric-guitar"));
+    REQUIRE(paused.song.laidOut());
+    CHECK(score.song()->trackCount() == 1);
+    CHECK(score.importWarnings().isEmpty());
+    CHECK(audio.position() == 0.0);
+    CHECK_FALSE(audio.looping());
+    CHECK_FALSE(audio.loopMarked());
 }
