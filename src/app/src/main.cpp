@@ -172,6 +172,11 @@ int main(int argc, char* argv[]) {
         QCoreApplication::translate("main",
                                     "With --smoke-test, edit a new song above the caret and check "
                                     "that the caret holds still on screen."));
+    const QCommandLineOption followOption(
+        QStringLiteral("follow"),
+        QCoreApplication::translate("main",
+                                    "With --smoke-test, move playback through a new song as it "
+                                    "plays and check that the view follows it."));
     const QCommandLineOption effectsOption(
         QStringLiteral("effects"),
         QCoreApplication::translate("main", "Open the note effects panel at the caret at start."));
@@ -245,6 +250,7 @@ int main(int argc, char* argv[]) {
                        bassSfzOption,    recoveryFolderOption,
                        crashOption,      windowStateOption});
     parser.addOption(holdStillOption);
+    parser.addOption(followOption);
     parser.process(app);
 
     elara::app::StartupOptions options;
@@ -348,6 +354,7 @@ int main(int argc, char* argv[]) {
     options.effects = parser.isSet(effectsOption);
     options.commands = parser.isSet(commandsOption);
     options.holdStill = parser.isSet(holdStillOption);
+    options.follow = parser.isSet(followOption);
     options.menu = parser.value(menuOption);
     if (!options.menu.isEmpty() &&
         !QStringList{QStringLiteral("file"), QStringLiteral("edit"), QStringLiteral("view"),

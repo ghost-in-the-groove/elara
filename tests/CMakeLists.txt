@@ -200,6 +200,9 @@ if(TARGET elara)
     COMMAND elara --smoke-test --menu view "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
   # The caret holds still on screen while an edit above it changes the layout.
   add_test(NAME app.smoke_hold_still COMMAND elara --smoke-test --hold-still)
+  # The view follows playback through a song several pages long in a short
+  # window, holds still once scrolled by hand and not at all with following off.
+  add_test(NAME app.smoke_follow COMMAND elara --smoke-test --follow --size 760x480)
   # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
@@ -211,7 +214,7 @@ if(TARGET elara)
   set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
     app.smoke_open_views app.smoke_open_missing
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
-    app.smoke_effects app.hold app.smoke_hold_still
+    app.smoke_effects app.hold app.smoke_hold_still app.smoke_follow
     PROPERTIES
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
@@ -230,6 +233,8 @@ if(TARGET elara)
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 58 layouts\\)")
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
+  set_tests_properties(app.smoke_follow PROPERTIES
+    PASS_REGULAR_EXPRESSION "follow: in view after [0-9]+ ticks[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.hold PROPERTIES PASS_REGULAR_EXPRESSION "hold: 1 s[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES

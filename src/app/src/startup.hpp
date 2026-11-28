@@ -62,6 +62,9 @@ struct StartupOptions {
     /// The smoke test edits a new song a page long above the caret and checks
     /// that the caret holds still on screen (`--hold-still`).
     bool holdStill = false;
+    /// The smoke test moves playback through a new song several pages long
+    /// as it would play and checks that the view follows it (`--follow`).
+    bool follow = false;
 };
 
 /// Prints the outcome of `--smoke-test` ("smoke-test: ok" or "FAILED").
@@ -113,6 +116,8 @@ private:
     [[nodiscard]] bool uncoverScore();
     void queueKeepPosition();
     void queueHoldStill();
+    void queueFollow();
+    void queueParking();
     void queuePdf();
     void queueExport();
     void queuePractice();
@@ -173,6 +178,10 @@ private:
     double heldScroll_ = 0.0;              ///< the view's scroll position before an edit
     double heldZoom_ = 0.0;                ///< and its zoom
     QString heldBy_;                       ///< what the document last held still, if anything
+    double followSeconds_ = 0.0;           ///< where `--follow` moved playback to
+    int followTicks_ = 0;                  ///< ticks it has moved playback since
+    double followScroll_ = 0.0;            ///< the view's scroll once scrolled by hand
+    qint64 followWheelAt_ = 0;             ///< when it was scrolled by hand
     int heldMeasure_ = 0;                  ///< the caret's measure before an edit
     int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
