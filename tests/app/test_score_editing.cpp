@@ -13,6 +13,7 @@
 
 #include "caret_editor.hpp"
 #include "score_document.hpp"
+#include "songs_to_edit.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QObject>
@@ -22,10 +23,14 @@
 #include <QTemporaryDir>
 #include <QUrl>
 #include <QVariantList>
+#include <QVariantMap>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <vector>
 
@@ -33,6 +38,8 @@ namespace {
 
 using elara::app::CaretEditor;
 using elara::app::ScoreDocument;
+using elara::app::testing::kSongsToEdit;
+using elara::app::testing::SongToEdit;
 using elara::core::Beat;
 using elara::core::Caret;
 using elara::core::NoteValue;
@@ -576,4 +583,260 @@ TEST_CASE("editing: the song's tempo keeps the beat it counts in") {
     score.setTempoFrom(0, 70);
     CHECK(score.song()->startTempo() == Tempo(70, dottedQuarter));
     CHECK(score.undoName() == QStringLiteral("Change tempo"));
+}
+
+// ---- The song's and the measures' edits, on each song the window opens ------
+
+TEST_CASE("editing: a credit, a track and a time signature are each one edit, undone and redone") {
+    using elara::core::Credit;
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+
+    // A line of the credits (ADR-0059): drawn, but not heard (ADR-0111).
+    const std::uint64_t sequences = score.sequenceWork().asked;
+    score.setCredit(static_cast<int>(Credit::Subtitle), QStringLiteral("Smoke credits"));
+    CHECK(score.sequenceWork().asked == sequences);
+    REQUIRE(song.laidOut());
+    const QStringList credits = score.credits();
+    REQUIRE(credits.size() == static_cast<int>(Credit::Notes) + 1);
+    CHECK(credits.at(static_cast<int>(Credit::Subtitle)) == QStringLiteral("Smoke credits"));
+    CHECK(score.undoName() == ScoreDocument::tr("Edit song info"));
+    score.undo();
+    REQUIRE(song.laidOut());
+
+    // A track added is shown.
+    const qsizetype tracks = score.trackNames().size();
+    score.addTrack(QStringLiteral("electric-bass"));
+    REQUIRE(song.laidOut());
+    CHECK(score.trackNames().size() == tracks + 1);
+    CHECK(score.track() == tracks);
+
+    // Playback follows the time signature.
+    const double duration = score.duration();
+    score.setTimeSignature(5, 8);
+    REQUIRE(song.laidOut());
+    CHECK(score.timeNumerator() == 5);
+    CHECK(score.timeDenominator() == 8);
+    CHECK(score.duration() != duration);
+
+    score.undo();
+    REQUIRE(song.laidOut());
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(score.trackNames().size() == tracks);
+    CHECK(score.timeNumerator() != 5);
+    CHECK_FALSE(score.canUndo());
+    CHECK(score.canRedo());
+    score.redo();
+    REQUIRE(song.laidOut());
+    CHECK(score.trackNames().size() == tracks + 1);
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a measure inserted after the caret takes signatures of its own, then goes") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    const int measures = score.measureCount();
+    const int numerator = score.timeNumerator();
+
+    score.insertMeasure(true);
+    REQUIRE(song.laidOut());
+    CHECK(score.measureCount() == measures + 1);
+    CHECK(score.caretMeasure() == 1);
+    score.setTimeSignatureFrom(score.caretMeasure(), 3, 4);
+    score.setKeySignatureFrom(score.caretMeasure(), 2, false);
+    REQUIRE(song.laidOut());
+    CHECK(score.caretTimeNumerator() == 3);
+    CHECK(score.caretTimeDenominator() == 4);
+    CHECK(score.caretKeyFifths() == 2);
+    CHECK(score.timeNumerator() == numerator); // the first measure's
+
+    score.removeMeasure();
+    REQUIRE(song.laidOut());
+    CHECK(score.measureCount() == measures);
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a segno and a jump on a measure are an undo step each") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+
+    // From the measure popup (ADR-0049).
+    score.setNavigation(0, {{QStringLiteral("segno"), true}});
+    CHECK(score.navigationAt(0).value(QStringLiteral("segno")).toBool());
+    CHECK(score.undoName() == ScoreDocument::tr("Change navigation marks"));
+    REQUIRE(song.laidOut());
+
+    // A D.S. al Coda beside it.
+    score.setNavigation(0, {{QStringLiteral("jump"), 2}, {QStringLiteral("jumpThen"), 2}});
+    const QVariantMap marks = score.navigationAt(0);
+    CHECK(marks.value(QStringLiteral("jump")).toInt() == 2);
+    CHECK(marks.value(QStringLiteral("jumpThen")).toInt() == 2);
+    CHECK(marks.value(QStringLiteral("segno")).toBool());
+    score.undo();
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK_FALSE(score.navigationAt(0).value(QStringLiteral("segno")).toBool());
+    CHECK(score.navigationAt(0).value(QStringLiteral("jump")).toInt() == 0);
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a repeat, its endings and a double barline are an undo step each") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+
+    // The first measure's start barline toggled, its end repeat played a
+    // different number of times (ADR-0016).
+    const QVariantMap before = score.repeatsAt(0);
+    const bool start = !before.value(QStringLiteral("start")).toBool();
+    const int times = before.value(QStringLiteral("times")).toInt() == 3 ? 4 : 3;
+    score.setRepeats(0, {{QStringLiteral("start"), start}, {QStringLiteral("times"), times}});
+    CHECK(score.repeatsAt(0).value(QStringLiteral("start")).toBool() == start);
+    CHECK(score.repeatsAt(0).value(QStringLiteral("times")).toInt() == times);
+    CHECK(score.undoName() == ScoreDocument::tr("Change repeats"));
+    REQUIRE(song.laidOut());
+
+    // Other endings, beside the repeat.
+    const QVariantList first{1, 2};
+    const QVariantList endings =
+        before.value(QStringLiteral("endings")).toList() == first ? QVariantList{2, 3} : first;
+    score.setRepeats(0, {{QStringLiteral("endings"), endings}});
+    CHECK(score.repeatsAt(0).value(QStringLiteral("endings")).toList() == endings);
+    CHECK(score.repeatsAt(0).value(QStringLiteral("times")).toInt() == times);
+
+    // The double barline (ADR-0103) toggles on its own.
+    const bool doubleBar = !score.repeatsAt(0).value(QStringLiteral("doubleBar")).toBool();
+    score.setRepeats(0, {{QStringLiteral("doubleBar"), doubleBar}});
+    CHECK(score.repeatsAt(0).value(QStringLiteral("doubleBar")).toBool() == doubleBar);
+    CHECK(score.repeatsAt(0).value(QStringLiteral("endings")).toList() == endings);
+    CHECK(score.undoName() == ScoreDocument::tr("Change barline"));
+    score.undo();
+    score.undo();
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(score.repeatsAt(0) == before);
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a section is named trimmed, and the song string marks where it starts") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+
+    // From the measure popup (ADR-0062).
+    const QString before = score.sectionAt(0);
+    const QString name =
+        before == QStringLiteral("Chorus") ? QStringLiteral("Verse") : QStringLiteral("Chorus");
+    score.setSection(0, QStringLiteral("  ") + name + QStringLiteral(" "));
+    CHECK(score.sectionAt(0) == name);
+    CHECK(score.undoName() == ScoreDocument::tr("Change section"));
+    REQUIRE(song.laidOut());
+    // Where it first plays: at the start.
+    const QVariantList marks = score.sectionMarks();
+    REQUIRE_FALSE(marks.isEmpty());
+    CHECK(marks.front().toMap().value(QStringLiteral("name")).toString() == name);
+    CHECK(marks.front().toMap().value(QStringLiteral("seconds"), -1.0).toDouble() == 0.0);
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(score.sectionAt(0) == before);
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a new measure repeats the one before, and taking the sign away writes it out") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    CaretEditor& editor = song.editor;
+
+    // From the measure popup (ADR-0102).
+    score.insertMeasure(true);
+    editor.setMeasureRepeat(1);
+    CHECK(editor.caretRepeat() == 1);
+    CHECK(score.undoName() == ScoreDocument::tr("Repeat measure"));
+    editor.setMeasureRepeat(0);
+    CHECK(editor.caretRepeat() == 0);
+    CHECK(score.undoName() == ScoreDocument::tr("Write out measure repeat"));
+    REQUIRE(song.laidOut());
+    score.undo();
+    score.undo();
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a tempo and a triplet feel from the second measure leave the first's") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    REQUIRE(score.measureCount() >= 2);
+
+    // From the measure popup (ADR-0042).
+    const QVariantMap first = score.tempoAt(0);
+    score.setTempoFrom(1, 90);
+    CHECK(score.tempoAt(1).value(QStringLiteral("bpm")).toInt() == 90);
+    CHECK(score.tempoAt(1).value(QStringLiteral("own")).toBool());
+    CHECK(score.undoName() == ScoreDocument::tr("Change tempo"));
+    CHECK(score.tempoAt(0) == first);
+    // Gradual to the next change (ADR-0082), keeping its tempo.
+    score.setTempoGradual(1, true);
+    CHECK(score.tempoAt(1).value(QStringLiteral("gradual")).toBool());
+    CHECK(score.tempoAt(1).value(QStringLiteral("bpm")).toInt() == 90);
+    CHECK(score.undoName() == ScoreDocument::tr("Change tempo"));
+    REQUIRE(song.laidOut());
+
+    // Taken away again.
+    score.setTempoFrom(1, 0);
+    CHECK_FALSE(score.tempoAt(1).value(QStringLiteral("own")).toBool());
+    // The triplet feel (ADR-0104) from the second measure on.
+    const int feelBefore = score.tripletFeelAt(0);
+    const int feel = score.tripletFeelAt(1) == 1 ? 3 : 1;
+    score.setTripletFeelFrom(1, feel);
+    CHECK(score.tripletFeelAt(1) == feel);
+    CHECK(score.tripletFeelAt(0) == feelBefore);
+    CHECK(score.undoName() == ScoreDocument::tr("Change triplet feel"));
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("editing: a capo a fret higher keeps the frets, and taking it off keeps the sound") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+
+    // The first track's tuning from the song panel (ADR-0046).
+    const QVariantMap before = score.trackTuning(0);
+    REQUIRE(before.value(QStringLiteral("fretted")).toBool());
+    const QString notes = before.value(QStringLiteral("notes")).toString();
+    const int capo = before.value(QStringLiteral("capo")).toInt() + 1;
+    score.setTrackTuning(0, notes, capo, true);
+    CHECK(score.trackTuning(0).value(QStringLiteral("notes")).toString() == notes);
+    CHECK(score.trackTuning(0).value(QStringLiteral("capo")).toInt() == capo);
+    CHECK(score.undoName() == ScoreDocument::tr("Change tuning"));
+    REQUIRE(song.laidOut());
+
+    // By its preset when it has one, else by its notes.
+    const QString preset = before.value(QStringLiteral("preset")).toString();
+    score.setTrackTuning(0, preset.isEmpty() ? notes : preset, 0, false);
+    CHECK(score.trackTuning(0).value(QStringLiteral("notes")).toString() == notes);
+    CHECK(score.trackTuning(0).value(QStringLiteral("capo")).toInt() == 0);
+    score.undo();
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(score.trackTuning(0) == before);
+    CHECK(song.unchanged());
 }

@@ -88,18 +88,12 @@ public:
 private:
     void tick();
     void queueSteps();
-    void queueEdits();
-    void queueMeasures();
+    void queueMeasurePopup();
+    void queueTuningFields();
     void queueSelection();
     void queueMix();
-    void queueNavigation();
-    void queueRepeats();
-    void queueTuning();
-    void queueTempo();
-    void queueSection();
     void queueSymbols();
     void queueSymbolClick();
-    void queueMeasureRepeat();
     void queueEffects();
     void queueCommands();
     /// Presses and lets go of `key` as the system would, shortcuts included.
@@ -155,10 +149,8 @@ private:
     QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
-    bool played_ = false;         ///< `--play` started playback
-    bool held_ = false;           ///< `--hold` has held the window open
-    qsizetype tracksBefore_ = 0;  ///< tracks when the smoke test's edits start
-    double durationBefore_ = 0.0; ///< the song's length in seconds before the edits
+    bool played_ = false; ///< `--play` started playback
+    bool held_ = false;   ///< `--hold` has held the window open
     /// What playback played before the mix changed.
     std::shared_ptr<const audio::Sequence> sequenceBefore_;
     QPointer<QObject> effectsPanel_;       ///< the note effects palette, watched for `--effects`
@@ -173,9 +165,8 @@ private:
     QPointer<QObject> trackRow_;           ///< a row of the song panel, which a mix change keeps
     QString trackName_;                    ///< the first track's name before it was renamed
     QVariantMap tuningBefore_;             ///< the first track's tuning before it changed
-    QVariantMap repeatsBefore_;            ///< the first measure's repeats before queueRepeats()
-    QVariantMap tempoBefore_;              ///< the second measure's tempo before it changed
-    QString sectionBefore_;                ///< the first measure's section before it changed
+    bool measuring_ = false;               ///< whether the measure popup steps run
+    std::optional<int> capoBefore_;        ///< the capo the tuning fields showed first
     double heldY_ = 0.0;                   ///< the caret's height on screen before an edit
     double heldTop_ = 0.0;                 ///< its staff's, in staff spaces down the pages
     double heldScroll_ = 0.0;              ///< the view's scroll position before an edit
@@ -189,8 +180,6 @@ private:
     int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
-    int measuresBefore_ = 0;               ///< measures when the measure edits start
-    int firstNumerator_ = 0;               ///< the first time signature then
     double positionBefore_ = 0.0;          ///< playback's position before an edit
     bool selecting_ = false;               ///< whether the selection steps run
     int lengthBefore_ = 0;                 ///< the song's length before pasting
