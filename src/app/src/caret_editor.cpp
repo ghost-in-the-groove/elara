@@ -791,6 +791,28 @@ void CaretEditor::setPluck(int finger) {
     });
 }
 
+QString CaretEditor::caretFingeringLabel() const {
+    const bool fretted = caretFretted();
+    const core::Finger finger = noteEffectsAtCaret().fingering;
+    return qstring(core::fingeringText(
+        finger == core::Finger::None ? core::nextFingering(finger, fretted) : finger, fretted));
+}
+
+QString CaretEditor::caretPluckLabel() const {
+    const core::Finger finger = noteEffectsAtCaret().pluck;
+    return qstring(
+        core::pluckText(finger == core::Finger::None ? core::nextPluck(finger) : finger));
+}
+
+void CaretEditor::nextFingering() {
+    setFingering(
+        static_cast<int>(core::nextFingering(noteEffectsAtCaret().fingering, caretFretted())));
+}
+
+void CaretEditor::nextPluck() {
+    setPluck(static_cast<int>(core::nextPluck(noteEffectsAtCaret().pluck)));
+}
+
 void CaretEditor::toggleTrill() {
     const bool on = caretTrill() == 0;
     changeNoteEffects([on](const core::Song& song, const core::Caret& caret) {
