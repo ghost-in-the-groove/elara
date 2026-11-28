@@ -10,6 +10,7 @@
 #include <elara/notation/symbol.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+using Catch::Matchers::WithinAbs;
 using elara::core::Beat;
 using elara::core::ChordSymbol;
 using elara::core::Clef;
@@ -204,6 +206,23 @@ TEST_CASE("Symbol: texts over the staff are picked by their words", "[notation][
         symbolAt(list, textOf(list, "let it ring"), kEvery, bravura());
     REQUIRE(text);
     CHECK(text->role == Role::BeatText);
+}
+
+TEST_CASE("Symbol: a text reaches as high and as low as layout makes room for",
+          "[notation][symbol]") {
+    const Song laid = song();
+    const DisplayList list = both(laid);
+    const auto words = std::ranges::find(list.texts, std::string("let it ring"), &TextItem::text);
+    REQUIRE(words != list.texts.end());
+
+    const std::optional<Symbol> text =
+        symbolAt(list, textOf(list, "let it ring"), kEvery, bravura(), 0.0);
+    REQUIRE(text);
+    // Layout keeps 0.75 em above a text's baseline and 0.21 em below it, as the
+    // layout issues do.
+    CHECK_THAT(text->box.y, WithinAbs(words->origin.y - (0.75 * words->size), 1e-9));
+    CHECK_THAT(text->box.y + text->box.height,
+               WithinAbs(words->origin.y + (0.21 * words->size), 1e-9));
 }
 
 TEST_CASE("Symbol: it names the staff it is drawn on", "[notation][symbol]") {

@@ -194,9 +194,7 @@ Extents inkExtents(const DisplayList& list, const EngravingFont& font, double st
     }
     for (const TextItem& item : list.texts) {
         const double width = textWidth(item);
-        const double from = item.align == TextAlign::Left    ? item.origin.x
-                            : item.align == TextAlign::Right ? item.origin.x - width
-                                                             : item.origin.x - width / 2;
+        const double from = textLeft(item);
         if (from + width < left || from > right) {
             continue;
         }

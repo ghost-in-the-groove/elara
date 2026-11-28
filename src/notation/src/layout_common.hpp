@@ -12,6 +12,8 @@
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
 
+#include "ink.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -43,11 +45,6 @@ inline constexpr double kEndGap = 1.0;       // after the last note, before the 
 inline constexpr double kQuarterSpace = 3.0; // ideal distance after a quarter note
 inline constexpr double kGraceScale = 0.65;  // of grace notes and their fret numbers (ADR-0079)
 inline constexpr double kEpsilon = 1e-9;
-
-// Text extents as layout assumes them: ascenders (and parentheses) reach
-// 0.75 em above the baseline, descenders 0.21 em below.
-inline constexpr double kTextAscent = 0.75;
-inline constexpr double kTextDescent = 0.21;
 
 /// Ideal distance after a note that lasts `length` whole notes: each doubling of
 /// the length multiplies the space by the square root of two.
