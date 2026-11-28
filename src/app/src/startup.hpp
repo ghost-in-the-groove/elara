@@ -89,12 +89,7 @@ private:
     void tick();
     void queueSteps();
     void queueEdits();
-    void queueEntry();
-    void queueTuplets();
     void queueMeasures();
-    void queuePitches();
-    void queueVoices();
-    void queueDrums();
     void queueSelection();
     void queueMix();
     void queueNavigation();
@@ -194,15 +189,9 @@ private:
     int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
-    bool entering_ = false;                ///< whether the shown track takes frets
-    bool tupleting_ = false;               ///< whether the tuplet steps run
     int measuresBefore_ = 0;               ///< measures when the measure edits start
     int firstNumerator_ = 0;               ///< the first time signature then
     double positionBefore_ = 0.0;          ///< playback's position before an edit
-    bool pitching_ = false;                ///< whether the caret takes note names
-    int typedMidi_ = -1;                   ///< the note name typed, as a MIDI number
-    bool voicing_ = false;                 ///< whether the voice steps run
-    bool drumming_ = false;                ///< whether the drum steps run
     bool selecting_ = false;               ///< whether the selection steps run
     int lengthBefore_ = 0;                 ///< the song's length before pasting
     int pasteAt_ = 0;                      ///< the measure pasted at

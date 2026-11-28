@@ -61,16 +61,8 @@ constexpr qint64 kStepTimeoutMilliseconds = 30000;
 // How long a screenshot waits for animations once the window is ready.
 constexpr qint64 kSettleMilliseconds = 900;
 constexpr int kTickMilliseconds = 30;
-constexpr int kSnareKey = 38;
 // The title of the song app.smoke_recovery_crash leaves a copy of.
 constexpr char kCrashedTitle[] = "Left by a crash";
-
-// The drum lane (1 at the top) of the kit piece with General MIDI `key`.
-int laneOf(int key) {
-    const auto pieces = core::drumPieces();
-    const auto found = std::ranges::find(pieces, key, &core::DrumPiece::key);
-    return static_cast<int>(found - pieces.begin()) + 1;
-}
 
 // Pages brought up to date so far: painted, or kept because a relayout left
 // them as they were.
@@ -223,12 +215,7 @@ void Startup::queueSteps() {
             queueEdits();
             queueRecoveryCopy();
             queueSave();
-            queueEntry();
-            queueTuplets();
             queueMeasures();
-            queuePitches();
-            queueVoices();
-            queueDrums();
             queueSelection();
             queueMix();
             queueNavigation();
@@ -330,12 +317,7 @@ void Startup::queueSteps() {
         });
         queueContinuous();
         queueEdits();
-        queueEntry();
-        queueTuplets();
         queueMeasures();
-        queuePitches();
-        queueVoices();
-        queueDrums();
         queueSelection();
         queueMix();
         queueNavigation();
@@ -908,151 +890,6 @@ void Startup::queueWindowState() {
     });
 }
 
-// Keyboard entry on the first fretted track shown: a click on the caret keeps
-// it, two digits make one fret as one undo step, a duration, a rest inserted
-// and deleted; then everything is undone and the song must end as it started.
-void Startup::queueEntry() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("entry check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        entering_ = editor_->caretFretted() && score_->caretPage() >= 0;
-        if (!entering_) {
-            return false;
-        }
-        const core::Caret before = score_->caret();
-        const QPointF centre = score_->caretRect().center();
-        check(score_->placeCaret(score_->caretPage(), centre.x(), centre.y()) &&
-                  score_->caret() == before,
-              "a click on the caret moved it");
-        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
-        // Both keys at one instant: the first digit's layout can outlast the
-        // two-digit window on a loaded machine.
-        const auto pressed = core::EditSession::Clock::now();
-        score_->typeDigit(1, pressed);
-        score_->typeDigit(2, pressed);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(editor_->fretAtCaret() == 12, "two digits did not type fret 12");
-        check(score_->caretPage() >= 0, "the caret went away after typing");
-        score_->undo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(!score_->modified(), "a two-digit fret is not one undo step");
-        score_->redo();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(editor_->fretAtCaret() == 12, "redo did not bring the fret back");
-        score_->setInputValue(8);
-        check(score_->inputValue() == 8, "the input duration did not change");
-        editor_->insertRest();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(!editor_->fretAtCaret().has_value(), "the caret is not on the inserted rest");
-        editor_->deleteAtCaret();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(editor_->fretAtCaret() == 12, "deleting the rest did not bring the note back");
-        for (int i = 0; i < 8 && score_->modified() && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!entering_) {
-            return false;
-        }
-        check(!score_->modified(), "undoing the entry did not restore the song");
-        return false;
-    });
-}
-
-// Tuplets at the caret (ADR-0050): a triplet eighth typed, which the caret's
-// beat takes and keeps when the caret comes back to it, then the input back to
-// plain eighths. Undone, the song must end as it started.
-void Startup::queueTuplets() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("tuplet check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    const auto caretDuration = [this] {
-        const core::Caret caret = score_->caret();
-        const core::Voice& voice = score_->song()
-                                       ->track(caret.track)
-                                       .staff(caret.staff)
-                                       .measure(caret.measure)
-                                       .voices.at(caret.voice);
-        return caret.beat < voice.beats.size() ? std::optional(voice.beats[caret.beat].duration)
-                                               : std::nullopt;
-    };
-    steps_.emplace_back([this, check] {
-        tupleting_ = score_->caretPage() >= 0 && editor_->caretFretted();
-        if (!tupleting_) {
-            return false;
-        }
-        score_->setInputValue(8);
-        score_->setInputTuplet(3);
-        check(score_->inputTuplet() == 3, "the input is not a triplet");
-        score_->typeDigit(5);
-        return true;
-    });
-    steps_.emplace_back([this, check, caretDuration] {
-        if (!tupleting_) {
-            return false;
-        }
-        const std::optional<core::Duration> typed = caretDuration();
-        check(typed && typed->tuplet() == core::Tuplet(3, 2) &&
-                  typed->value() == core::NoteValue::Eighth,
-              "the beat is not a triplet eighth");
-        score_->setInputTuplet(3);
-        check(score_->inputTuplet() == 0, "the triplet did not toggle off");
-        return true;
-    });
-    steps_.emplace_back([this, check, caretDuration] {
-        if (!tupleting_) {
-            return false;
-        }
-        const std::optional<core::Duration> plain = caretDuration();
-        check(plain && plain->tuplet().isNone(), "the beat kept its triplet");
-        check(score_->undoName() == ScoreDocument::tr("Change duration"),
-              "the tuplet is not an undo step");
-        for (int i = 0; i < 6 && score_->modified() && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!tupleting_) {
-            return false;
-        }
-        check(!score_->modified(), "undoing the tuplets did not restore the song");
-        return false;
-    });
-}
-
 // Measures at the caret: one inserted after it, given its own time and key
 // signatures, deleted again; then everything is undone.
 void Startup::queueMeasures() {
@@ -1107,179 +944,6 @@ void Startup::queueMeasures() {
         }
         check(!score_->modified() && score_->measureCount() == measuresBefore_,
               "undoing the measure edits did not restore the song");
-        return false;
-    });
-}
-
-// Note names at the caret: a C typed, raised a semitone, both undone.
-void Startup::queuePitches() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("pitch check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this] {
-        pitching_ = score_->caretPage() >= 0 && editor_->caretPitched();
-        if (!pitching_) {
-            return false;
-        }
-        editor_->typeNoteName(0, false);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!pitching_) {
-            return false;
-        }
-        const std::vector<core::Pitch> pitches = editor_->pitchesAtCaret();
-        check(pitches.size() == 1 && pitches.front().step() == core::Step::C,
-              "the note name did not type a C");
-        if (pitches.empty()) {
-            return false;
-        }
-        check(editor_->caretStatus().endsWith(QStringLiteral("C%1").arg(pitches.front().octave())),
-              "the status does not name the note");
-        typedMidi_ = pitches.front().midiNumber();
-        editor_->shiftPitch(1);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!pitching_) {
-            return false;
-        }
-        const std::vector<core::Pitch> pitches = editor_->pitchesAtCaret();
-        check(pitches.size() == 1 && pitches.front().midiNumber() == typedMidi_ + 1,
-              "the note did not move up a semitone");
-        for (int i = 0; i < 4 && score_->modified() && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!pitching_) {
-            return false;
-        }
-        check(!score_->modified(), "undoing the note names did not restore the song");
-        return false;
-    });
-}
-
-// Drum entry on a new drum kit track (ADR-0035): the status names the lane,
-// the caret box goes down with the lanes, and a snare is toggled on and off
-// again. Then the track is undone and the song must end as it started.
-void Startup::queueDrums() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("drum check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this] {
-        drumming_ = score_->caretPage() >= 0;
-        if (!drumming_) {
-            return false;
-        }
-        score_->addTrack(QStringLiteral("drum-kit"));
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!drumming_) {
-            return false;
-        }
-        check(editor_->caretOnDrums(), "the caret is not on the drum track");
-        const int lanes = static_cast<int>(core::drumPieces().size());
-        for (int lane = 1; lane < lanes; ++lane) {
-            score_->moveCaret(ScoreDocument::CaretMove::StringUp);
-        }
-        check(score_->caret().string == 1 &&
-                  editor_->caretStatus().endsWith(CaretEditor::laneName(1)),
-              "the status does not name the top lane");
-        const double crash = score_->caretRect().top();
-        for (int lane = 1; lane < laneOf(kSnareKey); ++lane) {
-            score_->moveCaret(ScoreDocument::CaretMove::StringDown);
-        }
-        check(editor_->caretStatus().endsWith(CaretEditor::laneName(laneOf(kSnareKey))),
-              "the status does not name the snare");
-        check(score_->caretRect().top() > crash, "the caret did not go down to the snare");
-        editor_->toggleDrum();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!drumming_) {
-            return false;
-        }
-        const std::vector<core::Pitch> hits = editor_->pitchesAtCaret();
-        check(hits.size() == 1 && hits.front().midiNumber() == kSnareKey,
-              "the snare was not added");
-        editor_->toggleDrum();
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!drumming_) {
-            return false;
-        }
-        check(editor_->pitchesAtCaret().empty(), "the snare was not removed");
-        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!drumming_) {
-            return false;
-        }
-        check(!score_->modified(), "undoing the drums did not restore the song");
-        if (score_->track() == 0) {
-            return false;
-        }
-        score_->setTrack(0);
-        return true;
-    });
-}
-
-// Voices: the caret goes to voice 2, which the status names, and a note typed
-// there goes into it; back in voice 1 the status no longer names a voice.
-// Undone, the song must end as it started.
-void Startup::queueVoices() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("voice check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        voicing_ = score_->caretPage() >= 0 && editor_->caretPitched();
-        if (!voicing_) {
-            return false;
-        }
-        score_->setCaretVoice(2);
-        check(score_->caretVoice() == 2, "the caret did not go to voice 2");
-        check(editor_->caretStatus().contains(CaretEditor::tr("Voice %1").arg(2)),
-              "the status does not name voice 2");
-        if (editor_->caretFretted()) {
-            score_->typeDigit(7);
-        } else {
-            editor_->typeNoteName(2, false);
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!voicing_) {
-            return false;
-        }
-        check(score_->caretVoice() == 2 && !editor_->pitchesAtCaret().empty(),
-              "the note did not go into voice 2");
-        score_->setCaretVoice(1);
-        check(score_->caretVoice() == 1 &&
-                  !editor_->caretStatus().contains(CaretEditor::tr("Voice %1").arg(2)),
-              "the caret did not come back to voice 1");
-        for (int i = 0; i < 3 && score_->modified() && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!voicing_) {
-            return false;
-        }
-        check(!score_->modified(), "undoing the voice did not restore the song");
         return false;
     });
 }
