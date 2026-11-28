@@ -14,14 +14,20 @@ Example:
 
 Prints the kit directory (the folder that contains lib/cmake/Qt6) on success.
 Extraction uses py7zr when available, otherwise the 7z command.
+
+The macOS kit is universal: its binaries hold an x86_64 and an arm64 build.
+--thin x86_64 (or arm64) keeps only that one in each, about half the kit, for
+a machine that builds for one architecture; CI caches the thinned kit.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import platform
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -141,6 +147,49 @@ def extract(archive: Path, outdir: Path, version: str, arch: str) -> None:
         shutil.copytree(source, target, dirs_exist_ok=True)
 
 
+# Mach-O universal ("fat") files: a big-endian header, then one entry per
+# architecture giving where its complete Mach-O image lies in the file.
+FAT_MAGIC, FAT_MAGIC_64 = 0xCAFEBABE, 0xCAFEBABF
+CPU_TYPES = {"x86_64": 0x01000007, "arm64": 0x0100000C}
+
+
+def thin_file(path: Path, cpu_type: int) -> int:
+    """Replace a universal Mach-O file by its slice for `cpu_type`, as
+    `lipo -thin` does: the slice is a whole Mach-O file, its code signature
+    included. Returns the bytes saved; other files are left alone."""
+    with path.open("rb") as f:
+        head = f.read(8)
+        if len(head) < 8:
+            return 0
+        magic, count = struct.unpack(">II", head)
+        # Java class files share FAT_MAGIC; their next word is a version, not
+        # a handful of architectures.
+        if magic not in (FAT_MAGIC, FAT_MAGIC_64) or not 0 < count < 16:
+            return 0
+        entry = ">iiQQII" if magic == FAT_MAGIC_64 else ">iiIII"
+        size = struct.calcsize(entry)
+        slices = [struct.unpack(entry, f.read(size))[:4] for _ in range(count)]
+        match = [(offset, length) for cpu, _, offset, length in slices if cpu == cpu_type]
+        if not match:
+            raise SystemExit(f"{path}: no slice for the requested architecture")
+        offset, length = match[0]
+        f.seek(offset)
+        data = f.read(length)
+    before = path.stat().st_size
+    mode = path.stat().st_mode
+    staged = path.with_name(path.name + ".thin")
+    staged.write_bytes(data)
+    os.chmod(staged, mode)
+    staged.replace(path)
+    return before - length
+
+
+def thin_kit(kit: Path, arch: str) -> None:
+    saved = sum(thin_file(p, CPU_TYPES[arch]) for p in kit.rglob("*")
+                if p.is_file() and not p.is_symlink())
+    print(f"thinned to {arch}: {saved / 2**20:.0f} MB less", file=sys.stderr)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--version", default="6.12.1")
@@ -149,6 +198,8 @@ def main() -> int:
     parser.add_argument("--modules", default="", help="comma-separated add-ons")
     parser.add_argument("--outdir", default="C:/Qt" if detect_host() == "windows" else str(Path.home() / "Qt"))
     parser.add_argument("--force", action="store_true", help="download even if the kit exists")
+    parser.add_argument("--thin", choices=sorted(CPU_TYPES),
+                        help="keep only this architecture in the macOS kit's universal binaries")
     args = parser.parse_args()
 
     host_dir, default_arch, pkg_prefix = HOSTS[args.host]
@@ -180,6 +231,8 @@ def main() -> int:
     kits = [p.parent.parent.parent for p in (outdir / args.version).glob("*/lib/cmake/Qt6")]
     if not kits:
         raise SystemExit(f"No kit with lib/cmake/Qt6 found under {outdir / args.version}")
+    if args.thin:
+        thin_kit(kits[0], args.thin)
     print(kits[0].resolve())
     return 0
 

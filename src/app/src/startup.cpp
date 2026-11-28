@@ -33,6 +33,7 @@
 #include <QTemporaryDir>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QWindow>
 
 #include <algorithm>
 #include <array>
@@ -42,6 +43,12 @@
 #include <filesystem>
 #include <optional>
 #include <utility>
+
+// Types a key into a window as the system does, shortcuts included: what Qt's
+// own tests type with (QTest::keyClick), exported by Qt GUI.
+Q_GUI_EXPORT void qt_handleKeyEvent(QWindow* window, QEvent::Type type, int key,
+                                    Qt::KeyboardModifiers modifiers, const QString& text,
+                                    bool autorepeat, ushort count);
 
 namespace elara::app {
 
@@ -161,7 +168,7 @@ void Startup::start() {
 }
 
 bool Startup::checking() const {
-    return options_.smokeTest || !options_.screenshot.isEmpty();
+    return options_.smokeTest || !options_.screenshot.isEmpty() || options_.hold.has_value();
 }
 
 void Startup::queueSteps() {
@@ -180,6 +187,10 @@ void Startup::queueSteps() {
         }
         if (options_.smokeTest && !options_.windowState.isEmpty()) {
             queueWindowState();
+            return;
+        }
+        if (options_.smokeTest && options_.holdStill) {
+            queueHoldStill();
             return;
         }
         // Without a file the smoke test edits a new song.
@@ -207,6 +218,7 @@ void Startup::queueSteps() {
             queueSymbols();
             queueMeasureRepeat();
             queueEffects();
+            queueCommands();
             queueContinuous();
         }
         return;
@@ -2156,11 +2168,202 @@ void Startup::queueEffects() {
     });
 }
 
+void Startup::pressKey(int key, Qt::KeyboardModifiers modifiers, const QString& text) {
+    for (const QEvent::Type type : {QEvent::KeyPress, QEvent::KeyRelease}) {
+        qt_handleKeyEvent(window_, type, key, modifiers, text, false, 1);
+    }
+}
+
+void Startup::typeText(const QString& text) {
+    for (const QChar c : text) {
+        // A printable key's code is its character, in capitals.
+        pressKey(static_cast<int>(c.toUpper().unicode()), Qt::NoModifier, QString(c));
+    }
+}
+
+// The command palette (ADR-0135), typed into as a person would: Ctrl+E opens
+// it, a few letters find a note effect, Enter puts it on the caret's note and
+// closes; Ctrl+E and Enter run the command used last again. A number goes to
+// its measure, with playback; "tempo 90" sets the tempo there, and the space
+// typed into it plays nothing; Escape closes it with nothing done, and Ctrl+E
+// opens it again as it fades and closes it. Undone, the song must end as it
+// started.
+void Startup::queueCommands() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("command palette check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    constexpr int kPalmMute = static_cast<int>(core::NoteEffect::PalmMute);
+    const auto palmMuted = [this] {
+        return (editor_->caretEffects() & (1 << kPalmMute)) != 0;
+    };
+    const auto chosen = [this] {
+        return commandPalette_ != nullptr ? commandPalette_->property("chosenId").toString()
+                                          : QString();
+    };
+    const auto shows = [this] {
+        return commandPalette_ != nullptr && commandPalette_->property("visible").toBool();
+    };
+    // Another popup holds the window's shortcuts while it shows, fading out
+    // included (the lyrics popup the effects opened and closed): Ctrl+E waits
+    // for it to go, as a person sees it go. Tooltips hold nothing.
+    const auto anotherPopupShows = [this] {
+        const auto objects = window_->findChildren<QObject*>();
+        return std::ranges::any_of(objects, [this](const QObject* object) {
+            return object != commandPalette_ && object->inherits("QQuickPopup") &&
+                   !object->inherits("QQuickToolTip") && object->property("visible").toBool();
+        });
+    };
+    // Where the keys went, for a failure: the window with the keyboard, the
+    // item with the focus and the popups that show.
+    const auto keyboard = [this] {
+        const QWindow* focused = QGuiApplication::focusWindow();
+        const QQuickItem* item = window_->activeFocusItem();
+        QStringList popups;
+        for (const QObject* object : window_->findChildren<QObject*>()) {
+            if (object->inherits("QQuickPopup") && object->property("visible").toBool()) {
+                popups << QStringLiteral("%1 %2").arg(
+                    QLatin1StringView(object->metaObject()->className()), object->objectName());
+            }
+        }
+        return QStringLiteral("keys to %1, focus on %2 %3, popups: %4")
+            .arg(focused == window_   ? QStringLiteral("the window")
+                 : focused == nullptr ? QStringLiteral("no window")
+                                      : QLatin1StringView(focused->metaObject()->className()),
+                 item != nullptr ? QLatin1StringView(item->metaObject()->className())
+                                 : QLatin1StringView("nothing"),
+                 item != nullptr ? item->objectName() : QString(),
+                 popups.isEmpty() ? QStringLiteral("none") : popups.join(QStringLiteral(", ")));
+    };
+    // A note of its own, typed once the wait for a second digit has ended.
+    steps_.emplace_back([this, check] {
+        commandPalette_ = window_->findChild<QObject*>(QStringLiteral("commandPalette"));
+        check(commandPalette_ != nullptr, "the window has none");
+        commanding_ =
+            commandPalette_ != nullptr && score_->caretPage() >= 0 && editor_->caretFretted();
+        if (!commanding_) {
+            return false;
+        }
+        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        score_->typeDigit(7);
+        score_->moveCaret(ScoreDocument::CaretMove::StringDown);
+        score_->moveCaret(ScoreDocument::CaretMove::StringUp);
+        return true;
+    });
+    // Its command runs once it has closed: the step waits for the edit.
+    steps_.emplace_back([this, check, palmMuted, chosen, shows, anotherPopupShows, keyboard] {
+        if (!commanding_) {
+            return false;
+        }
+        if (anotherPopupShows()) {
+            again_ = true;
+            return false;
+        }
+        check(!palmMuted(), "the note typed is already palm muted");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        if (!shows()) {
+            // What would be typed into it must not go into the score.
+            check(false, qPrintable(QStringLiteral("Ctrl+E did not open it (%1)").arg(keyboard())));
+            commanding_ = false;
+            return false;
+        }
+        check(commandPalette_->property("commandCount").toInt() > 150,
+              "it offers fewer commands than the window has");
+        typeText(QStringLiteral("palm"));
+        check(chosen() == QStringLiteral("effect.%1").arg(kPalmMute),
+              "palm did not find palm mute");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, palmMuted, chosen, shows] {
+        if (!commanding_) {
+            return false;
+        }
+        check(palmMuted() && score_->undoName() == ScoreDocument::tr("Change effect"),
+              "Enter did not palm mute the caret's note");
+        check(!commandPalette_->property("opened").toBool(), "Enter did not close it");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(shows() && chosen() == QStringLiteral("effect.%1").arg(kPalmMute),
+              "it did not open on the command used last");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, palmMuted, chosen] {
+        if (!commanding_) {
+            return false;
+        }
+        check(!palmMuted(), "Ctrl+E and Enter did not run the command used last again");
+        commandMeasure_ = std::min(3, score_->measureCount());
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QString::number(commandMeasure_));
+        check(chosen() == QStringLiteral("typed.measure"), "a number did not offer its measure");
+        pressKey(Qt::Key_Return);
+        // The caret moves without a layout: this waits a tick for the command.
+        return true;
+    });
+    steps_.emplace_back([this, check, chosen] {
+        if (!commanding_) {
+            return false;
+        }
+        const auto* audio = window_->findChild<AudioController*>();
+        check(score_->caretMeasure() == commandMeasure_ - 1,
+              "the number did not take the caret to its measure");
+        check(audio != nullptr &&
+                  std::abs(audio->position() - score_->measureStart(commandMeasure_ - 1)) < 1e-6,
+              "the number did not take playback to its measure");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QStringLiteral("tempo 90"));
+        check(audio != nullptr && !audio->playingSong(), "a space typed into it started playback");
+        check(chosen() == QStringLiteral("typed.tempo"), "tempo 90 was not offered");
+        pressKey(Qt::Key_Return);
+        return true;
+    });
+    steps_.emplace_back([this, check, shows] {
+        if (!commanding_) {
+            return false;
+        }
+        check(score_->caretTempo().value(QStringLiteral("bpm")).toInt() == 90,
+              "tempo 90 did not set the tempo at the caret's measure");
+        const QString undo = score_->undoName();
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        typeText(QStringLiteral("zqzqzq"));
+        check(commandPalette_->property("rowCount").toInt() == 0, "nonsense found commands");
+        pressKey(Qt::Key_Escape);
+        check(!commandPalette_->property("opened").toBool() && score_->undoName() == undo,
+              "Escape did not close it with nothing done");
+        // Its keys open it again as it fades, and close it.
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(shows() && !commandPalette_->property("leaving").toBool() &&
+                  commandPalette_->property("rowCount").toInt() > 0,
+              "Ctrl+E did not open it again as it closed");
+        pressKey(Qt::Key_E, Qt::ControlModifier);
+        check(commandPalette_->property("leaving").toBool(), "Ctrl+E did not close it");
+        for (int i = 0; i < 6 && score_->modified() && score_->canUndo(); ++i) {
+            score_->undo();
+        }
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        if (!commanding_) {
+            return false;
+        }
+        check(!score_->modified(), "undoing what it did did not restore the song");
+        return false;
+    });
+}
+
 void Startup::tick() {
     // The panel closes again once the smoke test clicks the score; it must
     // have opened at some point.
     if (effectsPanel_ != nullptr && effectsPanel_->property("opened").toBool()) {
         effectsOpened_ = true;
+    }
+    if (options_.commands && !commandsOpened_ && window_ != nullptr) {
+        const auto* palette = window_->findChild<QObject*>(QStringLiteral("commandPalette"));
+        commandsOpened_ = palette != nullptr && palette->property("opened").toBool();
     }
     if (!options_.menu.isEmpty() && !menuOpened_ && window_ != nullptr) {
         const auto* menu = window_->findChild<QObject*>(options_.menu + QStringLiteral("Menu"));
@@ -2256,6 +2459,13 @@ void Startup::tick() {
             return;
         }
     }
+    if (options_.play && !played_) {
+        played_ = true;
+        auto* audio = window_ != nullptr ? window_->findChild<AudioController*>() : nullptr;
+        if (audio != nullptr && !audio->playing()) {
+            audio->togglePlayback();
+        }
+    }
     if (!checking()) {
         timer_.stop();
         return;
@@ -2264,7 +2474,8 @@ void Startup::tick() {
         // Let animations settle first, the note effects palette's too once
         // `--effects` opened it, and the menu `--menu` names.
         if (((effectsPanel_ != nullptr && !effectsOpened_) ||
-             (!options_.menu.isEmpty() && !menuOpened_)) &&
+             (!options_.menu.isEmpty() && !menuOpened_) ||
+             (options_.commands && !commandsOpened_)) &&
             clock_.elapsed() - stepStarted_ < kStepTimeoutMilliseconds) {
             return;
         }
@@ -2289,6 +2500,17 @@ void Startup::tick() {
     }
     if (const QString overlap = overlappingBars(); !overlap.isEmpty()) {
         finish(false, overlap);
+        return;
+    }
+    // `--hold`: the window stays open with the check's timer stopped, so
+    // that only the app's own work runs, then the check ends as usual.
+    if (options_.hold && !held_) {
+        held_ = true;
+        timer_.stop();
+        std::printf("hold: %g s\n", *options_.hold);
+        std::fflush(stdout);
+        QTimer::singleShot(static_cast<int>(std::lround(*options_.hold * 1000.0)), this,
+                           [this] { timer_.start(); });
         return;
     }
     QString detail;
@@ -2819,6 +3041,192 @@ void Startup::queueExport() {
     });
 }
 
+// The view holds still while the layout changes: on a new song whose first
+// page is full, the caret's staff in a system down that page stays at its
+// height on screen while an edit makes the first system taller and while
+// undo takes that back. A measure inserted after the caret's, which takes
+// the caret on to the next system, shows it there, as the keys reveal it.
+void Startup::queueHoldStill() {
+    const auto view = [this] {
+        return window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    };
+    // The caret's bottom on screen, in the view's pixels.
+    const auto screenY = [view] {
+        QPointF point(0.0, -1.0);
+        QMetaObject::invokeMethod(view(), "caretPoint", Q_RETURN_ARG(QPointF, point));
+        return point.y();
+    };
+    // The caret's staff, in staff spaces from the top of the first page.
+    const auto staffTop = [this] {
+        const int page = score_->caretPage();
+        const QList<qreal> tops = score_->pageTops();
+        return page >= 0 && page < tops.size() ? tops[page] + score_->caretRect().y() : -1.0;
+    };
+    // How far the pages are scrolled, in the view's pixels.
+    const auto scroll = [view] {
+        const auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+        return pages != nullptr ? pages->property("contentY").toDouble() : -1.0;
+    };
+    // What a failure shows of the view, to tell why the caret moved.
+    const auto scene = [this, view, screenY, scroll] {
+        return QStringLiteral(
+                   "the caret at %1 px of %2 by %3, scrolled from %4 to %5 px, zoom from "
+                   "%6 to %7, held %8, a reveal pending: %9")
+            .arg(screenY())
+            .arg(view()->height())
+            .arg(view()->width())
+            .arg(heldScroll_)
+            .arg(scroll())
+            .arg(heldZoom_)
+            .arg(view()->property("shownZoom").toDouble())
+            .arg(heldBy_)
+            .arg(view()->property("revealPending").toBool());
+    };
+    const auto problem = [this](const QString& what) {
+        if (editProblem_.isEmpty()) {
+            editProblem_ = what;
+        }
+    };
+    steps_.emplace_back([this] {
+        score_->newSong(QStringLiteral("electric-guitar"));
+        connect(score_, &ScoreDocument::caretHeld, score_, [this](double spaces, int pages) {
+            heldBy_ = QStringLiteral("%1 staff spaces and %2 pages").arg(spaces).arg(pages);
+        });
+        return true;
+    });
+    steps_.emplace_back([this] {
+        score_->setMeasureCount(150);
+        return true;
+    });
+    // The caret at the start of the fourth system of the first page, in view.
+    steps_.emplace_back([this, view] {
+        const auto first = score_->page(0);
+        if (!first || first->systems.size() < 5 || score_->pageCount() < 2) {
+            failure_ = QStringLiteral("the new song does not fill its first page: %1 systems on "
+                                      "it, %2 pages")
+                           .arg(first ? static_cast<qsizetype>(first->systems.size()) : 0)
+                           .arg(score_->pageCount());
+            return false;
+        }
+        const auto target = static_cast<int>(first->systems[3].firstMeasure);
+        for (int i = 0; i < 150 && score_->caretMeasure() > target; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::PreviousMeasure);
+        }
+        for (int i = 0; i < 150 && score_->caretMeasure() < target; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::NextMeasure);
+        }
+        QMetaObject::invokeMethod(view(), "reveal");
+        return false;
+    });
+    // A section mark makes the first system taller.
+    steps_.emplace_back([this, view, screenY, staffTop, scroll] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        // The caret well inside the view first: a window that got shorter
+        // since the reveal can leave it under the bottom edge, where the view
+        // does not hold it and the reveal still pending scrolls to it.
+        const double height = view()->height();
+        if (const double y = screenY(); y > height - 120.0 && height > 240.0) {
+            auto* pages = view()->findChild<QQuickItem*>(QStringLiteral("pages"));
+            pages->setProperty("contentY", scroll() + y - (height / 2.0));
+            again_ = true;
+            return false;
+        }
+        heldY_ = screenY();
+        heldTop_ = staffTop();
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
+        score_->setSection(0, QStringLiteral("Intro"));
+        return true;
+    });
+    steps_.emplace_back([this, view, screenY, staffTop, scroll, scene, problem] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        std::printf("hold still: the staff moved %.2f staff spaces, the caret %.2f px\n",
+                    staffTop() - heldTop_, screenY() - heldY_);
+        if (std::abs(staffTop() - heldTop_) < 1.0) {
+            problem(QStringLiteral("the section moved the staff below it only %1 staff spaces")
+                        .arg(staffTop() - heldTop_));
+        } else if (std::abs(screenY() - heldY_) > 1.0) {
+            problem(QStringLiteral("the caret moved %1 px on screen as a system above it grew (%2)")
+                        .arg(screenY() - heldY_)
+                        .arg(scene()));
+        }
+        heldScroll_ = scroll();
+        heldZoom_ = view()->property("shownZoom").toDouble();
+        heldBy_ = QStringLiteral("nothing");
+        score_->undo();
+        return true;
+    });
+    steps_.emplace_back([this, view, screenY, scene, problem] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (std::abs(screenY() - heldY_) > 1.0) {
+            problem(
+                QStringLiteral("the caret moved %1 px on screen as undo took the section back (%2)")
+                    .arg(screenY() - heldY_)
+                    .arg(scene()));
+        }
+        return false;
+    });
+    // A measure inserted after the last of the caret's system, the caret in
+    // it, until the caret goes on to another system: it is shown there, as the
+    // keys show it, instead of held where it was.
+    steps_.emplace_back([this, view, screenY, problem] {
+        if (view()->property("settling").toBool() || score_->busy()) {
+            again_ = true;
+            return false;
+        }
+        // The system holding `measure` on the pages shown: its page and its
+        // first measure, or -1.
+        const auto systemOf = [this](int measure) {
+            for (int p = 0; p < score_->pageCount(); ++p) {
+                for (const notation::SystemBox& box : score_->page(p)->systems) {
+                    const auto first = static_cast<int>(box.firstMeasure);
+                    if (measure >= first && measure < first + static_cast<int>(box.measureCount)) {
+                        return std::pair{p, first};
+                    }
+                }
+            }
+            return std::pair{-1, -1};
+        };
+        if (heldMeasure_ > 0 && score_->caretMeasure() == heldMeasure_ &&
+            systemOf(heldMeasure_) != systemOf(heldMeasure_ - 1)) {
+            const double y = screenY();
+            if (y < 0.0 || y > view()->height()) {
+                problem(QStringLiteral("the caret on another system is out of view, at %1 px of %2")
+                            .arg(y)
+                            .arg(view()->height()));
+            }
+            return false;
+        }
+        if (++insertions_ > 12) {
+            problem(QStringLiteral("inserted measures never took the caret to another system"));
+            return false;
+        }
+        const auto [page, first] = systemOf(score_->caretMeasure());
+        int last = first;
+        while (systemOf(last + 1) == std::pair{page, first}) {
+            ++last;
+        }
+        for (int i = 0; i < 150 && score_->caretMeasure() < last; ++i) {
+            score_->moveCaret(ScoreDocument::CaretMove::NextMeasure);
+        }
+        heldMeasure_ = score_->caretMeasure() + 1;
+        score_->insertMeasure(true);
+        QMetaObject::invokeMethod(view(), "reveal");
+        again_ = true;
+        return false;
+    });
+}
+
 void Startup::queueKeepPosition() {
     const auto check = [this](const char* what) {
         auto* audio = window_->findChild<AudioController*>();
@@ -2947,6 +3355,10 @@ void Startup::finish(bool ok, const QString& detail) {
     if (ok && options_.smokeTest && options_.effects && !effectsOpened_) {
         ok = false;
         outcome = QStringLiteral("the note effects palette did not open");
+    }
+    if (ok && options_.smokeTest && options_.commands && !commandsOpened_) {
+        ok = false;
+        outcome = QStringLiteral("the command palette did not open");
     }
     if (ok && options_.smokeTest && !options_.menu.isEmpty() && !menuOpened_) {
         ok = false;

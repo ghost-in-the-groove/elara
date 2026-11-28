@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The command bar across the top of the window, dark in both themes: the mark
 // and the menus, the file tools, the transport with its readings and the
-// practice controls, and the panels. Its lower edge is the song string. In a
-// narrow window the file tools go first, then the tempo and the time, then
-// the metronome and the count-in, and the measure last.
+// practice controls, the command palette and the panels. Its lower edge is
+// the song string. In a narrow window the file tools go first, then the tempo
+// and the time, then the metronome and the count-in, and the measure last.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -29,6 +29,8 @@ Rectangle {
     signal songPaneToggled
     signal paletteToggled
     signal tunerRequested
+    /// The command palette's button (ADR-0135).
+    signal commandsRequested
 
     /// The measure playback stands in, from 1; the caret's before the song
     /// has a sequence to play.
@@ -297,6 +299,13 @@ Rectangle {
             objectName: "panelTools"
             spacing: 2
 
+            IconButton {
+                objectName: "commandsButton"
+                nightBar: true
+                iconPath: Icons.search
+                tip: qsTr("Find a command (Ctrl+E)")
+                onClicked: root.commandsRequested()
+            }
             IconButton {
                 nightBar: true
                 visible: root.hasScore

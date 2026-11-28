@@ -92,6 +92,19 @@ TEST_CASE("native format benchmarks", "[benchmark][io]") {
     BENCHMARK("decode the large song from a .elara file") {
         return elara::io::decodeNative(file)->measureCount();
     };
+
+    // Layout adjustments (ADR-0152): a break before every measure of every scope.
+    const elara::core::Song broken = elara::bench::withBreaksEverywhere(song);
+    const std::vector<std::uint8_t> brokenFile = elara::io::encodeNative(broken);
+    std::printf("with a break before every measure of every scope: song.json %zu bytes, "
+                ".elara file %zu bytes\n",
+                elara::io::songToJson(broken).size(), brokenFile.size());
+    BENCHMARK("encode the large song, a break before every measure of every scope") {
+        return elara::io::encodeNative(broken).size();
+    };
+    BENCHMARK("decode the same") {
+        return elara::io::decodeNative(brokenFile)->measureCount();
+    };
 }
 
 TEST_CASE("MusicXML import benchmarks", "[benchmark][io]") {

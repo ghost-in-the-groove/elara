@@ -301,9 +301,10 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
         syllables, chord names and dynamics, and measures wider than the page,
         found on finished pages and reported by `render --issues` (ADR-0150)
-  - [ ] Two voices on one staff a second apart or in unison do not collide
-  - [ ] No layout issue over the corpus and songs made at random
-  - [ ] System and page breaks stored per measure, in files and the CLI
+  - [x] Two voices on one staff a second apart or in unison do not collide
+        (ADR-0151)
+  - [x] No layout issue over the corpus and songs made at random (ADR-0150)
+  - [x] System and page breaks stored per measure, in files and the CLI (ADR-0152)
   - [ ] The line breaker keeps the stored breaks; the cache follows them
   - [ ] Lock the breaks of a range, and unlock them
   - [ ] Layout settings of a song: staff size, margins, spacing, in the CLI
@@ -314,7 +315,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [ ] Clear the layout adjustments of a range
   - [ ] A Layout menu: the commands at the caret, and marks on the score
   - [ ] Layout issues found on the worker and shown in the status bar
-  - [ ] The caret's system keeps its place on screen after an edit
+  - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
 - [x] Several songs open at once, in tabs, with measures copied between them
       (ADR-0160)
@@ -348,7 +349,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       panel at a time in a narrow window
 - [x] The window remembers its size, its panels, its zoom and the dark page
       from one run to the next (ADR-0137)
-- [ ] A command palette: every command by name, with its keys
+- [x] A command palette: every command by name, with its keys; recent ones
+      first, a measure number, a section, "tempo 90" or "3/4" typed into it
+      (ADR-0135)
 
 ## Milestone 6 - Practice tools
 

@@ -2,6 +2,8 @@
 #include <elara/core/commands.hpp>
 #include <elara/core/names.hpp>
 
+#include "held_bytes.hpp"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -35,6 +37,11 @@ void RemoveMeasures::apply(Song& song) {
     // Allocate before moving anything out, so nothing can fail half-way.
     headers_.reserve(count_);
     measures_.reserve(staves * count_);
+    layouts_.reserve(song.trackCount() + 1);
+    layouts_.push_back(song.measureLayouts(LayoutScope::song()));
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        layouts_.push_back(song.measureLayouts(LayoutScope::ofTrack(t)));
+    }
 
     for (std::size_t m = at_; m < at_ + count_; ++m) {
         headers_.push_back(std::move(song.measureHeader(m)));
@@ -66,8 +73,14 @@ void RemoveMeasures::revert(Song& song) {
             }
         }
     }
+    // As they were before: the insertion gave them default entries.
+    song.setMeasureLayouts(LayoutScope::song(), std::move(layouts_[0]));
+    for (std::size_t t = 0; t < song.trackCount(); ++t) {
+        song.setMeasureLayouts(LayoutScope::ofTrack(t), std::move(layouts_[t + 1]));
+    }
     headers_.clear();
     measures_.clear();
+    layouts_.clear();
 }
 
 // ---- Tracks ------------------------------------------------------------------
@@ -250,7 +263,14 @@ std::size_t RemoveMeasures::heldBytes() const noexcept {
     for (const SharedValue<Measure>& measure : measures_) {
         bytes += approximateBytes(measure.get());
     }
+    for (const MeasureLayouts& layouts : layouts_) {
+        bytes += detail::sharedBytes(layouts);
+    }
     return bytes;
+}
+
+std::size_t SetMeasureLayouts::heldBytes() const noexcept {
+    return detail::sharedBytes(layouts_);
 }
 
 std::size_t InsertTrack::heldBytes() const noexcept {
@@ -469,6 +489,40 @@ std::unique_ptr<Command> changeBarline(const Song& song, std::size_t measure, bo
     MeasureHeader header = song.measureHeader(measure); // throws first
     header.doubleBar = doubleBar;
     return changeHeader(song, measure, std::move(header), "Change barline");
+}
+
+// ---- Layout adjustments ------------------------------------------------------
+
+void SetMeasureLayouts::swapWith(Song& song) {
+    MeasureLayouts current = song.measureLayouts(scope_);
+    song.setMeasureLayouts(scope_, layouts_); // a shared copy: nothing lost if it throws
+    layouts_ = std::move(current);
+}
+
+std::unique_ptr<Command> changeBreaks(const Song& song, LayoutScope scope,
+                                      std::span<const std::pair<std::size_t, Break>> breaks) {
+    const MeasureLayouts& held = song.measureLayouts(scope); // throws first
+    std::vector<MeasureLayout> next =
+        held ? *held : std::vector<MeasureLayout>(song.measureCount());
+    bool changed = false;
+    for (const auto& [measure, kind] : breaks) {
+        if (measure >= next.size()) {
+            throw std::out_of_range("Song: no such measure");
+        }
+        if (nameOf(kind).empty()) {
+            throw std::invalid_argument("changeBreaks: no such break");
+        }
+        changed = changed || next[measure].breakBefore != kind;
+        next[measure].breakBefore = kind;
+    }
+    if (!changed) {
+        return nullptr;
+    }
+    MeasureLayouts layouts;
+    if (!std::ranges::all_of(next, &MeasureLayout::isDefault)) {
+        layouts = MeasureLayouts(std::move(next));
+    }
+    return std::make_unique<SetMeasureLayouts>(scope, std::move(layouts));
 }
 
 } // namespace elara::core

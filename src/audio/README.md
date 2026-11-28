@@ -97,13 +97,14 @@ main thread leaves the object alone (ADR-0122). `MicrophoneInput` (and
 queues the loudest channel's samples in a `SampleRing` (ADR-0029).
 
 `elara_audio_fluid` reads SoundFonts (SF2, and SF3 with compressed samples)
-through FluidSynth (ADR-0043): `SoundFont::open()` lists the presets and
-`presetFor()` picks each instrument's General MIDI preset. A track's sound is
-a FluidSynth synth of its own with the track's presets only, sixteen MIDI
-channels so each note takes one (a glide bends only its key), and a guitar's
-muted and harmonics presets for palm mutes, dead notes and harmonics.
-FluidSynth comes from the overlay port in `cmake/vcpkg-ports/fluidsynth`,
-built without audio drivers.
+through FluidSynth (ADR-0043): `SoundFont::open()` loads the presets once and
+lists them, and `presetFor()` picks each instrument's General MIDI preset. A
+track's sound is a FluidSynth synth of its own that plays the SoundFont's one
+loaded copy (ADR-0146) on the track's presets only, sixteen MIDI channels so
+each note takes one (a glide bends only its key), and a guitar's muted and
+harmonics presets for palm mutes, dead notes and harmonics. FluidSynth comes
+from the overlay port in `cmake/vcpkg-ports/fluidsynth`, built without audio
+drivers and patched so that synths on different threads can share a font.
 
 ## Real-time rule
 

@@ -43,6 +43,12 @@ using detail::Warnings;
 
 // ---- Small helpers ------------------------------------------------------------
 
+// A score is parsed with each element's text kept in the element instead of a
+// node of its own (pugixml's parse_embed_pcdata): nearly every element of a
+// note holds one value, so the document needs about half the nodes. Texts are
+// read through child_value() and text(), which find them either way.
+constexpr unsigned kParseOptions = pugi::parse_default | pugi::parse_embed_pcdata;
+
 std::string_view trim(std::string_view text) {
     const auto first = text.find_first_not_of(" \t\r\n");
     if (first == std::string_view::npos) {
@@ -3084,7 +3090,8 @@ std::expected<ImportResult, FormatError> importDocument(const pugi::xml_document
 std::expected<ImportResult, FormatError> importInPlace(std::span<char> xml,
                                                        const MusicXmlOptions& options) {
     pugi::xml_document document;
-    const pugi::xml_parse_result parsed = document.load_buffer_inplace(xml.data(), xml.size());
+    const pugi::xml_parse_result parsed =
+        document.load_buffer_inplace(xml.data(), xml.size(), kParseOptions);
     return importDocument(document, parsed, xml.size(), options);
 }
 
@@ -3109,7 +3116,8 @@ std::expected<ImportResult, FormatError> importOwnedBytes(std::vector<std::uint8
 std::expected<ImportResult, FormatError> importMusicXml(std::string_view xml,
                                                         const MusicXmlOptions& options) {
     pugi::xml_document document;
-    const pugi::xml_parse_result parsed = document.load_buffer(xml.data(), xml.size());
+    const pugi::xml_parse_result parsed =
+        document.load_buffer(xml.data(), xml.size(), kParseOptions);
     return importDocument(document, parsed, xml.size(), options);
 }
 

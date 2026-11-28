@@ -7,6 +7,7 @@ qt_standard_project_setup(REQUIRES 6.12
 # Painting of display lists and the list models the views show, in a library
 # of their own so that tests link them without the QML application.
 add_library(elara_app_view STATIC
+  src/command_search.cpp
   src/included_sound.cpp
   src/recent_scores.cpp
   src/recovery_store.cpp
@@ -15,7 +16,7 @@ add_library(elara_app_view STATIC
   src/window_state.cpp)
 target_include_directories(elara_app_view PUBLIC src)
 target_link_libraries(elara_app_view PUBLIC Qt6::Gui elara::notation PRIVATE elara::io)
-elara_source_warnings(src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
+elara_source_warnings(src/command_search.cpp src/included_sound.cpp src/recent_scores.cpp src/recovery_store.cpp
   src/score_painter.cpp src/track_list.cpp src/window_state.cpp)
 
 # The app icon (ADR-0064), drawn from icons/elara.svg at build time by a tool of
@@ -89,6 +90,7 @@ qt_add_qml_module(elara
     qml/ScoreView.qml
     qml/EntryBar.qml
     qml/EffectsPalette.qml
+    qml/CommandPalette.qml
     qml/MeasurePopup.qml
     qml/RecoveryDialog.qml
     qml/WordsPopup.qml
@@ -204,8 +206,12 @@ install(TARGETS elara
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 if(WIN32)
   install(FILES $<TARGET_RUNTIME_DLLS:elara> DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  # Left out (ADR-0145): the shader compilers, as Qt Quick draws through
+  # Direct3D 11 with Windows' own d3dcompiler_47.dll (Windows 10 and later)
+  # and only Direct3D 12 needs DXC; and plugins for what the app never does:
+  # QML debugging, TLS, network information and TUIO touch over the network.
   set(_elara_deploy_options INCLUDE_PLUGINS qoffscreen NO_COMPILER_RUNTIME
-    DEPLOY_TOOL_OPTIONS "--translations;en,es")
+    DEPLOY_TOOL_OPTIONS "--translations;en,es;--no-system-d3d-compiler;--no-system-dxc-compiler;--skip-plugin-types;qmltooling,tls,networkinformation,generic")
 elseif(NOT APPLE AND TARGET Qt6::QOffscreenIntegrationPlugin)
   # Qt's Linux deployment brings only the default platform plugin (xcb).
   install(FILES $<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin> DESTINATION plugins/platforms)
@@ -253,3 +259,28 @@ qt_generate_deploy_qml_app_script(
   NO_UNSUPPORTED_PLATFORM_ERROR
   ${_elara_deploy_options})
 install(SCRIPT "${_elara_deploy_script}")
+# Qt's deployment brings every Qt Quick Controls style, since QtQuick.Controls
+# may pick any of them at run time. The app always picks Material
+# (qtquickcontrols2.conf), which builds on Basic: the other styles' libraries,
+# plugins and QML, and the native style only the Windows and macOS styles use,
+# are removed from what was installed (ADR-0145). The packages' smoke tests run
+# the app from what is left.
+install(CODE [[
+  file(GLOB_RECURSE _elara_installed LIST_DIRECTORIES true
+    "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/*")
+  set(_elara_removed 0)
+  foreach(_elara_path IN LISTS _elara_installed)
+    get_filename_component(_elara_name "${_elara_path}" NAME)
+    string(TOLOWER "${_elara_name}" _elara_name)
+    if(_elara_name MATCHES "quickcontrols2(fluentwinui3|fusion|imagine|universal|windows|macos|ios)"
+        OR _elara_name MATCHES "quicknativestyle"
+        OR _elara_path MATCHES "/QtQuick/Controls/(FluentWinUI3|Fusion|Imagine|Universal|Windows|macOS|iOS)$"
+        OR _elara_path MATCHES "/QtQuick/NativeStyle$")
+      if(EXISTS "${_elara_path}")
+        file(REMOVE_RECURSE "${_elara_path}")
+        math(EXPR _elara_removed "${_elara_removed} + 1")
+      endif()
+    endif()
+  endforeach()
+  message(STATUS "Removed ${_elara_removed} files and folders of unused Qt Quick Controls styles")
+]])

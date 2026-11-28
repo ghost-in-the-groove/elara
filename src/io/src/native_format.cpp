@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <format>
 #include <limits>
 #include <memory>
@@ -31,6 +32,9 @@ namespace {
 using namespace core;
 
 constexpr std::string_view kFormatName = "elara";
+// A measure's spacing, in percent of its ideal spaces (ADR-0152).
+constexpr std::int64_t kMinSpacing = 50;
+constexpr std::int64_t kMaxSpacing = 200;
 // "generator" is this name and the version: "Elara 0.1.0".
 constexpr std::string_view kGeneratorName = "Elara ";
 
@@ -85,6 +89,7 @@ public:
             yyjson_mut_arr_append(measures, header(song.measureHeader(m)));
         }
         add(root, "measures", measures);
+        addLayouts(root, song.measureLayouts(LayoutScope::song()));
 
         yyjson_mut_val* tracks = yyjson_mut_arr(doc_);
         for (std::size_t t = 0; t < song.trackCount(); ++t) {
@@ -148,6 +153,29 @@ private:
         addTextIfAny(object, "transcriber", info.transcriber);
         addTextIfAny(object, "notes", info.notes);
         add(root, "info", object);
+    }
+
+    // The measures of a scope whose layout is not the default (ADR-0152), as
+    // "layout"; nothing for a scope that holds none.
+    void addLayouts(yyjson_mut_val* object, const MeasureLayouts& value) {
+        if (!value) {
+            return;
+        }
+        yyjson_mut_val* entries = yyjson_mut_arr(doc_);
+        for (std::size_t m = 0; m < value->size(); ++m) {
+            const MeasureLayout& layout = (*value)[m];
+            if (layout.isDefault()) {
+                continue;
+            }
+            yyjson_mut_val* entry = yyjson_mut_obj(doc_);
+            addInt(entry, "measure", static_cast<std::int64_t>(m));
+            addEnumIfNot(entry, "break", layout.breakBefore, Break::Auto);
+            if (layout.spacing != MeasureLayout::kDefaultSpacing) {
+                addInt(entry, "spacing", layout.spacing);
+            }
+            yyjson_mut_arr_append(entries, entry);
+        }
+        add(object, "layout", entries);
     }
 
     yyjson_mut_val* tempo(const Tempo& value) {
@@ -234,6 +262,7 @@ private:
             addFlag(mixJson, "solo", mix.solo);
             add(object, "mix", mixJson);
         }
+        addLayouts(object, value.measureLayouts());
 
         yyjson_mut_val* staves = yyjson_mut_arr(doc_);
         for (std::size_t s = 0; s < value.staffCount(); ++s) {
@@ -545,6 +574,7 @@ public:
                 song.measureHeader(m) = readHeader(header);
             });
         }
+        readLayouts(root, song, LayoutScope::song());
         if (yyjson_val* tracks = optionalArray(root, "tracks")) {
             Scope scope(*this, "tracks");
             forEach(tracks, [&](std::size_t, yyjson_val* track) { readTrack(track, song); });
@@ -896,12 +926,36 @@ private:
 
         Track& track = song.track(index);
         track.setMix(mix);
+        readLayouts(object, song, LayoutScope::ofTrack(index));
         Scope stavesScope(*this, "staves");
         forEach(stavesJson, [&](std::size_t s, yyjson_val* staffJson) {
             readMeasures(staffJson, track.staff(s), song.measureCount());
             readClefs(staffJson, track.staff(s), song.measureCount());
             readRepeats(staffJson, track.staff(s), song.measureCount());
         });
+    }
+
+    // The measure layouts of a scope (ADR-0152): the measures that differ.
+    void readLayouts(yyjson_val* object, Song& song, LayoutScope scope) {
+        yyjson_val* entries = optionalArray(object, "layout");
+        if (entries == nullptr) {
+            return;
+        }
+        Scope where(*this, "layout");
+        const std::size_t count = song.measureCount();
+        std::vector<MeasureLayout> layouts(count);
+        forEach(entries, [&](std::size_t, yyjson_val* entry) {
+            if (!yyjson_is_obj(entry)) {
+                fail("expected an object");
+            }
+            const auto m = static_cast<std::size_t>(
+                integer(entry, "measure", 0, static_cast<std::int64_t>(count) - 1));
+            layouts[m].breakBefore = enumValue(entry, "break", Break::Auto);
+            layouts[m].spacing = static_cast<std::uint8_t>(
+                optionalInteger(entry, "spacing", kMinSpacing, kMaxSpacing)
+                    .value_or(MeasureLayout::kDefaultSpacing));
+        });
+        song.setMeasureLayouts(scope, MeasureLayouts(std::move(layouts)));
     }
 
     // The measures that change the staff's clef (ADR-0087).
@@ -1255,11 +1309,60 @@ std::string songToJson(const Song& song) {
     return std::string(writer.write(song).view());
 }
 
-std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
+namespace {
+
+// yyjson's pool of values starts at a guess from the text's size, a value for
+// every 6 bytes, and grows by half through realloc() when the guess falls
+// short, holding both blocks while it copies. song.json has a value for about
+// every 5.5 bytes, so the pool of a large song grows once. Each block gets
+// that half more room when it is made, and a realloc() that fits stays.
+namespace roomy {
+
+constexpr std::size_t kHeader = 16; // the block's room, keeping malloc()'s alignment
+
+void* allocate(void* /*context*/, std::size_t size) noexcept {
+    const std::size_t room = size + (size / 2);
+    auto* block = static_cast<unsigned char*>(std::malloc(kHeader + room));
+    if (block == nullptr) {
+        return nullptr;
+    }
+    std::memcpy(block, &room, sizeof room);
+    return block + kHeader;
+}
+
+void release(void* /*context*/, void* data) noexcept {
+    if (data != nullptr) {
+        std::free(static_cast<unsigned char*>(data) - kHeader);
+    }
+}
+
+void* reallocate(void* context, void* data, std::size_t oldSize, std::size_t size) noexcept {
+    std::size_t room = 0;
+    std::memcpy(&room, static_cast<unsigned char*>(data) - kHeader, sizeof room);
+    if (size <= room) {
+        return data;
+    }
+    void* grown = allocate(context, size);
+    if (grown != nullptr) {
+        std::memcpy(grown, data, std::min(oldSize, size));
+        release(context, data);
+    }
+    return grown;
+}
+
+constexpr yyjson_alc kAllocator{
+    .malloc = allocate, .realloc = reallocate, .free = release, .ctx = nullptr};
+
+} // namespace roomy
+
+// Reads `length` bytes of song.json at `text`. Without YYJSON_READ_INSITU in
+// `flags` yyjson copies them and never modifies them; with it, it parses them
+// where they are, which needs YYJSON_PADDING_SIZE zero bytes after them.
+std::expected<ImportResult, FormatError> readJson(char* text, std::size_t length,
+                                                  yyjson_read_flag flags,
+                                                  const yyjson_alc* allocator = nullptr) {
     yyjson_read_err error{};
-    // Without YYJSON_READ_INSITU the input is only read, never modified.
-    yyjson_doc* doc =
-        yyjson_read_opts(const_cast<char*>(json.data()), json.size(), 0, nullptr, &error);
+    yyjson_doc* doc = yyjson_read_opts(text, length, flags, allocator, &error);
     if (doc == nullptr) {
         return std::unexpected(FormatError{
             std::format("invalid JSON at byte {}: {}", error.pos, error.msg ? error.msg : "")});
@@ -1277,6 +1380,41 @@ std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
     }
 }
 
+// The song.json of a native file's bytes, followed by the zero bytes that
+// readInPlace() needs.
+std::expected<std::string, FormatError> nativeJson(std::span<const std::uint8_t> bytes) {
+    try {
+        detail::ZipReader zip(bytes);
+        if (!zip.ok()) {
+            return std::unexpected(FormatError{"not an Elara file (not a zip archive)"});
+        }
+        const auto mime = zip.entry("mimetype", 256);
+        if (mime && *mime != kNativeMimeType) {
+            return std::unexpected(
+                FormatError{std::format("not an Elara file (mimetype {})", *mime)});
+        }
+        auto json = zip.entry("song.json", detail::kMaxEntryBytes, YYJSON_PADDING_SIZE);
+        if (!json) {
+            return std::unexpected(FormatError{"not an Elara file (no song.json)"});
+        }
+        return *std::move(json);
+    } catch (const FormatError& failure) {
+        return std::unexpected(failure);
+    }
+}
+
+// Reads nativeJson()'s text where it is, without a copy of it.
+std::expected<ImportResult, FormatError> readInPlace(std::string&& json) {
+    return readJson(json.data(), json.size() - YYJSON_PADDING_SIZE, YYJSON_READ_INSITU,
+                    &roomy::kAllocator);
+}
+
+} // namespace
+
+std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
+    return readJson(const_cast<char*>(json.data()), json.size(), YYJSON_READ_NOFLAG);
+}
+
 std::expected<Song, FormatError> songFromJson(std::string_view json) {
     return readSongJson(json).transform(songOf);
 }
@@ -1290,24 +1428,7 @@ std::vector<std::uint8_t> encodeNative(const Song& song) {
 }
 
 std::expected<ImportResult, FormatError> readNative(std::span<const std::uint8_t> bytes) {
-    try {
-        detail::ZipReader zip(bytes);
-        if (!zip.ok()) {
-            return std::unexpected(FormatError{"not an Elara file (not a zip archive)"});
-        }
-        const auto mime = zip.entry("mimetype", 256);
-        if (mime && *mime != kNativeMimeType) {
-            return std::unexpected(
-                FormatError{std::format("not an Elara file (mimetype {})", *mime)});
-        }
-        const auto json = zip.entry("song.json");
-        if (!json) {
-            return std::unexpected(FormatError{"not an Elara file (no song.json)"});
-        }
-        return readSongJson(*json);
-    } catch (const FormatError& failure) {
-        return std::unexpected(failure);
-    }
+    return nativeJson(bytes).and_then(readInPlace);
 }
 
 std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
@@ -1325,8 +1446,10 @@ std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {
 }
 
 std::expected<ImportResult, FormatError> openNative(const std::filesystem::path& path) {
-    return detail::readFile(path).and_then(
-        [](const std::vector<std::uint8_t>& bytes) { return readNative(bytes); });
+    // The file's bytes go before the song is read: only its text is held then.
+    auto json = detail::readFile(path).and_then(
+        [](const std::vector<std::uint8_t>& bytes) { return nativeJson(bytes); });
+    return std::move(json).and_then(readInPlace);
 }
 
 } // namespace elara::io

@@ -14,6 +14,11 @@ base speaks one vocabulary. American terms follow MusicXML.
 | sistema | system | `layoutSystem()`, `SystemBox` | Staves laid out together, notes that start together aligned (ADR-0013); a line of a page (ADR-0014) |
 | página | page | `layoutPages()`, `PageLayoutOptions` | Systems stacked between margins, with the title on the first (ADR-0014) |
 | salto de línea | line break | `LineBreaker` | Where one system ends and the next starts, chosen to space the systems evenly (ADR-0014) |
+| salto de sistema | system break | `Break::System` | A system that starts at a measure because the writer said so, stored in the measure's layout (ADR-0152); the line breaker chooses the others |
+| salto de página | page break | `Break::Page` | A page, and so a system, that starts at a measure because the writer said so (ADR-0152) |
+| mantener con el anterior | keep with previous | `Break::Keep` | No system starts at the measure while it fits beside the one before (ADR-0152) |
+| ajuste de maquetación | layout adjustment | `MeasureLayout` | What a writer asks of the layout where its rules are not enough, stored on what it adjusts: a measure's break and spacing (ADR-0152) |
+| ámbito de maquetación | layout scope | `LayoutScope` | Whose measure layouts a view reads: a track's own when it is shown alone, the song's when staves of several tracks are (ADR-0152) |
 | justificar | justify | stretch | Stretch or tighten a system's spacing so that it fills the width (ADR-0014) |
 | incidencia de maquetación | layout issue | `LayoutIssue`, `layoutIssues()` | What a laid-out page could not keep: ink that must never touch overlapping (noteheads, fret numbers, syllables...), or a measure wider than the page (ADR-0150). Not an `Issue` of `validate()`, which is about the song |
 | muelle | spring | `Spring` | The space after a column of notes: an ideal length and the least its ink needs (ADR-0014) |

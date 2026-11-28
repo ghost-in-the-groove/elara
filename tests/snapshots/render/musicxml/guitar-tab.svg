@@ -80,8 +80,8 @@
 <text class="t fretNumber" x="33.381" y="39.646" style="font-size:1.8px" text-anchor="middle" stroke="none">&lt;12&gt;</text>
 <rect class="knockout" x="37.889" y="36.706" width="1.289" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="38.534" y="38.146" style="font-size:1.8px" text-anchor="middle" stroke="none">3</text>
-<rect class="knockout" x="41.533" y="36.706" width="2.488" height="1.584" fill="white" stroke="none"/>
-<text class="t fretNumber" x="42.776" y="38.146" style="font-size:1.8px" text-anchor="middle" stroke="none">(3)</text>
+<rect class="knockout" x="41.781" y="36.864" width="1.99" height="1.267" fill="white" stroke="none"/>
+<text class="t fretNumber" x="42.776" y="38.016" style="font-size:1.44px" text-anchor="middle" stroke="none">(3)</text>
 <rect class="knockout" x="45.032" y="44.206" width="1.489" height="1.584" fill="white" stroke="none"/>
 <text class="t fretNumber" x="45.776" y="45.646" style="font-size:1.8px" text-anchor="middle" stroke="none">X</text>
 <text class="t bend" x="29.564" y="35.996" style="font-size:1.45px" text-anchor="middle" stroke="none">full</text>

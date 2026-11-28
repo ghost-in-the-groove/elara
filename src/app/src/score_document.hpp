@@ -487,6 +487,9 @@ public:
     /// Puts the caret where a click at (x, y) on page `index` points, in staff
     /// spaces from the page's top-left corner. Returns whether it moved there.
     Q_INVOKABLE bool placeCaret(int index, double x, double y);
+    /// Puts the caret on the first beat of `measure` (from 0), on its track,
+    /// staff, voice and string: a measure past the song's end is its last.
+    Q_INVOKABLE void caretToMeasure(int measure);
     /// Types a digit: a fret on the caret's string. A second digit within
     /// kTwoDigitMilliseconds on the same caret makes a two-digit fret, as one
     /// undo step.
@@ -623,6 +626,11 @@ signals:
     void layoutChanged();
     void historyChanged();
     void caretChanged();
+    /// A layout an edit, an undo or a redo caused moved the caret's staff
+    /// `spaces` staff spaces down the pages, and `pages` pages on, while the
+    /// caret stayed in the system it was in: the view scrolls as far, so that
+    /// the staff stays where it was on screen. Comes just before caretChanged.
+    void caretHeld(double spaces, int pages);
     void inputChanged();
     void selectionChanged();
     void clipboardChanged();
@@ -680,7 +688,9 @@ private:
     /// Finds the caret on the pages shown.
     void placeCaretBox();
     void edited();
-    void apply(const ScoreLayout& layout);
+    /// Lays out the score again; `edit` when an edit, an undo or a redo asks.
+    void requestLayout(bool edit);
+    void apply(const ScoreLayout& layout, bool edit);
     void fail(const QString& message);
     void updateBusy();
     void resequence();
@@ -713,6 +723,18 @@ private:
     int caretPage_ = -1;
     QRectF caretRect_;
     QRectF caretColumn_;
+    std::size_t caretBoxMeasure_ = 0; ///< the caret's measure when caretRect_ was found
+    /// Where the caret's box was before a layout an edit caused: in staff
+    /// spaces from the top of the first page, on which page, in which measure.
+    struct CaretAnchor {
+        double top = 0.0;
+        int page = 0;
+        std::size_t measure = 0;
+    };
+    std::optional<CaretAnchor> anchor_;
+    /// A layout asked for since the last one shown was not an edit's (a track,
+    /// view or page change): the next layout holds nothing still.
+    bool reshaped_ = false;
     int selectionRevision_ = 0;
     int track_ = 0;
     View view_ = View::Both;

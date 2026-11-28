@@ -82,6 +82,10 @@
         <translation>Tempo al %1 % de la velocidad escrita</translation>
     </message>
     <message>
+        <source>Find a command (Ctrl+E)</source>
+        <translation>Buscar un comando (Ctrl+E)</translation>
+    </message>
+    <message>
         <source>Note effects (F2)</source>
         <translation>Efectos de nota (F2)</translation>
     </message>
@@ -92,6 +96,168 @@
     <message>
         <source>Tuner (Ctrl+Shift+T)</source>
         <translation>Afinador (Ctrl+Mayús+T)</translation>
+    </message>
+</context>
+<context>
+    <name>CommandPalette</name>
+    <message>
+        <source>Open or start a song first.</source>
+        <translation>Abre o empieza una canción primero.</translation>
+    </message>
+    <message>
+        <source>Click a staff to put the caret there first.</source>
+        <translation>Haz clic en un pentagrama para poner allí el cursor primero.</translation>
+    </message>
+    <message>
+        <source>Needs a track with strings.</source>
+        <translation>Necesita una pista con cuerdas.</translation>
+    </message>
+    <message>
+        <source>Entry</source>
+        <translation>Entrada</translation>
+    </message>
+    <message>
+        <source>Longer note value</source>
+        <translation>Figura más larga</translation>
+    </message>
+    <message>
+        <source>Shorter note value</source>
+        <translation>Figura más corta</translation>
+    </message>
+    <message>
+        <source>Dotted note</source>
+        <translation>Nota con puntillo</translation>
+    </message>
+    <message>
+        <source>Insert a rest</source>
+        <translation>Insertar un silencio</translation>
+    </message>
+    <message>
+        <source>Delete the note</source>
+        <translation>Borrar la nota</translation>
+    </message>
+    <message>
+        <source>Delete the beat</source>
+        <translation>Borrar el tiempo</translation>
+    </message>
+    <message>
+        <source>Raise a semitone</source>
+        <translation>Subir un semitono</translation>
+    </message>
+    <message>
+        <source>Lower a semitone</source>
+        <translation>Bajar un semitono</translation>
+    </message>
+    <message>
+        <source>Raise an octave</source>
+        <translation>Subir una octava</translation>
+    </message>
+    <message>
+        <source>Lower an octave</source>
+        <translation>Bajar una octava</translation>
+    </message>
+    <message>
+        <source>Drum hit on the lane</source>
+        <translation>Golpe de batería en el carril</translation>
+    </message>
+    <message>
+        <source>Bend %1</source>
+        <translation>Bend %1</translation>
+    </message>
+    <message>
+        <source>Dynamic %1</source>
+        <translation>Dinámica %1</translation>
+    </message>
+    <message>
+        <source>Whammy bar %1</source>
+        <translation>Palanca de trémolo %1</translation>
+    </message>
+    <message>
+        <source>Go to</source>
+        <translation>Ir a</translation>
+    </message>
+    <message>
+        <source>The first measure</source>
+        <translation>El primer compás</translation>
+    </message>
+    <message>
+        <source>The last measure</source>
+        <translation>El último compás</translation>
+    </message>
+    <message>
+        <source>The next measure</source>
+        <translation>El compás siguiente</translation>
+    </message>
+    <message>
+        <source>The previous measure</source>
+        <translation>El compás anterior</translation>
+    </message>
+    <message>
+        <source>Section “%1”, measure %2</source>
+        <translation>Sección «%1», compás %2</translation>
+    </message>
+    <message>
+        <source>Tracks</source>
+        <translation>Pistas</translation>
+    </message>
+    <message>
+        <source>Show “%1”</source>
+        <translation>Mostrar «%1»</translation>
+    </message>
+    <message>
+        <source>Measure %1</source>
+        <translation>Compás %1</translation>
+    </message>
+    <message numerus="yes">
+        <source>The song has %n measure(s).</source>
+        <translation>
+            <numerusform>La canción tiene %n compás.</numerusform>
+            <numerusform>La canción tiene %n compases.</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Measure</source>
+        <translation>Compás</translation>
+    </message>
+    <message>
+        <source>Tempo %1 from measure %2</source>
+        <translation>Tempo %1 desde el compás %2</translation>
+    </message>
+    <message>
+        <source>A tempo is 10 to 999 beats a minute.</source>
+        <translation>Un tempo va de 10 a 999 pulsos por minuto.</translation>
+    </message>
+    <message>
+        <source>Time signature %1/%2 from measure %3</source>
+        <translation>Indicación de compás %1/%2 desde el compás %3</translation>
+    </message>
+    <message>
+        <source>%1/%2 is not a time signature.</source>
+        <translation>%1/%2 no es una indicación de compás.</translation>
+    </message>
+    <message>
+        <source>Used last</source>
+        <translation>Usados hace poco</translation>
+    </message>
+    <message>
+        <source>All commands</source>
+        <translation>Todos los comandos</translation>
+    </message>
+    <message>
+        <source>Find a command, or type a measure number</source>
+        <translation>Busca un comando o escribe un número de compás</translation>
+    </message>
+    <message>
+        <source>Find a command</source>
+        <translation>Buscar un comando</translation>
+    </message>
+    <message>
+        <source>Nothing is called “%1”. Try another word, a measure number, a section’s name, “tempo 120” or “3/4”.</source>
+        <translation>Nada se llama «%1». Prueba otra palabra, un número de compás, el nombre de una sección, «tempo 120» o «3/4».</translation>
+    </message>
+    <message>
+        <source>↑↓ to choose · Enter to run · Shift+Enter to run and stay · Esc to close</source>
+        <translation>↑↓ para elegir · Intro para ejecutar · Mayús+Intro para ejecutar sin cerrar · Esc para cerrar</translation>
     </message>
 </context>
 <context>
@@ -788,6 +954,10 @@
     <message>
         <source>&amp;Help</source>
         <translation>A&amp;yuda</translation>
+    </message>
+    <message>
+        <source>Find a command…</source>
+        <translation>Buscar un comando…</translation>
     </message>
     <message>
         <source>Details</source>
@@ -2682,6 +2852,14 @@
         <translation>Mover el cursor de reproducción a esos segundos.</translation>
     </message>
     <message>
+        <source>Start playback once the song is shown.</source>
+        <translation>Empieza a reproducir en cuanto se muestra la canción.</translation>
+    </message>
+    <message>
+        <source>Once the window is ready, stay open this many seconds, then quit (for measuring).</source>
+        <translation>Con la ventana lista, sigue abierta esos segundos y luego sale (para medir).</translation>
+    </message>
+    <message>
         <source>Open the tuner at start.</source>
         <translation>Abrir el afinador al iniciar.</translation>
     </message>
@@ -2702,8 +2880,16 @@
         <translation>Abrir la afinación de la primera pista en el panel de canción al iniciar.</translation>
     </message>
     <message>
+        <source>With --smoke-test, edit a new song above the caret and check that the caret holds still on screen.</source>
+        <translation>Con --smoke-test, editar una canción nueva por encima del cursor y comprobar que el cursor no se mueve en la pantalla.</translation>
+    </message>
+    <message>
         <source>Open the note effects panel at the caret at start.</source>
         <translation>Abrir el panel de efectos de nota en el cursor al iniciar.</translation>
+    </message>
+    <message>
+        <source>Open the command palette at start.</source>
+        <translation>Abrir la paleta de comandos al iniciar.</translation>
     </message>
     <message>
         <source>Show the score as one continuous scroll.</source>
