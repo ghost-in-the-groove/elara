@@ -181,9 +181,11 @@ TEST_CASE("Effects: a natural harmonic needs strings and a node", "[core][entry]
     const Song song = guitarSong();
     // Frets 5 and 7 are near nodes of the string; fret 6 is not.
     CHECK(toggleEffect(song, at(0, 0, 2), NoteEffect::Harmonic).command != nullptr);
-    CHECK_THROWS_AS(toggleEffect(song, at(1, 0, 3), NoteEffect::Harmonic), std::out_of_range);
+    const Entry noNode = toggleEffect(song, at(1, 0, 3), NoteEffect::Harmonic);
+    CHECK(noNode.command == nullptr);
+    CHECK(noNode.refused == Refusal::NoNaturalHarmonic);
     const Song flute = oneBeat("flute", {Note{.pitch = Pitch::fromMidi(72)}});
-    CHECK_THROWS_AS(toggleEffect(flute, at(0, 0), NoteEffect::Harmonic), std::logic_error);
+    CHECK(toggleEffect(flute, at(0, 0), NoteEffect::Harmonic).refused == Refusal::NeedsStrings);
 }
 
 TEST_CASE("Effects: techniques of strings go on fretted staves only", "[core][entry][effects]") {
@@ -200,14 +202,15 @@ TEST_CASE("Effects: techniques of strings go on fretted staves only", "[core][en
     Document doc(oneBeat("piano", {held}));
     for (const NoteEffect effect :
          {NoteEffect::Legato, NoteEffect::DeadNote, NoteEffect::Harmonic}) {
-        CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 0), effect), std::logic_error);
+        CHECK(toggleEffect(doc.song(), at(0, 0), effect).refused == Refusal::NeedsStrings);
     }
     run(doc, toggleEffect(doc.song(), at(0, 0), NoteEffect::Bend));
     CHECK_FALSE(notesAt(doc.song(), 0, 0).front().effects.bend.isEmpty());
     // One already there can still be taken off.
     run(doc, toggleEffect(doc.song(), at(0, 0), NoteEffect::PalmMute));
     CHECK_FALSE(notesAt(doc.song(), 0, 0).front().effects.palmMute);
-    CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 0), NoteEffect::PalmMute), std::logic_error);
+    CHECK(toggleEffect(doc.song(), at(0, 0), NoteEffect::PalmMute).refused ==
+          Refusal::NeedsStrings);
 }
 
 TEST_CASE("Effects: a tie takes the previous note on the string", "[core][entry][effects]") {
@@ -229,8 +232,11 @@ TEST_CASE("Effects: a tie takes the previous note on the string", "[core][entry]
 
     // Nothing to tie to: the first beat of the song, a string the previous beat
     // leaves silent.
-    CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 0, 3), NoteEffect::Tie), std::logic_error);
-    CHECK_THROWS_AS(toggleEffect(doc.song(), at(0, 1, 1), NoteEffect::Tie), std::logic_error);
+    for (const Caret& first : {at(0, 0, 3), at(0, 1, 1)}) {
+        const Entry nothing = toggleEffect(doc.song(), first, NoteEffect::Tie);
+        CHECK(nothing.command == nullptr);
+        CHECK(nothing.refused == Refusal::NoNoteToTie);
+    }
 }
 
 TEST_CASE("Effects: a tie without strings takes the previous single note",
@@ -428,7 +434,7 @@ TEST_CASE("Effects: fingers for the notes of a chord from the lowest up, or one 
     CHECK_THROWS_AS(setFingering(doc.song(), at(0, 0), two), std::invalid_argument);
     CHECK_THROWS_AS(setFingering(doc.song(), at(0, 0), std::span<const Finger>{}),
                     std::invalid_argument);
-    CHECK_THROWS_AS(setPluck(doc.song(), at(0, 0), Finger::Index), std::logic_error);
+    CHECK(setPluck(doc.song(), at(0, 0), Finger::Index).refused == Refusal::NeedsStrings);
 
     // On a fretted staff the note on the caret's string, fretted and plucked.
     Document guitar(guitarSong());
@@ -478,7 +484,7 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     CHECK(noteEffectsAt(doc.song(), caret).trill == trill);
     CHECK(noteEffectsAt(doc.song(), caret).vibrato == Vibrato::Wide);
     CHECK(setTrill(doc.song(), caret, trill).command == nullptr);
-    CHECK_THROWS_AS(setTrill(doc.song(), caret, Trill{.semitones = 13}), std::out_of_range);
+    CHECK(setTrill(doc.song(), caret, Trill{.semitones = 13}).refused == Refusal::TrillTooWide);
     run(doc, setTrill(doc.song(), caret, Trill{}));
     CHECK(!noteEffectsAt(doc.song(), caret).trill.isTrill());
 
@@ -509,7 +515,8 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     run(doc, setHarmonic(doc.song(), at(0, 0, 3), HarmonicKind::Natural));
     CHECK(onString(doc.song(), 0, 0, 3).effects.harmonic.fretTenths == 70);
     CHECK(onString(doc.song(), 0, 0, 2).effects.harmonic == Harmonic{});
-    CHECK_THROWS_AS(setHarmonic(doc.song(), at(1, 0, 3), HarmonicKind::Natural), std::out_of_range);
+    CHECK(setHarmonic(doc.song(), at(1, 0, 3), HarmonicKind::Natural).refused ==
+          Refusal::NoNaturalHarmonic);
     run(doc, setHarmonic(doc.song(), at(1, 0, 3), HarmonicKind::Artificial));
     CHECK(onString(doc.song(), 1, 0, 3).effects.harmonic.kind == HarmonicKind::Artificial);
 
@@ -535,7 +542,8 @@ TEST_CASE("Effects: slides, harmonics, vibrato and accents of any kind on the ca
     for (const Note& note : notesAt(piano.song(), 0, 0)) {
         CHECK(note.effects.accent == Accent::Accent);
     }
-    CHECK_THROWS_AS(setHarmonic(piano.song(), at(0, 0), HarmonicKind::Natural), std::logic_error);
+    CHECK(setHarmonic(piano.song(), at(0, 0), HarmonicKind::Natural).refused ==
+          Refusal::NeedsStrings);
 }
 
 TEST_CASE("Effects: a slide in or out changes only that slide of each note",
@@ -565,7 +573,7 @@ TEST_CASE("Effects: a slide in or out changes only that slide of each note",
 
     const Entry same = setSlideIn(doc.song(), at(0, 0), SlideIn::FromBelow);
     CHECK(same.command == nullptr);
-    CHECK_FALSE(same.missed);
+    CHECK_FALSE(same.refused);
     doc.undo();
     doc.undo();
     CHECK(doc.song() == before);
@@ -597,25 +605,32 @@ TEST_CASE("Effects: an edit that changes nothing says whether anything there tak
     // Already so: the note is there.
     const Entry same = setVibrato(doc.song(), at(0, 1, 1), Vibrato::None);
     CHECK(same.command == nullptr);
-    CHECK_FALSE(same.missed);
+    CHECK_FALSE(same.refused);
+    const Entry toggled = toggleEffect(doc.song(), at(0, 1, 1), NoteEffect::Vibrato);
+    CHECK(toggled.command != nullptr);
+    CHECK_FALSE(toggled.refused);
 
     // A rest, a string without a note and the free slot: nothing takes it.
+    constexpr Refusal kNothing = Refusal::NothingAtCaret;
     const std::array index{Finger::Index};
     for (const Caret& nothing : {at(0, 2, 1), at(0, 1, 3), at(1, 1, 1)}) {
-        CHECK(setVibrato(doc.song(), nothing, Vibrato::None).missed);
-        CHECK(setSlideIn(doc.song(), nothing, SlideIn::FromBelow).missed);
-        CHECK(setSlideOut(doc.song(), nothing, SlideOut::None).missed);
-        CHECK(setBend(doc.song(), nothing, BendCurve{}).missed);
-        CHECK(setFingering(doc.song(), nothing, index).missed);
+        CHECK(setVibrato(doc.song(), nothing, Vibrato::None).refused == kNothing);
+        CHECK(setSlideIn(doc.song(), nothing, SlideIn::FromBelow).refused == kNothing);
+        CHECK(setSlideOut(doc.song(), nothing, SlideOut::None).refused == kNothing);
+        CHECK(setBend(doc.song(), nothing, BendCurve{}).refused == kNothing);
+        CHECK(setFingering(doc.song(), nothing, index).refused == kNothing);
+        CHECK(toggleEffect(doc.song(), nothing, NoteEffect::Vibrato).refused == kNothing);
+        CHECK(toggleEffect(doc.song(), nothing, NoteEffect::Tie).refused == kNothing);
     }
 
     // A rest takes a hairpin, not a strum; the free slot takes nothing.
     const Caret rest = at(0, 2);
-    CHECK(setBeatEffect(doc.song(), rest, &BeatEffects::strum, Strum::Down).missed);
+    CHECK(setBeatEffect(doc.song(), rest, &BeatEffects::strum, Strum::Down).refused == kNothing);
     const Entry none = setBeatEffect(doc.song(), rest, &BeatEffects::strum, Strum::None);
     CHECK(none.command == nullptr);
-    CHECK_FALSE(none.missed);
-    CHECK(setBeatEffect(doc.song(), at(1, 1), &BeatEffects::hairpin, Hairpin::None).missed);
+    CHECK_FALSE(none.refused);
+    CHECK(setBeatEffect(doc.song(), at(1, 1), &BeatEffects::hairpin, Hairpin::None).refused ==
+          kNothing);
     CHECK(setBeatEffect(doc.song(), rest, &BeatEffects::hairpin, Hairpin::Crescendo).command !=
           nullptr);
 }

@@ -2,6 +2,8 @@
 // CaretEditor (ADR-0128): what is at the caret of a document, read and edited
 // through the document it is given.
 #include <elara/core/entry.hpp>
+#include <elara/core/names.hpp>
+#include <elara/core/refusal.hpp>
 
 #include "caret_editor.hpp"
 #include "score_document.hpp"
@@ -102,12 +104,83 @@ TEST_CASE("caret editor: it edits the document's song at the document's caret") 
     score.moveCaret(Move::NextBeat); // the free slot: no note to bend
     editor.setBend(1, 100);
     REQUIRE(failures.size() == 1);
-    CHECK(failures.front().contains(QStringLiteral("Effects go on notes")));
+    CHECK(failures.front() == ScoreDocument::refusalText(elara::core::Refusal::NothingAtCaret));
 
     // The caret is the document's: on another track, the editor reads that one.
     score.addTrack(QStringLiteral("drum-kit"));
     CHECK(editor.caretOnDrums());
     CHECK_FALSE(editor.caretFretted());
+}
+
+TEST_CASE("caret editor: an edit the song refuses says why, and changes nothing") {
+    using elara::core::NoteEffect;
+    using elara::core::Refusal;
+    ScoreDocument score;
+    CaretEditor editor;
+    editor.setDocument(&score);
+    score.newSong(QStringLiteral("electric-guitar"));
+    QStringList failures;
+    QObject::connect(&score, &ScoreDocument::editFailed,
+                     [&failures](const QString& message) { failures.append(message); });
+    const auto refused = [&failures](Refusal why) {
+        const bool said = failures == QStringList{ScoreDocument::refusalText(why)};
+        failures.clear();
+        return said;
+    };
+
+    score.typeDigit(6);
+    const QString typed = score.undoName();
+    // The first note of the song: nothing before it to tie to.
+    editor.toggleEffect(static_cast<int>(NoteEffect::Tie));
+    CHECK(refused(Refusal::NoNoteToTie));
+    // Fret 6 is near no node of the string.
+    editor.toggleEffect(static_cast<int>(NoteEffect::Harmonic));
+    CHECK(refused(Refusal::NoNaturalHarmonic));
+    editor.setHarmonic(static_cast<int>(elara::core::HarmonicKind::Natural));
+    CHECK(refused(Refusal::NoNaturalHarmonic));
+    // A drum hit on a guitar.
+    editor.toggleDrum();
+    CHECK(refused(Refusal::NeedsDrums));
+    // A grace note two frets below fret 1 leaves the neck: it comes from above.
+    score.typeDigit(1);
+    editor.toggleGraceNote();
+    CHECK(failures.isEmpty());
+    CHECK(editor.caretGraceNotes() == 1);
+    score.undo();
+    score.undo();
+    CHECK(score.undoName() == typed);
+
+    // The free slot after the note, with no note after it.
+    score.moveCaret(ScoreDocument::CaretMove::NextBeat);
+    editor.toggleEffect(static_cast<int>(NoteEffect::Vibrato));
+    CHECK(refused(Refusal::NothingAtCaret));
+    editor.setDynamic(0);
+    CHECK(refused(Refusal::NothingAtCaret));
+    editor.setStrum(1);
+    CHECK(refused(Refusal::NothingAtCaret));
+    CHECK(score.undoName() == typed);
+
+    // On a drum track: no note names, no strings.
+    score.addTrack(QStringLiteral("drum-kit"));
+    REQUIRE(editor.caretOnDrums());
+    editor.typeNoteName(0, false);
+    CHECK(refused(Refusal::NoNoteNames));
+    editor.toggleDrum();
+    REQUIRE(failures.isEmpty());
+    editor.toggleEffect(static_cast<int>(NoteEffect::PalmMute));
+    CHECK(refused(Refusal::NeedsStrings));
+    editor.setPluck(static_cast<int>(elara::core::Finger::Index));
+    CHECK(refused(Refusal::NeedsStrings));
+}
+
+TEST_CASE("score document: each refusal has words of its own") {
+    QStringList texts;
+    for (const elara::core::Refusal why : elara::core::enumValues<elara::core::Refusal>()) {
+        const QString text = ScoreDocument::refusalText(why);
+        CHECK_FALSE(text.isEmpty());
+        CHECK_FALSE(texts.contains(text));
+        texts.append(text);
+    }
 }
 
 TEST_CASE("caret editor: it says so when the caret moves and when the song under it changes") {
