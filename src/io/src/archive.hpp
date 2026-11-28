@@ -36,10 +36,11 @@ public:
 
     [[nodiscard]] bool ok() const noexcept { return ok_; }
 
-    /// The entry's content; nullopt when it is missing. Throws FormatError when
-    /// it is damaged or larger than `limit`.
-    [[nodiscard]] std::optional<std::string> entry(const std::string& name,
-                                                   std::size_t limit = kMaxEntryBytes);
+    /// The entry's content, followed by `padding` zero bytes that the string's
+    /// size includes; nullopt when it is missing. Throws FormatError when it is
+    /// damaged or larger than `limit`.
+    [[nodiscard]] std::optional<std::string>
+    entry(const std::string& name, std::size_t limit = kMaxEntryBytes, std::size_t padding = 0);
 
     /// Names of the entries, in archive order.
     [[nodiscard]] std::vector<std::string> names();

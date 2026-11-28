@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <format>
 #include <limits>
 #include <memory>
@@ -1308,11 +1309,60 @@ std::string songToJson(const Song& song) {
     return std::string(writer.write(song).view());
 }
 
-std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
+namespace {
+
+// yyjson's pool of values starts at a guess from the text's size, a value for
+// every 6 bytes, and grows by half through realloc() when the guess falls
+// short, holding both blocks while it copies. song.json has a value for about
+// every 5.5 bytes, so the pool of a large song grows once. Each block gets
+// that half more room when it is made, and a realloc() that fits stays.
+namespace roomy {
+
+constexpr std::size_t kHeader = 16; // the block's room, keeping malloc()'s alignment
+
+void* allocate(void* /*context*/, std::size_t size) noexcept {
+    const std::size_t room = size + (size / 2);
+    auto* block = static_cast<unsigned char*>(std::malloc(kHeader + room));
+    if (block == nullptr) {
+        return nullptr;
+    }
+    std::memcpy(block, &room, sizeof room);
+    return block + kHeader;
+}
+
+void release(void* /*context*/, void* data) noexcept {
+    if (data != nullptr) {
+        std::free(static_cast<unsigned char*>(data) - kHeader);
+    }
+}
+
+void* reallocate(void* context, void* data, std::size_t oldSize, std::size_t size) noexcept {
+    std::size_t room = 0;
+    std::memcpy(&room, static_cast<unsigned char*>(data) - kHeader, sizeof room);
+    if (size <= room) {
+        return data;
+    }
+    void* grown = allocate(context, size);
+    if (grown != nullptr) {
+        std::memcpy(grown, data, std::min(oldSize, size));
+        release(context, data);
+    }
+    return grown;
+}
+
+constexpr yyjson_alc kAllocator{
+    .malloc = allocate, .realloc = reallocate, .free = release, .ctx = nullptr};
+
+} // namespace roomy
+
+// Reads `length` bytes of song.json at `text`. Without YYJSON_READ_INSITU in
+// `flags` yyjson copies them and never modifies them; with it, it parses them
+// where they are, which needs YYJSON_PADDING_SIZE zero bytes after them.
+std::expected<ImportResult, FormatError> readJson(char* text, std::size_t length,
+                                                  yyjson_read_flag flags,
+                                                  const yyjson_alc* allocator = nullptr) {
     yyjson_read_err error{};
-    // Without YYJSON_READ_INSITU the input is only read, never modified.
-    yyjson_doc* doc =
-        yyjson_read_opts(const_cast<char*>(json.data()), json.size(), 0, nullptr, &error);
+    yyjson_doc* doc = yyjson_read_opts(text, length, flags, allocator, &error);
     if (doc == nullptr) {
         return std::unexpected(FormatError{
             std::format("invalid JSON at byte {}: {}", error.pos, error.msg ? error.msg : "")});
@@ -1330,6 +1380,41 @@ std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
     }
 }
 
+// The song.json of a native file's bytes, followed by the zero bytes that
+// readInPlace() needs.
+std::expected<std::string, FormatError> nativeJson(std::span<const std::uint8_t> bytes) {
+    try {
+        detail::ZipReader zip(bytes);
+        if (!zip.ok()) {
+            return std::unexpected(FormatError{"not an Elara file (not a zip archive)"});
+        }
+        const auto mime = zip.entry("mimetype", 256);
+        if (mime && *mime != kNativeMimeType) {
+            return std::unexpected(
+                FormatError{std::format("not an Elara file (mimetype {})", *mime)});
+        }
+        auto json = zip.entry("song.json", detail::kMaxEntryBytes, YYJSON_PADDING_SIZE);
+        if (!json) {
+            return std::unexpected(FormatError{"not an Elara file (no song.json)"});
+        }
+        return *std::move(json);
+    } catch (const FormatError& failure) {
+        return std::unexpected(failure);
+    }
+}
+
+// Reads nativeJson()'s text where it is, without a copy of it.
+std::expected<ImportResult, FormatError> readInPlace(std::string&& json) {
+    return readJson(json.data(), json.size() - YYJSON_PADDING_SIZE, YYJSON_READ_INSITU,
+                    &roomy::kAllocator);
+}
+
+} // namespace
+
+std::expected<ImportResult, FormatError> readSongJson(std::string_view json) {
+    return readJson(const_cast<char*>(json.data()), json.size(), YYJSON_READ_NOFLAG);
+}
+
 std::expected<Song, FormatError> songFromJson(std::string_view json) {
     return readSongJson(json).transform(songOf);
 }
@@ -1343,24 +1428,7 @@ std::vector<std::uint8_t> encodeNative(const Song& song) {
 }
 
 std::expected<ImportResult, FormatError> readNative(std::span<const std::uint8_t> bytes) {
-    try {
-        detail::ZipReader zip(bytes);
-        if (!zip.ok()) {
-            return std::unexpected(FormatError{"not an Elara file (not a zip archive)"});
-        }
-        const auto mime = zip.entry("mimetype", 256);
-        if (mime && *mime != kNativeMimeType) {
-            return std::unexpected(
-                FormatError{std::format("not an Elara file (mimetype {})", *mime)});
-        }
-        const auto json = zip.entry("song.json");
-        if (!json) {
-            return std::unexpected(FormatError{"not an Elara file (no song.json)"});
-        }
-        return readSongJson(*json);
-    } catch (const FormatError& failure) {
-        return std::unexpected(failure);
-    }
+    return nativeJson(bytes).and_then(readInPlace);
 }
 
 std::expected<Song, FormatError> decodeNative(std::span<const std::uint8_t> bytes) {
@@ -1378,8 +1446,10 @@ std::expected<Song, FormatError> loadNative(const std::filesystem::path& path) {
 }
 
 std::expected<ImportResult, FormatError> openNative(const std::filesystem::path& path) {
-    return detail::readFile(path).and_then(
-        [](const std::vector<std::uint8_t>& bytes) { return readNative(bytes); });
+    // The file's bytes go before the song is read: only its text is held then.
+    auto json = detail::readFile(path).and_then(
+        [](const std::vector<std::uint8_t>& bytes) { return nativeJson(bytes); });
+    return std::move(json).and_then(readInPlace);
 }
 
 } // namespace elara::io

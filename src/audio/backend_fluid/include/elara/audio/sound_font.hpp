@@ -13,6 +13,10 @@
 
 namespace elara::audio {
 
+namespace detail {
+struct LoadedSoundFont; // the file as FluidSynth loaded it
+} // namespace detail
+
 /// One sound of a SoundFont, by its MIDI bank and program.
 struct SoundFontPreset {
     int bank = 0;    ///< 128 for drum kits
@@ -24,8 +28,10 @@ struct SoundFontPreset {
 
 /// A SoundFont file (SF2, or SF3 with compressed samples) as a sound bank.
 ///
-/// Opening reads the presets only; each track's sound reads the samples of its
-/// own presets when it is made, so a song loads what it plays.
+/// Opening loads the presets and instruments once, and every track's sound
+/// plays that copy (ADR-0146); a sound reads the samples of its own presets
+/// when it is made, so a song loads what it plays. Sounds may outlive the
+/// SoundFont and render on different threads.
 class SoundFont final : public SoundBank {
 public:
     /// Fails with a message naming the file when it is missing or holds no
@@ -54,12 +60,14 @@ public:
     [[nodiscard]] std::string soundName(const core::Instrument& instrument) const override;
 
 private:
-    SoundFont(std::filesystem::path path, std::vector<SoundFontPreset> presets);
+    SoundFont(std::filesystem::path path, std::vector<SoundFontPreset> presets,
+              std::shared_ptr<detail::LoadedSoundFont> loaded);
 
     [[nodiscard]] const SoundFontPreset* find(int bank, int program) const noexcept;
 
     std::filesystem::path path_;
     std::vector<SoundFontPreset> presets_;
+    std::shared_ptr<detail::LoadedSoundFont> loaded_;
 };
 
 } // namespace elara::audio

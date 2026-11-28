@@ -1,6 +1,7 @@
 {
   "name": "fluidsynth",
   "version": "2.6.2",
+  "port-version": 1,
   "description": "FluidSynth's SoundFont synthesizer as a library, without audio or MIDI drivers, with SF3 support through libsndfile.",
   "homepage": "https://github.com/FluidSynth/fluidsynth",
   "license": "LGPL-2.1-or-later",

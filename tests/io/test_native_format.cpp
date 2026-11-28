@@ -509,6 +509,24 @@ TEST_CASE("A native file is a zip with a mimetype and song.json", "[io][native]"
     CHECK_FALSE(decodeNative(std::vector<std::uint8_t>{1, 2, 3}).has_value());
 }
 
+TEST_CASE("Text with escapes reads back the same from a native file", "[io][native]") {
+    // song.json is read where it was inflated, its escapes undone in place.
+    core::Song song = richSong();
+    song.info().title = "A \"quoted\" back\\slash,\ttab,\nline, \x01, "
+                        "\xC3\xA9t\xC3\xA9 \xF0\x9F\x8E\xB8 end";
+    song.info().artist = std::string(3000, '\\');
+    const auto decoded = decodeNative(encodeNative(song));
+    REQUIRE(decoded.has_value());
+    CHECK(*decoded == song);
+
+    const auto path = tempFile("elara-test-native-escapes.elara");
+    saveNative(song, path);
+    const auto opened = elara::io::openNative(path);
+    std::filesystem::remove(path);
+    REQUIRE(opened.has_value());
+    CHECK(opened->song == song);
+}
+
 TEST_CASE("Native files are saved atomically and loaded back", "[io][native]") {
     const auto path = tempFile("elara-test-native.elara");
     std::filesystem::remove(path);
