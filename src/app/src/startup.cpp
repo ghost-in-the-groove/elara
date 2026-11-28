@@ -4,8 +4,6 @@
 #include <elara/audio/sequence.hpp>
 #include <elara/core/entry.hpp>
 #include <elara/core/instrument.hpp>
-#include <elara/io/midi.hpp>
-#include <elara/io/musicxml.hpp>
 #include <elara/io/native_format.hpp>
 #include <elara/notation/display_list.hpp>
 
@@ -15,11 +13,8 @@
 #include "score_page.hpp"
 #include "tuner_controller.hpp"
 #include "window_state.hpp"
-#include <QByteArray>
 #include <QColor>
 #include <QCoreApplication>
-#include <QFile>
-#include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QImage>
@@ -187,8 +182,6 @@ void Startup::start() {
         connect(score_, &ScoreDocument::recoveryWritten, this, [this] { recoveryWritten_ = true; });
         connect(score_, &ScoreDocument::saveFinished, this,
                 [this](const QUrl& /*file*/, bool saved) { saved_ = saved; });
-        connect(score_, &ScoreDocument::exportFinished, this,
-                [this](const QUrl& /*file*/, bool written) { exported_ = written; });
     }
     if (options_.effects && window_ != nullptr) {
         effectsPanel_ = window_->findChild<QObject*>(QStringLiteral("effectsPanel"));
@@ -355,8 +348,6 @@ void Startup::queueSteps() {
             return false;
         });
         queueParking();
-        queuePdf();
-        queueExport();
         queuePractice();
         queueLoop();
         if (!options_.soundFont.isEmpty()) {
@@ -1969,138 +1960,6 @@ void Startup::queueSfz() {
     });
 }
 
-// An edit keeps playback where it is: a track added, then undone, each give
-// playback a new sequence and leave it where the click on the cursor put it.
-// A new song then starts playback from its beginning. The A-B loop that
-// queueLoop() left stays through the edit and goes with the new song.
-// The score exported as PDF (ADR-0074) into a folder of its own: a whole
-// document with as many pages as the score shows.
-void Startup::queuePdf() {
-    steps_.emplace_back([this] {
-        if (!scratch_) {
-            scratch_.emplace();
-        }
-        exported_.reset();
-        // ".pdf" is added.
-        score_->exportPdf(QUrl::fromLocalFile(scratch_->filePath(QStringLiteral("score"))));
-        return false;
-    });
-    // Laid out and written on a worker (ADR-0107).
-    steps_.emplace_back([this] {
-        const auto problem = [this](const QString& what) {
-            if (editProblem_.isEmpty()) {
-                editProblem_ = QStringLiteral("PDF export: %1").arg(what);
-            }
-        };
-        if (!exported_) {
-            again_ = true;
-            return false;
-        }
-        if (!*exported_) {
-            problem(QStringLiteral("it failed"));
-            return false;
-        }
-        QFile written(scratch_->filePath(QStringLiteral("score.pdf")));
-        if (!written.open(QIODevice::ReadOnly)) {
-            problem(QStringLiteral("no file was written"));
-            return false;
-        }
-        // Export as PDF… suggests the song's file with ".pdf" for its extension.
-        if (score_->source().isLocalFile()) {
-            const QFileInfo source(score_->source().toLocalFile());
-            const QFileInfo suggested(score_->exportFile(QStringLiteral("pdf")).toLocalFile());
-            if (suggested.dir() != source.dir() ||
-                suggested.fileName() != source.completeBaseName() + QStringLiteral(".pdf")) {
-                problem(QStringLiteral("%1 suggested for %2")
-                            .arg(suggested.filePath(), source.filePath()));
-            }
-        } else if (!score_->exportFile(QStringLiteral("pdf"))
-                        .toLocalFile()
-                        .endsWith(QStringLiteral(".pdf"))) {
-            problem(QStringLiteral("no PDF file suggested for a song without a file"));
-        }
-        const QByteArray pdf = written.readAll();
-        const qsizetype pages = pdf.count("/Type /Page ");
-        if (!pdf.startsWith("%PDF-1.7\n") || !pdf.endsWith("%%EOF\n")) {
-            problem(QStringLiteral("the file is no whole PDF document"));
-        } else if (pages != score_->pageCount()) {
-            problem(
-                QStringLiteral("%1 pages for a score of %2").arg(pages).arg(score_->pageCount()));
-        }
-        std::printf("pdf: %lld %s, %lld bytes\n", static_cast<long long>(pages),
-                    pages == 1 ? "page" : "pages", static_cast<long long>(pdf.size()));
-        return false;
-    });
-}
-
-// The song exported as MusicXML and as MIDI, beside Export as PDF…: files that
-// read back, MusicXML with every track, each export reporting what its format
-// left out, and the song still unmodified. Prints "musicxml: <tracks> tracks,
-// <warnings> warnings" and "midi: <bytes> bytes, <warnings> warnings".
-void Startup::queueExport() {
-    steps_.emplace_back([this] {
-        const auto problem = [this](const QString& what) {
-            if (editProblem_.isEmpty()) {
-                editProblem_ = QStringLiteral("export: %1").arg(what);
-            }
-        };
-        const bool modified = score_->modified();
-        QStringList reported;
-        int reports = 0;
-        const auto connection = QObject::connect(
-            score_, &ScoreDocument::report,
-            [&reported, &reports](const QString& /*message*/, const QStringList& details) {
-                reported = details;
-                ++reports;
-            });
-        const QTemporaryDir folder;
-        // ".musicxml" and ".mid" are added.
-        const bool xmlWritten =
-            score_->exportMusicXml(QUrl::fromLocalFile(folder.filePath(QStringLiteral("xml"))));
-        const QStringList xmlWarnings = reported;
-        reported.clear();
-        const bool midiWritten =
-            score_->exportMidi(QUrl::fromLocalFile(folder.filePath(QStringLiteral("midi"))));
-        const QStringList midiWarnings = reported;
-        QObject::disconnect(connection);
-        if (!xmlWritten || !midiWritten || reports != 2) {
-            problem(QStringLiteral("an export failed or reported nothing"));
-            return false;
-        }
-        const auto xml = elara::io::importMusicXmlFile(
-            folder.filePath(QStringLiteral("xml.musicxml")).toStdString());
-        const auto midi =
-            elara::io::importMidiFile(folder.filePath(QStringLiteral("midi.mid")).toStdString());
-        if (!xml || !midi) {
-            problem(QStringLiteral("an exported file does not read back"));
-            return false;
-        }
-        if (xml->song.trackCount() != score_->song()->trackCount()) {
-            problem(QStringLiteral("MusicXML read back with %1 tracks for %2")
-                        .arg(xml->song.trackCount())
-                        .arg(score_->song()->trackCount()));
-        }
-        if (score_->modified() != modified) {
-            problem(QStringLiteral("exporting changed the song's modified state"));
-        }
-        // Each export suggests the song's file with its own extension.
-        for (const QString& extension : {QStringLiteral("musicxml"), QStringLiteral("mid")}) {
-            if (!score_->exportFile(extension).toLocalFile().endsWith(QLatin1Char('.') +
-                                                                      extension)) {
-                problem(QStringLiteral("no .%1 file suggested").arg(extension));
-            }
-        }
-        std::printf("musicxml: %lld tracks, %lld warnings\n",
-                    static_cast<long long>(xml->song.trackCount()),
-                    static_cast<long long>(xmlWarnings.size()));
-        std::printf(
-            "midi: %lld bytes, %lld warnings\n",
-            static_cast<long long>(QFileInfo(folder.filePath(QStringLiteral("midi.mid"))).size()),
-            static_cast<long long>(midiWarnings.size()));
-        return false;
-    });
-}
-
 // The view holds still while the layout changes: on a new song whose first
 // page is full, the caret's staff in a system down that page stays at its
 // height on screen while an edit makes the first system taller and while
@@ -2680,6 +2539,10 @@ void Startup::queueParking() {
     });
 }
 
+// An edit keeps playback where it is: a track added, then undone, each give
+// playback a new sequence and leave it where the click on the cursor put it.
+// A new song then starts playback from its beginning. The A-B loop that
+// queueLoop() left stays through the edit and goes with the new song.
 void Startup::queueKeepPosition() {
     const auto check = [this](const char* what) {
         auto* audio = window_->findChild<AudioController*>();
