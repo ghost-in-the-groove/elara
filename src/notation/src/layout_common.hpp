@@ -411,8 +411,9 @@ public:
 
     /// Places the line's chord symbols above `top` (the highest ink of the
     /// staff, negative above it) and its texts above them, draws them into
-    /// `list` and forgets them.
-    void place(DisplayList& list, double top);
+    /// `list` and forgets them. A text that would run past `width`, the end
+    /// of the line, ends with it instead (ADR-0176).
+    void place(DisplayList& list, double top, double width);
 
 private:
     struct Read {
@@ -435,7 +436,7 @@ private:
     };
 
     // Places the line's texts above `top`, rows upwards.
-    void placeTexts(DisplayList& list, double top);
+    void placeTexts(DisplayList& list, double top, double width);
 
     [[nodiscard]] bool showsDiagram(const core::ChordSymbol& symbol) const noexcept {
         return diagrams_ && symbol.diagram && !symbol.diagram->frets.empty();

@@ -498,7 +498,7 @@ private:
             lanes_.place(list_, inkTop());
         }
         if (!aboveRow_.empty()) {
-            aboveRow_.place(list_, inkTop());
+            aboveRow_.place(list_, inkTop(), width);
         }
         // Lyrics right under the notes, dynamics under them (ADR-0084).
         if (!lyrics_.empty()) {

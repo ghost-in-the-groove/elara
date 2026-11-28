@@ -90,8 +90,9 @@ line at their natural spacing; `--layout page` breaks them into systems on
 pages of `--paper` with staff spaces `--staff-space` mm apart and `--margin` mm
 margins, with the title and credits on the first page (unless `--no-credits`);
 `--fit-staves` makes the staff space smaller when the staves shown would not
-leave two systems a page, as the app does for every track at once, and reports
-it as `"staffSpace"` (ADR-0171);
+leave two systems a page, as the app does for every track at once (ADR-0171),
+or when a measure would be wider than the page (ADR-0176), and reports it as
+`"staffSpace"`;
 `--layout scroll` stacks the systems on one page as long as the music,
 `--width` staff spaces wide (ADR-0014); `--layout strips` cuts that page into
 strips of whole systems no higher than `--strip-height` staff spaces (the

@@ -393,3 +393,33 @@ TEST_CASE("Tempo marks: a gradual change goes on into the next systems",
         CHECK(dash.to.x - dash.from.x > 1.0);
     }
 }
+
+TEST_CASE("Tempo marks: one that would run past the end of the system ends with it",
+          "[notation][layout][tempo]") {
+    // A change on the last beat: the mark is wider than what is left of the
+    // system, and moves back to end at the last barline (ADR-0176).
+    Song song = quarters(2);
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(3, 4), .tempo = Tempo(90)}};
+    const DisplayList list = layout(song);
+    const auto marks = texts(list, Role::Tempo);
+    REQUIRE(contents(marks) == std::vector<std::string>{"= 120", "= 90"});
+    const auto notes = glyphs(list, Role::Tempo);
+    REQUIRE(notes.size() == 2);
+    const auto heads = glyphs(list, Role::Notehead);
+    REQUIRE(heads.size() == 8);
+    const double width = marks[1].origin.x + textWidth(marks[1]) - left(notes[1]);
+    REQUIRE(left(heads[7]) + width > list.width); // from its beat it would run past the end
+    CHECK_THAT(marks[1].origin.x + textWidth(marks[1]), WithinAbs(list.width, kEpsilon));
+    CHECK(left(notes[1]) < left(heads[7]));
+    CHECK(left(notes[1]) > left(heads[4]));
+
+    // One with room after it stays over its beat.
+    song.measureHeader(1).tempoChanges = {
+        TempoChange{.offset = Fraction(1, 4), .tempo = Tempo(90)}};
+    const DisplayList fitting = layout(song);
+    const auto fittingNotes = glyphs(fitting, Role::Tempo);
+    REQUIRE(fittingNotes.size() == 2);
+    CHECK_THAT(left(fittingNotes[1]),
+               WithinAbs(left(glyphs(fitting, Role::Notehead)[5]), kEpsilon));
+}

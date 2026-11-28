@@ -1024,10 +1024,10 @@ std::pair<double, double> AboveRow::reach(const core::ChordSymbol& symbol) const
     return {left, right};
 }
 
-void AboveRow::place(DisplayList& list, double top) {
+void AboveRow::place(DisplayList& list, double top, double width) {
     double ceiling = std::min(top, 0.0); // the highest ink placed so far
     if (marks_.empty()) {
-        placeTexts(list, ceiling);
+        placeTexts(list, ceiling, width);
         return;
     }
     const double markHeight = font_.metrics(Glyph::FretboardO).box.height() * kChordMarkScale;
@@ -1059,12 +1059,18 @@ void AboveRow::place(DisplayList& list, double top) {
         }
     }
     marks_.clear();
-    placeTexts(list, ceiling);
+    placeTexts(list, ceiling, width);
 }
 
-void AboveRow::placeTexts(DisplayList& list, double top) {
+void AboveRow::placeTexts(DisplayList& list, double top, double width) {
     if (texts_.empty()) {
         return;
+    }
+    // A text that would run past the end of the line starts early enough to
+    // end with it, as far back as the line's start allows.
+    for (TextMark& mark : texts_) {
+        mark.left =
+            std::max(0.0, std::min(mark.left, width - textWidth(*mark.text, kBeatTextSize)));
     }
     std::ranges::stable_sort(texts_, {}, &TextMark::left);
     const double rowHeight = ((kTextAscent + kTextDescent) * kBeatTextSize) + kBeatTextRowGap;

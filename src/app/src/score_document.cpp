@@ -91,6 +91,10 @@ struct LayoutMemory {
     int issueCount = 0;
     double staffSpace = 0.0;
     bool hasTablature = false;
+    /// The staff space this view was narrowed to for a measure wider than the
+    /// page, and that measure (ADR-0176); 0 while every measure fits.
+    double narrowed = 0.0;
+    std::size_t narrowedBy = 0;
 };
 
 // The memories of the views of a song shown last (ADR-0175): a track or every
@@ -153,6 +157,44 @@ notation::PageLayoutOptions pageOptions(double staffSpace) {
 // (ADR-0171).
 double staffSpaceFor(const core::Song& song, std::span<const notation::StaffSelection> staves) {
     return notation::fittedStaffSpace(song, staves, notation::kA4, kStaffSpaceMm);
+}
+
+// Whether measure `m` is in `now` as it was in `before`: its header and what
+// each of `staves` plays in it.
+bool sameMeasure(const core::Song& before, const core::Song& now,
+                 std::span<const notation::StaffSelection> staves, std::size_t m) {
+    if (m >= before.measureCount() || m >= now.measureCount() ||
+        before.measureHeader(m) != now.measureHeader(m)) {
+        return false;
+    }
+    return std::ranges::all_of(staves, [&](const notation::StaffSelection& shown) {
+        if (shown.track >= before.trackCount() ||
+            shown.staff >= before.track(shown.track).staffCount()) {
+            return false;
+        }
+        const core::Measure& was = before.track(shown.track).staff(shown.staff).measure(m);
+        const core::Measure& is = now.track(shown.track).staff(shown.staff).measure(m);
+        return &was == &is || was == is;
+    });
+}
+
+// `staves` on A4 pages at the staff space that fits them, and that staff
+// space: the one of the staves shown (ADR-0171), smaller when a measure is
+// wider than the page there (ADR-0176). What an export lays out; the window's
+// layout does the same through its memory.
+std::pair<std::vector<notation::DisplayList>, double>
+fittedPages(const core::Song& song, std::span<const notation::StaffSelection> staves,
+            const notation::EngravingFont& font) {
+    double space = staffSpaceFor(song, staves);
+    auto pages = notation::layoutPages(song, staves, font, pageOptions(space));
+    const double narrower =
+        notation::narrowedStaffSpace(notation::kA4, kStaffSpaceMm, space,
+                                     notation::widthOverflow(pages, pageOptions(space)).amount);
+    if (narrower < space) {
+        space = narrower;
+        pages = notation::layoutPages(song, staves, font, pageOptions(space));
+    }
+    return {std::move(pages), space};
 }
 
 // The music font's metrics, read once from the app's resources.
@@ -291,19 +333,44 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
     }
     // Until this layout is done the memory holds no song's pages: a layout
     // that fails leaves its cache empty.
+    const std::shared_ptr<const core::Song> before = std::move(memory.song);
     memory.song.reset();
     try {
         const auto tracks = shownTracks(*song, track);
         result.hasTablature = notation::hasTablature(*song, tracks);
         const auto staves = notation::selectTracks(*song, tracks, trackView(view));
         const auto start = std::chrono::steady_clock::now();
-        result.staffSpace = staffSpaceFor(*song, staves);
-        notation::PageLayoutOptions options = pageOptions(result.staffSpace);
-        const double pageHeight = options.height;
-        if (continuous) {
-            options.height = 0.0;
+        // The staff space of the staves shown (ADR-0171) or, while the measure
+        // that did not fit the page's width there is as it was, the smaller
+        // one found for it (ADR-0176): an edit elsewhere then lays out only
+        // what it changed.
+        const double byStaves = staffSpaceFor(*song, staves);
+        result.staffSpace = byStaves;
+        if (memory.narrowed > 0.0 && memory.narrowed < byStaves && before &&
+            sameMeasure(*before, *song, staves, memory.narrowedBy)) {
+            result.staffSpace = memory.narrowed;
         }
-        auto pages = memory.cache.layout(song, staves, *font, options);
+        std::vector<notation::DisplayList> pages;
+        double pageHeight = 0.0;
+        for (int pass = 0;; ++pass) {
+            notation::PageLayoutOptions options = pageOptions(result.staffSpace);
+            pageHeight = options.height;
+            if (continuous) {
+                options.height = 0.0;
+            }
+            pages = memory.cache.layout(song, staves, *font, options);
+            // A measure wider than the page gets smaller staff spaces, on a
+            // page that is as wide in millimetres and so wider in them.
+            const notation::WidthOverflow over = notation::widthOverflow(pages, options);
+            const double narrower = notation::narrowedStaffSpace(notation::kA4, kStaffSpaceMm,
+                                                                 result.staffSpace, over.amount);
+            if (pass > 0 || narrower >= result.staffSpace) {
+                break;
+            }
+            result.staffSpace = narrower;
+            memory.narrowedBy = over.measure;
+        }
+        memory.narrowed = result.staffSpace < byStaves ? result.staffSpace : 0.0;
         if (continuous) {
             pages = notation::cutIntoStrips(pages.front(), pageHeight);
         }
@@ -2000,9 +2067,8 @@ void ScoreDocument::exportPdf(const QUrl& file) {
                                    try {
                                        const auto staves =
                                            notation::selectTracks(*song, tracks, view);
-                                       const double space = staffSpaceFor(*song, staves);
-                                       const auto pages = notation::layoutPages(
-                                           *song, staves, *font, pageOptions(space));
+                                       const auto [pages, space] =
+                                           fittedPages(*song, staves, *font);
                                        pdf = notation::toPdf(pages, *outlines,
                                                              {.staffSpace = space * 72.0 / 25.4,
                                                               .title = song->info().title,

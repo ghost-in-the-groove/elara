@@ -152,6 +152,7 @@ one that replaces them.
 | [0173](0173-the-caret-frames-what-it-marks.md) | The caret frames what it marks, and the cursor hides while the score is worked on | Accepted |
 | [0174](0174-the-staves-lines-are-dimmer-on-the-dark-page.md) | The staves' lines are dimmer on the dark page | Accepted |
 | [0175](0175-a-view-shown-before-comes-back-as-it-was.md) | A view shown before comes back as it was | Accepted |
+| [0176](0176-nothing-runs-past-the-right-margin.md) | Nothing runs past the right margin | Accepted |
 | [0180](0180-edits-at-the-caret-say-why-they-are-refused.md) | Edits at the caret say why they are refused | Accepted |
 
 ## Template
