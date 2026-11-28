@@ -22,6 +22,7 @@
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
+#include <elara/notation/staff_size.hpp>
 #include <elara/notation/symbol.hpp>
 
 #include "score_common.hpp"
@@ -69,6 +70,7 @@ struct ScoreLayout {
     ScoreDocument::View view = ScoreDocument::View::Both;
     bool continuous = false; ///< the pages are strips of one endless page
     bool hasTablature = false;
+    double staffSpace = 1.75; ///< mm the staves were laid out with (ADR-0171)
     int milliseconds = 0;
     QString error;
     bool opened = false;  ///< a song just read from `source`, to edit from now on
@@ -95,10 +97,15 @@ namespace {
 
 constexpr double kStaffSpaceMm = 1.75;
 
-const notation::PageLayoutOptions& pageOptions() {
-    static const notation::PageLayoutOptions options =
-        notation::pageOptions(notation::kA4, kStaffSpaceMm);
-    return options;
+// A4 pages with staff spaces `staffSpace` mm apart.
+notation::PageLayoutOptions pageOptions(double staffSpace) {
+    return notation::pageOptions(notation::kA4, staffSpace);
+}
+
+// The staff space `staves` are laid out with: smaller as more are shown at once
+// (ADR-0171).
+double staffSpaceFor(const core::Song& song, std::span<const notation::StaffSelection> staves) {
+    return notation::fittedStaffSpace(song, staves, notation::kA4, kStaffSpaceMm);
 }
 
 // The music font's metrics, read once from the app's resources.
@@ -178,10 +185,11 @@ std::shared_ptr<const audio::Sequence> sequenceFor(const core::Song& song,
     return sequence;
 }
 
-// Finds the layout issues of the pages of `result` (ADR-0150): a page the
-// last layout laid out the same keeps the list found then, so that an edit
-// checks only the pages it changed.
-void findIssues(ScoreLayout& result, const notation::EngravingFont& font, LayoutMemory& memory) {
+// Finds the layout issues of the pages of `result` (ADR-0150), laid out with
+// `options`: a page the last layout laid out the same keeps the list found
+// then, so that an edit checks only the pages it changed.
+void findIssues(ScoreLayout& result, const notation::EngravingFont& font,
+                const notation::PageLayoutOptions& options, LayoutMemory& memory) {
     static const PageIssues none = std::make_shared<const std::vector<notation::LayoutIssue>>();
     const std::vector<notation::DisplayList>& pages = *result.pages;
     const std::vector<notation::DisplayList>* before = memory.pages.get();
@@ -192,7 +200,7 @@ void findIssues(ScoreLayout& result, const notation::EngravingFont& font, Layout
             result.issues.push_back(memory.issues[p]);
         } else {
             std::vector<notation::LayoutIssue> found =
-                notation::layoutIssues(std::span(&pages[p], 1), font, pageOptions());
+                notation::layoutIssues(std::span(&pages[p], 1), font, options);
             result.issues.push_back(
                 found.empty()
                     ? none
@@ -226,19 +234,21 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.hasTablature = notation::hasTablature(*song, tracks);
         const auto staves = notation::selectTracks(*song, tracks, trackView(view));
         const auto start = std::chrono::steady_clock::now();
-        notation::PageLayoutOptions options = pageOptions();
+        result.staffSpace = staffSpaceFor(*song, staves);
+        notation::PageLayoutOptions options = pageOptions(result.staffSpace);
+        const double pageHeight = options.height;
         if (continuous) {
             options.height = 0.0;
         }
         auto pages = memory.cache.layout(song, staves, *font, options);
         if (continuous) {
-            pages = notation::cutIntoStrips(pages.front(), pageOptions().height);
+            pages = notation::cutIntoStrips(pages.front(), pageHeight);
         }
         const auto elapsed = std::chrono::steady_clock::now() - start;
         result.milliseconds = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
         result.pages = std::make_shared<const std::vector<notation::DisplayList>>(std::move(pages));
-        findIssues(result, *font, memory);
+        findIssues(result, *font, pageOptions(result.staffSpace), memory);
     } catch (const std::exception& error) {
         result.error =
             QObject::tr("The score could not be laid out: %1").arg(qstring(error.what()));
@@ -644,7 +654,8 @@ int ScoreDocument::pageCount() const {
 }
 
 QSizeF ScoreDocument::pageSize() const {
-    return {pageOptions().width, pageOptions().height};
+    const notation::PageLayoutOptions options = pageOptions(staffSpace_);
+    return {options.width, options.height};
 }
 
 void ScoreDocument::setContinuous(bool continuous) {
@@ -656,8 +667,8 @@ void ScoreDocument::setContinuous(bool continuous) {
     relayout();
 }
 
-double ScoreDocument::staffSpace() {
-    return kStaffSpaceMm;
+double ScoreDocument::staffSpace() const {
+    return staffSpace_;
 }
 
 QStringList ScoreDocument::nameFilters() {
@@ -969,6 +980,7 @@ void ScoreDocument::apply(const ScoreLayout& layout, bool edit) {
         pageTops_.append(top);
     }
     hasTablature_ = layout.hasTablature;
+    staffSpace_ = layout.staffSpace;
     layoutMilliseconds_ = layout.milliseconds;
     // The same lists, page for page, when the layout found nothing new.
     const bool issuesMoved = layout.issues != pageIssues_;
@@ -1917,40 +1929,41 @@ void ScoreDocument::exportPdf(const QUrl& file) {
                   tr("Could not export %1: %2").arg(local, tr("The music font is missing.")));
         return;
     }
-    whenDone(
-        QtConcurrent::run(&exportQueue_,
-                          [song = song_, tracks = shownTracks(*song_, track_),
-                           view = trackView(view_), font, outlines, local] {
-                              std::string pdf;
-                              try {
-                                  const auto staves = notation::selectTracks(*song, tracks, view);
-                                  const auto pages =
-                                      notation::layoutPages(*song, staves, *font, pageOptions());
-                                  pdf = notation::toPdf(pages, *outlines,
-                                                        {.staffSpace = kStaffSpaceMm * 72.0 / 25.4,
-                                                         .title = song->info().title,
-                                                         .compress = io::zlibCompress});
-                              } catch (const std::exception& error) {
-                                  return qstring(error.what());
-                              }
-                              // Written whole or not at all: a failed export leaves no half
-                              // file behind.
-                              QSaveFile out(local);
-                              const auto size = static_cast<qint64>(pdf.size());
-                              if (!out.open(QIODevice::WriteOnly) ||
-                                  out.write(pdf.data(), size) != size || !out.commit()) {
-                                  return out.errorString();
-                              }
-                              return QString();
-                          }),
-        this, [this, local](const QString& error) {
-            if (error.isEmpty()) {
-                emit notice(tr("Exported %1.").arg(QFileInfo(local).fileName()));
-            } else {
-                emit editFailed(tr("Could not export %1: %2").arg(local, error));
-            }
-            emit exportFinished(QUrl::fromLocalFile(local), error.isEmpty());
-        });
+    whenDone(QtConcurrent::run(&exportQueue_,
+                               [song = song_, tracks = shownTracks(*song_, track_),
+                                view = trackView(view_), font, outlines, local] {
+                                   std::string pdf;
+                                   try {
+                                       const auto staves =
+                                           notation::selectTracks(*song, tracks, view);
+                                       const double space = staffSpaceFor(*song, staves);
+                                       const auto pages = notation::layoutPages(
+                                           *song, staves, *font, pageOptions(space));
+                                       pdf = notation::toPdf(pages, *outlines,
+                                                             {.staffSpace = space * 72.0 / 25.4,
+                                                              .title = song->info().title,
+                                                              .compress = io::zlibCompress});
+                                   } catch (const std::exception& error) {
+                                       return qstring(error.what());
+                                   }
+                                   // Written whole or not at all: a failed export leaves no half
+                                   // file behind.
+                                   QSaveFile out(local);
+                                   const auto size = static_cast<qint64>(pdf.size());
+                                   if (!out.open(QIODevice::WriteOnly) ||
+                                       out.write(pdf.data(), size) != size || !out.commit()) {
+                                       return out.errorString();
+                                   }
+                                   return QString();
+                               }),
+             this, [this, local](const QString& error) {
+                 if (error.isEmpty()) {
+                     emit notice(tr("Exported %1.").arg(QFileInfo(local).fileName()));
+                 } else {
+                     emit editFailed(tr("Could not export %1: %2").arg(local, error));
+                 }
+                 emit exportFinished(QUrl::fromLocalFile(local), error.isEmpty());
+             });
 }
 
 bool ScoreDocument::execute(std::unique_ptr<core::Command> command) {

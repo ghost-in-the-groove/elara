@@ -355,6 +355,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] Following playback a system at a time, held off by a scroll by hand; the
       caret marks where playback starts while it is stopped, and the measure
       playing or the caret's is shaded across every staff (ADR-0170)
+- [x] Every track at once at a smaller staff size, two systems a page where
+      the staves allow it (ADR-0171)
 
 ## Milestone 6 - Practice tools
 

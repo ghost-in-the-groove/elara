@@ -1441,6 +1441,40 @@ add_test(NAME cli.render_tracks_pages_content
 set_tests_properties(cli.render_tracks_pages_content PROPERTIES FIXTURES_REQUIRED cli_rendered_pages
   PASS_REGULAR_EXPRESSION "viewBox=\"0 0 35 49\\.5\".*<text class=\"t credit\"[^>]*>Corpus Band</text>.*<text class=\"t trackName\"")
 
+# The staff space follows the staves shown (ADR-0171): six guitars in notation
+# over tablature get the least share of it, the same six in notation alone or
+# one of them keep it all, and only --fit-staves reports it.
+set(ELARA_CLI_SIX_GUITARS "${CMAKE_CURRENT_BINARY_DIR}/cli-six-guitars.elara")
+add_test(NAME cli.make_six_guitars
+  COMMAND elara-cli edit --out "${ELARA_CLI_SIX_GUITARS}" "add-track electric-guitar"
+    "add-track electric-guitar" "add-track electric-guitar" "add-track electric-guitar"
+    "add-track electric-guitar" "add-track electric-guitar" "append-measures 16")
+set_tests_properties(cli.make_six_guitars PROPERTIES FIXTURES_SETUP cli_six_guitars)
+add_test(NAME cli.render_fit_staves
+  COMMAND elara-cli --json render "${ELARA_CLI_SIX_GUITARS}" --tracks all --view both
+          --layout page --fit-staves)
+add_test(NAME cli.render_fit_staves_standard
+  COMMAND elara-cli --json render "${ELARA_CLI_SIX_GUITARS}" --tracks all --layout page
+          --fit-staves)
+add_test(NAME cli.render_fit_staves_one_track
+  COMMAND elara-cli render "${ELARA_CLI_SIX_GUITARS}" --tracks 0 --view both --layout page
+          --fit-staves)
+add_test(NAME cli.render_without_fit_staves
+  COMMAND elara-cli --json render "${ELARA_CLI_SIX_GUITARS}" --tracks all --view both
+          --layout page)
+set_tests_properties(cli.render_fit_staves cli.render_fit_staves_standard
+  cli.render_fit_staves_one_track cli.render_without_fit_staves PROPERTIES
+  FIXTURES_REQUIRED cli_six_guitars)
+set_tests_properties(cli.render_fit_staves PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"page\",\"staffSpace\":1\\.05,")
+set_tests_properties(cli.render_fit_staves_standard PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"page\",\"staffSpace\":1\\.75,")
+set_tests_properties(cli.render_fit_staves_one_track PROPERTIES
+  PASS_REGULAR_EXPRESSION "2 staves \\(both\\).*[\r\n]+  staff space 1\\.75 mm")
+set_tests_properties(cli.render_without_fit_staves PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"page\",\"pages\":"
+  FAIL_REGULAR_EXPRESSION "staffSpace")
+
 add_test(NAME cli.render_rejects_tracks_with_track
   COMMAND elara-cli render "${ELARA_CORPUS}/gp/band.gp" --tracks 0 --track 1)
 set_tests_properties(cli.render_rejects_tracks_with_track PROPERTIES WILL_FAIL TRUE)

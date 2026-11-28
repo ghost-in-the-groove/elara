@@ -12,6 +12,7 @@
 #include <elara/notation/pdf.hpp>
 #include <elara/notation/smufl.hpp>
 #include <elara/notation/staff_layout.hpp>
+#include <elara/notation/staff_size.hpp>
 #include <elara/notation/svg.hpp>
 #include <elara/notation/symbol.hpp>
 
@@ -54,6 +55,7 @@ struct RenderOptions {
     std::string layout = "line";
     std::string paper = "a4";
     double staffSpace = 1.75; // mm
+    bool fitStaves = false;   // a smaller staff space for many staves (ADR-0171)
     double margin = 15.0;     // mm
     double width = 0.0;       // staff spaces, for the scroll and strips layouts; 0: the paper's
     double stripHeight = 0.0; // staff spaces, for the strips layout; 0: the paper's height
@@ -489,7 +491,7 @@ notation::PageLayoutOptions pageLayoutOptions(const RenderOptions& options) {
     return page;
 }
 
-int runRender(bool json, const RenderOptions& options) {
+int runRender(bool json, RenderOptions options) {
     const auto song = openSong(options.file);
     if (!song) {
         return fail(std::format("{}: {}", options.file, song.error()));
@@ -504,6 +506,11 @@ int runRender(bool json, const RenderOptions& options) {
     if (options.first >= song->measureCount()) {
         return usageError(
             std::format("no measure {}: the song has {}", options.first, song->measureCount()));
+    }
+    if (options.fitStaves) {
+        options.staffSpace = notation::fittedStaffSpace(
+            *song, *selection, options.paper == "letter" ? notation::kLetter : notation::kA4,
+            options.staffSpace, options.margin);
     }
     const std::filesystem::path metadata =
         options.metadata.empty() ? defaultFontMetadata() : std::filesystem::path(options.metadata);
@@ -628,6 +635,9 @@ int runRender(bool json, const RenderOptions& options) {
                 .endObject();
         }
         out.field("view", options.view).field("layout", options.layout);
+        if (options.fitStaves) {
+            out.field("staffSpace", options.staffSpace);
+        }
         if (options.cursorAt >= 0.0) {
             out.key("cursor").raw(cursorReport(*song, pages, options.cursorAt).json);
         }
@@ -671,6 +681,9 @@ int runRender(bool json, const RenderOptions& options) {
                                  options.file, what, options.view, options.first,
                                  options.first + shown - 1, song->measureCount(),
                                  jsonNumber(list.width), jsonNumber(list.bottom - list.top));
+    }
+    if (options.fitStaves) {
+        std::cout << std::format("  staff space {} mm\n", jsonNumber(options.staffSpace));
     }
     std::array<std::size_t, kRoleCount> counts{};
     for (const notation::DisplayList& page : pages) {
@@ -744,6 +757,9 @@ void addRenderCommands(CLI::App& app, Context& context) {
     render->add_option("--staff-space", options->staffSpace, "Staff space in mm")
         ->check(CLI::Range(0.5, 10.0))
         ->capture_default_str();
+    render->add_flag("--fit-staves", options->fitStaves,
+                     "Make the staff space smaller when the staves shown would not leave two "
+                     "systems a page, as the app does for every track at once");
     render->add_option("--margin", options->margin, "Page margins in mm")
         ->check(CLI::Range(0.0, 100.0))
         ->capture_default_str();
