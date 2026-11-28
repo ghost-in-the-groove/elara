@@ -19,12 +19,7 @@
 
 #include <deque>
 #include <functional>
-#include <memory>
 #include <optional>
-
-namespace elara::audio {
-class Sequence;
-} // namespace elara::audio
 
 namespace elara::app {
 
@@ -106,13 +101,11 @@ private:
     void finish(bool ok, const QString& detail);
     void clickCursor();
     [[nodiscard]] bool uncoverScore();
-    void queueKeepPosition();
+    void queueCursorAfterEdit();
     void queueHoldStill();
     void queueFollow();
     void queueLoopOnScore();
     void queueParking();
-    void queuePractice();
-    void queueLoop();
     void queueSoundFont();
     void queueSfz();
     void queueSave();
@@ -145,10 +138,8 @@ private:
     QString layoutSteps_; ///< the steps after which each layout came, for the report
     qint64 settledAt_ = -1;
     bool queued_ = false;
-    bool played_ = false; ///< `--play` started playback
-    bool held_ = false;   ///< `--hold` has held the window open
-    /// What playback played before the mix changed.
-    std::shared_ptr<const audio::Sequence> sequenceBefore_;
+    bool played_ = false;                  ///< `--play` started playback
+    bool held_ = false;                    ///< `--hold` has held the window open
     QPointer<QObject> effectsPanel_;       ///< the note effects palette, watched for `--effects`
     bool effectsOpened_ = false;           ///< whether it has opened
     bool menuOpened_ = false;              ///< whether the menu `--menu` names has opened
@@ -178,7 +169,6 @@ private:
     int insertions_ = 0;                   ///< measures inserted to take the caret on
     QString editProblem_;                  ///< the first edit check that failed
     QString failure_;                      ///< set by a step that went wrong
-    double positionBefore_ = 0.0;          ///< playback's position before an edit
     bool recoveryWritten_ = false;         ///< ScoreDocument::recoveryWritten() came
     std::optional<QTemporaryDir> scratch_; ///< where checks save, made once
     std::optional<bool> saved_;            ///< what ScoreDocument::saveFinished() last said
