@@ -6,6 +6,8 @@
 #include <elara/core/parallel.hpp>
 #include <elara/notation/pdf.hpp>
 
+#include "ink.hpp"
+
 #include <array>
 #include <charconv>
 #include <cmath>
@@ -153,19 +155,7 @@ std::string_view fontName(TextFace face) {
     return "F1";
 }
 
-// The left edge of a text drawn at its origin with its alignment.
-double textLeft(const TextItem& text) {
-    const double width = textWidth(text);
-    switch (text.align) {
-    case TextAlign::Left:
-        return text.origin.x;
-    case TextAlign::Right:
-        return text.origin.x - width;
-    case TextAlign::Centre:
-        break;
-    }
-    return text.origin.x - width / 2;
-}
+using detail::textLeft;
 
 // The drawing operators of one page, keeping the line state it last set.
 class Content {
