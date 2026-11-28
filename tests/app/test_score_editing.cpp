@@ -7,6 +7,7 @@
 #include <elara/core/entry.hpp>
 #include <elara/core/measure.hpp>
 #include <elara/core/song.hpp>
+#include <elara/notation/display_list.hpp>
 
 #include "caret_editor.hpp"
 #include "score_document.hpp"
@@ -17,7 +18,9 @@
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantList>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <cstddef>
 #include <vector>
@@ -511,4 +514,37 @@ TEST_CASE("editing: transposing moves the notes of the selection, or of the care
     CHECK(editing.failures ==
           QStringList{QStringLiteral("A note would leave the range or the neck.")});
     CHECK(editing.beats(0)[0].notes[0].pitch.midiNumber() == first - 1);
+}
+
+// ---- Marks on the pages ----------------------------------------------------
+
+TEST_CASE("editing: measure spans are a rectangle a system, over the measures asked for") {
+    using Catch::Matchers::WithinAbs;
+    Editing editing;
+    ScoreDocument& score = editing.score;
+    score.setMeasureCount(40);
+    REQUIRE(
+        settle([&] { return !score.busy() && score.pageCount() > 0 && editing.measures() == 40; }));
+    const auto page = score.page(0);
+    REQUIRE(page);
+    REQUIRE(page->systems.size() >= 2);
+    const int second = static_cast<int>(page->systems[1].firstMeasure);
+    // From the second measure of the first system to the second of the next.
+    const int from = static_cast<int>(page->systems[0].firstMeasure) + 1;
+    const int to = second + 1;
+    const QVariantList spans = score.measureSpans(0, from, to);
+    REQUIRE(spans.size() == 2);
+    const QRectF first = spans[0].toRectF();
+    const QRectF next = spans[1].toRectF();
+    CHECK_THAT(first.left(), WithinAbs(score.measureBox(0, from).left(), 1e-9));
+    CHECK_THAT(first.right(), WithinAbs(score.measureBox(0, second - 1).right(), 1e-9));
+    CHECK_THAT(first.top(), WithinAbs(score.measureBox(0, from).top(), 1e-9));
+    CHECK_THAT(first.height(), WithinAbs(score.measureBox(0, from).height(), 1e-9));
+    CHECK_THAT(next.left(), WithinAbs(score.measureBox(0, second).left(), 1e-9));
+    CHECK_THAT(next.right(), WithinAbs(score.measureBox(0, to).right(), 1e-9));
+    CHECK(next.top() > first.top());
+    // One measure; none for a range the wrong way round or a page not there.
+    CHECK(score.measureSpans(0, from, from).size() == 1);
+    CHECK(score.measureSpans(0, to, from).isEmpty());
+    CHECK(score.measureSpans(99, 0, 3).isEmpty());
 }

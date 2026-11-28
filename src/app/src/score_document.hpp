@@ -570,6 +570,10 @@ public:
     /// Where measure `measure` (from 0) is on page `index`, as selectionBoxes()
     /// gives it; an empty rectangle when the page does not show it.
     Q_INVOKABLE [[nodiscard]] QRectF measureBox(int index, int measure) const;
+    /// Where measures `first` to `last` (from 0) are on page `index`: one
+    /// rectangle per system, from the first of them on it to the last, as
+    /// high as the system (the A-B loop, ADR-0172).
+    Q_INVOKABLE [[nodiscard]] QVariantList measureSpans(int index, int first, int last) const;
     /// Moves the caret `measures` measures on (back when negative), selecting
     /// from where it was.
     Q_INVOKABLE void extendSelection(int measures);

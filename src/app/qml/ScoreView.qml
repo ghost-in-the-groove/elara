@@ -44,6 +44,19 @@ Item {
     readonly property int shadedMeasure: cursorShown ? document.measureAt(cursorSeconds)
                                                      : document.caretPage >= 0
                                                        ? document.caretMeasure : -1
+    /// The A-B loop (ADR-0172), in seconds as the transport has it: a band over
+    /// its measures while it loops, over A's while B is still to come.
+    property bool looping: false
+    property bool loopMarked: false
+    property real loopFrom: 0
+    property real loopTo: 0
+    readonly property int loopFirst: (looping || loopMarked) && document.pageCount > 0
+                                     ? document.measureAt(loopFrom) : -1
+    // B at a measure's start ends the loop with the measure before.
+    readonly property int loopLast: looping && loopFirst >= 0
+                                    ? Math.max(loopFirst, document.measureAt(
+                                                   Math.max(loopFrom, loopTo - 0.001)))
+                                    : loopFirst
 
     // Playback that starts shows the cursor wherever it is, and the view goes
     // to it whatever was scrolled by hand.
@@ -800,6 +813,32 @@ Item {
                                 radius: 3
                                 color: Qt.alpha(Theme.accent, (root.cursorShown ? 0.07 : 0.05)
                                                 * (root.darkPage ? 1.8 : 1.0))
+                            }
+
+                            // The A-B loop (ADR-0172): a band over the top of its
+                            // measures, a system at a time, as the song string
+                            // draws it; over A's measure while B is to come.
+                            Repeater {
+                                model: root.loopFirst >= 0 && root.document.pageCount > 0
+                                       ? root.document.measureSpans(sheet.index, root.loopFirst,
+                                                                    root.loopLast)
+                                       : []
+
+                                delegate: Rectangle {
+                                    required property rect modelData
+                                    readonly property rect span: modelData
+                                    readonly property real scale: root.unit * root.shownZoom
+
+                                    objectName: "loopSpan"
+                                    x: span.x * scale
+                                    y: (span.y - 1.6) * scale
+                                    width: span.width * scale
+                                    height: Math.max(3, 0.6 * scale)
+                                    radius: height / 2
+                                    color: root.darkPage
+                                           ? Qt.alpha(Theme.lilac, root.looping ? 0.6 : 0.35)
+                                           : Qt.alpha(Theme.accent, root.looping ? 0.4 : 0.22)
+                                }
                             }
 
                             // The selected measures, tinted across their systems.

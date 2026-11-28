@@ -121,6 +121,7 @@ private:
     void queueKeepPosition();
     void queueHoldStill();
     void queueFollow();
+    void queueLoopOnScore();
     void queueParking();
     void queuePdf();
     void queueExport();

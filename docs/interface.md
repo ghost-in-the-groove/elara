@@ -47,7 +47,7 @@ a long stretch. So:
 | Tool row | in `Main.qml`, `EntryBar.qml` | What typing uses at the left; the track and the staff view at the right. |
 | Song tabs | `SongTabs.qml` | A tab for each song open, while there are two or more (ADR-0160): its title, a dot while it has unsaved changes, a cross that closes it (Ctrl+W, or a middle click). Ctrl+Tab and Ctrl+Shift+Tab show the next and the previous. |
 | Note effects | `EffectsPalette.qml` | Every technique, articulation, dynamic and line the caret's note or beat can take, in named groups that fold (F2, ADR-0109). A tile is lit while the caret has what it sets. |
-| Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the shaded measure, the popups the caret opens. With playback stopped the caret marks where it starts and the cursor hides; while it plays the view follows its system (ADR-0170). |
+| Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the shaded measure, the A-B loop's band over its measures (ADR-0172), the popups the caret opens. With playback stopped the caret marks where it starts and the cursor hides; while it plays the view follows its system (ADR-0170). |
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
 | Tuner | `TunerPane.qml` | The note heard, how far it is from in tune and the strings of the shown track (Ctrl+Shift+T). It docks where the song panel does, one of the two at a time, and listens only while it shows. |
 | Status bar | `StatusBar.qml` | Where the caret is, the page and the measures, what an import changed and what the layout could not keep (each a count to click, shown only when there is one); the layout and the zoom. |

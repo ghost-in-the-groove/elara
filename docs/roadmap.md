@@ -357,6 +357,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       playing or the caret's is shaded across every staff (ADR-0170)
 - [x] Every track at once at a smaller staff size, two systems a page where
       the staves allow it (ADR-0171)
+- [x] The A-B loop as a band over its measures on the score (ADR-0172)
 
 ## Milestone 6 - Practice tools
 
