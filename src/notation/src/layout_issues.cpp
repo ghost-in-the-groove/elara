@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/notation/layout_issues.hpp>
 
+#include "ink.hpp"
 #include "layout_common.hpp"
 
 #include <algorithm>
@@ -70,38 +71,6 @@ struct Ink {
 
 std::int32_t bandOf(double y) noexcept {
     return static_cast<std::int32_t>(std::floor(y / kBand));
-}
-
-// Digits, the letters of a fret number and the angle brackets of a natural
-// harmonic's stand on their baseline and reach no higher than their cap
-// height; other texts have ascenders and descenders.
-bool capsOnly(std::string_view text) noexcept {
-    return std::ranges::all_of(
-        text, [](char c) { return (c >= '0' && c <= '9') || c == 'X' || c == '<' || c == '>'; });
-}
-
-Rect textBox(const TextItem& text) {
-    const double width = textWidth(text);
-    const double left = text.align == TextAlign::Left     ? text.origin.x
-                        : text.align == TextAlign::Centre ? text.origin.x - (width / 2.0)
-                                                          : text.origin.x - width;
-    if (capsOnly(text.text)) {
-        const double height = capHeight(text.size);
-        return {.x = left, .y = text.origin.y - height, .width = width, .height = height};
-    }
-    return {.x = left,
-            .y = text.origin.y - (detail::kTextAscent * text.size),
-            .width = width,
-            .height = (detail::kTextAscent + detail::kTextDescent) * text.size};
-}
-
-Rect glyphBox(const GlyphItem& glyph, const EngravingFont& font) {
-    // The font's boxes have y upwards from the glyph's origin.
-    const BoundingBox& ink = font.metrics(glyph.glyph).box;
-    return {.x = glyph.origin.x + (ink.southWest.x * glyph.scale),
-            .y = glyph.origin.y - (ink.northEast.y * glyph.scale),
-            .width = ink.width() * glyph.scale,
-            .height = ink.height() * glyph.scale};
 }
 
 // The system of `page` whose ink holds the middle of `box`, or none.
@@ -186,7 +155,7 @@ private:
             if (!looked(glyph.role)) {
                 continue;
             }
-            const Rect box = glyphBox(glyph, font_);
+            const Rect box = detail::glyphInk(glyph, font_);
             if (box.width <= 0.0 || box.height <= 0.0) {
                 continue;
             }
@@ -202,7 +171,7 @@ private:
             if (!looked(text.role) || text.text.empty()) {
                 continue;
             }
-            add(list, Ink{.box = textBox(text),
+            add(list, Ink{.box = detail::textInk(text),
                           .origin = text.origin,
                           .measure = text.measure,
                           .order = order,
