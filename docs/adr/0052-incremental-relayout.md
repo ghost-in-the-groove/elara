@@ -14,7 +14,8 @@ A system's layout does not depend only on its own measures. It reads the
 measure before it (a time or key signature change, a repeat barline, an
 alternate ending that continues) and the one after it (ties and endings that
 go on into the next system), the tempo in force where it starts, and on each
-staff the dynamic in force there, which can come from any measure before.
+staff the dynamic in force there, which can come from any measure before, and
+the syllables held into it (ADR-0084), from up to 16 measures before.
 Line breaking is global: a measure that gets wider can move the breaks of
 several systems.
 
@@ -35,8 +36,8 @@ the new song with the kept one:
   stretch, none of those measures nor the one before or after it changed, and
   what it reads from before it is the same: the tempo in force (checked when a
   header before it, or the start tempo, changed) and, on each staff whose
-  notes before it changed, the dynamic in force. Every other system is laid
-  out again, on all cores.
+  notes before it changed, the dynamic in force and the syllables held into
+  it. Every other system is laid out again, on all cores.
 - **Pages** are stacked again from the systems. Each system is copied into its
   page and moved into place in one pass, the page's room reserved first, and
   pages are filled on several threads when there is much to copy. Full
@@ -48,7 +49,7 @@ track whose name, instrument, clefs, tuning or capo differ start again.
 **Correctness is tested against a full layout.** A property test plays the
 corpus files through until they are 40 measures long, applies random edits
 (notes pasted or cleared, ties, palm mutes, dynamics, tempo changes, the start
-tempo, repeats, endings, key signatures) and requires every incremental
+tempo, repeats, endings, key signatures, lyrics and held syllables) and requires every incremental
 layout to equal `layoutPages()` exactly, with most systems reused. Removing
 any of the conditions above makes it fail.
 
