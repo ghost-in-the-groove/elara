@@ -296,6 +296,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 - [x] The player prepared on a worker after edits, a new song or a new sound
       bank: events, buffers and new sounds off the interface thread (ADR-0112)
+  - [x] The first Play and a device's new sample rate too: playback starts once
+        the song's sounds are made, a second with MuseScore General (ADR-0148)
 - [ ] Layout adjustments: the automatic layout first, then what a writer may
       change where it is not enough, stored on what it adjusts
   - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
