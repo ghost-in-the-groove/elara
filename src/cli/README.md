@@ -90,8 +90,9 @@ line at their natural spacing; `--layout page` breaks them into systems on
 pages of `--paper` with staff spaces `--staff-space` mm apart and `--margin` mm
 margins, with the title and credits on the first page (unless `--no-credits`);
 `--fit-staves` makes the staff space smaller when the staves shown would not
-leave two systems a page, as the app does for every track at once, and reports
-it as `"staffSpace"` (ADR-0171);
+leave two systems a page, as the app does for every track at once (ADR-0171),
+or when a measure would be wider than the page (ADR-0176), and reports it as
+`"staffSpace"`;
 `--layout scroll` stacks the systems on one page as long as the music,
 `--width` staff spaces wide (ADR-0014); `--layout strips` cuts that page into
 strips of whole systems no higher than `--strip-height` staff spaces (the
@@ -152,7 +153,7 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `rename-track <i> [name]`
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
-(ADR-0042), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
+(ADR-0042: on measure 0, as `tempo`, the song's tempo in the beat it counts in), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
 `title`, `subtitle`, `artist`, `album`, `words`, `music`, `copyright`,
 `transcriber` or `notes`; no text clears it, ADR-0059),
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
@@ -371,6 +372,12 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
   is not well formed (exit 2) and lets what the song refuses through (exit 1).
   The caret and the input duration of a run of steps are a `core::EditSession`,
   the one the app's keys use (ADR-0127).
+  `stepForms()` lists every form of step, which `edit --help` prints: a
+  step whose verb no form starts with is unknown, so a new step needs its
+  form there before it runs.
+  An entry step core refuses fails with `refused: <name>`, the `Refusal`'s
+  name (`off-the-neck`, `needs-strings`, ...); one that nothing at the caret
+  takes is a warning on stderr, and the steps go on (ADR-0180).
   `tests/cli/test_edit_steps.cpp` runs steps against a song with Catch2; the
   `cli.edit_rejects_*` CTests check the message each step fails with.
 

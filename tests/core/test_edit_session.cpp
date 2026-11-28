@@ -65,7 +65,7 @@ TEST_CASE("Session: it starts on the first beat of a track, a quarter note to ty
 
     Document doc(bandSong());
     session.move(doc.song(), CaretMove::NextMeasure);
-    session.setInput(doc, kHalf);
+    (void)session.setInput(doc, kHalf);
     session.start(1);
     CHECK(session.caret() == Caret{.track = 1});
     CHECK(session.input() == kQuarter);
@@ -129,7 +129,7 @@ TEST_CASE("Session: typing goes into another voice from its nearest beat", "[cor
     CHECK_FALSE(session.setVoice(doc.song(), 4)); // a measure has four
     CHECK(session.caret().voice == 1);
 
-    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 7, session.input())));
+    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 7, session.input())).changed);
     CHECK(voice(doc.song(), 0, 1).beats.size() == 1);
     CHECK(voice(doc.song(), 0, 0).beats.size() == 2);
 }
@@ -140,21 +140,26 @@ TEST_CASE("Session: entering an edit moves the caret and executes its command", 
     session.place(doc.song(), Caret{.measure = 2});
 
     // A fret on the free slot: a beat of the input duration, the caret on it.
-    CHECK(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())));
+    CHECK(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())).changed);
     REQUIRE(voice(doc.song(), 2).beats.size() == 1);
     CHECK(voice(doc.song(), 2).beats[0].duration == kQuarter);
     CHECK(session.caret() == Caret{.measure = 2});
     CHECK(doc.undoName() == "Enter note");
 
     // An entry without a command only moves the caret.
-    CHECK_FALSE(session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 1}}));
+    const EntryResult moved =
+        session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 1}});
+    CHECK_FALSE(moved.changed);
+    CHECK_FALSE(moved.refused);
     CHECK(session.caret() == Caret{.measure = 1});
     CHECK(doc.undoCount() == 1);
 
     // The caret an entry names may be of the song after it: a measure added
     // at the end takes the caret.
-    CHECK(session.enter(doc, Entry{.command = std::make_unique<InsertMeasures>(3, 1),
-                                   .caret = Caret{.measure = 3}}));
+    CHECK(session
+              .enter(doc, Entry{.command = std::make_unique<InsertMeasures>(3, 1),
+                                .caret = Caret{.measure = 3}})
+              .changed);
     CHECK(doc.song().measureCount() == 4);
     CHECK(session.caret() == Caret{.measure = 3});
 }
@@ -169,20 +174,48 @@ TEST_CASE("Session: an edit the song refuses leaves the caret inside the song", 
     CHECK_FALSE(doc.canUndo());
 }
 
+TEST_CASE("Session: an edit refused at the caret says why and changes nothing", "[core][session]") {
+    Document doc(bandSong());
+    EditSession session;
+    // The first note of the song: nothing before it to tie to.
+    session.place(doc.song(), Caret{.string = 6});
+    const EntryResult tie =
+        session.enter(doc, toggleEffect(doc.song(), session.caret(), NoteEffect::Tie));
+    CHECK_FALSE(tie.changed);
+    CHECK(tie.refused == Refusal::NoNoteToTie);
+    CHECK_FALSE(doc.canUndo());
+    CHECK(session.caret() == Caret{.string = 6});
+
+    // The free slot of the third measure: no note there takes an effect.
+    session.place(doc.song(), Caret{.measure = 2});
+    const EntryResult vibrato =
+        session.enter(doc, toggleEffect(doc.song(), session.caret(), NoteEffect::Vibrato));
+    CHECK(vibrato.refused == Refusal::NothingAtCaret);
+    CHECK_FALSE(doc.canUndo());
+
+    // A refused edit ends the wait for a second digit, as any edit does.
+    REQUIRE(session.typeDigit(doc, 3, {}).changed);
+    const EntryResult refused = session.enter(
+        doc, Entry{.command = nullptr, .caret = session.caret(), .refused = Refusal::OffTheNeck});
+    CHECK(refused.refused == Refusal::OffTheNeck);
+    CHECK(session.typeDigit(doc, 1, {}).changed);
+    CHECK(voice(doc.song(), 2).beats.at(0).notes.at(0).position->fret == 1);
+}
+
 TEST_CASE("Session: the input duration is given to the caret's beat", "[core][session]") {
     Document doc(bandSong());
     EditSession session;
-    CHECK(session.setInput(doc, kHalf));
+    CHECK(session.setInput(doc, kHalf).changed);
     CHECK(session.input() == kHalf);
     CHECK(voice(doc.song(), 0).beats[0].duration == kHalf);
     CHECK(doc.undoName() == "Change duration");
-    CHECK_FALSE(session.setInput(doc, kHalf)); // it has it
+    CHECK_FALSE(session.setInput(doc, kHalf).changed); // it has it
 
     // The free slot has no beat to give it to; typing uses it from now on.
     session.place(doc.song(), Caret{.measure = 2});
-    CHECK_FALSE(session.setInput(doc, kEighth));
+    CHECK_FALSE(session.setInput(doc, kEighth).changed);
     CHECK(session.input() == kEighth);
-    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())));
+    REQUIRE(session.enter(doc, enterFret(doc.song(), session.caret(), 5, session.input())).changed);
     CHECK(voice(doc.song(), 2).beats[0].duration == kEighth);
 }
 
@@ -195,13 +228,13 @@ TEST_CASE("Session: the caret stays on the track shown alone", "[core][session]"
     CHECK(session.caret() == Caret{.track = 1, .measure = 1, .beat = 0, .string = 4});
 
     // An edit whose caret is on another track comes back to the one shown.
-    session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
+    (void)session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
     CHECK(session.caret().track == 1);
 
     // With every track shown the caret stays on the one it was on.
     session.showTrack(doc.song(), std::nullopt);
     CHECK(session.caret().track == 1);
-    session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
+    (void)session.enter(doc, Entry{.command = nullptr, .caret = Caret{.track = 0, .measure = 1}});
     CHECK(session.caret().track == 0);
 
     // The track shown goes: the caret is on the last the song has.
@@ -221,9 +254,10 @@ TEST_CASE("Session: a song without tracks or measures has no caret to move", "[c
     CHECK(session.caret() == Caret{});
 
     Document doc(empty);
-    CHECK_FALSE(session.setInput(doc, kHalf));
+    CHECK_FALSE(session.setInput(doc, kHalf).changed);
     CHECK(session.input() == kHalf);
-    CHECK_FALSE(session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 3}}));
+    CHECK_FALSE(
+        session.enter(doc, Entry{.command = nullptr, .caret = Caret{.measure = 3}}).changed);
 }
 
 // ---- Two digits for one fret --------------------------------------------------
@@ -243,7 +277,7 @@ struct Typing {
 
     bool type(int digit, std::chrono::milliseconds later = 100ms) {
         now += later;
-        return session.typeDigit(doc, digit, now);
+        return session.typeDigit(doc, digit, now).changed;
     }
     /// The fret on the first string of the caret's beat; -1 without a note there.
     [[nodiscard]] int fret() const {
@@ -348,11 +382,11 @@ TEST_CASE("Session: any other action ends the wait for a second digit", "[core][
           }) == 2);
     // An edit, though it changed nothing, and one that is never entered.
     CHECK(second([](EditSession& session, Document& doc) {
-              session.enter(doc, Entry{.command = nullptr, .caret = session.caret()});
+              (void)session.enter(doc, Entry{.command = nullptr, .caret = session.caret()});
           }) == 2);
     CHECK(second([](EditSession& session, Document&) { session.endTyping(); }) == 2);
     CHECK(second([](EditSession& session, Document& doc) {
-              session.setInput(doc, session.input());
+              (void)session.setInput(doc, session.input());
           }) == 2);
     // The song changed under the session, and came back to the same state.
     CHECK(second([](EditSession& session, Document& doc) {
@@ -377,7 +411,9 @@ TEST_CASE("Session: a digit where no fret can be typed says why and waits for no
     song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
     Document doc(song);
     EditSession session;
-    CHECK_THROWS_AS(session.typeDigit(doc, 3, {}), std::logic_error);
+    const EntryResult typed = session.typeDigit(doc, 3, {});
+    CHECK_FALSE(typed.changed);
+    CHECK(typed.refused == Refusal::NeedsStrings);
     CHECK_FALSE(doc.canUndo());
 }
 

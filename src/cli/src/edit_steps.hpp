@@ -8,6 +8,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/edit_session.hpp>
 
+#include <span>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -33,6 +34,11 @@ struct StepState {
     /// copies from with `from <song>` (ADR-0160).
     std::vector<core::Song> sources;
 };
+
+/// Every form of step runStep() runs, as the edit subcommand's help lists
+/// them: the verb, then what it takes ("time <m> <N/D>"). A step whose verb no
+/// form starts with is unknown.
+[[nodiscard]] std::span<const std::string_view> stepForms() noexcept;
 
 /// Runs one step, its words separated by spaces ("repeat 1 end 3"), on `doc`,
 /// then brings the caret back into the song. Throws StepSyntaxError for a

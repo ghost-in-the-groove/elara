@@ -20,23 +20,46 @@ Item {
     /// The page turned dark, its ink light (ADR-0114): for the dark theme.
     property bool darkPage: false
     readonly property color paper: darkPage ? Theme.nightPage : "white"
+    /// The staves' lines, dimmer than the ink on the dark page so that the
+    /// notes and the fret numbers stand out from them (ADR-0174).
+    readonly property color staffInk: darkPage ? Theme.nightStaff : "black"
     readonly property color ink: darkPage ? Theme.nightInk : "black"
-    /// Seconds into the song where the playback cursor stands; negative hides it.
+    /// Seconds into the song where playback stands; negative for nowhere.
     property real cursorSeconds: -1
     /// Whether playback plays: the cursor then shows wherever it is.
     property bool playing: false
-    /// Set while playback is stopped once the caret was put somewhere by a
-    /// click or the arrow keys, which move playback with it: the caret marks
-    /// where playback starts and the cursor hides until it plays (Main.qml).
+    /// Set while playback is stopped once the score was touched: the caret
+    /// put somewhere by a click or the keys, which take playback with them,
+    /// or the song edited. The caret then marks the place and the cursor
+    /// hides, until playback plays or is moved by something else, as the
+    /// song string does (ADR-0173).
     property bool cursorParked: false
+    /// Where playback stood when the cursor was parked.
+    property real parkedAt: -1
+    /// Set while parking moves playback itself.
+    property bool parking: false
+    /// An edit's layout moves the caret's box once more: playback goes to
+    /// where it is then.
+    property bool parkPending: false
+    // Playback moved by something else than the caret shows its cursor again.
+    // A device that opens tells the same place to within a frame.
+    onCursorSecondsChanged: {
+        if (cursorParked && !parking && Math.abs(cursorSeconds - parkedAt) > 0.001)
+            cursorParked = false;
+    }
     /// Scroll so that the cursor's system stays in view as it moves.
     property bool followCursor: false
-    property color cursorColor: Theme.accent
+    /// The lines drawn over the page, the caret's frame and the playback
+    /// cursor: the accent, lighter on the dark page, where the accent itself
+    /// is too dim to read as a line.
+    readonly property color markColor: darkPage ? Theme.accentInk : Theme.accent
+    property color cursorColor: markColor
     /// A click on the score asks to move playback there.
     signal seekRequested(real seconds)
     /// Where the cursor stands (ScoreDocument.cursorAt), empty when hidden.
     /// Reading pageCount makes it follow relayouts too.
-    readonly property var cursor: cursorSeconds >= 0 && document.pageCount > 0
+    readonly property var cursor: cursorSeconds >= 0 && (playing || !cursorParked)
+                                  && document.pageCount > 0
                                   ? document.cursorAt(cursorSeconds) : ({})
     readonly property bool cursorShown: cursor.page !== undefined
     /// The measure shaded across its system: the one playing while the cursor
@@ -64,21 +87,39 @@ Item {
         if (!playing)
             return;
         cursorParked = false;
+        parkPending = false;
         followAgain();
     }
 
+    /// Hides the cursor while playback is stopped, after taking playback to
+    /// `seconds` when that is a time in the song: the caret marks the place.
+    function parkAt(seconds: real) {
+        if (playing)
+            return;
+        parking = true;
+        if (seconds >= 0)
+            seekRequested(seconds);
+        parking = false;
+        parkedAt = cursorSeconds;
+        cursorParked = true;
+    }
     /// Moves playback to the caret's beat while it is stopped, as a click on
-    /// that beat would, and hides the cursor: the caret marks the place.
+    /// that beat would, and hides the cursor.
     function parkAtCaret() {
         if (playing || document.caretPage < 0)
             return;
         const caret = document.caretRect;
-        const seconds = document.secondsAt(document.caretPage, caret.x + caret.width / 2,
-                                           caret.y + caret.height / 2);
-        if (seconds < 0)
+        parkAt(document.secondsAt(document.caretPage, caret.x + caret.width / 2,
+                                  caret.y + caret.height / 2));
+    }
+    /// The caret moved or the score was edited at it, by the keys or a
+    /// command: while playback is stopped the caret marks where it starts,
+    /// now and once the edit is laid out.
+    function touched() {
+        if (playing)
             return;
-        cursorParked = true;
-        seekRequested(seconds);
+        parkPending = document.busy;
+        parkAtCaret();
     }
     /// The page under the middle of the view, from 1.
     readonly property int currentPage: Math.max(1, Math.min(document.pageCount,
@@ -203,8 +244,19 @@ Item {
         }
     }
     function toTop() {
+        heldAtTop = true;
         list.contentY = list.originY - list.topMargin;
     }
+    /// Whether the view shows the top of the first page.
+    function atTop(): bool {
+        return list.contentY <= list.originY - list.topMargin + 1;
+    }
+    /// Set when the zoom starts to change with the view at its top, or the
+    /// view is sent there meanwhile: it then stays at the top, so that a song
+    /// that opens, or a window that changes size, shows the title whole
+    /// instead of zooming into the middle of what was in view.
+    property bool heldAtTop: false
+    onZoomChanged: heldAtTop = atTop()
 
     // Each song keeps its place while another is shown (ADR-0160): where the
     // view's middle was, in pages, goes back to the middle when it shows again.
@@ -224,6 +276,7 @@ Item {
             toTop();
             return;
         }
+        heldAtTop = false;
         centre = document.viewCentre;
         list.contentY = list.originY + yAt(centre) - list.height / 2;
     }
@@ -234,6 +287,7 @@ Item {
     function reveal() {
         revealPending = true;
         revealCaret();
+        touched();
     }
     function revealCaret() {
         const page = document.caretPage;
@@ -461,10 +515,8 @@ Item {
             document.setInputTuplet(event.key - Qt.Key_0);
         } else if (event.key === Qt.Key_Right) {
             document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
-            parkAtCaret();
         } else if (event.key === Qt.Key_Left) {
             document.moveCaret(control ? ScoreDocument.PreviousMeasure : ScoreDocument.PreviousBeat);
-            parkAtCaret();
         } else if (event.key === Qt.Key_Up && !control) {
             document.moveCaret(ScoreDocument.StringUp);
         } else if (event.key === Qt.Key_Down && !control) {
@@ -530,6 +582,15 @@ Item {
                 root.revealCaret();
                 root.revealPending = root.document.busy;
             }
+            if (root.parkPending) {
+                root.parkPending = false;
+                root.parkAtCaret();
+            }
+        }
+        // An edit from a panel, an undo or a redo hides the cursor as the keys
+        // do, and leaves playback where it is: it was not made at the caret.
+        function onScoreEdited() {
+            root.parkAt(-1);
         }
     }
 
@@ -644,10 +705,16 @@ Item {
         easing.type: Easing.InOutCubic
     }
 
-    // Keep the page under the middle of the view in place while zooming.
+    // Keep the page under the middle of the view in place while zooming, or
+    // the top of the first page when the view was there.
     onShownZoomChanged: {
         zooming = true;
-        list.contentY = list.originY + yAt(centre) - list.height / 2;
+        if (heldAtTop) {
+            list.contentY = list.originY - list.topMargin;
+            centre = pagesAt(list.contentY - list.originY + list.height / 2);
+        } else {
+            list.contentY = list.originY + yAt(centre) - list.height / 2;
+        }
         zooming = false;
     }
 
@@ -775,6 +842,7 @@ Item {
                                 index: sheet.index
                                 paper: root.paper
                                 ink: root.ink
+                                staff: root.staffInk
                                 opacity: painted ? 1.0 : 0.0
 
                                 Behavior on opacity {
@@ -925,18 +993,24 @@ Item {
                                     color: Qt.alpha(Theme.accent,
                                                     (caret.lit ? 0.12 : 0.05) * caret.strength)
                                 }
+                                // A frame round the fret number or the note, never
+                                // over it (ADR-0173): no fill, and a line thin
+                                // enough for the room between a number and the
+                                // numbers on the strings next to it, half of it
+                                // outside the cell.
                                 Rectangle {
+                                    readonly property real line: caret.lit
+                                        ? Math.max(1, Math.min(2, 0.14 * caret.scale)) : 1
+
                                     objectName: "caretCell"
-                                    y: caret.cell.y * caret.scale
-                                    width: caret.width
-                                    height: caret.cell.height * caret.scale
+                                    x: -line / 2
+                                    y: caret.cell.y * caret.scale - line / 2
+                                    width: caret.width + line
+                                    height: caret.cell.height * caret.scale + line
                                     radius: Math.min(width, height) * 0.24
-                                    color: caret.whole ? "transparent" : Qt.alpha(
-                                                             Theme.accent, (caret.lit ? 0.16 : 0.06)
-                                                             * caret.strength)
-                                    border.color: Qt.alpha(Theme.accent, caret.lit ? 1.0 : 0.45)
-                                    border.width: caret.lit
-                                                  ? Math.max(1.5, Math.min(3, 0.3 * caret.scale)) : 1
+                                    color: "transparent"
+                                    border.color: Qt.alpha(root.markColor, caret.lit ? 1.0 : 0.5)
+                                    border.width: line
 
                                     Behavior on y {
                                         enabled: root.shownZoom === root.zoom
@@ -996,8 +1070,9 @@ Item {
                                         return;
                                     // Stopped, the caret marks where playback starts.
                                     if (placed && !root.playing)
-                                        root.cursorParked = true;
-                                    root.seekRequested(seconds);
+                                        root.parkAt(seconds);
+                                    else
+                                        root.seekRequested(seconds);
                                 }
                                 // A second click on a symbol edits it where it is.
                                 onDoubleTapped: eventPoint => {
@@ -1076,7 +1151,8 @@ Item {
         onClosed: root.forceActiveFocus()
     }
 
-    // The playback cursor: a line across the system, over the pages.
+    // The playback cursor: a thin line across the system, over the pages, with
+    // a head at its top that tells it from a barline and from the caret.
     Rectangle {
         id: playhead
 
@@ -1086,23 +1162,21 @@ Item {
         parent: list.contentItem
         z: 2
         visible: root.cursorShown
-        width: Math.max(2, 0.28 * scale)
+        width: Math.max(1.5, Math.min(2.5, 0.2 * scale))
         radius: width / 2
         color: root.cursorColor
-        opacity: 0.9
         x: root.cursorShown ? (list.contentWidth - root.pageWidth) / 2 + root.cursor.x * scale
                               - width / 2 : 0
         y: root.cursorShown ? root.pageY(root.cursor.page) + (root.cursor.y - 2) * scale : 0
         height: root.cursorShown ? (root.cursor.height + 4) * scale : 0
 
-        // A soft glow either side.
         Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 5
-            height: parent.height
-            radius: width / 2
+            objectName: "playheadTop"
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.max(7, Math.min(12, 0.9 * playhead.scale))
+            height: Math.max(4, Math.min(7, 0.5 * playhead.scale))
+            radius: height / 2
             color: root.cursorColor
-            opacity: 0.12
         }
     }
 

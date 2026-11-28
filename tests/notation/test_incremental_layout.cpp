@@ -26,7 +26,9 @@ using elara::core::Duration;
 using elara::core::Note;
 using elara::core::NoteValue;
 using elara::core::Pitch;
+using elara::core::SharedOptional;
 using elara::core::Song;
+using elara::core::Syllable;
 using elara::core::Tempo;
 using elara::core::TempoChange;
 using elara::core::Track;
@@ -196,5 +198,52 @@ TEST_CASE("An edit to the tempo a gradual change goes to lays out the ramp's sys
         const auto edited = std::make_shared<const Song>(song);
         CHECK(cache.layout(edited, staves, bravura(), options) ==
               layoutPages(*edited, staves, bravura(), options));
+    }
+}
+
+TEST_CASE("An edit to a syllable held into later systems lays those systems out again",
+          "[notation][pages][incremental]") {
+    // ADR-0084: a syllable held over notes draws its line on into the systems
+    // after it, up to 16 measures on, so those read measures well before
+    // their first.
+    Song song;
+    song.addTrack(Track("Lead", {}, {elara::core::Staff{}}));
+    song.appendMeasures(24);
+    for (std::size_t m = 0; m < song.measureCount(); ++m) {
+        auto& voice = song.track(0).staff(0).measure(m).voices[0];
+        for (int beat = 0; beat < 4; ++beat) {
+            voice.beats.push_back(Beat{.duration = Duration(NoteValue::Quarter),
+                                       .notes = {Note{.pitch = Pitch::fromMidi(60 + beat)}}});
+        }
+    }
+    const auto sing = [&song](std::size_t m, std::optional<Syllable> syllable) {
+        auto& beat = song.track(0).staff(0).measure(m).voices[0].beats[0];
+        beat.lyrics = syllable ? SharedOptional(std::vector<Syllable>{*syllable})
+                               : SharedOptional<std::vector<Syllable>>();
+    };
+    sing(0, Syllable{.text = "Ah", .extend = true}); // held to measure 16
+    const std::vector<StaffSelection> staves = everyStaff(song);
+    const PageLayoutOptions options;
+    PageLayoutCache cache;
+    auto first = std::make_shared<const Song>(song);
+    REQUIRE(cache.layout(first, staves, bravura(), options) ==
+            layoutPages(*first, staves, bravura(), options));
+    REQUIRE(cache.lastReuse().systems >= 3);
+
+    // A syllable at measure 2 ends the hold there; taken away, it is held on
+    // again; then the first syllable is no longer held.
+    for (const int step : {0, 1, 2}) {
+        CAPTURE(step);
+        if (step == 0) {
+            sing(2, Syllable{.text = "la"});
+        } else if (step == 1) {
+            sing(2, std::nullopt);
+        } else {
+            sing(0, Syllable{.text = "Ah"});
+        }
+        const auto edited = std::make_shared<const Song>(song);
+        CHECK(cache.layout(edited, staves, bravura(), options) ==
+              layoutPages(*edited, staves, bravura(), options));
+        CHECK(cache.lastReuse().laidOut < cache.lastReuse().systems);
     }
 }

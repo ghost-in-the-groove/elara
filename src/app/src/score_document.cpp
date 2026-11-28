@@ -73,18 +73,69 @@ struct ScoreLayout {
     double staffSpace = 1.75; ///< mm the staves were laid out with (ADR-0171)
     int milliseconds = 0;
     QString error;
+    bool kept = false;    ///< the pages are those this view laid out before (ADR-0175)
     bool opened = false;  ///< a song just read from `source`, to edit from now on
     QStringList warnings; ///< what reading `source` approximated or dropped
 };
 
-// What the layout worker keeps from one layout to the next: the systems it
-// laid out (ADR-0052), and the pages it laid out last with their layout
-// issues (ADR-0150), so that the next layout checks only the pages it
+// What the layout worker keeps of one view from one layout to the next: the
+// systems it laid out (ADR-0052), and the pages it laid out last with their
+// layout issues (ADR-0150), so that the next layout checks only the pages it
 // changed. Used by one layout at a time: the layout lane runs one job at once.
 struct LayoutMemory {
     notation::PageLayoutCache cache;
+    /// The song `pages` are the layout of; empty until a layout succeeds.
+    std::shared_ptr<const core::Song> song;
     std::shared_ptr<const std::vector<notation::DisplayList>> pages;
     std::vector<PageIssues> issues; ///< of each of pages
+    int issueCount = 0;
+    double staffSpace = 0.0;
+    bool hasTablature = false;
+    /// The staff space this view was narrowed to for a measure wider than the
+    /// page, and that measure (ADR-0176); 0 while every measure fits.
+    double narrowed = 0.0;
+    std::size_t narrowedBy = 0;
+};
+
+// The memories of the views of a song shown last (ADR-0175): a track or every
+// track, as notation, tablature or both, on pages or as one continuous page.
+// Going back to a view shown before lays out only what was edited since, and
+// nothing when nothing was. The views used longest ago are let go past
+// `kMost`, so that a song of many tracks does not keep a layout of each.
+class LayoutMemories {
+public:
+    struct View {
+        int track = 0;
+        ScoreDocument::View view = ScoreDocument::View::Both;
+        bool continuous = false;
+        friend bool operator==(const View&, const View&) = default;
+    };
+
+    static constexpr std::size_t kMost = 6;
+
+    /// The memory of `view`, a new one when it was not shown lately.
+    [[nodiscard]] LayoutMemory& of(const View& view) {
+        const auto found = std::ranges::find(kept_, view, &Kept::view);
+        if (found != kept_.end()) {
+            std::rotate(kept_.begin(), found, found + 1); // the latest first
+        } else {
+            if (kept_.size() >= kMost) {
+                kept_.pop_back();
+            }
+            kept_.insert(kept_.begin(), Kept{view, std::make_unique<LayoutMemory>()});
+        }
+        return *kept_.front().memory;
+    }
+
+    /// Another song is shown: nothing kept is of use.
+    void clear() { kept_.clear(); }
+
+private:
+    struct Kept {
+        View view;
+        std::unique_ptr<LayoutMemory> memory;
+    };
+    std::vector<Kept> kept_; // the view used last first
 };
 
 // An edited song's sequence, or why it could not be built.
@@ -106,6 +157,44 @@ notation::PageLayoutOptions pageOptions(double staffSpace) {
 // (ADR-0171).
 double staffSpaceFor(const core::Song& song, std::span<const notation::StaffSelection> staves) {
     return notation::fittedStaffSpace(song, staves, notation::kA4, kStaffSpaceMm);
+}
+
+// Whether measure `m` is in `now` as it was in `before`: its header and what
+// each of `staves` plays in it.
+bool sameMeasure(const core::Song& before, const core::Song& now,
+                 std::span<const notation::StaffSelection> staves, std::size_t m) {
+    if (m >= before.measureCount() || m >= now.measureCount() ||
+        before.measureHeader(m) != now.measureHeader(m)) {
+        return false;
+    }
+    return std::ranges::all_of(staves, [&](const notation::StaffSelection& shown) {
+        if (shown.track >= before.trackCount() ||
+            shown.staff >= before.track(shown.track).staffCount()) {
+            return false;
+        }
+        const core::Measure& was = before.track(shown.track).staff(shown.staff).measure(m);
+        const core::Measure& is = now.track(shown.track).staff(shown.staff).measure(m);
+        return &was == &is || was == is;
+    });
+}
+
+// `staves` on A4 pages at the staff space that fits them, and that staff
+// space: the one of the staves shown (ADR-0171), smaller when a measure is
+// wider than the page there (ADR-0176). What an export lays out; the window's
+// layout does the same through its memory.
+std::pair<std::vector<notation::DisplayList>, double>
+fittedPages(const core::Song& song, std::span<const notation::StaffSelection> staves,
+            const notation::EngravingFont& font) {
+    double space = staffSpaceFor(song, staves);
+    auto pages = notation::layoutPages(song, staves, font, pageOptions(space));
+    const double narrower =
+        notation::narrowedStaffSpace(notation::kA4, kStaffSpaceMm, space,
+                                     notation::widthOverflow(pages, pageOptions(space)).amount);
+    if (narrower < space) {
+        space = narrower;
+        pages = notation::layoutPages(song, staves, font, pageOptions(space));
+    }
+    return {std::move(pages), space};
 }
 
 // The music font's metrics, read once from the app's resources.
@@ -210,15 +299,17 @@ void findIssues(ScoreLayout& result, const notation::EngravingFont& font,
     }
     memory.pages = result.pages;
     memory.issues = result.issues;
+    memory.issueCount = result.issueCount;
 }
 
 // Lays out `track` (or every track) of `song` as `view` on A4 pages or, when
 // `continuous`, on one endless page cut into strips as high as A4 pages
-// (ADR-0057), and finds their layout issues. Goes through `memory` so that
-// only what changed since its last layout is laid out and checked again. Runs
-// on a worker thread and never throws.
+// (ADR-0057), and finds their layout issues. Goes through the memory of that
+// view so that only what changed since its last layout is laid out and checked
+// again, and gives the pages back as they are when nothing did. Runs on a
+// worker thread and never throws.
 ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocument::View view,
-                   bool continuous, LayoutMemory& memory) {
+                   bool continuous, LayoutMemories& memories) {
     ScoreLayout result;
     result.song = song;
     result.track = track;
@@ -229,18 +320,57 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
         result.error = QObject::tr("The music font is missing.");
         return result;
     }
+    LayoutMemory& memory = memories.of({.track = track, .view = view, .continuous = continuous});
+    if (memory.song == song && memory.pages) {
+        // The song as this view last laid it out: its pages are those.
+        result.pages = memory.pages;
+        result.issues = memory.issues;
+        result.issueCount = memory.issueCount;
+        result.staffSpace = memory.staffSpace;
+        result.hasTablature = memory.hasTablature;
+        result.kept = true;
+        return result;
+    }
+    // Until this layout is done the memory holds no song's pages: a layout
+    // that fails leaves its cache empty.
+    const std::shared_ptr<const core::Song> before = std::move(memory.song);
+    memory.song.reset();
     try {
         const auto tracks = shownTracks(*song, track);
         result.hasTablature = notation::hasTablature(*song, tracks);
         const auto staves = notation::selectTracks(*song, tracks, trackView(view));
         const auto start = std::chrono::steady_clock::now();
-        result.staffSpace = staffSpaceFor(*song, staves);
-        notation::PageLayoutOptions options = pageOptions(result.staffSpace);
-        const double pageHeight = options.height;
-        if (continuous) {
-            options.height = 0.0;
+        // The staff space of the staves shown (ADR-0171) or, while the measure
+        // that did not fit the page's width there is as it was, the smaller
+        // one found for it (ADR-0176): an edit elsewhere then lays out only
+        // what it changed.
+        const double byStaves = staffSpaceFor(*song, staves);
+        result.staffSpace = byStaves;
+        if (memory.narrowed > 0.0 && memory.narrowed < byStaves && before &&
+            sameMeasure(*before, *song, staves, memory.narrowedBy)) {
+            result.staffSpace = memory.narrowed;
         }
-        auto pages = memory.cache.layout(song, staves, *font, options);
+        std::vector<notation::DisplayList> pages;
+        double pageHeight = 0.0;
+        for (int pass = 0;; ++pass) {
+            notation::PageLayoutOptions options = pageOptions(result.staffSpace);
+            pageHeight = options.height;
+            if (continuous) {
+                options.height = 0.0;
+            }
+            pages = memory.cache.layout(song, staves, *font, options);
+            // A measure wider than the page gets smaller staff spaces, on a
+            // page that is as wide in millimetres and so wider in them.
+            const notation::WidthOverflow over = notation::widthOverflow(pages, options);
+            const double narrower = notation::narrowedStaffSpace(notation::kA4, kStaffSpaceMm,
+                                                                 result.staffSpace, over.amount);
+            if (pass > 0 || narrower >= result.staffSpace) {
+                break;
+            }
+            result.staffSpace = narrower;
+            memory.narrowedBy = over.measure;
+        }
+        memory.narrowed = result.staffSpace < byStaves ? result.staffSpace : 0.0;
         if (continuous) {
             pages = notation::cutIntoStrips(pages.front(), pageHeight);
         }
@@ -249,6 +379,9 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
             std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
         result.pages = std::make_shared<const std::vector<notation::DisplayList>>(std::move(pages));
         findIssues(result, *font, pageOptions(result.staffSpace), memory);
+        memory.staffSpace = result.staffSpace;
+        memory.hasTablature = result.hasTablature;
+        memory.song = std::move(song);
     } catch (const std::exception& error) {
         result.error =
             QObject::tr("The score could not be laid out: %1").arg(qstring(error.what()));
@@ -259,7 +392,7 @@ ScoreLayout layOut(std::shared_ptr<const core::Song> song, int track, ScoreDocum
 // Opens `file` and lays out its first track: as notation and tablature when it
 // is fretted. Runs on a worker thread and never throws.
 ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, bool continuous,
-                          LayoutMemory& memory) {
+                          LayoutMemories& memories) {
     ScoreLayout result;
     result.source = file;
     try {
@@ -278,7 +411,8 @@ ScoreLayout openAndLayOut(const QUrl& file, audio::SequenceOptions practice, boo
         const auto view = notation::hasTablature(*song, first) ? ScoreDocument::View::Both
                                                                : ScoreDocument::View::Standard;
         auto sequence = std::make_shared<const audio::Sequence>(*song, practice);
-        result = layOut(std::move(song), 0, view, continuous, memory);
+        memories.clear(); // the views of the song shown before
+        result = layOut(std::move(song), 0, view, continuous, memories);
         result.source = file;
         result.opened = true;
         result.sequence = std::move(sequence);
@@ -475,7 +609,7 @@ QString trackDetail(const core::Track& track) {
 } // namespace
 
 ScoreDocument::ScoreDocument(QObject* parent)
-    : QObject(parent), layoutMemory_(std::make_shared<LayoutMemory>()),
+    : QObject(parent), layoutMemories_(std::make_shared<LayoutMemories>()),
       layouts_(std::make_unique<JobLane<ScoreLayout>>(this, [this] { updateBusy(); })),
       sequences_(std::make_unique<JobLane<SequenceResult>>(this, [this] { updateBusy(); })) {
     // Connected first, so that the list is up to date for whoever else hears it.
@@ -693,8 +827,8 @@ void ScoreDocument::load(const QUrl& file, std::optional<RecoveryStore::Copy> re
     errorMessage_.clear();
     emit statusChanged();
     layouts_->request(
-        [file, practice = practice_, continuous = continuous_, memory = layoutMemory_] {
-            return openAndLayOut(file, practice, continuous, *memory);
+        [file, practice = practice_, continuous = continuous_, memories = layoutMemories_] {
+            return openAndLayOut(file, practice, continuous, *memories);
         },
         [this, recovered = std::move(recovered)](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
@@ -858,7 +992,7 @@ void ScoreDocument::requestLayout(bool edit) {
     }
     layouts_->request(
         [song = song_, track = track_, view = view_, continuous = continuous_,
-         memory = layoutMemory_] { return layOut(song, track, view, continuous, *memory); },
+         memories = layoutMemories_] { return layOut(song, track, view, continuous, *memories); },
         [this, edit](const ScoreLayout& result) {
             if (!result.error.isEmpty()) {
                 fail(result.error);
@@ -982,6 +1116,9 @@ void ScoreDocument::apply(const ScoreLayout& layout, bool edit) {
     hasTablature_ = layout.hasTablature;
     staffSpace_ = layout.staffSpace;
     layoutMilliseconds_ = layout.milliseconds;
+    if (layout.kept) {
+        ++layoutsKept_;
+    }
     // The same lists, page for page, when the layout found nothing new.
     const bool issuesMoved = layout.issues != pageIssues_;
     pageIssues_ = layout.issues;
@@ -1251,6 +1388,9 @@ void ScoreDocument::newSong(const QString& presetId) {
     layouts_->drop();   // a file still opening must not replace the new song
     sequences_->drop(); // nor an edit's sequence still being built
     sequencing_.reset();
+    // The views of the song shown before are of no use to this one; a layout
+    // still running keeps the memories it was given.
+    layoutMemories_ = std::make_shared<LayoutMemories>();
     document_.emplace(std::move(song));
     ++documentsMade_;
     song_ = std::make_shared<const core::Song>(document_->song());
@@ -1306,7 +1446,9 @@ void ScoreDocument::setTempo(int bpm) {
         bpm > static_cast<int>(core::Tempo::kMaxBpm)) {
         return;
     }
-    execute(std::make_unique<core::SetStartTempo>(core::Tempo(bpm)));
+    // In the beat the song counts in (ADR-0042).
+    execute(std::make_unique<core::SetStartTempo>(
+        core::Tempo(bpm, document_->song().startTempo().beatUnit())));
 }
 
 void ScoreDocument::setTimeSignature(int numerator, int denominator) {
@@ -1612,26 +1754,15 @@ void ScoreDocument::setTempoFrom(int measure, int bpm) {
         measure >= static_cast<int>(document_->song().measureCount())) {
         return;
     }
-    const core::Song& song = document_->song();
     const bool removing = bpm <= 0;
     if (!removing && (bpm < static_cast<int>(core::Tempo::kMinBpm) ||
                       bpm > static_cast<int>(core::Tempo::kMaxBpm))) {
         return;
     }
-    if (measure == 0) {
-        // The song's tempo, counted in the beat it already counts in; the
-        // first measure always has one.
-        if (removing) {
-            return;
-        }
-        const core::Tempo tempo(bpm, song.startTempo().beatUnit());
-        if (tempo != song.startTempo()) {
-            execute(std::make_unique<core::SetStartTempo>(tempo));
-        }
-        return;
-    }
+    // On the first measure, core sets the song's tempo in the beat it counts in.
     const auto bpmOrNone = removing ? std::nullopt : std::optional<double>(bpm);
-    if (auto change = core::changeTempo(song, static_cast<std::size_t>(measure), bpmOrNone)) {
+    if (auto change =
+            core::changeTempo(document_->song(), static_cast<std::size_t>(measure), bpmOrNone)) {
         execute(std::move(change));
     }
 }
@@ -1936,9 +2067,8 @@ void ScoreDocument::exportPdf(const QUrl& file) {
                                    try {
                                        const auto staves =
                                            notation::selectTracks(*song, tracks, view);
-                                       const double space = staffSpaceFor(*song, staves);
-                                       const auto pages = notation::layoutPages(
-                                           *song, staves, *font, pageOptions(space));
+                                       const auto [pages, space] =
+                                           fittedPages(*song, staves, *font);
                                        pdf = notation::toPdf(pages, *outlines,
                                                              {.staffSpace = space * 72.0 / 25.4,
                                                               .title = song->info().title,
@@ -2007,6 +2137,9 @@ void ScoreDocument::edited() {
         resequence();
     } else if (!sequencing_) {
         sequenceSong_ = song_; // the sequence plays this song as it played the one before
+    }
+    if (changes.notation) {
+        emit scoreEdited();
     }
 }
 
@@ -2219,14 +2352,11 @@ void ScoreDocument::typeDigit(int digit, core::EditSession::Clock::time_point at
         emit editFailed(tr("Frets are typed on a track with strings."));
         return;
     }
-    bool changed = false;
-    try {
-        changed = session_.typeDigit(*document_, digit, at);
-    } catch (const std::exception& error) {
-        emit editFailed(qstring(error.what()));
-        return;
+    const core::EntryResult typed = session_.typeDigit(*document_, digit, at);
+    if (typed.refused) {
+        emit editFailed(refusalText(*typed.refused));
     }
-    showEdit(changed);
+    showEdit(typed.changed);
 }
 
 void ScoreDocument::setInputValue(int value) {
@@ -2273,13 +2403,42 @@ void ScoreDocument::shorterDuration() {
 }
 
 bool ScoreDocument::enter(core::Entry entry) {
-    bool changed = false;
+    core::EntryResult entered;
     try {
-        changed = session_.enter(*document_, std::move(entry));
+        entered = session_.enter(*document_, std::move(entry));
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
     }
-    return showEdit(changed);
+    if (entered.refused) {
+        emit editFailed(refusalText(*entered.refused));
+    }
+    return showEdit(entered.changed);
+}
+
+QString ScoreDocument::refusalText(core::Refusal why) {
+    switch (why) {
+    case core::Refusal::NothingAtCaret:
+        return tr("That goes on a note: put the caret on one.");
+    case core::Refusal::NeedsStrings:
+        return tr("That needs a track with strings.");
+    case core::Refusal::NeedsDrums:
+        return tr("Hits are typed on a drum track.");
+    case core::Refusal::NoNoteNames:
+        return tr("Drums take no note names.");
+    case core::Refusal::NoString:
+        return tr("No string can play that note.");
+    case core::Refusal::OffTheNeck:
+        return tr("The note would leave the neck.");
+    case core::Refusal::OutOfRange:
+        return tr("That note is out of range.");
+    case core::Refusal::NoNoteToTie:
+        return tr("There is no note to tie to.");
+    case core::Refusal::NoNaturalHarmonic:
+        return tr("That fret has no natural harmonic.");
+    case core::Refusal::TrillTooWide:
+        return tr("A trill goes at most an octave away.");
+    }
+    return {};
 }
 
 bool ScoreDocument::showEdit(bool changed) {
@@ -2308,14 +2467,14 @@ void ScoreDocument::giveInput(core::Duration duration) {
         return;
     }
     const core::Duration before = session_.input();
-    bool changed = false;
+    core::EntryResult given;
     try {
-        changed = session_.setInput(*document_, duration);
+        given = session_.setInput(*document_, duration);
     } catch (const std::exception& error) {
         emit editFailed(qstring(error.what()));
     }
     inputMaybeChanged(before);
-    showEdit(changed);
+    showEdit(given.changed);
 }
 
 void ScoreDocument::placeCaretAt(const core::Caret& caret) {

@@ -160,8 +160,13 @@ TEST_CASE("Dynamics: nothing changes when the passage has it or no note follows"
     using enum Dynamic;
     const Song song = flute({MF, MF, F, F}, {});
     CHECK(setDynamic(song, at(0, 0), MF).command == nullptr);
+    CHECK_FALSE(setDynamic(song, at(0, 0), MF).refused); // so already
     CHECK(setDynamic(song, at(0, 3), F).command == nullptr);
-    CHECK(setDynamic(song, at(1, 0), PP).command == nullptr); // the free slot of an empty measure
+    CHECK_FALSE(setDynamic(song, at(0, 3), F).refused);
+    // The free slot of an empty measure: no note follows to take it.
+    const Entry none = setDynamic(song, at(1, 0), PP);
+    CHECK(none.command == nullptr);
+    CHECK(none.refused == Refusal::NothingAtCaret);
 }
 
 TEST_CASE("Dynamics: new notes take the dynamic in force at the caret", "[core][entry][dynamics]") {

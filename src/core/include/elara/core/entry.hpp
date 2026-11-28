@@ -7,12 +7,14 @@
 #include <elara/core/lyrics.hpp>
 #include <elara/core/names.hpp>
 #include <elara/core/pitch.hpp>
+#include <elara/core/refusal.hpp>
 #include <elara/core/song.hpp>
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -66,13 +68,16 @@ enum class CaretMove : std::uint8_t {
 [[nodiscard]] Caret moveCaret(const Song& song, const Caret& caret, CaretMove move);
 
 /// An edit to execute and where the caret goes after it.
+///
+/// An edit the song cannot take comes back refused, with no command, and says
+/// why (ADR-0180); an edit that changes nothing because what it asks is so
+/// already has neither a command nor a refusal. The edits below throw only for
+/// arguments no caller should pass (std::invalid_argument, or
+/// std::out_of_range for a measure past the song).
 struct Entry {
     std::unique_ptr<Command> command; ///< nullptr when nothing changes
     Caret caret;
-    /// Why nothing changed, for the effect edits (ADR-0123): true when nothing
-    /// at the caret takes the edit (no note there for a note's effect, the free
-    /// slot, or a rest for what only notes take), false when it is so already.
-    bool missed = false;
+    std::optional<Refusal> refused{}; ///< why the edit was not made
 };
 
 /// Typing a fret: the note at `fret` (from the capo) on the caret's string,
@@ -80,8 +85,8 @@ struct Entry {
 /// keeping its effects, or joins the chord (a rest becomes a note of the same
 /// duration); on the free slot it adds a beat of `duration`. The caret stays.
 /// A new note takes the dynamic in force at the caret (see dynamicAt()).
-/// Throws std::logic_error on a staff without a tuning and std::out_of_range for
-/// a fret off the neck.
+/// Refused on a staff without a tuning (NeedsStrings) and for a fret off the
+/// neck (OffTheNeck).
 [[nodiscard]] Entry enterFret(const Song& song, const Caret& caret, int fret, Duration duration);
 
 /// What a note name does to the caret's beat.
@@ -101,17 +106,17 @@ enum class PitchMode : std::uint8_t {
 /// works as `Replace`). On a fretted staff the note goes on the caret's string
 /// when that string reaches it, otherwise on the nearest string that does (in a
 /// chord, one without a note), and the caret follows it. The note takes the
-/// dynamic in force at the caret (see dynamicAt()). Throws
-/// std::logic_error on a percussion staff and std::out_of_range when the note
-/// leaves MIDI 0..127 or no string can play it.
+/// dynamic in force at the caret (see dynamicAt()). Refused on a percussion
+/// staff (NoNoteNames), when the note leaves MIDI 0..127 (OutOfRange) and when
+/// no string can play it (NoString).
 [[nodiscard]] Entry enterPitch(const Song& song, const Caret& caret, Step step, Duration duration,
                                PitchMode mode = PitchMode::Replace);
 
 /// Moves the caret's note by `semitones`, spelled in the measure's key and
 /// keeping its effects. On a fretted staff that is the note on the caret's
 /// string, which keeps its string; elsewhere every note of the beat. Nothing
-/// changes on a rest, the free slot or a string without a note. Throws
-/// std::out_of_range when a note would leave MIDI 0..127 or the neck.
+/// changes on a rest, the free slot or a string without a note. Refused when a
+/// note would leave MIDI 0..127 (OutOfRange) or the neck (OffTheNeck).
 [[nodiscard]] Entry shiftPitch(const Song& song, const Caret& caret, int semitones);
 
 /// The caret's beat gets `duration`; nothing changes on the free slot.
@@ -135,8 +140,8 @@ enum class PitchMode : std::uint8_t {
 /// Absent, it joins the beat's hits in lane order (a rest becomes a hit of the
 /// same duration; the free slot gets a beat of `duration`) at the dynamic in
 /// force there (see dynamicAt()); present, it goes, leaving a rest when it was
-/// the last. The caret stays. Throws
-/// std::logic_error on a staff that is not a percussion staff.
+/// the last. The caret stays. Refused (NeedsDrums) on a staff that is not a
+/// percussion staff.
 [[nodiscard]] Entry toggleDrum(const Song& song, const Caret& caret, Duration duration);
 
 /// A note effect that typing toggles (ADR-0037), in the form it is usually
@@ -179,17 +184,17 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 /// as one undo step ("Change effect"); any slide off the note counts as a
 /// slide, any bend as a bend. A tie takes the pitch (and fret) of the note it
 /// continues, in the beat just before: on a fretted staff its note on the same
-/// string, elsewhere its note of the same pitch or its only note. Nothing
-/// changes on a rest, the free slot or a string without a note. Throws
-/// std::logic_error for a tie with nothing to continue or for a technique of
-/// strings (needsStrings()) going on a staff without them, and
-/// std::out_of_range for a natural harmonic at a fret without a node.
+/// string, elsewhere its note of the same pitch or its only note. Refused on a
+/// rest, the free slot or a string without a note (NothingAtCaret), for a tie
+/// with nothing to continue (NoNoteToTie), for a technique of strings
+/// (needsStrings()) going on a staff without them (NeedsStrings) and for a
+/// natural harmonic at a fret without a node (NoNaturalHarmonic).
 [[nodiscard]] Entry toggleEffect(const Song& song, const Caret& caret, NoteEffect effect);
 
 /// Sets the bend of the notes the caret is on (as for toggleEffect) to `curve`,
 /// any form or an empty curve to remove it (ADR-0055), as one undo step
-/// ("Change bend"). Nothing changes when they all have it already, on a rest,
-/// the free slot or a string without a note.
+/// ("Change bend"). Nothing changes when they all have it already; refused
+/// (NothingAtCaret) on a rest, the free slot or a string without a note.
 [[nodiscard]] Entry setBend(const Song& song, const Caret& caret, const BendCurve& curve);
 
 /// The bend of the first note the caret is on (as for toggleEffect); empty on
@@ -202,8 +207,8 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 
 /// Each of these sets one effect of the notes the caret is on (as for
 /// toggleEffect) to any of its kinds, as one undo step (ADR-0058). Nothing
-/// changes when they all have it already, on a rest, the free slot or a string
-/// without a note (`missed`, ADR-0123).
+/// changes when they all have it already; refused (NothingAtCaret, ADR-0123) on
+/// a rest, the free slot or a string without a note.
 ///
 /// setSlides() sets how the notes slide in and out ("Change slide").
 [[nodiscard]] Entry setSlides(const Song& song, const Caret& caret, SlideIn in, SlideOut out);
@@ -215,8 +220,8 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 [[nodiscard]] Entry setVibrato(const Song& song, const Caret& caret, Vibrato vibrato);
 /// An accent, a marcato or neither ("Change accent").
 [[nodiscard]] Entry setAccent(const Song& song, const Caret& caret, Accent accent);
-/// A trill, or none with `Trill{}` ("Change trill", ADR-0090). Throws
-/// std::out_of_range for a trill more than an octave away.
+/// A trill, or none with `Trill{}` ("Change trill", ADR-0090). Refused
+/// (TrillTooWide) for a trill more than an octave away.
 [[nodiscard]] Entry setTrill(const Song& song, const Caret& caret, Trill trill);
 /// Trills each of the caret's notes to the next step up in the key of its
 /// measure, at `speed` ("Change trill", ADR-0090).
@@ -230,12 +235,12 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 [[nodiscard]] Entry setFingering(const Song& song, const Caret& caret,
                                  std::span<const Finger> fingers);
 /// The finger that plucks the caret's notes ("Change plucking finger",
-/// ADR-0093). Throws std::logic_error on a staff without strings.
+/// ADR-0093). Refused (NeedsStrings) on a staff without strings.
 [[nodiscard]] Entry setPluck(const Song& song, const Caret& caret, Finger finger);
 /// A harmonic of `kind`, or none ("Change harmonic"): a natural harmonic at the
-/// note's fret, the others an octave above the fretted note. Throws
-/// std::logic_error for a harmonic on a staff without strings, and
-/// std::out_of_range for a natural one at a fret near no node.
+/// note's fret, the others an octave above the fretted note. Refused for a
+/// harmonic on a staff without strings (NeedsStrings) and for a natural one at
+/// a fret near no node (NoNaturalHarmonic).
 [[nodiscard]] Entry setHarmonic(const Song& song, const Caret& caret, HarmonicKind kind);
 
 /// Sets the effects of the caret's beat (ADR-0056): strum, pick stroke,
@@ -243,7 +248,8 @@ static_assert(namesEnd(NoteEffect::Staccatissimo));
 /// notes, as one undo step ("Change beat effects"). Nothing changes when the
 /// beat has them already or on the free slot; a rest takes only a hairpin, a
 /// fermata, a slur, an octave line and the pedal (ADR-0089, ADR-0092). It is
-/// `missed` (ADR-0123) on the free slot, and on a rest asked for more.
+/// refused (NothingAtCaret, ADR-0123) on the free slot, and on a rest asked for
+/// more.
 [[nodiscard]] Entry setBeatEffects(const Song& song, const Caret& caret,
                                    const BeatEffects& effects);
 
@@ -269,9 +275,9 @@ template <typename Value>
 /// where the grace note takes the same string; the lane's hit on a percussion
 /// staff, which the grace note repeats (a flam: `semitones` does not count);
 /// the highest note of the beat elsewhere. It takes that note's dynamic and is
-/// spelled in the measure's key. Nothing changes on a rest, the free slot or a
-/// string without a note. Throws std::out_of_range when the grace note would
-/// leave the neck or MIDI 0..127.
+/// spelled in the measure's key. Refused on a rest, the free slot or a string
+/// without a note (NothingAtCaret), and when the grace note would leave the
+/// neck (OffTheNeck) or MIDI 0..127 (OutOfRange).
 [[nodiscard]] Entry addGraceNote(const Song& song, const Caret& caret, int semitones,
                                  Duration duration, bool onBeat);
 
@@ -296,7 +302,7 @@ template <typename Value>
 /// loudest dynamic of that first one, through later measures. Every note struck
 /// in it changes, and a tied note with the note it continues, even past its
 /// end. The caret stays. Nothing changes when the passage already has the
-/// dynamic or no note follows the caret.
+/// dynamic; refused (NothingAtCaret) when no note follows the caret.
 [[nodiscard]] Entry setDynamic(const Song& song, const Caret& caret, Dynamic dynamic);
 
 /// Chord symbol entry (ADR-0080): names the caret's beat `name` (spaces

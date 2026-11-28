@@ -135,7 +135,7 @@ bool EditSession::paste(Document& document, PasteMode mode) {
     caret.beat = 0;
     anchor_ = at;
     try {
-        return enter(document, Entry{.command = std::move(command), .caret = caret});
+        return enter(document, Entry{.command = std::move(command), .caret = caret}).changed;
     } catch (...) {
         anchor_.reset();
         throw;
@@ -158,24 +158,24 @@ bool EditSession::transpose(Document& document, int semitones) {
     return true;
 }
 
-bool EditSession::enter(Document& document, Entry entry) {
+EntryResult EditSession::enter(Document& document, Entry entry) {
     typed_.reset();
     caret_ = entry.caret;
-    bool changed = false;
+    EntryResult result{.changed = false, .refused = entry.refused};
     try {
-        if (entry.command) {
+        if (entry.command && !entry.refused) {
             document.execute(std::move(entry.command));
-            changed = true;
+            result.changed = true;
         }
     } catch (...) {
         fit(document.song());
         throw;
     }
     fit(document.song());
-    return changed;
+    return result;
 }
 
-bool EditSession::typeDigit(Document& document, int digit, Clock::time_point now) {
+EntryResult EditSession::typeDigit(Document& document, int digit, Clock::time_point now) {
     const std::optional<Typed> first = std::exchange(typed_, std::nullopt);
     const bool second = first && first->digit > 0 && first->caret == caret_ &&
                         first->revision == document.revision() &&
@@ -186,32 +186,34 @@ bool EditSession::typeDigit(Document& document, int digit, Clock::time_point now
         if (undone) {
             document.undo();
         }
-        try {
-            const int fret = first->digit * 10 + digit;
-            const bool entered = enter(document, enterFret(document.song(), caret_, fret, input_));
+        const int fret = first->digit * 10 + digit;
+        Entry two = enterFret(document.song(), caret_, fret, input_);
+        if (!two.refused) {
+            const EntryResult entered = enter(document, std::move(two));
             // Entering nothing, the song is still back as before the first digit.
-            return entered || undone;
-        } catch (const std::exception&) {
-            // Off the neck: the first digit stays, and the second starts a fret.
-            if (undone) {
-                document.redo();
-            }
+            return EntryResult{.changed = entered.changed || undone};
+        }
+        // Off the neck: the first digit stays, and the second starts a fret.
+        if (undone) {
+            document.redo();
         }
     }
-    const bool changed = enter(document, enterFret(document.song(), caret_, digit, input_));
-    typed_ = Typed{.digit = digit,
-                   .caret = caret_,
-                   .revision = document.revision(),
-                   .changed = changed,
-                   .at = now};
-    return changed;
+    const EntryResult result = enter(document, enterFret(document.song(), caret_, digit, input_));
+    if (!result.refused) {
+        typed_ = Typed{.digit = digit,
+                       .caret = caret_,
+                       .revision = document.revision(),
+                       .changed = result.changed,
+                       .at = now};
+    }
+    return result;
 }
 
-bool EditSession::setInput(Document& document, Duration duration) {
+EntryResult EditSession::setInput(Document& document, Duration duration) {
     typed_.reset();
     input_ = duration;
     if (!hasCaret(document.song())) {
-        return false;
+        return {};
     }
     return enter(document, setBeatDuration(document.song(), caret_, input_));
 }

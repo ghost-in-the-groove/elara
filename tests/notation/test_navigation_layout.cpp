@@ -407,3 +407,40 @@ TEST_CASE("Section marks: a song without sections draws none", "[notation][layou
     CHECK(std::ranges::none_of(list.lines,
                                [](const auto& line) { return line.role == Role::Section; }));
 }
+
+TEST_CASE("Section marks: a name that would run past the end of the system ends with it",
+          "[notation][layout][navigation]") {
+    // In the last measure the name is wider than what is left of the system:
+    // its box starts early enough to end at the last barline (ADR-0176).
+    Song song = quarters(3);
+    song.measureHeader(2).section = "A section with quite a long name";
+    const DisplayList list = layout(song);
+    const auto names = texts(list, Role::Section);
+    REQUIRE(names.size() == 1);
+    const Box box = sectionBox(list, 2);
+    const MeasureBox& measure = measureBox(list, 2);
+    REQUIRE(box.right - box.left > measure.width); // from its measure it would run past the end
+    CHECK(box.right <= list.width + 0.2);
+    CHECK(box.right > list.width - 0.2);
+    CHECK(box.left < measure.x);
+    CHECK(box.left >= 0.0);
+    // The name moved with its box.
+    CHECK(box.left < names[0].origin.x);
+    CHECK(box.right > names[0].origin.x + textWidth(names[0]));
+
+    // One that fits stays where its measure starts.
+    song.measureHeader(2).section = "Coda";
+    const DisplayList fitting = layout(song);
+    const Box coda = sectionBox(fitting, 2);
+    CHECK(coda.left >= measureBox(fitting, 2).x - kEpsilon);
+    CHECK(coda.right < fitting.width);
+
+    // One wider than the whole system starts with it.
+    Song narrow = quarters(1);
+    narrow.measureHeader(0).section =
+        "A section whose name is far too long for a system of one measure of four quarter notes";
+    const DisplayList wide = layout(narrow);
+    REQUIRE(sectionBox(wide, 0).right > wide.width);
+    CHECK(sectionBox(wide, 0).left >= -0.2);
+    CHECK(sectionBox(wide, 0).left < 0.2);
+}

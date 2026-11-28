@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include <elara/notation/symbol.hpp>
 
+#include "ink.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -14,10 +16,6 @@ namespace {
 // sharps of a key signature, a tempo's note and its number. Two staves of a
 // system are further apart.
 constexpr double kJoin = 1.0;
-
-// A text's ink over and under its baseline, as parts of its size.
-constexpr double kAscent = 0.8;
-constexpr double kDescent = 0.2;
 
 // One drawn item of a symbol.
 struct Piece {
@@ -68,30 +66,17 @@ std::vector<Piece> piecesOf(const DisplayList& list, std::span<const Role> roles
         if (!wanted(roles, glyph.role)) {
             continue;
         }
-        // The font's boxes have y upwards from the glyph's origin.
-        const BoundingBox& ink = font.metrics(glyph.glyph).box;
-        if (ink.width() <= 0.0 || ink.height() <= 0.0) {
+        const Rect ink = detail::glyphInk(glyph, font);
+        if (ink.width <= 0.0 || ink.height <= 0.0) {
             continue;
         }
-        pieces.push_back({glyph.role, glyph.measure,
-                          Rect{.x = glyph.origin.x + (ink.southWest.x * glyph.scale),
-                               .y = glyph.origin.y - (ink.northEast.y * glyph.scale),
-                               .width = ink.width() * glyph.scale,
-                               .height = ink.height() * glyph.scale}});
+        pieces.push_back({glyph.role, glyph.measure, ink});
     }
     for (const TextItem& text : list.texts) {
         if (!wanted(roles, text.role) || text.text.empty()) {
             continue;
         }
-        const double width = textWidth(text);
-        const double left = text.align == TextAlign::Left     ? text.origin.x
-                            : text.align == TextAlign::Centre ? text.origin.x - (width / 2.0)
-                                                              : text.origin.x - width;
-        pieces.push_back({text.role, text.measure,
-                          Rect{.x = left,
-                               .y = text.origin.y - (kAscent * text.size),
-                               .width = width,
-                               .height = (kAscent + kDescent) * text.size}});
+        pieces.push_back({text.role, text.measure, detail::textInk(text)});
     }
     for (const LineItem& line : list.lines) {
         if (wanted(roles, line.role)) {

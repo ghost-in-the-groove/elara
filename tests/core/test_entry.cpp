@@ -79,10 +79,14 @@ TEST_CASE("Entry: grace notes lead into the caret's beat", "[core][entry]") {
     CHECK(graceNotesAt(doc.song(), at(0, 0, 6)) == 0);
     CHECK(graceNotesAt(doc.song(), at(0, 2)) == 0); // the free slot
 
-    // Nothing on a string without a note or the free slot; off the neck throws.
-    CHECK(addGraceNote(doc.song(), at(0, 1, 1), -2, eighth, false).command == nullptr);
-    CHECK(addGraceNote(doc.song(), at(0, 2, 5), -2, eighth, false).command == nullptr);
-    CHECK_THROWS_AS(addGraceNote(doc.song(), at(0, 1, 5), -3, eighth, false), std::out_of_range);
+    // Nothing on a string without a note or the free slot; off the neck refused.
+    CHECK(addGraceNote(doc.song(), at(0, 1, 1), -2, eighth, false).refused ==
+          Refusal::NothingAtCaret);
+    CHECK(addGraceNote(doc.song(), at(0, 2, 5), -2, eighth, false).refused ==
+          Refusal::NothingAtCaret);
+    const Entry offTheNeck = addGraceNote(doc.song(), at(0, 1, 5), -3, eighth, false);
+    CHECK(offTheNeck.command == nullptr);
+    CHECK(offTheNeck.refused == Refusal::OffTheNeck);
 
     run(doc, removeGraceNotes(doc.song(), at(0, 1, 5)));
     CHECK(doc.undoName() == "Remove grace notes");
@@ -481,9 +485,13 @@ TEST_CASE("Entry: a fret on a rest makes a note of the rest's duration, spelled 
 TEST_CASE("Entry: frets need a tuning and a neck", "[core][entry]") {
     Song song = guitarSong();
     song.addTrack(Track::fromPreset(*findInstrumentPreset("piano")));
-    CHECK_THROWS_AS(enterFret(song, Caret{.track = 1}, 3, kQuarter), std::logic_error);
-    CHECK_THROWS_AS(enterFret(song, at(0, 0, 1), 99, kQuarter), std::out_of_range);
-    CHECK_THROWS_AS(enterFret(song, at(0, 0, 1), -1, kQuarter), std::out_of_range);
+    CHECK(enterFret(song, Caret{.track = 1}, 3, kQuarter).refused == Refusal::NeedsStrings);
+    for (const int fret : {99, -1, Tuning::kMaxFret + 1}) {
+        const Entry off = enterFret(song, at(0, 0, 1), fret, kQuarter);
+        CHECK(off.command == nullptr);
+        CHECK(off.refused == Refusal::OffTheNeck);
+    }
+    CHECK_FALSE(enterFret(song, at(0, 0, 1), Tuning::kMaxFret, kQuarter).refused);
 }
 
 TEST_CASE("Entry: a beat's duration changes, the free slot has none", "[core][entry]") {
@@ -668,7 +676,7 @@ TEST_CASE("Entry: a first note name starts near the middle line of the clef in f
 TEST_CASE("Entry: note names need a pitched staff and the MIDI range", "[core][entry]") {
     Song song = fluteSong();
     song.addTrack(Track::fromPreset(*findInstrumentPreset("drum-kit")));
-    CHECK_THROWS_AS(enterPitch(song, Caret{.track = 1}, Step::C, kQuarter), std::logic_error);
+    CHECK(enterPitch(song, Caret{.track = 1}, Step::C, kQuarter).refused == Refusal::NoNoteNames);
     // Up and up in a chord until the notes leave MIDI 127.
     Document doc(std::move(song));
     run(doc, enterPitch(doc.song(), at(0, 0), Step::C, kQuarter));
@@ -680,7 +688,9 @@ TEST_CASE("Entry: note names need a pitched staff and the MIDI range", "[core][e
     addC(); // C7
     addC(); // C8
     addC(); // C9 (MIDI 120)
-    CHECK_THROWS_AS(addC(), std::out_of_range);
+    const Entry above = enterPitch(doc.song(), at(0, 0), Step::C, kQuarter, PitchMode::AddToChord);
+    CHECK(above.command == nullptr);
+    CHECK(above.refused == Refusal::OutOfRange);
 }
 
 TEST_CASE("Entry: a pitch moves by semitones, a fretted note along its string", "[core][entry]") {
@@ -696,7 +706,7 @@ TEST_CASE("Entry: a pitch moves by semitones, a fretted note along its string", 
                             Note{.pitch = Pitch(Step::D, 0, 5)}});
     run(doc, shiftPitch(doc.song(), at(0, 0), -12));
     CHECK(firstVoice(doc.song(), 0).beats[0].notes.at(1).pitch == Pitch(Step::D, 0, 4));
-    CHECK_THROWS_AS(shiftPitch(doc.song(), at(0, 0), 100), std::out_of_range);
+    CHECK(shiftPitch(doc.song(), at(0, 0), 100).refused == Refusal::OutOfRange);
     CHECK(shiftPitch(doc.song(), at(0, 1), 1).command == nullptr); // the free slot
 
     Song song = guitarSong();
@@ -707,7 +717,7 @@ TEST_CASE("Entry: a pitch moves by semitones, a fretted note along its string", 
     expected.effects.letRing = true;
     CHECK(firstVoice(guitar.song(), 1).beats[0].notes == std::vector<Note>{expected});
     CHECK(shiftPitch(guitar.song(), at(1, 0, 2), 1).command == nullptr); // no note on string 2
-    CHECK_THROWS_AS(shiftPitch(guitar.song(), at(1, 0, 1), -4), std::out_of_range);
+    CHECK(shiftPitch(guitar.song(), at(1, 0, 1), -4).refused == Refusal::OffTheNeck);
 }
 
 TEST_CASE("Entry: delete on a staff without strings leaves a rest", "[core][entry]") {

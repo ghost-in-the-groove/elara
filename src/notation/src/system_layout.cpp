@@ -584,7 +584,9 @@ void markNavigation(DisplayList& system, const core::Song& song,
 
 // The sections of `system` (ADR-0062), above everything else over its first
 // staff: each name in a box from the start of its measure, on the lowest line
-// where the box clears the boxes already there.
+// where the box clears the boxes already there. A name that would run past the
+// end of the system, into the margin or off the page, ends with the system
+// instead, as far back as its start allows (ADR-0176).
 void markSections(DisplayList& system, const core::Song& song, std::span<const MeasureBox> measures,
                   std::span<const double> barlineEnds, const EngravingFont& font) {
     const double height = (kTextAscent + kTextDescent) * kSectionSize + 2 * kSectionPad;
@@ -598,8 +600,11 @@ void markSections(DisplayList& system, const core::Song& song, std::span<const M
         if (name.empty()) {
             continue;
         }
-        const double left = (i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset;
-        const double right = left + textWidth(name, kSectionSize, TextFace::Bold) + 2 * kSectionPad;
+        const double width = textWidth(name, kSectionSize, TextFace::Bold) + 2 * kSectionPad;
+        const double left =
+            std::max(0.0, std::min((i > 0 ? barlineEnds[i - 1] : measures[i].x) + kNavigationInset,
+                                   system.width - width));
+        const double right = left + width;
         const auto line = static_cast<std::size_t>(
             std::ranges::find_if(lineEnds,
                                  [left](double end) { return end + kSectionGap <= left; }) -
@@ -973,6 +978,21 @@ void markTempo(DisplayList& system, const core::Song& song, std::span<const Meas
             mark.tempo || mark.feel || !mark.word.empty() ? after + kRampGap : after;
         const double to = mark.rampEnd - kRampGap;
         drawn.back().to = after;
+        // A mark that would run past the end of the system ends with it, as
+        // far back as the system's start allows (ADR-0176). One with a line
+        // ends where the line does, inside the system.
+        if (const double past = std::min(after - system.width, mark.x);
+            past > kEpsilon && to - from < kRampMinLine) {
+            const Drawn& own = drawn.back();
+            for (std::size_t g = own.glyphs; g < system.glyphs.size(); ++g) {
+                system.glyphs[g].origin.x -= past;
+            }
+            for (std::size_t t = own.texts; t < system.texts.size(); ++t) {
+                system.texts[t].origin.x -= past;
+            }
+            drawn.back().from -= past;
+            drawn.back().to -= past;
+        }
         if (to - from >= kRampMinLine) {
             const double y = baseline - kRampLift;
             system.lines.push_back(LineItem{.from = {from, y},

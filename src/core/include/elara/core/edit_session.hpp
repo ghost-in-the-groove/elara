@@ -8,6 +8,7 @@
 #include <elara/core/document.hpp>
 #include <elara/core/duration.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/refusal.hpp>
 #include <elara/core/song.hpp>
 
 #include <array>
@@ -18,6 +19,13 @@
 #include <optional>
 
 namespace elara::core {
+
+/// How an edit went in (ADR-0180): whether the song changed, or why the edit
+/// was not made. A refused edit changes nothing.
+struct EntryResult {
+    bool changed = false;             ///< the song changed: one more undo step
+    std::optional<Refusal> refused{}; ///< why the edit was not made
+};
 
 /// The caret, the duration typing uses, the digit waiting for a second one,
 /// the selected measures and the measures copied; all but the last kept
@@ -155,17 +163,18 @@ public:
 
     /// Enters an edit: the caret goes where `entry` says, and its command, if
     /// it has one, is executed on `document`. Returns whether the song
-    /// changed. What the command throws goes on to the caller; the caret is
-    /// inside the song either way.
-    bool enter(Document& document, Entry entry);
+    /// changed, or why `entry` was refused (nothing is executed then). What
+    /// the command throws goes on to the caller; the caret is inside the song
+    /// either way.
+    [[nodiscard]] EntryResult enter(Document& document, Entry entry);
 
     /// Types a digit at `now`: a fret on the caret's string (enterFret()).
     /// A second digit within kTwoDigitWindow of a first one that was not 0,
     /// with nothing done in between, makes the two-digit fret instead, as one
     /// undo step; when that fret is off the neck the first digit stays and
-    /// the second starts a fret of its own. Returns whether the song changed.
-    /// What enterFret() throws for a fret of one digit goes on to the caller.
-    bool typeDigit(Document& document, int digit, Clock::time_point now);
+    /// the second starts a fret of its own. Returns whether the song changed,
+    /// or why the fret of one digit was refused (a staff without strings).
+    [[nodiscard]] EntryResult typeDigit(Document& document, int digit, Clock::time_point now);
 
     /// Ends the wait for a second digit, as every action but a digit does:
     /// for an edit at the caret that may turn out to change nothing and never
@@ -176,7 +185,7 @@ public:
     /// (setBeatDuration()). Returns whether the song changed. When the beat
     /// cannot take it, what the edit throws goes on to the caller and the
     /// input duration is `duration` all the same.
-    bool setInput(Document& document, Duration duration);
+    [[nodiscard]] EntryResult setInput(Document& document, Duration duration);
 
 private:
     /// The caret back on the track shown and inside `song`, and the selection

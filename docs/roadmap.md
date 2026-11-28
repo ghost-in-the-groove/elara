@@ -254,6 +254,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         Ctrl+2 to Ctrl+9 (ADR-0050)
   - [x] Voices 1 to 4 at the caret: `voice` in the CLI, Alt+1 to Alt+4 and a
         voice button in the app (ADR-0032)
+  - [x] An edit the song refuses says why, in words of the app's and a name
+        of the CLI's, and changes nothing (ADR-0180)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)
@@ -296,6 +298,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
       credits, chords, texts, lyrics and sections no sequence (ADR-0111)
 - [x] The player prepared on a worker after edits, a new song or a new sound
       bank: events, buffers and new sounds off the interface thread (ADR-0112)
+  - [x] The first Play and a device's new sample rate too: playback starts once
+        the song's sounds are made, a second with MuseScore General (ADR-0148)
 - [ ] Layout adjustments: the automatic layout first, then what a writer may
       change where it is not enough, stored on what it adjusts
   - [x] Layout issues: overlapping noteheads, accidentals, fret numbers,
@@ -342,7 +346,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] The welcome pane as a home: what to do at the left, the recent scores
       beside it
 - [x] The page in the dark theme: dark paper and light ink, black on white
-      when it leaves the program (ADR-0114)
+      when it leaves the program (ADR-0114); the staves' lines dimmer than the
+      notes and the fret numbers on them (ADR-0174)
 - [x] After a review of the whole window: one look for whatever is chosen, the
       paper the brightest surface, the palette's signs from the music font, the
       tuner docked beside the score, measure ticks on the song string, one side
@@ -357,7 +362,15 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
       playing or the caret's is shaded across every staff (ADR-0170)
 - [x] Every track at once at a smaller staff size, two systems a page where
       the staves allow it (ADR-0171)
+- [x] A track or a view shown before comes back with its pages instead of being laid
+      out again (ADR-0175)
+- [x] Nothing runs past the right margin: a measure wider than the page gets smaller
+      staves, and a section's name, a beat's text and a tempo mark end with their
+      system (ADR-0176)
 - [x] The A-B loop as a band over its measures on the score (ADR-0172)
+- [x] The caret's cell frames the fret number or the note instead of covering it, the
+      playback cursor hides while the score is worked on, and a song opens from its top
+      (ADR-0173)
 
 ## Milestone 6 - Practice tools
 

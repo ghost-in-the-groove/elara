@@ -15,6 +15,7 @@ constexpr double kUsualDistance = 5.0;  // between the lines of neighbouring sta
 constexpr double kInkRoom = 8.0;        // above the first staff and below the last
 constexpr double kSystemGap = 2.0;      // between the ink of two systems
 constexpr int kSystemsPerPage = 2;
+constexpr double kTolerance = 1e-6; // a system that ends on the margin is inside it
 
 } // namespace
 
@@ -58,6 +59,38 @@ double fittedStaffSpace(const core::Song& song, std::span<const StaffSelection> 
     }
     space = std::max(space, kLeastStaffSpace);
     return std::min(staffSpace, std::floor(space * 100.0) / 100.0);
+}
+
+WidthOverflow widthOverflow(std::span<const DisplayList> pages, const PageLayoutOptions& options) {
+    WidthOverflow widest;
+    for (const DisplayList& page : pages) {
+        const double limit = page.width - options.margin;
+        for (const SystemBox& system : page.systems) {
+            const double past = system.x + system.width - limit;
+            if (past > widest.amount + kTolerance) {
+                widest = {.amount = past, .measure = system.firstMeasure};
+            }
+        }
+    }
+    return widest;
+}
+
+double narrowedStaffSpace(const Paper& paper, double asked, double laidOut, double overflow,
+                          double margin) {
+    if (!(asked > 0.0) || !(laidOut > 0.0)) {
+        throw std::invalid_argument("the staff space must be positive");
+    }
+    const double room = paper.width - 2.0 * margin; // mm between the margins
+    if (!(room > 0.0)) {
+        throw std::invalid_argument("the margins leave no room on the page");
+    }
+    const double least = std::max(kLeastStaffShare * asked, kLeastStaffSpace);
+    if (!(overflow > 0.0) || laidOut <= least) {
+        return laidOut;
+    }
+    // The system needs the staff spaces the page has and `overflow` more.
+    const double space = room / (room / laidOut + overflow);
+    return std::clamp(std::floor(space * 100.0) / 100.0, least, laidOut);
 }
 
 } // namespace elara::notation

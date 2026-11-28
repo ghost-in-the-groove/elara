@@ -328,7 +328,7 @@ add_test(NAME cli.edit_rejects_note_name_on_drums
 add_test(NAME cli.edit_rejects_unknown_note_name
   COMMAND elara-cli edit "add-track flute" "append-measures 1" "pitch H")
 set_tests_properties(cli.edit_rejects_note_name_on_drums PROPERTIES
-  PASS_REGULAR_EXPRESSION "enterPitch: a percussion staff has no note names")
+  PASS_REGULAR_EXPRESSION "refused: no-note-names")
 set_tests_properties(cli.edit_rejects_unknown_note_name PROPERTIES
   PASS_REGULAR_EXPRESSION "pitch: not a note name \\(C to B\\): H")
 
@@ -350,7 +350,7 @@ add_test(NAME cli.edit_rejects_drum_on_guitar
 add_test(NAME cli.edit_rejects_drum_without_lane
   COMMAND elara-cli edit "add-track drum-kit" "append-measures 1" "drum 56")
 set_tests_properties(cli.edit_rejects_drum_on_guitar PROPERTIES
-  PASS_REGULAR_EXPRESSION "toggleDrum: the staff is not a percussion staff")
+  PASS_REGULAR_EXPRESSION "refused: needs-drums")
 set_tests_properties(cli.edit_rejects_drum_without_lane PROPERTIES
   PASS_REGULAR_EXPRESSION "drum: no lane for key 56")
 
@@ -375,7 +375,7 @@ add_test(NAME cli.edit_rejects_tie_without_note
 set_tests_properties(cli.edit_rejects_unknown_effect PROPERTIES
   PASS_REGULAR_EXPRESSION "not an effect: wah")
 set_tests_properties(cli.edit_rejects_tie_without_note PROPERTIES
-  PASS_REGULAR_EXPRESSION "toggleEffect: no note to tie to")
+  PASS_REGULAR_EXPRESSION "refused: no-note-to-tie")
 
 # Bends of any form (ADR-0055): a half-step bend and release on fret 7, then a
 # pre-bend of a step and a half on fret 9, taken off and put back by undo.
@@ -546,7 +546,7 @@ add_test(NAME cli.edit_rejects_grace_off_the_neck
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 1" "caret 0 0 0 3"
     "fret 1" "grace -2")
 set_tests_properties(cli.edit_rejects_grace_off_the_neck PROPERTIES
-  PASS_REGULAR_EXPRESSION "addGraceNote: the grace note leaves the neck")
+  PASS_REGULAR_EXPRESSION "refused: off-the-neck")
 add_test(NAME cli.edit_rejects_unknown_hairpin
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "hairpin swell")
 set_tests_properties(cli.edit_rejects_unknown_hairpin PROPERTIES
@@ -626,7 +626,7 @@ set_tests_properties(cli.edit_rejects_a_sixth_finger PROPERTIES
 add_test(NAME cli.edit_rejects_pluck_without_strings
   COMMAND elara-cli edit "add-track piano" "append-measures 1" "pitch C" "pluck i")
 set_tests_properties(cli.edit_rejects_pluck_without_strings PROPERTIES
-  PASS_REGULAR_EXPRESSION "setPluck: a plucking finger needs strings")
+  PASS_REGULAR_EXPRESSION "refused: needs-strings")
 # The sustain pedal at the caret (ADR-0092): down on the C, the D and a rest,
 # changed on the E. Drawn as "Ped.", its line broken by the notch, and the hook.
 set(ELARA_CLI_PEDALS "${CMAKE_CURRENT_BINARY_DIR}/cli-pedals.elara")
@@ -834,7 +834,7 @@ add_test(NAME cli.edit_rejects_natural_harmonic_off_node
 set_tests_properties(cli.edit_rejects_unknown_vibrato PROPERTIES
   PASS_REGULAR_EXPRESSION "vibrato: none, slight, wide, not huge")
 set_tests_properties(cli.edit_rejects_natural_harmonic_off_node PROPERTIES
-  PASS_REGULAR_EXPRESSION "setHarmonic: no natural harmonic at that fret")
+  PASS_REGULAR_EXPRESSION "refused: no-natural-harmonic")
 
 # Dynamics at the caret (ADR-0047): f from the second note holds to the end,
 # and a note typed after it is f too.
@@ -1010,12 +1010,15 @@ set_tests_properties(cli.edit_clears_tempo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":4,")
 add_test(NAME cli.edit_rejects_tempo_out_of_range
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 5")
-add_test(NAME cli.edit_rejects_tempo_from_first_measure
-  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90")
+# The first measure's tempo is the song's, in the beat it counts in (ADR-0042),
+# as the app's measure popup sets it.
+add_test(NAME cli.edit_tempo_from_first_measure
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90"
+    "tempo-from 0 none")
 set_tests_properties(cli.edit_rejects_tempo_out_of_range PROPERTIES
   PASS_REGULAR_EXPRESSION "tempo-from: 10 to 999 beats per minute, not 5")
-set_tests_properties(cli.edit_rejects_tempo_from_first_measure PROPERTIES
-  PASS_REGULAR_EXPRESSION "tempo-from: the first measure plays at the song's tempo \\(\"tempo <bpm>\"\\)")
+set_tests_properties(cli.edit_tempo_from_first_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "{\"title\":\"\",\"tempo\":90,.*\"undo\":{\"count\":3,\"next\":\"Change tempo\"}")
 # Triplet feel (ADR-0104): swung eighths from measure 1, straight again in
 # measure 2; at quarter = 120 the second eighth starts after a third of a
 # second, saved, read back and played.
@@ -1956,6 +1959,13 @@ add_test(NAME cli.render_issues_measure_too_wide
           --staff-space 10 --issues)
 set_tests_properties(cli.render_issues_measure_too_wide PROPERTIES
   PASS_REGULAR_EXPRESSION "\"issues\":\\[{\"kind\":\"measureTooWide\",\"page\":0,\"measure\":0,\"roles\":\\[\\],\"box\":\\[[0-9.,]+\\]}\\],\"pages\"")
+# With --fit-staves the same measure gets smaller staff spaces, on a page as
+# wide in millimetres, and fits it (ADR-0176): nothing is left to report.
+add_test(NAME cli.render_fit_staves_wide_measure
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --fit-staves --issues)
+set_tests_properties(cli.render_fit_staves_wide_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"page\",\"staffSpace\":9\\.23,\"issues\":\\[\\],\"pages\"")
 add_test(NAME cli.render_issues_text
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
           --staff-space 10 --issues)

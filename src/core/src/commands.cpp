@@ -369,16 +369,27 @@ std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
     if (measure >= song.measureCount()) {
         throw std::out_of_range("Change tempo: no such measure");
     }
-    if (measure == 0) {
-        throw std::invalid_argument("Change tempo: the first measure plays at the song's tempo");
-    }
     MeasureHeader header = song.measureHeader(measure);
+    const auto atStart = [](const TempoChange& change) {
+        return change.offset == Fraction{};
+    };
+    if (measure == 0 && std::ranges::none_of(header.tempoChanges, atStart)) {
+        // The song's own tempo starts the first measure, which always has one
+        // (ADR-0042); a new one counts in the beat it counts in.
+        if (!bpm) {
+            return nullptr;
+        }
+        const Tempo tempo(*bpm, song.startTempo().beatUnit()); // Tempo checks the range
+        if (tempo == song.startTempo()) {
+            return nullptr;
+        }
+        return std::make_unique<SetStartTempo>(tempo);
+    }
     // A new tempo stays gradual (ADR-0082).
     const bool gradual = std::ranges::any_of(header.tempoChanges, [](const TempoChange& change) {
         return change.offset == Fraction{} && change.gradual;
     });
-    std::erase_if(header.tempoChanges,
-                  [](const TempoChange& change) { return change.offset == Fraction{}; });
+    std::erase_if(header.tempoChanges, atStart);
     if (bpm) {
         // Tempo checks the range.
         const Tempo tempo(*bpm, song.tempoAt(measure).beatUnit());

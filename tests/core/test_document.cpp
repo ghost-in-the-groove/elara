@@ -657,9 +657,7 @@ TEST_CASE("A tempo change starts a measure and holds until the next one", "[core
     doc.execute(elara::core::changeTempo(doc.song(), 2, 75));
     CHECK(elara::core::changeTempo(doc.song(), 2, 75) == nullptr);
 
-    // The first measure plays at the song's tempo; tempos out of range and
-    // measures the song does not have are refused.
-    CHECK_THROWS_AS(elara::core::changeTempo(original, 0, 90), std::invalid_argument);
+    // Tempos out of range and measures the song does not have are refused.
     CHECK_THROWS_AS(elara::core::changeTempo(original, 1, 5), std::invalid_argument);
     CHECK_THROWS_AS(elara::core::changeTempo(original, 4, 90), std::out_of_range);
 }
@@ -671,6 +669,34 @@ TEST_CASE("A tempo change counts in the beat the song counts in there", "[core][
     Document doc(original);
     doc.execute(elara::core::changeTempo(doc.song(), 3, 80));
     CHECK(doc.song().tempoAt(3) == Tempo(80, dottedQuarter));
+}
+
+TEST_CASE("The first measure's tempo is the song's, in the beat it counts in", "[core][document]") {
+    // ADR-0042: the song's own tempo starts the first measure; the app's
+    // measure popup and the CLI's tempo steps set it through this edit.
+    Song original = smallSong();
+    const Duration dottedQuarter(NoteValue::Quarter, 1);
+    original.setStartTempo(Tempo(60, dottedQuarter));
+    Document doc(original);
+    doc.execute(elara::core::changeTempo(doc.song(), 0, 80));
+    CHECK(doc.song().startTempo() == Tempo(80, dottedQuarter));
+    CHECK(doc.song().measureHeader(0) == original.measureHeader(0));
+    CHECK(doc.undoName() == "Change tempo");
+    // The same again, or none: the first measure always has a tempo.
+    CHECK(elara::core::changeTempo(doc.song(), 0, 80) == nullptr);
+    CHECK(elara::core::changeTempo(doc.song(), 0, std::nullopt) == nullptr);
+    CHECK_THROWS_AS(elara::core::changeTempo(doc.song(), 0, 5), std::invalid_argument);
+
+    // A change written at the very start, as Guitar Pro files have, is what
+    // the first measure plays: that is the one changed, or taken away.
+    Song imported = original;
+    imported.measureHeader(0).tempoChanges = {TempoChange{.offset = {}, .tempo = Tempo(90)}};
+    Document other(imported);
+    other.execute(elara::core::changeTempo(other.song(), 0, 100));
+    CHECK(other.song().tempoAt(0) == Tempo(100));
+    CHECK(other.song().startTempo() == imported.startTempo());
+    other.execute(elara::core::changeTempo(other.song(), 0, std::nullopt));
+    CHECK(other.song().tempoAt(0) == imported.startTempo());
 }
 
 TEST_CASE("A key signature change runs until the next change", "[core][document]") {
