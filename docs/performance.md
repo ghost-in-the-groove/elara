@@ -532,12 +532,38 @@ Programs: `elara.exe` 16.7 to 8.4 MB, `elara-cli.exe` 9.1 to 3.1 MB. Install
 folder: 162.2 MB in 172 files to 112.4 MB in 120; zip 83.0 to 68.4 MB, of which
 the SoundFont is 38.1 MB.
 
+**2026-11-28, Windows package.** Before: the package measured as "After"
+above. After: the tracks' synthesizers share one loaded SoundFont
+(ADR-0146), and a `.elara` file's `song.json` is read where it was inflated
+and written as the song is walked (ADR-0147). Both packages measured one
+after the other on the reference machine; peak working set / peak private MB.
+The times did not change beyond what they vary from run to run.
+
+| Scenario | Before | After |
+|---|---|---|
+| CLI: open the huge `.elara`, save it again | 206 / 341 | 157 / 180 |
+| CLI: export it as MIDI | 191 / 219 | 157 / 180 |
+| CLI: sequence it | 191 / 219 | 186 / 183 |
+| CLI: one track of the large song as PDF pages | 69 / 75 | 58 / 62 |
+| CLI: render the large song through MuseScore General | 394 / 402 | 209 / 217 |
+| App: playing it through MuseScore General, held 10 s | 560 / 618, 20.5 % of a core | 379 / 433, 16.7 % of a core |
+
+Rendering through MuseScore General with `elara-cli` now takes about 2.6 MB
+for each track past the first, against 12.3 MB before. Programs and install
+folder: within 0.3 MB of the package before (`elara.exe` 8.7 MB, install
+folder 112.7 MB in 120 files).
+
 What the numbers point at next:
 
-- MuseScore General costs the app about 325 MB for 20 tracks. Rendering
-  through it with `elara-cli` takes 105 MB for one track and about 12 MB for
-  each track more: every track has a synthesizer of its own, and each loads
-  the SoundFont's 3861 preset and instrument zones again (the samples are
-  shared).
-- Opening a `.elara` file commits 341 MB for 206 MB used: yyjson reserves
-  room for as many values as the text could hold.
+- Rendering through MuseScore General is the costliest thing Elara does:
+  477 s of processor time for the large song's 1000 s of audio, about 2.4 %
+  of a core for each track, where the built-in synthesizer takes 30 s for
+  the same song. The time goes to FluidSynth's voices; building its DSP in
+  single precision did not make it faster (measured, not kept).
+- Importing the huge MusicXML peaks at 412 MB for 73 MB of XML: pugixml holds
+  the whole document as a tree while the song is built from it.
+- Exporting the huge song as `.mxl` commits 373 MB: the parts' text is held
+  whole while it is deflated into the file.
+- The app holds about 120 MB more with the large song open than on its
+  welcome pane; part of it is the laid-out pages' geometry, held twice (the
+  2026-11-26 row in Results).
