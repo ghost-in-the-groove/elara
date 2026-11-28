@@ -155,6 +155,7 @@ one that replaces them.
 | [0176](0176-nothing-runs-past-the-right-margin.md) | Nothing runs past the right margin | Accepted |
 | [0177](0177-guitar-pro-6-drums-by-kit-element.md) | Guitar Pro 6 drums by kit element | Accepted |
 | [0180](0180-edits-at-the-caret-say-why-they-are-refused.md) | Edits at the caret say why they are refused | Accepted |
+| [0181](0181-the-smoke-test-checks-the-window.md) | The smoke test checks the window | Accepted |
 
 ## Template
 

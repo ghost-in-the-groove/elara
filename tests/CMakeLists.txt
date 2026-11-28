@@ -234,17 +234,17 @@ if(TARGET elara)
   # The new song's edits end in a song with a measure wider than the page: the
   # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 65 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 47 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 43 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
   # things its import dropped, and the
   # score exports as a PDF document of its one page (ADR-0074), as MusicXML
   # with its four tracks and as MIDI, each telling what it left out.
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 43 layouts\\)")
   set_tests_properties(app.smoke_open_views app.smoke_measure app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 58 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 40 layouts\\)")
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_follow PROPERTIES

@@ -1,21 +1,36 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // CaretEditor (ADR-0128): what is at the caret of a document, read and edited
 // through the document it is given.
+#include <elara/core/duration.hpp>
+#include <elara/core/edit_session.hpp>
 #include <elara/core/entry.hpp>
+#include <elara/core/instrument.hpp>
+#include <elara/core/measure.hpp>
 #include <elara/core/names.hpp>
+#include <elara/core/pitch.hpp>
 #include <elara/core/refusal.hpp>
 
 #include "caret_editor.hpp"
 #include "score_document.hpp"
+#include "songs_to_edit.hpp"
 #include <QObject>
+#include <QPointF>
 #include <QString>
 #include <QStringList>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
+
+#include <algorithm>
+#include <optional>
+#include <vector>
 
 namespace {
 
 using elara::app::CaretEditor;
 using elara::app::ScoreDocument;
+using elara::app::testing::kSongsToEdit;
+using elara::app::testing::SongToEdit;
 using Move = ScoreDocument::CaretMove;
 
 // How many times the editor said that what is at the caret changed.
@@ -26,6 +41,25 @@ struct Changes {
         QObject::connect(&editor, &CaretEditor::caretChanged, [this] { ++count; });
     }
 };
+
+// The duration of the beat at the caret, if the caret is on one.
+std::optional<elara::core::Duration> caretDuration(const ScoreDocument& score) {
+    const elara::core::Caret caret = score.caret();
+    const elara::core::Voice& voice = score.song()
+                                          ->track(caret.track)
+                                          .staff(caret.staff)
+                                          .measure(caret.measure)
+                                          .voices.at(caret.voice);
+    return caret.beat < voice.beats.size() ? std::optional(voice.beats[caret.beat].duration)
+                                           : std::nullopt;
+}
+
+// The drum lane (1 at the top) of the kit piece with General MIDI `key`.
+int laneOf(int key) {
+    const auto pieces = elara::core::drumPieces();
+    const auto found = std::ranges::find(pieces, key, &elara::core::DrumPiece::key);
+    return static_cast<int>(found - pieces.begin()) + 1;
+}
 
 } // namespace
 
@@ -228,4 +262,169 @@ TEST_CASE("caret editor: it says so when the caret moves and when the song under
     CHECK(changes.count == before);
     editor.setDocument(&other); // the same again: nothing to say
     CHECK(changes.count == before);
+}
+
+// ---- Typing at the caret of each song the window opens ----------------------
+
+TEST_CASE("caret editor: two digits are one fret and one undo step, and a rest goes in and out") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    CaretEditor& editor = song.editor;
+    REQUIRE(editor.caretFretted());
+
+    // A click on the caret keeps it.
+    const elara::core::Caret before = score.caret();
+    const QPointF centre = score.caretRect().center();
+    CHECK(score.placeCaret(score.caretPage(), centre.x(), centre.y()));
+    CHECK(score.caret() == before);
+
+    // Both keys at one instant: the first digit's layout can outlast the
+    // two-digit window on a loaded machine.
+    score.moveCaret(Move::StringDown);
+    const auto pressed = elara::core::EditSession::Clock::now();
+    score.typeDigit(1, pressed);
+    score.typeDigit(2, pressed);
+    REQUIRE(song.laidOut());
+    CHECK(editor.fretAtCaret() == 12);
+    CHECK(score.caretPage() >= 0);
+    score.undo();
+    REQUIRE(song.laidOut());
+    CHECK(song.unchanged());
+    score.redo();
+    REQUIRE(song.laidOut());
+    CHECK(editor.fretAtCaret() == 12);
+
+    score.setInputValue(8);
+    CHECK(score.inputValue() == 8);
+    editor.insertRest();
+    REQUIRE(song.laidOut());
+    CHECK_FALSE(editor.fretAtCaret().has_value());
+    editor.deleteAtCaret();
+    REQUIRE(song.laidOut());
+    CHECK(editor.fretAtCaret() == 12);
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("caret editor: a triplet eighth typed is the caret's beat until the input is plain") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    REQUIRE(song.editor.caretFretted());
+
+    score.setInputValue(8);
+    score.setInputTuplet(3);
+    CHECK(score.inputTuplet() == 3);
+    score.typeDigit(5);
+    REQUIRE(song.laidOut());
+    const std::optional<elara::core::Duration> typed = caretDuration(score);
+    REQUIRE(typed);
+    CHECK(typed->tuplet() == elara::core::Tuplet(3, 2));
+    CHECK(typed->value() == elara::core::NoteValue::Eighth);
+
+    // The same tuplet again toggles it off, on the caret's beat too.
+    score.setInputTuplet(3);
+    CHECK(score.inputTuplet() == 0);
+    REQUIRE(song.laidOut());
+    const std::optional<elara::core::Duration> plain = caretDuration(score);
+    REQUIRE(plain);
+    CHECK(plain->tuplet().isNone());
+    CHECK(score.undoName() == ScoreDocument::tr("Change duration"));
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("caret editor: a note name types its note, and the status names it") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    CaretEditor& editor = song.editor;
+    REQUIRE(editor.caretPitched());
+
+    editor.typeNoteName(0, false);
+    REQUIRE(song.laidOut());
+    const std::vector<elara::core::Pitch> typed = editor.pitchesAtCaret();
+    REQUIRE(typed.size() == 1);
+    CHECK(typed.front().step() == elara::core::Step::C);
+    // Before the beat's effects, which a file's beat may have.
+    INFO(editor.caretStatus().toStdString());
+    CHECK(editor.caretStatus().contains(QStringLiteral("C%1").arg(typed.front().octave())));
+
+    // A semitone up.
+    editor.shiftPitch(1);
+    REQUIRE(song.laidOut());
+    const std::vector<elara::core::Pitch> raised = editor.pitchesAtCaret();
+    REQUIRE(raised.size() == 1);
+    CHECK(raised.front().midiNumber() == typed.front().midiNumber() + 1);
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("caret editor: a note typed in voice 2 goes into it, which the status names") {
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    CaretEditor& editor = song.editor;
+    REQUIRE(editor.caretPitched());
+    const QString voice2 = CaretEditor::tr("Voice %1").arg(2);
+
+    score.setCaretVoice(2);
+    CHECK(score.caretVoice() == 2);
+    CHECK(editor.caretStatus().contains(voice2));
+    if (editor.caretFretted()) {
+        score.typeDigit(7);
+    } else {
+        editor.typeNoteName(2, false);
+    }
+    REQUIRE(song.laidOut());
+    CHECK(score.caretVoice() == 2);
+    CHECK_FALSE(editor.pitchesAtCaret().empty());
+
+    // Back in voice 1, the status no longer names a voice.
+    score.setCaretVoice(1);
+    CHECK(score.caretVoice() == 1);
+    CHECK_FALSE(editor.caretStatus().contains(voice2));
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
+}
+
+TEST_CASE("caret editor: on a new drum kit track the caret goes down the lanes, naming each") {
+    constexpr int kSnareKey = 38;
+    const char* source = GENERATE(from_range(kSongsToEdit));
+    INFO(source);
+    SongToEdit song(source);
+    ScoreDocument& score = song.score;
+    CaretEditor& editor = song.editor;
+
+    score.addTrack(QStringLiteral("drum-kit"));
+    REQUIRE(song.laidOut());
+    CHECK(editor.caretOnDrums());
+    const int lanes = static_cast<int>(elara::core::drumPieces().size());
+    for (int lane = 1; lane < lanes; ++lane) {
+        score.moveCaret(Move::StringUp);
+    }
+    CHECK(score.caret().string == 1);
+    CHECK(editor.caretStatus().endsWith(CaretEditor::laneName(1)));
+    const double top = score.caretRect().top();
+    for (int lane = 1; lane < laneOf(kSnareKey); ++lane) {
+        score.moveCaret(Move::StringDown);
+    }
+    CHECK(editor.caretStatus().endsWith(CaretEditor::laneName(laneOf(kSnareKey))));
+    CHECK(score.caretRect().top() > top);
+
+    // The snare, on and off again.
+    editor.toggleDrum();
+    REQUIRE(song.laidOut());
+    const std::vector<elara::core::Pitch> hits = editor.pitchesAtCaret();
+    REQUIRE(hits.size() == 1);
+    CHECK(hits.front().midiNumber() == kSnareKey);
+    editor.toggleDrum();
+    REQUIRE(song.laidOut());
+    CHECK(editor.pitchesAtCaret().empty());
+    REQUIRE(song.undoAll());
+    CHECK(song.unchanged());
 }
