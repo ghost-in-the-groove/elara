@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 using elara::core::Accent;
@@ -21,6 +22,8 @@ using elara::core::Fraction;
 using elara::core::Harmonic;
 using elara::core::HarmonicKind;
 using elara::core::naturalHarmonicSemitones;
+using elara::core::nextFingering;
+using elara::core::nextPluck;
 using elara::core::Note;
 using elara::core::NoteEffects;
 using elara::core::NoteValue;
@@ -253,6 +256,30 @@ TEST_CASE("Fingerings are written from the thumb, or from the index on strings",
     CHECK(pluckOfText("p") == Finger::Thumb);
     CHECK(pluckOfText("x") == Finger::Little);
     CHECK(pluckOfText("q") == std::nullopt);
+}
+
+TEST_CASE("Fingers are stepped through in the order they are written, then none",
+          "[core][effects]") {
+    // ADR-0093: from the thumb, or on strings from the index with the thumb last.
+    const auto steps = [](bool fretted) {
+        std::string written;
+        Finger finger = Finger::None;
+        for (int i = 0; i < 7; ++i) {
+            finger = nextFingering(finger, fretted);
+            written += finger == Finger::None ? "-" : std::string(fingeringText(finger, fretted));
+        }
+        return written;
+    };
+    CHECK(steps(false) == "12345-1");
+    CHECK(steps(true) == "1234T-1");
+
+    std::string plucked;
+    Finger finger = Finger::None;
+    for (int i = 0; i < 7; ++i) {
+        finger = nextPluck(finger);
+        plucked += finger == Finger::None ? "-" : std::string(pluckText(finger));
+    }
+    CHECK(plucked == "pimac-p");
 }
 
 TEST_CASE("A beat goes under the sustain pedal or changes it", "[core][effects]") {

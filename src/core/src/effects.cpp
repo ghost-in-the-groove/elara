@@ -59,6 +59,20 @@ std::optional<Finger> pluckOfText(std::string_view text) noexcept {
     return std::nullopt;
 }
 
+Finger nextFingering(Finger finger, bool fretted) noexcept {
+    // After none, the thumb, the index, ... the little finger.
+    constexpr std::array kAfterFretting{Finger::Index, Finger::None,   Finger::Middle,
+                                        Finger::Ring,  Finger::Little, Finger::Thumb};
+    if (fretted) {
+        return kAfterFretting[indexOf(finger)];
+    }
+    return static_cast<Finger>((indexOf(finger) + 1) % kFingeringTexts.size());
+}
+
+Finger nextPluck(Finger finger) noexcept {
+    return static_cast<Finger>((indexOf(finger) + 1) % kPluckTexts.size());
+}
+
 BendCurve::BendCurve(std::vector<BendPoint> points) : points_(std::move(points)) {
     if (points_.size() > kMaxPoints) {
         throw std::invalid_argument("BendCurve: too many points");

@@ -539,29 +539,23 @@ Rectangle {
                             active: root.editor.caretAccent === 2
                             onClicked: root.editor.setAccent(active ? 0 : 2)
                         }
-                        // The finger that plays the caret's notes, numbered as
-                        // core::Finger: each click the next one, then none. On a
-                        // fretted staff 1 is the index and T the thumb, which
-                        // comes last (ADR-0093).
+                        // The finger that plays the caret's notes: each click the
+                        // next one, then none. On a fretted staff 1 is the index
+                        // and T the thumb, which comes last (ADR-0093).
                         LabelTile {
-                            readonly property bool fretted: root.editor.caretFretted
-                            readonly property int finger: root.editor.caretFingering
-
                             tip: qsTr("Fingering: again for the next finger")
-                            label: (fretted ? ["1", "T", "1", "2", "3", "4"]
-                                            : ["1", "1", "2", "3", "4", "5"])[finger]
-                            active: finger !== 0
-                            onClicked: root.editor.setFingering(
-                                           fretted ? [2, 0, 3, 4, 5, 1][finger] : (finger + 1) % 6)
+                            label: root.editor.caretFingeringLabel
+                            active: root.editor.caretFingering !== 0
+                            onClicked: root.editor.nextFingering()
                         }
                         // The finger that plucks them on a fretted staff: p, i, m,
                         // a, c, then none.
                         LabelTile {
                             visible: root.editor.caretFretted
                             tip: qsTr("Plucking finger: again for the next one")
-                            label: ["p", "p", "i", "m", "a", "c"][root.editor.caretPluck]
+                            label: root.editor.caretPluckLabel
                             active: root.editor.caretPluck !== 0
-                            onClicked: root.editor.setPluck((root.editor.caretPluck + 1) % 6)
+                            onClicked: root.editor.nextPluck()
                         }
                     }
                     Tiles {

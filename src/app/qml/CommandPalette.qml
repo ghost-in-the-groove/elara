@@ -371,14 +371,11 @@ Popup {
                value => editor.setAccent(value), "accent >");
         choice("accent.marcato", fx("Marcato"), editor.caretAccent, 2,
                value => editor.setAccent(value), "accent ^ marcato");
-        const fretted = editor.caretFretted;
-        const finger = editor.caretFingering;
         into.push(atCaret("fingering", group, fx("Fingering: again for the next finger"),
-                          () => editor.setFingering(fretted ? [2, 0, 3, 4, 5, 1][finger]
-                                                            : (finger + 1) % 6),
-                          { chosen: finger !== 0, words: "fingering finger" }));
+                          () => editor.nextFingering(),
+                          { chosen: editor.caretFingering !== 0, words: "fingering finger" }));
         into.push(atCaret("pluck", group, fx("Plucking finger: again for the next one"),
-                          () => editor.setPluck((editor.caretPluck + 1) % 6), {
+                          () => editor.nextPluck(), {
                               strings: true, chosen: editor.caretPluck !== 0,
                               words: "plucking finger p i m a"
                           }));

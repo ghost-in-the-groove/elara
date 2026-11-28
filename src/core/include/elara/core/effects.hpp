@@ -164,6 +164,13 @@ static_assert(namesEnd(Finger::Little));
 /// The plucking finger of a letter, as pluckText() writes it ("e" and "x" for
 /// the little finger too); nullopt for anything else.
 [[nodiscard]] std::optional<Finger> pluckOfText(std::string_view text) noexcept;
+/// The finger after `finger` when the fingers are stepped through, as pressing
+/// one button again and again does (ADR-0093): in the order fingeringText()
+/// numbers them, so from the thumb, or on a fretted instrument from the index
+/// with the thumb last; then none, then the first again.
+[[nodiscard]] Finger nextFingering(Finger finger, bool fretted) noexcept;
+/// The plucking finger after `finger`: p, i, m, a, c, then none, then p again.
+[[nodiscard]] Finger nextPluck(Finger finger) noexcept;
 
 /// The quick notes an ornament starts its note with, as steps of the key from
 /// the note (+1 the step above, -1 the step below, 0 the note); the note

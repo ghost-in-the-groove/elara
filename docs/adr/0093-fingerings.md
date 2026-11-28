@@ -60,7 +60,9 @@ up, or one for all) and `core::setPluck()` (fretted staves only), the CLI's
 `none`) and `pluck <p|i|m|a|c|none>`, and two buttons in the app's entry
 bar: one steps the caret's notes through the fingers, giving all of them the
 same one (on a fretted staff from the index, the thumb last), the other,
-shown on fretted staves, through p, i, m, a and c.
+shown on fretted staves, through p, i, m, a and c. The order is core's
+(`core::nextFingering()`, `core::nextPluck()`), which the app's
+`CaretEditor::nextFingering()` and `nextPluck()` follow.
 
 ## Consequences
 

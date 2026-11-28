@@ -61,6 +61,8 @@ class CaretEditor : public QObject {
     Q_PROPERTY(int caretOrnament READ caretOrnament NOTIFY caretChanged)
     Q_PROPERTY(int caretFingering READ caretFingering NOTIFY caretChanged)
     Q_PROPERTY(int caretPluck READ caretPluck NOTIFY caretChanged)
+    Q_PROPERTY(QString caretFingeringLabel READ caretFingeringLabel NOTIFY caretChanged)
+    Q_PROPERTY(QString caretPluckLabel READ caretPluckLabel NOTIFY caretChanged)
     Q_PROPERTY(int caretDynamic READ caretDynamic NOTIFY caretChanged)
     Q_PROPERTY(int caretHarmonic READ caretHarmonic NOTIFY caretChanged)
     Q_PROPERTY(int caretTremolo READ caretTremolo NOTIFY caretChanged)
@@ -241,6 +243,15 @@ public:
     [[nodiscard]] int caretPluck() const;
     Q_INVOKABLE void setFingering(int finger);
     Q_INVOKABLE void setPluck(int finger);
+    /// What the fingering and the plucking finger buttons show: the caret's
+    /// finger as the staff writes it, or with none the one a press gives.
+    [[nodiscard]] QString caretFingeringLabel() const;
+    [[nodiscard]] QString caretPluckLabel() const;
+    /// Give the caret's notes the finger after theirs (core::nextFingering()),
+    /// or the plucking finger after theirs (core::nextPluck()): a button pressed
+    /// again and again steps through them.
+    Q_INVOKABLE void nextFingering();
+    Q_INVOKABLE void nextPluck();
     /// The dynamic at the caret (ADR-0047), numbered as core::Dynamic (0 ppp
     /// to 7 fff): the notes there, or the last ones struck before them.
     [[nodiscard]] int caretDynamic() const;

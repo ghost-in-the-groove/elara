@@ -100,6 +100,23 @@ TEST_CASE("caret editor: it edits the document's song at the document's caret") 
     CHECK(editor.caretChord().isEmpty());
     CHECK(failures.isEmpty());
 
+    // The fingering buttons step through the fingers, the thumb last on a
+    // fretted staff, and show the one a press gives while there is none.
+    CHECK(editor.caretFingeringLabel() == QStringLiteral("1"));
+    QStringList fingers;
+    for (int i = 0; i < 6; ++i) {
+        editor.nextFingering();
+        fingers.append(editor.caretFingering() == 0 ? QStringLiteral("-")
+                                                    : editor.caretFingeringLabel());
+    }
+    CHECK(fingers.join(QString()) == QStringLiteral("1234T-"));
+    CHECK(score.undoName() == QStringLiteral("Change fingering"));
+    CHECK(editor.caretPluckLabel() == QStringLiteral("p"));
+    editor.nextPluck();
+    editor.nextPluck();
+    CHECK(editor.caretPluckLabel() == QStringLiteral("i"));
+    CHECK(failures.isEmpty());
+
     // What the song refuses is told by the document, as its own edits are.
     score.moveCaret(Move::NextBeat); // the free slot: no note to bend
     editor.setBend(1, 100);
