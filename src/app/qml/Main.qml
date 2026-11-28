@@ -9,8 +9,8 @@ import Elara.App
 ApplicationWindow {
     id: window
 
-    /// A file to open at start (from the command line).
-    property url initialFile
+    /// Files to open at start, each in a tab of its own (from the command line).
+    property list<url> initialFiles
     /// Open the tuner at start (from the command line).
     property bool showTuner: false
     /// The song panel at the right of the score, where the tuner also docks:
@@ -45,7 +45,13 @@ ApplicationWindow {
     /// A file the window's state is kept in instead of the settings, also
     /// during checks (`--window-state`, ADR-0137).
     property string windowStateFile
+    /// The song shown, which the window's commands act on; the others wait
+    /// in their tabs (ADR-0160).
+    readonly property ScoreDocument score: documents.current
     readonly property bool hasScore: score.pageCount > 0
+    /// Pages or one continuous scroll (ADR-0057): the window's choice, which
+    /// every song shown takes.
+    property bool continuous: false
     readonly property bool dark: Material.theme === Material.Dark
     /// In the dark theme the page is dark too, its ink light (ADR-0114); off,
     /// it stays a dimmed white page.
@@ -85,11 +91,11 @@ ApplicationWindow {
         windowState.remember = rememberSettings || windowStateFile.length > 0;
         restoreWindowState();
         recent.remember = rememberSettings;
-        if (initialFile.toString().length > 0)
-            score.open(initialFile);
+        if (initialFiles.length > 0)
+            documents.open(initialFiles);
         if (showMenu.length > 0)
             Qt.callLater(commandBar.openMenu, showMenu);
-        if (showCommands && initialFile.toString().length === 0) {
+        if (showCommands && initialFiles.length === 0) {
             showCommands = false;
             Qt.callLater(commandPalette.show, "");
         }
@@ -105,17 +111,55 @@ ApplicationWindow {
         } else if (rememberSettings) {
             audio.restoreSound();
         }
-        recoveryDialog.offer(score.recoverable());
+        recoveryDialog.offer(documents.recoverable());
     }
 
     onClosing: close => {
-        if (closing || (!score.saving && !score.modified))
+        if (closing || !documents.unsaved)
             return;
         close.accepted = false;
+        closeUnsaved();
+    }
+
+    /// Shows each song with unsaved changes in turn, asks whether to save
+    /// them and closes it, then quits. Cancelling stops there.
+    function closeUnsaved() {
+        const index = documents.nextUnsaved();
+        if (index >= 0) {
+            closeSongAt(index, closeUnsaved);
+            return;
+        }
+        closing = true;
+        close();
+    }
+
+    /// Closes song `index`, shown first to ask whether to save its changes;
+    /// then runs `then`, when given.
+    function closeSongAt(index, then) {
+        const song = documents.at(index);
+        if (!song)
+            return;
+        documents.currentIndex = index;
         whenSaved(() => {
-            window.closing = true;
-            window.close();
+            documents.close(documents.indexOf(song));
+            if (then)
+                then();
         });
+    }
+
+    /// Closes the song shown, asking first whether to save its changes.
+    function closeSong() {
+        closeSongAt(documents.currentIndex, null);
+    }
+
+    /// Shows the song in the next tab, from the last back to the first.
+    function nextSong() {
+        documents.showNext();
+    }
+
+    /// Shows the song in the previous tab, from the first round to the last.
+    function previousSong() {
+        documents.showPrevious();
     }
 
     function toggleTuner() {
@@ -131,7 +175,7 @@ ApplicationWindow {
             if (!showTuner)
                 showSongPane = showSongPane || windowState.songPane;
             darkPage = windowState.darkPage;
-            score.continuous = windowState.continuous;
+            continuous = windowState.continuous;
             scoreView.fit = windowState.zoomFit;
             if (windowState.zoomFit.length === 0)
                 scoreView.setZoom(windowState.zoom);
@@ -139,7 +183,7 @@ ApplicationWindow {
         windowState.effects = Qt.binding(() => palette.opened);
         windowState.songPane = Qt.binding(() => window.showSongPane);
         windowState.darkPage = Qt.binding(() => window.darkPage);
-        windowState.continuous = Qt.binding(() => score.continuous);
+        windowState.continuous = Qt.binding(() => window.continuous);
         windowState.zoomFit = Qt.binding(() => scoreView.fit);
         windowState.zoom = Qt.binding(() => scoreView.zoom);
     }
@@ -198,15 +242,21 @@ ApplicationWindow {
             action();
     }
 
+    /// Asks for scores to open, each in a tab of its own beside the songs
+    /// open (ADR-0160).
     function openScore() {
-        whenSaved(() => openDialog.open());
+        openDialog.open();
     }
 
+    /// Opens `files`, each in a tab of its own; one open already is shown.
+    function openFiles(files) {
+        documents.open(files);
+    }
+
+    /// A new song in a tab of its own, or in the empty one shown.
     function newSong() {
-        whenSaved(() => {
-            score.newSong("electric-guitar");
-            window.showSongPane = true;
-        });
+        documents.newSong("electric-guitar");
+        showSongPane = true;
     }
 
     /// Runs an edit asked for from a menu and brings the caret into view, as
@@ -261,38 +311,78 @@ ApplicationWindow {
         midiDialog.open();
     }
 
-    ScoreDocument {
-        id: score
+    // The songs open, a tab each (ADR-0160). A file that does not open says
+    // why, and its tab closes again.
+    DocumentSet {
+        id: documents
 
+        objectName: "documents"
         recoveryFolder: window.recoveryFolder
-        // A new song starts at its top, at the zoom chosen last: by default
-        // its page across the view up to the reading zoom. A file opened or
-        // saved goes to the top of the recent scores.
-        onSourceChanged: {
-            scoreView.fitSong();
-            scoreView.toTop();
-            if (source.toString().length > 0)
-                recent.add(source);
+        onFailed: message => toast.show(message)
+    }
+
+    // The shown song takes the window's view, and a choice made in the
+    // status bar is the window's.
+    Binding {
+        target: window.score
+        property: "continuous"
+        value: window.continuous
+    }
+    Connections {
+        target: window.score
+
+        function onContinuousChanged() {
+            window.continuous = window.score.continuous;
         }
-        onStatusChanged: {
-            if (status === ScoreDocument.Error)
-                toast.show(errorMessage);
-        }
-        onEditFailed: message => toast.show(message)
-        // What waited for the saves runs once the last one is written,
-        // after asking again if the song changed meanwhile. A failed save
-        // drops it.
-        onSaveFinished: (file, saved) => {
-            if (!saved)
+    }
+
+    // What each song says, shown or not.
+    Instantiator {
+        model: documents
+
+        delegate: Connections {
+            required property ScoreDocument document
+
+            target: document
+
+            // A new song starts at its top, at the zoom chosen last: by
+            // default its page across the view up to the reading zoom. One
+            // not shown starts there when it is. A file opened or saved goes
+            // to the top of the recent scores.
+            function onSourceChanged() {
+                if (document === window.score) {
+                    scoreView.fitSong();
+                    scoreView.toTop();
+                } else {
+                    document.viewCentre = -1;
+                }
+                if (document.source.toString().length > 0)
+                    recent.add(document.source);
+            }
+            function onEditFailed(message) {
+                toast.show(message);
+            }
+            // What waited for the saves runs once the last one is written,
+            // after asking again if the song changed meanwhile. A failed
+            // save drops it.
+            function onSaveFinished(file, saved) {
+                if (document !== window.score)
+                    return;
+                if (!saved)
+                    window.savedAction = null;
+                if (document.saving || !window.savedAction)
+                    return;
+                const action = window.savedAction;
                 window.savedAction = null;
-            if (score.saving || !window.savedAction)
-                return;
-            const action = window.savedAction;
-            window.savedAction = null;
-            window.whenSaved(action);
+                window.whenSaved(action);
+            }
+            function onNotice(message) {
+                toast.inform(message, []);
+            }
+            function onReport(message, details) {
+                toast.inform(message, details);
+            }
         }
-        onNotice: message => toast.inform(message, [])
-        onReport: (message, details) => toast.inform(message, details)
     }
 
     RecentScores {
@@ -362,9 +452,10 @@ ApplicationWindow {
     FileDialog {
         id: openDialog
 
-        title: qsTr("Open a score")
+        title: qsTr("Open scores")
+        fileMode: FileDialog.OpenFiles
         nameFilters: score.nameFilters
-        onAccepted: score.open(selectedFile)
+        onAccepted: window.openFiles(selectedFiles)
     }
 
     FileDialog {
@@ -570,8 +661,9 @@ ApplicationWindow {
         id: recoveryDialog
 
         objectName: "recoveryDialog"
-        onRecoverRequested: file => window.whenSaved(() => score.recover(file))
-        onDiscardRequested: file => score.discardRecovery(file)
+        // Each copy recovered opens in a tab of its own.
+        onRecoverRequested: file => documents.recover(file)
+        onDiscardRequested: file => documents.discardRecovery(file)
     }
 
     AppDialog {
@@ -612,6 +704,7 @@ ApplicationWindow {
     // its lower edge, and the tool row under it while a score is open.
     header: Item {
         implicitHeight: commandBar.height + (window.hasScore ? toolRow.height : 0)
+                        + (songTabs.visible ? songTabs.height : 0)
 
         CommandBar {
             id: commandBar
@@ -667,7 +760,7 @@ ApplicationWindow {
                                 required property var modelData
 
                                 text: modelData.name
-                                onTriggered: window.whenSaved(() => score.open(modelData.url))
+                                onTriggered: window.openFiles([modelData.url])
                             }
                             onObjectAdded: (index, object) => recentMenu.insertItem(index, object)
                             onObjectRemoved: (index, object) => recentMenu.removeItem(object)
@@ -677,6 +770,13 @@ ApplicationWindow {
                             text: qsTr("Clear the list")
                             onTriggered: recent.clear()
                         }
+                    }
+                    AppMenuItem {
+                        objectName: "closeSongItem"
+                        text: qsTr("Close song")
+                        keys: KeyNames.native("Ctrl+W")
+                        enabled: window.hasScore || documents.count > 1
+                        onTriggered: window.closeSong()
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
@@ -825,14 +925,14 @@ ApplicationWindow {
                     AppMenuItem {
                         text: qsTr("Page view")
                         enabled: window.hasScore
-                        chosen: window.hasScore && !score.continuous
-                        onTriggered: score.continuous = false
+                        chosen: window.hasScore && !window.continuous
+                        onTriggered: window.continuous = false
                     }
                     AppMenuItem {
                         text: qsTr("Continuous view")
                         enabled: window.hasScore
-                        chosen: window.hasScore && score.continuous
-                        onTriggered: score.continuous = true
+                        chosen: window.hasScore && window.continuous
+                        onTriggered: window.continuous = true
                     }
                     AppMenuSeparator {}
                     AppMenuItem {
@@ -879,6 +979,21 @@ ApplicationWindow {
                         keys: KeyNames.native("Ctrl+Shift+T")
                         chosen: window.showTuner
                         onTriggered: window.toggleTuner()
+                    }
+                    AppMenuSeparator {}
+                    AppMenuItem {
+                        objectName: "nextSongItem"
+                        text: qsTr("Next song")
+                        keys: KeyNames.native("Ctrl+Tab")
+                        enabled: documents.count > 1
+                        onTriggered: window.nextSong()
+                    }
+                    AppMenuItem {
+                        objectName: "previousSongItem"
+                        text: qsTr("Previous song")
+                        keys: KeyNames.native("Ctrl+Shift+Tab")
+                        enabled: documents.count > 1
+                        onTriggered: window.previousSong()
                     }
                 }
 
@@ -1149,6 +1264,19 @@ ApplicationWindow {
             }
         }
 
+        // A tab for each song open, while there are two or more (ADR-0160).
+        SongTabs {
+            id: songTabs
+
+            objectName: "songTabs"
+            y: commandBar.height + (window.hasScore ? toolRow.height : 0)
+            width: parent.width
+            height: implicitHeight
+            visible: documents.count > 1
+            songs: documents
+            onCloseRequested: index => window.closeSongAt(index, null)
+        }
+
         SongString {
             id: songString
 
@@ -1189,7 +1317,7 @@ ApplicationWindow {
             recentScores: recent.scores
             onOpenRequested: window.openScore()
             onNewRequested: window.newSong()
-            onRecentRequested: file => window.whenSaved(() => score.open(file))
+            onRecentRequested: file => window.openFiles([file])
             onForgetRequested: file => recent.remove(file)
 
             Behavior on opacity {
@@ -1323,17 +1451,15 @@ ApplicationWindow {
             visible: score.busy
         }
 
-        // Drop a file anywhere to open it.
+        // Drop files anywhere to open them, each in a tab of its own.
         DropArea {
             id: drop
 
             anchors.fill: parent
             onEntered: drag => drag.accepted = drag.hasUrls
             onDropped: drop => {
-                if (drop.hasUrls) {
-                    const file = drop.urls[0];
-                    window.whenSaved(() => score.open(file));
-                }
+                if (drop.hasUrls)
+                    window.openFiles(drop.urls);
             }
         }
 
@@ -1500,6 +1626,20 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+Q"
         onActivated: window.close()
+    }
+    Shortcut {
+        sequences: [StandardKey.Close]
+        onActivated: window.closeSong()
+    }
+    Shortcut {
+        sequences: [StandardKey.NextChild, "Ctrl+PgDown"]
+        enabled: documents.count > 1
+        onActivated: window.nextSong()
+    }
+    Shortcut {
+        sequences: [StandardKey.PreviousChild, "Ctrl+PgUp"]
+        enabled: documents.count > 1
+        onActivated: window.previousSong()
     }
     Shortcut {
         sequences: [StandardKey.Print]

@@ -612,10 +612,6 @@
         <translation>%1 — Elara</translation>
     </message>
     <message>
-        <source>Open a score</source>
-        <translation>Abrir una partitura</translation>
-    </message>
-    <message>
         <source>Choose a SoundFont</source>
         <translation>Elegir una SoundFont</translation>
     </message>
@@ -720,6 +716,10 @@
         <translation>Abrir reciente</translation>
     </message>
     <message>
+        <source>Open scores</source>
+        <translation>Abrir partituras</translation>
+    </message>
+    <message>
         <source>What the layout could not keep</source>
         <translation>Lo que la maquetación no pudo respetar</translation>
     </message>
@@ -738,6 +738,10 @@
     <message>
         <source>Clear the list</source>
         <translation>Vaciar la lista</translation>
+    </message>
+    <message>
+        <source>Close song</source>
+        <translation>Cerrar canción</translation>
     </message>
     <message>
         <source>Save</source>
@@ -854,6 +858,14 @@
     <message>
         <source>Tuner</source>
         <translation>Afinador</translation>
+    </message>
+    <message>
+        <source>Next song</source>
+        <translation>Canción siguiente</translation>
+    </message>
+    <message>
+        <source>Previous song</source>
+        <translation>Canción anterior</translation>
     </message>
     <message>
         <source>&amp;Sound</source>
@@ -1543,6 +1555,17 @@
     <message>
         <source>Position in the song</source>
         <translation>Posición en la canción</translation>
+    </message>
+</context>
+<context>
+    <name>SongTabs</name>
+    <message>
+        <source>Close song</source>
+        <translation>Cerrar canción</translation>
+    </message>
+    <message>
+        <source>Close song (%1)</source>
+        <translation>Cerrar canción (%1)</translation>
     </message>
 </context>
 <context>
@@ -2319,6 +2342,17 @@
     </message>
 </context>
 <context>
+    <name>elara::app::DocumentSet</name>
+    <message>
+        <source>Untitled</source>
+        <translation>Sin título</translation>
+    </message>
+    <message>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+</context>
+<context>
     <name>elara::app::ScoreDocument</name>
     <message>
         <source>Electric guitar</source>
@@ -2841,8 +2875,8 @@
         <translation>Editor de tablaturas y partituras</translation>
     </message>
     <message>
-        <source>A score to open.</source>
-        <translation>Una partitura para abrir.</translation>
+        <source>Scores to open, each in a tab of its own.</source>
+        <translation>Partituras para abrir, cada una en su pestaña.</translation>
     </message>
     <message>
         <source>Show this track (from 1), or &quot;all&quot;.</source>

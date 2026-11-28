@@ -180,16 +180,34 @@ std::vector<RecoveryStore::Copy> RecoveryStore::left() {
 
 bool RecoveryStore::discard(const QString& file) {
     const std::scoped_lock guard(mutex_);
+    const auto taken = takenCopy(file);
+    if (taken == taken_.end()) {
+        return false;
+    }
+    removeFilesOf(taken->first);
+    taken_.erase(taken); // and with it the lock file
+    return true;
+}
+
+bool RecoveryStore::release(const QString& file) {
+    const std::scoped_lock guard(mutex_);
+    const auto taken = takenCopy(file);
+    if (taken == taken_.end()) {
+        return false;
+    }
+    taken_.erase(taken); // the lock file goes, the copy stays
+    return true;
+}
+
+RecoveryStore::Taken::iterator RecoveryStore::takenCopy(const QString& file) {
     const QFileInfo info(file);
     const QString id = info.completeBaseName();
     const auto taken = taken_.find(id);
     if (taken == taken_.end() ||
         info.absoluteFilePath() != QFileInfo(pathOf(id, kSongExtension)).absoluteFilePath()) {
-        return false;
+        return taken_.end();
     }
-    removeFilesOf(id);
-    taken_.erase(taken); // and with it the lock file
-    return true;
+    return taken;
 }
 
 } // namespace elara::app
