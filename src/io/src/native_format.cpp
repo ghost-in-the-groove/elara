@@ -45,461 +45,617 @@ constexpr std::string_view kGeneratorName = "Elara ";
 // Writing
 // ============================================================================
 
-// song.json as yyjson writes it, in yyjson's own buffer: handed on as it is,
-// with no copy of the text.
-class JsonText {
+// The length of the UTF-8 sequence that starts at `at`; 0 when it is not
+// valid UTF-8 (RFC 3629: no overlong forms, surrogates or code points past
+// U+10FFFF).
+std::size_t sequenceLength(std::string_view text, std::size_t at) noexcept {
+    const auto byte = [&](std::size_t i) -> unsigned {
+        return at + i < text.size() ? static_cast<unsigned char>(text[at + i]) : 0U;
+    };
+    const auto follows = [&](std::size_t i) {
+        return (byte(i) & 0xC0U) == 0x80U;
+    };
+    const unsigned lead = byte(0);
+    const unsigned second = byte(1);
+    if (lead >= 0xC2U && lead <= 0xDFU) {
+        return follows(1) ? 2 : 0;
+    }
+    if (lead >= 0xE0U && lead <= 0xEFU) {
+        const bool overlong = lead == 0xE0U && second < 0xA0U;
+        const bool surrogate = lead == 0xEDU && second >= 0xA0U;
+        return follows(1) && follows(2) && !overlong && !surrogate ? 3 : 0;
+    }
+    if (lead >= 0xF0U && lead <= 0xF4U) {
+        const bool overlong = lead == 0xF0U && second < 0x90U;
+        const bool beyond = lead == 0xF4U && second >= 0x90U;
+        return follows(1) && follows(2) && follows(3) && !overlong && !beyond ? 4 : 0;
+    }
+    return 0;
+}
+
+// song.json in yyjson's compact form, written while the song is walked: the
+// text grows a value at a time, with no tree of values before it (on a large
+// song the tree took four times the text, and yyjson reserved the text at
+// three times its size).
+class JsonOut {
 public:
-    JsonText(char* text, std::size_t size) : text_(text), size_(size) {}
-    [[nodiscard]] std::string_view view() const { return {text_.get(), size_}; }
+    [[nodiscard]] std::string take() && { return std::move(text_); }
+
+    void beginObject() {
+        separate();
+        text_ += '{';
+        first_ = true;
+    }
+    void endObject() {
+        text_ += '}';
+        first_ = false;
+    }
+    void beginArray() {
+        separate();
+        text_ += '[';
+        first_ = true;
+    }
+    void endArray() {
+        text_ += ']';
+        first_ = false;
+    }
+
+    /// An object's key, which the next value goes with.
+    void key(std::string_view name) {
+        separate();
+        quoted(name);
+        text_ += ':';
+        first_ = true;
+    }
+    void string(std::string_view value) {
+        separate();
+        quoted(value);
+    }
+    void integer(std::int64_t value) {
+        separate();
+        std::array<char, 24> digits{};
+        const char* end = std::to_chars(digits.data(), digits.data() + digits.size(), value).ptr;
+        text_.append(digits.data(), static_cast<std::size_t>(end - digits.data()));
+    }
+    /// As yyjson writes a number: the shortest text that reads back the same.
+    /// Infinities and NaN are not JSON, and cannot be written.
+    void real(double value) {
+        if (!std::isfinite(value)) {
+            throw std::runtime_error("cannot write song.json: a number that is not finite");
+        }
+        separate();
+        yyjson_val number{};
+        yyjson_set_real(&number, value);
+        std::array<char, 48> digits{};
+        const char* end = yyjson_write_number(&number, digits.data());
+        if (end == nullptr) {
+            throw std::runtime_error("cannot write song.json");
+        }
+        text_.append(digits.data(), static_cast<std::size_t>(end - digits.data()));
+    }
+    void boolean(bool value) {
+        separate();
+        text_ += value ? "true" : "false";
+    }
 
 private:
-    struct Free {
-        void operator()(char* text) const {
-            std::free(text); // NOLINT(cppcoreguidelines-no-malloc): allocated by yyjson
+    void separate() {
+        if (!first_) {
+            text_ += ',';
         }
-    };
-    std::unique_ptr<char, Free> text_;
-    std::size_t size_ = 0;
+        first_ = false;
+    }
+
+    // Escapes what yyjson escapes: quotes, backslashes and control
+    // characters; the rest of the UTF-8 text is copied. Text that is not
+    // UTF-8 cannot be written, as with yyjson.
+    void quoted(std::string_view value) {
+        static constexpr std::string_view kHex = "0123456789ABCDEF";
+        text_ += '"';
+        std::size_t copied = 0; // value[copied, i) still to append
+        for (std::size_t i = 0; i < value.size();) {
+            const auto byte = static_cast<unsigned char>(value[i]);
+            if (byte >= 0x80U) {
+                const std::size_t length = sequenceLength(value, i);
+                if (length == 0) {
+                    throw std::runtime_error("cannot write song.json: text that is not UTF-8");
+                }
+                i += length;
+                continue;
+            }
+            if (byte >= 0x20U && byte != '"' && byte != '\\') {
+                ++i;
+                continue;
+            }
+            text_.append(value.substr(copied, i - copied));
+            switch (byte) {
+            case '"':
+                text_ += "\\\"";
+                break;
+            case '\\':
+                text_ += "\\\\";
+                break;
+            case '\b':
+                text_ += "\\b";
+                break;
+            case '\t':
+                text_ += "\\t";
+                break;
+            case '\n':
+                text_ += "\\n";
+                break;
+            case '\f':
+                text_ += "\\f";
+                break;
+            case '\r':
+                text_ += "\\r";
+                break;
+            default:
+                text_ += "\\u00";
+                text_ += kHex[byte >> 4U];
+                text_ += kHex[byte & 0x0FU];
+                break;
+            }
+            copied = ++i;
+        }
+        text_.append(value.substr(copied));
+        text_ += '"';
+    }
+
+    std::string text_;
+    bool first_ = true;
 };
 
 class Writer {
 public:
-    Writer() : doc_(yyjson_mut_doc_new(nullptr)) {
-        if (doc_ == nullptr) {
-            throw std::bad_alloc();
-        }
-    }
-    Writer(const Writer&) = delete;
-    Writer& operator=(const Writer&) = delete;
-    Writer(Writer&&) = delete;
-    Writer& operator=(Writer&&) = delete;
-    ~Writer() { yyjson_mut_doc_free(doc_); }
+    std::string write(const Song& song) && {
+        out_.beginObject();
+        text("format", kFormatName);
+        integer("formatVersion", kNativeFormatVersion);
+        text("generator", std::format("{}{}", kGeneratorName, version()));
+        info(song.info());
+        out_.key("tempo");
+        out_.beginObject();
+        tempoFields(song.startTempo());
+        out_.endObject();
 
-    JsonText write(const Song& song) {
-        yyjson_mut_val* root = yyjson_mut_obj(doc_);
-        yyjson_mut_doc_set_root(doc_, root);
-        yyjson_mut_obj_add_str(doc_, root, "format", kFormatName.data());
-        yyjson_mut_obj_add_int(doc_, root, "formatVersion", kNativeFormatVersion);
-        addText(root, "generator", std::format("{}{}", kGeneratorName, version()));
-        addInfo(root, song.info());
-        add(root, "tempo", tempo(song.startTempo()));
-
-        yyjson_mut_val* measures = yyjson_mut_arr(doc_);
+        out_.key("measures");
+        out_.beginArray();
         for (std::size_t m = 0; m < song.measureCount(); ++m) {
-            yyjson_mut_arr_append(measures, header(song.measureHeader(m)));
+            header(song.measureHeader(m));
         }
-        add(root, "measures", measures);
-        addLayouts(root, song.measureLayouts(LayoutScope::song()));
+        out_.endArray();
+        layouts(song.measureLayouts(LayoutScope::song()));
 
-        yyjson_mut_val* tracks = yyjson_mut_arr(doc_);
+        out_.key("tracks");
+        out_.beginArray();
         for (std::size_t t = 0; t < song.trackCount(); ++t) {
-            yyjson_mut_arr_append(tracks, track(song.track(t)));
+            track(song.track(t));
         }
-        add(root, "tracks", tracks);
-
-        std::size_t length = 0;
-        char* text = yyjson_mut_write(doc_, YYJSON_WRITE_NOFLAG, &length);
-        if (text == nullptr) {
-            throw std::runtime_error("cannot write song.json");
-        }
-        return {text, length};
+        out_.endArray();
+        out_.endObject();
+        return std::move(out_).take();
     }
 
 private:
-    // Keys are string literals (kept by pointer); values are copied.
-    void add(yyjson_mut_val* object, const char* key, yyjson_mut_val* value) {
-        yyjson_mut_obj_add_val(doc_, object, key, value);
+    void text(std::string_view key, std::string_view value) {
+        out_.key(key);
+        out_.string(value);
     }
-    void addText(yyjson_mut_val* object, const char* key, std::string_view value) {
-        yyjson_mut_obj_add_strncpy(doc_, object, key, value.data(), value.size());
-    }
-    void addTextIfAny(yyjson_mut_val* object, const char* key, std::string_view value) {
+    void textIfAny(std::string_view key, std::string_view value) {
         if (!value.empty()) {
-            addText(object, key, value);
+            text(key, value);
         }
     }
-    void addInt(yyjson_mut_val* object, const char* key, std::int64_t value) {
-        yyjson_mut_obj_add_int(doc_, object, key, value);
+    void integer(std::string_view key, std::int64_t value) {
+        out_.key(key);
+        out_.integer(value);
     }
-    void addFlag(yyjson_mut_val* object, const char* key, bool value) {
+    void flag(std::string_view key, bool value) {
         if (value) {
-            yyjson_mut_obj_add_true(doc_, object, key);
+            out_.key(key);
+            out_.boolean(true);
         }
     }
     // Whole numbers are written without a fraction ("120", not "120.0").
-    void addNumber(yyjson_mut_val* object, const char* key, double value) {
+    void number(std::string_view key, double value) {
         if (std::trunc(value) == value && std::abs(value) < 1e15) {
-            addInt(object, key, static_cast<std::int64_t>(value));
+            integer(key, static_cast<std::int64_t>(value));
         } else {
-            yyjson_mut_obj_add_real(doc_, object, key, value);
+            out_.key(key);
+            out_.real(value);
         }
     }
     template <NamedEnum Enum>
-    void addEnumIfNot(yyjson_mut_val* object, const char* key, Enum value, Enum skip) {
+    void enumIfNot(std::string_view key, Enum value, Enum skip) {
         if (value != skip) {
-            addText(object, key, nameOf(value));
+            text(key, nameOf(value));
         }
     }
 
-    void addInfo(yyjson_mut_val* root, const SongInfo& info) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addTextIfAny(object, "title", info.title);
-        addTextIfAny(object, "subtitle", info.subtitle);
-        addTextIfAny(object, "artist", info.artist);
-        addTextIfAny(object, "album", info.album);
-        addTextIfAny(object, "words", info.words);
-        addTextIfAny(object, "music", info.music);
-        addTextIfAny(object, "copyright", info.copyright);
-        addTextIfAny(object, "transcriber", info.transcriber);
-        addTextIfAny(object, "notes", info.notes);
-        add(root, "info", object);
+    void info(const SongInfo& info) {
+        out_.key("info");
+        out_.beginObject();
+        textIfAny("title", info.title);
+        textIfAny("subtitle", info.subtitle);
+        textIfAny("artist", info.artist);
+        textIfAny("album", info.album);
+        textIfAny("words", info.words);
+        textIfAny("music", info.music);
+        textIfAny("copyright", info.copyright);
+        textIfAny("transcriber", info.transcriber);
+        textIfAny("notes", info.notes);
+        out_.endObject();
     }
 
     // The measures of a scope whose layout is not the default (ADR-0152), as
     // "layout"; nothing for a scope that holds none.
-    void addLayouts(yyjson_mut_val* object, const MeasureLayouts& value) {
+    void layouts(const MeasureLayouts& value) {
         if (!value) {
             return;
         }
-        yyjson_mut_val* entries = yyjson_mut_arr(doc_);
+        out_.key("layout");
+        out_.beginArray();
         for (std::size_t m = 0; m < value->size(); ++m) {
             const MeasureLayout& layout = (*value)[m];
             if (layout.isDefault()) {
                 continue;
             }
-            yyjson_mut_val* entry = yyjson_mut_obj(doc_);
-            addInt(entry, "measure", static_cast<std::int64_t>(m));
-            addEnumIfNot(entry, "break", layout.breakBefore, Break::Auto);
+            out_.beginObject();
+            integer("measure", static_cast<std::int64_t>(m));
+            enumIfNot("break", layout.breakBefore, Break::Auto);
             if (layout.spacing != MeasureLayout::kDefaultSpacing) {
-                addInt(entry, "spacing", layout.spacing);
+                integer("spacing", layout.spacing);
             }
-            yyjson_mut_arr_append(entries, entry);
+            out_.endObject();
         }
-        add(object, "layout", entries);
+        out_.endArray();
     }
 
-    yyjson_mut_val* tempo(const Tempo& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addNumber(object, "bpm", value.bpm());
+    // A tempo's fields, in an object its caller opens.
+    void tempoFields(const Tempo& value) {
+        number("bpm", value.bpm());
         if (value.beatUnit() != Duration{}) {
-            addText(object, "beatUnit", value.beatUnit().toString());
+            text("beatUnit", value.beatUnit().toString());
         }
-        return object;
     }
 
-    yyjson_mut_val* header(const MeasureHeader& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
+    void header(const MeasureHeader& value) {
+        out_.beginObject();
         if (value.timeSignature != TimeSignature{}) {
-            addText(object, "timeSignature", value.timeSignature.toString());
+            text("timeSignature", value.timeSignature.toString());
         }
         if (value.keySignature != KeySignature{}) {
-            addText(object, "keySignature", value.keySignature.toString());
+            text("keySignature", value.keySignature.toString());
         }
         if (!value.tempoChanges.empty()) {
-            yyjson_mut_val* changes = yyjson_mut_arr(doc_);
+            out_.key("tempoChanges");
+            out_.beginArray();
             for (const auto& change : value.tempoChanges) {
-                yyjson_mut_val* item = tempo(change.tempo);
+                out_.beginObject();
+                tempoFields(change.tempo);
                 if (!change.offset.isZero()) {
-                    addText(item, "offset", change.offset.toString());
+                    text("offset", change.offset.toString());
                 }
-                addFlag(item, "gradual", change.gradual);
-                yyjson_mut_arr_append(changes, item);
+                flag("gradual", change.gradual);
+                out_.endObject();
             }
-            add(object, "tempoChanges", changes);
+            out_.endArray();
         }
-        addFlag(object, "repeatStart", value.repeatStart);
+        flag("repeatStart", value.repeatStart);
         if (value.repeatEnd()) {
-            addInt(object, "repeatTimes", value.repeatTimes);
+            integer("repeatTimes", value.repeatTimes);
         }
         if (value.alternateEndings != 0) {
-            yyjson_mut_val* endings = yyjson_mut_arr(doc_);
+            out_.key("alternateEndings");
+            out_.beginArray();
             for (int time = 1; time <= MeasureHeader::kMaxEnding; ++time) {
                 if (value.playedOnTime(time)) {
-                    yyjson_mut_arr_add_int(doc_, endings, time);
+                    out_.integer(time);
                 }
             }
-            add(object, "alternateEndings", endings);
+            out_.endArray();
         }
-        addFlag(object, "doubleBar", value.doubleBar);
-        addEnumIfNot(object, "tripletFeel", value.tripletFeel, TripletFeel::None);
-        // Each sign as the flag MeasureHeader names it ("segnoSegno"); the
-        // names are literals, so their views end in a null.
+        flag("doubleBar", value.doubleBar);
+        enumIfNot("tripletFeel", value.tripletFeel, TripletFeel::None);
+        // Each sign as the flag MeasureHeader names it ("segnoSegno").
         for (const NavigationSign sign : enumValues<NavigationSign>()) {
-            addFlag(object, signField(sign).data(), value.*signFlag(sign));
+            flag(signField(sign), value.*signFlag(sign));
         }
-        addEnumIfNot(object, "jump", value.jump, JumpTo::None);
+        enumIfNot("jump", value.jump, JumpTo::None);
         if (value.jump != JumpTo::None) {
-            addEnumIfNot(object, "jumpThen", value.jumpThen, JumpThen::End);
+            enumIfNot("jumpThen", value.jumpThen, JumpThen::End);
         }
-        addTextIfAny(object, "section", value.section);
-        return object;
+        textIfAny("section", value.section);
+        out_.endObject();
     }
 
-    yyjson_mut_val* track(const Track& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "name", value.name());
+    void track(const Track& value) {
+        out_.beginObject();
+        text("name", value.name());
         const Instrument& instrument = value.instrument();
-        yyjson_mut_val* inst = yyjson_mut_obj(doc_);
-        addTextIfAny(inst, "name", instrument.name);
-        addText(inst, "kind", nameOf(instrument.kind));
+        out_.key("instrument");
+        out_.beginObject();
+        textIfAny("name", instrument.name);
+        text("kind", nameOf(instrument.kind));
         if (instrument.midiProgram != 0) {
-            addInt(inst, "midiProgram", instrument.midiProgram);
+            integer("midiProgram", instrument.midiProgram);
         }
         if (instrument.writtenOffset != 0) {
-            addInt(inst, "writtenOffset", instrument.writtenOffset);
+            integer("writtenOffset", instrument.writtenOffset);
         }
-        add(object, "instrument", inst);
+        out_.endObject();
 
         if (const TrackMix& mix = value.mix(); mix != TrackMix{}) {
-            yyjson_mut_val* mixJson = yyjson_mut_obj(doc_);
+            out_.key("mix");
+            out_.beginObject();
             if (mix.volume != TrackMix::kDefaultVolume) {
-                addNumber(mixJson, "volume", mix.volume);
+                number("volume", mix.volume);
             }
             if (mix.pan != 0.0) {
-                addNumber(mixJson, "pan", mix.pan);
+                number("pan", mix.pan);
             }
-            addFlag(mixJson, "mute", mix.mute);
-            addFlag(mixJson, "solo", mix.solo);
-            add(object, "mix", mixJson);
+            flag("mute", mix.mute);
+            flag("solo", mix.solo);
+            out_.endObject();
         }
-        addLayouts(object, value.measureLayouts());
+        layouts(value.measureLayouts());
 
-        yyjson_mut_val* staves = yyjson_mut_arr(doc_);
+        out_.key("staves");
+        out_.beginArray();
         for (std::size_t s = 0; s < value.staffCount(); ++s) {
-            yyjson_mut_arr_append(staves, staff(value.staff(s)));
+            staff(value.staff(s));
         }
-        add(object, "staves", staves);
-        return object;
+        out_.endArray();
+        out_.endObject();
     }
 
-    yyjson_mut_val* staff(const Staff& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "clef", nameOf(value.clef()));
+    void staff(const Staff& value) {
+        out_.beginObject();
+        text("clef", nameOf(value.clef()));
         if (value.tuning()) {
-            addText(object, "tuning", value.tuning()->toString());
+            text("tuning", value.tuning()->toString());
         }
         if (value.capo() != 0) {
-            addInt(object, "capo", value.capo());
+            integer("capo", value.capo());
         }
         // The measures that change the clef (ADR-0087), apart from their
         // content: a change can stand on an empty measure at the end.
-        yyjson_mut_val* clefs = nullptr;
+        bool clefs = false;
         for (std::size_t m = 0; m < value.measureCount(); ++m) {
             if (const std::optional<Clef>& clef = value.measure(m).clef) {
-                if (clefs == nullptr) {
-                    clefs = yyjson_mut_arr(doc_);
+                if (!clefs) {
+                    out_.key("clefs");
+                    out_.beginArray();
+                    clefs = true;
                 }
-                yyjson_mut_val* change = yyjson_mut_obj(doc_);
-                addInt(change, "measure", static_cast<std::int64_t>(m));
-                addText(change, "clef", nameOf(*clef));
-                yyjson_mut_arr_append(clefs, change);
+                out_.beginObject();
+                integer("measure", static_cast<std::int64_t>(m));
+                text("clef", nameOf(*clef));
+                out_.endObject();
             }
         }
-        if (clefs != nullptr) {
-            add(object, "clefs", clefs);
+        if (clefs) {
+            out_.endArray();
         }
         // The measure repeats (ADR-0102), which stand on empty measures.
-        yyjson_mut_val* repeats = nullptr;
+        bool repeats = false;
         for (std::size_t m = 0; m < value.measureCount(); ++m) {
             if (const MeasureRepeat repeat = value.measure(m).repeat;
                 repeat != MeasureRepeat::None) {
-                if (repeats == nullptr) {
-                    repeats = yyjson_mut_arr(doc_);
+                if (!repeats) {
+                    out_.key("repeats");
+                    out_.beginArray();
+                    repeats = true;
                 }
-                yyjson_mut_val* sign = yyjson_mut_obj(doc_);
-                addInt(sign, "measure", static_cast<std::int64_t>(m));
-                addText(sign, "repeat", nameOf(repeat));
-                yyjson_mut_arr_append(repeats, sign);
+                out_.beginObject();
+                integer("measure", static_cast<std::int64_t>(m));
+                text("repeat", nameOf(repeat));
+                out_.endObject();
             }
         }
-        if (repeats != nullptr) {
-            add(object, "repeats", repeats);
+        if (repeats) {
+            out_.endArray();
         }
         std::size_t used = value.measureCount(); // trailing empty measures are omitted
         while (used > 0 && value.measure(used - 1).isEmpty()) {
             --used;
         }
-        yyjson_mut_val* measures = yyjson_mut_arr(doc_);
+        out_.key("measures");
+        out_.beginArray();
         for (std::size_t m = 0; m < used; ++m) {
-            yyjson_mut_arr_append(measures, measure(value.measure(m)));
+            measure(value.measure(m));
         }
-        add(object, "measures", measures);
-        return object;
+        out_.endArray();
+        out_.endObject();
     }
 
-    yyjson_mut_val* measure(const Measure& value) {
+    void measure(const Measure& value) {
         std::size_t used = Measure::kMaxVoices; // trailing empty voices are omitted
         while (used > 0 && value.voices[used - 1].isEmpty()) {
             --used;
         }
-        yyjson_mut_val* voices = yyjson_mut_arr(doc_);
+        out_.beginArray();
         for (std::size_t v = 0; v < used; ++v) {
-            yyjson_mut_val* beats = yyjson_mut_arr(doc_);
+            out_.beginArray();
             for (const Beat& b : value.voices[v].beats) {
-                yyjson_mut_arr_append(beats, beat(b));
+                beat(b);
             }
-            yyjson_mut_arr_append(voices, beats);
+            out_.endArray();
         }
-        return voices;
+        out_.endArray();
     }
 
-    yyjson_mut_val* beat(const Beat& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "duration", value.duration.toString());
+    void beat(const Beat& value) {
+        out_.beginObject();
+        text("duration", value.duration.toString());
         if (value.chord) {
-            add(object, "chord", chord(*value.chord));
+            out_.key("chord");
+            chord(*value.chord);
         }
         if (value.text) {
-            addText(object, "text", *value.text);
+            text("text", *value.text);
         }
         if (value.lyrics) { // ADR-0084: "be-" joins the next syllable, "low_" is held
-            yyjson_mut_val* verses = yyjson_mut_arr(doc_);
+            out_.key("lyrics");
+            out_.beginArray();
             for (const Syllable& syllable : *value.lyrics) {
-                std::string text = syllable.text;
+                std::string written = syllable.text;
                 if (syllable.hyphen) {
-                    text += '-';
+                    written += '-';
                 }
                 if (syllable.extend) {
-                    text += '_';
+                    written += '_';
                 }
-                yyjson_mut_arr_add_strncpy(doc_, verses, text.data(), text.size());
+                out_.string(written);
             }
-            add(object, "lyrics", verses);
+            out_.endArray();
         }
         if (!value.graces.empty()) {
-            yyjson_mut_val* graces = yyjson_mut_arr(doc_);
+            out_.key("graces");
+            out_.beginArray();
             for (const Grace& g : value.graces) {
-                yyjson_mut_arr_append(graces, grace(g));
+                grace(g);
             }
-            add(object, "graces", graces);
+            out_.endArray();
         }
         if (!value.notes.empty()) {
-            yyjson_mut_val* notes = yyjson_mut_arr(doc_);
+            out_.key("notes");
+            out_.beginArray();
             for (const Note& n : value.notes) {
-                yyjson_mut_arr_append(notes, note(n));
+                note(n);
             }
-            add(object, "notes", notes);
+            out_.endArray();
         }
         if (value.effects != BeatEffects{}) {
-            add(object, "effects", beatEffects(value.effects));
+            out_.key("effects");
+            beatEffects(value.effects);
         }
-        return object;
+        out_.endObject();
     }
 
-    yyjson_mut_val* chord(const ChordSymbol& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addTextIfAny(object, "name", value.name);
+    void chord(const ChordSymbol& value) {
+        out_.beginObject();
+        textIfAny("name", value.name);
         if (value.diagram) {
-            yyjson_mut_val* diagram = yyjson_mut_obj(doc_);
-            addInt(diagram, "firstFret", value.diagram->firstFret);
-            yyjson_mut_val* frets = yyjson_mut_arr(doc_);
+            out_.key("diagram");
+            out_.beginObject();
+            integer("firstFret", value.diagram->firstFret);
+            out_.key("frets");
+            out_.beginArray();
             for (const std::int8_t fret : value.diagram->frets) {
-                yyjson_mut_arr_add_int(doc_, frets, fret);
+                out_.integer(fret);
             }
-            add(diagram, "frets", frets);
-            add(object, "diagram", diagram);
+            out_.endArray();
+            out_.endObject();
         }
-        return object;
+        out_.endObject();
     }
 
-    yyjson_mut_val* grace(const Grace& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "duration", value.duration.toString());
+    void grace(const Grace& value) {
+        out_.beginObject();
+        text("duration", value.duration.toString());
         if (!value.notes.empty()) {
-            yyjson_mut_val* notes = yyjson_mut_arr(doc_);
+            out_.key("notes");
+            out_.beginArray();
             for (const Note& n : value.notes) {
-                yyjson_mut_arr_append(notes, note(n));
+                note(n);
             }
-            add(object, "notes", notes);
+            out_.endArray();
         }
-        addFlag(object, "onBeat", value.onBeat);
-        return object;
+        flag("onBeat", value.onBeat);
+        out_.endObject();
     }
 
-    yyjson_mut_val* note(const Note& value) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
-        addText(object, "pitch", value.pitch.toString());
+    void note(const Note& value) {
+        out_.beginObject();
+        text("pitch", value.pitch.toString());
         if (value.position) {
-            addInt(object, "string", value.position->string);
-            addInt(object, "fret", value.position->fret);
+            integer("string", value.position->string);
+            integer("fret", value.position->fret);
         }
         if (value.effects != NoteEffects{}) {
-            add(object, "effects", noteEffects(value.effects));
+            out_.key("effects");
+            noteEffects(value.effects);
         }
-        return object;
+        out_.endObject();
     }
 
-    yyjson_mut_val* curve(const BendCurve& value) {
-        yyjson_mut_val* points = yyjson_mut_arr(doc_);
+    void curve(const BendCurve& value) {
+        out_.beginArray();
         for (const BendPoint& point : value.points()) {
-            yyjson_mut_val* pair = yyjson_mut_arr(doc_);
-            yyjson_mut_arr_add_int(doc_, pair, point.position);
-            yyjson_mut_arr_add_int(doc_, pair, point.cents);
-            yyjson_mut_arr_append(points, pair);
+            out_.beginArray();
+            out_.integer(point.position);
+            out_.integer(point.cents);
+            out_.endArray();
         }
-        return points;
+        out_.endArray();
     }
 
-    yyjson_mut_val* noteEffects(const NoteEffects& fx) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
+    void noteEffects(const NoteEffects& fx) {
+        out_.beginObject();
         if (!fx.bend.isEmpty()) {
-            add(object, "bend", curve(fx.bend));
+            out_.key("bend");
+            curve(fx.bend);
         }
         if (fx.harmonic != Harmonic{}) {
-            yyjson_mut_val* harmonic = yyjson_mut_obj(doc_);
-            addText(harmonic, "kind", nameOf(fx.harmonic.kind));
+            out_.key("harmonic");
+            out_.beginObject();
+            text("kind", nameOf(fx.harmonic.kind));
             if (fx.harmonic.fretTenths != 0) {
-                addNumber(harmonic, "fret", fx.harmonic.fretTenths / 10.0);
+                number("fret", fx.harmonic.fretTenths / 10.0);
             }
-            add(object, "harmonic", harmonic);
+            out_.endObject();
         }
         if (fx.trill.isTrill()) {
-            yyjson_mut_val* trill = yyjson_mut_obj(doc_);
-            addInt(trill, "semitones", fx.trill.semitones);
-            addText(trill, "speed", Duration(fx.trill.speed).toString());
-            add(object, "trill", trill);
+            out_.key("trill");
+            out_.beginObject();
+            integer("semitones", fx.trill.semitones);
+            text("speed", Duration(fx.trill.speed).toString());
+            out_.endObject();
         }
-        addFlag(object, "tiedFromPrevious", fx.tiedFromPrevious);
-        addFlag(object, "legatoFromPrevious", fx.legatoFromPrevious);
-        addEnumIfNot(object, "slideIn", fx.slideIn, SlideIn::None);
-        addEnumIfNot(object, "slideOut", fx.slideOut, SlideOut::None);
-        addEnumIfNot(object, "vibrato", fx.vibrato, Vibrato::None);
-        addFlag(object, "palmMute", fx.palmMute);
-        addFlag(object, "deadNote", fx.deadNote);
-        addFlag(object, "ghost", fx.ghost);
-        addFlag(object, "letRing", fx.letRing);
-        addFlag(object, "staccato", fx.staccato);
-        addFlag(object, "staccatissimo", fx.staccatissimo);
-        addFlag(object, "tenuto", fx.tenuto);
-        addEnumIfNot(object, "accent", fx.accent, Accent::None);
-        addEnumIfNot(object, "ornament", fx.ornament, Ornament::None);
-        addEnumIfNot(object, "fingering", fx.fingering, Finger::None);
-        addEnumIfNot(object, "pluck", fx.pluck, Finger::None);
-        addEnumIfNot(object, "dynamic", fx.dynamic, Dynamic::MF);
-        return object;
+        flag("tiedFromPrevious", fx.tiedFromPrevious);
+        flag("legatoFromPrevious", fx.legatoFromPrevious);
+        enumIfNot("slideIn", fx.slideIn, SlideIn::None);
+        enumIfNot("slideOut", fx.slideOut, SlideOut::None);
+        enumIfNot("vibrato", fx.vibrato, Vibrato::None);
+        flag("palmMute", fx.palmMute);
+        flag("deadNote", fx.deadNote);
+        flag("ghost", fx.ghost);
+        flag("letRing", fx.letRing);
+        flag("staccato", fx.staccato);
+        flag("staccatissimo", fx.staccatissimo);
+        flag("tenuto", fx.tenuto);
+        enumIfNot("accent", fx.accent, Accent::None);
+        enumIfNot("ornament", fx.ornament, Ornament::None);
+        enumIfNot("fingering", fx.fingering, Finger::None);
+        enumIfNot("pluck", fx.pluck, Finger::None);
+        enumIfNot("dynamic", fx.dynamic, Dynamic::MF);
+        out_.endObject();
     }
 
-    yyjson_mut_val* beatEffects(const BeatEffects& fx) {
-        yyjson_mut_val* object = yyjson_mut_obj(doc_);
+    void beatEffects(const BeatEffects& fx) {
+        out_.beginObject();
         if (!fx.whammyBar.isEmpty()) {
-            add(object, "whammyBar", curve(fx.whammyBar));
+            out_.key("whammyBar");
+            curve(fx.whammyBar);
         }
-        addEnumIfNot(object, "pickStroke", fx.pickStroke, PickStroke::None);
-        addEnumIfNot(object, "strum", fx.strum, Strum::None);
+        enumIfNot("pickStroke", fx.pickStroke, PickStroke::None);
+        enumIfNot("strum", fx.strum, Strum::None);
         if (fx.tremoloPicking) {
-            addText(object, "tremoloPicking", Duration(*fx.tremoloPicking).toString());
+            text("tremoloPicking", Duration(*fx.tremoloPicking).toString());
         }
-        addEnumIfNot(object, "bassTechnique", fx.bassTechnique, BassTechnique::None);
-        addEnumIfNot(object, "hairpin", fx.hairpin, Hairpin::None);
-        addEnumIfNot(object, "fermata", fx.fermata, Fermata::None);
-        addFlag(object, "slur", fx.slur);
-        addEnumIfNot(object, "ottava", fx.ottava, Ottava::None);
-        addEnumIfNot(object, "pedal", fx.pedal, Pedal::None);
-        addEnumIfNot(object, "breath", fx.breath, Breath::None);
-        return object;
+        enumIfNot("bassTechnique", fx.bassTechnique, BassTechnique::None);
+        enumIfNot("hairpin", fx.hairpin, Hairpin::None);
+        enumIfNot("fermata", fx.fermata, Fermata::None);
+        flag("slur", fx.slur);
+        enumIfNot("ottava", fx.ottava, Ottava::None);
+        enumIfNot("pedal", fx.pedal, Pedal::None);
+        enumIfNot("breath", fx.breath, Breath::None);
+        out_.endObject();
     }
 
-    yyjson_mut_doc* doc_;
+    JsonOut out_;
 };
 
 // ============================================================================
@@ -1305,8 +1461,7 @@ Song songOf(ImportResult&& read) {
 } // namespace
 
 std::string songToJson(const Song& song) {
-    Writer writer;
-    return std::string(writer.write(song).view());
+    return Writer().write(song);
 }
 
 namespace {
@@ -1420,10 +1575,10 @@ std::expected<Song, FormatError> songFromJson(std::string_view json) {
 }
 
 std::vector<std::uint8_t> encodeNative(const Song& song) {
-    const JsonText json = Writer().write(song);
+    const std::string json = Writer().write(song);
     const std::array entries{
         detail::ZipEntry{.name = "mimetype", .content = kNativeMimeType, .level = 0},
-        detail::ZipEntry{.name = "song.json", .content = json.view()}};
+        detail::ZipEntry{.name = "song.json", .content = json}};
     return detail::writeZip(entries);
 }
 
