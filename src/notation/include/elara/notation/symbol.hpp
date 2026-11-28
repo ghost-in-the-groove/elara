@@ -42,7 +42,9 @@ inline constexpr double kPickSlack = 0.4;
 /// The symbol of one of `roles` drawn at `point`, or within `slack` of it; of
 /// several there, the one whose piece under the point is the smallest. Empty
 /// when none is. A glyph is where the font says its ink is; a text, where
-/// layout assumes it is (textWidth()).
+/// layout assumes it is: textWidth() wide, and from its baseline up to its cap
+/// height when it is a fret number (digits, X, angle brackets), else from its
+/// ascent to its descent.
 [[nodiscard]] std::optional<Symbol> symbolAt(const DisplayList& list, Point point,
                                              std::span<const Role> roles, const EngravingFont& font,
                                              double slack = kPickSlack);
