@@ -99,6 +99,7 @@ elara_add_unit_tests(notation
   notation/test_measure_repeat_layout.cpp
   notation/test_ornament_layout.cpp notation/test_pedal_layout.cpp
   notation/test_fingering_layout.cpp notation/test_layout_issues.cpp notation/test_voice_layout.cpp
+  notation/test_staff_size.cpp
   LIBRARIES elara::notation elara::io)
 # The incremental layout is checked against a full one on the corpus files.
 target_compile_definitions(elara_notation_tests PRIVATE ELARA_FONT_DIR="${ELARA_FONT_DIR}"
@@ -134,8 +135,11 @@ if(TARGET elara)
   # transport plays through a device of the tests' own (ADR-0126).
   target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp app/test_fret_entry.cpp
     app/test_score_editing.cpp app/test_caret_editor.cpp app/test_symbols.cpp
+    app/test_document_set.cpp
     app/test_score_layout_issues.cpp
+    app/test_staff_size.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
+    "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/caret_editor.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/audio_controller.cpp")
   set_target_properties(elara_app_tests PROPERTIES AUTOMOC ON)
@@ -207,13 +211,19 @@ if(TARGET elara)
   # The note effects palette open at the caret while effects are set.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
+  # Several songs open at once (ADR-0160): two files named together load side
+  # by side in tabs, a measure copied in one is pasted in the other, and the
+  # changed one closes once its changes are discarded.
+  add_test(NAME app.smoke_songs
+    COMMAND elara --smoke-test "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/melody.gp3"
+      "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/dal-segno.gp5")
   # A song shown, playing, held open for a second with nothing of the check
   # running, as scripts/usage.py measures it; without an audio device (as in
   # CI) playback does not start, and the window must still close cleanly.
   add_test(NAME app.hold
     COMMAND elara --hold 1 --play "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/band.gp")
   set_tests_properties(app.smoke app.smoke_narrow app.smoke_menu app.smoke_open_tracks
-    app.smoke_open_views app.smoke_open_missing
+    app.smoke_open_views app.smoke_open_missing app.smoke_songs
     app.smoke_tuner app.smoke_tuner_track app.smoke_song_pane app.smoke_measure app.smoke_lyrics
     app.smoke_effects app.hold app.smoke_hold_still app.smoke_follow
     PROPERTIES
@@ -223,7 +233,7 @@ if(TARGET elara)
   # The new song's edits end in a song with a measure wider than the page: the
   # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 66 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 65 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
@@ -239,6 +249,8 @@ if(TARGET elara)
   set_tests_properties(app.smoke_follow PROPERTIES
     PASS_REGULAR_EXPRESSION "follow: in view after [0-9]+ ticks[\r\n]+loop: measures 3 to 6, [1-9][0-9]* bands?[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
+  set_tests_properties(app.smoke_songs PROPERTIES
+    PASS_REGULAR_EXPRESSION "songs: 2 open: [^\r\n]+ \\| [^\r\n]+[\r\n]+songs: pasted measure 1 of [^\r\n]+ into measure 2 of [^\r\n]+[\r\n]+songs: closed the second, 1 open[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.hold PROPERTIES PASS_REGULAR_EXPRESSION "hold: 1 s[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES
     PASS_REGULAR_EXPRESSION "tuner: E1 A1 D2 G2[\r\n]+tuner: D1 G1 C2 F2[\r\n]+tuner: E1 A1 D2 G2[\r\n]+.*smoke-test: ok")

@@ -25,9 +25,13 @@ AppDialog {
             open();
     }
 
+    /// Opens copy `index` as the song it was, in a tab of its own (ADR-0160);
+    /// the others stay on offer.
     function recover(index: int) {
         const file = copies[index].file;
-        close();
+        copies = copies.filter((copy, i) => i !== index);
+        if (count === 0)
+            close();
         recoverRequested(file);
     }
 

@@ -317,12 +317,12 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [x] Layout issues found on the worker and shown in the status bar (ADR-0150)
   - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
-- [ ] Several songs open at once, in tabs, with measures copied between them
+- [x] Several songs open at once, in tabs, with measures copied between them
       (ADR-0160)
   - [x] One clipboard for every song open: measures copied in one song are
         pasted in another, shared with the song they came from; the CLI
         `edit --from` and `copy ... from` steps
-  - [ ] Songs in tabs: new, open, close and switch; files opened together
+  - [x] Songs in tabs: new, open, close and switch; files opened together
         load in parallel; the transport follows the song shown
 
 ## The interface
@@ -355,6 +355,8 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] Following playback a system at a time, held off by a scroll by hand; the
       caret marks where playback starts while it is stopped, and the measure
       playing or the caret's is shaded across every staff (ADR-0170)
+- [x] Every track at once at a smaller staff size, two systems a page where
+      the staves allow it (ADR-0171)
 - [x] The A-B loop as a band over its measures on the score (ADR-0172)
 
 ## Milestone 6 - Practice tools

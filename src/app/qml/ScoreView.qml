@@ -206,6 +206,28 @@ Item {
         list.contentY = list.originY - list.topMargin;
     }
 
+    // Each song keeps its place while another is shown (ADR-0160): where the
+    // view's middle was, in pages, goes back to the middle when it shows again.
+    property ScoreDocument shownSong: null
+    onDocumentChanged: {
+        if (shownSong)
+            shownSong.viewCentre = centre;
+        shownSong = document;
+        Qt.callLater(showPlace);
+    }
+    /// The shown song where it was left, or at its top the first time.
+    function showPlace() {
+        if (document.pageCount === 0)
+            return; // laid out later: it opens at its top then
+        fitSong();
+        if (document.viewCentre < 0) {
+            toTop();
+            return;
+        }
+        centre = document.viewCentre;
+        list.contentY = list.originY + yAt(centre) - list.height / 2;
+    }
+
     // Keyboard entry: the caret follows the keys and stays in view.
     property bool revealPending: false
 
@@ -475,6 +497,15 @@ Item {
         // A song just opened or started: typing goes to it.
         function onSourceChanged() {
             root.forceActiveFocus();
+        }
+        // Another track or view lays the pages out anew, maybe with another
+        // staff size (ADR-0171): the caret comes back into view once they are,
+        // and the playback cursor's system while it plays.
+        function onTrackChanged() {
+            root.revealPending = !root.playing;
+        }
+        function onViewChanged() {
+            root.revealPending = !root.playing;
         }
         // An edit's layout moved the caret's staff: scroll as far, so that it
         // stays where it was on screen, when it was in view.

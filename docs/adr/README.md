@@ -146,6 +146,7 @@ one that replaces them.
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
 | [0160](0160-several-songs-open-at-once.md) | Several songs open at once | Accepted |
 | [0170](0170-following-playback-and-the-caret-marks-where-it-starts.md) | Following playback, and the caret marks where it starts | Accepted |
+| [0171](0171-staff-size-follows-the-staves-shown.md) | The staff size follows the staves shown | Accepted |
 | [0172](0172-the-a-b-loop-on-the-score.md) | The A-B loop on the score | Accepted |
 
 ## Template
