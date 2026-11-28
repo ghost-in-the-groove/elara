@@ -104,7 +104,8 @@ measure playing. A click on a note moves playback to it. While the cursor moves,
 when it is not, near the top, and a scroll by hand holds that off until the cursor goes into another system
 ("Follow playback" in the Sound menu turns it off). With playback stopped a click or Left and Right put the caret
 and playback together and the cursor hides; the measure playing, or the caret's, is shaded across its system
-(`ScoreDocument::measureBox`, ADR-0170).
+(`ScoreDocument::measureBox`, ADR-0170). The A-B loop is a band over the top of its measures on the pages, a
+system at a time (`ScoreDocument::measureSpans`, ADR-0172).
 
 ## Command line
 
@@ -136,7 +137,8 @@ elara [FILE] [--track N|all] [--view notation|tab|both] [--seek SECONDS]
   long every tick as playing does: the view must bring the cursor's system in
   while it moves, hold still after a scroll by hand with the wheel until the
   cursor goes into another system, and stay put with following off
-  (`app.smoke_follow`, ADR-0170).
+  (`app.smoke_follow`, ADR-0170); then it marks an A-B loop and checks its
+  bands on the pages (ADR-0172).
 - `--screenshot OUT.png` saves the window once it is shown and quits.
 - `--play` starts playback once the song is shown.
 - `--hold SECONDS`, for measuring: once the window is ready (the song laid out

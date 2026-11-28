@@ -355,6 +355,7 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] Following playback a system at a time, held off by a scroll by hand; the
       caret marks where playback starts while it is stopped, and the measure
       playing or the caret's is shaded across every staff (ADR-0170)
+- [x] The A-B loop as a band over its measures on the score (ADR-0172)
 
 ## Milestone 6 - Practice tools
 

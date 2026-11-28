@@ -237,7 +237,7 @@ if(TARGET elara)
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_follow PROPERTIES
-    PASS_REGULAR_EXPRESSION "follow: in view after [0-9]+ ticks[\r\n]+.*smoke-test: ok")
+    PASS_REGULAR_EXPRESSION "follow: in view after [0-9]+ ticks[\r\n]+loop: measures 3 to 6, [1-9][0-9]* bands?[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_open_missing PROPERTIES WILL_FAIL TRUE)
   set_tests_properties(app.hold PROPERTIES PASS_REGULAR_EXPRESSION "hold: 1 s[\r\n]+.*smoke-test: ok")
   set_tests_properties(app.smoke_tuner_track PROPERTIES

@@ -1216,6 +1216,10 @@ ApplicationWindow {
             cursorSeconds: audio.playingSong || (audio.position > 0 && !cursorParked)
                            ? audio.position : -1
             playing: audio.playingSong
+            looping: audio.looping
+            loopMarked: audio.loopMarked
+            loopFrom: audio.loopFrom
+            loopTo: audio.loopTo
             followCursor: true
             onSeekRequested: seconds => audio.seek(seconds)
             opacity: window.hasScore ? 1.0 : 0.0

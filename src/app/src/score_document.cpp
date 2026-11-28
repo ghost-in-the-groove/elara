@@ -2396,6 +2396,36 @@ QRectF ScoreDocument::measureBox(int index, int measure) const {
     return {};
 }
 
+QVariantList ScoreDocument::measureSpans(int index, int first, int last) const {
+    QVariantList spans;
+    if (!pages_ || index < 0 || index >= static_cast<int>(pages_->size()) || first < 0 ||
+        last < first) {
+        return spans;
+    }
+    // A page's measures are in order, system after system: those of one system
+    // share its top.
+    QRectF span;
+    for (const notation::MeasureBox& box : (*pages_)[static_cast<std::size_t>(index)].measures) {
+        if (box.index < static_cast<std::size_t>(first) ||
+            box.index > static_cast<std::size_t>(last)) {
+            continue;
+        }
+        const QRectF rect(box.x, box.y, box.width, box.height);
+        if (!span.isEmpty() && rect.y() == span.y()) {
+            span = span.united(rect);
+            continue;
+        }
+        if (!span.isEmpty()) {
+            spans.append(span);
+        }
+        span = rect;
+    }
+    if (!span.isEmpty()) {
+        spans.append(span);
+    }
+    return spans;
+}
+
 void ScoreDocument::selectionMoved() {
     ++selectionRevision_;
     emit selectionChanged();

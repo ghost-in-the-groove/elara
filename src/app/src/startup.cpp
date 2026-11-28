@@ -3406,6 +3406,88 @@ void Startup::queueFollow() {
         }
         return false;
     });
+    queueLoopOnScore();
+}
+
+void Startup::queueLoopOnScore() {
+    const auto view = [this] {
+        return window_->findChild<QQuickItem*>(QStringLiteral("scoreView"));
+    };
+    const auto audio = [this] {
+        return window_->findChild<AudioController*>();
+    };
+    // The loop's bands the pages show, in staff spaces, and those its measures
+    // span on the pages: a system at a time, top to bottom.
+    const auto byPlace = [](QList<QRectF>& spans) {
+        std::ranges::sort(spans, [](const QRectF& a, const QRectF& b) {
+            return std::pair(a.y(), a.x()) < std::pair(b.y(), b.x());
+        });
+        return spans;
+    };
+    const auto shown = [view, byPlace] {
+        QList<QQuickItem*> bands;
+        shownItems(view(), QLatin1StringView("loopSpan"), bands);
+        QList<QRectF> spans;
+        for (const QQuickItem* band : bands) {
+            spans.append(band->property("span").toRectF());
+        }
+        return byPlace(spans);
+    };
+    const auto spanned = [this, byPlace](int first, int last) {
+        QList<QRectF> spans;
+        for (int page = 0; page < score_->pageCount(); ++page) {
+            for (const QVariant& span : score_->measureSpans(page, first, last)) {
+                spans.append(span.toRectF());
+            }
+        }
+        return byPlace(spans);
+    };
+    // A at the third measure: a band over it.
+    steps_.emplace_back([this, audio] {
+        audio()->seek(score_->measureStart(2));
+        audio()->markLoop();
+        return false;
+    });
+    steps_.emplace_back([this, view, shown, spanned] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        if (shown().isEmpty() || shown() != spanned(2, 2)) {
+            failure_ = QStringLiteral("A at measure 3 shows %1 loop bands").arg(shown().size());
+        }
+        return false;
+    });
+    // B at the start of the seventh: a band over the third to the sixth.
+    steps_.emplace_back([this, audio] {
+        audio()->seek(score_->measureStart(6));
+        audio()->markLoop();
+        return false;
+    });
+    steps_.emplace_back([this, view, audio, shown, spanned] {
+        if (view()->property("settling").toBool()) {
+            again_ = true;
+            return false;
+        }
+        const QList<QRectF> bands = shown();
+        if (!audio()->looping() || bands.isEmpty() || bands != spanned(2, 5)) {
+            failure_ = QStringLiteral("the loop of measures 3 to 6 shows %1 bands, not the %2 "
+                                      "over the systems its measures span")
+                           .arg(bands.size())
+                           .arg(spanned(2, 5).size());
+            return false;
+        }
+        std::printf("loop: measures 3 to 6, %lld %s\n", static_cast<long long>(bands.size()),
+                    bands.size() == 1 ? "band" : "bands");
+        audio()->markLoop(); // a third time ends it
+        return false;
+    });
+    steps_.emplace_back([this, shown] {
+        if (!shown().isEmpty()) {
+            failure_ = QStringLiteral("the loop's band stays after the loop ended");
+        }
+        return false;
+    });
 }
 
 // A click on the score while playback is stopped puts the caret there and
