@@ -200,7 +200,8 @@ if(TARGET elara)
   # scrolling when it is taller than it.
   add_test(NAME app.smoke_measure
     COMMAND elara --smoke-test --measure "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
-  # The lyrics popup open over a staff that sings while a verse is typed.
+  # The lyrics popup open over a staff that sings while a verse is typed: it
+  # shows the verse as typed.
   add_test(NAME app.smoke_lyrics
     COMMAND elara --smoke-test --lyrics "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/quartet.gp4")
   # A menu open as the window shows: its items load without warnings, and it
@@ -212,7 +213,8 @@ if(TARGET elara)
   # The view follows playback through a song several pages long in a short
   # window, holds still once scrolled by hand and not at all with following off.
   add_test(NAME app.smoke_follow COMMAND elara --smoke-test --follow --size 760x480)
-  # The note effects palette open at the caret while effects are set.
+  # The note effects palette open at the caret while effects are set: it
+  # lights the tiles of what the caret's note has.
   add_test(NAME app.smoke_effects
     COMMAND elara --smoke-test --effects "${CMAKE_CURRENT_SOURCE_DIR}/corpus/gp/guitar-techniques.gp")
   # Several songs open at once (ADR-0160): two files named together load side
@@ -237,22 +239,26 @@ if(TARGET elara)
   # The new song's edits end in a song with a measure wider than the page: the
   # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 23 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 22 layouts\\)")
   # Two more than quartet.gp4 lays out alone: the tuning fields follow a capo
   # moved and undone.
   set_tests_properties(app.smoke_song_pane PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 20 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
   # things its import dropped, and the
   # score exports as a PDF document of its one page (ADR-0074), as MusicXML
   # with its four tracks and as MIDI, each telling what it left out.
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
-  set_tests_properties(app.smoke_open_views app.smoke_effects PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 16 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 17 layouts\\)")
+  set_tests_properties(app.smoke_open_views PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 15 layouts\\)")
   # Three more: the measure popup follows a measure inserted, edited and undone.
   set_tests_properties(app.smoke_measure PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 19 layouts\\)")
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
+  # Three more: the note effects palette lights the tiles of effects set on a
+  # note typed, and puts them out again on undo.
+  set_tests_properties(app.smoke_effects PROPERTIES
+    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 18 layouts\\)")
   set_tests_properties(app.smoke_narrow app.smoke_menu app.smoke_hold_still PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok")
   set_tests_properties(app.smoke_follow PROPERTIES
