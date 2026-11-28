@@ -1181,20 +1181,40 @@ bool sings(const core::Beat& beat, std::size_t verse) {
     return beat.lyrics && verse < beat.lyrics->size() && !(*beat.lyrics)[verse].text.empty();
 }
 
-} // namespace
-
-void LyricsRow::start(std::size_t m) {
-    syllables_.clear();
-    held_.clear();
-    drawn_.clear();
-    first_ = m;
-    heldKnown_ = false;
+// The last note a syllable on beat `beat` of `voice` in measure m of `staff`
+// is held over, before the next syllable of `verse`, a rest or the end;
+// nullopt when none follows it.
+std::optional<HeldEnd> heldTo(const core::Staff& staff, std::size_t m, std::size_t voice,
+                              std::size_t beat, std::size_t verse) {
+    std::optional<HeldEnd> last;
+    const std::size_t limit = std::min(staff.measureCount(), m + kHeldMeasures + 1);
+    std::size_t next = beat + 1;
+    for (std::size_t at = m; at < limit; ++at, next = 0) {
+        const std::vector<core::Beat>& beats = staff.measure(at).voices[voice].beats;
+        if (beats.empty()) {
+            return last; // a measure rest
+        }
+        core::Fraction start;
+        for (std::size_t b = 0; b < next && b < beats.size(); ++b) {
+            start += beats[b].duration.length();
+        }
+        for (std::size_t b = next; b < beats.size(); ++b) {
+            if (beats[b].isRest() || sings(beats[b], verse)) {
+                return last;
+            }
+            last = HeldEnd{.measure = at, .start = start};
+            start += beats[b].duration.length();
+        }
+    }
+    return last;
 }
 
-void LyricsRow::findHeld() {
-    const std::size_t m = first_;
+} // namespace
+
+std::vector<HeldSyllable> heldInto(const core::Staff& staff, std::size_t m) {
+    std::vector<HeldSyllable> held;
     for (std::size_t before = m > kHeldMeasures ? m - kHeldMeasures : 0; before < m; ++before) {
-        const core::Measure& measure = staff_.measure(before);
+        const core::Measure& measure = staff.measure(before);
         for (std::size_t v = 0; v < core::Measure::kMaxVoices; ++v) {
             const std::vector<core::Beat>& beats = measure.voices[v].beats;
             for (std::size_t b = 0; b < beats.size(); ++b) {
@@ -1207,38 +1227,23 @@ void LyricsRow::findHeld() {
                         verses[verse].text.empty()) {
                         continue;
                     }
-                    if (const auto to = heldTo(before, v, b, verse); to && to->measure >= m) {
-                        held_.push_back(Held{.verse = verse, .to = *to, .measure = m});
+                    if (const auto to = heldTo(staff, before, v, b, verse);
+                        to && to->measure >= m) {
+                        held.push_back(HeldSyllable{.verse = verse, .to = *to});
                     }
                 }
             }
         }
     }
+    return held;
 }
 
-std::optional<LyricsRow::Spot> LyricsRow::heldTo(std::size_t m, std::size_t voice, std::size_t beat,
-                                                 std::size_t verse) const {
-    std::optional<Spot> last;
-    const std::size_t limit = std::min(staff_.measureCount(), m + kHeldMeasures + 1);
-    std::size_t next = beat + 1;
-    for (std::size_t at = m; at < limit; ++at, next = 0) {
-        const std::vector<core::Beat>& beats = staff_.measure(at).voices[voice].beats;
-        if (beats.empty()) {
-            return last; // a measure rest
-        }
-        core::Fraction start;
-        for (std::size_t b = 0; b < next && b < beats.size(); ++b) {
-            start += beats[b].duration.length();
-        }
-        for (std::size_t b = next; b < beats.size(); ++b) {
-            if (beats[b].isRest() || sings(beats[b], verse)) {
-                return last;
-            }
-            last = Spot{.measure = at, .start = start};
-            start += beats[b].duration.length();
-        }
-    }
-    return last;
+void LyricsRow::start(std::size_t m) {
+    syllables_.clear();
+    held_.clear();
+    drawn_.clear();
+    first_ = m;
+    heldKnown_ = false;
 }
 
 void LyricsRow::collect(std::size_t m, std::vector<ColumnInk>& ink, double centre) {
@@ -1303,7 +1308,7 @@ void LyricsRow::collect(std::size_t m, std::vector<ColumnInk>& ink, double centr
 
 void LyricsRow::draw(std::span<const ColumnPosition> positions, double centre) {
     if (!heldKnown_) {
-        findHeld();
+        held_ = heldInto(staff_, first_);
         heldKnown_ = true;
     }
     // Where the line's notes are matters from its first syllable on, or from
@@ -1325,12 +1330,12 @@ void LyricsRow::draw(std::span<const ColumnPosition> positions, double centre) {
                  .width = width,
                  .measure = readMeasure_,
                  .heldTo = syllable.extend && !syllable.hyphen
-                               ? heldTo(readMeasure_, item.voice, item.beat, item.verse)
+                               ? heldTo(staff_, readMeasure_, item.voice, item.beat, item.verse)
                                : std::nullopt});
     }
 }
 
-double LyricsRow::noteEnd(const Spot& spot, double end) const {
+double LyricsRow::noteEnd(const HeldEnd& spot, double end) const {
     for (const Drawn& measure : drawn_) {
         if (measure.measure == spot.measure) {
             return columnX(measure.positions, spot.start) + headWidth_;
@@ -1401,7 +1406,7 @@ void LyricsRow::place(DisplayList& list, double bottom, double staffHeight, doub
         }
     }
     // Held over from the line before: from the first note of the line.
-    for (const Held& held : held_) {
+    for (const HeldSyllable& held : held_) {
         const std::vector<ColumnPosition>& positions = drawn_.front().positions;
         if (positions.empty()) {
             continue;
@@ -1409,7 +1414,7 @@ void LyricsRow::place(DisplayList& list, double bottom, double staffHeight, doub
         const double from = positions.front().x;
         const double to = noteEnd(held.to, end);
         if (to - from >= kMinExtender) {
-            line(from, to, baseline(held.verse), held.measure);
+            line(from, to, baseline(held.verse), first_);
         }
     }
     syllables_.clear();
