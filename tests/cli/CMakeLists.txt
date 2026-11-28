@@ -1959,6 +1959,13 @@ add_test(NAME cli.render_issues_measure_too_wide
           --staff-space 10 --issues)
 set_tests_properties(cli.render_issues_measure_too_wide PROPERTIES
   PASS_REGULAR_EXPRESSION "\"issues\":\\[{\"kind\":\"measureTooWide\",\"page\":0,\"measure\":0,\"roles\":\\[\\],\"box\":\\[[0-9.,]+\\]}\\],\"pages\"")
+# With --fit-staves the same measure gets smaller staff spaces, on a page as
+# wide in millimetres, and fits it (ADR-0176): nothing is left to report.
+add_test(NAME cli.render_fit_staves_wide_measure
+  COMMAND elara-cli --json render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
+          --staff-space 10 --fit-staves --issues)
+set_tests_properties(cli.render_fit_staves_wide_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "\"layout\":\"page\",\"staffSpace\":9\\.23,\"issues\":\\[\\],\"pages\"")
 add_test(NAME cli.render_issues_text
   COMMAND elara-cli render "${ELARA_CORPUS}/musicxml/melody.musicxml" --layout page
           --staff-space 10 --issues)

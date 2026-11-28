@@ -55,7 +55,8 @@ struct RenderOptions {
     std::string layout = "line";
     std::string paper = "a4";
     double staffSpace = 1.75; // mm
-    bool fitStaves = false;   // a smaller staff space for many staves (ADR-0171)
+    bool fitStaves = false;   // a smaller staff space for many staves (ADR-0171) or a
+                              // measure wider than the page (ADR-0176)
     double margin = 15.0;     // mm
     double width = 0.0;       // staff spaces, for the scroll and strips layouts; 0: the paper's
     double stripHeight = 0.0; // staff spaces, for the strips layout; 0: the paper's height
@@ -507,6 +508,7 @@ int runRender(bool json, RenderOptions options) {
         return usageError(
             std::format("no measure {}: the song has {}", options.first, song->measureCount()));
     }
+    const double askedStaffSpace = options.staffSpace;
     if (options.fitStaves) {
         options.staffSpace = notation::fittedStaffSpace(
             *song, *selection, options.paper == "letter" ? notation::kLetter : notation::kA4,
@@ -522,11 +524,25 @@ int runRender(bool json, RenderOptions options) {
     std::vector<notation::DisplayList> pages;
     std::optional<notation::PageLayoutOptions> laidOut;
     if (paged) {
-        const notation::PageLayoutOptions page = pageLayoutOptions(options);
-        laidOut = page;
+        notation::PageLayoutOptions page = pageLayoutOptions(options);
         if (page.width <= 2 * page.margin) {
             return usageError("the margins leave no room on the page");
         }
+        if (options.fitStaves) {
+            // A measure wider than the page gets smaller staff spaces, on a
+            // page as wide in millimetres (ADR-0176), as the app lays it out.
+            const double narrower = notation::narrowedStaffSpace(
+                options.paper == "letter" ? notation::kLetter : notation::kA4, askedStaffSpace,
+                options.staffSpace,
+                notation::widthOverflow(notation::layoutPages(*song, *selection, *font, page), page)
+                    .amount,
+                options.margin);
+            if (narrower < options.staffSpace) {
+                options.staffSpace = narrower;
+                page = pageLayoutOptions(options);
+            }
+        }
+        laidOut = page;
         if (options.layout == "strips") {
             const double height =
                 options.stripHeight > 0.0
@@ -759,7 +775,8 @@ void addRenderCommands(CLI::App& app, Context& context) {
         ->capture_default_str();
     render->add_flag("--fit-staves", options->fitStaves,
                      "Make the staff space smaller when the staves shown would not leave two "
-                     "systems a page, as the app does for every track at once");
+                     "systems a page, or a measure would not fit the page's width, as the app "
+                     "does");
     render->add_option("--margin", options->margin, "Page margins in mm")
         ->check(CLI::Range(0.0, 100.0))
         ->capture_default_str();

@@ -667,7 +667,7 @@ private:
             }
         }
         if (!aboveRow_.empty()) {
-            aboveRow_.place(list_, inkTop());
+            aboveRow_.place(list_, inkTop(), width);
         }
         if (!lyrics_.empty()) {
             lyrics_.place(list_, inkBottom(), height(), width - defaults_.thinBarlineThickness);
