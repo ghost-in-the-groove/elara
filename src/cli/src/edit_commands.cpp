@@ -28,6 +28,23 @@ namespace elara::cli {
 
 namespace {
 
+// What the steps argument's help says: every form of step, each quoted when it
+// has words after its verb.
+std::string stepsHelp() {
+    std::string help = "Steps in order, each quoted:";
+    std::string_view separator = " ";
+    for (const std::string_view form : stepForms()) {
+        help += separator;
+        separator = ", ";
+        if (form.contains(' ')) {
+            help += std::format("\"{}\"", form);
+        } else {
+            help += form;
+        }
+    }
+    return help;
+}
+
 using core::Document;
 using core::Song;
 
@@ -185,42 +202,7 @@ void addEditCommands(CLI::App& app, Context& context) {
                      "Another .elara file open beside it, which \"copy ... from <n>\" "
                      "copies from: the first is song 1 (repeat for more)")
         ->allow_extra_args(false);
-    editCommand->add_option(
-        "steps", options->steps,
-        "Steps in order, each quoted: \"add-track <preset> [at]\", "
-        "\"remove-track <i>\", \"rename-track <i> [name]\", \"insert-measures <at> [n]\", "
-        "\"append-measures <n>\", "
-        "\"remove-measures <at> [n]\", \"time <m> <N/D>\", \"key <m> <key>\", "
-        "\"mix <track> <volume 0..1> <pan -1..1> [mute] [solo]\", "
-        "\"tempo <bpm>\", \"tempo-from <m> <bpm|none>\", \"tempo-gradual <m> <on|off>\", "
-        "\"section <m> [name]\", \"break <m> <system|page|keep|auto> [track <t>]\", "
-        "\"title <text>\", "
-        "\"credit <title|subtitle|artist|album|words|music|copyright|transcriber|notes> "
-        "[text]\", "
-        "\"note <track> <m> <string> <fret> "
-        "<duration>\", \"rest <track> <m> <duration>\", \"fill <track> <m>\", "
-        "\"copy <m> <n> [track <t> [<count>]] [from <song>]\", \"paste <m> [track <t>] [insert]\", "
-        "\"transpose <semitones> [measures <m> <n>] [tracks <t>...]\", "
-        "\"caret <track> <m> <beat> [string]\", \"voice <1-4>\", right, left, up, down, "
-        "next-measure, "
-        "previous-measure, \"fret <n>\", \"pitch <C..B> [add]\", \"shift <semitones>\", "
-        "\"duration <d>\", delete, delete-beat, "
-        "insert-rest, \"drum [key]\", \"effect <name>\", \"bend <form> [cents]\", \"strum "
-        "<down|up|none>\", "
-        "\"pick <down|up|none>\", \"tremolo <8|16|32|none>\", "
-        "\"whammy <dive|dip|pre-dive|return|none> [cents]\", \"bass <tap|slap|pop|none>\", "
-        "\"hairpin <crescendo|diminuendo|none>\", \"fermata <short|normal|long|none>\", "
-        "\"slur <on|none>\", \"ottava <8va|8vb|15ma|15mb|none>\", \"pedal <down|change|none>\", "
-        "\"breath <comma|caesura|none>\", "
-        "\"chord <name|none>\", \"text <words|none>\", "
-        "\"slide-in "
-        "<from-below|from-above|none>\", \"slide-out <shift|legato|downwards|upwards|none>\", "
-        "\"vibrato <slight|wide|none>\", \"accent <accent|marcato|none>\", "
-        "\"trill <on|semitones|none> [16|32|64]\", "
-        "\"ornament <mordent|upper-mordent|turn|inverted-turn|none>\", "
-        "\"fingering <1-5|t|none>...\", \"pluck <p|i|m|a|c|none>\", \"harmonic "
-        "<natural|artificial|pinch|tapped|semi|none>\", undo, redo, "
-        "save");
+    editCommand->add_option("steps", options->steps, stepsHelp());
     editCommand->callback(
         [&context, options] { context.exitCode = runEdit(context.json, *options); });
 }
