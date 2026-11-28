@@ -352,6 +352,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] A command palette: every command by name, with its keys; recent ones
       first, a measure number, a section, "tempo 90" or "3/4" typed into it
       (ADR-0135)
+- [x] Following playback a system at a time, held off by a scroll by hand; the
+      caret marks where playback starts while it is stopped, and the measure
+      playing or the caret's is shaded across every staff (ADR-0170)
 
 ## Milestone 6 - Practice tools
 

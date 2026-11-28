@@ -145,6 +145,7 @@ one that replaces them.
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
 | [0160](0160-several-songs-open-at-once.md) | Several songs open at once | Accepted |
+| [0170](0170-following-playback-and-the-caret-marks-where-it-starts.md) | Following playback, and the caret marks where it starts | Accepted |
 
 ## Template
 

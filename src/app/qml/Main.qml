@@ -945,6 +945,12 @@ ApplicationWindow {
                         onTriggered: audio.markLoop()
                     }
                     AppMenuItem {
+                        text: qsTr("Follow playback")
+                        enabled: window.hasScore
+                        chosen: scoreView.followCursor
+                        onTriggered: scoreView.followCursor = !scoreView.followCursor
+                    }
+                    AppMenuItem {
                         text: qsTr("Metronome")
                         chosen: score.metronome
                         onTriggered: score.metronome = !score.metronome
@@ -1213,7 +1219,11 @@ ApplicationWindow {
             caretSeconds: window.hasScore && score.measureStarts.length > 0
                           ? score.measureStart(score.caretMeasure) : -1
             marker: window.hasScore ? commandBar.playingMeasure : ""
-            onSeekRequested: seconds => audio.seek(seconds)
+            // Moved on the string, playback shows its cursor on the score.
+            onSeekRequested: seconds => {
+                scoreView.cursorParked = false;
+                audio.seek(seconds);
+            }
         }
     }
 
@@ -1252,7 +1262,11 @@ ApplicationWindow {
             anchors.right: rightDock.left
             document: score
             editor: caretEditor
-            cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
+            // The cursor shows while playing and where playback stopped, until
+            // the caret is put somewhere: then the caret marks the place.
+            cursorSeconds: audio.playingSong || (audio.position > 0 && !cursorParked)
+                           ? audio.position : -1
+            playing: audio.playingSong
             followCursor: true
             onSeekRequested: seconds => audio.seek(seconds)
             opacity: window.hasScore ? 1.0 : 0.0

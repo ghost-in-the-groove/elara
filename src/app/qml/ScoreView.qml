@@ -23,7 +23,13 @@ Item {
     readonly property color ink: darkPage ? Theme.nightInk : "black"
     /// Seconds into the song where the playback cursor stands; negative hides it.
     property real cursorSeconds: -1
-    /// Scroll so that the cursor stays in view as it moves.
+    /// Whether playback plays: the cursor then shows wherever it is.
+    property bool playing: false
+    /// Set while playback is stopped once the caret was put somewhere by a
+    /// click or the arrow keys, which move playback with it: the caret marks
+    /// where playback starts and the cursor hides until it plays (Main.qml).
+    property bool cursorParked: false
+    /// Scroll so that the cursor's system stays in view as it moves.
     property bool followCursor: false
     property color cursorColor: Theme.accent
     /// A click on the score asks to move playback there.
@@ -33,6 +39,34 @@ Item {
     readonly property var cursor: cursorSeconds >= 0 && document.pageCount > 0
                                   ? document.cursorAt(cursorSeconds) : ({})
     readonly property bool cursorShown: cursor.page !== undefined
+    /// The measure shaded across its system: the one playing while the cursor
+    /// shows, the caret's otherwise; -1 for none.
+    readonly property int shadedMeasure: cursorShown ? document.measureAt(cursorSeconds)
+                                                     : document.caretPage >= 0
+                                                       ? document.caretMeasure : -1
+
+    // Playback that starts shows the cursor wherever it is, and the view goes
+    // to it whatever was scrolled by hand.
+    onPlayingChanged: {
+        if (!playing)
+            return;
+        cursorParked = false;
+        followAgain();
+    }
+
+    /// Moves playback to the caret's beat while it is stopped, as a click on
+    /// that beat would, and hides the cursor: the caret marks the place.
+    function parkAtCaret() {
+        if (playing || document.caretPage < 0)
+            return;
+        const caret = document.caretRect;
+        const seconds = document.secondsAt(document.caretPage, caret.x + caret.width / 2,
+                                           caret.y + caret.height / 2);
+        if (seconds < 0)
+            return;
+        cursorParked = true;
+        seekRequested(seconds);
+    }
     /// The page under the middle of the view, from 1.
     readonly property int currentPage: Math.max(1, Math.min(document.pageCount,
                                                            Math.floor(centre) + 1))
@@ -414,8 +448,10 @@ Item {
             document.setInputTuplet(event.key - Qt.Key_0);
         } else if (event.key === Qt.Key_Right) {
             document.moveCaret(control ? ScoreDocument.NextMeasure : ScoreDocument.NextBeat);
+            parkAtCaret();
         } else if (event.key === Qt.Key_Left) {
             document.moveCaret(control ? ScoreDocument.PreviousMeasure : ScoreDocument.PreviousBeat);
+            parkAtCaret();
         } else if (event.key === Qt.Key_Up && !control) {
             document.moveCaret(ScoreDocument.StringUp);
         } else if (event.key === Qt.Key_Down && !control) {
@@ -499,26 +535,73 @@ Item {
         }
     }
 
-    // Brings the cursor into view when it leaves it: a third of the way down,
-    // and horizontally when the page is wider than the view.
-    onCursorChanged: {
-        if (!followCursor || !cursorShown || zooming)
+    // Following the cursor (ADR-0170). The system it is in comes into view
+    // whole when it is not, near the top so that the systems after it show
+    // below; a system taller than the view comes in from its top. The cursor
+    // moves every frame while playing, so a scroll already under way towards
+    // the same place goes on rather than starting again.
+    //
+    // Scrolling by hand holds following off: from then on the view follows
+    // only once the cursor goes into another system, and not before
+    // followPause milliseconds have gone by since the last scroll by hand.
+    readonly property int followPause: 1500
+    /// Whether a scroll by hand holds following off.
+    property bool heldByHand: false
+    property real scrolledByHandAt: 0
+    property string followedSystem: ""
+
+    function scrolledByHand() {
+        heldByHand = true;
+        scrolledByHandAt = Date.now();
+        followY.stop();
+        followX.stop();
+    }
+    /// Follows the cursor from where it is now, whatever was scrolled by hand.
+    function followAgain() {
+        heldByHand = false;
+        followedSystem = "";
+        follow();
+    }
+    onCursorChanged: follow()
+    onFollowCursorChanged: followAgain()
+
+    function follow() {
+        // The cursor itself, not cursorShown: this runs as the cursor changes,
+        // maybe before cursorShown follows it.
+        if (!followCursor || cursor.page === undefined || zooming)
+            return;
+        const system = cursor.page + ":" + cursor.y.toFixed(3);
+        const entered = system !== followedSystem;
+        followedSystem = system;
+        if (list.moving || (heldByHand && Date.now() - scrolledByHandAt < followPause))
             return;
         const scale = unit * shownZoom;
         const top = pageY(cursor.page) + (cursor.y - 6) * scale;
-        const bottom = top + (cursor.height + 12) * scale;
-        if (top < list.contentY || bottom > list.contentY + list.height) {
+        const height = (cursor.height + 12) * scale;
+        // Where the view is, or where it is going.
+        const y = followY.running ? followY.to : list.contentY;
+        const shown = top >= y && top + height <= y + list.height;
+        if (!shown && (entered || !heldByHand || followY.running)) {
+            heldByHand = false;
+            const lead = Math.max(0, Math.min(list.height / 5, (list.height - height) / 2));
             const highest = list.originY - list.topMargin;
             const lowest = list.originY + list.contentHeight + list.bottomMargin - list.height;
-            followY.to = Math.max(highest, Math.min(lowest, top - list.height / 3));
-            followY.restart();
+            const to = Math.max(highest, Math.min(Math.max(highest, lowest), top - lead));
+            if (!followY.running || Math.abs(followY.to - to) > 1) {
+                followY.stop();
+                followY.to = to;
+                followY.start();
+            }
         }
         const x = playhead.x;
-        if (list.contentWidth > list.width && (x < list.contentX + 40
-                                               || x > list.contentX + list.width - 40)) {
-            followX.to = Math.max(0, Math.min(list.contentWidth - list.width,
-                                              x - list.width / 3));
-            followX.restart();
+        const left = followX.running ? followX.to : list.contentX;
+        if (list.contentWidth > list.width && (x < left + 40 || x > left + list.width - 40)) {
+            const to = Math.max(0, Math.min(list.contentWidth - list.width, x - list.width / 3));
+            if (!followX.running || Math.abs(followX.to - to) > 1) {
+                followX.stop();
+                followX.to = to;
+                followX.start();
+            }
         }
     }
 
@@ -571,12 +654,22 @@ Item {
                 root.centre = root.pagesAt(contentY - originY + height / 2);
         }
         onHeightChanged: root.centre = root.pagesAt(contentY - originY + height / 2)
+        // A drag, a flick or the wheel: scrolled by hand.
+        onMovementStarted: root.scrolledByHand()
 
         ScrollBar.vertical: ScrollBar {
             policy: ScrollBar.AsNeeded
+            onPressedChanged: {
+                if (pressed)
+                    root.scrolledByHand();
+            }
         }
         ScrollBar.horizontal: ScrollBar {
             policy: ScrollBar.AsNeeded
+            onPressedChanged: {
+                if (pressed)
+                    root.scrolledByHand();
+            }
         }
 
         // The continuous view's strips lie on one sheet with one shadow, so
@@ -676,6 +769,28 @@ Item {
                                 radius: parent.radius
                                 visible: Theme.dark && !root.darkPage
                                 color: Qt.rgba(0.07, 0.06, 0.03, 0.16)
+                            }
+
+                            // The measure playing, or the caret's while playback is
+                            // stopped: shaded across its system, every staff of every
+                            // track and voice shown.
+                            Rectangle {
+                                readonly property real scale: root.unit * root.shownZoom
+                                readonly property rect box: root.shadedMeasure >= 0
+                                                            && root.document.pageCount > 0
+                                                            ? root.document.measureBox(
+                                                                  sheet.index, root.shadedMeasure)
+                                                            : Qt.rect(0, 0, 0, 0)
+
+                                objectName: "measureShade"
+                                visible: box.width > 0
+                                x: box.x * scale
+                                y: box.y * scale
+                                width: box.width * scale
+                                height: box.height * scale
+                                radius: 3
+                                color: Qt.alpha(Theme.accent, (root.cursorShown ? 0.07 : 0.05)
+                                                * (root.darkPage ? 1.8 : 1.0))
                             }
 
                             // The selected measures, tinted across their systems.
@@ -828,9 +943,13 @@ Item {
                                     const y = eventPoint.position.y / scale;
                                     const seconds = root.document.secondsAt(sheet.index, x, y);
                                     root.forceActiveFocus();
-                                    root.document.placeCaret(sheet.index, x, y);
-                                    if (seconds >= 0)
-                                        root.seekRequested(seconds);
+                                    const placed = root.document.placeCaret(sheet.index, x, y);
+                                    if (seconds < 0)
+                                        return;
+                                    // Stopped, the caret marks where playback starts.
+                                    if (placed && !root.playing)
+                                        root.cursorParked = true;
+                                    root.seekRequested(seconds);
                                 }
                                 // A second click on a symbol edits it where it is.
                                 onDoubleTapped: eventPoint => {

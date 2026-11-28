@@ -546,6 +546,9 @@ public:
     /// Where the selected measures are on page `index`, in staff spaces from the
     /// page's top-left corner: one rectangle per measure, across its system.
     Q_INVOKABLE QVariantList selectionBoxes(int index) const;
+    /// Where measure `measure` (from 0) is on page `index`, as selectionBoxes()
+    /// gives it; an empty rectangle when the page does not show it.
+    Q_INVOKABLE [[nodiscard]] QRectF measureBox(int index, int measure) const;
     /// Moves the caret `measures` measures on (back when negative), selecting
     /// from where it was.
     Q_INVOKABLE void extendSelection(int measures);
