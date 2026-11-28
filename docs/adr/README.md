@@ -154,6 +154,7 @@ one that replaces them.
 | [0175](0175-a-view-shown-before-comes-back-as-it-was.md) | A view shown before comes back as it was | Accepted |
 | [0176](0176-nothing-runs-past-the-right-margin.md) | Nothing runs past the right margin | Accepted |
 | [0180](0180-edits-at-the-caret-say-why-they-are-refused.md) | Edits at the caret say why they are refused | Accepted |
+| [0181](0181-the-smoke-test-checks-the-window.md) | The smoke test checks the window | Accepted |
 
 ## Template
 

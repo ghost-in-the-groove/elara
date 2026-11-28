@@ -56,7 +56,9 @@ Build output: `build/dev/` (executables in `build/dev/bin/`). Toolchain setup:
 4. **Everything verifiable headlessly** (ADR-0003). CI has no speakers or screen,
    so every feature gets: an `elara-cli` subcommand with `--json` output, and tests
    (Catch2 unit tests and/or CTest cases driving the CLI). UI changes must keep
-   `app.smoke` passing (QML loads with zero warnings).
+   `app.smoke` passing (QML loads with zero warnings). The smoke test checks
+   only what needs the window; the document's behaviour is tested through its
+   own interface in `tests/app` (ADR-0181).
 5. **Tests first for behaviour.** Add or extend a test that fails, then make it pass.
    Test names are prefixed by module (`core.`, `io.`, `audio.`, `cli.`, `app.`).
    Tests run in parallel, one per core: a test writes only files of its own
