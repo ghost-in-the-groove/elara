@@ -16,6 +16,7 @@
 #include "tuner_controller.hpp"
 #include "window_state.hpp"
 #include <QByteArray>
+#include <QColor>
 #include <QCoreApplication>
 #include <QFile>
 #include <QFileInfo>
@@ -282,8 +283,8 @@ void Startup::queueSteps() {
                                                 : 0.0;
             const double at = pages != nullptr ? pages->property("contentY").toDouble() : -1e9;
             if (std::abs(at - top) > 1.0) {
-                failure_ = QStringLiteral("the song opened scrolled %1 px from its top")
-                               .arg(at - top);
+                failure_ =
+                    QStringLiteral("the song opened scrolled %1 px from its top").arg(at - top);
             }
             return false;
         });
