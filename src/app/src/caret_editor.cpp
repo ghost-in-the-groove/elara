@@ -337,70 +337,35 @@ void CaretEditor::insertRest() {
 }
 
 void CaretEditor::typeNoteName(int step, bool addToChord) {
-    if (!editing() || step < 0 || step > 6) {
+    if (step < 0 || step > 6) {
         return;
     }
-    if (!caretPitched()) {
-        document_->refuse(tr("Drums take no note names."));
-        return;
-    }
-    document_->endTyping();
-    try {
-        document_->enter(
-            core::enterPitch(edited(), where(), static_cast<core::Step>(step), inputDuration(),
-                             addToChord ? core::PitchMode::AddToChord : core::PitchMode::Replace));
-    } catch (const std::out_of_range&) {
-        document_->refuse(caretFretted() ? tr("No string can play that note.")
-                                         : tr("That note is out of range."));
-    }
+    runEntry([this, step, addToChord](const core::Song& song) {
+        return core::enterPitch(song, where(), static_cast<core::Step>(step), inputDuration(),
+                                addToChord ? core::PitchMode::AddToChord
+                                           : core::PitchMode::Replace);
+    });
 }
 
 void CaretEditor::shiftPitch(int semitones) {
-    if (!editing()) {
-        return;
-    }
-    document_->endTyping();
-    try {
-        document_->enter(core::shiftPitch(edited(), where(), semitones));
-    } catch (const std::out_of_range&) {
-        document_->refuse(caretFretted() ? tr("The note would leave the neck.")
-                                         : tr("That note is out of range."));
-    }
+    runEntry([this, semitones](const core::Song& song) {
+        return core::shiftPitch(song, where(), semitones);
+    });
 }
 
 void CaretEditor::toggleDrum() {
-    if (!editing()) {
-        return;
-    }
-    if (!caretOnDrums()) {
-        document_->refuse(tr("Hits are typed on a drum track."));
-        return;
-    }
     runEntry([this](const core::Song& song) {
         return core::toggleDrum(song, where(), inputDuration());
     });
 }
 
 void CaretEditor::toggleEffect(int effect) {
-    if (!editing() || effect < 0 || effect >= kEffectCount) {
+    if (effect < 0 || effect >= kEffectCount) {
         return;
     }
-    document_->endTyping();
-    const auto which = static_cast<core::NoteEffect>(effect);
-    try {
-        core::Entry entry = core::toggleEffect(edited(), where(), which);
-        if (!entry.command) {
-            document_->refuse(tr("Effects go on notes: put the caret on one."));
-            return;
-        }
-        document_->enter(std::move(entry));
-    } catch (const std::out_of_range&) {
-        document_->refuse(tr("That fret has no natural harmonic."));
-    } catch (const std::logic_error&) {
-        document_->refuse(which == core::NoteEffect::Tie
-                              ? tr("There is no note to tie to.")
-                              : tr("%1 needs strings.").arg(effectName(effect)));
-    }
+    runEntry([this, effect](const core::Song& song) {
+        return core::toggleEffect(song, where(), static_cast<core::NoteEffect>(effect));
+    });
 }
 
 int CaretEditor::caretEffects() const {
@@ -456,15 +421,7 @@ void CaretEditor::setBend(int form, int cents) {
     } catch (const std::invalid_argument&) {
         return;
     }
-    core::Entry entry = core::setBend(edited(), where(), curve);
-    if (!entry.command) {
-        // Silent when the notes have that bend already.
-        if (entry.missed) {
-            document_->refuse(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    document_->enter(std::move(entry));
+    document_->enter(core::setBend(edited(), where(), curve));
 }
 
 core::BeatEffects CaretEditor::beatEffectsAtCaret() const {
@@ -481,15 +438,7 @@ void CaretEditor::setBeatEffect(Value core::BeatEffects::* field,
         return;
     }
     document_->endTyping();
-    core::Entry entry = core::setBeatEffect(edited(), where(), field, std::move(value));
-    if (!entry.command) {
-        // Silent when the beat has it already.
-        if (entry.missed) {
-            document_->refuse(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    document_->enter(std::move(entry));
+    document_->enter(core::setBeatEffect(edited(), where(), field, std::move(value)));
 }
 
 void CaretEditor::setStrum(int direction) {
@@ -539,11 +488,12 @@ void CaretEditor::toggleGraceNote() {
     }
     runEntry([this](const core::Song& song) {
         const core::Duration eighth(core::NoteValue::Eighth);
-        try {
-            return core::addGraceNote(song, where(), -2, eighth, false);
-        } catch (const std::out_of_range&) {
+        core::Entry below = core::addGraceNote(song, where(), -2, eighth, false);
+        if (below.refused == core::Refusal::OffTheNeck ||
+            below.refused == core::Refusal::OutOfRange) {
             return core::addGraceNote(song, where(), 2, eighth, false); // from above
         }
+        return below;
     });
 }
 
@@ -738,15 +688,7 @@ void CaretEditor::changeNoteEffects(
         return;
     }
     document_->endTyping();
-    core::Entry entry = make(edited(), where());
-    if (!entry.command) {
-        // Silent when the notes have it already.
-        if (entry.missed) {
-            document_->refuse(tr("Effects go on notes: put the caret on one."));
-        }
-        return;
-    }
-    document_->enter(std::move(entry));
+    document_->enter(make(edited(), where()));
 }
 
 void CaretEditor::setSlideIn(int kind) {
@@ -786,16 +728,9 @@ void CaretEditor::setHarmonic(int kind) {
     if (!wanted) {
         return;
     }
-    // What setHarmonic() throws, as it documents it.
-    try {
-        changeNoteEffects([harmonic = *wanted](const core::Song& song, const core::Caret& caret) {
-            return core::setHarmonic(song, caret, harmonic);
-        });
-    } catch (const std::out_of_range&) {
-        document_->refuse(tr("That fret has no natural harmonic."));
-    } catch (const std::logic_error&) {
-        document_->refuse(tr("Harmonics need strings."));
-    }
+    changeNoteEffects([harmonic = *wanted](const core::Song& song, const core::Caret& caret) {
+        return core::setHarmonic(song, caret, harmonic);
+    });
 }
 
 int CaretEditor::caretSlideIn() const {
@@ -848,11 +783,11 @@ void CaretEditor::setFingering(int finger) {
 
 void CaretEditor::setPluck(int finger) {
     const std::optional<core::Finger> chosen = core::enumFromIndex<core::Finger>(finger);
-    if (!chosen || !caretFretted()) { // setPluck() needs strings
+    if (!chosen) {
         return;
     }
     changeNoteEffects([chosen = *chosen](const core::Song& song, const core::Caret& caret) {
-        return core::setPluck(song, caret, chosen);
+        return core::setPluck(song, caret, chosen); // refused without strings
     });
 }
 
@@ -877,14 +812,7 @@ void CaretEditor::setDynamic(int dynamic) {
         return;
     }
     document_->endTyping();
-    core::Entry entry = core::setDynamic(edited(), where(), *wanted);
-    if (!entry.command) {
-        if (core::dynamicAt(edited(), where()) != *wanted) {
-            document_->refuse(tr("Dynamics go on notes: put the caret on one."));
-        }
-        return;
-    }
-    document_->enter(std::move(entry));
+    document_->enter(core::setDynamic(edited(), where(), *wanted));
 }
 
 QString CaretEditor::dynamicName(int dynamic) const {

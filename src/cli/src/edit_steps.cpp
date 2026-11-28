@@ -11,6 +11,7 @@
 #include <elara/core/instrument.hpp>
 #include <elara/core/lyrics.hpp>
 #include <elara/core/names.hpp>
+#include <elara/core/refusal.hpp>
 #include <elara/core/retune.hpp>
 #include <elara/core/transpose.hpp>
 #include <elara/core/validation.hpp>
@@ -303,7 +304,7 @@ bool runEntryStep(Document& doc, const Step& step, core::EditSession& session) {
     } else if (verb == "duration") {
         const Duration duration = step.duration(1);
         requireCaret();
-        session.setInput(doc, duration);
+        (void)session.setInput(doc, duration); // a beat takes any duration typing offers
         return true;
     } else if (verb == "delete") {
         edit = deleteAtCaret(song, session.caret());
@@ -321,7 +322,7 @@ bool runEntryStep(Document& doc, const Step& step, core::EditSession& session) {
             }
             Caret lane = session.caret();
             lane.string = static_cast<int>(found - pieces.begin()) + 1;
-            session.enter(doc, Entry{.command = nullptr, .caret = lane});
+            (void)session.enter(doc, Entry{.command = nullptr, .caret = lane});
         }
         edit = toggleDrum(song, session.caret(), session.input());
     } else if (verb == "effect") { // effect <name>: toggled on the caret's notes
@@ -499,7 +500,13 @@ bool runEntryStep(Document& doc, const Step& step, core::EditSession& session) {
     } else {
         return false;
     }
-    session.enter(doc, std::move(edit));
+    const EntryResult entered = session.enter(doc, std::move(edit));
+    if (entered.refused == Refusal::NothingAtCaret) {
+        // As the app's keys: nothing happens, and the step goes on (ADR-0123).
+        std::cerr << std::format("warning: {}: {}\n", verb, nameOf(*entered.refused));
+    } else if (entered.refused) {
+        throw std::runtime_error(std::format("refused: {}", nameOf(*entered.refused)));
+    }
     return true;
 }
 
