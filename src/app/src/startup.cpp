@@ -874,10 +874,10 @@ void Startup::queueTrackRow() {
     });
 }
 
-// A symbol edited where it is drawn (ADR-0130): the time signature of the
-// first page is found under a point of its ink, nothing is found in the page's
-// corner, and what a double click on it calls opens its card for the measure
-// the signature starts at. Nothing is changed.
+// A symbol edited where it is drawn (ADR-0130): what a double click on the
+// time signature of the first page calls opens its card for the measure the
+// signature starts at. Nothing is changed. What the document finds where is
+// checked in tests/app/test_symbols.cpp (ADR-0181).
 void Startup::queueSymbols() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
@@ -896,13 +896,6 @@ void Startup::queueSymbols() {
             return false; // a view that writes none on its first page
         }
         const QVariantMap symbol = score_->symbolAt(0, digit->origin.x + 0.5, digit->origin.y);
-        check(symbol.value(QStringLiteral("kind")).toString() == QStringLiteral("time"),
-              "the time signature is not found where it is drawn");
-        check(symbol.value(QStringLiteral("rect"))
-                  .toRectF()
-                  .contains(QPointF(digit->origin.x + 0.5, digit->origin.y)),
-              "the time signature's box is not round it");
-        check(score_->symbolAt(0, 0.2, 0.2).isEmpty(), "a symbol was found in the page's corner");
         check(QMetaObject::invokeMethod(view, "editSymbol", Q_ARG(int, 0),
                                         Q_ARG(QVariant, QVariant(symbol))),
               "the score view does not edit a symbol");
