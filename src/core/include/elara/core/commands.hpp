@@ -280,17 +280,21 @@ private:
 /// Sets the tempo that starts measure `measure`, in beats per minute of the
 /// beat the song counts in there (a dotted quarter in 6/8 stays one), or with
 /// no `bpm` takes it away; it holds until the next tempo change. Changes later
-/// in the measure stay. One undo step; null when nothing would change. Throws
-/// std::out_of_range when the song has no measure `measure`, and
-/// std::invalid_argument for the first measure, which plays at the song's
-/// tempo (SetStartTempo), or a bpm outside the range of Tempo.
+/// in the measure stay. One undo step; null when nothing would change. The
+/// first measure plays at the song's own tempo unless a change starts it:
+/// there the edit sets the song's tempo, in the beat it counts in, and none
+/// changes nothing (ADR-0042). Throws std::out_of_range when the song has no
+/// measure `measure`, and std::invalid_argument for a bpm outside the range of
+/// Tempo.
 [[nodiscard]] std::unique_ptr<Command> changeTempo(const Song& song, std::size_t measure,
                                                    std::optional<double> bpm);
 
 /// Makes the tempo change that starts `measure` gradual, moving to the next
 /// change's tempo, or sudden again (ADR-0082), as one undo step ("Change
 /// tempo"); a measure without one starts one at the tempo in force. Null when
-/// nothing changes. Throws like changeTempo().
+/// nothing changes. Throws std::out_of_range when the song has no measure
+/// `measure`, and std::invalid_argument for the first measure, which starts at
+/// the song's own tempo.
 [[nodiscard]] std::unique_ptr<Command> changeTempoGradual(const Song& song, std::size_t measure,
                                                           bool gradual);
 
