@@ -142,6 +142,7 @@ one that replaces them.
 | [0150](0150-layout-issues.md) | Layout issues | Accepted |
 | [0151](0151-two-voices-on-one-staff.md) | Two voices on one staff | Accepted |
 | [0152](0152-layout-adjustments.md) | Layout adjustments | Accepted |
+| [0170](0170-following-playback-and-the-caret-marks-where-it-starts.md) | Following playback, and the caret marks where it starts | Accepted |
 
 ## Template
 

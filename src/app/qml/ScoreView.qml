@@ -513,7 +513,7 @@ Item {
         }
     }
 
-    // Following the cursor (ADR-0161). The system it is in comes into view
+    // Following the cursor (ADR-0170). The system it is in comes into view
     // whole when it is not, near the top so that the systems after it show
     // below; a system taller than the view comes in from its top. The cursor
     // moves every frame while playing, so a scroll already under way towards

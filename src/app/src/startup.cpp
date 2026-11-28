@@ -3149,7 +3149,7 @@ void Startup::queueHoldStill() {
     });
 }
 
-// Following playback (ADR-0161), in a new song several pages long: playback is
+// Following playback (ADR-0170), in a new song several pages long: playback is
 // moved every tick as it moves while it plays. The view must bring the
 // cursor's system in while the cursor goes on moving, hold still once scrolled
 // by hand until the cursor goes into another system, and not follow at all
@@ -3224,7 +3224,8 @@ void Startup::queueFollow() {
     });
     // It goes on moving every tick, as it does while playing, a little longer
     // than the view takes to scroll: the cursor's system must be in view by then.
-    steps_.emplace_back([this, inView, scene, seek] {
+    // The measure playing is shaded across its system, where the pages say it is.
+    steps_.emplace_back([this, view, audio, inView, scene, seek] {
         if (++followTicks_ < 40) {
             seek(followSeconds_ + followTicks_ * 0.01);
             again_ = true;
@@ -3232,6 +3233,19 @@ void Startup::queueFollow() {
         }
         if (!inView()) {
             failure_ = QStringLiteral("the view did not follow playback: %1").arg(scene());
+            return false;
+        }
+        const double position = audio()->position();
+        const int playing = score_->measureAt(position);
+        const QRectF expected = score_->measureBox(
+            score_->cursorAt(position).value(QStringLiteral("page")).toInt(), playing);
+        QList<QQuickItem*> shades;
+        shownItems(view(), QLatin1StringView("measureShade"), shades);
+        if (expected.isEmpty() || shades.size() != 1 ||
+            shades.front()->property("box").toRectF() != expected) {
+            failure_ = QStringLiteral("%1 shades show, none on measure %2, which plays")
+                           .arg(shades.size())
+                           .arg(playing + 1);
         }
         std::printf("follow: in view after %d ticks\n", followTicks_);
         return false;
@@ -3332,7 +3346,7 @@ void Startup::queueFollow() {
 }
 
 // A click on the score while playback is stopped puts the caret there and
-// playback with it (ADR-0161): the cursor hides, since the caret marks the
+// playback with it (ADR-0170): the cursor hides, since the caret marks the
 // place, and the caret's measure is shaded across its system. The arrow keys
 // move playback with the caret too.
 void Startup::queueParking() {
