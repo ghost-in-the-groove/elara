@@ -659,6 +659,10 @@ signals:
     /// found some on a page it changed.
     void layoutIssuesChanged();
     void historyChanged();
+    /// An edit, an undo or a redo changed what the score shows (not only how
+    /// the song sounds, as a fader does). Comes after songChanged() and
+    /// historyChanged(), with the layout asked for.
+    void scoreEdited();
     void caretChanged();
     /// A layout an edit, an undo or a redo caused moved the caret's staff
     /// `spaces` staff spaces down the pages, and `pages` pages on, while the

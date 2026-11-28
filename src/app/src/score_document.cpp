@@ -2008,6 +2008,9 @@ void ScoreDocument::edited() {
     } else if (!sequencing_) {
         sequenceSong_ = song_; // the sequence plays this song as it played the one before
     }
+    if (changes.notation) {
+        emit scoreEdited();
+    }
 }
 
 void ScoreDocument::setTrackName(int track, const QString& name) {

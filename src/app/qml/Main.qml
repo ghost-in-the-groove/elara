@@ -1340,9 +1340,8 @@ ApplicationWindow {
             document: score
             editor: caretEditor
             // The cursor shows while playing and where playback stopped, until
-            // the caret is put somewhere: then the caret marks the place.
-            cursorSeconds: audio.playingSong || (audio.position > 0 && !cursorParked)
-                           ? audio.position : -1
+            // the score is touched: then the caret marks the place (ADR-0173).
+            cursorSeconds: audio.playingSong || audio.position > 0 ? audio.position : -1
             playing: audio.playingSong
             looping: audio.looping
             loopMarked: audio.loopMarked

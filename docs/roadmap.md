@@ -362,6 +362,9 @@ Guitar Pro, MuseScore and Dorico lay out the same job.
 - [x] Every track at once at a smaller staff size, two systems a page where
       the staves allow it (ADR-0171)
 - [x] The A-B loop as a band over its measures on the score (ADR-0172)
+- [x] The caret's cell frames the fret number or the note instead of covering it, the
+      playback cursor hides while the score is worked on, and a song opens from its top
+      (ADR-0173)
 
 ## Milestone 6 - Practice tools
 
