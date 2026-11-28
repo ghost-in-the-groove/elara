@@ -205,9 +205,12 @@ struct Rig {
 // A song to edit and a transport on it, paused: its device stays closed.
 struct Paused {
     SongToEdit song;
-    AudioController audio{[] { return std::make_unique<FakeDevice>(); }};
+    AudioController audio;
 
-    explicit Paused(const char* source) : song(source) { audio.setDocument(&song.score); }
+    explicit Paused(const char* source)
+        : song(source), audio([] { return std::make_unique<FakeDevice>(); }) {
+        audio.setDocument(&song.score);
+    }
 
     // Waits for playback to be given a sequence other than `before`, built
     // without a relayout.
