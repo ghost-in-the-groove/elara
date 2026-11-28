@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -242,4 +243,40 @@ TEST_CASE("Beat text: on a rest, over the tablature alone, once over both",
     const DisplayList both = layoutSystem(song, staves, bravura());
     REQUIRE(texts(both).size() == 1);
     CHECK(textBottom(texts(both)[0]) < both.staves[0].y);
+}
+
+TEST_CASE("Beat text: one that would run past the end of the line ends with it",
+          "[notation][layout][text]") {
+    // On the last beat a long text has no room after it: it starts early
+    // enough to end at the last barline instead of in the margin (ADR-0176).
+    const std::string words = "until the end of the phrase";
+    const DisplayList list = layout(
+        voice({{sing(), sing(), sing(), sing()}, {sing(), sing(), sing(), texted(sing(), words)}}));
+    const auto found = texts(list);
+    REQUIRE(found.size() == 1);
+    const auto heads = noteheads(list);
+    REQUIRE(heads.size() == 8);
+    const double width = textWidth(words, found[0].size);
+    REQUIRE(width < list.width);
+    REQUIRE(heads[7].origin.x + width > list.width); // from its beat it would run past the end
+    CHECK(found[0].origin.x < heads[7].origin.x);
+    CHECK_THAT(textRight(found[0]), WithinAbs(list.width, kEpsilon));
+
+    // Two that end there stack, the later above the earlier.
+    const DisplayList two = layout(voice(
+        {{sing(), sing(), sing(), sing()},
+         {sing(), sing(), texted(sing(), "slowing down more"), texted(sing(), "and dying away")}}));
+    const auto both = texts(two);
+    REQUIRE(both.size() == 2);
+    CHECK(textRight(both[0]) <= two.width + kEpsilon);
+    CHECK(textRight(both[1]) <= two.width + kEpsilon);
+    CHECK(std::abs(both[0].origin.y - both[1].origin.y) > 0.5);
+
+    // One wider than the whole line starts with it.
+    const DisplayList narrow = layout(voice({{texted(
+        sing(NoteValue::Whole), "a text far too long for a line of one whole note to hold")}}));
+    const auto wide = texts(narrow);
+    REQUIRE(wide.size() == 1);
+    REQUIRE(textRight(wide[0]) > narrow.width);
+    CHECK_THAT(wide[0].origin.x, WithinAbs(0.0, kEpsilon));
 }

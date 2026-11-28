@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -25,6 +26,7 @@ using elara::core::NoteValue;
 using elara::core::Pitch;
 using elara::core::Song;
 using elara::core::Staff;
+using elara::core::TimeSignature;
 using elara::core::Track;
 using elara::core::Tuning;
 using elara::notation::EngravingFont;
@@ -33,11 +35,14 @@ using elara::notation::kA4;
 using elara::notation::kLeastStaffShare;
 using elara::notation::kLeastStaffSpace;
 using elara::notation::layoutPages;
+using elara::notation::narrowedStaffSpace;
 using elara::notation::pageOptions;
 using elara::notation::selectTracks;
 using elara::notation::StaffSelection;
 using elara::notation::TrackView;
 using elara::notation::typicalSystemHeight;
+using elara::notation::WidthOverflow;
+using elara::notation::widthOverflow;
 
 namespace {
 
@@ -86,6 +91,24 @@ std::vector<std::size_t> all(const Song& song) {
 std::vector<StaffSelection> both(const Song& song) {
     const auto tracks = all(song);
     return selectTracks(song, tracks, TrackView::Both);
+}
+
+// A guitar playing three measures, the second of `sixteenths` sixteenth notes
+// with two-digit frets in a time signature as long: wider than an A4 page at
+// 1.75 mm from about forty of them.
+Song wideMeasure(int sixteenths) {
+    Song song = guitars(1, 3);
+    song.measureHeader(1).timeSignature = TimeSignature(sixteenths / 4, 4);
+    auto& beats = song.track(0).staff(0).measure(1).voices[0].beats;
+    beats.clear();
+    for (int b = 0; b < sixteenths; ++b) {
+        const auto fret = static_cast<std::int8_t>(10 + b % 5);
+        beats.push_back(
+            Beat{.duration = Duration(NoteValue::Sixteenth),
+                 .notes = {Note{.pitch = Pitch::fromMidi(Tuning::standardGuitar().midiAt(1, fret)),
+                                .position = FretPosition{.string = 1, .fret = fret}}}});
+    }
+    return song;
 }
 
 } // namespace
@@ -156,4 +179,55 @@ TEST_CASE("Staff size: margins that leave no room are refused", "[notation]") {
     const Song song = guitars(2, 1);
     CHECK_THROWS_AS(fittedStaffSpace(song, both(song), kA4, 1.75, 150.0), std::invalid_argument);
     CHECK_THROWS_AS(fittedStaffSpace(song, both(song), kA4, 0.0), std::invalid_argument);
+}
+
+TEST_CASE("Staff size: a measure wider than the page fits it at the narrowed staff space",
+          "[notation]") {
+    const Song song = wideMeasure(48);
+    const auto staves = both(song);
+    const auto options = pageOptions(kA4, 1.75);
+    const WidthOverflow over =
+        widthOverflow(layoutPages(song, staves, bravura(), options), options);
+    REQUIRE(over.amount > 1.0);
+    CHECK(over.measure == 1);
+
+    const double space = narrowedStaffSpace(kA4, 1.75, 1.75, over.amount);
+    INFO(over.amount << " staff spaces past the margin: " << space << " mm");
+    CHECK(space < 1.75);
+    CHECK(space >= kLeastStaffShare * 1.75 - 1e-9);
+    // There the measure ends inside the margin; a little larger and it would not.
+    const auto narrowed = pageOptions(kA4, space);
+    CHECK(widthOverflow(layoutPages(song, staves, bravura(), narrowed), narrowed).amount == 0.0);
+    const auto larger = pageOptions(kA4, space + 0.02);
+    CHECK(widthOverflow(layoutPages(song, staves, bravura(), larger), larger).amount > 0.0);
+}
+
+TEST_CASE("Staff size: pages whose systems end inside the margin are left alone", "[notation]") {
+    const Song song = guitars(1, 12);
+    const auto staves = both(song);
+    const auto options = pageOptions(kA4, 1.75);
+    const WidthOverflow over =
+        widthOverflow(layoutPages(song, staves, bravura(), options), options);
+    CHECK(over.amount == 0.0);
+    CHECK(narrowedStaffSpace(kA4, 1.75, 1.75, over.amount) == 1.75);
+    CHECK(narrowedStaffSpace(kA4, 1.75, 1.4, -3.0) == 1.4);
+}
+
+TEST_CASE("Staff size: narrowing stops at the least share of a part's staff", "[notation]") {
+    const double least = kLeastStaffShare * 1.75;
+    // A system twice as wide as the page: as small as it goes, and still too wide.
+    const double page = (kA4.width - 2.0 * 15.0) / 1.75;
+    CHECK(std::abs(narrowedStaffSpace(kA4, 1.75, 1.75, page) - least) < 1e-9);
+    // Staves smaller than that already, as every track at once has them, stay.
+    CHECK(narrowedStaffSpace(kA4, 1.75, 0.8, 10.0) == 0.8);
+    // A view narrowed once is narrowed further from where it is.
+    const double further = narrowedStaffSpace(kA4, 1.75, 1.5, 5.0);
+    CHECK(further < 1.5);
+    CHECK(further >= least - 1e-9);
+    // Hundredths of a millimetre, rounded down.
+    CHECK(std::abs(further * 100.0 - std::round(further * 100.0)) < 1e-6);
+
+    CHECK_THROWS_AS(narrowedStaffSpace(kA4, 1.75, 1.75, 5.0, 150.0), std::invalid_argument);
+    CHECK_THROWS_AS(narrowedStaffSpace(kA4, 0.0, 1.75, 5.0), std::invalid_argument);
+    CHECK_THROWS_AS(narrowedStaffSpace(kA4, 1.75, 0.0, 5.0), std::invalid_argument);
 }
