@@ -151,6 +151,7 @@ one that replaces them.
 | [0172](0172-the-a-b-loop-on-the-score.md) | The A-B loop on the score | Accepted |
 | [0173](0173-the-caret-frames-what-it-marks.md) | The caret frames what it marks, and the cursor hides while the score is worked on | Accepted |
 | [0174](0174-the-staves-lines-are-dimmer-on-the-dark-page.md) | The staves' lines are dimmer on the dark page | Accepted |
+| [0180](0180-edits-at-the-caret-say-why-they-are-refused.md) | Edits at the caret say why they are refused | Accepted |
 
 ## Template
 

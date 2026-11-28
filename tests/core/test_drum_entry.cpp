@@ -130,5 +130,7 @@ TEST_CASE("Drum entry: delete removes the lane's piece only", "[core][entry]") {
 TEST_CASE("Drum entry needs a percussion staff", "[core][entry]") {
     Song song = drumSong();
     song.addTrack(Track::fromPreset(*findInstrumentPreset("electric-guitar")));
-    CHECK_THROWS_AS(toggleDrum(song, Caret{.track = 1}, kQuarter), std::logic_error);
+    const Entry hit = toggleDrum(song, Caret{.track = 1}, kQuarter);
+    CHECK(hit.command == nullptr);
+    CHECK(hit.refused == Refusal::NeedsDrums);
 }

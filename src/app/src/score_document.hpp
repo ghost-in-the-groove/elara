@@ -629,11 +629,14 @@ public:
     /// it is made (core::EditSession::endTyping()).
     void endTyping() noexcept { session_.endTyping(); }
     /// Enters an edit at the caret and shows what it did: the edited song, or
-    /// only the caret. Reports through editFailed() what the song refuses.
-    /// Returns whether the song changed. Only with a song open.
+    /// only the caret. Reports through editFailed() why the song refuses it
+    /// (refusalText()). Returns whether the song changed. Only with a song
+    /// open.
     bool enter(core::Entry entry);
     /// Reports through editFailed() an edit that cannot be made.
     void refuse(const QString& message) { emit editFailed(message); }
+    /// What the window says for an edit refused for `why` (ADR-0180).
+    [[nodiscard]] static QString refusalText(core::Refusal why);
 
 signals:
     void sourceChanged();

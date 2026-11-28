@@ -254,6 +254,8 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
         Ctrl+2 to Ctrl+9 (ADR-0050)
   - [x] Voices 1 to 4 at the caret: `voice` in the CLI, Alt+1 to Alt+4 and a
         voice button in the app (ADR-0032)
+  - [x] An edit the song refuses says why, in words of the app's and a name
+        of the CLI's, and changes nothing (ADR-0180)
 - [x] Copy/paste of measures, insert/delete measures, transposition (ADR-0026, ADR-0027)
   - [x] Measures at the caret in the app: insert before or after, delete, time
         and key signatures from that measure on (ADR-0033)
