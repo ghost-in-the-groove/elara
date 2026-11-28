@@ -139,6 +139,7 @@ if(TARGET elara)
     app/test_score_layout_issues.cpp
     app/test_score_views.cpp
     app/test_score_saving.cpp
+    app/test_score_exporting.cpp
     app/test_staff_size.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
@@ -246,11 +247,10 @@ if(TARGET elara)
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 14 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
-  # things its import dropped, and the
-  # score exports as a PDF document of its one page (ADR-0074), as MusicXML
-  # with its four tracks and as MIDI, each telling what it left out.
+  # things its import dropped. What its exports hold is checked in the
+  # app.exporting tests (ADR-0181).
   set_tests_properties(app.smoke_open_tracks PROPERTIES
-    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*pdf: 1 page, [0-9]+ bytes[\r\n]+musicxml: 4 tracks, 4 warnings[\r\n]+midi: [0-9]+ bytes, [1-9][0-9]* warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
+    PASS_REGULAR_EXPRESSION "recent: quartet \\(GP4\\)[\r\n]+import: 2 warnings[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
   set_tests_properties(app.smoke_open_views PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 10 layouts\\)")
   # Three more: the measure popup follows a measure inserted, edited and undone.

@@ -111,8 +111,6 @@ private:
     void queueFollow();
     void queueLoopOnScore();
     void queueParking();
-    void queuePdf();
-    void queueExport();
     void queuePractice();
     void queueLoop();
     void queueSoundFont();
@@ -182,9 +180,8 @@ private:
     QString failure_;                      ///< set by a step that went wrong
     double positionBefore_ = 0.0;          ///< playback's position before an edit
     bool recoveryWritten_ = false;         ///< ScoreDocument::recoveryWritten() came
-    std::optional<QTemporaryDir> scratch_; ///< where checks save and export, made once
+    std::optional<QTemporaryDir> scratch_; ///< where checks save, made once
     std::optional<bool> saved_;            ///< what ScoreDocument::saveFinished() last said
-    std::optional<bool> exported_;         ///< what ScoreDocument::exportFinished() last said
 };
 
 } // namespace elara::app
