@@ -31,6 +31,9 @@ QtObject {
     /// The page of the score in the dark theme, and the ink on it (ADR-0114).
     readonly property color nightPage: "#27262e"
     readonly property color nightInk: "#e7e5ec"
+    /// The lines of the staves on that page (ADR-0174): four and a half to
+    /// one against it, where the ink is twelve to one.
+    readonly property color nightStaff: "#8c8a96"
     /// Hairlines between and around surfaces.
     readonly property color line: dark ? "#35333d" : "#d8d4cc"
 
