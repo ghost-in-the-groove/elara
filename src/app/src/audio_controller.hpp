@@ -120,7 +120,9 @@ public:
     Q_INVOKABLE void setOutputDevice(const QString& type, const QString& name);
 
     /// Plays the score, or pauses it. The first time, the device opens first,
-    /// on a worker, and playback starts once it has.
+    /// on a worker, and playback starts once it has. The song's sounds are
+    /// made on a worker too, the first time and for another song: playback
+    /// starts once they are, and a second press meanwhile takes it back.
     Q_INVOKABLE void togglePlayback();
     /// Stops and goes back to the start.
     Q_INVOKABLE void stopPlayback();
@@ -177,6 +179,9 @@ public:
     Q_INVOKABLE void clearSfz(const QString& tracks);
     /// Plays every track through the built-in synthesizer again.
     Q_INVOKABLE void useBuiltinSound();
+    /// The tracks play through `bank` from now on, as through a SoundFont
+    /// opened from no file: for a bank made in code, as the tests' are.
+    void setSoundBank(std::shared_ptr<const elara::audio::SoundBank> bank);
     /// Opens the SoundFont and the SFZ instruments chosen last time, when
     /// rememberSound is on: the included SoundFont when no sound was ever
     /// chosen or the file chosen is gone. The output device chosen last time
@@ -214,9 +219,9 @@ private:
     void makePlayer();
     void loadSong();
     void loadSequence();
-    void loadSequenceNow();
     void publishSequence(const std::shared_ptr<const elara::audio::Sequence>& sequence,
                          elara::audio::PreparedSong prepared);
+    void playLoaded();
     void songEdited();
     void previewMix();
     void setPlaying(bool playing);
@@ -271,6 +276,11 @@ private:
     /// Songs prepared for player_ on a worker: only the newest is published
     /// (ADR-0112).
     elara::app::JobLane<std::shared_ptr<elara::audio::PreparedSong>> preparing_{this};
+    bool playWhenLoaded_ = false; // start playback once player_ has the document's song
+    /// A player made at the device's new rate, its song prepared on a worker
+    /// before it takes over from player_.
+    std::unique_ptr<elara::audio::Player> next_;
+    elara::app::JobLane<std::shared_ptr<elara::audio::PreparedSong>> switching_{this};
     std::shared_ptr<const elara::audio::Sequence> loaded_; // what player_ plays
     std::shared_ptr<const elara::audio::Sequence> placed_; // what position_ counts in
     QTimer pollTimer_;

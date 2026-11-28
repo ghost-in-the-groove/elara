@@ -1,6 +1,6 @@
 # 0112. Preparing the player on a worker
 
-- Status: Accepted
+- Status: Accepted; the first Play and a new sample rate superseded by 0148
 - Date: 2026-11-26
 
 ## Context
