@@ -137,6 +137,7 @@ if(TARGET elara)
     app/test_score_editing.cpp app/test_caret_editor.cpp app/test_symbols.cpp
     app/test_document_set.cpp
     app/test_score_layout_issues.cpp
+    app/test_score_views.cpp
     app/test_staff_size.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
