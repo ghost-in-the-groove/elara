@@ -107,6 +107,7 @@ qt_add_qml_module(elara
     qml/SongPane.qml
     qml/TuningFields.qml
     qml/PracticeControls.qml
+    qml/SongTabs.qml
   SOURCES
     src/audio_controller.hpp
     src/audio_controller.cpp
@@ -119,6 +120,8 @@ qt_add_qml_module(elara
     src/score_common.hpp
     src/score_document.hpp
     src/score_document.cpp
+    src/document_set.hpp
+    src/document_set.cpp
     src/score_page.hpp
     src/score_page.cpp
     src/startup.hpp

@@ -29,6 +29,7 @@ a long stretch. So:
 |=====[12]=======o==========================o==============================|  song string
 | note values . 3 V1 | rest delete effects chord text lyrics measure       |
 |                                                    [track] [Not|Tab|Both]|  tool row
+| [Riff]  [• Ballad  x]  [Etude]                                           |  song tabs
 +-----------+----------------------------------------------+---------------+
 | note      |                                              | song and      |
 | effects,  |                  the page                    | tracks,       |
@@ -44,6 +45,7 @@ a long stretch. So:
 | Command bar | `CommandBar.qml` | The mark, the menus, the file tools, the transport with its readings and the practice controls, the button of the command palette, and the buttons of the effects palette, the song panel and the tuner, each lit while its panel shows. Dark in both themes. |
 | Song string | `SongString.qml` | The lower edge of the command bar: the song as one line with a tick where measures start, lit as far as it has played, the measure at the position riding it (outlined at the start, filled once playback has moved), a taller tick at the caret's measure, the A-B loop as a band, the sections as inlays. Click or drag to move playback. |
 | Tool row | in `Main.qml`, `EntryBar.qml` | What typing uses at the left; the track and the staff view at the right. |
+| Song tabs | `SongTabs.qml` | A tab for each song open, while there are two or more (ADR-0160): its title, a dot while it has unsaved changes, a cross that closes it (Ctrl+W, or a middle click). Ctrl+Tab and Ctrl+Shift+Tab show the next and the previous. |
 | Note effects | `EffectsPalette.qml` | Every technique, articulation, dynamic and line the caret's note or beat can take, in named groups that fold (F2, ADR-0109). A tile is lit while the caret has what it sets. |
 | Score | `ScoreView.qml` | The pages on the desk, the caret, the playback cursor, the shaded measure, the popups the caret opens. With playback stopped the caret marks where it starts and the cursor hides; while it plays the view follows its system (ADR-0170). |
 | Song and tracks | `SongPane.qml` | The song's own values and each track's mix and tuning (Ctrl+I). |
@@ -63,6 +65,15 @@ The window opens as it was last closed (ADR-0137): its place and size, or
 maximized, on the screen it was on while that screen is still there; the
 palette and the song panel open or closed; the zoom, the dark page and the
 continuous view. The tuner always starts closed.
+
+Several songs can be open at once, a tab each (ADR-0160). A new song or a
+file opened goes into a tab of its own, beside the others, and is shown; a
+file already open is only shown. The menus, the tools, the transport and the
+panels act on the song shown; each song keeps its own caret, history, view
+and place in the score, while the zoom and the continuous view are the
+window's. Measures copied in one song paste into another. Closing a song
+asks whether to save its changes; quitting asks so for each unsaved song in
+turn, showing it.
 
 Nothing floats over the music but what the caret opened, and the command
 palette while it is asked for. A panel docks and the score makes room; an

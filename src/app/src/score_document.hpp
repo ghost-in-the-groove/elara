@@ -148,6 +148,10 @@ class ScoreDocument : public QObject {
     // Practice (ADR-0024): how playback plays the song, whatever song it is.
     Q_PROPERTY(int speed READ speed WRITE setSpeed NOTIFY practiceChanged)
     Q_PROPERTY(bool metronome READ metronome WRITE setMetronome NOTIFY practiceChanged)
+    /// Where the window last showed the song, in pages from the top of the
+    /// first (the view's centre); negative before it was shown. The window
+    /// keeps it while another song is shown (ADR-0160).
+    Q_PROPERTY(double viewCentre MEMBER viewCentre_ NOTIFY viewCentreChanged)
 
 public:
     enum class Status : quint8 { Empty, Loading, Ready, Error };
@@ -269,6 +273,9 @@ public:
     Q_INVOKABLE void recover(const QString& file);
     /// Removes a copy recoverable() offered.
     Q_INVOKABLE void discardRecovery(const QString& file);
+    /// Lets go of a copy recoverable() offered, keeping it, so that another
+    /// song open recovers it (ADR-0160).
+    void releaseRecovery(const QString& file);
     /// Lays out the score again (after a track or view change).
     Q_INVOKABLE void relayout();
 
@@ -571,6 +578,9 @@ public:
     /// every track when all are shown).
     Q_INVOKABLE void copy();
     [[nodiscard]] bool canPaste() const { return session_.canPaste(); }
+    /// Copies into, and pastes from, `clipboard`, which the other songs open
+    /// share (ADR-0160); a null one is one of its own.
+    void shareClipboard(std::shared_ptr<core::Clipboard> clipboard);
     /// Pastes the copied measures at the first selected measure, or the
     /// caret's, over the measures there or into new ones before it; the pasted
     /// measures are selected.
@@ -661,6 +671,7 @@ signals:
     void mixPreviewed();
     void practiceChanged();
     void recoveryFolderChanged();
+    void viewCentreChanged();
     /// The recovery copy of the song is on the disk.
     void recoveryWritten();
     void savingChanged();
@@ -771,6 +782,7 @@ private:
     QString recoveredFrom_;           ///< a recovered copy, to discard once this run's is written
     std::uint64_t documentsMade_ = 0; ///< documents opened or made so far: a save knows its own
     int saving_ = 0;                  ///< saves being written
+    double viewCentre_ = -1.0;        ///< viewCentre()
     /// Saves run here, one at a time and in order; exports, one at a time, in
     /// the other. Destroyed with the document after the jobs left in them.
     QThreadPool saveQueue_;
