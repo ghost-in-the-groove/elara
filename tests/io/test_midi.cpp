@@ -1377,3 +1377,33 @@ TEST_CASE("MIDI import leaves the text events of other files alone", "[io][midi]
     REQUIRE(imported.has_value());
     CHECK(lyricsOf(imported->song.track(0).staff(0).measure(0).voices[0]).front().empty());
 }
+
+TEST_CASE("MIDI export names stored system and page breaks as left out", "[io][midi]") {
+    // ADR-0152: only the native format keeps the layout adjustments.
+    using elara::core::LayoutScope;
+    using elara::core::MeasureLayouts;
+    elara::core::Song song;
+    song.appendMeasures(4);
+    song.addTrack(
+        elara::core::Track::fromPreset(*elara::core::findInstrumentPreset("electric-guitar")));
+    std::vector<elara::core::MeasureLayout> layouts(4);
+    layouts[0].breakBefore = elara::core::Break::Page; // before the first measure: means nothing
+    layouts[2].breakBefore = elara::core::Break::System;
+    song.setMeasureLayouts(elara::core::LayoutScope::song(), elara::core::MeasureLayouts(layouts));
+    layouts = std::vector<elara::core::MeasureLayout>(4);
+    layouts[1].breakBefore = elara::core::Break::Page;
+    layouts[3].breakBefore = elara::core::Break::Keep;
+    song.setMeasureLayouts(elara::core::LayoutScope::ofTrack(0),
+                           elara::core::MeasureLayouts(layouts));
+    const std::vector<std::string> warnings = exportMidi(song).warnings;
+    CHECK(std::ranges::count(warnings, std::string("system and page breaks dropped (measure 3)")) ==
+          1);
+    CHECK(std::ranges::count(warnings, std::string("Electric Guitar: system and page breaks "
+                                                   "dropped (2 times, first in measure 2)")) == 1);
+    // Without them, nothing is said.
+    song.setMeasureLayouts(LayoutScope::song(), MeasureLayouts());
+    song.setMeasureLayouts(LayoutScope::ofTrack(0), MeasureLayouts());
+    for (const std::string& warning : exportMidi(song).warnings) {
+        CHECK(warning.find("breaks") == std::string::npos);
+    }
+}

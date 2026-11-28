@@ -480,6 +480,25 @@ inline constexpr double kLyricEndGap = 0.3; // between a syllable and the barlin
 inline constexpr double kLyricBarlineReach =
     0.6; // how far one reaches into the gap after a barline
 
+/// Where a held syllable's notes end: the start of the last of them.
+struct HeldEnd {
+    std::size_t measure = 0;
+    core::Fraction start;
+    friend bool operator==(const HeldEnd&, const HeldEnd&) = default;
+};
+
+/// A syllable of `verse` held over notes from a measure before into another.
+struct HeldSyllable {
+    std::size_t verse = 0;
+    HeldEnd to{};
+    friend bool operator==(const HeldSyllable&, const HeldSyllable&) = default;
+};
+
+/// The syllables of `staff` held over notes from the measures before m into
+/// it, from at most 16 measures back: what a line starting at m draws from
+/// before its first measure.
+[[nodiscard]] std::vector<HeldSyllable> heldInto(const core::Staff& staff, std::size_t m);
+
 /// The lyrics under a staff. Each verse has its own line under the staff's
 /// ink, in order; a syllable is centred under its note, or starts at the
 /// notehead when it is held. A hyphen goes between the syllables of a word,
@@ -513,12 +532,6 @@ public:
     void place(DisplayList& list, double bottom, double staffHeight, double end);
 
 private:
-    /// Where a held syllable's notes end: the start of the last of them.
-    struct Spot {
-        std::size_t measure = 0;
-        core::Fraction start;
-    };
-
     struct Read {
         core::Fraction start;
         core::Fraction length; // of its beat
@@ -534,15 +547,7 @@ private:
         double left = 0.0;
         double width = 0.0;
         std::size_t measure = 0;
-        std::optional<Spot> heldTo{}; // when held over notes
-    };
-
-    /// A syllable held over from the line before: its line goes from the first
-    /// note of the line to the end of the notes at `to`.
-    struct Held {
-        std::size_t verse = 0;
-        Spot to{};
-        std::size_t measure = 0;
+        std::optional<HeldEnd> heldTo{}; // when held over notes
     };
 
     /// The columns of a measure drawn on the line.
@@ -551,27 +556,18 @@ private:
         std::vector<ColumnPosition> positions{};
     };
 
-    /// The last note a syllable on beat `beat` of `voice` in measure m is held
-    /// over, before the next syllable of `verse`, a rest or the end; nullopt
-    /// when none follows it.
-    [[nodiscard]] std::optional<Spot> heldTo(std::size_t m, std::size_t voice, std::size_t beat,
-                                             std::size_t verse) const;
-
     /// The x of the end of the notehead at `spot`, or `end` past the line.
-    [[nodiscard]] double noteEnd(const Spot& spot, double end) const;
-
-    /// Finds the held syllables of the measures before the line's first.
-    void findHeld();
+    [[nodiscard]] double noteEnd(const HeldEnd& spot, double end) const;
 
     const core::Staff& staff_;
     std::size_t first_ = 0;  // the line's first measure
-    bool heldKnown_ = false; // findHeld() ran for the line
+    bool heldKnown_ = false; // held_ was found for the line
     double headWidth_ = 0.0;
     std::vector<Read> read_{};
     std::size_t readMeasure_ = 0;
-    std::vector<Sung> syllables_{}; // of the line
-    std::vector<Held> held_{};      // of the line
-    std::vector<Drawn> drawn_{};    // of the line
+    std::vector<Sung> syllables_{};    // of the line
+    std::vector<HeldSyllable> held_{}; // into the line, from the lines before
+    std::vector<Drawn> drawn_{};       // of the line
 };
 
 // ---- Staff writers --------------------------------------------------------------------

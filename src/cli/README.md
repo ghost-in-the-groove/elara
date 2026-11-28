@@ -374,6 +374,9 @@ Run it with `python scripts/elara.py cli -- <args>`. Conventions:
   `stepForms()` lists every form of step, which `edit --help` prints: a
   step whose verb no form starts with is unknown, so a new step needs its
   form there before it runs.
+  An entry step core refuses fails with `refused: <name>`, the `Refusal`'s
+  name (`off-the-neck`, `needs-strings`, ...); one that nothing at the caret
+  takes is a warning on stderr, and the steps go on (ADR-0180).
   `tests/cli/test_edit_steps.cpp` runs steps against a song with Catch2; the
   `cli.edit_rejects_*` CTests check the message each step fails with.
 

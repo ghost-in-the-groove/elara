@@ -286,6 +286,7 @@ MidiTrack conductorTrack(const Song& song, const PlayedMeasures& played, const T
     if (otherInfo) {
         warnings.add("", "song info other than the title and copyright dropped");
     }
+    detail::reportLayoutDropped(song, warnings);
 
     // Returns the microseconds per quarter note written. The tempos go into
     // the track at the end, with what fermatas hold.
