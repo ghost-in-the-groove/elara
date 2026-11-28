@@ -1010,12 +1010,15 @@ set_tests_properties(cli.edit_clears_tempo PROPERTIES
   PASS_REGULAR_EXPRESSION "\"measures\":\\[{\"time\":\"4/4\",\"key\":\"C major\"},{\"time\":\"4/4\",\"key\":\"C major\"}\\],.*\"undo\":{\"count\":4,")
 add_test(NAME cli.edit_rejects_tempo_out_of_range
   COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 1 5")
-add_test(NAME cli.edit_rejects_tempo_from_first_measure
-  COMMAND elara-cli edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90")
+# The first measure's tempo is the song's, in the beat it counts in (ADR-0042),
+# as the app's measure popup sets it.
+add_test(NAME cli.edit_tempo_from_first_measure
+  COMMAND elara-cli --json edit "add-track electric-guitar" "append-measures 2" "tempo-from 0 90"
+    "tempo-from 0 none")
 set_tests_properties(cli.edit_rejects_tempo_out_of_range PROPERTIES
   PASS_REGULAR_EXPRESSION "tempo-from: 10 to 999 beats per minute, not 5")
-set_tests_properties(cli.edit_rejects_tempo_from_first_measure PROPERTIES
-  PASS_REGULAR_EXPRESSION "tempo-from: the first measure plays at the song's tempo \\(\"tempo <bpm>\"\\)")
+set_tests_properties(cli.edit_tempo_from_first_measure PROPERTIES
+  PASS_REGULAR_EXPRESSION "{\"title\":\"\",\"tempo\":90,.*\"undo\":{\"count\":3,\"next\":\"Change tempo\"}")
 # Triplet feel (ADR-0104): swung eighths from measure 1, straight again in
 # measure 2; at quarter = 120 the second eighth starts after a third of a
 # second, saved, read back and played.

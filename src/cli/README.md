@@ -152,7 +152,7 @@ Steps: `add-track <preset> [at]`, `remove-track <i>`, `rename-track <i> [name]`
 `append-measures <n>`, `remove-measures <at> [n]`, `time <m> <N/D>`,
 `key <m> <key>`, `mix <track> <volume> <pan> [mute] [solo]` (volume 0 to 1,
 pan -1 left to 1 right, ADR-0020), `tempo <bpm>`, `tempo-from <m> <bpm>|none`
-(ADR-0042), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
+(ADR-0042: on measure 0, as `tempo`, the song's tempo in the beat it counts in), `tempo-gradual <m> on|off` (ADR-0082), `feel <m> <none|eighth|sixteenth|dotted-eighth|dotted-sixteenth|scottish-eighth|scottish-sixteenth>` (ADR-0104), `title <text>`, `credit <line> [text]` (any line of the credits:
 `title`, `subtitle`, `artist`, `album`, `words`, `music`, `copyright`,
 `transcriber` or `notes`; no text clears it, ADR-0059),
 `note <track> <m> <string> <fret> <duration>`, `rest <track> <m> <duration>`,
