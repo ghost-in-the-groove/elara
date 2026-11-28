@@ -23,8 +23,8 @@ namespace elara::core {
 /// How an edit went in (ADR-0180): whether the song changed, or why the edit
 /// was not made. A refused edit changes nothing.
 struct EntryResult {
-    bool changed = false;           ///< the song changed: one more undo step
-    std::optional<Refusal> refused; ///< why the edit was not made
+    bool changed = false;             ///< the song changed: one more undo step
+    std::optional<Refusal> refused{}; ///< why the edit was not made
 };
 
 /// The caret, the duration typing uses, the digit waiting for a second one,

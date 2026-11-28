@@ -77,7 +77,7 @@ enum class CaretMove : std::uint8_t {
 struct Entry {
     std::unique_ptr<Command> command; ///< nullptr when nothing changes
     Caret caret;
-    std::optional<Refusal> refused; ///< why the edit was not made
+    std::optional<Refusal> refused{}; ///< why the edit was not made
 };
 
 /// Typing a fret: the note at `fret` (from the capo) on the caret's string,
