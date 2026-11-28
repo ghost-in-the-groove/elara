@@ -138,6 +138,7 @@ if(TARGET elara)
     app/test_document_set.cpp
     app/test_score_layout_issues.cpp
     app/test_score_views.cpp
+    app/test_score_saving.cpp
     app/test_staff_size.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
@@ -239,7 +240,7 @@ if(TARGET elara)
   # The new song's edits end in a song with a measure wider than the page: the
   # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 17 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 12 layouts\\)")
   # Two more than quartet.gp4 lays out alone: the tuning fields follow a capo
   # moved and undone.
   set_tests_properties(app.smoke_song_pane PROPERTIES

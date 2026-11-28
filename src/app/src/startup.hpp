@@ -117,7 +117,6 @@ private:
     void queueLoop();
     void queueSoundFont();
     void queueSfz();
-    void queueRecoveryCopy();
     void queueSave();
     void queueCrashAfterRecoveryCopy();
     void queueRecover();
