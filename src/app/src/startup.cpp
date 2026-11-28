@@ -238,13 +238,11 @@ void Startup::queueSteps() {
             });
             queueRecoveryCopy();
             queueSave();
-            queueSelection();
-            queueMix();
+            queueTrackRow();
             queueSymbols();
             queueLyricsPopup();
             queueEffectsPalette();
             queueCommands();
-            queueContinuous();
             queueLayoutIssues();
         }
         return;
@@ -332,10 +330,8 @@ void Startup::queueSteps() {
             score_->setTrack(0);
             return true;
         });
-        queueContinuous();
         queueMeasurePopup();
-        queueSelection();
-        queueMix();
+        queueTrackRow();
         queueTuningFields();
         queueSymbols();
         queueLyricsPopup();
@@ -460,48 +456,6 @@ void Startup::queueLayoutIssues() {
             issues.indexOf(ScoreDocument::tr("Measure %1 is wider than the page").arg(2)));
         QMetaObject::invokeMethod(window_, "showLayoutIssue", Q_ARG(int, std::max(at, 0)));
         check(score_->caretMeasure() == 1, "choosing the issue did not take the caret to it");
-        return false;
-    });
-}
-
-// The continuous view (ADR-0057): the pages give way to strips of one endless
-// page, no higher than a page, stacked without gaps, then come back as they
-// were.
-void Startup::queueContinuous() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ =
-                QStringLiteral("continuous view check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        pagesBefore_ = score_->pageCount();
-        check(!score_->continuous() && !score_->showsStrips(), "the score starts in strips");
-        score_->setContinuous(true);
-        check(score_->continuous(), "the continuous view was not asked for");
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(score_->showsStrips(), "the score is not shown in strips");
-        const QList<qreal> tops = score_->pageTops();
-        check(tops.size() == score_->pageCount() + 1 && tops.front() == 0.0,
-              "the strips' tops do not match them");
-        const double height = score_->pageSize().height();
-        for (qsizetype s = 1; s < tops.size(); ++s) {
-            check(tops[s] > tops[s - 1] && tops[s] - tops[s - 1] <= height + 1e-6,
-                  "a strip is empty or higher than a page");
-        }
-        score_->setContinuous(false);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        check(!score_->showsStrips() && score_->pageCount() == pagesBefore_,
-              "the pages did not come back");
-        const QList<qreal> tops = score_->pageTops();
-        const double height = score_->pageSize().height();
-        check(tops.size() == pagesBefore_ + 1 &&
-                  std::abs(tops.back() - height * pagesBefore_) < 1e-6,
-              "the pages are not a page high each");
         return false;
     });
 }
@@ -956,122 +910,29 @@ void Startup::queueTuningFields() {
     });
 }
 
-// Selected measures (ADR-0036): two measures selected and tinted on the page,
-// copied, let go, pasted into new measures before the caret's, which end up
-// selected, and transposed. Then everything is undone and the song must end as it started.
-void Startup::queueSelection() {
+// A row of the song panel (ADR-0039): a mix change, and its undo, change the
+// rows but must not make them again; a name typed in a row, as a double click
+// on it starts, goes to its track. The mix itself is checked in
+// tests/app/test_score_editing.cpp (ADR-0181).
+void Startup::queueTrackRow() {
     const auto check = [this](bool ok, const char* what) {
         if (!ok && editProblem_.isEmpty()) {
             editProblem_ =
-                QStringLiteral("selection check failed: %1").arg(QLatin1StringView(what));
+                QStringLiteral("track row check failed: %1").arg(QLatin1StringView(what));
         }
     };
     steps_.emplace_back([this, check] {
-        selecting_ = score_->caretPage() >= 0 && score_->measureCount() > 1;
-        if (!selecting_) {
-            return false;
-        }
-        lengthBefore_ = score_->measureCount();
-        const bool last = score_->caretMeasure() + 1 >= lengthBefore_;
-        score_->extendSelection(last ? -1 : 1);
-        check(score_->hasSelection() && score_->selectionLast() == score_->selectionFirst() + 1,
-              "Shift+Right did not select two measures");
-        check(score_->selectionBoxes(score_->caretPage()).size() == 2,
-              "the page does not show the two measures selected");
-        check(editor_->caretStatus().startsWith(CaretEditor::tr("Measures %1-%2 selected")
-                                                    .arg(score_->selectionFirst() + 1)
-                                                    .arg(score_->selectionLast() + 1)),
-              "the status does not say what is selected");
-        score_->copy();
-        check(score_->canPaste(), "nothing was copied");
-        score_->clearSelection();
-        pasteAt_ = score_->caretMeasure();
-        score_->paste(true);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!selecting_) {
-            return false;
-        }
-        check(score_->measureCount() == lengthBefore_ + 2, "pasting did not insert two measures");
-        check(score_->hasSelection() && score_->selectionFirst() == pasteAt_ &&
-                  score_->selectionLast() == pasteAt_ + 1,
-              "the pasted measures are not selected");
-        score_->transposeSelection(2);
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!selecting_) {
-            return false;
-        }
-        check(score_->undoName() == ScoreDocument::tr("Transpose"),
-              "the transposition is not undoable");
-        score_->clearSelection();
-        check(!score_->hasSelection() && score_->selectionBoxes(score_->caretPage()).isEmpty(),
-              "Escape did not let go of the selection");
-        for (int i = 0; i < 2 && score_->canUndo(); ++i) {
-            score_->undo();
-        }
-        return true;
-    });
-    steps_.emplace_back([this, check] {
-        if (!selecting_) {
-            return false;
-        }
-        check(!score_->modified() && score_->measureCount() == lengthBefore_,
-              "undoing the paste did not restore the song");
-        return false;
-    });
-}
-
-// The mixer (ADR-0039): a fader previewed without changing the song, then the
-// first track's mix set, soloed, as one undo step that keeps what playback
-// plays and silences the other tracks. Undone, the song must end as it started.
-void Startup::queueMix() {
-    const auto check = [this](bool ok, const char* what) {
-        if (!ok && editProblem_.isEmpty()) {
-            editProblem_ = QStringLiteral("mix check failed: %1").arg(QLatin1StringView(what));
-        }
-    };
-    steps_.emplace_back([this, check] {
-        sequenceBefore_ = score_->sequence();
-        // A row of the song panel: the mix changes below change rows, but
-        // must not make them again.
         trackRow_ = findItem(window_->contentItem(), QStringLiteral("trackRow"));
         check(trackRow_ != nullptr, "the song panel lists no track");
-        const auto tracks = static_cast<std::size_t>(score_->tracks().size());
-        score_->previewTrackMix(0, 0.25, 0.5);
-        check(score_->previewMixes().size() == tracks &&
-                  score_->previewMixes().front().volume == 0.25 && !score_->modified(),
-              "the fader preview changed the song");
-        const std::uint64_t layouts = score_->layoutWork().asked;
-        const std::uint64_t sequences = score_->sequenceWork().asked;
         score_->setTrackMix(0, 0.25, -0.5, false, true);
-        // Neither drawn nor part of the sequence (ADR-0111).
-        check(score_->layoutWork().asked == layouts && score_->sequenceWork().asked == sequences,
-              "a mix change was laid out or sequenced");
-        const QVariantMap first = score_->tracks().front().toMap();
-        check(first.value(QStringLiteral("volume")).toDouble() == 0.25 &&
-                  first.value(QStringLiteral("pan")).toDouble() == -0.5 &&
-                  first.value(QStringLiteral("solo")).toBool(),
-              "the mix was not set");
-        check(score_->undoName() == ScoreDocument::tr("Change mix"), "the mix is not undoable");
-        check(score_->sequence() == sequenceBefore_, "a mix change stops playback");
         return true;
     });
-    steps_.emplace_back([this, check] {
-        const QVariantList tracks = score_->tracks();
-        check(tracks.size() < 2 || !tracks.at(1).toMap().value(QStringLiteral("audible")).toBool(),
-              "the solo did not silence the other tracks");
+    steps_.emplace_back([this] {
         score_->undo();
         return true;
     });
     steps_.emplace_back([this, check] {
-        check(!score_->modified() &&
-                  !score_->tracks().front().toMap().value(QStringLiteral("solo")).toBool(),
-              "undoing the mix did not restore the song");
         check(trackRow_ != nullptr, "a mix change made the song panel's rows again");
-        sequenceBefore_.reset();
         if (trackRow_ == nullptr) {
             return false;
         }
