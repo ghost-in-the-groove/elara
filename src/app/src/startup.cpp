@@ -231,6 +231,7 @@ void Startup::queueSteps() {
             queueEffects();
             queueCommands();
             queueContinuous();
+            queueLayoutIssues();
         }
         return;
     }
@@ -379,6 +380,68 @@ void Startup::queueSteps() {
     if (options_.seek) {
         seekTo(*options_.seek);
     }
+}
+
+// The layout issues in the status bar (ADR-0150): a song with a measure wider
+// than the page counts one there, its list names the measure, and choosing it
+// puts the caret on it. Opens the song in place of the one edited.
+void Startup::queueLayoutIssues() {
+    const auto check = [this](bool ok, const char* what) {
+        if (!ok && editProblem_.isEmpty()) {
+            editProblem_ =
+                QStringLiteral("layout issues check failed: %1").arg(QLatin1StringView(what));
+        }
+    };
+    steps_.emplace_back([this, check] {
+        check(window_->findChild<QQuickItem*>(QStringLiteral("layoutIssuesLabel")) == nullptr,
+              "the status bar counts layout issues before there are any");
+        // 128 sixteenths with accidentals in one measure of 32/4.
+        core::Song song;
+        song.appendMeasures(3);
+        song.addTrack(core::Track("Part", core::Instrument{.name = "Part"},
+                                  {core::Staff(core::Clef::Treble)}));
+        song.measureHeader(1).timeSignature = core::TimeSignature(32, 4);
+        std::vector<core::Beat>& beats = song.track(0).staff(0).measure(1).voices[0].beats;
+        for (int b = 0; b < 128; ++b) {
+            beats.push_back(core::Beat{
+                .duration = core::Duration(core::NoteValue::Sixteenth),
+                .notes = {core::Note{.pitch = core::Pitch::fromMidi(b % 2 == 0 ? 73 : 63)}}});
+        }
+        if (!scratch_) {
+            scratch_.emplace();
+        }
+        const QString file = scratch_->filePath(QStringLiteral("too-wide.elara"));
+        io::saveNative(song, std::filesystem::path(file.toStdU16String()));
+        score_->open(QUrl::fromLocalFile(file));
+        return true;
+    });
+    steps_.emplace_back([this, check] {
+        const QStringList issues = score_->layoutIssueList();
+        QStringList found;
+        for (const PageIssues& page : score_->pageIssues()) {
+            for (const notation::LayoutIssue& issue : *page) {
+                found.append(QStringLiteral("%1 in measure %2")
+                                 .arg(QLatin1StringView(notation::issueKindName(issue.kind)))
+                                 .arg(issue.measure + 1));
+            }
+        }
+        std::printf("layout issues: %d (%s)\n", score_->layoutIssueCount(),
+                    qPrintable(found.join(QStringLiteral(", "))));
+        check(score_->layoutIssueCount() == static_cast<int>(issues.size()) &&
+                  issues.contains(ScoreDocument::tr("Measure %1 is wider than the page").arg(2)),
+              "the measure too wide is not among the issues");
+        check(window_->findChild<QQuickItem*>(QStringLiteral("layoutIssuesLabel")) != nullptr,
+              "the status bar does not count the layout issues");
+        QMetaObject::invokeMethod(window_, "showLayoutIssues");
+        auto* dialog = window_->findChild<QObject*>(QStringLiteral("layoutIssuesDialog"));
+        check(dialog != nullptr && dialog->property("visible").toBool(),
+              "the list of layout issues did not open");
+        const auto at = static_cast<int>(
+            issues.indexOf(ScoreDocument::tr("Measure %1 is wider than the page").arg(2)));
+        QMetaObject::invokeMethod(window_, "showLayoutIssue", Q_ARG(int, std::max(at, 0)));
+        check(score_->caretMeasure() == 1, "choosing the issue did not take the caret to it");
+        return false;
+    });
 }
 
 // The continuous view (ADR-0057): the pages give way to strips of one endless

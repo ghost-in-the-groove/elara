@@ -720,6 +720,10 @@
         <translation>Abrir reciente</translation>
     </message>
     <message>
+        <source>What the layout could not keep</source>
+        <translation>Lo que la maquetación no pudo respetar</translation>
+    </message>
+    <message>
         <source>&amp;File</source>
         <translation>&amp;Archivo</translation>
     </message>
@@ -1559,6 +1563,13 @@
         <translation>
             <numerusform>%n cambio al importar</numerusform>
             <numerusform>%n cambios al importar</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <source>%n layout issue(s)</source>
+        <translation>
+            <numerusform>%n problema de maquetación</numerusform>
+            <numerusform>%n problemas de maquetación</numerusform>
         </translation>
     </message>
     <message>
@@ -2670,6 +2681,38 @@
     <message>
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
+    </message>
+    <message>
+        <source>notehead</source>
+        <translation>cabeza de nota</translation>
+    </message>
+    <message>
+        <source>accidental</source>
+        <translation>alteración</translation>
+    </message>
+    <message>
+        <source>fret number</source>
+        <translation>número de traste</translation>
+    </message>
+    <message>
+        <source>syllable</source>
+        <translation>sílaba</translation>
+    </message>
+    <message>
+        <source>chord name</source>
+        <translation>nombre de acorde</translation>
+    </message>
+    <message>
+        <source>dynamic</source>
+        <translation>dinámica</translation>
+    </message>
+    <message>
+        <source>Measure %1 is wider than the page</source>
+        <translation>El compás %1 es más ancho que la página</translation>
+    </message>
+    <message>
+        <source>Measure %1: %2 and %3 overlap</source>
+        <translation>Compás %1: %2 y %3 se solapan</translation>
     </message>
     <message>
         <source>Unknown instrument: %1</source>
