@@ -1,0 +1,69 @@
+diff --git a/src/sfloader/fluid_defsfont.c b/src/sfloader/fluid_defsfont.c
+index 5b972d2..8c9251c 100644
+--- a/src/sfloader/fluid_defsfont.c
++++ b/src/sfloader/fluid_defsfont.c
+@@ -2052,8 +2052,13 @@ fluid_zone_inside_range(fluid_zone_range_t *range, int key, int vel)
+     /* ignoreInstrumentZone is set in mono legato playing */
+     int ignore_zone = range->ignore;
+ 
+-    /* Reset the 'ignore' request */
+-    range->ignore = FALSE;
++    /* Reset the 'ignore' request, only when made: the zones of a SoundFont
++     * that several synthesizers share are read on several threads
++     * (patched for Elara). */
++    if(ignore_zone)
++    {
++        range->ignore = FALSE;
++    }
+ 
+     return !ignore_zone && ((range->keylo <= key) &&
+                             (range->keyhi >= key) &&
+@@ -2250,11 +2255,15 @@ static int load_preset_samples(fluid_defsfont_t *defsfont, fluid_preset_t *prese
+                         if(sffile == NULL)
+                         {
+                             FLUID_LOG(FLUID_ERR, "Unable to open Soundfont file");
+-                            return FLUID_FAILED;
+                         }
+                     }
+ 
+-                    if(fluid_defsfont_load_sampledata(defsfont, sffile, sample) == FLUID_OK)
++                    /* Without the file, the sample is disabled like one that
++                     * cannot be read, and the preset's other samples are still
++                     * counted, as unload_preset_samples() expects
++                     * (patched for Elara). */
++                    if(sffile != NULL
++                            && fluid_defsfont_load_sampledata(defsfont, sffile, sample) == FLUID_OK)
+                     {
+                         fluid_sample_sanitize_loop(sample, (sample->end + 1) * sizeof(short));
+                         fluid_voice_optimize_sample(sample);
+diff --git a/src/sfloader/fluid_sfont.h b/src/sfloader/fluid_sfont.h
+index 56904fb..dc9b3f7 100644
+--- a/src/sfloader/fluid_sfont.h
++++ b/src/sfloader/fluid_sfont.h
+@@ -56,11 +56,23 @@ fluid_sfont_t *new_fluid_sfont_local(fluid_sfont_get_name_t get_name,
+   ( ((_preset) && (_preset)->notify) ? (*(_preset)->notify)(_preset,_reason,_chan) : FLUID_OK )
+ 
+ 
+-#define fluid_sample_incr_ref(_sample) { (_sample)->refcount++; }
++/* Synthesizers that share a SoundFont start and end voices of the same
++ * samples on different threads, so a sample's count of voices changes
++ * atomically (patched for Elara). */
++#if defined(_MSC_VER)
++#include <intrin.h>
++#define fluid_sample_refcount_add(_sample, _n) \
++  ((unsigned int)_InterlockedExchangeAdd((volatile long *)&(_sample)->refcount, (long)(_n)) \
++   + (unsigned int)(_n))
++#else
++#define fluid_sample_refcount_add(_sample, _n) \
++  __atomic_add_fetch(&(_sample)->refcount, (unsigned int)(_n), __ATOMIC_ACQ_REL)
++#endif
++
++#define fluid_sample_incr_ref(_sample) { (void)fluid_sample_refcount_add(_sample, 1); }
+ 
+ #define fluid_sample_decr_ref(_sample) \
+-  (_sample)->refcount--; \
+-  if (((_sample)->refcount == 0) && ((_sample)->notify)) \
++  if ((fluid_sample_refcount_add(_sample, -1) == 0) && ((_sample)->notify)) \
+     (*(_sample)->notify)(_sample, FLUID_SAMPLE_DONE);
+ 
+ 
