@@ -213,6 +213,17 @@ TEST_CASE("Notation benchmarks", "[benchmark][notation]") {
         BENCHMARK("find the layout issues of all 20 staves on A4 pages") {
             return elara::notation::layoutIssues(all, font, pages);
         };
+        // What the app pays to keep the issues of the pages an edit left as
+        // they were: each page compared with itself laid out again, equal to
+        // the last item.
+        const auto again = layoutPages(song, score, font, pages);
+        BENCHMARK("tell which of all 20 staves' A4 pages a layout left as they were") {
+            std::size_t same = 0;
+            for (std::size_t p = 0; p < all.size() && p < again.size(); ++p) {
+                same += all[p] == again[p] ? 1 : 0;
+            }
+            return same;
+        };
     }
     pages.threads = 0;
     BENCHMARK("lay out all 20 staves of the large song on A4 pages") {

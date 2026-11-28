@@ -113,6 +113,7 @@ private:
     /// Types `text` a key at a time.
     void typeText(const QString& text);
     void queueContinuous();
+    void queueLayoutIssues();
     void queueTunerFollowsTrack();
     void finish(bool ok, const QString& detail);
     void clickCursor();

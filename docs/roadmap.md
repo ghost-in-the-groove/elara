@@ -314,7 +314,7 @@ Done when a song can be built, edited, undone and saved/loaded from the CLI.
   - [ ] A measure looser or tighter
   - [ ] Clear the layout adjustments of a range
   - [ ] A Layout menu: the commands at the caret, and marks on the score
-  - [ ] Layout issues found on the worker and shown in the status bar
+  - [x] Layout issues found on the worker and shown in the status bar (ADR-0150)
   - [x] The caret's system keeps its place on screen after an edit
   - [ ] Handles to drag breaks, room and spacing on the score
 - [x] Several songs open at once, in tabs, with measures copied between them

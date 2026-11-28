@@ -266,6 +266,18 @@ ApplicationWindow {
         scoreView.reveal();
     }
 
+    /// Lists the layout issues of the pages shown (ADR-0150).
+    function showLayoutIssues() {
+        layoutIssuesDialog.lines = score.layoutIssueList();
+        layoutIssuesDialog.open();
+    }
+
+    /// Takes the caret to layout issue `index` and brings it into view.
+    function showLayoutIssue(index: int) {
+        layoutIssuesDialog.close();
+        edit(() => score.showLayoutIssue(index));
+    }
+
     /// Saves, then runs `action` once the song is on the disk.
     function saveThen(action) {
         savedAction = action;
@@ -533,6 +545,71 @@ ApplicationWindow {
                 text: "• " + modelData
                 wrapMode: Text.Wrap
                 color: Theme.ink
+            }
+        }
+    }
+
+    // What the layout could not keep (ADR-0150), one line each: choosing one
+    // takes the caret to it.
+    AppDialog {
+        id: layoutIssuesDialog
+
+        property var lines: []
+
+        objectName: "layoutIssuesDialog"
+        anchors.centerIn: parent
+        width: Math.min(560, window.width - 48)
+        modal: true
+        title: qsTr("What the layout could not keep")
+        standardButtons: Dialog.Close
+
+        ListView {
+            id: layoutIssueList
+
+            implicitHeight: Math.min(contentHeight, window.height * 0.5)
+            width: layoutIssuesDialog.availableWidth
+            clip: true
+            model: layoutIssuesDialog.lines
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: Scroll {}
+            delegate: Item {
+                id: issueRow
+
+                required property string modelData
+                required property int index
+
+                width: ListView.view.width
+                implicitHeight: issueLabel.implicitHeight + 12
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData
+
+                HoverHandler {
+                    id: issueHover
+
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    onTapped: window.showLayoutIssue(issueRow.index)
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusSmall
+                    color: issueHover.hovered ? Theme.hover : "transparent"
+                }
+
+                Label {
+                    id: issueLabel
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 8
+                    width: parent.width - 16
+                    text: issueRow.modelData
+                    wrapMode: Text.Wrap
+                    font.pixelSize: Theme.fontBody
+                    color: Theme.ink
+                }
             }
         }
     }
@@ -1525,6 +1602,7 @@ ApplicationWindow {
             detailsDialog.lines = score.importWarnings;
             detailsDialog.open();
         }
+        onLayoutIssuesRequested: window.showLayoutIssues()
     }
 
     Shortcut {

@@ -135,6 +135,7 @@ if(TARGET elara)
   target_sources(elara_app_tests PRIVATE app/test_audio_controller.cpp app/test_fret_entry.cpp
     app/test_score_editing.cpp app/test_caret_editor.cpp app/test_symbols.cpp
     app/test_document_set.cpp
+    app/test_score_layout_issues.cpp
     "${PROJECT_SOURCE_DIR}/src/app/src/score_document.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/document_set.cpp"
     "${PROJECT_SOURCE_DIR}/src/app/src/caret_editor.cpp"
@@ -227,8 +228,10 @@ if(TARGET elara)
       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
       TIMEOUT 60)
+  # The new song's edits end in a song with a measure wider than the page: the
+  # status bar counts the layout issue (ADR-0150).
   set_tests_properties(app.smoke PROPERTIES
-    PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 64 layouts\\)")
+    PASS_REGULAR_EXPRESSION "layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+.*smoke-test: ok \\(1 pages, [0-9]+ painted, 65 layouts\\)")
   set_tests_properties(app.smoke_song_pane PROPERTIES
     PASS_REGULAR_EXPRESSION "smoke-test: ok \\(1 pages, [0-9]+ painted, 62 layouts\\)")
   # The file opened is the first of the recent scores (ADR-0071) with the two
@@ -422,7 +425,7 @@ if(TARGET elara)
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
     TIMEOUT 60)
   set_tests_properties(app.smoke_spanish PROPERTIES
-    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
+    PASS_REGULAR_EXPRESSION "ui language: es[\r\n]+layout issues: 1 \\(measureTooWide in measure 2\\)[\r\n]+pages kept: [0-9]+[\r\n]+smoke-test: ok")
   set_tests_properties(app.language_unknown PROPERTIES
     PASS_REGULAR_EXPRESSION "no translation for language \"xx\"")
   add_test(NAME app.translations_complete
